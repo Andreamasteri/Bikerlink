@@ -20,6 +20,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import type { EventDTO, EventStatus } from "@/shared/event-types";
 import { EVENT_TYPE_LABELS, EVENT_TYPE_COLORS } from "@/shared/event-types";
+import { useT } from "@/lib/language-context";
 
 const STATUS_LABELS: Record<EventStatus, string> = {
   pending: "In attesa",
@@ -212,6 +213,7 @@ const card = StyleSheet.create({
 });
 
 export default function AdminEventiScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<"pending" | "all">("pending");
@@ -348,7 +350,7 @@ export default function AdminEventiScreen() {
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={40} color={Colors.textSecondary} />
               <Text style={styles.emptyText}>
-                {tab === "pending" ? "Nessun evento in attesa" : "Nessun evento"}
+                {tab === "pending" ? t("admin.noPendingEvents") : t("admin.noEvents")}
               </Text>
             </View>
           }

@@ -11,6 +11,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
+import { useT } from "@/lib/language-context";
 
 interface GpsError {
   id: string;
@@ -108,6 +109,7 @@ function ErrorCard({ item }: { item: GpsError }) {
 }
 
 export default function GpsErrorsScreen() {
+  const t = useT();
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
@@ -147,7 +149,7 @@ export default function GpsErrorsScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {isLoading ? "Caricamento…" : "Nessun errore GPS registrato"}
+              {isLoading ? t("common.loading") : t("admin.noGpsErrors")}
             </Text>
           </View>
         }

@@ -462,8 +462,8 @@ export default function TabLayout() {
             />
             <Text style={[reminderStyles.text, { color: colors.text }]}>
               {isBikerOrCoppia
-                ? "Ehi, ricordati di parcheggiare le tue moto nel garage!! Lo trovi sotto Profilo Utente, in fondo a destra"
-                : "Ehi, ricordati di condividere la tua lista dei desideri motociclistica! La trovi sotto Profilo Utente, in fondo a destra"}
+                ? t("profile.garageReminder")
+                : t("profile.wishlistReminder")}
             </Text>
             <Pressable
               style={[reminderStyles.btn, { backgroundColor: colors.accent }]}

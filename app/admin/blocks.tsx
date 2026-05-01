@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 interface BlockEntry {
   id: string;
@@ -59,6 +60,7 @@ function Avatar({ url, nickname }: { url: string | null; nickname: string }) {
 }
 
 export default function AdminBlocks() {
+  const t = useT();
   const rawInsets = useSafeAreaInsets();
   const insets = Platform.OS === "web"
     ? { top: 67, bottom: 34, left: rawInsets.left, right: rawInsets.right }
@@ -112,12 +114,12 @@ export default function AdminBlocks() {
 
   function handleRemove(item: BlockEntry) {
     Alert.alert(
-      "Rimuovi blocco",
+      t("admin.removeBlock"),
       `Vuoi rimuovere il blocco tra ${item.blockerNickname} e ${item.blockedNickname}?`,
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Rimuovi",
+          text: t("admin.remove"),
           style: "destructive",
           onPress: () => deleteMutation.mutate(item.id),
         },
@@ -166,7 +168,7 @@ export default function AdminBlocks() {
       <View style={styles.searchBar}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Cerca per nickname..."
+          placeholder={t("admin.searchNickname")}
           placeholderTextColor={Colors.textSecondary}
           value={search}
           onChangeText={setSearch}

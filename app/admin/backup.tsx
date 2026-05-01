@@ -10,6 +10,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import Colors from "@/constants/colors";
 import { getApiUrl, queryClient, apiRequest, authFetchHeaders } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 interface BackupStatus {
   scheduled: boolean;
@@ -45,6 +46,7 @@ function formatDate(iso: string): string {
 }
 
 export default function BackupScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [dbHoursInput, setDbHoursInput] = useState("");
   const [mediaHoursInput, setMediaHoursInput] = useState("");
@@ -70,7 +72,7 @@ export default function BackupScreen() {
       const url = new URL("/api/admin/backup/db", getApiUrl()).toString();
       const res = await fetch(url, { method: "POST", credentials: "include" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Errore backup");
+      if (!res.ok) throw new Error(data.message || t("admin.backupErrorMsg"));
       return data;
     },
     onSuccess: () => {
@@ -84,7 +86,7 @@ export default function BackupScreen() {
       const url = new URL("/api/admin/backup/media", getApiUrl()).toString();
       const res = await fetch(url, { method: "POST", credentials: "include" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Errore backup media");
+      if (!res.ok) throw new Error(data.message || t("admin.backupMediaErrorMsg"));
       return data;
     },
     onSuccess: () => {
@@ -111,7 +113,7 @@ export default function BackupScreen() {
         credentials: "include",
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Errore");
+      if (!res.ok) throw new Error(data.message || t("admin.genericError"));
       return data;
     },
     onSuccess: () => {

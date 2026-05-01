@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { useT } from "@/lib/language-context";
 
 interface PerformanceRecord {
   id: string;
@@ -21,6 +22,7 @@ interface PerformanceRecord {
 }
 
 export default function AdminPerformance() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
 
@@ -82,7 +84,7 @@ export default function AdminPerformance() {
           <Ionicons name="search" size={18} color={Colors.textSecondary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Cerca per nickname..."
+            placeholder={t("admin.searchNicknamePerf")}
             placeholderTextColor={Colors.textSecondary}
             value={search}
             onChangeText={setSearch}

@@ -19,9 +19,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import MapPickerContent from "@/components/MapPickerModal";
+import { useT } from "@/lib/language-context";
 
 const WAYPOINT_TYPES = [
-  { value: "start", label: "Partenza", icon: "flag" as const, color: "#4CAF50" },
+  { value: "start", label: t("routes.start"), icon: "flag" as const, color: "#4CAF50" },
   { value: "stop", label: "Sosta", icon: "pause-circle" as const, color: "#FF9800" },
   { value: "poi", label: "Punto di Interesse", icon: "star" as const, color: "#2196F3" },
   { value: "end", label: "Arrivo", icon: "flag-checkered" as const, color: "#E63946" },
@@ -46,6 +47,7 @@ function getWaypointMeta(type: string) {
 }
 
 export default function CreateRouteScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -233,7 +235,7 @@ export default function CreateRouteScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="navigate-outline" size={36} color={Colors.textSecondary} />
             <Text style={styles.emptyText}>
-              Nessuna tappa aggiunta.{"\n"}Tocca "Aggiungi" per selezionare un punto sulla mappa.
+              {t("routes.noStops")}
             </Text>
           </View>
         )}

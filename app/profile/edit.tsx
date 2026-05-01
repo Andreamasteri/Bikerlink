@@ -27,6 +27,7 @@ import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { EUROPEAN_COUNTRIES, getRegionsForCountry, findCountryByRegion } from "@/lib/countries-regions";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import { useUnits } from "@/lib/units-context";
+import { useT } from "@/lib/language-context";
 
 interface ProfileData {
   id: string;
@@ -71,6 +72,7 @@ const RIDING_STYLES = [
 ];
 
 export default function EditProfileScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -482,7 +484,7 @@ export default function EditProfileScreen() {
                     !region && { color: Colors.textSecondary },
                   ]}
                 >
-                  {region || "Seleziona regione"}
+                  {region || t("profile.selectRegion")}
                 </Text>
                 <Feather
                   name={showRegionPicker ? "chevron-up" : "chevron-down"}

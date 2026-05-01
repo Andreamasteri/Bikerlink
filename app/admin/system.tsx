@@ -29,6 +29,7 @@ import {
 } from "@/components/NativeUpdateChecker";
 import { runManualOtaCheck } from "@/lib/ota-check";
 import * as Clipboard from "expo-clipboard";
+import { useT } from "@/lib/language-context";
 
 // ── Module-scope per garantire identità stabile della classe tra i render.
 // Dichiarare AdminFetchError dentro il componente farebbe sì che `instanceof`
@@ -186,7 +187,7 @@ function eventLabel(type: string): string {
     case "COLD_START": return "Avvio Freddo";
     case "METRO_UP": return "Frontend Online";
     case "METRO_DOWN": return "Frontend Offline";
-    case "OTA_PUBLISHED": return "Aggiornamento OTA";
+    case "OTA_PUBLISHED": return t("admin.otaUpdate");
     default: return "Evento generico";
   }
 }
@@ -225,10 +226,11 @@ function platformLabel(p: string): string {
 function outcomeMeta(o: UpdateOutcome): { label: string; color: string; icon: keyof typeof Ionicons.glyphMap } {
   if (o === "force") return { label: "Force update richiesto", color: "#FF4444", icon: "alert-circle" };
   if (o === "soft") return { label: "Soft update disponibile", color: "#FFAA00", icon: "arrow-up-circle" };
-  return { label: "Nessun aggiornamento", color: "#44AA44", icon: "checkmark-circle" };
+  return { label: t("admin.noUpdate"), color: "#44AA44", icon: "checkmark-circle" };
 }
 
 export default function SystemScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [backendUptimeSec, setBackendUptimeSec] = useState<number>(0);
@@ -280,7 +282,7 @@ export default function SystemScreen() {
         Alert.alert("In corso", "Pulizia cache già in esecuzione, attendi.");
         return;
       }
-      if (!res.ok) throw new Error("Errore server");
+      if (!res.ok) throw new Error(t("admin.serverError"));
       Alert.alert("Avviata", "Pulizia cache workspace avviata in background.");
     } catch {
       Alert.alert("Errore", "Impossibile avviare la pulizia della cache.");
@@ -324,7 +326,7 @@ export default function SystemScreen() {
           }),
         }
       );
-      if (!res.ok) throw new Error("Errore server");
+      if (!res.ok) throw new Error(t("admin.serverError"));
       Alert.alert("Salvato", "Configurazione versioni native aggiornata.");
     } catch {
       Alert.alert("Errore", "Impossibile salvare la configurazione.");
@@ -356,7 +358,7 @@ export default function SystemScreen() {
       );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        Alert.alert("Errore", (body as { message?: string }).message ?? "Errore server");
+        Alert.alert("Errore", (body as { message?: string }).message ?? t("admin.serverError"));
         return;
       }
       const body = await res.json() as { purged: boolean; deletedUsers: number };
@@ -382,12 +384,12 @@ export default function SystemScreen() {
 
   const handlePurgeNonAdminUsers = useCallback(() => {
     Alert.alert(
-      "Purga DB utenti",
-      "Questa azione elimina TUTTI gli utenti non-admin (moderatori, utenti normali) e invalida tutte le sessioni attive. L'operazione è irreversibile.",
+      t("admin.purgeDb"),
+      t("admin.purgeConfirm"),
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Continua",
+          text: t("common.continue"),
           style: "destructive",
           onPress: () => {
             setPurgeConfirmText("");
@@ -586,12 +588,12 @@ export default function SystemScreen() {
     // /api/auth/me quando la sessione è realmente persa.
     const isSessionGone = code === "session_expired" || sessionExpired;
 
-    let title = "Errore nel caricamento dei dati";
+    let title = t("admin.loadDataError");
     let hint = "";
     let iconColor = "#FF4444";
     if (isSessionGone) {
       title = "Sessione scaduta";
-      hint = "La tua sessione admin non è più valida. Effettua di nuovo l'accesso per riaprire il monitor.";
+      hint = t("admin.sessionExpired");
       iconColor = "#FFA500";
     } else if (code === "forbidden") {
       title = "Accesso non autorizzato";
@@ -606,11 +608,11 @@ export default function SystemScreen() {
       hint = "Il backend ha risposto con un errore. Riprova tra qualche secondo o controlla i log di produzione.";
     } else if (code === "network") {
       title = "Server non raggiungibile";
-      hint = "Verifica la connessione e riprova.";
+      hint = t("admin.checkConnection");
     } else if (error?.message) {
       hint = String(error.message);
     } else {
-      hint = "Risposta vuota dal server.";
+      hint = t("admin.emptyResponse");
     }
 
     const goToLogin = async () => {

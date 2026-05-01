@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { showImagePickerMenu, pickMultipleImages, BulkImageAsset } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 interface Campaign {
   id: string;
@@ -227,6 +228,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function AdminAds() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("tutti");
@@ -607,12 +609,12 @@ export default function AdminAds() {
   function handleDeleteAll() {
     if (campaigns.length === 0) return;
     Alert.alert(
-      "Elimina tutte le campagne",
-      `Eliminare tutte le ${campaigns.length} campagne visibili nel tab "${TABS.find(t => t.key === activeTab)?.label}"? L'operazione è irreversibile.`,
+      t("admin.deleteAllCampaigns"),
+      t("admin.deleteCampaignsConfirm").replace("{count}", String(campaigns.length)).replace("{tab}", TABS.find(tab => tab.key === activeTab)?.label ?? ""),
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: `Elimina ${campaigns.length}`,
+          text: t("admin.deleteCampaignsBtn").replace("{count}", String(campaigns.length)),
           style: "destructive",
           onPress: () => bulkDeleteMutation.mutate(campaigns.map((c) => c.id)),
         },
@@ -665,8 +667,8 @@ export default function AdminAds() {
 
   function handleDelete(campaign: Campaign) {
     Alert.alert("Elimina campagna", `Eliminare "${campaign.name}"?`, [
-      { text: "Annulla", style: "cancel" },
-      { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate(campaign.id) },
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("common.delete"), style: "destructive", onPress: () => deleteMutation.mutate(campaign.id) },
     ]);
   }
 
@@ -737,7 +739,7 @@ export default function AdminAds() {
           <Text style={styles.countText}>{campaigns.length} campagn{campaigns.length === 1 ? "a" : "e"}</Text>
           {imageHealth?.checkedAt ? (
             <Text style={styles.checkedAtText}>
-              {imageHealth.isRunning ? "Verifica in corso…" : `Verifica: ${new Date(imageHealth.checkedAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`}
+              {imageHealth.isRunning ? t("admin.verifyInProgress") : `Verifica: ${new Date(imageHealth.checkedAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`}
             </Text>
           ) : imageHealth?.isRunning ? (
             <Text style={styles.checkedAtText}>Verifica in corso…</Text>
@@ -979,7 +981,7 @@ export default function AdminAds() {
             >
               <MaterialIcons name="add-photo-alternate" size={22} color={Colors.accent} />
               <Text style={styles.pickImagesBtnText}>
-                {bulkImages.length === 0 ? "Scegli immagini" : `Aggiungi immagini (${bulkImages.length} selezionate)`}
+                {bulkImages.length === 0 ? t("admin.chooseImages") : t("admin.addImagesCount").replace("{count}", String(bulkImages.length))}
               </Text>
             </TouchableOpacity>
 

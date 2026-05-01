@@ -33,7 +33,7 @@ export default function LoginScreen() {
   const handleLogin = async () => {
     setError("");
     if (!identifier.trim() || !password.trim()) {
-      setError("Inserisci email/nickname e password");
+      setError(t("auth.enterCredentials"));
       return;
     }
     setIsSubmitting(true);
@@ -74,7 +74,7 @@ export default function LoginScreen() {
         },
         onError: (err: any) => {
           setIsSubmitting(false);
-          const msg = err?.message || "Errore durante il login";
+          const msg = err?.message || t("auth.loginError");
           const cleaned = msg.replace(/^\d+:\s*/, "");
           try {
             const parsed = JSON.parse(cleaned);

@@ -295,7 +295,7 @@ function TelefonoTab() {
         <Text style={styles.sectionTitle}>{loading && assets.length === 0 ? t("music.loading") : t("music.tracksCount").replace("{count}", String(assets.length))}</Text>
         <TouchableOpacity style={styles.playAllBtn} onPress={handlePlayAll} disabled={!playerAvailable || assets.length === 0}>
           <Ionicons name="play-circle" size={14} color={Colors.accent} />
-          <Text style={styles.playAllBtnText}>t("music.playAll")</Text>
+          <Text style={styles.playAllBtnText}>{t("music.playAll")}</Text>
         </TouchableOpacity>
       </View>
       <FlatList
@@ -1661,7 +1661,7 @@ function BraniTab({
                 ) : (
                   <>
                     <Ionicons name="play-circle-outline" size={18} color={Colors.accent} />
-                    <Text style={styles.playAllBtnText}>t("music.playAll")</Text>
+                    <Text style={styles.playAllBtnText}>{t("music.playAll")}</Text>
                   </>
                 )}
               </TouchableOpacity>

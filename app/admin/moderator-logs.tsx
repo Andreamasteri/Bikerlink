@@ -16,6 +16,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { useT } from "@/lib/language-context";
 
 interface ModeratorLog {
   id: string;
@@ -88,6 +89,7 @@ function LogRow({ log }: { log: ModeratorLog }) {
 }
 
 export default function AdminModeratorLogs() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
@@ -123,7 +125,7 @@ export default function AdminModeratorLogs() {
       Alert.alert("Log svuotati", `${result.deletedCount} righe eliminate.`);
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : "Errore sconosciuto";
+      const msg = err instanceof Error ? err.message : t("admin.unknownError");
       Alert.alert("Errore", `Impossibile svuotare i log: ${msg}`);
     },
   });
@@ -131,11 +133,11 @@ export default function AdminModeratorLogs() {
   function handleClearLogs() {
     if (clearMutation.isPending) return;
     Alert.alert(
-      "Svuota log moderatori",
-      "Cancellare tutti i log moderatori? L'operazione non è reversibile.",
+      t("admin.clearModLogs"),
+      t("admin.clearModLogsConfirm"),
       [
-        { text: "Annulla", style: "cancel" },
-        { text: "Svuota", style: "destructive", onPress: () => clearMutation.mutate() },
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("admin.clearLogs"), style: "destructive", onPress: () => clearMutation.mutate() },
       ]
     );
   }
@@ -172,7 +174,7 @@ export default function AdminModeratorLogs() {
             style={styles.searchInput}
             value={search}
             onChangeText={setSearch}
-            placeholder="Cerca in questa pagina…"
+            placeholder={t("admin.searchPage")}
             placeholderTextColor={Colors.textSecondary}
           />
           {hasFilters && (
@@ -186,7 +188,7 @@ export default function AdminModeratorLogs() {
           onPress={handleClearLogs}
           disabled={clearMutation.isPending}
           testID="clear-moderator-logs-btn"
-          accessibilityLabel="Svuota log moderatori"
+          accessibilityLabel={t("admin.clearModLogsLabel")}
         >
           {clearMutation.isPending ? (
             <ActivityIndicator size="small" color={Colors.error} />

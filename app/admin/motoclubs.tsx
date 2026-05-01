@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 interface ClubRequest {
   id: string;
@@ -81,6 +82,7 @@ interface PendingLocation {
 }
 
 export default function AdminMotoclubs() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [tab, setTab] = useState<"requests" | "clubs" | "user_creation" | "sedi">("requests");
@@ -191,18 +193,18 @@ export default function AdminMotoclubs() {
 
   function handleApprove(req: ClubRequest) {
     Alert.alert("Approva club", `Approvare "${req.name}"?\n\nVerrà creato un nuovo club e una chat di gruppo dedicata.`, [
-      { text: "Annulla", style: "cancel" },
+      { text: t("common.cancel"), style: "cancel" },
       { text: "Approva", onPress: () => approveMutation.mutate(req.id) },
     ]);
   }
 
   function handleDelete(club: Club) {
     Alert.alert(
-      "Elimina club",
-      `Eliminare "${club.name}"?\n\n${club.memberCount} ${club.memberCount === 1 ? "membro verrà rimosso" : "membri verranno rimossi"}. Questa azione è irreversibile.`,
+      t("admin.deleteClubTitle"),
+      club.memberCount === 1 ? t("admin.deleteClubConfirmSingle").replace("{name}", club.name).replace("{count}", "1") : t("admin.deleteClubConfirmMulti").replace("{name}", club.name).replace("{count}", String(club.memberCount)),
       [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate(club.id) },
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.delete"), style: "destructive", onPress: () => deleteMutation.mutate(club.id) },
       ]
     );
   }
@@ -364,7 +366,7 @@ export default function AdminMotoclubs() {
             <TouchableOpacity
               style={[styles.actionPill, { backgroundColor: Colors.success }]}
               onPress={() => Alert.alert("Approva sede", `Approvare la sede proposta per "${item.name}"?`, [
-                { text: "Annulla", style: "cancel" },
+                { text: t("common.cancel"), style: "cancel" },
                 { text: "Approva", onPress: () => approveLocationMutation.mutate(item.id) },
               ])}
               disabled={approveLocationMutation.isPending}
@@ -375,7 +377,7 @@ export default function AdminMotoclubs() {
             <TouchableOpacity
               style={[styles.actionPill, { backgroundColor: Colors.error }]}
               onPress={() => Alert.alert("Rifiuta sede", `Rifiutare la sede proposta per "${item.name}"?`, [
-                { text: "Annulla", style: "cancel" },
+                { text: t("common.cancel"), style: "cancel" },
                 { text: "Rifiuta", style: "destructive", onPress: () => rejectLocationMutation.mutate(item.id) },
               ])}
               disabled={rejectLocationMutation.isPending}
@@ -461,7 +463,7 @@ export default function AdminMotoclubs() {
         <Ionicons name="search" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Cerca club..."
+          placeholder={t("admin.searchClub")}
           placeholderTextColor={Colors.textSecondary}
           value={search}
           onChangeText={setSearch}
@@ -536,14 +538,14 @@ export default function AdminMotoclubs() {
             <Ionicons name="shield-outline" size={48} color={Colors.border} />
             <Text style={styles.emptyText}>
               {(tab === "requests" || tab === "user_creation" ? loadingReqs : tab === "sedi" ? loadingLocations : loadingClubs)
-                ? "Caricamento..."
+                ? t("admin.loading2")
                 : tab === "requests"
-                ? "Nessuna richiesta"
+                ? t("admin.noRequest")
                 : tab === "user_creation"
-                ? "Nessuna richiesta da utenti"
+                ? t("admin.noUserRequest")
                 : tab === "sedi"
-                ? "Nessuna proposta di sede in attesa"
-                : "Nessun club attivo"}
+                ? t("admin.noPendingProposals")
+                : t("admin.noActiveClubs")}
             </Text>
           </View>
         }
@@ -576,7 +578,7 @@ export default function AdminMotoclubs() {
                 disabled={rejectMutation.isPending}
               >
                 <Text style={styles.rejectConfirmBtnText}>
-                  {rejectMutation.isPending ? "Rifiuto in corso..." : "Conferma Rifiuto"}
+                  {rejectMutation.isPending ? t("admin.rejectingInProgress") : t("admin.confirmRejection")}
                 </Text>
               </TouchableOpacity>
             </View>

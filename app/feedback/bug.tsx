@@ -101,7 +101,7 @@ export default function BugReportScreen() {
         <Text style={styles.sectionLabel}>Oggetto</Text>
         <TextInput
           style={styles.input}
-          placeholder="Es: Crash nell'apertura della mappa"
+          placeholder={t("feedback.bugPlaceholderFull")}
           placeholderTextColor={Colors.textSecondary}
           value={subject}
           onChangeText={setSubject}

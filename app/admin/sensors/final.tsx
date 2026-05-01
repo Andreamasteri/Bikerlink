@@ -14,6 +14,7 @@ import type { DeviceMotionMeasurement } from "expo-sensors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { useT } from "@/lib/language-context";
 
 const SESSIONS_STORAGE_KEY = "g_peak_sessions";
 const MAX_SESSIONS = 50;
@@ -207,6 +208,7 @@ function SessionCard({ session, onDelete }: { session: GSession; onDelete: () =>
 }
 
 export default function SensorsFinal() {
+  const t = useT();
   const insets = useSafeAreaInsets();
 
   const [raw, setRaw] = useState<RawValues>({
@@ -389,11 +391,11 @@ export default function SensorsFinal() {
   function clearAllSessions() {
     Alert.alert(
       "Cancella cronologia",
-      "Eliminare tutte le sessioni salvate?",
+      t("admin.deleteAllSessions"),
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Elimina tutto",
+          text: t("admin.deleteAll"),
           style: "destructive",
           onPress: () => {
             sessionsRef.current = [];

@@ -64,7 +64,7 @@ export default function EventiScreen() {
       url.searchParams.set("limit", "20");
       if (filter !== "tutti") url.searchParams.set("type", filter);
       const res = await fetch(url.toString(), { credentials: "include" });
-      if (!res.ok) throw new Error("Errore nel caricamento degli eventi");
+      if (!res.ok) throw new Error(t("events.loadError"));
       return res.json();
     },
     getNextPageParam: (last) => {
@@ -160,7 +160,7 @@ export default function EventiScreen() {
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Ionicons name="calendar-outline" size={56} color={Colors.textSecondary} />
-              <Text style={styles.emptyTitle}>Nessun evento in programma</Text>
+              <Text style={styles.emptyTitle}>{t("events.noScheduled")}</Text>
               <Text style={styles.emptySubtitle}>Sii il primo a crearne uno!</Text>
               <Pressable style={styles.emptyBtn} onPress={() => setShowForm(true)}>
                 <Ionicons name="add" size={18} color="#000" />

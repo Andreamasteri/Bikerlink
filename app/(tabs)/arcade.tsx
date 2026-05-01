@@ -26,6 +26,8 @@ import TrafficRacer from "@/components/arcade/TrafficRacer";
 import WheelieChallenge from "@/components/arcade/WheelieChallenge";
 import Tetris from "@/components/arcade/Tetris";
 import SpaceInvaders from "@/components/arcade/SpaceInvaders";
+import { useT } from "@/lib/language-context";
+import { t as tStatic } from "@/lib/i18n";
 
 const { width: W } = Dimensions.get("window");
 
@@ -33,11 +35,11 @@ type GameId = "endless_biker" | "traffic_racer" | "wheelie" | "tetris" | "space_
 type HubTab = "games" | "leaderboard" | "hof";
 
 const GAMES: { id: GameId; title: string; emoji: string; desc: string; scoreLabel: string }[] = [
-  { id: "endless_biker", title: "Endless Biker", emoji: "🏍️", desc: "Corri e salta gli ostacoli!", scoreLabel: "m" },
-  { id: "traffic_racer", title: "Traffic Racer", emoji: "🚦", desc: "Sorpassa il traffico!", scoreLabel: "pt" },
-  { id: "wheelie", title: "Wheelie Challenge", emoji: "🤸", desc: "Tieni l'impennata!", scoreLabel: "s" },
-  { id: "tetris", title: "Tetris", emoji: "🧩", desc: "Il classico senza tempo!", scoreLabel: "pt" },
-  { id: "space_invaders", title: "Space Invaders", emoji: "👾", desc: "Elimina gli alieni!", scoreLabel: "pt" },
+  { id: "endless_biker", title: "Endless Biker", emoji: "🏍️", desc: tStatic("arcade.corriSalta"), scoreLabel: "m" },
+  { id: "traffic_racer", title: "Traffic Racer", emoji: "🚦", desc: tStatic("arcade.sorpassaTraffico"), scoreLabel: "pt" },
+  { id: "wheelie", title: "Wheelie Challenge", emoji: "🤸", desc: tStatic("arcade.tieniImpennata"), scoreLabel: "s" },
+  { id: "tetris", title: "Tetris", emoji: "🧩", desc: tStatic("arcade.classicoSenzaTempo"), scoreLabel: "pt" },
+  { id: "space_invaders", title: "Space Invaders", emoji: "👾", desc: tStatic("arcade.eliminaGlialieni"), scoreLabel: "pt" },
 ];
 
 const GAME_LABEL: Record<GameId, string> = {
@@ -249,6 +251,7 @@ function HallOfFameView() {
 }
 
 export default function ArcadeScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ tab?: string; game?: string }>();
   const { suppressWidget } = useFloatingWidget();

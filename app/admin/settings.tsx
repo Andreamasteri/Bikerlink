@@ -91,7 +91,7 @@ function ManualAdminSection() {
           <Text style={manualStyles.subtitle}>
             {manualInfo?.available
               ? `${formatSize(manualInfo.fileSize)} — ${manualInfo.lastModified ? new Date(manualInfo.lastModified).toLocaleDateString("it-IT") : ""}`
-              : "Nessun manuale caricato"}
+              : t("admin.noManual")}
           </Text>
         </View>
       </View>
@@ -336,7 +336,7 @@ function EmailStatusCard() {
       setTestResult(json);
       refetchDiag();
     } catch (e: any) {
-      setTestResult({ ok: false, error: e?.message || "Errore di rete" });
+      setTestResult({ ok: false, error: e?.message || t("admin.networkError") });
     } finally {
       setTesting(false);
     }
@@ -347,7 +347,7 @@ function EmailStatusCard() {
       "Reset rate limit email",
       "Cancella tutti i contatori in-memory di verify-email, resend-verification e user-lockouts. Confermi?",
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
           text: "Reset",
           style: "destructive",
@@ -371,15 +371,15 @@ function EmailStatusCard() {
   const credColor = diag?.credentials.present ? "#22c55e" : "#ef4444";
   const credLabel = diag?.credentials.present
     ? `Configurate (sorgente: ${diag.credentials.source.toUpperCase()})${diag.credentials.maskedUser ? " · " + diag.credentials.maskedUser : ""}`
-    : "MANCANTI — nessuna credenziale Gmail in DB né in env";
+    : t("admin.missingCredentials");
 
   const lastSendOk = diag?.lastSend.status === "ok";
   const lastSendErr = diag?.lastSend.status === "error";
   const errCodeLabel: Record<string, string> = {
     "no-credentials": "Credenziali assenti",
     "auth": "Auth Gmail rifiutata (App Password revocata?)",
-    "network": "Errore di rete",
-    "other": "Errore SMTP",
+    "network": t("admin.networkError"),
+    "other": t("admin.smtpError"),
   };
 
   const totalRLEntries = (rl?.verifyEmail.entries.length ?? 0) + (rl?.resendVerification.entries.length ?? 0) + (rl?.userLockouts.entries.length ?? 0);
@@ -429,7 +429,7 @@ function EmailStatusCard() {
               <Text style={emailStatusStyles.rowLabel}>Ultimo invio reale</Text>
               <Text style={emailStatusStyles.rowValue}>
                 {diag?.lastSend.status === null
-                  ? "nessun invio registrato"
+                  ? t("admin.noSendRegistered")
                   : `${lastSendOk ? "OK" : "ERRORE"} · ${formatRelative(diag?.lastSend.at ?? null)}${diag?.lastSend.recipient ? " · " + diag.lastSend.recipient : ""}`}
               </Text>
             </View>
@@ -455,7 +455,7 @@ function EmailStatusCard() {
           {testResult && (
             <View style={[emailStatusStyles.testResult, { backgroundColor: testResult.ok ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)", borderLeftColor: testResult.ok ? "#22c55e" : "#ef4444" }]}>
               <Text style={[emailStatusStyles.testResultTitle, { color: testResult.ok ? "#22c55e" : "#ef4444" }]}>
-                {testResult.ok ? "✓ Test invio riuscito" : `✗ Test invio fallito${testResult.errorCode ? " (" + testResult.errorCode + ")" : ""}`}
+                {testResult.ok ? t("admin.testSendOk") : `✗ Test invio fallito${testResult.errorCode ? " (" + testResult.errorCode + ")" : ""}`}
               </Text>
               {testResult.messageId ? (
                 <Text style={emailStatusStyles.testResultBody}>messageId: {testResult.messageId}</Text>
@@ -530,6 +530,7 @@ const emailStatusStyles = StyleSheet.create({
 });
 
 export default function AdminSettings() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
@@ -639,7 +640,7 @@ export default function AdminSettings() {
         body: JSON.stringify(body),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Errore aggiornamento impostazioni storico coordinate");
+      if (!res.ok) throw new Error(t("admin.settingsUpdateError"));
       return res.json();
     },
     onSuccess: () => {
@@ -686,7 +687,7 @@ export default function AdminSettings() {
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
+        const err = await res.json().catch(() => ({ message: t("admin.genericError2") }));
         throw new Error(err.message);
       }
       return res.json();
@@ -755,7 +756,7 @@ export default function AdminSettings() {
         body: JSON.stringify({ value: value ? "true" : "false" }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Errore aggiornamento impostazione tema");
+      if (!res.ok) throw new Error(t("admin.themeUpdateError"));
       return res.json();
     },
     onSuccess: () => {
@@ -773,7 +774,7 @@ export default function AdminSettings() {
         body: JSON.stringify({ value }),
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Errore aggiornamento tema default");
+      if (!res.ok) throw new Error(t("admin.defaultThemeUpdateError"));
       return res.json();
     },
     onSuccess: (_data, variables) => {
@@ -819,7 +820,7 @@ export default function AdminSettings() {
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
+        const err = await res.json().catch(() => ({ message: t("admin.genericError2") }));
         throw new Error(err.message);
       }
       return res.json();
@@ -845,7 +846,7 @@ export default function AdminSettings() {
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
+        const err = await res.json().catch(() => ({ message: t("admin.genericError2") }));
         throw new Error(err.message);
       }
       return res.json();
@@ -1204,7 +1205,7 @@ export default function AdminSettings() {
         const sec = match ? match[1] : "?";
         setMatchingTriggerFeedback(`Debounce attivo (ultimo ciclo ${sec}s fa)`);
       } else if (data.reason === "already_running") {
-        setMatchingTriggerFeedback("Già in esecuzione");
+        setMatchingTriggerFeedback(t("admin.alreadyRunning"));
       } else {
         setMatchingTriggerFeedback(data.reason ?? "Risposta inattesa");
       }
@@ -3425,7 +3426,7 @@ export default function AdminSettings() {
                   "Sync produzione → sviluppo",
                   "Il database di sviluppo verrà sovrascritto con i dati di produzione. Continuare?",
                   [
-                    { text: "Annulla", style: "cancel" },
+                    { text: t("common.cancel"), style: "cancel" },
                     { text: "Sincronizza", style: "destructive", onPress: () => syncMutation.mutate() },
                   ]
                 );

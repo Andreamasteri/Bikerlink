@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { subscribeOtaResult } from "@/lib/ota-check";
+import { t } from "@/lib/i18n";
 
 const SAFETY_TIMEOUT_MS = 15_000;
 
@@ -15,7 +16,7 @@ export default function OtaGateScreen() {
   const colors = useColors();
   const navigated = useRef(false);
   const dotAnim = useRef(new Animated.Value(0)).current;
-  const [status, setStatus] = useState<string>("Controllo aggiornamenti...");
+  const [status, setStatus] = useState<string>(t("ota.checkingUpdates"));
 
   const { data: gateData, error: gateError } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/ota-gate-enabled"],
@@ -53,7 +54,7 @@ export default function OtaGateScreen() {
     const unsub = subscribeOtaResult((result) => {
       clearTimeout(safetyTimer);
       if (result.phase === "reload") {
-        setStatus("Aggiornamento in corso...");
+        setStatus(t("ota.updating"));
         // fallback: reloadAsync non ritorna normalmente, ma se lo facesse navighiamo dopo 3s
         setTimeout(() => navigate(), 3_000);
       } else {

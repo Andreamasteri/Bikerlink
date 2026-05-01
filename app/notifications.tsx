@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 interface AppNotification {
   id: string;
@@ -81,6 +82,7 @@ function getNotifRoute(item: AppNotification): string | null {
 }
 
 export default function NotificationsScreen() {
+  const t = useT();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
@@ -122,9 +124,9 @@ export default function NotificationsScreen() {
   const handleDeleteAll = useCallback(() => {
     Alert.alert(
       "Cancella tutte le notifiche",
-      "Questa azione eliminerà definitivamente tutte le notifiche. Continuare?",
+      t("notifications.deleteAllConfirm"),
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
           text: "Cancella tutto",
           style: "destructive",

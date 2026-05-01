@@ -505,7 +505,7 @@ export default function ChatScreen() {
               )}
               ListEmptyComponent={
                 searchQuery.length > 0 ? (
-                  <Text style={styles.noUsersText}>Nessun utente trovato</Text>
+                  <Text style={styles.noUsersText}>{t("chat.noUserFound")}</Text>
                 ) : null
               }
             />

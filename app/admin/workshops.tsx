@@ -7,6 +7,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 interface Workshop {
   id: string;
@@ -22,6 +23,7 @@ interface Workshop {
 }
 
 export default function AdminWorkshops() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [showModal, setShowModal] = useState(false);
   const [formName, setFormName] = useState("");
@@ -69,8 +71,8 @@ export default function AdminWorkshops() {
 
   function handleDelete(workshop: Workshop) {
     Alert.alert("Elimina officina", `Eliminare "${workshop.name}"?`, [
-      { text: "Annulla", style: "cancel" },
-      { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate(workshop.id) },
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("common.delete"), style: "destructive", onPress: () => deleteMutation.mutate(workshop.id) },
     ]);
   }
 
@@ -146,7 +148,7 @@ export default function AdminWorkshops() {
                   disabled={!formName || createMutation.isPending}
                   onPress={() => createMutation.mutate({ name: formName, address: formAddress || undefined, phone: formPhone || undefined, email: formEmail || undefined, isApproved: true, isSynecoPartner: false })}
                 >
-                  <Text style={styles.submitBtnText}>{createMutation.isPending ? "Salvataggio..." : "Crea Officina"}</Text>
+                  <Text style={styles.submitBtnText}>{createMutation.isPending ? t("admin.saving") : t("admin.createWorkshop")}</Text>
                 </TouchableOpacity>
               </KeyboardAwareScrollViewCompat>
             </View>

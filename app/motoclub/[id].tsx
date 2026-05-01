@@ -23,6 +23,7 @@ import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import * as Location from "expo-location";
 import FavoriteStar from "@/components/FavoriteStar";
 import { useAuth } from "@/lib/auth-context";
+import { useT } from "@/lib/language-context";
 
 const PAGE_SIZE = 30;
 const INITIAL_VISIBLE = 5;
@@ -115,6 +116,7 @@ const avatarStyles = StyleSheet.create({
 });
 
 export default function ClubDetailScreen() {
+  const t = useT();
   const { id, conversationId: convParam } = useLocalSearchParams<{ id: string; conversationId?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -203,7 +205,7 @@ export default function ClubDetailScreen() {
       const res = await apiRequest("POST", `/api/motoclubs/${id}/propose-location`, { latitude, longitude, address: address || null });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error((err as any).message || "Errore nella proposta");
+        throw new Error((err as any).message || t("motoclub.proposalError"));
       }
       return res.json();
     },
@@ -623,7 +625,7 @@ export default function ClubDetailScreen() {
                 disabled={proposeLocationMutation.isPending}
               >
                 <Text style={styles.modalSubmitBtnText}>
-                  {proposeLocationMutation.isPending ? "Invio..." : "Invia proposta"}
+                  {proposeLocationMutation.isPending ? t("motoclub.sendingProposal") : t("motoclub.sendProposal")}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -19,6 +19,7 @@ import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
 import { getCurrentLocale } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 
 interface Waypoint {
   id: string;
@@ -57,7 +58,7 @@ interface CustomRouteDetail {
 }
 
 const WAYPOINT_TYPE_LABELS: Record<string, string> = {
-  start: "Partenza",
+  start: t("routes.start"),
   stop: "Sosta",
   poi: "Punto di Interesse",
   end: "Arrivo",
@@ -119,14 +120,14 @@ export default function CustomRouteDetailScreen() {
 
   const handleDelete = () => {
     if (Platform.OS === "web") {
-      if (confirm("Eliminare questo percorso?")) {
+      if (confirm(t("routes.deleteConfirm"))) {
         deleteMutation.mutate();
       }
     } else {
       Alert.alert("Elimina Percorso", "Eliminare questo percorso?", [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
-          text: "Elimina",
+          text: t("common.delete"),
           style: "destructive",
           onPress: () => deleteMutation.mutate(),
         },

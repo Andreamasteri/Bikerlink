@@ -12,6 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { t as tStatic } from "@/lib/i18n";
 
 interface RecentRecord {
   id: string;
@@ -72,8 +73,8 @@ function getRecordSub(record: RecentRecord): string {
   if (record.conversationType != null) parts.push(`type: ${record.conversationType}`);
   if (record.messageType != null) parts.push(`type: ${record.messageType}`);
   if (record.clubType != null) parts.push(`tipo: ${record.clubType}`);
-  if (record.isApproved != null) parts.push(`approvato: ${record.isApproved ? "sì" : "no"}`);
-  if (record.isActive != null) parts.push(`attivo: ${record.isActive ? "sì" : "no"}`);
+  if (record.isApproved != null) parts.push(tStatic("admin.dbApproved").replace("{val}", record.isApproved ? "sì" : "no"));
+  if (record.isActive != null) parts.push(tStatic("admin.dbActive").replace("{val}", record.isActive ? "sì" : "no"));
   if (record.model != null) parts.push(`modello: ${record.model}`);
   if (record.targetType != null) parts.push(`target: ${record.targetType}`);
   if (record.notificationType != null) parts.push(`tipo: ${record.notificationType}`);
@@ -162,7 +163,7 @@ export default function AdminDbDebug() {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.subtitle}>
-            {data ? `${data.tables.length} tabelle · ${totalRecords.toLocaleString("it-IT")} record totali` : "Caricamento..."}
+            {data ? tStatic("admin.tableStats").replace("{tables}", String(data.tables.length)).replace("{records}", totalRecords.toLocaleString()) : tStatic("common.loading")}
           </Text>
           {lastUpdated && (
             <Text style={styles.lastUpdated}>

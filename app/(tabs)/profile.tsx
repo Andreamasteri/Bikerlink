@@ -873,7 +873,7 @@ export default function ProfileScreen() {
           <View style={styles.privacyRowLeft}>
             <Ionicons name="eye-off-outline" size={20} color={Colors.accent} style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.privacyLabel}>Non mostrarmi sulla mappa</Text>
+              <Text style={styles.privacyLabel}>{t("profile.notOnMap")}</Text>
               <Text style={styles.privacyDesc}>
                 {t("profile.markerHiddenNote")}
               </Text>

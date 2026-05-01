@@ -25,17 +25,13 @@ import EventParticipants from "@/components/eventi/EventParticipants";
 import EventForm from "@/components/eventi/EventForm";
 import type { EventDTO } from "@/shared/event-types";
 import { EVENT_TYPE_LABELS, EVENT_TYPE_COLORS } from "@/shared/event-types";
+import { useT } from "@/lib/language-context";
 
 function formatFullDate(dateStr: string, timeStr: string | null): string {
   try {
     const d = new Date(dateStr);
-    const days = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
-    const months = [
-      "Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno",
-      "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre",
-    ];
-    const base = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
-    return timeStr ? `${base} alle ${timeStr}` : base;
+    const base = d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+    return timeStr ? `${base} ${timeStr}` : base;
   } catch {
     return dateStr;
   }
@@ -88,6 +84,7 @@ const statusStyles = StyleSheet.create({
 });
 
 export default function EventoDetail() {
+  const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -141,11 +138,11 @@ export default function EventoDetail() {
 
   const handleDelete = () => {
     Alert.alert(
-      "Elimina evento",
-      "Sei sicuro di voler eliminare questo evento? L'operazione è irreversibile.",
+      t("events.deleteTitle"),
+      t("events.deleteConfirm"),
       [
-        { text: "Annulla", style: "cancel" },
-        { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate() },
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("events.deleteBtn"), style: "destructive", onPress: () => deleteMutation.mutate() },
       ]
     );
   };

@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 interface Campaign {
   id: string;
@@ -133,6 +134,7 @@ function CampaignCard({
 }
 
 export default function ModeratorCampaigns() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("tutti");
@@ -339,7 +341,7 @@ export default function ModeratorCampaigns() {
           <View style={styles.modalOverlay}>
             <KeyboardAvoidingView behavior="padding" style={{ width: "100%" }}>
               <ScrollView style={styles.modalBox} keyboardShouldPersistTaps="handled">
-                <Text style={styles.modalTitle}>{isEditing ? "Modifica Campagna" : "Nuova Campagna"}</Text>
+                <Text style={styles.modalTitle}>{isEditing ? t("moderator.editCampaign") : t("moderator.newCampaign")}</Text>
 
                 <Text style={styles.fieldLabel}>Nome *</Text>
                 <TextInput style={styles.input} value={formName} onChangeText={setFormName} placeholder="Nome campagna" placeholderTextColor={Colors.textSecondary} />
@@ -356,7 +358,7 @@ export default function ModeratorCampaigns() {
                   ) : (
                     <>
                       <MaterialIcons name="add-photo-alternate" size={28} color={Colors.accent} />
-                      <Text style={styles.imagePickerLabel}>{isEditing ? "Cambia immagine" : "Aggiungi immagine"}</Text>
+                      <Text style={styles.imagePickerLabel}>{isEditing ? t("moderator.changeImage") : t("moderator.addImage")}</Text>
                     </>
                   )}
                 </TouchableOpacity>
@@ -372,7 +374,7 @@ export default function ModeratorCampaigns() {
                   >
                     {isPending
                       ? <ActivityIndicator size="small" color="#fff" />
-                      : <Text style={styles.createText}>{isEditing ? "Salva" : "Crea"}</Text>
+                      : <Text style={styles.createText}>{isEditing ? t("moderator.save") : t("moderator.create")}</Text>
                     }
                   </TouchableOpacity>
                 </View>

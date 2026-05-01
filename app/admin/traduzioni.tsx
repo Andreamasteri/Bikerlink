@@ -17,6 +17,7 @@ import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { useT } from "@/lib/language-context";
 
 type StepStatus = "idle" | "loading" | "success" | "error";
 
@@ -267,7 +268,7 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
       const data: TableRow[] = await resp.json();
       setTableData(data);
     } catch (e: unknown) {
-      setTableError(e instanceof Error ? e.message : "Errore caricamento");
+      setTableError(e instanceof Error ? e.message : t("admin.loadError2"));
     } finally {
       setLoadingTable(false);
     }
@@ -300,7 +301,7 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
     setCellStates((prev) => ({ ...prev, [cellKey]: "saving" }));
     try {
       const resp = await apiRequest("PATCH", "/api/admin/translations/key", { key, lang, value: value.trim() });
-      if (!resp.ok) throw new Error("Errore salvataggio");
+      if (!resp.ok) throw new Error(t("admin.saveError"));
       setTableData((prev) =>
         prev.map((row) =>
           row.key === key ? { ...row, [lang]: value.trim() } : row
@@ -450,7 +451,7 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
         ) : (
           <>
             <MaterialCommunityIcons name="refresh" size={16} color="#fff" />
-            <Text style={styles.buttonText}>{tableData.length > 0 ? "Aggiorna Tabella" : "Carica Tabella"}</Text>
+            <Text style={styles.buttonText}>{tableData.length > 0 ? t("admin.updateTable") : t("admin.loadTable")}</Text>
           </>
         )}
       </TouchableOpacity>
@@ -470,7 +471,7 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
               style={styles.searchInput}
               value={searchText}
               onChangeText={setSearchText}
-              placeholder="Cerca per chiave o testo IT..."
+              placeholder={t("admin.searchKey")}
               placeholderTextColor={Colors.textSecondary}
               clearButtonMode="while-editing"
               autoCorrect={false}
@@ -575,6 +576,7 @@ function LiveTableSection({ restartStatus, restartResult, onRestartPress }: {
 }
 
 export default function TraduzioniScreen() {
+  const t = useT();
   const insets = useSafeAreaInsets();
 
   const [prepareStatus, setPrepareStatus] = useState<StepStatus>("idle");
@@ -610,7 +612,7 @@ export default function TraduzioniScreen() {
       );
     } catch (e: any) {
       setPrepareStatus("error");
-      setPrepareResult(e?.message || "Errore durante la preparazione");
+      setPrepareResult(e?.message || t("admin.prepareError"));
     }
   }
 
@@ -636,7 +638,7 @@ export default function TraduzioniScreen() {
         return (data as { message: string }).message;
       }
     } catch {}
-    return "Errore download";
+    return t("admin.downloadError");
   }
 
   async function handleDownloadDocx() {
@@ -670,7 +672,7 @@ export default function TraduzioniScreen() {
         if (canShare) {
           await Sharing.shareAsync(filePath, {
             mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            dialogTitle: "Salva Word Traduzioni",
+            dialogTitle: t("admin.saveWord"),
           });
           setDocxResult({ ok: true, msg: "File Word pronto da condividere" });
         } else {
@@ -678,7 +680,7 @@ export default function TraduzioniScreen() {
         }
       }
     } catch (e: unknown) {
-      setDocxResult({ ok: false, msg: extractErrorMessage(e, "Errore download Word") });
+      setDocxResult({ ok: false, msg: extractErrorMessage(e, t("admin.wordDownloadError")) });
     } finally {
       setDocxLoading(false);
     }
@@ -704,7 +706,7 @@ export default function TraduzioniScreen() {
         setRestartResult("Backend in riavvio (connessione chiusa dal server)...");
       } else {
         setRestartStatus("error");
-        setRestartResult(msg || "Errore durante il riavvio");
+        setRestartResult(msg || t("admin.restartError"));
       }
     }
   }
@@ -787,7 +789,7 @@ export default function TraduzioniScreen() {
       await uploadDocxFile(fd);
     } catch (err: unknown) {
       setImportStatus("error");
-      setImportResult(extractErrorMessage(err, "Errore durante l'import"));
+      setImportResult(extractErrorMessage(err, t("admin.importError")));
     } finally {
       if (webImportInputRef.current) webImportInputRef.current.value = "";
     }
@@ -809,7 +811,7 @@ export default function TraduzioniScreen() {
       const asset = picked.assets[0];
       const fileName = asset.name || "translations.docx";
       if (!/\.docx$/i.test(fileName)) {
-        throw new Error("Seleziona un file con estensione .docx");
+        throw new Error(t("admin.selectDocxFile"));
       }
       setImportFileName(fileName);
 
@@ -824,7 +826,7 @@ export default function TraduzioniScreen() {
       await uploadDocxFile(fd);
     } catch (err: unknown) {
       setImportStatus("error");
-      setImportResult(extractErrorMessage(err, "Errore durante l'import"));
+      setImportResult(extractErrorMessage(err, t("admin.importError")));
     }
   }
 

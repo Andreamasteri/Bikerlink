@@ -7,6 +7,7 @@ import Constants from "expo-constants";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
+import { useT } from "@/lib/language-context";
 
 let MapView: React.ComponentType<Record<string, unknown>> | null = null;
 let MapMarker: React.ComponentType<Record<string, unknown>> | null = null;
@@ -106,6 +107,7 @@ function formatDateIT(dateStr: string | null): string {
 
 
 export default function AdminUsers() {
+  const t = useT();
   const rawInsets = useSafeAreaInsets();
   const insets = Platform.OS === "web"
     ? { top: 67, bottom: 34, left: rawInsets.left, right: rawInsets.right }
@@ -316,7 +318,7 @@ export default function AdminUsers() {
         text: status.charAt(0).toUpperCase() + status.slice(1),
         onPress: () => statusMutation.mutate({ id: user.id, status }),
       })),
-      { text: "Annulla", style: "cancel" as const },
+      { text: t("common.cancel"), style: "cancel" as const },
     ]);
   }
 
@@ -325,9 +327,9 @@ export default function AdminUsers() {
       "Rendi Moderatore",
       `Vuoi rendere ${user.nickname} un moderatore?`,
       [
-        { text: "Annulla", style: "cancel" as const },
+        { text: t("common.cancel"), style: "cancel" as const },
         {
-          text: "Conferma",
+          text: t("common.confirm"),
           onPress: () => roleMutation.mutate({ id: user.id, role: "moderator" }),
         },
       ]
@@ -336,21 +338,21 @@ export default function AdminUsers() {
 
   function handleDeleteUser(user: AdminUser) {
     Alert.alert(
-      "Elimina profilo",
+      t("admin.deleteProfile"),
       `Sei sicuro di voler eliminare il profilo di ${user.nickname}?`,
       [
-        { text: "Annulla", style: "cancel" as const },
+        { text: t("common.cancel"), style: "cancel" as const },
         {
-          text: "Elimina",
+          text: t("admin.deleteUser"),
           style: "destructive" as const,
           onPress: () => {
             Alert.alert(
-              "Conferma eliminazione",
-              "Questa azione è irreversibile. Procedere?",
+              t("admin.confirmDelete"),
+              t("admin.irreversibleAction"),
               [
-                { text: "Annulla", style: "cancel" as const },
+                { text: t("common.cancel"), style: "cancel" as const },
                 {
-                  text: "Elimina definitivamente",
+                  text: t("admin.deleteDefinitely"),
                   style: "destructive" as const,
                   onPress: () => deleteMutation.mutate({ id: user.id }),
                 },
@@ -367,7 +369,7 @@ export default function AdminUsers() {
       "Clear Last.fm",
       `Cancellare tutti i dati Last.fm di ${user.nickname}? (brani, sessione, snapshot)`,
       [
-        { text: "Annulla", style: "cancel" as const },
+        { text: t("common.cancel"), style: "cancel" as const },
         {
           text: "Cancella",
           style: "destructive" as const,
@@ -544,14 +546,14 @@ export default function AdminUsers() {
             <Text style={statsStyles.label}>Disponibile</Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
               <MaterialIcons name={u.isAvailable ? "check-circle" : "cancel"} size={16} color={u.isAvailable ? Colors.success : Colors.error} />
-              <Text style={[statsStyles.value, { color: u.isAvailable ? Colors.success : Colors.error }]}>{u.isAvailable ? "Sì" : "No"}</Text>
+              <Text style={[statsStyles.value, { color: u.isAvailable ? Colors.success : Colors.error }]}>{u.isAvailable ? t("common.siCapital") : t("common.noCapital")}</Text>
             </View>
           </View>
           <View style={statsStyles.row}>
-            <Text style={statsStyles.label}>Ghost mode all'uscita app</Text>
+            <Text style={statsStyles.label}>{t("admin.ghostModeLabel")}</Text>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
               <MaterialIcons name={u.ghostMode ? "check-circle" : "cancel"} size={16} color={u.ghostMode ? Colors.warning : Colors.textSecondary} />
-              <Text style={[statsStyles.value, { color: u.ghostMode ? Colors.warning : Colors.textSecondary }]}>{u.ghostMode ? "Sì" : "No"}</Text>
+              <Text style={[statsStyles.value, { color: u.ghostMode ? Colors.warning : Colors.textSecondary }]}>{u.ghostMode ? t("common.siCapital") : t("common.noCapital")}</Text>
             </View>
           </View>
         </View>
@@ -765,7 +767,7 @@ export default function AdminUsers() {
           <Ionicons name="search" size={18} color={Colors.textSecondary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Cerca per nickname, email o telefono..."
+            placeholder={t("admin.searchUsers")}
             placeholderTextColor="#666"
             value={searchText}
             onChangeText={setSearchText}
@@ -853,7 +855,7 @@ export default function AdminUsers() {
                   disabled={emailMutation.isPending}
                 >
                   <Text style={styles.saveBtnText}>
-                    {emailMutation.isPending ? "..." : "Salva"}
+                    {emailMutation.isPending ? "..." : t("common.save")}
                   </Text>
                 </TouchableOpacity>
               </View>

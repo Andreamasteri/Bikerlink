@@ -259,7 +259,7 @@ function ArcadeChampionsSection() {
                   </Text>
                 </>
               ) : (
-                <Text style={[arcadeStyles.cardScore, { color: Colors.textSecondary, fontSize: 11 }]}>Nessun record</Text>
+                <Text style={[arcadeStyles.cardScore, { color: Colors.textSecondary, fontSize: 11 }]}>{t("contest.noRecord")}</Text>
               )}
             </Pressable>
           );

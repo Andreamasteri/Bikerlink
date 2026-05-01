@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 type InvitationCode = {
   id: string;
@@ -57,6 +58,7 @@ type Stats = {
 const EMPTY_FORM = { code: "", label: "", giftMessage: "", maxUses: "100", expiresAt: "" };
 
 export default function InviteCodesScreen() {
+  const t = useT();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
@@ -140,7 +142,7 @@ export default function InviteCodesScreen() {
       setPendingImage(null);
     },
     onError: (err: any) => {
-      const msg = err?.message || "Errore nella creazione";
+      const msg = err?.message || t("admin.createError2");
       try { setFormError(JSON.parse(msg.replace(/^\d+:\s*/, "")).message); } catch { setFormError(msg); }
     },
   });
@@ -159,7 +161,7 @@ export default function InviteCodesScreen() {
       setPendingImage(null);
     },
     onError: (err: any) => {
-      const msg = err?.message || "Errore nell'aggiornamento";
+      const msg = err?.message || t("admin.updateError");
       try { setFormError(JSON.parse(msg.replace(/^\d+:\s*/, "")).message); } catch { setFormError(msg); }
     },
   });
@@ -199,7 +201,7 @@ export default function InviteCodesScreen() {
 
   const handleSave = () => {
     if (!editingCode && !form.code.trim()) {
-      setFormError("Inserisci il codice");
+      setFormError(t("admin.insertCode"));
       return;
     }
     if (editingCode) {
@@ -349,7 +351,7 @@ export default function InviteCodesScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{editingCode ? "Modifica codice" : "Nuovo codice"}</Text>
+              <Text style={styles.modalTitle}>{editingCode ? t("admin.editCode") : t("admin.newCode")}</Text>
               <TouchableOpacity onPress={() => setShowCreateModal(false)}>
                 <Ionicons name="close" size={24} color={Colors.text} />
               </TouchableOpacity>
@@ -459,7 +461,7 @@ export default function InviteCodesScreen() {
                 {isSaving ? (
                   <ActivityIndicator color={Colors.background} />
                 ) : (
-                  <Text style={styles.saveBtnText}>{editingCode ? "Salva modifiche" : "Crea codice"}</Text>
+                  <Text style={styles.saveBtnText}>{editingCode ? t("admin.saveChanges2") : t("admin.createCode")}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>

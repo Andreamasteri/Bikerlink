@@ -22,6 +22,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import FavoriteStar from "@/components/FavoriteStar";
+import { t } from "@/lib/i18n";
 
 function formatLastSeen(dateStr: string | null): string {
   if (!dateStr) return "";
@@ -76,7 +77,7 @@ export default function PublicProfileScreen() {
       const res = await fetch(new URL(`/api/users/${id}/public`, baseUrl).toString(), {
         credentials: "include",
       });
-      if (!res.ok) throw new Error("Errore");
+      if (!res.ok) throw new Error(t("profile.loadError"));
       return res.json();
     },
     enabled: !!id,
@@ -172,7 +173,7 @@ export default function PublicProfileScreen() {
       "Blocca utente",
       `Sei sicuro di voler bloccare ${profile?.nickname ?? "questo utente"}?\n\nL'utente scomparirà dai match, dal profilo e dalla chat.`,
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
           text: "Blocca",
           style: "destructive",
@@ -188,7 +189,7 @@ export default function PublicProfileScreen() {
       "Sblocca utente",
       `Sbloccare ${profile?.nickname ?? "questo utente"}? Potrete tornare a vedervi nei match e nella chat.`,
       [
-        { text: "Annulla", style: "cancel" },
+        { text: t("common.cancel"), style: "cancel" },
         {
           text: "Sblocca",
           onPress: () => unblockMutation.mutate(),

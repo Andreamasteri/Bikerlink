@@ -19,6 +19,7 @@ import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { getApiUrl, apiRequest } from "@/lib/query-client";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
+import { t } from "@/lib/i18n";
 
 type Club = { id: string; name: string; clubType: string };
 type UserResult = { id: string; nickname: string; userType: string };
@@ -124,7 +125,7 @@ export default function CreateMotoclub() {
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
+        const err = await res.json().catch(() => ({ message: t("motoclub.createError") }));
         throw new Error(err.message);
       }
       return res.json();
@@ -313,7 +314,7 @@ export default function CreateMotoclub() {
                 style={[styles.textInput, { marginTop: 10 }]}
                 value={userSearch}
                 onChangeText={handleSearchChange}
-                placeholder="Cerca nickname..."
+                placeholder={t("motoclub.searchNickname")}
                 placeholderTextColor={Colors.textSecondary}
                 onFocus={() => setSearchFocused(true)}
                 onBlur={() => setTimeout(() => setSearchFocused(false), 150)}

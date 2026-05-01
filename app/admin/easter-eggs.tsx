@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import MapPickerContent from "@/components/MapPickerModal";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import { useT } from "@/lib/language-context";
 
 interface EasterEgg {
   id: string;
@@ -27,6 +28,7 @@ function randomItalyCoords() {
 }
 
 export default function AdminEasterEggs() {
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [showModal, setShowModal] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
@@ -165,14 +167,14 @@ export default function AdminEasterEggs() {
 
   function handleDelete(egg: EasterEgg) {
     Alert.alert("Elimina Easter Egg", `Eliminare "${egg.name}"?`, [
-      { text: "Annulla", style: "cancel" },
-      { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate(egg.id) },
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("common.delete"), style: "destructive", onPress: () => deleteMutation.mutate(egg.id) },
     ]);
   }
 
   function handleBatch() {
     Alert.alert("Aggiungi 10 Easter Egg", "Verranno creati 10 Easter Egg in posizioni casuali in Italia (raggio 30m, 10 punti ciascuno)", [
-      { text: "Annulla", style: "cancel" },
+      { text: t("common.cancel"), style: "cancel" },
       { text: "Crea 10", onPress: () => batchMutation.mutate() },
     ]);
   }
@@ -271,7 +273,7 @@ export default function AdminEasterEggs() {
             <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>
-                  {editingEgg ? "Modifica Easter Egg" : "Nuovo Easter Egg"}
+                  {editingEgg ? t("admin.editEasterEgg") : t("admin.newEasterEgg")}
                 </Text>
                 <TouchableOpacity onPress={closeModal}>
                   <Ionicons name="close" size={24} color={Colors.textSecondary} />
@@ -331,7 +333,7 @@ export default function AdminEasterEggs() {
                 onPress={handleSubmit}
               >
                 <Text style={styles.submitBtnText}>
-                  {isPending ? "Salvataggio..." : editingEgg ? "Salva Modifiche" : "Crea Easter Egg"}
+                  {isPending ? t("admin.saving") : editingEgg ? t("admin.saveChanges") : t("admin.createEasterEgg")}
                 </Text>
               </TouchableOpacity>
             </View>
