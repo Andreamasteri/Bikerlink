@@ -306,7 +306,7 @@ export default function ReadyToRideScreen() {
 
       <Modal visible={showSosModal} transparent animationType="fade" onRequestClose={() => setShowSosModal(false)}>
         <KeyboardAvoidingView
-          behavior="padding"
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
           style={{ flex: 1 }}
         >
           <Pressable style={styles.modalOverlay} onPress={() => setShowSosModal(false)}>

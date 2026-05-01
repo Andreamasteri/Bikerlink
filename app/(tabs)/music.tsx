@@ -1710,7 +1710,7 @@ function BraniTab({
             autoCorrect={false}
             autoCapitalize="none"
           />
-          {searchInput.length > 0 && (
+          {searchInput.length > 0 && Platform.OS !== "ios" && (
             <TouchableOpacity onPress={() => onSearchChange("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
             </TouchableOpacity>

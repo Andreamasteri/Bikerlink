@@ -722,6 +722,7 @@ export default function TrackingScreen() {
 
   // ── Volume down x5 to dismiss Hands-Off (Android only) ───────────────────
   useEffect(() => {
+    if (Platform.OS !== "android") return;
     if (!handsOffActive) return;
 
     volumePressTimestampsRef.current = [];
