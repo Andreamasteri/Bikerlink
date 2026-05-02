@@ -935,7 +935,7 @@ export default function MapScreen() {
 
       <Modal visible={showOnlineList} transparent animationType="slide" onRequestClose={() => setShowOnlineList(false)}>
         <Pressable style={styles.detailOverlay} onPress={() => setShowOnlineList(false)}>
-          <Pressable style={styles.listSheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[styles.listSheet, { paddingBottom: insets.bottom || 16 }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.detailHandle} />
             <View style={styles.listSheetHeader}>
               <Ionicons name="radio-button-on" size={20} color={Colors.success} />
@@ -1019,7 +1019,7 @@ export default function MapScreen() {
 
       <Modal visible={showBikerList} transparent animationType="slide" onRequestClose={() => setShowBikerList(false)}>
         <Pressable style={styles.detailOverlay} onPress={() => setShowBikerList(false)}>
-          <Pressable style={styles.listSheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[styles.listSheet, { paddingBottom: insets.bottom || 16 }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.detailHandle} />
             <View style={styles.listSheetHeader}>
               <Ionicons name="hand-left" size={20} color={Colors.accent} />
@@ -1085,7 +1085,7 @@ export default function MapScreen() {
 
       <Modal visible={showZavorrinaList} transparent animationType="slide" onRequestClose={() => setShowZavorrinaList(false)}>
         <Pressable style={styles.detailOverlay} onPress={() => setShowZavorrinaList(false)}>
-          <Pressable style={styles.listSheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[styles.listSheet, { paddingBottom: insets.bottom || 16 }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.detailHandle} />
             <View style={styles.listSheetHeader}>
               <MaterialCommunityIcons name="seat-passenger" size={20} color={Colors.femaleIcon} />
