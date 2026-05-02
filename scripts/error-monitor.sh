@@ -83,28 +83,43 @@ check_recent_crashes() {
   touch /tmp/em_last_crash_check 2>/dev/null
 }
 
-# ── Check 3: OTA mismatch produzione (ogni 20 cicli, ~10 min) ───────────────
+# ── Check 3: OTA mismatch produzione (ogni 10 cicli, ~5 min) ────────────────
 check_ota_mismatch() {
   local OTA_JSON="ota-updates.json"
   [ -f "$OTA_JSON" ] || return 0
+  [ -f "app.json" ] || return 0
 
-  local EXPECTED_RV EXPECTED_ID
-  EXPECTED_RV=$(node -e "
+  # Legge runtimeVersion corrente da app.json e l'ultima entry published da
+  # ota-updates.json (array piatto, filtrato per runtimeVersion + status=published).
+  local EXPECTED_RV EXPECTED_ID EXPECTED_OTA
+  local META
+  META=$(node -e "
     try {
-      const d = require('./$OTA_JSON');
-      const cycle = d.cycles?.at(-1);
-      const last = cycle?.updates?.at(-1);
-      console.log(last?.runtimeVersion ?? '');
-    } catch { console.log(''); }
-  " 2>/dev/null || echo "")
-  EXPECTED_ID=$(node -e "
-    try {
-      const d = require('./$OTA_JSON');
-      const cycle = d.cycles?.at(-1);
-      const last = cycle?.updates?.at(-1);
-      console.log(last?.releaseId ?? '');
-    } catch { console.log(''); }
-  " 2>/dev/null || echo "")
+      const fs = require('fs');
+      const rv = JSON.parse(fs.readFileSync('app.json','utf8'))?.expo?.runtimeVersion ?? '';
+      if (!rv) { console.log('ERROR:no_rv'); process.exit(0); }
+      const data = JSON.parse(fs.readFileSync('$OTA_JSON','utf8'));
+      const published = data.filter(e =>
+        typeof e.updateNumber === 'number' &&
+        e.runtimeVersion === rv &&
+        e.status === 'published'
+      );
+      if (published.length === 0) { console.log('NO_PUBLISHED:rv=' + rv); process.exit(0); }
+      const last = published[published.length - 1];
+      console.log('OK:rv=' + rv + ':ota=' + last.updateNumber + ':id=' + (last.releaseId ?? ''));
+    } catch(e) { console.log('ERROR:' + e.message.replace(/\n/g,' ')); }
+  " 2>/dev/null || echo "ERROR:node_failed")
+
+  if [[ "$META" == ERROR:* ]]; then
+    return 0
+  fi
+  if [[ "$META" == NO_PUBLISHED:* ]]; then
+    return 0
+  fi
+
+  EXPECTED_RV=$(echo "$META" | grep -o 'rv=[^:]*' | head -1 | cut -d= -f2)
+  EXPECTED_OTA=$(echo "$META" | grep -o 'ota=[^:]*' | head -1 | cut -d= -f2)
+  EXPECTED_ID=$(echo "$META" | grep -o 'id=.*' | head -1 | cut -d= -f2)
 
   [ -z "$EXPECTED_RV" ] && return 0
 
@@ -122,29 +137,27 @@ check_ota_mismatch() {
     return 0
   fi
 
-  if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "304" ]; then
-    log "OTA_WARN: produzione risponde HTTP $HTTP_CODE per rv=$EXPECTED_RV (OTA non pubblicata o aggiornata)"
-    return 0
-  fi
-
   if [ "$HTTP_CODE" != "200" ]; then
+    # 204/304 = no update available; altri codici = errore transiente
     return 0
   fi
 
-  SERVED_ID=$(echo "$HTTP_BODY" | node -e "
-    let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>{
-      try { const j=JSON.parse(d); console.log(j.id ?? ''); } catch{ console.log(''); }
-    });
-  " 2>/dev/null || echo "")
+  # Estrae il releaseId (UUID) dal body — funziona sia con JSON puro che con
+  # multipart/mixed (Expo Protocol v1)
+  SERVED_ID=$(echo "$HTTP_BODY" \
+    | grep -oE '"id"[[:space:]]*:[[:space:]]*"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"' \
+    | head -1 \
+    | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
+    || echo "")
 
   if [ -z "$SERVED_ID" ]; then
     return 0
   fi
 
   if [ -n "$EXPECTED_ID" ] && [ "$SERVED_ID" != "$EXPECTED_ID" ]; then
-    log "OTA_MISMATCH: produzione serve id=$SERVED_ID, atteso=$EXPECTED_ID (rv=$EXPECTED_RV)"
+    log "WARN_OTA_MISMATCH: produzione serve id=$SERVED_ID, atteso OTA-${EXPECTED_OTA} id=$EXPECTED_ID (rv=$EXPECTED_RV)"
   else
-    log "OTA_OK: produzione serve rv=$EXPECTED_RV id=$SERVED_ID"
+    log "OTA_OK: produzione serve OTA-${EXPECTED_OTA} rv=$EXPECTED_RV id=$SERVED_ID"
   fi
 }
 
@@ -182,7 +195,7 @@ log "  Intervallo:   ${CHECK_INTERVAL}s"
 log "  Log:          $LOG_FILE"
 log "  Checks/ciclo: backend, backend-crashes"
 log "  Check Last.fm produzione: ogni 10 cicli (~5 min)"
-log "  Check OTA mismatch produzione: ogni 20 cicli (~10 min)"
+log "  Check OTA mismatch produzione: ogni 10 cicli (~5 min)"
 log "============================================"
 
 run_all_checks
@@ -198,7 +211,7 @@ while true; do
     check_lastfm_prod
   fi
 
-  if [ $((CYCLE % 20)) -eq 0 ]; then
+  if [ $((CYCLE % 10)) -eq 0 ]; then
     check_ota_mismatch
   fi
 
