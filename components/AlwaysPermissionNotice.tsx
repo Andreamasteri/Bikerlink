@@ -76,8 +76,11 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
             <View style={[styles.deniedBox, { backgroundColor: "#FF444418", borderColor: "#FF444433" }]}>
               <Ionicons name="warning-outline" size={16} color="#FF4444" />
               <Text style={[styles.deniedText, { color: "#FF4444" }]}>
-                Permesso negato. Usa "Apri Impostazioni" e seleziona{" "}
-                <Text style={{ fontFamily: "Inter_600SemiBold" }}>Posizione → Sempre</Text>.
+                Permesso negato. Vai in{" "}
+                <Text style={{ fontFamily: "Inter_600SemiBold" }}>
+                  Impostazioni → BikerLink → Posizione → Sempre
+                </Text>
+                .
               </Text>
             </View>
           )}
@@ -98,24 +101,26 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[
-              styles.secondaryBtn,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-            onPress={handleRequest}
-            activeOpacity={0.85}
-          >
-            <Ionicons
-              name="location-outline"
-              size={18}
-              color={colors.accent}
-              style={styles.btnIcon}
-            />
-            <Text style={[styles.secondaryBtnText, { color: colors.accent }]}>
-              Richiedi permesso
-            </Text>
-          </TouchableOpacity>
+          {!denied && (
+            <TouchableOpacity
+              style={[
+                styles.secondaryBtn,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+              onPress={handleRequest}
+              activeOpacity={0.85}
+            >
+              <Ionicons
+                name="location-outline"
+                size={18}
+                color={colors.accent}
+                style={styles.btnIcon}
+              />
+              <Text style={[styles.secondaryBtnText, { color: colors.accent }]}>
+                Richiedi permesso
+              </Text>
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={styles.dismissBtn}
