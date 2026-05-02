@@ -61,25 +61,28 @@ function getNotifRoute(item: AppNotification): string | null {
     case "match":
     case "match_request":
     case "match_accepted":
-      // referenceId is the other user's ID (set on the backend)
-      return rid ? `/profile/${rid}` : "/(tabs)/match";
+      // referenceId is the other user's ID; stay on list if absent
+      return rid ? `/profile/${rid}` : null;
     case "motoclub":
     case "motoclub_invite":
     case "motoclub_join":
-      return rid ? `/motoclub/${rid}` : "/(tabs)/motoclub";
+      // referenceId is the club ID; stay on list if absent
+      return rid ? `/motoclub/${rid}` : null;
     case "event_approved":
     case "event_rejected":
     case "event_invite":
-      return rid ? `/evento/${rid}` : "/(tabs)/eventi";
+      // referenceId is the event ID; stay on list if absent
+      return rid ? `/evento/${rid}` : null;
     case "proposal":
     case "proposal_joined":
-      return rid ? `/proposals/${rid}` : "/(tabs)/proposals";
+      // referenceId is the proposal ID; stay on list if absent
+      return rid ? `/proposals/${rid}` : null;
     case "sos":
-      // SOS notifications: open the map tab (index is the map/main screen)
+      // SOS: always open the map — no specific referenceId needed
       return "/(tabs)/index";
     case "chat":
-      // referenceId is the conversation ID — navigate directly to the chat
-      return rid ? `/chat/${rid}` : "/(tabs)/chat";
+      // referenceId is the conversation ID; stay on list if absent
+      return rid ? `/chat/${rid}` : null;
     case "system":
       // System notifications carry no deep-link target
       return null;
