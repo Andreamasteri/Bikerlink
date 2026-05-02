@@ -98,16 +98,16 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
           title: "Here Comes Your Chance!!",
           body: `Una zavorrina cerca proprio la tua moto: ${brand} ${model}! (${zavarrinaUser?.nickname || "Zavorrina"})`,
           notificationType: "match",
-          referenceType: "match",
-          referenceId: wm.id,
+          referenceType: "user",
+          referenceId: wm.userId,
         });
         await storage.createNotification({
           userId: wm.userId,
           title: "Here Comes Your Chance!!",
           body: `Un biker ha la moto che cerchi: ${brand} ${model}!`,
           notificationType: "match",
-          referenceType: "match",
-          referenceId: motorcycle.id,
+          referenceType: "user",
+          referenceId: userId,
         });
         sendMatchPushNotifications([userId, wm.userId]);
         matches.push({ zavarrinaNickname: zavarrinaUser?.nickname, brand, model, ridingStyle });
