@@ -331,6 +331,8 @@ export const routePoints = pgTable("route_points", {
   longitude: doublePrecision("longitude").notNull(),
   altitude: doublePrecision("altitude"),
   speedKmh: doublePrecision("speed_kmh"),
+  accelG: doublePrecision("accel_g"),
+  tiltDeg: doublePrecision("tilt_deg"),
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 }, (table) => [
   index("route_points_route_id_idx").on(table.routeId),

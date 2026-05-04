@@ -86,6 +86,8 @@ router.post("/:id/points", async (req: Request, res: Response) => {
       longitude: p.longitude,
       altitude: p.altitude ?? null,
       speedKmh: p.speedKmh ?? null,
+      accelG: typeof p.accelG === "number" && isFinite(p.accelG) ? p.accelG : null,
+      tiltDeg: typeof p.tiltDeg === "number" && isFinite(p.tiltDeg) ? p.tiltDeg : null,
       timestamp: p.timestamp ? new Date(p.timestamp) : new Date(),
     }));
 

@@ -18,6 +18,7 @@ import Colors from "@/constants/colors";
 import { t, getCurrentLocale } from "@/lib/i18n";
 import { useUnits } from "@/lib/units-context";
 import { formatDistance, formatSpeed, formatDateTime, convertSpeed } from "@/lib/units";
+import Svg, { Polyline } from "react-native-svg";
 
 interface RouteDetail {
   id: string;
@@ -42,6 +43,8 @@ interface RouteDetail {
     longitude: number;
     altitude: number | null;
     speedKmh: number | null;
+    accelG: number | null;
+    tiltDeg: number | null;
     timestamp: string;
   }>;
 }
@@ -107,6 +110,8 @@ export default function RouteDetailScreen() {
 
   const pts = route.points || [];
   const hasPoints = pts.length > 0;
+  const hasSensorData = pts.some((p) => p.accelG != null && p.accelG !== 0);
+  const speedUnitLabel = convertSpeed(0, speedUnit).label;
 
   const mappedPoints = useMemo(
     () => pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude, speedKmh: p.speedKmh ?? null })),
@@ -211,6 +216,39 @@ export default function RouteDetailScreen() {
         )}
       </View>
 
+      {pts.length > 1 && (
+        <View style={styles.chartSection}>
+          <Text style={styles.chartTitle}>Andamento giro</Text>
+          <SparklineChart
+            values={pts.map((p) =>
+              p.speedKmh != null ? convertSpeed(p.speedKmh, speedUnit).value : null
+            )}
+            color={Colors.accent}
+            label="Velocità"
+            unit={speedUnitLabel}
+            toFixed={0}
+          />
+          {hasSensorData && (
+            <>
+              <SparklineChart
+                values={pts.map((p) => p.accelG)}
+                color="#FF3B30"
+                label="G-Force"
+                unit="G"
+                toFixed={2}
+              />
+              <SparklineChart
+                values={pts.map((p) => p.tiltDeg)}
+                color="#0A84FF"
+                label="Inclinazione"
+                unit="°"
+                toFixed={1}
+              />
+            </>
+          )}
+        </View>
+      )}
+
       <View style={styles.actionsRow}>
         <TouchableOpacity
           style={styles.likeButton}
@@ -226,6 +264,67 @@ export default function RouteDetailScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+  );
+}
+
+function SparklineChart({
+  values,
+  color,
+  label,
+  unit,
+  toFixed = 1,
+}: {
+  values: (number | null | undefined)[];
+  color: string;
+  label: string;
+  unit: string;
+  toFixed?: number;
+}) {
+  const valid = values.filter((v): v is number => v != null);
+  if (valid.length < 2) return null;
+
+  const min = Math.min(...valid);
+  const max = Math.max(...valid);
+  const range = max - min || 1;
+  const VW = 300;
+  const VH = 52;
+  const PAD = 3;
+
+  const step = values.length > 120 ? Math.ceil(values.length / 120) : 1;
+  const sampled = values.filter((_, i) => i % step === 0).map((v) => v ?? 0);
+
+  const pts = sampled
+    .map((v, i) => {
+      const x = PAD + (i / Math.max(sampled.length - 1, 1)) * (VW - 2 * PAD);
+      const y = VH - PAD - ((v - min) / range) * (VH - 2 * PAD);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <View style={styles.chartRow}>
+      <View style={styles.chartMeta}>
+        <Text style={styles.chartLabel}>{label}</Text>
+        <Text style={[styles.chartPeak, { color }]}>
+          {max.toFixed(toFixed)} {unit}
+        </Text>
+      </View>
+      <Svg
+        width="100%"
+        height={VH}
+        viewBox={`0 0 ${VW} ${VH}`}
+        preserveAspectRatio="none"
+      >
+        <Polyline
+          points={pts}
+          fill="none"
+          stroke={color}
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      </Svg>
+    </View>
   );
 }
 
@@ -328,6 +427,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700" as const,
     marginTop: 2,
+  },
+  chartSection: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  chartTitle: {
+    color: Colors.text,
+    fontSize: 16,
+    fontWeight: "600" as const,
+    marginBottom: 10,
+  },
+  chartRow: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 6,
+    marginBottom: 8,
+  },
+  chartMeta: {
+    flexDirection: "row" as const,
+    justifyContent: "space-between" as const,
+    alignItems: "center" as const,
+    marginBottom: 6,
+  },
+  chartLabel: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+  },
+  chartPeak: {
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
   actionsRow: {
     flexDirection: "row",

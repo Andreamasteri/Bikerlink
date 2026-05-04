@@ -80,6 +80,8 @@ interface GpsPoint {
   altitude: number;
   speedKmh: number;
   timestamp: string;
+  accelG?: number;
+  tiltDeg?: number;
 }
 
 interface RouteRecord {
@@ -612,6 +614,8 @@ export default function TrackingScreen() {
   const maxAccelGRef = useRef(0);
   const maxDecelGRef = useRef(0);
   const maxTiltDegRef = useRef(0);
+  const currentAccelGRef = useRef(0);
+  const currentTiltDegRef = useRef(0);
   const sprintStartTimeRef = useRef<number | null>(null);
   const sprintPhaseRef = useRef<"waiting" | "measuring" | "done">("waiting");
   const handsOffAnim = useRef(new Animated.Value(1)).current;
@@ -1284,6 +1288,9 @@ export default function TrackingScreen() {
         altitude: alt,
         speedKmh,
         timestamp: new Date(now).toISOString(),
+        ...(sensorsEnabledRef.current && accelBaselineRef.current !== null
+          ? { accelG: currentAccelGRef.current, tiltDeg: currentTiltDegRef.current }
+          : {}),
       };
       pointsBufferRef.current.push(point);
       setPointsBuffered(pointsBufferRef.current.length);
@@ -1423,6 +1430,7 @@ export default function TrackingScreen() {
         // Only update state every 2 samples to reduce re-render frequency
         sampleCount++;
         const gLong = y - accelBaselineRef.current;
+        currentAccelGRef.current = gLong;
         if (gLong > maxAccelGRef.current) {
           maxAccelGRef.current = gLong;
         }
@@ -1431,6 +1439,7 @@ export default function TrackingScreen() {
         }
         // Lateral lean angle (degrees) using x and z axes
         const tiltDeg = Math.atan2(Math.abs(x), Math.abs(z)) * (180 / Math.PI);
+        currentTiltDegRef.current = tiltDeg;
         if (tiltDeg > maxTiltDegRef.current) {
           maxTiltDegRef.current = tiltDeg;
         }

@@ -1167,6 +1167,14 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] user_profiles.units_preference:", e);
         }
 
+        try {
+          await db.execute(sql`ALTER TABLE route_points ADD COLUMN IF NOT EXISTS accel_g DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE route_points ADD COLUMN IF NOT EXISTS tilt_deg DOUBLE PRECISION`);
+          console.log("[MIGRATION] route_points.accel_g/tilt_deg ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] route_points sensor columns:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
