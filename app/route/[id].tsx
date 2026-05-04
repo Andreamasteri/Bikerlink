@@ -17,7 +17,7 @@ import { apiRequest, getQueryFn } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { t, getCurrentLocale } from "@/lib/i18n";
 import { useUnits } from "@/lib/units-context";
-import { formatDistance, formatSpeed, formatDateTime } from "@/lib/units";
+import { formatDistance, formatSpeed, formatDateTime, convertSpeed } from "@/lib/units";
 
 interface RouteDetail {
   id: string;
@@ -205,7 +205,7 @@ export default function RouteDetailScreen() {
         {route.sprint0to100Ms !== null && (route.sprint0to100Ms ?? 0) > 0 && (
           <StatCard
             icon="timer-outline"
-            label="0→100 km/h"
+            label={`0→${convertSpeed(100, speedUnit).value.toFixed(0)} ${convertSpeed(100, speedUnit).label}`}
             value={`${((route.sprint0to100Ms ?? 0) / 1000).toFixed(2)}s`}
           />
         )}
