@@ -23,7 +23,8 @@ import Colors from "@/constants/colors";
 import { apiRequest, getQueryFn, getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
+import { useIsFocused } from "@react-navigation/native";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { getCurrentLocale } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
@@ -632,6 +633,13 @@ export default function TrackingScreen() {
   const bgToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [bgToastCount, setBgToastCount] = useState(0);
   const [bgToastVisible, setBgToastVisible] = useState(false);
+  // Count stored when app returns from background while this tab is not focused,
+  // so we can show the toast when the user navigates back to this tab.
+  const pendingBgToastCountRef = useRef(0);
+  // Ref kept in sync with useIsFocused so the AppState closure can read it.
+  const isTabFocusedRef = useRef(true);
+  const isTabFocused = useIsFocused();
+  useEffect(() => { isTabFocusedRef.current = isTabFocused; }, [isTabFocused]);
 
   // Derived
   const isFermo = currentSpeed <= IDLE_THRESHOLD_KMH;
@@ -878,7 +886,13 @@ export default function TrackingScreen() {
           const acquired = totalGpsPointsRef.current - bgStartPointsRef.current;
           bgPointsCountRef.current = acquired;
           if (acquired > 0) {
-            showBgPointsToast(acquired);
+            if (isTabFocusedRef.current) {
+              // Tab is visible — show the toast immediately
+              showBgPointsToast(acquired);
+            } else {
+              // Tab is hidden (user is on another tab) — defer until tab gains focus
+              pendingBgToastCountRef.current = acquired;
+            }
           }
         }
         bgStartPointsRef.current = 0;
@@ -938,6 +952,17 @@ export default function TrackingScreen() {
       if (bgToastTimerRef.current) clearTimeout(bgToastTimerRef.current);
     };
   }, [showBgPointsToast]);
+
+  // ── Show deferred bg-points toast when tab gains focus ────────────────────
+  useFocusEffect(
+    useCallback(() => {
+      const pending = pendingBgToastCountRef.current;
+      if (pending > 0) {
+        pendingBgToastCountRef.current = 0;
+        showBgPointsToast(pending);
+      }
+    }, [showBgPointsToast])
+  );
 
   // ── Keep refs in sync ─────────────────────────────────────────────────────
   useEffect(() => { profileRef.current = profile; }, [profile]);
