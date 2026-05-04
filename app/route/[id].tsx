@@ -110,7 +110,7 @@ export default function RouteDetailScreen() {
 
   const pts = route.points || [];
   const hasPoints = pts.length > 0;
-  const hasSensorData = pts.some((p) => p.accelG != null && p.accelG !== 0);
+  const hasSensorData = pts.some((p) => p.accelG != null || p.tiltDeg != null);
   const speedUnitLabel = convertSpeed(0, speedUnit).label;
 
   const mappedPoints = useMemo(
@@ -291,15 +291,26 @@ function SparklineChart({
   const PAD = 3;
 
   const step = values.length > 120 ? Math.ceil(values.length / 120) : 1;
-  const sampled = values.filter((_, i) => i % step === 0).map((v) => v ?? 0);
+  const sampled = values.filter((_, i) => i % step === 0);
 
   const pts = sampled
-    .map((v, i) => {
-      const x = PAD + (i / Math.max(sampled.length - 1, 1)) * (VW - 2 * PAD);
-      const y = VH - PAD - ((v - min) / range) * (VH - 2 * PAD);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
+    .reduce<{ segments: string[][]; current: string[] }>(
+      (acc, v, i) => {
+        if (v == null) {
+          if (acc.current.length > 0) {
+            acc.segments.push(acc.current);
+            acc.current = [];
+          }
+        } else {
+          const x = PAD + (i / Math.max(sampled.length - 1, 1)) * (VW - 2 * PAD);
+          const y = VH - PAD - ((v - min) / range) * (VH - 2 * PAD);
+          acc.current.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+        }
+        return acc;
+      },
+      { segments: [], current: [] }
+    );
+  if (pts.current.length > 0) pts.segments.push(pts.current);
 
   return (
     <View style={styles.chartRow}>
@@ -315,14 +326,19 @@ function SparklineChart({
         viewBox={`0 0 ${VW} ${VH}`}
         preserveAspectRatio="none"
       >
-        <Polyline
-          points={pts}
-          fill="none"
-          stroke={color}
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+        {pts.segments.map((seg, idx) =>
+          seg.length > 1 ? (
+            <Polyline
+              key={idx}
+              points={seg.join(" ")}
+              fill="none"
+              stroke={color}
+              strokeWidth="2"
+              strokeLinejoin="round"
+              strokeLinecap="round"
+            />
+          ) : null
+        )}
       </Svg>
     </View>
   );
