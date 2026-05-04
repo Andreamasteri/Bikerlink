@@ -637,8 +637,8 @@ export default function TrackingScreen() {
   // so we can show the toast when the user navigates back to this tab.
   const pendingBgToastCountRef = useRef(0);
   // Ref kept in sync with useIsFocused so the AppState closure can read it.
-  const isTabFocusedRef = useRef(true);
   const isTabFocused = useIsFocused();
+  const isTabFocusedRef = useRef(isTabFocused);
   useEffect(() => { isTabFocusedRef.current = isTabFocused; }, [isTabFocused]);
 
   // Derived
@@ -890,8 +890,8 @@ export default function TrackingScreen() {
               // Tab is visible — show the toast immediately
               showBgPointsToast(acquired);
             } else {
-              // Tab is hidden (user is on another tab) — defer until tab gains focus
-              pendingBgToastCountRef.current = acquired;
+              // Tab is hidden (user is on another tab) — accumulate and defer until tab gains focus
+              pendingBgToastCountRef.current += acquired;
             }
           }
         }
