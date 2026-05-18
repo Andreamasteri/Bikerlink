@@ -359,13 +359,47 @@ interface RouteMapModalProps {
   speedUnit: SpeedUnit;
   insets: { top: number; bottom: number };
   loading?: boolean;
+  routeId?: string | null;
 }
 
 function RouteMapModal({
   visible, onClose, onCloseAll, points, tileUrl, tileMaxZoom,
-  totalKm, maxSpeed, totalMs, distanceUnit, speedUnit, insets, loading,
+  totalKm, maxSpeed, totalMs, distanceUnit, speedUnit, insets, loading, routeId,
 }: RouteMapModalProps) {
   const t = useT();
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExportGpx = async () => {
+    if (!routeId || isExporting) return;
+    setIsExporting(true);
+    try {
+      const url = new URL(`/api/routes/${routeId}/export.gpx`, getApiUrl()).href;
+      const resp = await fetch(url, { headers: authFetchHeaders(), credentials: "include" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const gpxText = await resp.text();
+      const safeName = routeId.replace(/[^a-zA-Z0-9_\-]/g, "_").slice(0, 60);
+      const fileUri = `${FileSystem.cacheDirectory}${safeName}.gpx`;
+      await FileSystem.writeAsStringAsync(fileUri, gpxText, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+      const canShare = await Sharing.isAvailableAsync();
+      if (canShare) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: "application/gpx+xml",
+          dialogTitle: t("tracking.exportGpx"),
+          UTI: "com.topografix.gpx",
+        });
+      } else {
+        Alert.alert("GPX", fileUri);
+      }
+    } catch (err) {
+      console.warn("[BikerLink] GPX export error:", err);
+      Alert.alert(t("common.error"), t("tracking.exportGpxError"));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const html = useMemo(
     () => buildLeafletPostRideHtml(tileUrl, tileMaxZoom, Colors.accent, points),
     [tileUrl, tileMaxZoom, points]
@@ -474,6 +508,33 @@ function RouteMapModal({
                 {t("tracking.backToRide")}
               </Text>
             </TouchableOpacity>
+            {!!routeId && (
+              <TouchableOpacity
+                onPress={handleExportGpx}
+                activeOpacity={0.8}
+                disabled={isExporting}
+                style={{
+                  flex: 1,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  backgroundColor: Colors.surfaceLight,
+                  opacity: isExporting ? 0.5 : 1,
+                }}
+              >
+                {isExporting ? (
+                  <ActivityIndicator size="small" color={Colors.accent} />
+                ) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="download-outline" size={15} color={Colors.accent} />
+                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent }}>
+                      GPX
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               onPress={onCloseAll}
               activeOpacity={0.8}
@@ -2705,6 +2766,7 @@ export default function TrackingScreen() {
         distanceUnit={distanceUnit}
         speedUnit={speedUnit}
         insets={insets}
+        routeId={completedRouteId}
       />
 
       {/* ── HISTORICAL ROUTE MAP MODAL ────────────────────────────────────── */}
@@ -2722,6 +2784,7 @@ export default function TrackingScreen() {
         speedUnit={speedUnit}
         insets={insets}
         loading={histMapLoading}
+        routeId={histMapRecord?.id ?? null}
       />
 
       {/* ── PUBLISH MODAL ────────────────────────────────────────────────── */}
