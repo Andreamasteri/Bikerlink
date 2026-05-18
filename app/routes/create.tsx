@@ -101,14 +101,6 @@ export default function CreateRouteScreen() {
         gpxContent,
         title: guessedTitle || undefined,
       });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
-        const msg = typeof body.error === "string" ? body.error : "Importazione fallita";
-        Alert.alert("Errore", msg);
-        return;
-      }
-
       const route = await res.json() as { id: string };
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       router.replace(`/routes/${route.id}` as any);
@@ -281,7 +273,7 @@ export default function CreateRouteScreen() {
               ) : (
                 <>
                   <Ionicons name="cloud-upload-outline" size={18} color="#FF6600" />
-                  <Text style={styles.importBtnText}>GPX</Text>
+                  <Text style={styles.importBtnText}>Importa GPX</Text>
                 </>
               )}
             </TouchableOpacity>
