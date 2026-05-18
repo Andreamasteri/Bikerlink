@@ -539,7 +539,6 @@ export default function ProfileScreen() {
   const totalRides = profile?.profile?.totalRides ?? 0;
   const totalKm = profile?.profile?.totalKm ?? 0;
   const easterEggs = profile?.profile?.easterEggsCollected ?? 0;
-  const isZavorrina = currentUserType === "zavorrina";
   const isBikerOrCoppia = currentUserType === "biker" || currentUserType === "coppia";
 
   const pickCoordFromGPS = async (target: "home" | "fake") => {
@@ -705,8 +704,7 @@ export default function ProfileScreen() {
         </View>
       ) : null}
 
-      {isZavorrina && (
-        <View style={styles.section}>
+      <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{t("profile.photos")}</Text>
           </View>
@@ -784,7 +782,6 @@ export default function ProfileScreen() {
             })}
           </View>
         </View>
-      )}
 
       <View style={styles.section}>
         <Pressable style={styles.garageCard} onPress={() => router.push("/garage" as any)}>
