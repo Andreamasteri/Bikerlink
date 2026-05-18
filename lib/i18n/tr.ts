@@ -1055,6 +1055,9 @@ const tr: Record<string, string> = {
   "tracking.bufferSent": "Arabellek / Gönderilen",
   "tracking.exportGpx": "GPX dışa aktar",
   "tracking.gpsLost": "GPS kayboldu — sinyal yok",
+  "tracking.gpsBlackoutLabel": "GPS sinyali kayboldu",
+  "tracking.gpsBlackoutTimes": "kez",
+  "tracking.gpsBlackoutTotal": "toplam",
   "tracking.exportGpxError": "Rota dışa aktarılamadı. Lütfen tekrar deneyin.",
 };
 

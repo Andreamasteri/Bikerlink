@@ -1105,6 +1105,7 @@ const it: Record<string, string> = {
   "tracking.gpsLost": "GPS perso — segnale assente",
   "tracking.gpsBlackoutLabel": "Segnale GPS perso",
   "tracking.gpsBlackoutTimes": "volte",
+  "tracking.gpsBlackoutTotal": "totali",
   "tracking.exportGpxError": "Impossibile esportare il percorso. Riprova.",
 };
 

@@ -345,7 +345,7 @@ function RecordCard({
         <View style={styles.gpsBlackoutRow}>
           <Ionicons name="warning-outline" size={13} color={Colors.textSecondary} />
           <Text style={styles.gpsBlackoutText}>
-            {`${t("tracking.gpsBlackoutLabel")}: ${item.gpsBlackoutCount} ${t("tracking.gpsBlackoutTimes")} (${item.gpsBlackoutSeconds ?? 0} s)`}
+            {`${t("tracking.gpsBlackoutLabel")}: ${item.gpsBlackoutCount} ${t("tracking.gpsBlackoutTimes")} (${item.gpsBlackoutSeconds ?? 0} s ${t("tracking.gpsBlackoutTotal")})`}
           </Text>
         </View>
       )}

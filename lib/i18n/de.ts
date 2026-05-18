@@ -1055,6 +1055,9 @@ const de: Record<string, string> = {
   "tracking.bufferSent": "Puffer / Gesendet",
   "tracking.exportGpx": "GPX exportieren",
   "tracking.gpsLost": "GPS verloren — kein Signal",
+  "tracking.gpsBlackoutLabel": "GPS-Signal verloren",
+  "tracking.gpsBlackoutTimes": "Mal",
+  "tracking.gpsBlackoutTotal": "gesamt",
   "tracking.exportGpxError": "Route konnte nicht exportiert werden. Bitte erneut versuchen.",
 };
 

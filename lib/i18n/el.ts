@@ -1055,6 +1055,9 @@ const el: Record<string, string> = {
   "tracking.bufferSent": "Ουρά / Εστάλησαν",
   "tracking.exportGpx": "Εξαγωγή GPX",
   "tracking.gpsLost": "GPS χάθηκε — απουσία σήματος",
+  "tracking.gpsBlackoutLabel": "Σήμα GPS χάθηκε",
+  "tracking.gpsBlackoutTimes": "φορές",
+  "tracking.gpsBlackoutTotal": "συνολικά",
   "tracking.exportGpxError": "Αδύνατη εξαγωγή διαδρομής. Δοκίμασε ξανά.",
 };
 
