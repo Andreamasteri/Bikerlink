@@ -68,8 +68,9 @@ export default function MapScreen() {
   const [mapFullscreenReady, setMapFullscreenReady] = useState(false);
   const [filterBiker, setFilterBiker] = useState(true);
   const [filterZavorrina, setFilterZavorrina] = useState(true);
-  const [filterClubs, setFilterClubs] = useState(true);
+  const [filterClubs, setFilterClubs] = useState(false);
   const [filterEvents, setFilterEvents] = useState(true);
+  const [filtersLoaded, setFiltersLoaded] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
   const [selectedMapPhoto, setSelectedMapPhoto] = useState<string | null>(null);
@@ -141,6 +142,30 @@ export default function MapScreen() {
       setCountriesLoaded(true);
     })();
   }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem("map_filters");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (typeof parsed.biker === "boolean") setFilterBiker(parsed.biker);
+          if (typeof parsed.zavorrina === "boolean") setFilterZavorrina(parsed.zavorrina);
+          if (typeof parsed.clubs === "boolean") setFilterClubs(parsed.clubs);
+          if (typeof parsed.events === "boolean") setFilterEvents(parsed.events);
+        }
+      } catch {}
+      setFiltersLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!filtersLoaded) return;
+    AsyncStorage.setItem(
+      "map_filters",
+      JSON.stringify({ biker: filterBiker, zavorrina: filterZavorrina, clubs: filterClubs, events: filterEvents })
+    ).catch(() => {});
+  }, [filterBiker, filterZavorrina, filterClubs, filterEvents, filtersLoaded]);
 
   const countriesQueryParam = useMemo(() => {
     if (!countriesLoaded || selectedCountries.length === 0) return "";
