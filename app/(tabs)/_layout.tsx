@@ -81,7 +81,13 @@ export default function TabLayout() {
   const [showGarageReminder, setShowGarageReminder] = useState(false);
   const reminderIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const { data: profileData } = useQuery({
+  interface ProfileData {
+    isAvailable?: boolean;
+    ghostMode?: boolean;
+    hideFromMap?: boolean;
+  }
+
+  const { data: profileData } = useQuery<ProfileData>({
     queryKey: ["/api/users/profile"],
     enabled: !!user,
   });
@@ -153,11 +159,9 @@ export default function TabLayout() {
   );
 
   // ── Stato visibilità mappa (per icona cromatica "Status") ────────────────
-  const ghostMode = (profileData as any)?.ghostMode || false;
-  const hideFromMap = (profileData as any)?.hideFromMap || false;
+  const ghostMode = profileData?.ghostMode || false;
+  const hideFromMap = profileData?.hideFromMap || false;
   const isVisibleOnMap = !ghostMode && !hideFromMap;
-
-  const isAvailable = (profileData as any)?.isAvailable || false;
 
   const tabBarHeight = 60 + insets.bottom;
   const tabBarPaddingBottom = insets.bottom;
