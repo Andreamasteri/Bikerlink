@@ -738,9 +738,6 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
       const resp = await apiRequest("GET", "/api/lastfm/auth-token");
       const data = await resp.json() as { token: string; authUrl: string };
       setToken(data.token);
-      // scheme:"bikerlink" in app.json generates a generic Android intent filter
-      // that covers ALL bikerlink:// URIs — no separate intentFilter for
-      // lastfm-callback is needed (Task #976 verified this is sufficient).
       const result = await WebBrowser.openAuthSessionAsync(data.authUrl, "bikerlink://lastfm-callback");
       if (result.type === "cancel" || result.type === "dismiss") {
         setStep("idle");
