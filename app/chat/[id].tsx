@@ -275,11 +275,17 @@ export default function ChatConversationScreen() {
     queryKey: ["/api/chat/conversations"],
   });
 
-  const conversation = conversations?.find((c) => c.id === id);
+  const { data: conversationDetail } = useQuery<ConversationDetail>({
+    queryKey: ["/api/chat/conversations", id],
+    staleTime: 60000,
+    enabled: !!id,
+  });
+
+  const conversation = conversationDetail ?? conversations?.find((c) => c.id === id);
   const isMotoclub = conversation?.conversationType === "motoclub";
 
   const isMotoclubRef = useRef(false);
-  if (conversations !== undefined) isMotoclubRef.current = isMotoclub;
+  if (conversation !== undefined) isMotoclubRef.current = isMotoclub;
 
   const { data: messages, isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],

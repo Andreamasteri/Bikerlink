@@ -668,6 +668,44 @@ router.delete("/conversations/:id", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/conversations/:id", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const convId = req.params.id as string;
+
+    const participants = await storage.getConversationParticipants(convId);
+    if (!participants.find((p) => p.userId === userId)) {
+      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+    }
+
+    const conv = await storage.getConversation(convId);
+    if (!conv) {
+      return res.status(404).json({ message: "Conversazione non trovata" });
+    }
+
+    const allUserIds = participants.map((p) => p.userId);
+    const allUsers = allUserIds.length > 0
+      ? await db.select({ id: users.id, nickname: users.nickname, avatarUrl: users.avatarUrl, userType: users.userType, sex: users.sex })
+          .from(users).where(inArray(users.id, allUserIds))
+      : [];
+    const userMap = new Map(allUsers.map((u) => [u.id, u]));
+
+    const participantUsers = participants.map((p) => userMap.get(p.userId)).filter(Boolean);
+
+    return res.json({
+      id: conv.id,
+      conversationType: conv.conversationType,
+      title: conv.title,
+      participants: participantUsers,
+    });
+  } catch (error) {
+    console.error("Get conversation error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.get("/conversations/:id/messages", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
