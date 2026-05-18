@@ -87,6 +87,7 @@ const PlayerContext = createContext<PlayerContextType | null>(null);
 
 const FAVORITES_KEY = "player_favorite_stations";
 const SLEEP_KEY = "player_sleep_timer";
+const SHUFFLE_KEY = "player_shuffle";
 
 const AUDIO_MODE_ACTIVE = {
   allowsRecording: false,
@@ -128,6 +129,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const queueIndexRef = useRef(0);
   const repeatModeRef = useRef<RepeatMode>("off");
   const isPlayingRef = useRef(false);
+  const isShuffledRef = useRef(false);
+  const shuffleHistoryRef = useRef<Set<number>>(new Set());
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const radioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenRef = useRef(0);
@@ -136,6 +139,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { queueIndexRef.current = queueIndex; }, [queueIndex]);
   useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
+  useEffect(() => { isShuffledRef.current = isShuffled; }, [isShuffled]);
 
   useEffect(() => {
     let mounted = true;
@@ -155,6 +159,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           setFavoriteStationIds(JSON.parse(v));
         } catch (err) {
           console.warn("[Player] favorites parse error:", err);
+        }
+      }
+    });
+
+    AsyncStorage.getItem(SHUFFLE_KEY).then((v) => {
+      if (v && mounted) {
+        try {
+          const saved = JSON.parse(v);
+          if (saved === true) {
+            setIsShuffled(true);
+            isShuffledRef.current = true;
+          }
+        } catch (err) {
+          console.warn("[Player] shuffle parse error:", err);
         }
       }
     });
@@ -185,6 +203,33 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sleepTimerEnd]);
 
+  // Returns the next queue index, respecting shuffle mode.
+  // In shuffle mode it picks a random unplayed track; when all tracks have
+  // been played it resets the history and starts a new cycle.
+  const getNextIndex = useCallback((q: PlayerTrack[], currentIdx: number): number => {
+    if (!isShuffledRef.current) {
+      return (currentIdx + 1) % q.length;
+    }
+    const history = shuffleHistoryRef.current;
+    history.add(currentIdx);
+    const unplayed: number[] = [];
+    for (let i = 0; i < q.length; i++) {
+      if (!history.has(i)) unplayed.push(i);
+    }
+    if (unplayed.length === 0) {
+      // All tracks played — reset history and start a new cycle,
+      // but avoid replaying the track that just finished.
+      shuffleHistoryRef.current = new Set([currentIdx]);
+      const fresh: number[] = [];
+      for (let i = 0; i < q.length; i++) {
+        if (i !== currentIdx) fresh.push(i);
+      }
+      if (fresh.length === 0) return currentIdx; // single-track edge case
+      return fresh[Math.floor(Math.random() * fresh.length)];
+    }
+    return unplayed[Math.floor(Math.random() * unplayed.length)];
+  }, []);
+
   const onPlaybackStatus = useCallback((status: AudioStatus) => {
     if (!status.isLoaded) return;
     setIsPlaying(status.playing);
@@ -201,14 +246,14 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           playerRef.current.seekTo(0);
           playerRef.current.play();
         }
-      } else if (mode === "queue" || idx < q.length - 1) {
-        const nextIdx = (idx + 1) % q.length;
+      } else if (mode === "queue" || isShuffledRef.current || idx < q.length - 1) {
+        const nextIdx = getNextIndex(q, idx);
         loadAndPlay(q[nextIdx], nextIdx);
       } else {
         setIsPlaying(false);
       }
     }
-  }, []);
+  }, [getNextIndex]);
 
   const destroyPlayer = useCallback(() => {
     if (radioTimeoutRef.current) {
@@ -343,6 +388,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const playQueue = useCallback(async (tracks: PlayerTrack[], startIndex = 0) => {
     if (tracks.length === 0) return;
+    shuffleHistoryRef.current = new Set(); // reset shuffle history for new queue
     setQueue(tracks);
     queueRef.current = tracks;
     await loadAndPlay(tracks[startIndex], startIndex);
@@ -376,9 +422,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const q = queueRef.current;
     const idx = queueIndexRef.current;
     if (q.length <= 1) return;
-    const nextIdx = (idx + 1) % q.length;
+    const nextIdx = getNextIndex(q, idx);
     await loadAndPlay(q[nextIdx], nextIdx);
-  }, [loadAndPlay]);
+  }, [loadAndPlay, getNextIndex]);
 
   const prev = useCallback(async () => {
     const q = queueRef.current;
@@ -416,7 +462,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const toggleShuffle = useCallback(() => setIsShuffled((v) => !v), []);
+  const toggleShuffle = useCallback(() => {
+    setIsShuffled((v) => {
+      const next = !v;
+      isShuffledRef.current = next;
+      shuffleHistoryRef.current = new Set(); // reset history on every toggle
+      AsyncStorage.setItem(SHUFFLE_KEY, JSON.stringify(next)).catch((err) => {
+        console.warn("[Player] shuffle persist error:", err);
+      });
+      return next;
+    });
+  }, []);
 
   const toggleRepeat = useCallback(() => {
     setRepeatMode((prev) => {
