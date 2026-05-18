@@ -1169,10 +1169,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         enabled: enabledSetting?.value !== "false",
         provider: providerSetting?.value || "carto_light",
-        userChoiceEnabled: userChoiceSetting?.value !== "false",
+        userChoiceEnabled: userChoiceSetting?.value === "true",
       });
     } catch {
-      res.json({ enabled: true, provider: "carto_light", userChoiceEnabled: true });
+      res.json({ enabled: true, provider: "carto_light", userChoiceEnabled: false });
     }
   });
 
@@ -1181,7 +1181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const setting = await storage.getAppSetting("maps_user_choice_enabled");
       res.json({ enabled: setting?.value !== "false" });
     } catch {
-      res.json({ enabled: true });
+      res.json({ enabled: false });
     }
   });
 

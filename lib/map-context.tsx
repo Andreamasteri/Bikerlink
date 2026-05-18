@@ -29,7 +29,7 @@ const defaultConfig: MapConfig = {
   enabled: true,
   adminProvider: "carto_light",
   resolvedProvider: "carto_light",
-  userChoiceEnabled: true,
+  userChoiceEnabled: false,
   isLoading: false,
 };
 
@@ -58,7 +58,7 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
       ? rawAdminProvider
       : "carto_light";
 
-  const userChoiceEnabled = mapsData?.userChoiceEnabled !== false;
+  const userChoiceEnabled = mapsData?.userChoiceEnabled === true;
   const mapsEnabled = mapsData?.enabled !== false;
 
   const rawUserPref = profileData?.profile?.preferredMapStyle as MapProvider | undefined;

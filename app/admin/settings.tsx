@@ -2676,8 +2676,8 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {mapsUserChoiceEnabled
-            ? "Gli utenti possono scegliere il proprio stile mappa"
-            : t("admin.allProviders")}
+            ? "Attivo — gli utenti vedono la sezione «Stile Mappa» nel profilo e possono scegliere il proprio stile"
+            : "Disattivato (default) — la sezione «Stile Mappa» è nascosta nel profilo utente; viene usato lo stile impostato qui sopra"}
         </Text>
           </View>
         )}
