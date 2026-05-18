@@ -6,11 +6,11 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useRouter, useRootNavigationState } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/query-client";
-import { Platform, AppState, ActivityIndicator, View, Text, StyleSheet } from "react-native";
+import { Platform, AppState, ActivityIndicator, View, Text, StyleSheet, Linking } from "react-native";
 import NativeUpdateChecker from "@/components/NativeUpdateChecker";
 import MatchPopupAlert from "@/components/MatchPopupAlert";
 import UpdateNudgeModal from "@/components/UpdateNudgeModal";
@@ -313,30 +313,87 @@ function navigateFromNotifData(data: { type?: string; unreadChat?: number } | un
   }
 }
 
+function parseDeepLink(url: string): { type?: string; unreadChat?: number } | null {
+  try {
+    if (!url.startsWith("bikerlink://")) return null;
+    const parsed = new URL(url);
+    const type = parsed.searchParams.get("type") ?? undefined;
+    const unreadChatStr = parsed.searchParams.get("unreadChat");
+    const unreadChat = unreadChatStr != null ? parseInt(unreadChatStr, 10) : undefined;
+    if (!type) return null;
+    return { type, unreadChat };
+  } catch {
+    return null;
+  }
+}
+
 function BackgroundNotificationHandler() {
   const router = useRouter();
+  const navState = useRootNavigationState();
+  const isNavReady = !!(navState?.key);
+  const pendingNavRef = useRef<{ type?: string; unreadChat?: number } | null>(null);
+  const isNavReadyRef = useRef(isNavReady);
 
   useEffect(() => {
-    if (!Notifications) return;
+    isNavReadyRef.current = isNavReady;
+  }, [isNavReady]);
 
-    (async () => {
-      try {
-        const lastResponse = await Notifications.getLastNotificationResponseAsync();
-        if (lastResponse) {
-          const data = lastResponse.notification.request.content.data as { type?: string; unreadChat?: number } | undefined;
-          navigateFromNotifData(data, router);
-        }
-      } catch {}
-    })();
+  useEffect(() => {
+    if (!isNavReady) return;
+    if (pendingNavRef.current) {
+      const data = pendingNavRef.current;
+      pendingNavRef.current = null;
+      navigateFromNotifData(data, router);
+    }
+  }, [isNavReady, router]);
 
-    let sub: { remove: () => void } | null = null;
-    try {
-      sub = Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data as { type?: string; unreadChat?: number } | undefined;
+  useEffect(() => {
+    function handleNavData(data: { type?: string; unreadChat?: number } | undefined) {
+      if (!data) return;
+      if (isNavReadyRef.current) {
         navigateFromNotifData(data, router);
-      });
-    } catch {}
-    return () => { sub?.remove(); };
+      } else {
+        pendingNavRef.current = data;
+      }
+    }
+
+    if (Notifications) {
+      (async () => {
+        try {
+          const lastResponse = await Notifications.getLastNotificationResponseAsync();
+          if (lastResponse) {
+            const data = lastResponse.notification.request.content.data as { type?: string; unreadChat?: number } | undefined;
+            handleNavData(data);
+          }
+        } catch {}
+      })();
+    }
+
+    Linking.getInitialURL().then((url) => {
+      if (!url) return;
+      const parsed = parseDeepLink(url);
+      if (parsed) handleNavData(parsed);
+    }).catch(() => {});
+
+    let notifSub: { remove: () => void } | null = null;
+    if (Notifications) {
+      try {
+        notifSub = Notifications.addNotificationResponseReceivedListener((response) => {
+          const data = response.notification.request.content.data as { type?: string; unreadChat?: number } | undefined;
+          handleNavData(data);
+        });
+      } catch {}
+    }
+
+    const linkingSub = Linking.addEventListener("url", ({ url }) => {
+      const parsed = parseDeepLink(url);
+      if (parsed) navigateFromNotifData(parsed, router);
+    });
+
+    return () => {
+      notifSub?.remove();
+      linkingSub.remove();
+    };
   }, [router]);
 
   return null;

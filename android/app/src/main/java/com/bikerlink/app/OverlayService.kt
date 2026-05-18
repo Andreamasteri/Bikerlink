@@ -12,6 +12,7 @@ import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.view.Gravity
@@ -175,10 +176,19 @@ class OverlayService : Service() {
                     val totalDy = event.rawY - downRawY
                     val dist = sqrt(totalDx * totalDx + totalDy * totalDy)
                     if (dist < dp(8)) {
-                        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                        val deepLink = "bikerlink://notifications?type=background_badge&unreadChat=$badgeChat&unreadNotif=$badgeNotif"
+                        val deepLinkIntent = Intent(Intent.ACTION_VIEW, Uri.parse(deepLink)).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            setPackage(packageName)
                         }
-                        if (launchIntent != null) startActivity(launchIntent)
+                        try {
+                            startActivity(deepLinkIntent)
+                        } catch (_: Exception) {
+                            val fallback = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                            }
+                            if (fallback != null) startActivity(fallback)
+                        }
                     }
                     true
                 }
