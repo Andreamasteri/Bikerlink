@@ -526,12 +526,9 @@ function RouteMapModal({
                 {isExporting ? (
                   <ActivityIndicator size="small" color={Colors.accent} />
                 ) : (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <Ionicons name="download-outline" size={15} color={Colors.accent} />
-                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent }}>
-                      GPX
-                    </Text>
-                  </View>
+                  <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent }}>
+                    {t("tracking.exportGpx")}
+                  </Text>
                 )}
               </TouchableOpacity>
             )}
