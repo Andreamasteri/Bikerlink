@@ -1179,10 +1179,6 @@ export const userMusicTokens = pgTable("user_music_tokens", {
 
 export type UserMusicToken = typeof userMusicTokens.$inferSelect;
 export type InsertUserMusicToken = typeof userMusicTokens.$inferInsert;
-// Legacy aliases kept for historical reference (renamed from Spotify era)
-export const userSpotifyTokens = userMusicTokens;
-export type UserSpotifyToken = UserMusicToken;
-export type InsertUserSpotifyToken = InsertUserMusicToken;
 
 export const userMusicTracks = pgTable("user_music_tracks", {
   id: serial("id").primaryKey(),
