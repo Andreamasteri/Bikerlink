@@ -1,11 +1,18 @@
+import { PROTECTED_NICKNAMES } from "./constants";
+
 interface TrackedUser {
   role: string;
+  nickname: string;
   status: string;
   userType: string;
   isAvailable: boolean;
   ghostMode: boolean;
   country: string | null;
   lastSeen: Date;
+}
+
+function isSystemEntry(entry: Pick<TrackedUser, "role" | "nickname">): boolean {
+  return entry.role === "admin" || PROTECTED_NICKNAMES.includes(entry.nickname);
 }
 
 export class OnlineTracker {
@@ -27,9 +34,9 @@ export class OnlineTracker {
   }
 
   setOnline(userId: string, data: Omit<TrackedUser, "lastSeen">): void {
-    // Task #1212: admins are never tracked — they must not appear in map
-    // counters or the heartbeat list returned to non-admin callers.
-    if (data.role === "admin" || data.status !== "active") {
+    // Task #1236: system accounts (admin role OR protected nickname) are never
+    // tracked — they must not appear in map counters or heartbeat lists.
+    if (isSystemEntry(data) || data.status !== "active") {
       this.users.delete(userId);
       return;
     }
@@ -73,7 +80,7 @@ export class OnlineTracker {
   countOnlineUsers(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {
-      if (entry.role === "admin" || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active") continue;
       if (entry.ghostMode) continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
       count++;
@@ -84,7 +91,7 @@ export class OnlineTracker {
   countAvailableBikers(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {
-      if (entry.role === "admin" || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active") continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "biker" && entry.userType !== "coppia") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
@@ -96,7 +103,7 @@ export class OnlineTracker {
   countAvailableZavorrine(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {
-      if (entry.role === "admin" || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active") continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "zavorrina") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
@@ -108,7 +115,7 @@ export class OnlineTracker {
   getOnlineUserIds(countries?: string[]): string[] {
     const ids: string[] = [];
     for (const [userId, entry] of this.users) {
-      if (entry.role === "admin" || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active") continue;
       if (entry.ghostMode) continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
       ids.push(userId);
@@ -119,7 +126,7 @@ export class OnlineTracker {
   getAvailableBikerIds(countries?: string[]): string[] {
     const ids: string[] = [];
     for (const [userId, entry] of this.users) {
-      if (entry.role === "admin" || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active") continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "biker" && entry.userType !== "coppia") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
@@ -131,7 +138,7 @@ export class OnlineTracker {
   getAvailableZavorrinaIds(countries?: string[]): string[] {
     const ids: string[] = [];
     for (const [userId, entry] of this.users) {
-      if (entry.role === "admin" || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active") continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "zavorrina") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;

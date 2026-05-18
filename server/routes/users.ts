@@ -3,7 +3,8 @@ import multer, { MulterError } from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "../storage";
-import { isProtectedUser, PROTECTED_NICKNAMES } from "../constants";
+import { isProtectedUser } from "../constants";
+import { isSystemAccount, systemAccountConditions } from "../lib/system-account-filter";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
 import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos } from "@shared/schema";
@@ -112,7 +113,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     if (lat != null && lng != null) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and, ne, notInArray: notInArr } = await import("drizzle-orm");
+      const { eq, and, notInArray: notInArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance");
       const rows = await db
@@ -121,8 +122,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         .leftJoin(profilesTable, eq(profilesTable.userId, usersTable.id))
         .where(and(
           notInArr(usersTable.id, [requesterId, ...Array.from(blockedSet)]),
-          ne(usersTable.role, "admin"),
-          notInArr(usersTable.nickname, PROTECTED_NICKNAMES),
+          ...systemAccountConditions(usersTable),
         ))
         .orderBy(sqlTag`distance`);
       type UserDistanceRow = { user: { id: string; nickname: string; avatarUrl: string | null; userType: string }; distance: number | null; hideFromMap: boolean | null };
@@ -138,7 +138,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
     const allUsers = await storage.getAllUsers();
     const results = allUsers
-      .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId && u.role !== "admin" && !PROTECTED_NICKNAMES.includes(u.nickname))
+      .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId && !isSystemAccount(u))
       .map((u) => ({
         id: u.id,
         nickname: u.nickname,
@@ -559,7 +559,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
-    if (targetUser.role === "admin" || PROTECTED_NICKNAMES.includes(targetUser.nickname)) {
+    if (isSystemAccount(targetUser)) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
@@ -680,12 +680,12 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     if (includeOffline) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and, lt, or, isNull, inArray: inArr, notInArray: notInArr } = await import("drizzle-orm");
+      const { eq, and, lt, or, isNull, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"]), notInArr(usersTable.nickname, PROTECTED_NICKNAMES)];
+      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq(usersTable.ghostMode, false), ...systemAccountConditions(usersTable)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResultsRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
@@ -808,12 +808,12 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
     if (includeOffline) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and, or, inArray: inArr, notInArray: notInArr } = await import("drizzle-orm");
+      const { eq, and, or, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const bikerConds: any[] = [eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia")), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"]), notInArr(usersTable.nickname, PROTECTED_NICKNAMES)];
+      const bikerConds: any[] = [eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia")), eq(usersTable.ghostMode, false), ...systemAccountConditions(usersTable)];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
       const allBikersRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
@@ -882,12 +882,12 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
     if (includeOffline) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and, inArray: inArr, notInArray: notInArr } = await import("drizzle-orm");
+      const { eq, and, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina"), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"]), notInArr(usersTable.nickname, PROTECTED_NICKNAMES)];
+      const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina"), eq(usersTable.ghostMode, false), ...systemAccountConditions(usersTable)];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
       const allZavRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
