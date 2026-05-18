@@ -1103,6 +1103,8 @@ const it: Record<string, string> = {
   "tracking.bufferSent": "Buffer / Inviati",
   "tracking.exportGpx": "Esporta GPX",
   "tracking.gpsLost": "GPS perso — segnale assente",
+  "tracking.gpsBlackoutLabel": "Segnale GPS perso",
+  "tracking.gpsBlackoutTimes": "volte",
   "tracking.exportGpxError": "Impossibile esportare il percorso. Riprova.",
 };
 

@@ -98,6 +98,8 @@ interface RouteRecord {
   maxAccelerationG?: number | null;
   isSprint?: boolean;
   sprint0to100Ms?: number | null;
+  gpsBlackoutCount?: number | null;
+  gpsBlackoutSeconds?: number | null;
 }
 
 // ─── Local record type (offline-recovered, not synced to server) ──────────────
@@ -337,6 +339,14 @@ function RecordCard({
             </Text>
             <Text style={styles.recordStatLabel}>{t("tracking.maxSpeed")}</Text>
           </View>
+        </View>
+      )}
+      {!item.isSprint && (item.gpsBlackoutCount ?? 0) > 0 && (
+        <View style={styles.gpsBlackoutRow}>
+          <Ionicons name="warning-outline" size={13} color={Colors.textSecondary} />
+          <Text style={styles.gpsBlackoutText}>
+            {`${t("tracking.gpsBlackoutLabel")}: ${item.gpsBlackoutCount} ${t("tracking.gpsBlackoutTimes")} (${item.gpsBlackoutSeconds ?? 0} s)`}
+          </Text>
         </View>
       )}
     </View>
@@ -682,6 +692,10 @@ export default function TrackingScreen() {
   const gpsOfflineBufferRef = useRef<GpsPoint[]>([]);
   const gpsOfflineWriteCountRef = useRef(0);
   const bufferWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const gpsWasLostRef = useRef(false);
+  const gpsBlackoutCountRef = useRef(0);
+  const gpsBlackoutSecondsRef = useRef(0);
+  const gpsBlackoutStartRef = useRef<number | null>(null);
   const volumePressTimestampsRef = useRef<number[]>([]);
   const lastVolumeRef = useRef<number | null>(null);
   const handsOffDismissedForRideRef = useRef(false);
@@ -1445,6 +1459,10 @@ export default function TrackingScreen() {
     gpsOfflineBufferRef.current = [];
     gpsOfflineWriteCountRef.current = 0;
     bufferWriteQueueRef.current = Promise.resolve();
+    gpsWasLostRef.current = false;
+    gpsBlackoutCountRef.current = 0;
+    gpsBlackoutSecondsRef.current = 0;
+    gpsBlackoutStartRef.current = null;
     volumePressTimestampsRef.current = [];
     lastVolumeRef.current = null;
     handsOffDismissedForRideRef.current = false;
@@ -1535,7 +1553,17 @@ export default function TrackingScreen() {
       const lastGpsAge = lastPosRef.current
         ? now - lastPosRef.current.time
         : now - startTimeRef.current;
-      setGpsLost(lastGpsAge > GPS_SIGNAL_TIMEOUT_MS);
+      const isNowLost = lastGpsAge > GPS_SIGNAL_TIMEOUT_MS;
+      const wasLost = gpsWasLostRef.current;
+      if (!wasLost && isNowLost) {
+        gpsBlackoutStartRef.current = now;
+        gpsBlackoutCountRef.current += 1;
+      } else if (wasLost && !isNowLost && gpsBlackoutStartRef.current !== null) {
+        gpsBlackoutSecondsRef.current += Math.round((now - gpsBlackoutStartRef.current) / 1000);
+        gpsBlackoutStartRef.current = null;
+      }
+      gpsWasLostRef.current = isNowLost;
+      setGpsLost(isNowLost);
     }, 100);
 
     flushTimerRef.current = setInterval(() => {
@@ -1725,6 +1753,12 @@ export default function TrackingScreen() {
     // Persist any in-memory points that haven't reached the 5-point batch threshold yet
     await flushRemainingToBuffer();
 
+    // Close out any GPS blackout period still active at stop time
+    if (gpsBlackoutStartRef.current !== null) {
+      gpsBlackoutSecondsRef.current += Math.round((Date.now() - gpsBlackoutStartRef.current) / 1000);
+      gpsBlackoutStartRef.current = null;
+    }
+
     try {
       await apiRequest("PUT", `/api/routes/${rId}/stop`, {
         totalDistanceKm: totalKmRef.current,
@@ -1737,6 +1771,8 @@ export default function TrackingScreen() {
         maxDecelerationG: maxDecelGRef.current,
         maxTiltDeg: maxTiltDegRef.current > 0 ? maxTiltDegRef.current : null,
         sprint0to100Ms: sprint0to100MsRef.current,
+        gpsBlackoutCount: gpsBlackoutCountRef.current,
+        gpsBlackoutSeconds: gpsBlackoutSecondsRef.current,
       });
       await clearGpsBuffer();
       await refetchRecords();
@@ -3352,6 +3388,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
     gap: 10,
+  },
+  gpsBlackoutRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 5,
+    marginTop: -4,
+  },
+  gpsBlackoutText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary,
   },
   recordHeader: {
     flexDirection: "row" as const,

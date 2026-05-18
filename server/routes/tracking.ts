@@ -127,6 +127,8 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       maxAccelerationG: clientMaxAccel,
       maxDecelerationG: clientMaxDecel,
       sprint0to100Ms: clientSprint0to100Ms,
+      gpsBlackoutCount: clientGpsBlackoutCount,
+      gpsBlackoutSeconds: clientGpsBlackoutSeconds,
     } = req.body;
 
     let totalDistanceKm: number;
@@ -200,6 +202,8 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
     if (sprint0to100Ms !== null) {
       updatePayload.sprint0to100Ms = sprint0to100Ms;
     }
+    updatePayload.gpsBlackoutCount = Math.max(0, Math.floor(Number(clientGpsBlackoutCount) || 0));
+    updatePayload.gpsBlackoutSeconds = Math.max(0, Math.floor(Number(clientGpsBlackoutSeconds) || 0));
     const updated = await storage.updateRoute(id, updatePayload);
 
     const profile = await storage.getUserProfile(userId);

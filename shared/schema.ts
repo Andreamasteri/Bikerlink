@@ -291,6 +291,8 @@ export const routes = pgTable("routes", {
   maxDecelerationG: doublePrecision("max_deceleration_g").default(0),
   isSprint: boolean("is_sprint").notNull().default(false),
   sprint0to100Ms: integer("sprint_0to100_ms"),
+  gpsBlackoutCount: integer("gps_blackout_count").notNull().default(0),
+  gpsBlackoutSeconds: integer("gps_blackout_seconds").notNull().default(0),
   likes: integer("likes").notNull().default(0),
   startedAt: timestamp("started_at").notNull().defaultNow(),
   stoppedAt: timestamp("stopped_at"),
