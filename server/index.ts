@@ -1175,6 +1175,14 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] route_points sensor columns:", e);
         }
 
+        try {
+          await db.execute(sql`ALTER TABLE routes ADD COLUMN IF NOT EXISTS gps_blackout_count INTEGER NOT NULL DEFAULT 0`);
+          await db.execute(sql`ALTER TABLE routes ADD COLUMN IF NOT EXISTS gps_blackout_seconds INTEGER NOT NULL DEFAULT 0`);
+          console.log("[MIGRATION] routes.gps_blackout_count/gps_blackout_seconds ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] routes gps blackout columns:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
