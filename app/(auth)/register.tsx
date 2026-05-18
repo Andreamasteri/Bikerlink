@@ -798,7 +798,7 @@ export default function RegisterScreen() {
       {showCountries && (
         <View style={styles.regionList}>
           <ScrollView style={styles.regionScroll} nestedScrollEnabled>
-            {EUROPEAN_COUNTRIES.map((c) => (
+            {[...EUROPEAN_COUNTRIES].sort((a, b) => a.name.localeCompare(b.name)).map((c) => (
               <TouchableOpacity
                 key={c.code}
                 style={[styles.regionItem, country === c.code && styles.regionItemSelected]}
@@ -828,7 +828,7 @@ export default function RegisterScreen() {
           {showRegions && (
             <View style={styles.regionList}>
               <ScrollView style={styles.regionScroll} nestedScrollEnabled>
-                {getRegionsForCountry(country).map((r) => (
+                {[...getRegionsForCountry(country)].sort((a, b) => a.name.localeCompare(b.name)).map((r) => (
                   <TouchableOpacity
                     key={r.name}
                     style={[styles.regionItem, region === r.name && styles.regionItemSelected]}

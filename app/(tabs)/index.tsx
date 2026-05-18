@@ -15,6 +15,7 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
+  SectionList,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
@@ -196,10 +197,22 @@ export default function MapScreen() {
     });
   }, []);
 
-  const sortedCountries = useMemo(() => {
-    const itEntry = EUROPEAN_COUNTRIES.find((c) => c.code === "IT");
-    const rest = EUROPEAN_COUNTRIES.filter((c) => c.code !== "IT").sort((a, b) => a.name.localeCompare(b.name));
-    return itEntry ? [itEntry, ...rest] : rest;
+  const continentSections = useMemo(() => {
+    const CONTINENT_GROUPS: { label: string; codes: string[] }[] = [
+      { label: "🌍 Europa", codes: ["IT","DE","FR","ES","PT","GB","NL","BE","CH","AT","PL","CZ","SK","HU","RO","BG","HR","SI","RS","BA","MK","AL","ME","XK","GR","CY","MT","SE","NO","DK","FI","EE","LV","LT","IE","IS","LU","MC","AD","LI","SM","VA","BY","MD","UA"] },
+      { label: "🌍 Nord Africa", codes: ["MA","DZ","TN","LY","EG","MR"] },
+      { label: "🌐 Nord America", codes: ["US","CA","MX"] },
+      { label: "🌎 Sud America", codes: ["BR","AR","CL","CO","PE","VE","UY","PY","BO","EC","GY","SR","GF"] },
+      { label: "🌏 Altro", codes: ["RU","TR","GE","AM","AZ","JP"] },
+    ];
+    const countryMap = new Map(EUROPEAN_COUNTRIES.map((c) => [c.code, c]));
+    return CONTINENT_GROUPS.map((group) => ({
+      title: group.label,
+      data: group.codes
+        .map((code) => countryMap.get(code))
+        .filter(Boolean)
+        .sort((a, b) => a!.name.localeCompare(b!.name)) as typeof EUROPEAN_COUNTRIES,
+    })).filter((section) => section.data.length > 0);
   }, []);
 
   const getRegionFallback = useCallback(() => {
@@ -1610,10 +1623,16 @@ export default function MapScreen() {
               </Pressable>
             </View>
             <Text style={styles.areaSubtitle}>{t("home.defineAreaDesc")}</Text>
-            <FlatList
-              data={sortedCountries}
+            <SectionList
+              sections={continentSections}
               keyExtractor={(item) => item.code}
               style={{ maxHeight: 420 }}
+              stickySectionHeadersEnabled={false}
+              renderSectionHeader={({ section }) => (
+                <View style={styles.continentHeader}>
+                  <Text style={styles.continentHeaderText}>{section.title}</Text>
+                </View>
+              )}
               renderItem={({ item }) => {
                 const isSelected = selectedCountries.includes(item.code);
                 return (
@@ -2251,6 +2270,18 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     marginBottom: 12,
+  },
+  continentHeader: {
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  continentHeaderText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.5,
   },
   countryRow: {
     flexDirection: "row" as const,
