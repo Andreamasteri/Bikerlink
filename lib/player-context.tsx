@@ -6,7 +6,7 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import { Alert } from "react-native";
+import { Alert, AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   createAudioPlayer,
@@ -131,6 +131,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const isPlayingRef = useRef(false);
   const isShuffledRef = useRef(false);
   const shuffleHistoryRef = useRef<Set<number>>(new Set());
+  const userPausedRef = useRef(false);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const radioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenRef = useRef(0);
@@ -177,8 +178,25 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Interruption recovery: when the app returns to the foreground after an
+    // audio interruption (phone call, alarm, Bluetooth disconnect), re-request
+    // audio focus and resume if the user had not explicitly paused.
+    const appStateSub = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active" && playerRef.current && !isPlayingRef.current && !userPausedRef.current) {
+        console.log("[Player] AppState active — re-requesting audio focus and resuming");
+        setAudioModeAsync(AUDIO_MODE_ACTIVE)
+          .then(() => {
+            if (playerRef.current && !isPlayingRef.current && !userPausedRef.current) {
+              playerRef.current.play();
+            }
+          })
+          .catch((err) => console.warn("[Player] interruption recovery error:", err));
+      }
+    });
+
     return () => {
       mounted = false;
+      appStateSub.remove();
       if (radioTimeoutRef.current) {
         clearTimeout(radioTimeoutRef.current);
         radioTimeoutRef.current = null;
@@ -275,6 +293,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const loadAndPlay = useCallback(async (track: PlayerTrack, trackIndex: number) => {
     const gen = ++loadGenRef.current;
+    userPausedRef.current = false; // new track load is always intentional play
     try {
       destroyPlayer();
 
@@ -348,10 +367,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   }, [onPlaybackStatus, destroyPlayer]);
 
   const play = useCallback(() => {
+    userPausedRef.current = false;
     try { playerRef.current?.play(); } catch (err) { console.warn("[Player] play error:", err); }
   }, []);
 
   const pause = useCallback(() => {
+    userPausedRef.current = true;
     try { playerRef.current?.pause(); } catch (err) { console.warn("[Player] pause error:", err); }
   }, []);
 
