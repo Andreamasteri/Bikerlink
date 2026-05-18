@@ -46,76 +46,6 @@ function generateId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
-interface GpxPoint {
-  lat: number;
-  lon: number;
-  name: string;
-}
-
-function extractAttr(attrs: string, name: string): number | null {
-  const m = new RegExp(`${name}="([^"]+)"`).exec(attrs);
-  if (!m) return null;
-  const v = parseFloat(m[1]);
-  return isNaN(v) ? null : v;
-}
-
-function extractTagText(inner: string, tag: string): string {
-  const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i").exec(inner);
-  return m ? m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim() : "";
-}
-
-function parseGpx(text: string): GpxPoint[] {
-  const points: GpxPoint[] = [];
-
-  const tryParse = (tagName: string, defaultLabel: string) => {
-    const re = new RegExp(`<${tagName}\\s([^>]+)>([\\s\\S]*?)<\\/${tagName}>`, "gi");
-    let m: RegExpExecArray | null;
-    while ((m = re.exec(text)) !== null) {
-      const attrs = m[1];
-      const inner = m[2];
-      const lat = extractAttr(attrs, "lat");
-      const lon = extractAttr(attrs, "lon");
-      if (lat === null || lon === null) continue;
-      const name = extractTagText(inner, "name") || defaultLabel;
-      points.push({ lat, lon, name });
-    }
-  };
-
-  tryParse("wpt", "Waypoint");
-  if (points.length === 0) tryParse("rtept", "Punto");
-
-  if (points.length === 0) {
-    const trkptRe = /<trkpt\s([^>]+)>/gi;
-    const all: GpxPoint[] = [];
-    let m: RegExpExecArray | null;
-    while ((m = trkptRe.exec(text)) !== null) {
-      const lat = extractAttr(m[1], "lat");
-      const lon = extractAttr(m[1], "lon");
-      if (lat !== null && lon !== null) all.push({ lat, lon, name: "" });
-    }
-    if (all.length > 0) {
-      const MAX = 50;
-      const step = Math.max(1, Math.floor(all.length / MAX));
-      const sampled = all.filter((_, i) => i % step === 0);
-      if (sampled[sampled.length - 1] !== all[all.length - 1]) {
-        sampled.push(all[all.length - 1]);
-      }
-      sampled.forEach((p, i) => {
-        points.push({ ...p, name: `Punto ${i + 1}` });
-      });
-    }
-  }
-
-  return points;
-}
-
-function assignWaypointTypes(points: GpxPoint[]): string[] {
-  return points.map((_, i) => {
-    if (i === 0) return "start";
-    if (i === points.length - 1 && points.length > 1) return "end";
-    return "stop";
-  });
-}
 
 function getWaypointMeta(type: string, types: ReturnType<typeof getWaypointTypes>) {
   return types.find((w) => w.value === type) || types[1];
@@ -162,47 +92,33 @@ export default function CreateRouteScreen() {
       if (result.canceled || !result.assets?.[0]) return;
 
       const asset = result.assets[0];
-      const content = await FileSystem.readAsStringAsync(asset.uri);
-      const parsed = parseGpx(content);
-
-      if (parsed.length === 0) {
-        Alert.alert("Errore", "Nessuna tappa trovata nel file GPX.");
-        return;
-      }
-
-      const types = assignWaypointTypes(parsed);
-      const newWaypoints: LocalWaypoint[] = parsed.map((p, i) => ({
-        localId: generateId(),
-        name: p.name,
-        description: "",
-        latitude: p.lat,
-        longitude: p.lon,
-        waypointType: types[i],
-        orderIndex: i,
-      }));
+      const gpxContent = await FileSystem.readAsStringAsync(asset.uri);
 
       const rawName = asset.name ?? "";
       const guessedTitle = rawName.replace(/\.gpx$/i, "").replace(/[_-]+/g, " ").trim();
-      if (guessedTitle && !title.trim()) setTitle(guessedTitle);
 
-      if (waypoints.length > 0) {
-        Alert.alert(
-          "Importa GPX",
-          `Trovate ${parsed.length} tappe. Sostituire le tappe esistenti?`,
-          [
-            { text: "Annulla", style: "cancel" },
-            { text: "Sostituisci", style: "destructive", onPress: () => setWaypoints(newWaypoints) },
-          ]
-        );
-      } else {
-        setWaypoints(newWaypoints);
+      const res = await apiRequest("POST", "/api/custom-routes/import-gpx", {
+        gpxContent,
+        title: guessedTitle || undefined,
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as Record<string, unknown>;
+        const msg = typeof body.error === "string" ? body.error : "Importazione fallita";
+        Alert.alert("Errore", msg);
+        return;
       }
-    } catch (e: any) {
-      Alert.alert("Errore", e.message || "Impossibile leggere il file GPX.");
+
+      const route = await res.json() as { id: string };
+      queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+      router.replace(`/routes/${route.id}` as any);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Impossibile leggere il file GPX.";
+      Alert.alert("Errore", msg);
     } finally {
       setIsImporting(false);
     }
-  }, [title, waypoints.length]);
+  }, [router]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {

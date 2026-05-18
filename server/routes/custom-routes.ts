@@ -267,6 +267,133 @@ router.delete("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) =
   }
 });
 
+// ─── GPX helpers ─────────────────────────────────────────────────────────────
+
+function gpxExtractAttr(attrs: string, name: string): number | null {
+  const m = new RegExp(`${name}="([^"]+)"`).exec(attrs);
+  if (!m) return null;
+  const v = parseFloat(m[1]);
+  return isNaN(v) ? null : v;
+}
+
+function gpxExtractTagText(inner: string, tag: string): string {
+  const m = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i").exec(inner);
+  if (!m) return "";
+  return m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim();
+}
+
+interface GpxPoint { lat: number; lon: number; name: string }
+
+function parseGpxServer(text: string): GpxPoint[] {
+  const points: GpxPoint[] = [];
+
+  const tryTag = (tagName: string, fallbackLabel: string) => {
+    const re = new RegExp(`<${tagName}\\s([^>]+)>([\\s\\S]*?)<\\/${tagName}>`, "gi");
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const lat = gpxExtractAttr(m[1], "lat");
+      const lon = gpxExtractAttr(m[1], "lon");
+      if (lat === null || lon === null) continue;
+      const name = gpxExtractTagText(m[2], "name") || fallbackLabel;
+      points.push({ lat, lon, name });
+    }
+  };
+
+  tryTag("wpt", "Waypoint");
+  if (points.length === 0) tryTag("rtept", "Punto");
+
+  if (points.length === 0) {
+    const trkptRe = /<trkpt\s([^>]+)>/gi;
+    const all: GpxPoint[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = trkptRe.exec(text)) !== null) {
+      const lat = gpxExtractAttr(m[1], "lat");
+      const lon = gpxExtractAttr(m[1], "lon");
+      if (lat !== null && lon !== null) all.push({ lat, lon, name: "" });
+    }
+    if (all.length > 0) {
+      const MAX = 50;
+      const step = Math.max(1, Math.floor(all.length / MAX));
+      const sampled = all.filter((_, i) => i % step === 0);
+      if (sampled[sampled.length - 1] !== all[all.length - 1]) {
+        sampled.push(all[all.length - 1]);
+      }
+      sampled.forEach((p, i) => points.push({ ...p, name: `Punto ${i + 1}` }));
+    }
+  }
+
+  return points;
+}
+
+function gpxWaypointType(index: number, total: number): string {
+  if (index === 0) return "start";
+  if (index === total - 1 && total > 1) return "end";
+  return "stop";
+}
+
+// ─── POST /api/custom-routes/import-gpx ──────────────────────────────────────
+// Accepts { gpxContent: string, title?: string }, parses GPX server-side,
+// creates the route with all waypoints, and returns the full route object.
+
+router.post("/api/custom-routes/import-gpx", async (req, res) => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+
+    const featureSetting = await storage.getAppSetting("custom_routes_enabled");
+    if (featureSetting?.value === "false") {
+      return res.status(403).json({ error: "Funzione disattivata" });
+    }
+
+    const { gpxContent, title } = req.body as { gpxContent?: unknown; title?: unknown };
+
+    if (typeof gpxContent !== "string" || gpxContent.trim().length === 0) {
+      return res.status(400).json({ error: "gpxContent è obbligatorio" });
+    }
+
+    const points = parseGpxServer(gpxContent);
+    if (points.length === 0) {
+      return res.status(422).json({ error: "Nessuna tappa trovata nel file GPX" });
+    }
+    if (points.length < 2) {
+      return res.status(422).json({ error: "Il file GPX deve contenere almeno 2 tappe" });
+    }
+
+    const routeTitle =
+      (typeof title === "string" && title.trim().length > 0)
+        ? title.trim()
+        : "Percorso importato";
+
+    const route = await storage.createCustomRoute({
+      userId,
+      title: routeTitle,
+      description: null,
+      isPublic: false,
+      visibility: "private",
+    });
+
+    for (let i = 0; i < points.length; i++) {
+      const p = points[i];
+      await storage.createCustomRouteWaypoint({
+        routeId: route.id,
+        name: p.name,
+        description: null,
+        latitude: p.lat,
+        longitude: p.lon,
+        waypointType: gpxWaypointType(i, points.length),
+        orderIndex: i,
+      });
+    }
+
+    const waypoints = await storage.getCustomRouteWaypoints(route.id);
+    res.json({ ...route, waypoints });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Errore interno";
+    res.status(500).json({ error: msg });
+  }
+});
+
+// ─── GET /api/users/:userId/custom-routes ─────────────────────────────────────
 router.get("/api/users/:userId/custom-routes", async (req, res) => {
   try {
     const sessionUserId = (req.session as any)?.userId;
