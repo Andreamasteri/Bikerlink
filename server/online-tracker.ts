@@ -27,6 +27,8 @@ class OnlineTracker {
   }
 
   setOnline(userId: string, data: Omit<TrackedUser, "lastSeen">): void {
+    // Task #1212: admins are never tracked — they must not appear in map
+    // counters or the heartbeat list returned to non-admin callers.
     if (data.role === "admin" || data.status !== "active") {
       this.users.delete(userId);
       return;

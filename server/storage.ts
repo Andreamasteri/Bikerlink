@@ -1121,6 +1121,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
+    // Task #1212: notInArray(users.role, ["admin"]) ensures admins are excluded
+    // from the nearby-users list and map pin count.
     const conditions = [
       eq(users.status, "active"),
       eq(users.ghostMode, false),
@@ -1209,6 +1211,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countAvailableUsers(): Promise<number> {
+    // Task #1212: notInArray(users.role, ["admin"]) — admins excluded from available-user count.
     const conditions = [eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin"])];
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(userProfiles).innerJoin(users, eq(users.id, userProfiles.userId)).where(and(...conditions));
     return result[0]?.count ?? 0;
@@ -1218,6 +1221,7 @@ export class DatabaseStorage implements IStorage {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
+    // Task #1212: notInArray(users.role, ["admin"]) — admins excluded from heartbeat list.
     const conditions: any[] = [eq(users.status, "active"), eq(users.ghostMode, false), notInArray(users.role, ["admin"])];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
@@ -1241,6 +1245,7 @@ export class DatabaseStorage implements IStorage {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
+    // Task #1212: notInArray(users.role, ["admin"]) — admins excluded from available-users list.
     const results = await db
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)

@@ -641,6 +641,11 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+// Task #1212: onlineTracker.countOnlineUsers / getOnlineUserIds already exclude
+// role="admin" users at the tracker level (setOnline rejects admins on entry).
+// The storage-layer queries (getOnlineUsersList, countAvailableUsers,
+// getAvailableUsersList, getNearbyUsers) also include notInArray(role, ["admin"]).
+// Admins therefore cannot appear in the map count badge or heartbeat list.
 router.get("/online-count", requireAuth, (req: Request, res: Response) => {
   const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
   return res.json({ count: onlineTracker.countOnlineUsers(countriesParam) });
