@@ -16,7 +16,6 @@
       }
     },
     "production": {
-      "channel": "production",
       "distribution": "store",
       "credentialsSource": "remote",
       "android": {
@@ -30,8 +29,5 @@
         "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app"
       }
     }
-  },
-  "submit": {
-    "production": {}
   }
 }
