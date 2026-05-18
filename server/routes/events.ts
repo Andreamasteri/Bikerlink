@@ -29,6 +29,7 @@ import {
   notInArray,
 } from "drizzle-orm";
 import { PROTECTED_NICKNAMES } from "../constants";
+import { systemAccountConditions } from "../lib/system-account-filter";
 import { uploadBuffer, deleteObject } from "../objectStorage";
 import { allLimited } from "../lib/concurrency";
 import { sendNewEventNotificationEmail } from "../email";
@@ -127,8 +128,7 @@ async function enrichEvent(evt: EventRow, requestingUserId: string | null) {
       .leftJoin(users, eq(users.id, eventParticipants.userId))
       .where(and(
         eq(eventParticipants.eventId, evt.id),
-        ne(users.role, "admin"),
-        notInArray(users.nickname, PROTECTED_NICKNAMES),
+        ...systemAccountConditions(users),
       ))
       .orderBy(asc(eventParticipants.joinedAt)),
   ]);
@@ -371,8 +371,7 @@ router.get("/map", async (req: Request, res: Response) => {
         eq(events.status, "approved"),
         gte(events.eventDate, now),
         sql`${events.latitude} IS NOT NULL AND ${events.longitude} IS NOT NULL`,
-        ne(users.role, "admin"),
-        notInArray(users.nickname, PROTECTED_NICKNAMES),
+        ...systemAccountConditions(users),
       ))
       .orderBy(asc(events.eventDate))
       .limit(200);
@@ -438,7 +437,7 @@ router.get("/", async (req: Request, res: Response) => {
     })
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
-      .where(and(...conditions, ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)))
+      .where(and(...conditions, ...systemAccountConditions(users)))
       .orderBy(asc(events.eventDate));
 
     // Geo-distance filter (post-query, Haversine)
@@ -636,7 +635,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     })
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
-      .where(and(eq(events.id, id), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)));
+      .where(and(eq(events.id, id), ...systemAccountConditions(users)));
 
     if (!row) return res.status(404).json({ message: "Evento non trovato" });
 

@@ -1,6 +1,7 @@
 import { eq, and, or, sql, desc, asc, gte, lte, inArray, notInArray } from "drizzle-orm";
 import { db } from "./db";
 import { PROTECTED_NICKNAMES } from "./constants";
+import { systemAccountConditions } from "./lib/system-account-filter";
 import {
   users,
   userPhotos,
@@ -528,7 +529,8 @@ export class DatabaseStorage implements IStorage {
         and(
           eq(users.status, "active"),
           eq(users.ghostMode, false),
-          sql`${users.nickname} ILIKE ${pattern}`
+          sql`${users.nickname} ILIKE ${pattern}`,
+          ...systemAccountConditions(users),
         )
       )
       .limit(20);
@@ -626,8 +628,7 @@ export class DatabaseStorage implements IStorage {
           sql`${proposals.departureLatitude} IS NOT NULL`,
           sql`${proposals.departureLongitude} IS NOT NULL`,
           sql`${proposals.searchType} IS NOT NULL`,
-          notInArray(users.role, ["admin"]),
-          notInArray(users.nickname, PROTECTED_NICKNAMES)
+          ...systemAccountConditions(users),
         )
       );
     return results.map(r => r.proposal);
@@ -1128,8 +1129,7 @@ export class DatabaseStorage implements IStorage {
     const conditions = [
       eq(users.status, "active"),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin"]),
-      notInArray(users.nickname, PROTECTED_NICKNAMES),
+      ...systemAccountConditions(users),
       sql`${userProfiles.latitude} IS NOT NULL`,
       sql`${userProfiles.longitude} IS NOT NULL`,
     ];
@@ -1207,7 +1207,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countOnlineUsers(since: Date, countries?: string[]): Promise<number> {
-    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false), notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES)];
+    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false), ...systemAccountConditions(users)];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(...conditions));
     return result[0]?.count ?? 0;
@@ -1215,7 +1215,7 @@ export class DatabaseStorage implements IStorage {
 
   async countAvailableUsers(): Promise<number> {
     // Task #1212: notInArray(users.role, ["admin"]) — admins excluded from available-user count.
-    const conditions = [eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES)];
+    const conditions = [eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), ...systemAccountConditions(users)];
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(userProfiles).innerJoin(users, eq(users.id, userProfiles.userId)).where(and(...conditions));
     return result[0]?.count ?? 0;
   }
@@ -1225,7 +1225,7 @@ export class DatabaseStorage implements IStorage {
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
     // Task #1212: notInArray(users.role, ["admin"]) — admins excluded from heartbeat list.
-    const conditions: any[] = [eq(users.status, "active"), eq(users.ghostMode, false), notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES)];
+    const conditions: any[] = [eq(users.status, "active"), eq(users.ghostMode, false), ...systemAccountConditions(users)];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
     } else if (!onlineIds) {
@@ -1253,7 +1253,7 @@ export class DatabaseStorage implements IStorage {
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES)))
+      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), ...systemAccountConditions(users)))
       .orderBy(sql`distance`);
     // Privacy: null out derived distance for users who opted out of map visibility
     return maskHiddenLocationRows(results);
@@ -1529,7 +1529,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]> {
-    const baseCondition = and(notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES))!;
+    const baseCondition = and(...systemAccountConditions(users))!;
     const condition = countries && countries.length > 0
       ? and(baseCondition, inArray(users.country, countries))
       : baseCondition;
@@ -1545,8 +1545,7 @@ export class DatabaseStorage implements IStorage {
   async getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]> {
     const baseCondition = and(
       or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!,
-      notInArray(users.role, ["admin"]),
-      notInArray(users.nickname, PROTECTED_NICKNAMES)
+      ...systemAccountConditions(users)
     )!;
     const condition = countries && countries.length > 0
       ? and(baseCondition, inArray(users.country, countries))
@@ -1606,8 +1605,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin"]),
-      notInArray(users.nickname, PROTECTED_NICKNAMES),
+      ...systemAccountConditions(users),
       gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
@@ -1625,8 +1623,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin"]),
-      notInArray(users.nickname, PROTECTED_NICKNAMES),
+      ...systemAccountConditions(users),
       gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
@@ -1646,8 +1643,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin"]),
-      notInArray(users.nickname, PROTECTED_NICKNAMES),
+      ...systemAccountConditions(users),
     ];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
@@ -1674,8 +1670,7 @@ export class DatabaseStorage implements IStorage {
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
-      notInArray(users.role, ["admin"]),
-      notInArray(users.nickname, PROTECTED_NICKNAMES),
+      ...systemAccountConditions(users),
     ];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));

@@ -19,6 +19,7 @@ import {
 } from "@shared/schema";
 import { eq, and, ilike, or, sql, desc, ne, count, notInArray } from "drizzle-orm";
 import { PROTECTED_NICKNAMES } from "../constants";
+import { systemAccountConditions } from "../lib/system-account-filter";
 import { sendEmail } from "../email";
 
 const router = Router();
@@ -465,7 +466,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
           const memberQuery = db.select({ u: users })
             .from(motoClubMembers)
             .innerJoin(users, eq(users.id, motoClubMembers.userId))
-            .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.status, "active"), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)));
+            .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.status, "active"), ...systemAccountConditions(users)));
 
           const members = await memberQuery;
           const filtered = members.filter(({ u }) => {
@@ -770,7 +771,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     })
       .from(motoClubMembers)
       .innerJoin(users, eq(users.id, motoClubMembers.userId))
-      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)));
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), ...systemAccountConditions(users)));
 
     const members = membersRaw.map(r => ({
       userId: r.user.id,
@@ -930,7 +931,7 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
       })
       .from(motoClubMembers)
       .innerJoin(users, eq(motoClubMembers.userId, users.id))
-      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)))
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), ...systemAccountConditions(users)))
       .orderBy(motoClubMembers.joinedAt)
       .limit(limit)
       .offset(offset);
@@ -939,7 +940,7 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
       .select({ totalCount: count(motoClubMembers.id) })
       .from(motoClubMembers)
       .innerJoin(users, eq(motoClubMembers.userId, users.id))
-      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)));
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), ...systemAccountConditions(users)));
 
     const total = Number(totalCount);
     return res.json({ ...club, hasPendingLocationProposal, members: memberships, totalCount: total, hasMore: offset + limit < total });
