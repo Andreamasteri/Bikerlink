@@ -142,13 +142,15 @@ export default function TabLayout() {
   }, [unreadCount]);
 
   // ── Query proposte attive (per icona cromatica "Ride!") ──────────────────
-  const { data: proposalMatchesData } = useQuery<unknown[]>({
+  const { data: proposalMatchesData } = useQuery<{ status: string }[]>({
     queryKey: ["/api/proposals/matches"],
     enabled: !!user,
     refetchInterval: 30000,
   });
 
-  const hasActiveMatches = (proposalMatchesData?.length ?? 0) > 0;
+  const hasActiveMatches = (proposalMatchesData ?? []).some(
+    (m) => m.status === "pending" || m.status === "accepted"
+  );
 
   // ── Stato visibilità mappa (per icona cromatica "Status") ────────────────
   const ghostMode = (profileData as any)?.ghostMode || false;
