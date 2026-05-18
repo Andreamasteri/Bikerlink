@@ -1409,6 +1409,7 @@ export default function TrackingScreen() {
     }
     setTrackingActive(false);
     setGpsLost(false);
+    pendingBgToastCountRef.current = 0;
   }, []);
 
   // ── Reset tracking state ───────────────────────────────────────────────────
@@ -1462,6 +1463,7 @@ export default function TrackingScreen() {
     gpsWasLostRef.current = false;
     gpsBlackoutCountRef.current = 0;
     gpsBlackoutSecondsRef.current = 0;
+    pendingBgToastCountRef.current = 0;
     gpsBlackoutStartRef.current = null;
     volumePressTimestampsRef.current = [];
     lastVolumeRef.current = null;
