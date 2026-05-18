@@ -136,6 +136,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // Cleared on play(), loadAndPlay(), and stop(). Used by the AppState recovery handler.
   const wasInterruptedRef = useRef(false);
   const prevPlayingRef = useRef(false);
+  // One-shot delayed recovery for foreground-only interruptions (Bluetooth
+  // disconnect while app stays in foreground — no AppState change fires).
+  const recoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const radioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenRef = useRef(0);
@@ -268,9 +271,33 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (prevPlayingRef.current && !status.playing && !status.didJustFinish && !userPausedRef.current) {
       wasInterruptedRef.current = true;
       console.log("[Player] OS interruption detected — waiting to recover");
+      // Schedule a foreground recovery attempt for interruptions that never
+      // trigger an AppState change (e.g. Bluetooth disconnect while the app
+      // stays in foreground). Fires once after 5 s; if the player is still
+      // paused and the native AUDIOFOCUS_GAIN callback has not already resumed
+      // it, we re-request audio focus and call play().
+      if (recoveryTimeoutRef.current) clearTimeout(recoveryTimeoutRef.current);
+      recoveryTimeoutRef.current = setTimeout(() => {
+        recoveryTimeoutRef.current = null;
+        if (playerRef.current && wasInterruptedRef.current && !isPlayingRef.current && !userPausedRef.current) {
+          console.log("[Player] Foreground recovery attempt after interruption");
+          setAudioModeAsync(AUDIO_MODE_ACTIVE)
+            .then(() => {
+              if (playerRef.current && wasInterruptedRef.current && !isPlayingRef.current && !userPausedRef.current) {
+                wasInterruptedRef.current = false;
+                playerRef.current.play();
+              }
+            })
+            .catch((err) => console.warn("[Player] foreground recovery error:", err));
+        }
+      }, 5000);
     } else if (status.playing) {
       // Playing resumed (either by user or by native AUDIOFOCUS_GAIN handling).
       wasInterruptedRef.current = false;
+      if (recoveryTimeoutRef.current) {
+        clearTimeout(recoveryTimeoutRef.current);
+        recoveryTimeoutRef.current = null;
+      }
     }
     prevPlayingRef.current = status.playing;
 
@@ -318,6 +345,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const loadAndPlay = useCallback(async (track: PlayerTrack, trackIndex: number) => {
     const gen = ++loadGenRef.current;
     userPausedRef.current = false; // new track load is always intentional play
+    wasInterruptedRef.current = false;
+    if (recoveryTimeoutRef.current) { clearTimeout(recoveryTimeoutRef.current); recoveryTimeoutRef.current = null; }
     try {
       destroyPlayer();
 
@@ -393,6 +422,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const play = useCallback(() => {
     userPausedRef.current = false;
     wasInterruptedRef.current = false;
+    if (recoveryTimeoutRef.current) { clearTimeout(recoveryTimeoutRef.current); recoveryTimeoutRef.current = null; }
     try { playerRef.current?.play(); } catch (err) { console.warn("[Player] play error:", err); }
   }, []);
 
@@ -410,6 +440,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     userPausedRef.current = false;
     wasInterruptedRef.current = false;
     prevPlayingRef.current = false;
+    if (recoveryTimeoutRef.current) { clearTimeout(recoveryTimeoutRef.current); recoveryTimeoutRef.current = null; }
     if (sleepTimerRef.current) {
       clearTimeout(sleepTimerRef.current);
       sleepTimerRef.current = null;
