@@ -221,6 +221,9 @@ export default function MapScreen() {
 
       if (coords) {
         try {
+          await AsyncStorage.setItem("map_last_gps", JSON.stringify({ latitude: coords.latitude, longitude: coords.longitude }));
+        } catch {}
+        try {
           await apiRequest("PUT", "/api/users/location", {
             latitude: coords.latitude,
             longitude: coords.longitude,
@@ -241,9 +244,24 @@ export default function MapScreen() {
     let cancelled = false;
     async function initMapLocation() {
       try {
+        // Leggi subito l'ultima posizione GPS salvata localmente (zero delay di rete)
+        try {
+          const cachedGps = await AsyncStorage.getItem("map_last_gps");
+          if (cachedGps) {
+            const parsed = JSON.parse(cachedGps);
+            if (parsed && typeof parsed.latitude === "number" && typeof parsed.longitude === "number") {
+              if (!cancelled) {
+                setLocation({ latitude: parsed.latitude, longitude: parsed.longitude });
+                setLocationLoading(false);
+              }
+            }
+          }
+        } catch {}
+
         sendStartupBeacon("fetch_gps_start");
         if (user?.region) {
-          if (!cancelled) setLocation(getRegionCoordinates(user.region, user.country));
+          // Applica la regione del profilo solo se non abbiamo già una posizione GPS locale
+          if (!cancelled) setLocation((prev) => prev ?? getRegionCoordinates(user.region, user.country));
           if (!cancelled) setLocationLoading(false);
           const gps = await fetchGPSLocation();
           if (gps && !cancelled) setLocation(gps);
@@ -251,7 +269,7 @@ export default function MapScreen() {
         }
 
         if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
-          if (!cancelled) setLocation({ latitude: Number(profileLat), longitude: Number(profileLng) });
+          if (!cancelled) setLocation((prev) => prev ?? { latitude: Number(profileLat), longitude: Number(profileLng) });
           if (!cancelled) setLocationLoading(false);
           const gps = await fetchGPSLocation();
           if (gps && !cancelled) setLocation(gps);
@@ -263,7 +281,7 @@ export default function MapScreen() {
           if (gps) {
             setLocation(gps);
           } else {
-            setLocation(getRegionFallback());
+            setLocation((prev) => prev ?? getRegionFallback());
           }
           setLocationLoading(false);
         }
