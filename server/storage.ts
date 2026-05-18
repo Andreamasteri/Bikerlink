@@ -1,5 +1,6 @@
 import { eq, and, or, sql, desc, asc, gte, lte, inArray, notInArray } from "drizzle-orm";
 import { db } from "./db";
+import { PROTECTED_NICKNAMES } from "./constants";
 import {
   users,
   userPhotos,
@@ -1127,6 +1128,7 @@ export class DatabaseStorage implements IStorage {
       eq(users.status, "active"),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin"]),
+      notInArray(users.nickname, PROTECTED_NICKNAMES),
       sql`${userProfiles.latitude} IS NOT NULL`,
       sql`${userProfiles.longitude} IS NOT NULL`,
     ];
@@ -1204,7 +1206,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countOnlineUsers(since: Date, countries?: string[]): Promise<number> {
-    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false), notInArray(users.role, ["admin"])];
+    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false), notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES)];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(...conditions));
     return result[0]?.count ?? 0;
@@ -1212,7 +1214,7 @@ export class DatabaseStorage implements IStorage {
 
   async countAvailableUsers(): Promise<number> {
     // Task #1212: notInArray(users.role, ["admin"]) — admins excluded from available-user count.
-    const conditions = [eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin"])];
+    const conditions = [eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES)];
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(userProfiles).innerJoin(users, eq(users.id, userProfiles.userId)).where(and(...conditions));
     return result[0]?.count ?? 0;
   }
@@ -1222,7 +1224,7 @@ export class DatabaseStorage implements IStorage {
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
     // Task #1212: notInArray(users.role, ["admin"]) — admins excluded from heartbeat list.
-    const conditions: any[] = [eq(users.status, "active"), eq(users.ghostMode, false), notInArray(users.role, ["admin"])];
+    const conditions: any[] = [eq(users.status, "active"), eq(users.ghostMode, false), notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES)];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
     } else if (!onlineIds) {
@@ -1250,7 +1252,7 @@ export class DatabaseStorage implements IStorage {
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin"])))
+      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES)))
       .orderBy(sql`distance`);
     // Privacy: null out derived distance for users who opted out of map visibility
     return maskHiddenLocationRows(results);
@@ -1526,7 +1528,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]> {
-    const baseCondition = notInArray(users.role, ["admin"]);
+    const baseCondition = and(notInArray(users.role, ["admin"]), notInArray(users.nickname, PROTECTED_NICKNAMES))!;
     const condition = countries && countries.length > 0
       ? and(baseCondition, inArray(users.country, countries))
       : baseCondition;
@@ -1542,7 +1544,8 @@ export class DatabaseStorage implements IStorage {
   async getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]> {
     const baseCondition = and(
       or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!,
-      notInArray(users.role, ["admin"])
+      notInArray(users.role, ["admin"]),
+      notInArray(users.nickname, PROTECTED_NICKNAMES)
     )!;
     const condition = countries && countries.length > 0
       ? and(baseCondition, inArray(users.country, countries))
@@ -1603,6 +1606,7 @@ export class DatabaseStorage implements IStorage {
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin"]),
+      notInArray(users.nickname, PROTECTED_NICKNAMES),
       gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
@@ -1621,6 +1625,7 @@ export class DatabaseStorage implements IStorage {
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin"]),
+      notInArray(users.nickname, PROTECTED_NICKNAMES),
       gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
@@ -1641,6 +1646,7 @@ export class DatabaseStorage implements IStorage {
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin"]),
+      notInArray(users.nickname, PROTECTED_NICKNAMES),
     ];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
@@ -1668,6 +1674,7 @@ export class DatabaseStorage implements IStorage {
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),
       notInArray(users.role, ["admin"]),
+      notInArray(users.nickname, PROTECTED_NICKNAMES),
     ];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));

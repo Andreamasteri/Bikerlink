@@ -17,7 +17,8 @@ import {
   userProfiles,
   userMotorcycles,
 } from "@shared/schema";
-import { eq, and, ilike, or, sql, desc, ne, count } from "drizzle-orm";
+import { eq, and, ilike, or, sql, desc, ne, count, notInArray } from "drizzle-orm";
+import { PROTECTED_NICKNAMES } from "../constants";
 import { sendEmail } from "../email";
 
 const router = Router();
@@ -464,7 +465,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
           const memberQuery = db.select({ u: users })
             .from(motoClubMembers)
             .innerJoin(users, eq(users.id, motoClubMembers.userId))
-            .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.status, "active")));
+            .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.status, "active"), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)));
 
           const members = await memberQuery;
           const filtered = members.filter(({ u }) => {
@@ -769,7 +770,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     })
       .from(motoClubMembers)
       .innerJoin(users, eq(users.id, motoClubMembers.userId))
-      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")));
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)));
 
     const members = membersRaw.map(r => ({
       userId: r.user.id,

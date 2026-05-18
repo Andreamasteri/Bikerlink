@@ -3,7 +3,7 @@ import multer, { MulterError } from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "../storage";
-import { isProtectedUser } from "../constants";
+import { isProtectedUser, PROTECTED_NICKNAMES } from "../constants";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
 import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos } from "@shared/schema";
@@ -122,6 +122,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         .where(and(
           notInArr(usersTable.id, [requesterId, ...Array.from(blockedSet)]),
           ne(usersTable.role, "admin"),
+          notInArr(usersTable.nickname, PROTECTED_NICKNAMES),
         ))
         .orderBy(sqlTag`distance`);
       type UserDistanceRow = { user: { id: string; nickname: string; avatarUrl: string | null; userType: string }; distance: number | null; hideFromMap: boolean | null };
@@ -137,7 +138,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
     const allUsers = await storage.getAllUsers();
     const results = allUsers
-      .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId && u.role !== "admin")
+      .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId && u.role !== "admin" && !PROTECTED_NICKNAMES.includes(u.nickname))
       .map((u) => ({
         id: u.id,
         nickname: u.nickname,
@@ -684,7 +685,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"])];
+      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"]), notInArr(usersTable.nickname, PROTECTED_NICKNAMES)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResultsRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
