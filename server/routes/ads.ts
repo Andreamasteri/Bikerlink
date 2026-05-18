@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
-import { downloadBuffer } from "../objectStorage";
+import { downloadBuffer, deleteObject, listObjects } from "../objectStorage";
 import path from "path";
 import fs from "fs";
 
@@ -114,15 +114,39 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
       try {
         fs.unlinkSync(path.join(localDir, file));
         removed++;
-        console.log(`[ADS CLEANUP] Removed orphaned image: ${file}`);
+        console.log(`[ADS CLEANUP] Removed orphaned local cache: ${file}`);
       } catch (unlinkErr) {
-        console.warn(`[ADS CLEANUP] Failed to remove ${file} (non-fatal):`, unlinkErr);
+        console.warn(`[ADS CLEANUP] Failed to remove local ${file} (non-fatal):`, unlinkErr);
       }
     }
 
     console.log(
-      `[ADS CLEANUP] Done — removed: ${removed}, kept: ${referencedFilenames.size} referenced`,
+      `[ADS CLEANUP] Local cache — removed: ${removed}, kept: ${referencedFilenames.size} referenced`,
     );
+
+    // Also remove orphaned files from object storage (public/ads/).
+    // This covers images replaced/deleted before the per-operation deleteObject
+    // calls were added — those files were never cleaned from the primary store.
+    try {
+      const objectFiles = await listObjects("public/ads/");
+      let objectRemoved = 0;
+      for (const obj of objectFiles) {
+        // obj.name is the full path, e.g. "public/ads/1234567890-abc123.webp"
+        const filename = obj.name.slice("public/ads/".length);
+        if (!filename || filename.includes("/")) continue; // skip sub-prefixes
+        if (referencedFilenames.has(filename)) continue;
+        try {
+          await deleteObject(obj.name);
+          objectRemoved++;
+          console.log(`[ADS CLEANUP] Removed orphaned object: ${obj.name}`);
+        } catch (deleteErr) {
+          console.warn(`[ADS CLEANUP] Failed to remove object ${obj.name} (non-fatal):`, deleteErr);
+        }
+      }
+      console.log(`[ADS CLEANUP] Object storage — removed: ${objectRemoved}`);
+    } catch (objErr) {
+      console.warn("[ADS CLEANUP] Object storage sweep failed (non-fatal):", objErr);
+    }
   } catch (err) {
     console.warn("[ADS CLEANUP] Cleanup failed (non-fatal):", err);
   }

@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, ShadingType, AlignmentType, TextRun, HeightRule } from "docx";
 import bcrypt from "bcryptjs";
-import { uploadBuffer, objectExists, isValidOtaBundlePath } from "../objectStorage";
+import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "../objectStorage";
 import { storage } from "../storage";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
@@ -2280,6 +2280,9 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
               console.warn("[Ads] Failed to remove old cached image on replace:", localPath, err.message);
             }
           });
+          deleteObject(`public/ads/${filename}`).catch((err) => {
+            console.warn("[Ads] Failed to remove old object on replace:", filename, (err as Error)?.message ?? err);
+          });
         }
       }
     }
@@ -2310,6 +2313,9 @@ router.delete("/advertisements/bulk-delete", async (req: Request, res: Response)
               if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
                 console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
               }
+            });
+            deleteObject(`public/ads/${filename}`).catch((err) => {
+              console.warn("[Ads] Failed to remove object on bulk-delete:", filename, (err as Error)?.message ?? err);
             });
           }
         }
@@ -2387,6 +2393,9 @@ router.delete("/advertisements/:id", async (req: Request, res: Response) => {
             if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
               console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
             }
+          });
+          deleteObject(`public/ads/${filename}`).catch((err) => {
+            console.warn("[Ads] Failed to remove object on delete:", filename, (err as Error)?.message ?? err);
           });
         }
       }
