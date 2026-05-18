@@ -2239,9 +2239,11 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     if (req.body.startDate !== undefined) updates.startDate = req.body.startDate ? new Date(req.body.startDate) : null;
     if (req.body.endDate !== undefined) updates.endDate = req.body.endDate ? new Date(req.body.endDate) : null;
     if (req.body.placement !== undefined) updates.placement = req.body.placement;
+    let oldImageUrl: string | null = null;
     if (req.file) {
-      updates.imageUrl = await uploadAdImageToObjectStorage(req.file.buffer, req.file.originalname, req.file.mimetype);
       const existing = await storage.getAdCampaign(id);
+      oldImageUrl = existing?.imageUrl ?? null;
+      updates.imageUrl = await uploadAdImageToObjectStorage(req.file.buffer, req.file.originalname, req.file.mimetype);
       updates.imageVersion = ((existing?.imageVersion ?? 0) + 1);
     } else if (req.body.imageUrl !== undefined) {
       if (req.body.imageUrl !== null && req.body.imageUrl !== "" && !String(req.body.imageUrl).startsWith("/api/ads/images/")) {
@@ -2266,6 +2268,20 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     });
     if (req.file || req.body.imageUrl !== undefined) {
       cacheAdImage(campaign.imageUrl).catch(() => {});
+    }
+    if (req.file && oldImageUrl && oldImageUrl !== updates.imageUrl) {
+      const match = oldImageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
+      if (match) {
+        const filename = match[1];
+        if (filename && !filename.includes("..") && !filename.includes("/")) {
+          const localPath = path.join(adsDir, filename);
+          fs.unlink(localPath, (err) => {
+            if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
+              console.warn("[Ads] Failed to remove old cached image on replace:", localPath, err.message);
+            }
+          });
+        }
+      }
     }
     return res.json(campaign);
   } catch (error) {
