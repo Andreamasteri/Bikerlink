@@ -11,7 +11,7 @@ import { useTaskbarStyle } from "@/lib/taskbar-style-context";
 import { useT } from "@/lib/language-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
-import { registerHandsOffCallback, registerSprintMeasuringCallback } from "@/lib/tracking-active";
+import { registerHandsOffCallback, registerSprintMeasuringCallback, registerTrackingActiveCallback } from "@/lib/tracking-active";
 
 export default function TabLayout() {
   const t = useT();
@@ -42,6 +42,14 @@ export default function TabLayout() {
 
   useEffect(() => {
     const unsub = registerSprintMeasuringCallback(setGlobalSprintMeasuring);
+    return unsub;
+  }, []);
+
+  // ── Tracking Active (per icona cromatica tab "Ride!") ────────────────────
+  const [globalTrackingActive, setGlobalTrackingActive] = useState(false);
+
+  useEffect(() => {
+    const unsub = registerTrackingActiveCallback(setGlobalTrackingActive);
     return unsub;
   }, []);
 
@@ -132,6 +140,20 @@ export default function TabLayout() {
     }
     prevUnreadRef.current = unreadCount;
   }, [unreadCount]);
+
+  // ── Query proposte attive (per icona cromatica "Ride!") ──────────────────
+  const { data: proposalMatchesData } = useQuery<unknown[]>({
+    queryKey: ["/api/proposals/matches"],
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
+
+  const hasActiveMatches = (proposalMatchesData?.length ?? 0) > 0;
+
+  // ── Stato visibilità mappa (per icona cromatica "Status") ────────────────
+  const ghostMode = (profileData as any)?.ghostMode || false;
+  const hideFromMap = (profileData as any)?.hideFromMap || false;
+  const isVisibleOnMap = !ghostMode && !hideFromMap;
 
   const isAvailable = (profileData as any)?.isAvailable || false;
 
@@ -253,9 +275,17 @@ export default function TabLayout() {
         <Tabs.Screen
           name="proposals"
           options={{
-            title: "Trip",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="megaphone" size={size} color={color} />
+            title: "Ride!",
+            tabBarIcon: () => (
+              <MaterialCommunityIcons
+                name="motorbike"
+                size={22}
+                color={
+                  globalTrackingActive || globalSprintMeasuring || hasActiveMatches
+                    ? "#f97316"
+                    : colors.text
+                }
+              />
             ),
             headerTitle: isBikerOrCoppia ? "Proposte e Richieste" : "Le Mie Richieste",
             href: gpsTabHref,
@@ -264,12 +294,12 @@ export default function TabLayout() {
         <Tabs.Screen
           name="ready"
           options={{
-            title: "Ride!",
-            tabBarIcon: ({ focused }) => (
+            title: "Status",
+            tabBarIcon: () => (
               <Ionicons
-                name="bicycle"
+                name="location"
                 size={22}
-                color={isAvailable ? colors.success : colors.accentRed}
+                color={isVisibleOnMap ? colors.success : colors.accentRed}
               />
             ),
             headerShown: false,

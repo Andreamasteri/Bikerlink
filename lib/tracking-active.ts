@@ -10,6 +10,9 @@ export function registerLayoutWatcherCallbacks(
   _resumeWatcher = resume;
 }
 
+// ── Tracking Active broadcast ──────────────────────────────────────────────
+const _trackingActiveCallbacks: ((active: boolean) => void)[] = [];
+
 export function setTrackingActive(value: boolean): void {
   _isTrackingActive = value;
   if (value) {
@@ -17,10 +20,22 @@ export function setTrackingActive(value: boolean): void {
   } else {
     _resumeWatcher?.();
   }
+  _trackingActiveCallbacks.forEach((cb) => cb(value));
 }
 
 export function isTrackingActive(): boolean {
   return _isTrackingActive;
+}
+
+export function registerTrackingActiveCallback(
+  cb: (active: boolean) => void
+): () => void {
+  _trackingActiveCallbacks.push(cb);
+  cb(_isTrackingActive);
+  return () => {
+    const idx = _trackingActiveCallbacks.indexOf(cb);
+    if (idx >= 0) _trackingActiveCallbacks.splice(idx, 1);
+  };
 }
 
 // ── 0-100 Sprint nav-lock broadcast ───────────────────────────────────────
