@@ -1,8 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubMembers } from "@shared/schema";
-import { and, eq } from "drizzle-orm";
+import { motoClubMembers, proposalZoneNotifications } from "@shared/schema";
+import { and, eq, inArray } from "drizzle-orm";
 import { isSystemAccount } from "../lib/system-account-filter";
 import { runMatchingForUser, runProposalMatchingForUser, triggerProposalCreatedMatching } from "../matching-engine";
 import { allLimited, matchEnrichmentSemaphore, SemaphoreQueueFullError } from "../lib/concurrency";
@@ -438,6 +438,41 @@ router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Respon
     }
 
     const updated = await storage.updateProposalMatch(matchId, updateData as any);
+
+    // After the match is committed, notify zone-proximity observers.
+    // This runs only when both users have now accepted (status flipped to "accepted").
+    if (newAcceptedByUser1 && newAcceptedByUser2) {
+      try {
+        const proposalIds = [match.proposalId1, match.proposalId2].filter(Boolean) as string[];
+        const matchedUserIds = new Set([match.userId1, match.userId2]);
+
+        const zoneRows = await db
+          .select({ userId: proposalZoneNotifications.userId })
+          .from(proposalZoneNotifications)
+          .where(inArray(proposalZoneNotifications.proposalId, proposalIds));
+
+        const recipientIds = [...new Set(zoneRows.map((r) => r.userId))].filter(
+          (uid) => !matchedUserIds.has(uid),
+        );
+
+        for (const uid of recipientIds) {
+          try {
+            await storage.createNotification({
+              userId: uid,
+              title: "Proposta abbinata! 🏍️",
+              body: "La proposta vicina a te ha trovato il suo match — creane una tu!",
+              referenceType: "proposal_match",
+              referenceId: match.id,
+            });
+          } catch (notifErr) {
+            console.error("[zone-match-notify] Failed to notify user", uid, notifErr);
+          }
+        }
+      } catch (zoneErr) {
+        console.error("[zone-match-notify] Error fetching zone notification recipients:", zoneErr);
+      }
+    }
+
     return res.json(updated);
   } catch (error) {
     console.error("Accept match error:", error);
