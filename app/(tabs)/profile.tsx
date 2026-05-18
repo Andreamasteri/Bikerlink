@@ -62,6 +62,7 @@ interface ProfileData {
   role: string;
   status: string;
   isPrimal?: boolean;
+  floatingWidgetEnabled?: boolean;
   deletionRequestedAt?: string;
   profile?: {
     isAvailable: boolean;
@@ -134,11 +135,33 @@ export default function ProfileScreen() {
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
+  const [localFloatingWidget, setLocalFloatingWidget] = useState<boolean>(true);
 
   const { data: allSettingsData } = useQuery<{ unitsPrefEnabled?: boolean }>({
     queryKey: ["/api/settings/all"],
     staleTime: 120000,
     retry: false,
+  });
+
+  const { data: adminWidgetData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/floating-widget"],
+    staleTime: 60_000,
+    enabled: !!user,
+  });
+  const adminWidgetEnabled = adminWidgetData?.enabled !== false;
+
+  const floatingWidgetMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("PUT", "/api/users/me", { floatingWidgetEnabled: enabled });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message);
+    },
   });
 
   const unitsPrefEnabled = allSettingsData?.unitsPrefEnabled === true;
@@ -163,6 +186,12 @@ export default function ProfileScreen() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.country, applyCountryDefault]);
+
+  useEffect(() => {
+    if (profile) {
+      setLocalFloatingWidget(profile.floatingWidgetEnabled !== false);
+    }
+  }, [profile?.floatingWidgetEnabled]);
 
   const currentUserType = profile?.userType ?? user?.userType ?? "biker";
   const currentSex = profile?.sex ?? (user as any)?.sex;
@@ -1287,6 +1316,20 @@ export default function ProfileScreen() {
             })}
           </View>
         </View>
+        {adminWidgetEnabled && (
+          <View style={taskbarStyles.inlineRow}>
+            <Text style={taskbarStyles.inlineLabel}>Widget</Text>
+            <Switch
+              value={localFloatingWidget}
+              onValueChange={(val) => {
+                setLocalFloatingWidget(val);
+                floatingWidgetMutation.mutate(val);
+              }}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor="#fff"
+            />
+          </View>
+        )}
       </View>
 
       {donationData?.enabled && !!donationData?.paypalEmail && (

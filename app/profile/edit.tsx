@@ -13,7 +13,6 @@ import {
   Image,
   Pressable,
   Modal,
-  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -113,28 +112,6 @@ export default function EditProfileScreen() {
   const [showRevokeConsentModal, setShowRevokeConsentModal] = useState(false);
 
   const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
-  const [localFloatingWidget, setLocalFloatingWidget] = useState<boolean>(true);
-
-  const { data: adminWidgetData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/floating-widget"],
-    staleTime: 60_000,
-    enabled: !!user,
-  });
-  const adminWidgetEnabled = adminWidgetData?.enabled !== false;
-
-  const floatingWidgetMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const res = await apiRequest("PUT", "/api/users/me", { floatingWidgetEnabled: enabled });
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-    },
-    onError: (error: Error) => {
-      Alert.alert(t("common.error"), error.message);
-    },
-  });
 
   useEffect(() => {
     if (profile) {
@@ -153,7 +130,6 @@ export default function EditProfileScreen() {
           ? String(profile.profile.maxPickupDistance)
           : "50"
       );
-      setLocalFloatingWidget(profile.floatingWidgetEnabled !== false);
     }
   }, [profile]);
 
@@ -867,26 +843,6 @@ export default function EditProfileScreen() {
             </View>
           </View>
 
-          {adminWidgetEnabled && (
-            <>
-              <View style={{ height: 24 }} />
-              <View style={{ marginBottom: 4 }}>
-                <Text style={{ fontSize: 11, color: Colors.textSecondary, marginBottom: 10, letterSpacing: 0.5 }}>PREFERENZE APP</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 4 }}>
-                  <Text style={{ fontSize: 13, color: Colors.textSecondary }}>Widget notifiche</Text>
-                  <Switch
-                    value={localFloatingWidget}
-                    onValueChange={(val) => {
-                      setLocalFloatingWidget(val);
-                      floatingWidgetMutation.mutate(val);
-                    }}
-                    trackColor={{ false: Colors.border, true: Colors.accent }}
-                    thumbColor="#fff"
-                  />
-                </View>
-              </View>
-            </>
-          )}
 
           <View style={{ height: 16 }} />
 
