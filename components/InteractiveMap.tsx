@@ -112,6 +112,7 @@ interface InteractiveMapProps {
   onProposeClubLocation?: (club: ClubMapPin) => void;
   initialCenterOverride?: { latitude: number; longitude: number } | null;
   onRegionChangeComplete?: (center: { latitude: number; longitude: number }) => void;
+  gpsFollowupEnabled?: boolean;
 }
 
 export interface InteractiveMapHandle {
@@ -148,6 +149,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   onProposeClubLocation,
   initialCenterOverride,
   onRegionChangeComplete,
+  gpsFollowupEnabled = false,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
@@ -155,6 +157,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const initialCenterDoneRef = useRef(false);
+  const gpsCenterDoneRef = useRef(false);
 
   useEffect(() => {
     sendStartupBeacon("interactive_map_mount");
@@ -297,6 +300,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
       );
     } else if (userLocation) {
       initialCenterDoneRef.current = true;
+      gpsCenterDoneRef.current = true;
       inject(
         "window.leafletBridge && window.leafletBridge.focusOn(" +
         userLocation.latitude + "," +
@@ -304,6 +308,17 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
       );
     }
   }, [mapReady, userLocation, initialCenterOverride, inject]);
+
+  useEffect(() => {
+    if (!gpsFollowupEnabled) return;
+    if (!mapReady || !initialCenterDoneRef.current || gpsCenterDoneRef.current || !userLocation) return;
+    gpsCenterDoneRef.current = true;
+    inject(
+      "window.leafletBridge && window.leafletBridge.focusOn(" +
+      userLocation.latitude + "," +
+      userLocation.longitude + ",13)"
+    );
+  }, [gpsFollowupEnabled, mapReady, userLocation, inject]);
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     try {

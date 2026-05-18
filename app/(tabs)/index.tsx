@@ -637,6 +637,37 @@ export default function MapScreen() {
     };
     return [selfMarker, ...rawList];
   }, [nearbyUsers, user, location]);
+
+  const smallMapInitialCenter = useMemo(() => {
+    const filtersActive = !filterBiker || !filterZavorrina;
+    if (filtersActive) {
+      const visibleUsers = usersWithSelf.filter((u: any) => {
+        if (u.latitude == null || u.longitude == null || isNaN(u.latitude) || isNaN(u.longitude)) return false;
+        if (user?.id != null && u.id === user.id) return true;
+        if (u.userType === "biker" && !filterBiker) return false;
+        if (u.userType === "zavorrina" && !filterZavorrina) return false;
+        return true;
+      });
+      if (visibleUsers.length > 0) {
+        const lat = visibleUsers.reduce((s: number, u: any) => s + Number(u.latitude), 0) / visibleUsers.length;
+        const lng = visibleUsers.reduce((s: number, u: any) => s + Number(u.longitude), 0) / visibleUsers.length;
+        return { latitude: lat, longitude: lng };
+      }
+    }
+    const profileData = profileQuery.data as any;
+    const savedLat = profileData?.latitude;
+    const savedLng = profileData?.longitude;
+    if (
+      savedLat != null &&
+      savedLng != null &&
+      !isNaN(Number(savedLat)) &&
+      !isNaN(Number(savedLng))
+    ) {
+      return { latitude: Number(savedLat), longitude: Number(savedLng) };
+    }
+    return null;
+  }, [filterBiker, filterZavorrina, usersWithSelf, user?.id, profileQuery.data]);
+
   const onlineCount = onlineCountQuery.data?.count ?? 0;
   const bikerCount = bikerCountQuery.data?.count ?? 0;
   const zavCount = zavCountQuery.data?.count ?? 0;
@@ -828,6 +859,8 @@ export default function MapScreen() {
             fakeMeMarker={fakeMeMarker}
             showEventPins={false}
             onRegionChangeComplete={(center) => setLastSmallMapCenter(center)}
+            initialCenterOverride={smallMapInitialCenter}
+            gpsFollowupEnabled={true}
           />
         ) : (
           <View style={styles.mapPlaceholder}>
