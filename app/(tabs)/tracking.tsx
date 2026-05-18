@@ -1298,7 +1298,7 @@ export default function TrackingScreen() {
         lastAvgSpeedUpdateRef.current = _avgNow;
       }
 
-      if (speedKmh > maxSpeedRef.current) {
+      if (speedKmh <= 300 && speedKmh > maxSpeedRef.current) {
         maxSpeedRef.current = speedKmh;
         setMaxSpeed(speedKmh);
       }
@@ -2054,7 +2054,7 @@ export default function TrackingScreen() {
                   <StatCard
                     icon="speedometer-outline"
                     color={Colors.success}
-                    value={convertSpeed(avgSpeedDisplayKmh, speedUnit).toFixed(2)}
+                    value={convertSpeed(avgSpeedKmh, speedUnit).toFixed(2)}
                     label={`${t("tracking.avgSpeed")} ${speedUnitLabel(speedUnit)}`}
                   />
                   <StatCard

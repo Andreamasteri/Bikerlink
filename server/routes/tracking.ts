@@ -174,7 +174,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
           totalDistanceKm += haversineKm(prev.latitude, prev.longitude, pt.latitude, pt.longitude);
           const intervalSec = Math.abs(new Date(pt.timestamp).getTime() - new Date(prev.timestamp).getTime()) / 1000;
           const speed = pt.speedKmh ?? 0;
-          if (speed < 3) {
+          if (speed < 2) {
             idleTimeSec += intervalSec;
           }
         }
