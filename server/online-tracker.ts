@@ -8,7 +8,7 @@ interface TrackedUser {
   lastSeen: Date;
 }
 
-class OnlineTracker {
+export class OnlineTracker {
   private users = new Map<string, TrackedUser>();
   private cleanupInterval: NodeJS.Timeout;
 

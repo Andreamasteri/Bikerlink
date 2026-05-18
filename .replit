@@ -52,6 +52,10 @@ args = "Error Monitor"
 task = "workflow.run"
 args = "ota-guard"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "admin-map-exclusion"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -134,6 +138,17 @@ args = "SKIP_LIVE_CHECK=1 bash scripts/validate-ota.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "admin-map-exclusion"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/check-admin-map-exclusion.ts"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
