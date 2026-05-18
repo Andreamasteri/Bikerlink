@@ -739,7 +739,9 @@ const LastfmLoginModal = React.memo(function LastfmLoginModal({ visible, onClose
       const data = await resp.json() as { token: string; authUrl: string };
       setToken(data.token);
       const result = await WebBrowser.openAuthSessionAsync(data.authUrl, "bikerlink://lastfm-callback");
+      console.log("[Last.fm OAuth] openAuthSessionAsync result:", result.type, "url" in result ? result.url : "(none)");
       if (result.type === "cancel" || result.type === "dismiss") {
+        console.log("[Last.fm OAuth] user cancelled — resetting to idle");
         setStep("idle");
         return;
       }
