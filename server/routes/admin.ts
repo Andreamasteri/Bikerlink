@@ -9,9 +9,9 @@ import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "
 import { storage } from "../storage";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable } from "@shared/schema";
 import { createClubInvitesForMoto } from "./motoclubs";
-import { eq, and, ne, desc, sql, count, notExists, inArray, lte, isNull, or, ilike } from "drizzle-orm";
+import { eq, and, ne, desc, sql, count, notExists, inArray, notInArray, lte, isNull, or, ilike } from "drizzle-orm";
 import { sendEmail, sendEmailDetailed, getEmailDiagnostics } from "../email";
 import {
   verifyEmailStore,
@@ -2012,6 +2012,40 @@ router.put("/settings/:key", async (req: Request, res: Response) => {
 });
 
 const adsDir = path.join(process.cwd(), "uploads", "ads");
+
+/**
+ * Delete an ad image file only when no other campaign still references it.
+ * Pass the IDs of the campaign(s) being deleted/updated so they are excluded
+ * from the reference check (they are about to lose their reference).
+ * Both local-cache and object-storage copies are cleaned. Fire-and-forget safe.
+ */
+async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[]): Promise<void> {
+  try {
+    const imageUrl = `/api/ads/images/${filename}`;
+    const conditions = [eq(adCampaignsTable.imageUrl, imageUrl)];
+    if (excludeIds.length > 0) {
+      conditions.push(notInArray(adCampaignsTable.id, excludeIds));
+    }
+    const refs = await db.select({ id: adCampaignsTable.id }).from(adCampaignsTable).where(and(...conditions));
+    if (refs.length > 0) {
+      console.log(`[Ads] Skipping delete of ${filename} — still referenced by ${refs.length} campaign(s)`);
+      return;
+    }
+    const localPath = path.join(adsDir, filename);
+    fs.unlink(localPath, (err) => {
+      if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
+        console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
+      }
+    });
+    deleteObject(`public/ads/${filename}`).catch((err) => {
+      console.warn("[Ads] Failed to remove object:", filename, (err as Error)?.message ?? err);
+    });
+    console.log(`[Ads] Deleted unreferenced image: ${filename}`);
+  } catch (err) {
+    console.warn("[Ads] deleteAdImageIfUnreferenced failed (non-fatal):", (err as Error)?.message ?? err);
+  }
+}
+
 const inviteCodesDir = path.join(process.cwd(), "uploads", "invitation-codes");
 if (!fs.existsSync(inviteCodesDir)) fs.mkdirSync(inviteCodesDir, { recursive: true });
 if (!fs.existsSync(adsDir)) {
@@ -2274,15 +2308,9 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
       if (match) {
         const filename = match[1];
         if (filename && !filename.includes("..") && !filename.includes("/")) {
-          const localPath = path.join(adsDir, filename);
-          fs.unlink(localPath, (err) => {
-            if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
-              console.warn("[Ads] Failed to remove old cached image on replace:", localPath, err.message);
-            }
-          });
-          deleteObject(`public/ads/${filename}`).catch((err) => {
-            console.warn("[Ads] Failed to remove old object on replace:", filename, (err as Error)?.message ?? err);
-          });
+          // The campaign at `id` now uses the new URL, so exclude it from the
+          // reference check — it is no longer a reference to the old filename.
+          deleteAdImageIfUnreferenced(filename, [id]).catch(() => {});
         }
       }
     }
@@ -2299,7 +2327,6 @@ router.delete("/advertisements/bulk-delete", async (req: Request, res: Response)
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({ message: "Array di ID campagne obbligatorio" });
     }
-    const { adCampaigns: adCampaignsTable } = await import("@shared/schema");
     const toDelete = await db.select().from(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
     await db.delete(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
     for (const campaign of toDelete) {
@@ -2308,15 +2335,9 @@ router.delete("/advertisements/bulk-delete", async (req: Request, res: Response)
         if (match) {
           const filename = match[1];
           if (filename && !filename.includes("..") && !filename.includes("/")) {
-            const localPath = path.join(adsDir, filename);
-            fs.unlink(localPath, (err) => {
-              if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
-                console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
-              }
-            });
-            deleteObject(`public/ads/${filename}`).catch((err) => {
-              console.warn("[Ads] Failed to remove object on bulk-delete:", filename, (err as Error)?.message ?? err);
-            });
+            // All campaigns in `ids` are being deleted; exclude them all so the
+            // reference check considers only surviving campaigns.
+            deleteAdImageIfUnreferenced(filename, ids).catch(() => {});
           }
         }
       }
@@ -2388,15 +2409,8 @@ router.delete("/advertisements/:id", async (req: Request, res: Response) => {
       if (match) {
         const filename = match[1];
         if (filename && !filename.includes("..") && !filename.includes("/")) {
-          const localPath = path.join(adsDir, filename);
-          fs.unlink(localPath, (err) => {
-            if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
-              console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
-            }
-          });
-          deleteObject(`public/ads/${filename}`).catch((err) => {
-            console.warn("[Ads] Failed to remove object on delete:", filename, (err as Error)?.message ?? err);
-          });
+          // The campaign at `id` is gone; exclude it from the reference check.
+          deleteAdImageIfUnreferenced(filename, [id]).catch(() => {});
         }
       }
     }
