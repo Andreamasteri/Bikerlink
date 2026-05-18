@@ -2035,12 +2035,15 @@ async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[
     fs.unlink(localPath, (err) => {
       if (err && (err as NodeJS.ErrnoException).code !== "ENOENT") {
         console.warn("[Ads] Failed to remove cached image:", localPath, err.message);
+      } else if (!err) {
+        console.log(`[Ads] Deleted local cache: ${filename}`);
       }
     });
-    deleteObject(`public/ads/${filename}`).catch((err) => {
-      console.warn("[Ads] Failed to remove object:", filename, (err as Error)?.message ?? err);
-    });
-    console.log(`[Ads] Deleted unreferenced image: ${filename}`);
+    deleteObject(`public/ads/${filename}`)
+      .then(() => console.log(`[Ads] Deleted object storage: public/ads/${filename}`))
+      .catch((err) => {
+        console.warn("[Ads] Failed to remove object:", filename, (err as Error)?.message ?? err);
+      });
   } catch (err) {
     console.warn("[Ads] deleteAdImageIfUnreferenced failed (non-fatal):", (err as Error)?.message ?? err);
   }

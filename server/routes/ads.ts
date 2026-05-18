@@ -82,7 +82,6 @@ export async function cacheAdImage(imageUrl: string | null | undefined): Promise
 export async function cleanupOrphanedAdImages(): Promise<void> {
   try {
     const localDir = path.resolve(process.cwd(), "uploads", "ads");
-    if (!fs.existsSync(localDir)) return;
 
     // Protect images from ALL campaigns (active + inactive). Only campaigns
     // physically deleted from the DB (DELETE) should lose their cached images.
@@ -106,23 +105,25 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
       }
     }
 
-    const files = fs.readdirSync(localDir);
-    let removed = 0;
-
-    for (const file of files) {
-      if (referencedFilenames.has(file)) continue;
-      try {
-        fs.unlinkSync(path.join(localDir, file));
-        removed++;
-        console.log(`[ADS CLEANUP] Removed orphaned local cache: ${file}`);
-      } catch (unlinkErr) {
-        console.warn(`[ADS CLEANUP] Failed to remove local ${file} (non-fatal):`, unlinkErr);
+    // Local-cache sweep — skipped if the directory doesn't exist yet, but the
+    // object-storage sweep below always runs regardless of local-dir state.
+    if (fs.existsSync(localDir)) {
+      const files = fs.readdirSync(localDir);
+      let removed = 0;
+      for (const file of files) {
+        if (referencedFilenames.has(file)) continue;
+        try {
+          fs.unlinkSync(path.join(localDir, file));
+          removed++;
+          console.log(`[ADS CLEANUP] Removed orphaned local cache: ${file}`);
+        } catch (unlinkErr) {
+          console.warn(`[ADS CLEANUP] Failed to remove local ${file} (non-fatal):`, unlinkErr);
+        }
       }
+      console.log(`[ADS CLEANUP] Local cache — removed: ${removed}, kept: ${referencedFilenames.size} referenced`);
+    } else {
+      console.log("[ADS CLEANUP] Local cache dir not found — skipping disk sweep, continuing with object storage");
     }
-
-    console.log(
-      `[ADS CLEANUP] Local cache — removed: ${removed}, kept: ${referencedFilenames.size} referenced`,
-    );
 
     // Also remove orphaned files from object storage (public/ads/).
     // This covers images replaced/deleted before the per-operation deleteObject
