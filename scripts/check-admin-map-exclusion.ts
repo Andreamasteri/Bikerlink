@@ -116,7 +116,29 @@ async function cleanup(): Promise<void> {
   await db.delete(users).where(eq(users.id, BIKER_ID));
 }
 
-// ── HTTP helper ───────────────────────────────────────────────────────────────
+// ── HTTP helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Wait until the backend responds to a health probe or the timeout elapses.
+ * Returns true if ready, false if timed out.
+ */
+async function waitForBackend(
+  timeoutMs = 15_000,
+  intervalMs = 500,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch(`${BASE_URL}/api/health`, { signal: AbortSignal.timeout(1000) });
+      if (res.status < 500) return true;
+    } catch {
+      // server not up yet — keep retrying
+    }
+    await new Promise((r) => setTimeout(r, intervalMs));
+  }
+  return false;
+}
+
 async function httpGet(path: string, bearer: string): Promise<{ status: number; body: unknown }> {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: { Authorization: `Bearer ${bearer}` },
@@ -221,7 +243,14 @@ function checkTrackerMethods(tracker: OnlineTracker): void {
 
 // ── HTTP-layer checks ─────────────────────────────────────────────────────────
 async function checkHttpEndpoints(): Promise<void> {
-  // 1. Obtain a session cookie by logging in as the non-admin biker.
+  // 0. Wait for the backend to be ready (handles parallel startup scenarios).
+  const ready = await waitForBackend(15_000);
+  if (!ready) {
+    fail("Backend not reachable at localhost:5000 after 15 s — skipping HTTP checks");
+    return;
+  }
+
+  // 1. Obtain a session token by logging in as the non-admin biker.
   const loginRes = await fetch(`${BASE_URL}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
