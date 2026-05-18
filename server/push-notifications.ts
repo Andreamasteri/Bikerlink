@@ -1,6 +1,7 @@
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { inArray, eq } from "drizzle-orm";
+import it from "../lib/i18n/it";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
@@ -88,8 +89,8 @@ export async function sendMatchPushNotifications(userIds: string[]): Promise<voi
         userIdByToken.set(row.expoPushToken, row.id);
         messages.push({
           to: row.expoPushToken,
-          title: "Ehi, It's a match! 🔥",
-          body: "Tocca per vedere chi è",
+          title: it["push.match.title"] ?? "Ehi, hai un match! 🔥",
+          body: it["push.match.body"] ?? "Tocca per vedere chi è",
           sound: "default" as const,
           data: { type: "match" },
           channelId: "matches",
@@ -101,5 +102,37 @@ export async function sendMatchPushNotifications(userIds: string[]): Promise<voi
     await sendExpoMessages(messages, userIdByToken);
   } catch (err) {
     console.warn("[Push] sendMatchPushNotifications error (non-fatal):", err);
+  }
+}
+
+export async function sendZoneProposalPushNotifications(userIds: string[]): Promise<void> {
+  if (!userIds.length) return;
+  try {
+    const rows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(inArray(users.id, userIds));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+
+    for (const row of rows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: it["push.zoneProposal.title"] ?? "C'è una proposta nella tua zona! 🏍️",
+          body: it["push.zoneProposal.body"] ?? "Apri BikerLink per scoprirla",
+          sound: "default" as const,
+          data: { type: "zone_proposal" },
+          channelId: "matches",
+        });
+      }
+    }
+
+    if (messages.length === 0) return;
+    await sendExpoMessages(messages, userIdByToken);
+  } catch (err) {
+    console.warn("[Push] sendZoneProposalPushNotifications error (non-fatal):", err);
   }
 }

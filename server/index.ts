@@ -1183,6 +1183,22 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] routes gps blackout columns:", e);
         }
 
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS proposal_zone_notifications (
+              id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+              user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              proposal_id VARCHAR(36) NOT NULL REFERENCES proposals(id) ON DELETE CASCADE,
+              sent_at TIMESTAMP NOT NULL DEFAULT now()
+            )
+          `);
+          await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS proposal_zone_notif_unique_idx ON proposal_zone_notifications (user_id, proposal_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS proposal_zone_notif_proposal_idx ON proposal_zone_notifications (proposal_id)`);
+          console.log("[MIGRATION] proposal_zone_notifications table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] proposal_zone_notifications:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 

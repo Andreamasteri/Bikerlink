@@ -4,7 +4,7 @@ import { db } from "../db";
 import { motoClubMembers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
 import { isSystemAccount } from "../lib/system-account-filter";
-import { runMatchingForUser, runProposalMatchingForUser } from "../matching-engine";
+import { runMatchingForUser, runProposalMatchingForUser, triggerProposalCreatedMatching } from "../matching-engine";
 import { allLimited, matchEnrichmentSemaphore, SemaphoreQueueFullError } from "../lib/concurrency";
 
 const router = Router();
@@ -797,6 +797,8 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       proposalId: proposal.id,
       userId,
     });
+
+    triggerProposalCreatedMatching(proposal);
 
     return res.status(201).json(proposal);
   } catch (error) {

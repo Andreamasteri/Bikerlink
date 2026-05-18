@@ -1,8 +1,9 @@
 import { storage } from "./storage";
 import { db } from "./db";
-import { motoClubMembers, type Proposal } from "@shared/schema";
-import { and, eq, inArray } from "drizzle-orm";
-import { sendMatchPushNotifications } from "./push-notifications";
+import { motoClubMembers, proposalZoneNotifications, userProfiles, users, type Proposal } from "@shared/schema";
+import { and, eq, inArray, isNotNull, gt, sql } from "drizzle-orm";
+import { sendMatchPushNotifications, sendZoneProposalPushNotifications } from "./push-notifications";
+import it from "../lib/i18n/it";
 
 /**
  * Task #1124 vuln 2: club-boundary enforcement for proposal matching.
@@ -186,18 +187,20 @@ async function runMatching(): Promise<number> {
         matchCount++;
 
         try {
+          const proposalMatchTitle = it["push.proposalMatch.title"] ?? "Hai un nuovo match proposta! 🔥";
+          const proposalMatchBody = it["push.proposalMatch.body"] ?? "Una proposta compatibile è stata trovata per il tuo viaggio.";
           await storage.createNotification({
             userId: p1.userId,
-            title: "New proposal match found!",
-            body: "A compatible proposal has been found for your trip.",
+            title: proposalMatchTitle,
+            body: proposalMatchBody,
             notificationType: "proposal_match",
             referenceType: "proposal_match",
             referenceId: newMatch.id,
           });
           await storage.createNotification({
             userId: p2.userId,
-            title: "New proposal match found!",
-            body: "A compatible proposal has been found for your trip.",
+            title: proposalMatchTitle,
+            body: proposalMatchBody,
             notificationType: "proposal_match",
             referenceType: "proposal_match",
             referenceId: newMatch.id,
@@ -649,18 +652,20 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
         matchCount++;
 
         try {
+          const proposalMatchTitle = it["push.proposalMatch.title"] ?? "Hai un nuovo match proposta! 🔥";
+          const proposalMatchBody = it["push.proposalMatch.body"] ?? "Una proposta compatibile è stata trovata per il tuo viaggio.";
           await storage.createNotification({
             userId: p1.userId,
-            title: "New proposal match found!",
-            body: "A compatible proposal has been found for your trip.",
+            title: proposalMatchTitle,
+            body: proposalMatchBody,
             notificationType: "proposal_match",
             referenceType: "proposal_match",
             referenceId: newMatch.id,
           });
           await storage.createNotification({
             userId: p2.userId,
-            title: "New proposal match found!",
-            body: "A compatible proposal has been found for your trip.",
+            title: proposalMatchTitle,
+            body: proposalMatchBody,
             notificationType: "proposal_match",
             referenceType: "proposal_match",
             referenceId: newMatch.id,
@@ -678,6 +683,151 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
     console.error("[ProposalMatchingForUser] error:", error);
     return 0;
   }
+}
+
+/**
+ * After a new proposal is created, find active users in the area who:
+ *   (a) have a known GPS position updated in the last 7 days
+ *   (b) are role-compatible with the new proposal's searchType
+ *   (c) do NOT already have an active proposal (they are not already matched)
+ *   (d) have NOT already received a zone notification for this proposal (deduplication)
+ * and send them a push notification "C'è una proposta nella tua zona!".
+ */
+export async function runProposalZoneNotifications(proposal: Proposal): Promise<void> {
+  try {
+    if (proposal.departureLatitude == null || proposal.departureLongitude == null || !proposal.searchType) return;
+
+    const searchRadius = proposal.searchRadius || 50;
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    // Determine which userTypes are compatible targets for this proposal
+    // Biker proposals (find_a_friend, hitcher, find_a_guest) target bikers/coppie
+    // Zavorrina proposals (find_a_biker, hitchhiker) target bikers/coppie
+    // We notify users who COULD create a compatible proposal
+    const bikerSearchTypes = new Set(["find_a_friend", "find_a_guest", "hitcher"]);
+    const zavSearchTypes = new Set(["find_a_biker", "hitchhiker"]);
+
+    let targetUserTypes: string[];
+    if (bikerSearchTypes.has(proposal.searchType)) {
+      // A biker created this — compatible partners are bikers (find_a_friend) or zavorrine (find_a_guest/hitcher)
+      if (proposal.searchType === "find_a_friend") {
+        targetUserTypes = ["biker", "coppia"];
+      } else {
+        targetUserTypes = ["zavorrina", "coppia"];
+      }
+    } else if (zavSearchTypes.has(proposal.searchType)) {
+      // A zavorrina created this — compatible partners are bikers
+      targetUserTypes = ["biker", "coppia"];
+    } else {
+      targetUserTypes = ["biker", "zavorrina", "coppia"];
+    }
+
+    // Fetch all active users with recent GPS position
+    const usersWithProfiles = await db
+      .select({
+        userId: userProfiles.userId,
+        latitude: userProfiles.latitude,
+        longitude: userProfiles.longitude,
+        coordinatesUpdatedAt: userProfiles.coordinatesUpdatedAt,
+        userType: users.userType,
+        role: users.role,
+        status: users.status,
+      })
+      .from(userProfiles)
+      .innerJoin(users, eq(userProfiles.userId, users.id))
+      .where(
+        and(
+          isNotNull(userProfiles.latitude),
+          isNotNull(userProfiles.longitude),
+          gt(userProfiles.coordinatesUpdatedAt, sevenDaysAgo),
+          eq(users.status, "active"),
+        )
+      );
+
+    // Filter: same zone, compatible role, not the proposal creator
+    const candidateIds = usersWithProfiles
+      .filter((u) => {
+        if (u.userId === proposal.userId) return false;
+        if (u.role === "admin") return false;
+        if (!targetUserTypes.includes(u.userType ?? "")) return false;
+        if (u.latitude == null || u.longitude == null) return false;
+        const dist = haversineDistance(
+          proposal.departureLatitude!,
+          proposal.departureLongitude!,
+          u.latitude,
+          u.longitude,
+        );
+        return dist <= searchRadius;
+      })
+      .map((u) => u.userId);
+
+    if (candidateIds.length === 0) return;
+
+    // Check which users already have an active proposal (exclude them)
+    const activeProposals = await storage.getActiveProposalsWithLocation();
+    const usersWithActiveProposal = new Set(activeProposals.map((p) => p.userId));
+
+    // Deduplication: check who already received this notification
+    const alreadySentRows = await db
+      .select({ userId: proposalZoneNotifications.userId })
+      .from(proposalZoneNotifications)
+      .where(eq(proposalZoneNotifications.proposalId, proposal.id));
+    const alreadySent = new Set(alreadySentRows.map((r) => r.userId));
+
+    const toNotify = candidateIds.filter(
+      (id) => !usersWithActiveProposal.has(id) && !alreadySent.has(id)
+    );
+
+    if (toNotify.length === 0) return;
+
+    // Record sent notifications (deduplication)
+    for (const userId of toNotify) {
+      try {
+        await db.insert(proposalZoneNotifications).values({
+          userId,
+          proposalId: proposal.id,
+        }).onConflictDoNothing();
+
+        await storage.createNotification({
+          userId,
+          title: it["push.zoneProposal.title"] ?? "C'è una proposta nella tua zona! 🏍️",
+          body: it["push.zoneProposal.body"] ?? "Apri BikerLink per scoprirla",
+          notificationType: "zone_proposal",
+          referenceType: "proposal",
+          referenceId: proposal.id,
+        });
+      } catch (err) {
+        console.warn("[ZoneNotif] Error inserting zone notification record:", err);
+      }
+    }
+
+    console.log(`[ZoneNotif] Invio notifica "proposta in zona" a ${toNotify.length} utenti per proposta ${proposal.id}`);
+    sendZoneProposalPushNotifications(toNotify);
+  } catch (err) {
+    console.error("[ZoneNotif] Errore zone notifications:", err);
+  }
+}
+
+/**
+ * Trigger proposal matching + zone notifications immediately after a new proposal
+ * is created. Fire-and-forget — does not block the HTTP response.
+ */
+export function triggerProposalCreatedMatching(proposal: Proposal): void {
+  setImmediate(async () => {
+    try {
+      const matchCount = await runProposalMatchingForUser(proposal.userId);
+      if (matchCount > 0) {
+        console.log(`[ProposalCreated] ${matchCount} match trovati per proposta ${proposal.id}`);
+      }
+    } catch (err) {
+      console.error("[ProposalCreated] Errore matching immediato:", err);
+    }
+    try {
+      await runProposalZoneNotifications(proposal);
+    } catch (err) {
+      console.error("[ProposalCreated] Errore zone notifications:", err);
+    }
+  });
 }
 
 const lastUserMatchingAt = new Map<string, number>();

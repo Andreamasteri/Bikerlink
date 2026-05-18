@@ -1469,3 +1469,22 @@ export const appCrashLogs = pgTable("app_crash_logs", {
 
 export type AppCrashLog = typeof appCrashLogs.$inferSelect;
 export type InsertAppCrashLog = typeof appCrashLogs.$inferInsert;
+
+export const proposalZoneNotifications = pgTable("proposal_zone_notifications", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  proposalId: varchar("proposal_id", { length: 36 })
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  sentAt: timestamp("sent_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("proposal_zone_notif_unique_idx").on(table.userId, table.proposalId),
+  index("proposal_zone_notif_proposal_idx").on(table.proposalId),
+]);
+
+export type ProposalZoneNotification = typeof proposalZoneNotifications.$inferSelect;
+export type InsertProposalZoneNotification = typeof proposalZoneNotifications.$inferInsert;

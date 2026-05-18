@@ -140,7 +140,7 @@ export default function MatchPopupAlert() {
         >
           <Text style={styles.flame}>🔥</Text>
           <View style={styles.textWrap}>
-            <Text style={styles.title}>Ehi, It's a match!</Text>
+            <Text style={styles.title}>Ehi, hai un match!</Text>
             <Text style={styles.sub}>Tocca per vedere chi è</Text>
           </View>
           <TouchableOpacity

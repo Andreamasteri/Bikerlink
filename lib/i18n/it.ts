@@ -1107,6 +1107,13 @@ const it: Record<string, string> = {
   "tracking.gpsBlackoutTimes": "volte",
   "tracking.gpsBlackoutTotal": "totali",
   "tracking.exportGpxError": "Impossibile esportare il percorso. Riprova.",
+
+  "push.match.title": "Ehi, hai un match! 🔥",
+  "push.match.body": "Tocca per vedere chi è",
+  "push.proposalMatch.title": "Hai un nuovo match proposta! 🔥",
+  "push.proposalMatch.body": "Una proposta compatibile è stata trovata per il tuo viaggio.",
+  "push.zoneProposal.title": "C'è una proposta nella tua zona! 🏍️",
+  "push.zoneProposal.body": "Apri BikerLink per scoprirla",
 };
 
 export default it;
