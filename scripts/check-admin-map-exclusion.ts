@@ -58,6 +58,12 @@ const BIKER_PASSWORD = "Test1234!";
 const LAT = 45.4642;
 const LNG = 9.19;
 
+// "ZZ" is not a valid ISO-3166-1 country code and is never assigned to real
+// users.  Using it as the admin's country gives us a clean country-filter
+// bucket: with ?countries=ZZ the only candidate is the test admin — and since
+// admins are excluded, online-count must be 0 and online-list must be [].
+const ADMIN_COUNTRY = "ZZ";
+
 const BASE_URL = "http://localhost:5000";
 
 // ── Seed / cleanup helpers ────────────────────────────────────────────────────
@@ -71,6 +77,7 @@ async function seedAdmin(): Promise<void> {
     role: "admin",
     status: "active",
     ghostMode: false,
+    country: ADMIN_COUNTRY,
     lastLoginAt: new Date(), // recently active — maximises leak surface
   });
   await db.insert(userProfiles).values({
@@ -234,54 +241,57 @@ async function checkHttpEndpoints(): Promise<void> {
   }
   pass("Login as test biker succeeded (Bearer token obtained)");
 
-  // 2. GET /api/users/online-count
-  // This endpoint reads from the in-memory tracker which already excludes
-  // admins at setOnline() time.  Seed admin has a recent lastLoginAt but was
-  // never accepted by the tracker, so the count must not increase.
-  const countRes1 = await httpGet("/api/users/online-count", bearer);
-  const count1: number = (countRes1.body as { count: number })?.count ?? -1;
+  // 2. GET /api/users/online-count?countries=ZZ
+  // The admin is the only user with country="ZZ" (an unassigned ISO code).
+  // The tracker already rejects admins at setOnline(), so this bucket must be
+  // empty → count === 0.
+  const countRes = await httpGet(`/api/users/online-count?countries=${ADMIN_COUNTRY}`, bearer);
   assert(
-    countRes1.status === 200,
-    `GET /api/users/online-count responded 200`,
-    `GET /api/users/online-count responded ${countRes1.status}`,
+    countRes.status === 200,
+    `GET /api/users/online-count?countries=${ADMIN_COUNTRY} responded 200`,
+    `GET /api/users/online-count?countries=${ADMIN_COUNTRY} responded ${countRes.status}`,
   );
-  // Sanity: count must be a non-negative integer (not NaN from a leaked admin).
+  const count: number = (countRes.body as { count: number })?.count ?? -1;
   assert(
-    Number.isInteger(count1) && count1 >= 0,
-    `GET /api/users/online-count returned a valid count (${count1})`,
-    `GET /api/users/online-count returned invalid count: ${count1}`,
+    count === 0,
+    `GET /api/users/online-count?countries=${ADMIN_COUNTRY} === 0 (admin excluded from tracker)`,
+    `GET /api/users/online-count?countries=${ADMIN_COUNTRY} === ${count} — expected 0, admin may have leaked`,
   );
 
-  // 3. GET /api/users/online-list — standard (online users only)
-  const listRes = await httpGet("/api/users/online-list", bearer);
+  // 3. GET /api/users/online-list?countries=ZZ
+  // Same reasoning: tracker has no ZZ users (admin was never accepted) → [].
+  const listRes = await httpGet(`/api/users/online-list?countries=${ADMIN_COUNTRY}`, bearer);
   assert(
     listRes.status === 200,
-    "GET /api/users/online-list responded 200",
-    `GET /api/users/online-list responded ${listRes.status}`,
+    `GET /api/users/online-list?countries=${ADMIN_COUNTRY} responded 200`,
+    `GET /api/users/online-list?countries=${ADMIN_COUNTRY} responded ${listRes.status}`,
   );
   const list = Array.isArray(listRes.body) ? (listRes.body as { id: string }[]) : [];
   assert(
-    !list.some((u) => u.id === ADMIN_ID),
-    "GET /api/users/online-list does not contain admin",
-    "GET /api/users/online-list contains admin row — leaked through route",
+    list.length === 0,
+    `GET /api/users/online-list?countries=${ADMIN_COUNTRY} returned [] (empty)`,
+    `GET /api/users/online-list?countries=${ADMIN_COUNTRY} returned ${list.length} rows — admin leaked`,
   );
 
-  // 4. GET /api/users/online-list?includeOffline=true
-  // This route branch has its own inline SQL with notInArr(role,["admin"])
-  // that is separate from storage.getOnlineUsersList().
-  const offlineListRes = await httpGet("/api/users/online-list?includeOffline=true", bearer);
+  // 4. GET /api/users/online-list?includeOffline=true&countries=ZZ
+  // The includeOffline branch has its own inline SQL with notInArr(role,["admin"]).
+  // The only ZZ-country user in the DB is the test admin → after exclusion, [].
+  const offlineListRes = await httpGet(
+    `/api/users/online-list?includeOffline=true&countries=${ADMIN_COUNTRY}`,
+    bearer,
+  );
   assert(
     offlineListRes.status === 200,
-    "GET /api/users/online-list?includeOffline=true responded 200",
-    `GET /api/users/online-list?includeOffline=true responded ${offlineListRes.status}`,
+    `GET /api/users/online-list?includeOffline=true&countries=${ADMIN_COUNTRY} responded 200`,
+    `GET /api/users/online-list?includeOffline=true&countries=${ADMIN_COUNTRY} responded ${offlineListRes.status}`,
   );
   const offlineList = Array.isArray(offlineListRes.body)
     ? (offlineListRes.body as { id: string }[])
     : [];
   assert(
-    !offlineList.some((u) => u.id === ADMIN_ID),
-    "GET /api/users/online-list?includeOffline=true does not contain admin",
-    "GET /api/users/online-list?includeOffline=true contains admin row — inline SQL leaked admin",
+    offlineList.length === 0,
+    `GET /api/users/online-list?includeOffline=true&countries=${ADMIN_COUNTRY} returned [] (admin excluded by inline SQL)`,
+    `GET /api/users/online-list?includeOffline=true&countries=${ADMIN_COUNTRY} returned ${offlineList.length} rows — admin leaked through includeOffline path`,
   );
 
   // 5. GET /api/users/nearby — admin has a location seeded at Milan
