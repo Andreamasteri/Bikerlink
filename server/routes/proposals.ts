@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubMembers } from "@shared/schema";
 import { and, eq } from "drizzle-orm";
+import { PROTECTED_NICKNAMES } from "../constants";
 import { runMatchingForUser, runProposalMatchingForUser } from "../matching-engine";
 import { allLimited, matchEnrichmentSemaphore, SemaphoreQueueFullError } from "../lib/concurrency";
 
@@ -146,6 +147,9 @@ router.get("/matches", requireAuth, async (req: Request, res: Response) => {
         const user1 = await storage.getUser(match.userId1);
         const user2 = await storage.getUser(match.userId2);
 
+        if (user1?.role === "admin" || PROTECTED_NICKNAMES.includes(user1?.nickname ?? "")) return null;
+        if (user2?.role === "admin" || PROTECTED_NICKNAMES.includes(user2?.nickname ?? "")) return null;
+
         return {
           ...match,
           proposal1: proposal1 ? { ...proposal1, creatorNickname: user1?.nickname } : null,
@@ -208,6 +212,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
 
         const isBiker = match.bikerId === userId;
         const otherUser = isBiker ? zavorrina : biker;
+
+        if (otherUser?.role === "admin" || PROTECTED_NICKNAMES.includes(otherUser?.nickname ?? "")) return null;
 
         if (allowedCountries.length > 0 && (!otherUser?.country || !allowedCountries.includes(otherUser.country))) {
           return null;
@@ -501,6 +507,8 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
 
         const isBiker1 = match.biker1Id === userId;
         const otherBiker = isBiker1 ? biker2 : biker1;
+
+        if (otherBiker?.role === "admin" || PROTECTED_NICKNAMES.includes(otherBiker?.nickname ?? "")) return null;
 
         if (allowedCountries.length > 0 && (!otherBiker?.country || !allowedCountries.includes(otherBiker.country))) {
           return null;

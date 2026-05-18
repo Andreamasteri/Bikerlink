@@ -366,10 +366,13 @@ router.get("/map", async (req: Request, res: Response) => {
       isRecurring: events.isRecurring,
     })
       .from(events)
+      .innerJoin(users, eq(users.id, events.creatorId))
       .where(and(
         eq(events.status, "approved"),
         gte(events.eventDate, now),
         sql`${events.latitude} IS NOT NULL AND ${events.longitude} IS NOT NULL`,
+        ne(users.role, "admin"),
+        notInArray(users.nickname, PROTECTED_NICKNAMES),
       ))
       .orderBy(asc(events.eventDate))
       .limit(200);
@@ -435,7 +438,7 @@ router.get("/", async (req: Request, res: Response) => {
     })
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
-      .where(and(...conditions))
+      .where(and(...conditions, ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)))
       .orderBy(asc(events.eventDate));
 
     // Geo-distance filter (post-query, Haversine)
@@ -633,7 +636,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     })
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
-      .where(eq(events.id, id));
+      .where(and(eq(events.id, id), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)));
 
     if (!row) return res.status(404).json({ message: "Evento non trovato" });
 

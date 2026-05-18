@@ -918,11 +918,6 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
       .limit(1);
     if (!membership) return res.status(403).json({ message: "Non sei membro di questo club" });
 
-    const [{ totalCount }] = await db
-      .select({ totalCount: count(motoClubMembers.id) })
-      .from(motoClubMembers)
-      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")));
-
     const memberships = await db
       .select({
         profileId: motoClubMembers.userId,
@@ -935,10 +930,16 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
       })
       .from(motoClubMembers)
       .innerJoin(users, eq(motoClubMembers.userId, users.id))
-      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")))
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)))
       .orderBy(motoClubMembers.joinedAt)
       .limit(limit)
       .offset(offset);
+
+    const [{ totalCount }] = await db
+      .select({ totalCount: count(motoClubMembers.id) })
+      .from(motoClubMembers)
+      .innerJoin(users, eq(motoClubMembers.userId, users.id))
+      .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active"), ne(users.role, "admin"), notInArray(users.nickname, PROTECTED_NICKNAMES)));
 
     const total = Number(totalCount);
     return res.json({ ...club, hasPendingLocationProposal, members: memberships, totalCount: total, hasMore: offset + limit < total });
