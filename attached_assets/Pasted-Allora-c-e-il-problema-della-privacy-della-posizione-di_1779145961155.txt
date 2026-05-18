@@ -1,0 +1,68 @@
+Allora, c e il problema della privacy della posizione di casa....
+
+E, effettivamente, la funzione 'disponibile' nn fa granche, a parte dire 'sono libero'....
+
+Va assestata, soprattutto pensando al fattp cbd qualche malintenzionato  potrebbe seguirci.
+
+Quindi, prima di tutto, elencami cosa cambia, allo stato attuale, tra quamdp un utente è disponibile o non disponibile.
+
+La mia idea è cambiare uj po di dettagli per quando l utente è 'non disponibile' 
+
+E bisogna portare molto bene in evidenza il menu con le opzioni 'la mia privacy altera posizione'
+
+Allora, definiamo cosa succede nelle varie modalita
+
+Offline
+L utente ha chiuso l app, o attivato il ghost mode.
+Sparisce dai counter.
+Rimane la sua icona sulla mappa,, ma con una posizione randomizzata in un raggio di 20km dalla chiusura dell app.
+È un opzione che dobbiamo aggiungere al.menu 'la mia privacy - altera posizione' 
+Facciamolo subito
+'Alla chiusura dell app, l ultima posizione utente visibile sulla mappa viene randomizzata in un raggio di 20km da essa. 
+
+Online
+L utente compare sui counter relativi, con la posizione eventualmente filtrata dalle opzioni di 'la mia privacy -altera posizione'
+
+Non disponibile
+Un utente offline è sempre non disponibile
+Un utente online può essere non disponibile.
+
+Un utente online e non disponibile, risulta solo nel counter 'online'
+Nel counter online degli utanti online attualmente viene visualizzata la distanza...non son convinto sia una buona idea....fa cosi, crea un opzione nel pannello admin, chiamiamola 'gestione counter'....all interno, c e la voce se visualizzare o meno la distanza degli utenti online.
+Altre cose verranno piu avanti.
+
+
+Disponibile...
+Un utente disponibile viene visualizzato sia sulla mappa, che nei counter.
+L utente compare sui counter relativi, con la posizione eventualmente filtrata dalle opzioni di 'la mia privacy -altera posizione'.
+
+Dovremmo esserci.
+Fammi una tabella coi dati riassuntivi.
+
+Inoltre, dobbiamo spostare le opzioni della privacy: attualmente sotto profilo utente, vanno messe in Ride!, e l utente ogni volta che apre ride! Riceve un bel pop up con le note esplicative per le opzioni della privacy...con ls spiegszione chiara che settando quelle opziomi si puo tenere il programma sempre attivo, senza timore di svelare la proprjs posizione di ufficio, lavoro, casa.
+Aggiungi al pop-up un opzione da smarcare per non vederlo piu.
+Per rivedere il pop up, metti una 'i' cerchiata cliccsbile vicino alle opzioni di privacy.
+
+Inoltre, gia che ci stai mettendo mano, aggiungiamo altre 2 opzioni 'fake home position.
+Arriviamo cosi a un totale di 3
+Fake home
+Fake work 
+Fake whatever
+
+Ricordati di spiegare il concetto nel popup...
+
+Dove mettiamo titta sta roba?
+Direi che com e fatto adesso, menu collassabile, credo si chiami, va benissimo.
+
+Posizionalo  sotto 'ghost mode'
+
+
+A questo punto, spostiamo dentro ride anche 'precisione gps -tracking', che al momento è in 'profilo utente'
+
+Identifica le pecche che mi son sfuggite.
+
+Parliamp di privacy
+
+L.opzione di setup di fakehome va messa come popup all accesso.
+Finche non spunti l opzione 'ok, basta mostrarmi l annuncio', o il sistema trova l opzione attivata, l annuncio continua a comparire.
+

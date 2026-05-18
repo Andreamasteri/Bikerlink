@@ -626,7 +626,8 @@ export class DatabaseStorage implements IStorage {
           sql`${proposals.departureLatitude} IS NOT NULL`,
           sql`${proposals.departureLongitude} IS NOT NULL`,
           sql`${proposals.searchType} IS NOT NULL`,
-          notInArray(users.role, ["admin"])
+          notInArray(users.role, ["admin"]),
+          notInArray(users.nickname, PROTECTED_NICKNAMES)
         )
       );
     return results.map(r => r.proposal);

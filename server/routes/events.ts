@@ -25,7 +25,10 @@ import {
   gte,
   lte,
   inArray,
+  ne,
+  notInArray,
 } from "drizzle-orm";
+import { PROTECTED_NICKNAMES } from "../constants";
 import { uploadBuffer, deleteObject } from "../objectStorage";
 import { allLimited } from "../lib/concurrency";
 import { sendNewEventNotificationEmail } from "../email";
@@ -122,7 +125,11 @@ async function enrichEvent(evt: EventRow, requestingUserId: string | null) {
     })
       .from(eventParticipants)
       .leftJoin(users, eq(users.id, eventParticipants.userId))
-      .where(eq(eventParticipants.eventId, evt.id))
+      .where(and(
+        eq(eventParticipants.eventId, evt.id),
+        ne(users.role, "admin"),
+        notInArray(users.nickname, PROTECTED_NICKNAMES),
+      ))
       .orderBy(asc(eventParticipants.joinedAt)),
   ]);
 

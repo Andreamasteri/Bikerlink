@@ -559,7 +559,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
-    if (targetUser.role === "admin" || targetUser.role === "moderator" || targetUser.role === "moderatore") {
+    if (targetUser.role === "admin" || PROTECTED_NICKNAMES.includes(targetUser.nickname)) {
       return res.status(404).json({ message: "Utente non trovato" });
     }
 
@@ -813,7 +813,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const bikerConds: any[] = [eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia")), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"])];
+      const bikerConds: any[] = [eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia")), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"]), notInArr(usersTable.nickname, PROTECTED_NICKNAMES)];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
       const allBikersRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
@@ -887,7 +887,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina"), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"])];
+      const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina"), eq(usersTable.ghostMode, false), notInArr(usersTable.role, ["admin"]), notInArr(usersTable.nickname, PROTECTED_NICKNAMES)];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
       const allZavRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
