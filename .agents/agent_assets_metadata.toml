@@ -515,3 +515,15 @@ id = "MKEdfzBMo2hxt8PxPkwbM"
 uri = "file://attached_assets/generated_videos/biker_adrenalina_17s.mp4"
 type = "video"
 title = "Biker Adrenalina — 18s (impennata, curve, salto crepaccio)"
+
+[[outputs]]
+id = "SIEAn4Sd5qNb_RBUfxz02"
+uri = "file://server/public/assets/competitor-analysis.pdf"
+type = "pdf"
+title = "Analisi Competitor Route Planning — PDF (6 pagine)"
+
+[[outputs]]
+id = "SCDfDgTeiLAzIDImcSyCP"
+uri = "file://server/public/assets/competitor-analysis.png"
+type = "image"
+title = "Tabella Comparativa — Immagine 1200×630px"

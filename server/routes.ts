@@ -1329,6 +1329,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const EULA_PDF_PATH = path.resolve(process.cwd(), "server/public/bikerlink-eula.pdf");
   const PRIVACY_PDF_PATH = path.resolve(process.cwd(), "server/public/bikerlink-privacy-policy.pdf");
 
+  const COMPETITOR_PDF_PATH = path.resolve(process.cwd(), "server/public/assets/competitor-analysis.pdf");
+  const COMPETITOR_PNG_PATH = path.resolve(process.cwd(), "server/public/assets/competitor-analysis.png");
+
+  app.get("/assets/competitor-analysis.pdf", (_req, res) => {
+    if (!fs.existsSync(COMPETITOR_PDF_PATH)) {
+      return res.status(404).json({ message: "File non disponibile" });
+    }
+    res.setHeader("Content-Disposition", 'inline; filename="competitor-analysis.pdf"');
+    res.setHeader("Content-Type", "application/pdf");
+    fs.createReadStream(COMPETITOR_PDF_PATH).pipe(res);
+  });
+
+  app.get("/assets/competitor-analysis.png", (_req, res) => {
+    if (!fs.existsSync(COMPETITOR_PNG_PATH)) {
+      return res.status(404).json({ message: "File non disponibile" });
+    }
+    res.setHeader("Content-Type", "image/png");
+    fs.createReadStream(COMPETITOR_PNG_PATH).pipe(res);
+  });
+
   app.get("/api/manual/download", (_req, res) => {
     if (!fs.existsSync(MANUAL_PATH)) {
       return res.status(404).json({ message: "Manuale non disponibile" });
