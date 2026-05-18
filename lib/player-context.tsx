@@ -132,6 +132,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const isShuffledRef = useRef(false);
   const shuffleHistoryRef = useRef<Set<number>>(new Set());
   const userPausedRef = useRef(false);
+  // Set by onPlaybackStatus when it detects an OS-caused pause (not user, not track-end).
+  // Cleared on play(), loadAndPlay(), and stop(). Used by the AppState recovery handler.
+  const wasInterruptedRef = useRef(false);
+  const prevPlayingRef = useRef(false);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const radioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenRef = useRef(0);
@@ -178,15 +182,19 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Interruption recovery: when the app returns to the foreground after an
-    // audio interruption (phone call, alarm, Bluetooth disconnect), re-request
-    // audio focus and resume if the user had not explicitly paused.
+    // Interruption recovery: when the app returns to the foreground after a
+    // permanent audio focus loss (AUDIOFOCUS_LOSS / phone call), re-request
+    // audio focus and resume only if:
+    //   • playerRef exists (active player, not stopped)
+    //   • wasInterruptedRef is true (pause was OS-caused, detected in onPlaybackStatus)
+    //   • player is still paused (not resumed by native transient-focus handling)
     const appStateSub = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active" && playerRef.current && !isPlayingRef.current && !userPausedRef.current) {
-        console.log("[Player] AppState active — re-requesting audio focus and resuming");
+      if (nextState === "active" && playerRef.current && wasInterruptedRef.current && !isPlayingRef.current) {
+        console.log("[Player] Recovering from audio interruption — re-requesting focus");
         setAudioModeAsync(AUDIO_MODE_ACTIVE)
           .then(() => {
-            if (playerRef.current && !isPlayingRef.current && !userPausedRef.current) {
+            if (playerRef.current && wasInterruptedRef.current && !isPlayingRef.current) {
+              wasInterruptedRef.current = false;
               playerRef.current.play();
             }
           })
@@ -250,6 +258,22 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const onPlaybackStatus = useCallback((status: AudioStatus) => {
     if (!status.isLoaded) return;
+
+    // Detect OS-caused pause: playing transitioned true→false, track did not
+    // finish, and the user did not explicitly pause. This indicates an audio
+    // interruption (phone call, alarm, Bluetooth disconnect, etc.).
+    // Native expo-audio already handles AUDIOFOCUS_LOSS_TRANSIENT by auto-
+    // resuming — but AUDIOFOCUS_LOSS (permanent, e.g. phone call) does not
+    // auto-resume. We flag it here so the AppState listener can recover it.
+    if (prevPlayingRef.current && !status.playing && !status.didJustFinish && !userPausedRef.current) {
+      wasInterruptedRef.current = true;
+      console.log("[Player] OS interruption detected — waiting to recover");
+    } else if (status.playing) {
+      // Playing resumed (either by user or by native AUDIOFOCUS_GAIN handling).
+      wasInterruptedRef.current = false;
+    }
+    prevPlayingRef.current = status.playing;
+
     setIsPlaying(status.playing);
     setIsBuffering(status.isBuffering);
     setPosition(status.currentTime);
@@ -368,6 +392,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const play = useCallback(() => {
     userPausedRef.current = false;
+    wasInterruptedRef.current = false;
     try { playerRef.current?.play(); } catch (err) { console.warn("[Player] play error:", err); }
   }, []);
 
@@ -382,6 +407,9 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const stop = useCallback(() => {
     loadGenRef.current++;
+    userPausedRef.current = false;
+    wasInterruptedRef.current = false;
+    prevPlayingRef.current = false;
     if (sleepTimerRef.current) {
       clearTimeout(sleepTimerRef.current);
       sleepTimerRef.current = null;
