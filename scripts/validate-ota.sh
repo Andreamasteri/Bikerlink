@@ -288,6 +288,11 @@ elif [[ "$MULTI_CYCLE_CHECK" == MULTI:* ]]; then
 fi
 
 # ── 8. LIVE SERVER GUARD — verifica che la produzione serva l'OTA corrente ──
+# Task #1214 verification (2026-05-18): ran without SKIP_LIVE_CHECK against
+# production after OTA-25 publish. Result: HTTP 200 multipart/mixed (Protocol
+# v1), grep extractor correctly pulled releaseId=501f77ef-755f-482d-be35-
+# 7ad55213be57, LIVE_CHECK_OK printed, exit 0. No whitespace/escaping edge
+# cases observed in the real multipart body. Extraction pattern confirmed good.
 echo ""
 echo -e "${BOLD}── Live Server Guard ──────────────────────────────────────${RESET}"
 
