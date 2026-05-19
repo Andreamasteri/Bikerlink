@@ -84,6 +84,24 @@ export default function TabellaLingue() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [recentlySaved, setRecentlySaved] = useState<Set<string>>(new Set());
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const handleAiComplete = useCallback(async () => {
+    setAiLoading(true);
+    setAiResult(null);
+    try {
+      const resp = await apiRequest("POST", "/api/admin/translations/ai-complete", {});
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.message || "Errore AI");
+      setAiResult({ ok: true, msg: data.message || "Completamento AI riuscito" });
+      loadTable();
+    } catch (e: unknown) {
+      setAiResult({ ok: false, msg: e instanceof Error ? e.message : "Errore AI" });
+    } finally {
+      setAiLoading(false);
+    }
+  }, []);
 
   const loadTable = useCallback(async () => {
     setLoading(true);
@@ -341,6 +359,36 @@ export default function TabellaLingue() {
             <Text style={styles.legendText}>Identico all'italiano</Text>
           </View>
         </View>
+      </View>
+
+      <View style={styles.aiBar}>
+        <TouchableOpacity
+          style={[styles.aiBtn, aiLoading && styles.aiBtnDisabled]}
+          onPress={handleAiComplete}
+          disabled={aiLoading}
+          activeOpacity={0.7}
+        >
+          {aiLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <MaterialCommunityIcons name="auto-fix" size={15} color="#fff" />
+              <Text style={styles.aiBtnText}>Completa con AI</Text>
+            </>
+          )}
+        </TouchableOpacity>
+        {aiResult ? (
+          <View style={[styles.aiResultBadge, aiResult.ok ? styles.aiResultBadgeOk : styles.aiResultBadgeErr]}>
+            <MaterialCommunityIcons
+              name={aiResult.ok ? "check-circle" : "alert-circle"}
+              size={12}
+              color={aiResult.ok ? "#4CAF50" : "#F44336"}
+            />
+            <Text style={[styles.aiResultText, { color: aiResult.ok ? "#4CAF50" : "#F44336" }]} numberOfLines={2}>
+              {aiResult.msg}
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {saveError ? (
@@ -753,5 +801,53 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+  },
+  aiBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border ?? "#2a2a2a",
+    flexWrap: "wrap",
+  },
+  aiBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  aiBtnDisabled: {
+    opacity: 0.5,
+  },
+  aiBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  aiResultBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    flex: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  aiResultBadgeOk: {
+    backgroundColor: "#4CAF5015",
+  },
+  aiResultBadgeErr: {
+    backgroundColor: "#F4433615",
+  },
+  aiResultText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    flex: 1,
   },
 });

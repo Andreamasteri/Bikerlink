@@ -5224,6 +5224,116 @@ router.post("/translations/restart", async (_req: Request, res: Response) => {
   }
 });
 
+router.post("/translations/ai-complete", async (_req: Request, res: Response) => {
+  try {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      return res.status(503).json({ message: "OPENAI_API_KEY non configurata. Aggiungila nei Secrets di Replit." });
+    }
+
+    const OpenAI = (await import("openai")).default;
+    const openai = new OpenAI({ apiKey });
+
+    const itPath = path.resolve(process.cwd(), "lib/i18n/it.ts");
+    const itRaw = fs.readFileSync(itPath, "utf-8");
+    const keyLineRegex = /^\s*"([^"]+)":\s*"((?:[^"\\]|\\.)*)"/;
+
+    const itMap: Record<string, string> = {};
+    for (const line of itRaw.split("\n")) {
+      const m = line.match(keyLineRegex);
+      if (m) {
+        itMap[m[1]] = m[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+      }
+    }
+
+    const LANG_NAMES: Record<string, string> = {
+      en: "English",
+      de: "German",
+      es: "Spanish",
+      fr: "French",
+      el: "Greek",
+      tr: "Turkish",
+    };
+
+    const BATCH_SIZE = 80;
+    const summary: Record<string, number> = {};
+
+    for (const lang of Array.from(ALLOWED_LANGS)) {
+      const filePath = LANG_FILE_MAP[lang];
+      const existing: Record<string, string> = {};
+
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, "utf-8");
+        const kvRegex = /^\s*"([^"]+)"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,?\s*$/gm;
+        let m: RegExpExecArray | null;
+        while ((m = kvRegex.exec(content)) !== null) {
+          const val = m[2].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+          existing[m[1]] = val;
+        }
+      }
+
+      const missingKeys = Object.keys(itMap).filter((k) => !existing[k]?.trim());
+      if (missingKeys.length === 0) {
+        summary[lang] = 0;
+        continue;
+      }
+
+      const allTranslations: Record<string, string> = {};
+
+      for (let i = 0; i < missingKeys.length; i += BATCH_SIZE) {
+        const batch = missingKeys.slice(i, i + BATCH_SIZE);
+        const payload: Record<string, string> = {};
+        for (const k of batch) payload[k] = itMap[k];
+
+        const systemPrompt = `You are a professional app translator. Translate the given key-value pairs from Italian to ${LANG_NAMES[lang]}. The values are UI strings for a motorcycle social app called BikerLink. Preserve any special markers like {name}, {count}, {brand} etc. Return ONLY a valid JSON object with the same keys and translated values. No explanation, no markdown, just the JSON object.`;
+        const userPrompt = `Translate these Italian strings to ${LANG_NAMES[lang]}:\n${JSON.stringify(payload, null, 2)}`;
+
+        try {
+          const completion = await openai.chat.completions.create({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt },
+            ],
+            temperature: 0.2,
+            response_format: { type: "json_object" },
+          });
+
+          const raw = completion.choices[0]?.message?.content ?? "{}";
+          const parsed = JSON.parse(raw) as Record<string, string>;
+          for (const k of batch) {
+            if (parsed[k] && typeof parsed[k] === "string" && parsed[k].trim()) {
+              allTranslations[k] = parsed[k].trim();
+            }
+          }
+        } catch (batchErr) {
+          console.error(`[translations/ai-complete] batch error for ${lang}:`, batchErr);
+        }
+      }
+
+      const changed = applyTranslationsToFile(filePath, allTranslations);
+      summary[lang] = changed;
+    }
+
+    const totalChanged = Object.values(summary).reduce((a, b) => a + b, 0);
+    const summaryText = Object.entries(summary)
+      .map(([l, n]) => `${l.toUpperCase()}: ${n}`)
+      .join(", ");
+
+    return res.json({
+      ok: true,
+      summary,
+      totalChanged,
+      message: totalChanged > 0
+        ? `Completate ${totalChanged} traduzioni → ${summaryText}`
+        : "Nessuna traduzione mancante trovata",
+    });
+  } catch (error: any) {
+    console.error("[translations/ai-complete] error:", error);
+    return res.status(500).json({ message: error?.message || "Errore durante il completamento AI" });
+  }
+});
+
 const docxImportUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 25 * 1024 * 1024 },

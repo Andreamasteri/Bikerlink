@@ -596,6 +596,10 @@ export default function TraduzioniScreen() {
   const [importFileName, setImportFileName] = useState<string>("");
   const webImportInputRef = React.useRef<HTMLInputElement | null>(null);
 
+  const [aiStatus, setAiStatus] = useState<StepStatus>("idle");
+  const [aiResult, setAiResult] = useState("");
+  const [aiSummary, setAiSummary] = useState<Record<string, number> | null>(null);
+
   async function handlePrepare() {
     setPrepareStatus("loading");
     setPrepareResult("");
@@ -823,6 +827,23 @@ export default function TraduzioniScreen() {
     handlePickAndImportNative();
   }
 
+  async function handleAiComplete() {
+    setAiStatus("loading");
+    setAiResult("");
+    setAiSummary(null);
+    try {
+      const resp = await apiRequest("POST", "/api/admin/translations/ai-complete", {});
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.message || "Errore AI");
+      setAiStatus("success");
+      setAiResult(data.message || "Completamento AI riuscito");
+      if (data.summary) setAiSummary(data.summary as Record<string, number>);
+    } catch (e: any) {
+      setAiStatus("error");
+      setAiResult(e?.message || "Errore durante il completamento AI");
+    }
+  }
+
   return (
     <ScrollView
       style={styles.container}
@@ -966,6 +987,60 @@ export default function TraduzioniScreen() {
             >
               {importResult}
             </Text>
+          </View>
+        ) : null}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={[styles.stepBadge, aiStatus === "success" && styles.stepBadgeSuccess, aiStatus === "error" && styles.stepBadgeError]}>
+            <MaterialCommunityIcons name="robot-outline" size={16} color="#fff" />
+          </View>
+          <View style={styles.cardHeaderText}>
+            <Text style={styles.cardTitle}>Completa con AI</Text>
+            <Text style={styles.cardDesc}>
+              Chiama OpenAI per tradurre automaticamente le chiavi ancora vuote in ogni lingua, senza sovrascrivere quelle già valorizzate.
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, aiStatus === "loading" && styles.buttonDisabled]}
+          onPress={handleAiComplete}
+          disabled={aiStatus === "loading"}
+          activeOpacity={0.7}
+        >
+          {aiStatus === "loading" ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <MaterialCommunityIcons name="auto-fix" size={18} color="#fff" />
+              <Text style={styles.buttonText}>Avvia completamento AI</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        {aiResult ? (
+          <View style={[styles.resultBox, aiStatus === "success" ? styles.resultBoxSuccess : styles.resultBoxError]}>
+            <MaterialCommunityIcons
+              name={aiStatus === "success" ? "check-circle-outline" : "alert-circle-outline"}
+              size={16}
+              color={aiStatus === "success" ? "#4CAF50" : "#F44336"}
+            />
+            <Text style={[styles.resultText, aiStatus === "success" ? styles.resultTextSuccess : styles.resultTextError]}>
+              {aiResult}
+            </Text>
+          </View>
+        ) : null}
+
+        {aiSummary && aiStatus === "success" ? (
+          <View style={styles.aiSummaryBox}>
+            {Object.entries(aiSummary).map(([lang, count]) => (
+              <View key={lang} style={styles.aiSummaryRow}>
+                <Text style={styles.aiSummaryLang}>{lang.toUpperCase()}</Text>
+                <Text style={styles.aiSummaryCount}>{count} chiavi aggiunte</Text>
+              </View>
+            ))}
           </View>
         ) : null}
       </View>
@@ -1336,5 +1411,31 @@ const styles = StyleSheet.create({
     height: 7,
     borderRadius: 4,
     backgroundColor: "#FF9800",
+  },
+  aiSummaryBox: {
+    marginTop: 10,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    padding: 10,
+    gap: 6,
+  },
+  aiSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 3,
+  },
+  aiSummaryLang: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
+    width: 36,
+  },
+  aiSummaryCount: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    flex: 1,
+    marginLeft: 8,
   },
 });
