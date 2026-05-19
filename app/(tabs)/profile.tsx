@@ -354,13 +354,33 @@ export default function ProfileScreen() {
     saveMatchPrefMutation.mutate({ [key]: value });
   };
 
-  const notifPrefs = {
-    matches: profile?.profile?.notificationPreferences?.matches ?? true,
-    zoneProposals: profile?.profile?.notificationPreferences?.zoneProposals ?? true,
-    chat: profile?.profile?.notificationPreferences?.chat ?? true,
-    motoclub: profile?.profile?.notificationPreferences?.motoclub ?? true,
-    eventi: profile?.profile?.notificationPreferences?.eventi ?? true,
-  };
+  const [notifPrefs, setNotifPrefs] = useState<{
+    matches: boolean;
+    zoneProposals: boolean;
+    chat: boolean;
+    motoclub: boolean;
+    eventi: boolean;
+  }>({
+    matches: true,
+    zoneProposals: true,
+    chat: true,
+    motoclub: true,
+    eventi: true,
+  });
+
+  // Seed per-category toggles from server on load (survives reinstalls — server is authoritative)
+  const serverNotifPrefs = profile?.profile?.notificationPreferences;
+  useEffect(() => {
+    if (serverNotifPrefs != null) {
+      setNotifPrefs({
+        matches: serverNotifPrefs.matches ?? true,
+        zoneProposals: serverNotifPrefs.zoneProposals ?? true,
+        chat: serverNotifPrefs.chat ?? true,
+        motoclub: serverNotifPrefs.motoclub ?? true,
+        eventi: serverNotifPrefs.eventi ?? true,
+      });
+    }
+  }, [serverNotifPrefs]);
 
   const notifPrefsMutation = useMutation({
     mutationFn: async (updates: Partial<{ matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean }>) => {
@@ -375,7 +395,9 @@ export default function ProfileScreen() {
   });
 
   const toggleNotifPref = (key: "matches" | "zoneProposals" | "chat" | "motoclub" | "eventi", value: boolean) => {
-    notifPrefsMutation.mutate({ [key]: value });
+    const previous = notifPrefs;
+    setNotifPrefs(prev => ({ ...prev, [key]: value }));
+    notifPrefsMutation.mutate({ [key]: value }, { onError: () => setNotifPrefs(previous) });
   };
 
   const { data: donationData } = useQuery<{ enabled: boolean; text: string; paypalEmail: string }>({
