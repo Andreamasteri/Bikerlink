@@ -5899,6 +5899,176 @@ router.get("/match-settings", async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/match-health
+// Esegue un controllo completo della salute del motore di matching
+router.get("/match-health", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { captureSchemaSnapshot, loadSchemaSnapshot, diffSchemas, saveSchemaSnapshot } = await import("../scripts/snapshot-schema");
+
+    const MATCH_TYPES = [
+      { id: 1, key: "bikerBikerBrand", label: "Biker-Biker Brand", table: "biker_biker_matches", filter: "motorcycle_brand NOT LIKE '%:%' AND motorcycle_brand NOT IN ('musica','musica_zav','distanza','distanza_zav','eventi') AND motorcycle_brand NOT LIKE 'gps_%' AND motorcycle_brand NOT LIKE 'zona_%'", prefColumn: "biker_biker_brand" },
+      { id: 2, key: "bikerZavorrinaBrand", label: "Biker-Zavarrina Brand", table: "biker_zavarrina_matches", filter: "1=1", prefColumn: "biker_zavorrina_brand" },
+      { id: 3, key: "bikerClubBrand", label: "Biker-Club Brand", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'club:%' AND motorcycle_brand NOT LIKE 'club_zav:%'", prefColumn: "biker_club_brand" },
+      { id: 4, key: "zavarrinaClubBrand", label: "Zavarrina-Club Brand", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'club_zav:%'", prefColumn: "zavorrina_club_brand" },
+      { id: 5, key: "bikerBikerTypeStyle", label: "Biker-Biker Type+Style", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'tipo:%' AND motorcycle_brand NOT LIKE 'tipo_zav:%'", prefColumn: "biker_biker_type_style" },
+      { id: 6, key: "bikerZavarrinaTypeStyle", label: "Biker-Zavarrina Type+Style", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'tipo_zav:%'", prefColumn: "biker_zavorrina_type_style" },
+      { id: 7, key: "bikerBikerDistance", label: "Biker-Biker Distance", table: "biker_biker_matches", filter: "motorcycle_brand = 'distanza'", prefColumn: "biker_biker_distance" },
+      { id: 8, key: "bikerZavarrinaDistance", label: "Biker-Zavarrina Distance", table: "biker_biker_matches", filter: "motorcycle_brand = 'distanza_zav'", prefColumn: "biker_zavorrina_distance" },
+      { id: 9, key: "bikerBikerMusic", label: "Biker-Biker Music", table: "biker_biker_matches", filter: "motorcycle_brand = 'musica'", prefColumn: "biker_biker_music" },
+      { id: 10, key: "bikerZavarrinaMusic", label: "Biker-Zavarrina Music", table: "biker_biker_matches", filter: "motorcycle_brand = 'musica_zav'", prefColumn: "biker_zavorrina_music" },
+      { id: 11, key: "bikerBikerLeanAngle", label: "Biker-Biker Lean Angle (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_tilt', 'gps_full')", prefColumn: "biker_biker_lean_angle" },
+      { id: 12, key: "bikerBikerRouteTypeZone", label: "Biker-Biker Route+Zone", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'zona_bb:%'", prefColumn: "biker_biker_route_type_zone" },
+      { id: 13, key: "bikerZavarrinaRouteTypeZone", label: "Biker-Zavarrina Route+Zone", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'zona_zav:%'", prefColumn: "biker_zavorrina_route_type_zone" },
+      { id: 14, key: "bikerBikerAvgSpeed", label: "Biker-Biker Avg Speed (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_speed', 'gps_full')", prefColumn: "biker_biker_avg_speed" },
+      { id: 15, key: "bikerBikerAvgDuration", label: "Biker-Biker Avg Duration (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_speed', 'gps_full')", prefColumn: "biker_biker_avg_duration" },
+      { id: 16, key: "bikerBikerDayTime", label: "Biker-Biker Day+Time (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_day', 'gps_full')", prefColumn: "biker_biker_day_time" },
+      { id: 17, key: "bikerBikerEvents", label: "Biker-Biker Events", table: "biker_biker_matches", filter: "motorcycle_brand = 'eventi'", prefColumn: "biker_biker_events" },
+    ];
+
+    const { pool } = await import("../db");
+    const client = await pool.connect();
+
+    try {
+      // 1. Schema diff
+      const currentSnapshot = await captureSchemaSnapshot();
+      const previousSnapshot = loadSchemaSnapshot();
+      let schemaCheck: Record<string, unknown>;
+
+      if (!previousSnapshot) {
+        schemaCheck = { status: "WARN", message: "Nessuno snapshot precedente trovato — verrà creato ora", diff: null };
+      } else {
+        const diff = diffSchemas(previousSnapshot, currentSnapshot);
+        const hasChanges = diff.addedTables.length > 0 || diff.removedTables.length > 0 || diff.modifiedTables.length > 0;
+        schemaCheck = {
+          status: hasChanges ? "WARN" : "OK",
+          previousSnapshotAt: previousSnapshot.capturedAt,
+          diff: hasChanges ? diff : null,
+          message: hasChanges ? "Schema modificato dall'ultima esecuzione" : "Schema invariato",
+        };
+      }
+
+      // 2. Match type counts
+      const matchCounts: Array<{ id: number; key: string; label: string; count: number; status: "OK" | "WARN" }> = [];
+      for (const mt of MATCH_TYPES) {
+        const res = await client.query<{ cnt: string }>(
+          `SELECT COUNT(*) AS cnt FROM ${mt.table} WHERE ${mt.filter}`
+        );
+        const count = parseInt(res.rows[0]?.cnt ?? "0", 10);
+        matchCounts.push({ id: mt.id, key: mt.key, label: mt.label, count, status: count === 0 ? "WARN" : "OK" });
+      }
+
+      // 3. Match preferences alignment
+      const prefCols = await client.query<{ column_name: string }>(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_schema='public' AND table_name='match_preferences'
+        AND column_name NOT IN ('id','user_id','updated_at','direct_match')
+        ORDER BY ordinal_position
+      `);
+      const dbPrefCols = new Set(prefCols.rows.map(r => r.column_name));
+      const expectedPrefColumns = MATCH_TYPES.map(mt => mt.prefColumn);
+      const missingFromDb = expectedPrefColumns.filter(col => !dbPrefCols.has(col));
+      const unknownInDb = [...dbPrefCols].filter(col => !expectedPrefColumns.includes(col));
+      const prefsCheck = {
+        status: missingFromDb.length > 0 ? "ERROR" : unknownInDb.length > 0 ? "WARN" : "OK",
+        missingFromDb,
+        unknownInDb,
+        message: missingFromDb.length > 0
+          ? `Colonne mancanti: ${missingFromDb.join(", ")}`
+          : unknownInDb.length > 0
+          ? `Colonne extra: ${unknownInDb.join(", ")}`
+          : "match_preferences allineata con i 17 tipi",
+      };
+
+      // 4. Distance sample — 5 random biker-biker matches with GPS coordinates
+      const sampleRes = await client.query<{ b1lat: number | null; b1lng: number | null; b2lat: number | null; b2lng: number | null }>(`
+        SELECT up1.latitude AS b1lat, up1.longitude AS b1lng,
+               up2.latitude AS b2lat, up2.longitude AS b2lng
+        FROM biker_biker_matches m
+        JOIN user_profiles up1 ON up1.user_id = m.biker1_id
+        JOIN user_profiles up2 ON up2.user_id = m.biker2_id
+        WHERE up1.latitude IS NOT NULL AND up1.longitude IS NOT NULL
+          AND up2.latitude IS NOT NULL AND up2.longitude IS NOT NULL
+        ORDER BY RANDOM()
+        LIMIT 5
+      `);
+
+      const haversine = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+        const R = 6371;
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLng = ((lng2 - lng1) * Math.PI) / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      };
+
+      const distances = sampleRes.rows
+        .filter(r => r.b1lat != null && r.b1lng != null && r.b2lat != null && r.b2lng != null)
+        .map(r => Math.round(haversine(r.b1lat!, r.b1lng!, r.b2lat!, r.b2lng!)));
+
+      const distanceCheck = {
+        status: sampleRes.rows.length === 0 ? "WARN" : distances.every(d => d > 0) ? "OK" : "WARN",
+        sampleCount: sampleRes.rows.length,
+        distancesKm: distances,
+        message: sampleRes.rows.length === 0
+          ? "Nessun match con coordinate GPS trovato"
+          : `${distances.length} campioni verificati (Haversine): ${distances.map(d => d + "km").join(", ")}`,
+      };
+
+      // 5. Admin gate
+      const gateRes = await client.query<{ value: string | null }>(
+        `SELECT value FROM app_settings WHERE key = 'auto_matching_enabled' LIMIT 1`
+      );
+      const adminGateCheck = {
+        status: gateRes.rows.length === 0 ? "WARN" : "OK",
+        key: "auto_matching_enabled",
+        value: gateRes.rows[0]?.value ?? null,
+        message: gateRes.rows.length === 0
+          ? "Chiave 'auto_matching_enabled' non trovata in app_settings"
+          : `auto_matching_enabled = ${gateRes.rows[0].value ?? "true (default)"}`,
+      };
+
+      // Save updated snapshot
+      await saveSchemaSnapshot();
+
+      // Aggregate overall status
+      const allChecks = [
+        schemaCheck.status,
+        ...matchCounts.map(m => m.status),
+        prefsCheck.status,
+        distanceCheck.status,
+        adminGateCheck.status,
+      ];
+      const overallStatus = allChecks.includes("ERROR") ? "ERROR" : allChecks.includes("WARN") ? "WARN" : "OK";
+
+      const typesWithZero = matchCounts.filter(m => m.count === 0).length;
+
+      return res.json({
+        overallStatus,
+        checkedAt: new Date().toISOString(),
+        summary: {
+          totalMatchTypes: MATCH_TYPES.length,
+          typesWithZeroResults: typesWithZero,
+          schemaStatus: schemaCheck.status,
+          prefsStatus: prefsCheck.status,
+          distanceStatus: distanceCheck.status,
+          adminGateStatus: adminGateCheck.status,
+        },
+        checks: {
+          schema: schemaCheck,
+          matchCounts,
+          preferences: prefsCheck,
+          distanceSample: distanceCheck,
+          adminGate: adminGateCheck,
+        },
+      });
+    } finally {
+      client.release();
+    }
+  } catch (err) {
+    console.error("[ADMIN match-health] error:", err);
+    return res.status(500).json({ message: "Errore durante il health check", error: String(err) });
+  }
+});
+
 // PUT /api/admin/match-settings
 // Attiva/disattiva la sezione preferenze matching per tutti gli utenti
 router.put("/match-settings", async (req: Request, res: Response) => {

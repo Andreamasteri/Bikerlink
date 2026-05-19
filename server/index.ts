@@ -1822,6 +1822,17 @@ function setupErrorHandler(app: express.Application) {
           }, 60 * 1000);
           console.log(`[INIT] Phase 12.5 ota_events cleanup scheduled (1min delay, then every 6h, retention=${OTA_EVENTS_RETENTION})`);
         }
+
+        // Phase 13 — schema snapshot (non-blocking, fire-and-forget)
+        // Captures a fresh snapshot of the DB schema after all migrations have run.
+        // Used by the match-health skill to detect structural changes between deploys.
+        try {
+          const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
+          await saveSchemaSnapshot();
+          console.log("[INIT] Phase 13 schema snapshot saved");
+        } catch (e) {
+          console.warn("[INIT] Phase 13 schema snapshot failed (non-fatal):", e);
+        }
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);
         initState.initializing = false;
