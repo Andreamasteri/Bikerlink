@@ -1633,7 +1633,7 @@ export default function MapScreen() {
 
       <Modal visible={showAreaModal} transparent animationType="slide" onRequestClose={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}>
         <Pressable style={styles.detailOverlay} onPress={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}>
-          <Pressable style={styles.areaSheet} onPress={(e) => e.stopPropagation()}>
+          <Pressable style={[styles.areaSheet, { paddingBottom: insets.bottom || 16 }]} onPress={(e) => e.stopPropagation()}>
             <View style={styles.detailHandle} />
             <View style={styles.listSheetHeader}>
               <Ionicons name="globe-outline" size={20} color={Colors.accent} />
