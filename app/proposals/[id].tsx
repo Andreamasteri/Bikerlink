@@ -349,13 +349,13 @@ export default function ProposalDetailScreen() {
                 }
               };
               Alert.alert(
-                  t("proposals.detail.deleteProposal"),
-                  t("proposals.detail.deleteConfirm"),
-                  [
-                    { text: t("common.cancel"), style: "cancel" },
-                    { text: t("common.delete"), style: "destructive", onPress: doDelete },
-                  ]
-                );
+                t("proposals.detail.deleteProposal"),
+                t("proposals.detail.deleteConfirm"),
+                [
+                  { text: t("common.cancel"), style: "cancel" },
+                  { text: t("common.delete"), style: "destructive", onPress: doDelete },
+                ]
+              );
             }}
             activeOpacity={0.8}
           >
