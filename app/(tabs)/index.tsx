@@ -203,7 +203,10 @@ export default function MapScreen() {
       { label: "🌍 Nord Africa", codes: ["MA","DZ","TN","LY","EG","MR"] },
       { label: "🌐 Nord America", codes: ["US","CA","MX"] },
       { label: "🌎 Sud America", codes: ["BR","AR","CL","CO","PE","VE","UY","PY","BO","EC","GY","SR","GF"] },
-      { label: "🌏 Altro", codes: ["RU","TR","GE","AM","AZ","JP"] },
+      { label: "🌏 Asia", codes: ["JP","IN","ID","TH","CN","KR","VN","PH","MY","SG","PK","BD","LK","NP","MM"] },
+      { label: "🌍 Africa sub-sahariana", codes: ["ZA","NG","KE","ET","GH","TZ","UG","SN","CI","CM","AO","MZ","ZM","ZW"] },
+      { label: "🌏 Oceania", codes: ["AU","NZ","FJ","PG"] },
+      { label: "🌏 Altro", codes: ["RU","TR","GE","AM","AZ"] },
     ];
     const countryMap = new Map(EUROPEAN_COUNTRIES.map((c) => [c.code, c]));
     return CONTINENT_GROUPS.map((group) => ({
