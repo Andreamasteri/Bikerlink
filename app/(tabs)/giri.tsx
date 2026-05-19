@@ -7,11 +7,15 @@ import {
   StyleSheet,
   RefreshControl,
   Platform,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest } from "@/lib/query-client";
 
@@ -93,6 +97,38 @@ export default function GiriScreen() {
     setRefreshing(false);
   }, [refetch]);
 
+  const [isImporting, setIsImporting] = useState(false);
+  const handleImportGpx = useCallback(async () => {
+    try {
+      setIsImporting(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/gpx+xml", "application/octet-stream", "*/*"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+      const gpxContent = await FileSystem.readAsStringAsync(asset.uri);
+
+      const rawName = asset.name ?? "";
+      const guessedTitle = rawName.replace(/\.gpx$/i, "").replace(/[_-]+/g, " ").trim();
+
+      const res = await apiRequest("POST", "/api/planned-routes/import-gpx", {
+        gpxContent,
+        title: guessedTitle || undefined,
+        visibility: "private",
+      });
+      const route = await res.json() as { id: string };
+      qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
+      router.push(`/giri/${route.id}` as any);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Impossibile leggere il file GPX.";
+      Alert.alert("Errore", msg);
+    } finally {
+      setIsImporting(false);
+    }
+  }, [qc, router]);
+
   const s = styles(colors);
 
   return (
@@ -102,13 +138,28 @@ export default function GiriScreen() {
           <Text style={s.headerTitle}>Giri</Text>
           <Text style={s.headerSub}>I tuoi percorsi in moto</Text>
         </View>
-        <Pressable
-          style={s.planBtn}
-          onPress={() => router.push("/giri/create" as any)}
-        >
-          <MaterialCommunityIcons name="map-marker-plus" size={20} color="#000" />
-          <Text style={s.planBtnText}>Pianifica</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+          <Pressable
+            style={s.importBtn}
+            onPress={handleImportGpx}
+            disabled={isImporting}
+            testID="import-gpx-btn"
+          >
+            {isImporting ? (
+              <ActivityIndicator size="small" color={colors.text} />
+            ) : (
+              <MaterialCommunityIcons name="file-upload-outline" size={18} color={colors.text} />
+            )}
+            <Text style={s.importBtnText}>Importa GPX</Text>
+          </Pressable>
+          <Pressable
+            style={s.planBtn}
+            onPress={() => router.push("/giri/create" as any)}
+          >
+            <MaterialCommunityIcons name="map-marker-plus" size={20} color="#000" />
+            <Text style={s.planBtnText}>Pianifica</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={s.filterRow}>
@@ -292,6 +343,22 @@ const styles = (colors: ReturnType<typeof useColors>) =>
       fontFamily: "Inter_600SemiBold",
       fontSize: 14,
       color: "#000",
+    },
+    importBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+    },
+    importBtnText: {
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 13,
+      color: colors.text,
     },
     filterRow: {
       flexDirection: "row",
