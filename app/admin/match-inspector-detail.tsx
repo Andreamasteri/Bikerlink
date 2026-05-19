@@ -10,7 +10,7 @@ import {
   Alert,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -66,10 +66,26 @@ function statusColor(status: string): string {
   }
 }
 
-function PreferencesDiffCard({ sections }: { sections: MatchTypeSection[] }) {
+function PreferencesDiffCard({
+  sections,
+  userId,
+  nickname,
+}: {
+  sections: MatchTypeSection[];
+  userId: string;
+  nickname: string;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const router = useRouter();
   const disabled = sections.filter((s) => s.disabled);
   const hasCustom = disabled.length > 0;
+
+  const handleEditPress = () => {
+    router.push({
+      pathname: "/admin/match-preferences-edit",
+      params: { userId, nickname },
+    });
+  };
 
   return (
     <View style={styles.prefsCard}>
@@ -145,7 +161,28 @@ function PreferencesDiffCard({ sections }: { sections: MatchTypeSection[] }) {
               </Text>
             </View>
           ))}
+          <TouchableOpacity
+            style={styles.editPrefsBtn}
+            onPress={handleEditPress}
+            activeOpacity={0.7}
+            testID="edit-prefs-btn"
+          >
+            <Ionicons name="create-outline" size={14} color={Colors.accent} />
+            <Text style={styles.editPrefsBtnText}>Modifica preferenze</Text>
+          </TouchableOpacity>
         </View>
+      )}
+
+      {!expanded && (
+        <TouchableOpacity
+          style={styles.editPrefsBtnCollapsed}
+          onPress={handleEditPress}
+          activeOpacity={0.7}
+          testID="edit-prefs-btn-collapsed"
+        >
+          <Ionicons name="create-outline" size={13} color={Colors.accent} />
+          <Text style={styles.editPrefsBtnText}>Modifica</Text>
+        </TouchableOpacity>
       )}
     </View>
   );
@@ -262,7 +299,7 @@ export default function MatchInspectorDetailScreen() {
         </TouchableOpacity>
       </View>
 
-      <PreferencesDiffCard sections={matchesByType} />
+      <PreferencesDiffCard sections={matchesByType} userId={userId!} nickname={user.nickname} />
 
       <Text style={styles.sectionTitle}>17 Tipi di Match</Text>
 
@@ -562,5 +599,28 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     paddingBottom: 8,
+  },
+  editPrefsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  editPrefsBtnCollapsed: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  editPrefsBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.accent,
   },
 });

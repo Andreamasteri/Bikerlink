@@ -1,0 +1,62 @@
+export type MatchPrefsPayload = {
+  bikerBikerBrand: boolean;
+  bikerZavorrinaBrand: boolean;
+  bikerClubBrand: boolean;
+  zavarrinaClubBrand: boolean;
+  bikerBikerTypeStyle: boolean;
+  bikerZavarrinaTypeStyle: boolean;
+  bikerBikerDistance: boolean;
+  bikerZavarrinaDistance: boolean;
+  bikerBikerMusic: boolean;
+  bikerZavarrinaMusic: boolean;
+  bikerBikerLeanAngle: boolean;
+  bikerBikerRouteTypeZone: boolean;
+  bikerZavarrinaRouteTypeZone: boolean;
+  bikerBikerAvgSpeed: boolean;
+  bikerBikerAvgDuration: boolean;
+  bikerBikerDayTime: boolean;
+  bikerBikerEvents: boolean;
+  directMatch: boolean;
+};
+
+export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
+  bikerBikerBrand: true,
+  bikerZavorrinaBrand: true,
+  bikerClubBrand: true,
+  zavarrinaClubBrand: true,
+  bikerBikerTypeStyle: true,
+  bikerZavarrinaTypeStyle: true,
+  bikerBikerDistance: true,
+  bikerZavarrinaDistance: true,
+  bikerBikerMusic: true,
+  bikerZavarrinaMusic: true,
+  bikerBikerLeanAngle: true,
+  bikerBikerRouteTypeZone: true,
+  bikerZavarrinaRouteTypeZone: true,
+  bikerBikerAvgSpeed: true,
+  bikerBikerAvgDuration: true,
+  bikerBikerDayTime: true,
+  bikerBikerEvents: true,
+  directMatch: true,
+};
+
+export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string }[] = [
+  { key: "bikerBikerBrand", label: "Biker ↔ Biker — Marca moto" },
+  { key: "bikerZavorrinaBrand", label: "Biker ↔ Zavorra — Marca moto" },
+  { key: "bikerClubBrand", label: "Biker ↔ Club — Marca moto" },
+  { key: "zavarrinaClubBrand", label: "Zavorra ↔ Club — Marca moto" },
+  { key: "bikerBikerTypeStyle", label: "Biker ↔ Biker — Tipo + Stile guida" },
+  { key: "bikerZavarrinaTypeStyle", label: "Biker ↔ Zavorra — Tipo + Stile guida" },
+  { key: "bikerBikerDistance", label: "Biker ↔ Biker — Distanza giro" },
+  { key: "bikerZavarrinaDistance", label: "Biker ↔ Zavorra — Distanza giro" },
+  { key: "bikerBikerMusic", label: "Biker ↔ Biker — Musica (≥65%)" },
+  { key: "bikerZavarrinaMusic", label: "Biker ↔ Zavorra — Musica (≥65%)" },
+  { key: "bikerBikerLeanAngle", label: "Biker ↔ Biker — Angolo piega" },
+  { key: "bikerBikerRouteTypeZone", label: "Biker ↔ Biker — Tipo + Zona percorso" },
+  { key: "bikerZavarrinaRouteTypeZone", label: "Biker ↔ Zavorra — Tipo + Zona percorso" },
+  { key: "bikerBikerAvgSpeed", label: "Biker ↔ Biker — Velocità media" },
+  { key: "bikerBikerAvgDuration", label: "Biker ↔ Biker — Durata media uscita" },
+  { key: "bikerBikerDayTime", label: "Biker ↔ Biker — Giorno/Fascia oraria" },
+  { key: "bikerBikerEvents", label: "Biker ↔ Biker — Raduni frequentati" },
+  { key: "directMatch", label: "Match Diretto (Richiedi Match)" },
+];

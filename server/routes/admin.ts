@@ -6481,6 +6481,94 @@ router.get("/users/match-summary", handleMatchInspectorUsers);
 router.get("/users/:userId/matches", handleMatchInspectorUserDetail);
 router.post("/users/:userId/matches/recalculate", handleMatchInspectorRecalculate);
 
+// GET /api/admin/users/:userId/match-preferences
+// Returns the match preferences for a specific user (admin only).
+router.get("/users/:userId/match-preferences", async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const [row] = await db
+      .select()
+      .from(matchPreferences)
+      .where(eq(matchPreferences.userId, userId))
+      .limit(1);
+
+    if (!row) {
+      return res.json({ preferences: DEFAULT_PREFS });
+    }
+
+    return res.json({
+      preferences: {
+        bikerBikerBrand: row.bikerBikerBrand,
+        bikerZavorrinaBrand: row.bikerZavorrinaBrand,
+        bikerClubBrand: row.bikerClubBrand,
+        zavarrinaClubBrand: row.zavarrinaClubBrand,
+        bikerBikerTypeStyle: row.bikerBikerTypeStyle,
+        bikerZavarrinaTypeStyle: row.bikerZavarrinaTypeStyle,
+        bikerBikerDistance: row.bikerBikerDistance,
+        bikerZavarrinaDistance: row.bikerZavarrinaDistance,
+        bikerBikerMusic: row.bikerBikerMusic,
+        bikerZavarrinaMusic: row.bikerZavarrinaMusic,
+        bikerBikerLeanAngle: row.bikerBikerLeanAngle,
+        bikerBikerRouteTypeZone: row.bikerBikerRouteTypeZone,
+        bikerZavarrinaRouteTypeZone: row.bikerZavarrinaRouteTypeZone,
+        bikerBikerAvgSpeed: row.bikerBikerAvgSpeed,
+        bikerBikerAvgDuration: row.bikerBikerAvgDuration,
+        bikerBikerDayTime: row.bikerBikerDayTime,
+        bikerBikerEvents: row.bikerBikerEvents,
+        directMatch: row.directMatch,
+      },
+    });
+  } catch (err) {
+    console.error("[ADMIN match-preferences GET] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// PUT /api/admin/users/:userId/match-preferences
+// Updates the match preferences for a specific user (admin only).
+router.put("/users/:userId/match-preferences", async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const body = req.body as Partial<typeof DEFAULT_PREFS>;
+
+    const allowedKeys = Object.keys(DEFAULT_PREFS) as Array<keyof typeof DEFAULT_PREFS>;
+    const updates: Record<string, boolean> = {};
+    for (const key of allowedKeys) {
+      if (typeof body[key] === "boolean") {
+        updates[key] = body[key] as boolean;
+      }
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: "Nessun campo valido fornito" });
+    }
+
+    const [existing] = await db
+      .select({ id: matchPreferences.id })
+      .from(matchPreferences)
+      .where(eq(matchPreferences.userId, userId))
+      .limit(1);
+
+    if (existing) {
+      await db
+        .update(matchPreferences)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(matchPreferences.userId, userId));
+    } else {
+      await db.insert(matchPreferences).values({
+        userId,
+        ...DEFAULT_PREFS,
+        ...updates,
+      });
+    }
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[ADMIN match-preferences PUT] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 // Route registrations — legacy alias paths (backward compat)
 router.get("/match-inspector/users", handleMatchInspectorUsers);
 router.get("/match-inspector/users/:userId", handleMatchInspectorUserDetail);

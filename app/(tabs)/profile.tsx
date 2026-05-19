@@ -46,6 +46,7 @@ import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
+import { MATCH_PREF_ITEMS, DEFAULT_MATCH_PREFS, type MatchPrefsPayload } from "@/lib/match-pref-items";
 
 
 interface ProfileData {
@@ -309,48 +310,6 @@ export default function ProfileScreen() {
     enabled: !!user,
   });
   const matchPrefGateVisible = matchPrefGateData?.visible === true;
-
-  type MatchPrefsPayload = {
-    bikerBikerBrand: boolean;
-    bikerZavorrinaBrand: boolean;
-    bikerClubBrand: boolean;
-    zavarrinaClubBrand: boolean;
-    bikerBikerTypeStyle: boolean;
-    bikerZavarrinaTypeStyle: boolean;
-    bikerBikerDistance: boolean;
-    bikerZavarrinaDistance: boolean;
-    bikerBikerMusic: boolean;
-    bikerZavarrinaMusic: boolean;
-    bikerBikerLeanAngle: boolean;
-    bikerBikerRouteTypeZone: boolean;
-    bikerZavarrinaRouteTypeZone: boolean;
-    bikerBikerAvgSpeed: boolean;
-    bikerBikerAvgDuration: boolean;
-    bikerBikerDayTime: boolean;
-    bikerBikerEvents: boolean;
-    directMatch: boolean;
-  };
-
-  const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
-    bikerBikerBrand: true,
-    bikerZavorrinaBrand: true,
-    bikerClubBrand: true,
-    zavarrinaClubBrand: true,
-    bikerBikerTypeStyle: true,
-    bikerZavarrinaTypeStyle: true,
-    bikerBikerDistance: true,
-    bikerZavarrinaDistance: true,
-    bikerBikerMusic: true,
-    bikerZavarrinaMusic: true,
-    bikerBikerLeanAngle: true,
-    bikerBikerRouteTypeZone: true,
-    bikerZavarrinaRouteTypeZone: true,
-    bikerBikerAvgSpeed: true,
-    bikerBikerAvgDuration: true,
-    bikerBikerDayTime: true,
-    bikerBikerEvents: true,
-    directMatch: true,
-  };
 
   const { data: matchPrefsData } = useQuery<{ preferences: MatchPrefsPayload }>({
     queryKey: ["/api/match-preferences"],
@@ -1056,26 +1015,7 @@ export default function ProfileScreen() {
               <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular", marginBottom: 8 }}>
                 Scegli i criteri con cui vuoi essere abbinato/a. Disabilitando un tipo di match non comparirai nei risultati di quella categoria.
               </Text>
-              {([
-                { key: "bikerBikerBrand" as const, label: "Biker ↔ Biker — Marca moto" },
-                { key: "bikerZavorrinaBrand" as const, label: "Biker ↔ Zavorra — Marca moto" },
-                { key: "bikerClubBrand" as const, label: "Biker ↔ Club — Marca moto" },
-                { key: "zavarrinaClubBrand" as const, label: "Zavorra ↔ Club — Marca moto" },
-                { key: "bikerBikerTypeStyle" as const, label: "Biker ↔ Biker — Tipo + Stile guida" },
-                { key: "bikerZavarrinaTypeStyle" as const, label: "Biker ↔ Zavorra — Tipo + Stile guida" },
-                { key: "bikerBikerDistance" as const, label: "Biker ↔ Biker — Distanza giro" },
-                { key: "bikerZavarrinaDistance" as const, label: "Biker ↔ Zavorra — Distanza giro" },
-                { key: "bikerBikerMusic" as const, label: "Biker ↔ Biker — Musica (≥65%)" },
-                { key: "bikerZavarrinaMusic" as const, label: "Biker ↔ Zavorra — Musica (≥65%)" },
-                { key: "bikerBikerLeanAngle" as const, label: "Biker ↔ Biker — Angolo piega" },
-                { key: "bikerBikerRouteTypeZone" as const, label: "Biker ↔ Biker — Tipo + Zona percorso" },
-                { key: "bikerZavarrinaRouteTypeZone" as const, label: "Biker ↔ Zavorra — Tipo + Zona percorso" },
-                { key: "bikerBikerAvgSpeed" as const, label: "Biker ↔ Biker — Velocità media" },
-                { key: "bikerBikerAvgDuration" as const, label: "Biker ↔ Biker — Durata media uscita" },
-                { key: "bikerBikerDayTime" as const, label: "Biker ↔ Biker — Giorno/Fascia oraria" },
-                { key: "bikerBikerEvents" as const, label: "Biker ↔ Biker — Raduni frequentati" },
-                { key: "directMatch" as const, label: "Match Diretto (Richiedi Match)" },
-              ]).map((item) => (
+              {MATCH_PREF_ITEMS.map((item) => (
                 <View
                   key={item.key}
                   style={{
