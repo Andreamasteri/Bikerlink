@@ -105,6 +105,7 @@ const adminGroups: AdminGroup[] = [
     headerIconSet: "MaterialIcons",
     items: [
       { key: "traduzioni", label: "Traduzioni", icon: "translate", iconSet: "MaterialIcons", route: "/admin/traduzioni", accentColor: "#9C27B0" },
+      { key: "tabella-lingue", label: "Tabella Lingue", icon: "table-large", iconSet: "MaterialCommunityIcons", route: "/admin/tabella-lingue", accentColor: "#9C27B0" },
     ],
   },
   {

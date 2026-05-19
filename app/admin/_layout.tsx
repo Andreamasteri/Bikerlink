@@ -33,6 +33,7 @@ export default function AdminLayout() {
       <Stack.Screen name="system" options={{ title: "System Monitor" }} />
       <Stack.Screen name="eventi" options={{ title: "Raduni — Moderazione" }} />
       <Stack.Screen name="traduzioni" options={{ title: "Sistema Traduzioni" }} />
+      <Stack.Screen name="tabella-lingue" options={{ title: "Tabella Lingue" }} />
       <Stack.Screen name="gps-errors" options={{ title: "GPS Error Log" }} />
       <Stack.Screen name="sensors" options={{ headerShown: false }} />
       <Stack.Screen name="moderator-logs" options={{ title: "Log Moderatori" }} />
