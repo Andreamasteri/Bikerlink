@@ -74,7 +74,7 @@ export default function WelcomeScreen() {
       return;
     }
 
-    if (isWeb) return;
+    if (Platform.OS === 'web') return;
 
     Animated.sequence([
       Animated.timing(titleOpacity, {
