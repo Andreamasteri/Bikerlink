@@ -684,7 +684,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let cacheHit = true;
       if (!sha256Hash) {
         cacheHit = false;
-        const { downloadBuffer } = await import("./objectStorage");
+        const { downloadBuffer, isValidOtaBundlePath } = await import("./objectStorage");
+        if (!isValidOtaBundlePath(release.bundle_path)) {
+          console.error(
+            `[expo-updates] Refusing to build manifest for release ${release.id}: bundle_path failed validator: ${release.bundle_path}`,
+          );
+          return sendNoUpdateDirective();
+        }
         const bundleBuffer = await downloadBuffer(release.bundle_path as string);
         sha256Hash = crypto.createHash("sha256").update(bundleBuffer).digest("base64url");
         _expoUpdateHashCache.set(release.id as string, sha256Hash);
