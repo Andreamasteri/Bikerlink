@@ -271,6 +271,13 @@
       color: var(--accent); line-height: 1;
     }
     .stat-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-top: 4px; }
+    .area-apk-banner {
+      margin-top: 24px; padding: 20px 24px;
+      background: var(--accent-dim); border: 1px solid rgba(255,102,0,0.3);
+      border-radius: 8px; display: flex; align-items: center; gap: 16px;
+    }
+    .area-apk-icon { font-size: 28px; flex-shrink: 0; }
+    .area-apk-btn { flex-shrink: 0; }
     .empty-state { text-align: center; padding: 32px; color: var(--text3); font-size: 14px; }
 
     /* ── MEDIA PAGE ─────────────────────────────────────────────────────── */
@@ -625,6 +632,7 @@ const I18N = {
     "area.totalRides": "Giri",
     "area.logout": "Esci",
     "area.loginRequired": "Devi effettuare il login per accedere a questa sezione",
+    "area.downloadApp": "Scarica l'App Android",
     "media.title": "Risorse",
     "media.subtitle": "Guide, manuali e video per la community BikerLink",
     "media.pdf": "Guide & Manuali",
@@ -703,6 +711,7 @@ const I18N = {
     "area.totalRides": "Rides",
     "area.logout": "Log Out",
     "area.loginRequired": "You must log in to access this section",
+    "area.downloadApp": "Download Android App",
     "media.title": "Resources",
     "media.subtitle": "Guides, manuals and videos for the BikerLink community",
     "media.pdf": "Guides & Manuals",
@@ -1106,13 +1115,15 @@ async function renderArea() {
   setApp(`<div class="loading-page"><div class="loader"></div></div>`);
 
   try {
-    const [profileRes, motorcyclesRes] = await Promise.all([
+    const [profileRes, motorcyclesRes, apkStatusRes] = await Promise.all([
       fetch('/api/auth/me', { credentials: 'include' }),
       fetch('/api/motorcycles', { credentials: 'include' }),
+      fetch('/api/download/apk/status'),
     ]);
 
     const profile = profileRes.ok ? await profileRes.json() : currentUser;
     const motorcycles = motorcyclesRes.ok ? await motorcyclesRes.json() : [];
+    const apkAvailable = apkStatusRes.ok ? (await apkStatusRes.json()).available : false;
 
     const initials = (profile.nickname || '?').charAt(0).toUpperCase();
     const memberDate = profile.createdAt
@@ -1169,6 +1180,11 @@ async function renderArea() {
             </div>
           </div>
         </div>
+        ${apkAvailable ? `
+        <div class="area-apk-banner">
+          <span class="area-apk-icon">📱</span>
+          <a href="/api/download/apk/latest" class="btn btn-primary area-apk-btn">⬇ ${t('area.downloadApp')}</a>
+        </div>` : ''}
       </div>
       ${renderFooter()}
     `);

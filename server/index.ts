@@ -321,6 +321,19 @@ function configureExpoAndLanding(app: express.Application) {
     });
   }
 
+  // ── APK Status (no redirect) ─────────────────────────────────────────────
+  // Returns { available: true } if an APK URL is configured, { available: false } otherwise.
+  app.get("/api/download/apk/status", async (_req: Request, res: Response) => {
+    try {
+      const setting = await storage.getAppSetting("apk_download_url");
+      const apkUrl = (setting?.value?.trim()) || process.env.APK_DOWNLOAD_URL;
+      return res.json({ available: !!apkUrl });
+    } catch {
+      const apkUrl = process.env.APK_DOWNLOAD_URL;
+      return res.json({ available: !!apkUrl });
+    }
+  });
+
   // ── APK Direct Download ──────────────────────────────────────────────────
   // Reads apk_download_url from app_settings DB first, then APK_DOWNLOAD_URL env var.
   // Returns 404 if neither is set.
