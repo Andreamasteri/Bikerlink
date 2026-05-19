@@ -180,6 +180,18 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
 router.put("/motos/:motoId", requireAuth, async (req: Request, res: Response) => {
   try {
     const motoId = req.params.motoId as string;
+    const userId = req.session.userId as string;
+
+    const existingMoto = await storage.getWishlistMoto(motoId);
+    if (!existingMoto) {
+      return res.status(404).json({ message: "Moto non trovata" });
+    }
+
+    const userWishlist = await storage.getWishlist(userId);
+    if (!userWishlist || existingMoto.wishlistId !== userWishlist.id) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+
     const { brand, model, ridingStyle, motorcycleType } = req.body;
     const moto = await storage.updateWishlistMoto(motoId, { brand, model, ridingStyle, motorcycleType });
     return res.json(moto);
@@ -192,6 +204,18 @@ router.put("/motos/:motoId", requireAuth, async (req: Request, res: Response) =>
 router.delete("/motos/:motoId", requireAuth, async (req: Request, res: Response) => {
   try {
     const motoId = req.params.motoId as string;
+    const userId = req.session.userId as string;
+
+    const existingMoto = await storage.getWishlistMoto(motoId);
+    if (!existingMoto) {
+      return res.status(404).json({ message: "Moto non trovata" });
+    }
+
+    const userWishlist = await storage.getWishlist(userId);
+    if (!userWishlist || existingMoto.wishlistId !== userWishlist.id) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+
     await storage.deleteWishlistMoto(motoId);
     return res.json({ message: "Moto eliminata dalla wishlist" });
   } catch (error) {
