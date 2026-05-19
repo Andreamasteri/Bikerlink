@@ -255,7 +255,7 @@ export default function ReadyToRideScreen() {
         <View style={styles.privacyCard}>
           <View style={styles.privacyHeader}>
             <Ionicons name="shield-outline" size={18} color={Colors.accent} />
-            <Text style={styles.privacyTitle}>Privacy</Text>
+            <Text style={styles.privacyTitle}>{t("ready.privacy.title")}</Text>
           </View>
 
           {ghostModeFeatureEnabled && (
@@ -270,7 +270,7 @@ export default function ReadyToRideScreen() {
                 <View style={styles.privacyRowText}>
                   <Text style={styles.privacyRowLabel}>{t("ride.ghostMode")}</Text>
                   <Text style={styles.privacyRowDesc}>
-                    {isGhostMode ? t("ride.ghostModeDesc") : "Sei visibile sulla mappa"}
+                    {isGhostMode ? t("ride.ghostModeDesc") : t("ready.privacy.visibleOnMap")}
                   </Text>
                 </View>
                 <Switch
@@ -293,9 +293,9 @@ export default function ReadyToRideScreen() {
               style={styles.privacyRowIcon}
             />
             <View style={styles.privacyRowText}>
-              <Text style={styles.privacyRowLabel}>Non visibile sulla mappa</Text>
+              <Text style={styles.privacyRowLabel}>{t("ready.privacy.hideFromMapLabel")}</Text>
               <Text style={styles.privacyRowDesc}>
-                Il tuo marker non viene mostrato agli altri utenti.
+                {t("ready.privacy.hideFromMapDesc")}
               </Text>
             </View>
             <Switch
@@ -317,9 +317,9 @@ export default function ReadyToRideScreen() {
               style={styles.privacyRowIcon}
             />
             <View style={styles.privacyRowText}>
-              <Text style={styles.privacyRowLabel}>Randomizza posizione offline</Text>
+              <Text style={styles.privacyRowLabel}>{t("ready.privacy.offlineRandomizeLabel")}</Text>
               <Text style={styles.privacyRowDesc}>
-                Quando chiudi l'app, la posizione viene spostata di ±20 km.
+                {t("ready.privacy.offlineRandomizeDesc")}
               </Text>
             </View>
             <Switch
@@ -336,7 +336,7 @@ export default function ReadyToRideScreen() {
             onPress={() => router.push("/ride" as any)}
           >
             <Ionicons name="settings-outline" size={16} color={Colors.accent} />
-            <Text style={styles.privacyMoreBtnText}>Altre opzioni privacy & GPS</Text>
+            <Text style={styles.privacyMoreBtnText}>{t("ready.privacy.moreOptions")}</Text>
             <Ionicons name="chevron-forward" size={14} color={Colors.accent} />
           </Pressable>
         </View>

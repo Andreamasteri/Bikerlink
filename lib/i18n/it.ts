@@ -1132,6 +1132,13 @@ const it: Record<string, string> = {
   "push.proposalMatch.body": "Una proposta compatibile è stata trovata per il tuo viaggio.",
   "push.zoneProposal.title": "C'è una proposta nella tua zona! 🏍️",
   "push.zoneProposal.body": "Apri BikerLink per scoprirla",
+  "ready.privacy.title": "Privacy",
+  "ready.privacy.visibleOnMap": "Sei visibile sulla mappa",
+  "ready.privacy.hideFromMapLabel": "Non visibile sulla mappa",
+  "ready.privacy.hideFromMapDesc": "Il tuo marker non viene mostrato agli altri utenti.",
+  "ready.privacy.offlineRandomizeLabel": "Randomizza posizione offline",
+  "ready.privacy.offlineRandomizeDesc": "Quando chiudi l'app, la posizione viene spostata di ±20 km.",
+  "ready.privacy.moreOptions": "Altre opzioni privacy & GPS",
 };
 
 export default it;

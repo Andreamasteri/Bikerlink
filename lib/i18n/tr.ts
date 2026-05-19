@@ -1077,6 +1077,13 @@ const tr: Record<string, string> = {
   "tracking.gpsBlackoutTimes": "kez",
   "tracking.gpsBlackoutTotal": "toplam",
   "tracking.exportGpxError": "Rota dışa aktarılamadı. Lütfen tekrar deneyin.",
+  "ready.privacy.title": "Gizlilik",
+  "ready.privacy.visibleOnMap": "Haritada görünüyorsun",
+  "ready.privacy.hideFromMapLabel": "Haritada görünmez",
+  "ready.privacy.hideFromMapDesc": "Konumun diğer kullanıcılara gösterilmez.",
+  "ready.privacy.offlineRandomizeLabel": "Çevrimdışı konumu rastgele kaydır",
+  "ready.privacy.offlineRandomizeDesc": "Uygulamayı kapattığında konumun ±20 km kaydırılır.",
+  "ready.privacy.moreOptions": "Daha fazla gizlilik & GPS seçeneği",
 };
 
 export default tr;

@@ -1077,6 +1077,13 @@ const el: Record<string, string> = {
   "tracking.gpsBlackoutTimes": "φορές",
   "tracking.gpsBlackoutTotal": "συνολικά",
   "tracking.exportGpxError": "Αδύνατη εξαγωγή διαδρομής. Δοκίμασε ξανά.",
+  "ready.privacy.title": "Απόρρητο",
+  "ready.privacy.visibleOnMap": "Είσαι ορατός/ή στον χάρτη",
+  "ready.privacy.hideFromMapLabel": "Μη ορατός στον χάρτη",
+  "ready.privacy.hideFromMapDesc": "Το σήμα σου δεν εμφανίζεται στους άλλους χρήστες.",
+  "ready.privacy.offlineRandomizeLabel": "Τυχαιοποίηση θέσης εκτός σύνδεσης",
+  "ready.privacy.offlineRandomizeDesc": "Όταν κλείνεις την εφαρμογή, η θέση σου μετατοπίζεται κατά ±20 χλμ.",
+  "ready.privacy.moreOptions": "Περισσότερες επιλογές απορρήτου & GPS",
 };
 
 export default el;

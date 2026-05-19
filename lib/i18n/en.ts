@@ -1125,6 +1125,13 @@ const en: Record<string, string> = {
   "tracking.gpsBlackoutTimes": "times",
   "tracking.gpsBlackoutTotal": "total",
   "tracking.exportGpxError": "Cannot export the route. Please try again.",
+  "ready.privacy.title": "Privacy",
+  "ready.privacy.visibleOnMap": "You are visible on the map",
+  "ready.privacy.hideFromMapLabel": "Hidden from map",
+  "ready.privacy.hideFromMapDesc": "Your marker won't be shown to other users.",
+  "ready.privacy.offlineRandomizeLabel": "Randomize offline position",
+  "ready.privacy.offlineRandomizeDesc": "When you close the app, your position is shifted by ±20 km.",
+  "ready.privacy.moreOptions": "More privacy & GPS options",
 };
 
 export default en;
