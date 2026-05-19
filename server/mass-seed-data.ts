@@ -138,6 +138,40 @@ export const EUROPEAN_ZONES: EuropeanZone[] = [
 
   // ── IRLANDA ──────────────────────────────────────────────────────────────────
   { region: "Dublin", country: "IE", lat: 53.35, lng: -6.26, spokenLanguages: ["English"] },
+
+  // ── INDIA (4 regioni) ─────────────────────────────────────────────────────
+  { region: "Maharashtra", country: "IN", lat: 19.75, lng: 75.71, spokenLanguages: ["English"] },
+  { region: "Delhi", country: "IN", lat: 28.61, lng: 77.21, spokenLanguages: ["English"] },
+  { region: "Karnataka", country: "IN", lat: 15.32, lng: 75.71, spokenLanguages: ["English"] },
+  { region: "Tamil Nadu", country: "IN", lat: 11.13, lng: 78.66, spokenLanguages: ["English"] },
+
+  // ── AUSTRALIA (3 regioni) ─────────────────────────────────────────────────
+  { region: "New South Wales", country: "AU", lat: -31.25, lng: 146.92, spokenLanguages: ["English"] },
+  { region: "Victoria", country: "AU", lat: -37.02, lng: 144.96, spokenLanguages: ["English"] },
+  { region: "Queensland", country: "AU", lat: -22.58, lng: 144.08, spokenLanguages: ["English"] },
+
+  // ── INDONESIA (3 regioni) ─────────────────────────────────────────────────
+  { region: "DKI Jakarta", country: "ID", lat: -6.21, lng: 106.85, spokenLanguages: ["English"] },
+  { region: "Jawa Barat", country: "ID", lat: -7.09, lng: 107.67, spokenLanguages: ["English"] },
+  { region: "Bali", country: "ID", lat: -8.34, lng: 115.09, spokenLanguages: ["English"] },
+
+  // ── THAILANDIA (3 regioni) ────────────────────────────────────────────────
+  { region: "Bangkok", country: "TH", lat: 13.76, lng: 100.50, spokenLanguages: ["English"] },
+  { region: "Chiang Mai", country: "TH", lat: 18.79, lng: 98.99, spokenLanguages: ["English"] },
+  { region: "Phuket", country: "TH", lat: 7.88, lng: 98.39, spokenLanguages: ["English"] },
+
+  // ── SUDAFRICA (3 regioni) ─────────────────────────────────────────────────
+  { region: "Gauteng", country: "ZA", lat: -26.27, lng: 28.11, spokenLanguages: ["English"] },
+  { region: "Western Cape", country: "ZA", lat: -33.23, lng: 21.86, spokenLanguages: ["English"] },
+  { region: "KwaZulu-Natal", country: "ZA", lat: -28.53, lng: 30.90, spokenLanguages: ["English"] },
+
+  // ── NIGERIA (2 regioni) ───────────────────────────────────────────────────
+  { region: "Lagos", country: "NG", lat: 6.52, lng: 3.38, spokenLanguages: ["English"] },
+  { region: "Abuja (FCT)", country: "NG", lat: 9.06, lng: 7.50, spokenLanguages: ["English"] },
+
+  // ── KENYA (2 regioni) ─────────────────────────────────────────────────────
+  { region: "Nairobi", country: "KE", lat: -1.29, lng: 36.82, spokenLanguages: ["English"] },
+  { region: "Coast", country: "KE", lat: -3.30, lng: 40.03, spokenLanguages: ["English"] },
 ];
 
 export const MALE_NAMES = [
