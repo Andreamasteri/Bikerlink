@@ -49,6 +49,8 @@ import * as Sharing from "expo-sharing";
 
 const BACKGROUND_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "@bikerlink/bg_points_pending";
+const BG_NOTIF_CONFIG_KEY = "@bikerlink/bg_notif_config";
+const BG_NOTIF_THROTTLE = 5;
 
 if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
   TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
@@ -64,7 +66,41 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
         speedKmh: (loc.coords.speed ?? 0) * 3.6,
         timestamp: new Date(loc.timestamp).toISOString(),
       }));
+      const newCount = existing.length + newPoints.length;
       await AsyncStorage.setItem(BG_POINTS_KEY, JSON.stringify([...existing, ...newPoints]));
+
+      // Throttled notification update: refresh body when we cross a multiple of BG_NOTIF_THROTTLE
+      const prevBucket = Math.floor(existing.length / BG_NOTIF_THROTTLE);
+      const curBucket = Math.floor(newCount / BG_NOTIF_THROTTLE);
+      if (curBucket > prevBucket && newCount > 0) {
+        try {
+          const cfgRaw = await AsyncStorage.getItem(BG_NOTIF_CONFIG_KEY);
+          if (cfgRaw) {
+            const cfg = JSON.parse(cfgRaw) as {
+              title: string;
+              body: string;
+              pointsLabel: string;
+              accuracy: number;
+              timeInterval: number;
+              distanceInterval: number;
+            };
+            const pointsText = cfg.pointsLabel.replace("{count}", String(newCount));
+            await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+              accuracy: cfg.accuracy,
+              timeInterval: cfg.timeInterval,
+              distanceInterval: cfg.distanceInterval,
+              foregroundService: {
+                notificationTitle: cfg.title,
+                notificationBody: `${cfg.body} • ${pointsText}`,
+                notificationColor: "#FF6600",
+                killServiceOnDestroy: false,
+              },
+              pausesUpdatesAutomatically: false,
+              activityType: Location.ActivityType.AutomotiveNavigation,
+            }).catch(() => {});
+          }
+        } catch {}
+      }
     } catch {}
   });
 }
@@ -999,13 +1035,24 @@ export default function TrackingScreen() {
             // 3. Try to start background task BEFORE stopping the foreground watch
             //    so there is no window without location tracking
             const bgConfig = getModeConfigBackground(profileRef.current);
+            const bgTitle = t("tracking.bgNotification.title");
+            const bgBody = profileRef.current === "easy" ? t("tracking.bgNotification.easy") : profileRef.current === "medium" ? t("tracking.bgNotification.standard") : t("tracking.bgNotification.race");
+            // Persist config so the background task can rebuild the notification with the live point count
+            await AsyncStorage.setItem(BG_NOTIF_CONFIG_KEY, JSON.stringify({
+              title: bgTitle,
+              body: bgBody,
+              pointsLabel: t("tracking.bgNotification.pointsCount"),
+              accuracy: bgConfig.accuracy,
+              timeInterval: bgConfig.timeInterval,
+              distanceInterval: bgConfig.distanceInterval,
+            })).catch(() => {});
             const started = await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
               accuracy: bgConfig.accuracy,
               timeInterval: bgConfig.timeInterval,
               distanceInterval: bgConfig.distanceInterval,
               foregroundService: {
-                notificationTitle: t("tracking.bgNotification.title"),
-                notificationBody: profileRef.current === "easy" ? t("tracking.bgNotification.easy") : profileRef.current === "medium" ? t("tracking.bgNotification.standard") : t("tracking.bgNotification.race"),
+                notificationTitle: bgTitle,
+                notificationBody: bgBody,
                 notificationColor: "#FF6600",
                 killServiceOnDestroy: false,
               },

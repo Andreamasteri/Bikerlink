@@ -422,6 +422,7 @@ const tr: Record<string, string> = {
   "tracking.bgNotification.easy": "Easy Modu — pil tasarrufu",
   "tracking.bgNotification.standard": "Standard Modu — yüksek hassasiyet",
   "tracking.bgNotification.race": "Race Modu — maksimum hassasiyet",
+  "tracking.bgNotification.pointsCount": "{count} nokta alındı",
   "tracking.interruptedRideTitle": "Yarıda kalmış gezi bulundu",
   "tracking.interruptedRideBody1": "Tamamlanmamış bir gezi bulundu,",
   "tracking.interruptedRideBody2": "GPS noktası var. Kurtarmak veya silmek ister misin?",

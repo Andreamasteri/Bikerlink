@@ -422,6 +422,7 @@ const el: Record<string, string> = {
   "tracking.bgNotification.easy": "Λειτουργία Easy — εξοικονόμηση μπαταρίας",
   "tracking.bgNotification.standard": "Λειτουργία Standard — υψηλή ακρίβεια",
   "tracking.bgNotification.race": "Λειτουργία Race — μέγιστη ακρίβεια",
+  "tracking.bgNotification.pointsCount": "{count} σημεία ελήφθησαν",
   "tracking.interruptedRideTitle": "Βρέθηκε διακοπτόμενη βόλτα",
   "tracking.interruptedRideBody1": "Βρέθηκε μια ημιτελής βόλτα με",
   "tracking.interruptedRideBody2": "σημεία GPS. Θέλεις να την ανακτήσεις ή να την απορρίψεις;",

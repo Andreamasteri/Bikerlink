@@ -422,6 +422,7 @@ const es: Record<string, string> = {
   "tracking.bgNotification.easy": "Modo Easy — ahorro de batería",
   "tracking.bgNotification.standard": "Modo Standard — alta precisión",
   "tracking.bgNotification.race": "Modo Race — máxima precisión",
+  "tracking.bgNotification.pointsCount": "{count} puntos adquiridos",
   "tracking.interruptedRideTitle": "Ruta interrumpida encontrada",
   "tracking.interruptedRideBody1": "Se encontró una ruta incompleta con",
   "tracking.interruptedRideBody2": "puntos GPS. ¿Quieres recuperarla o descartarla?",

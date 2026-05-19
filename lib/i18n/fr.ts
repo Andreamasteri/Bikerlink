@@ -422,6 +422,7 @@ const fr: Record<string, string> = {
   "tracking.bgNotification.easy": "Mode Easy — économie de batterie",
   "tracking.bgNotification.standard": "Mode Standard — haute précision",
   "tracking.bgNotification.race": "Mode Race — précision maximale",
+  "tracking.bgNotification.pointsCount": "{count} points acquis",
   "tracking.interruptedRideTitle": "Sortie interrompue trouvée",
   "tracking.interruptedRideBody1": "Une sortie incomplète avec",
   "tracking.interruptedRideBody2": "points GPS trouvée. Récupérer ou abandonner ?",
