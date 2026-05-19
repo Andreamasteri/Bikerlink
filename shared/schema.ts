@@ -1134,6 +1134,10 @@ export const otaReleases = pgTable("ota_releases", {
   scheduledAt: timestamp("scheduled_at"),
   publishedAt: timestamp("published_at"),
   status: varchar("status", { length: 20 }).notNull().default("draft"),
+  slot: varchar("slot", { length: 32 }),
+  promotedAt: timestamp("promoted_at"),
+  promotedBy: varchar("promoted_by", { length: 100 }),
+  successCount: integer("success_count").notNull().default(0),
   createdBy: varchar("created_by", { length: 36 })
     .references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -1141,10 +1145,22 @@ export const otaReleases = pgTable("ota_releases", {
 }, (table) => [
   index("ota_releases_status_idx").on(table.status),
   index("ota_releases_rv_status_idx").on(table.runtimeVersion, table.status),
+  index("ota_releases_slot_idx").on(table.slot),
 ]);
 
 export type OtaRelease = typeof otaReleases.$inferSelect;
 export type InsertOtaRelease = typeof otaReleases.$inferInsert;
+
+export const deviceOtaAssignments = pgTable("device_ota_assignments", {
+  deviceId: varchar("device_id", { length: 128 }).primaryKey(),
+  slot: varchar("slot", { length: 32 }).notNull().default("stable"),
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  assignedBy: varchar("assigned_by", { length: 100 }),
+  expiresAt: timestamp("expires_at"),
+});
+
+export type DeviceOtaAssignment = typeof deviceOtaAssignments.$inferSelect;
+export type InsertDeviceOtaAssignment = typeof deviceOtaAssignments.$inferInsert;
 
 export const otaEvents = pgTable("ota_events", {
   id: varchar("id", { length: 36 })

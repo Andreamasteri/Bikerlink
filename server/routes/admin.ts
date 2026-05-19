@@ -7,7 +7,7 @@ import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, Sha
 import bcrypt from "bcryptjs";
 import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "../objectStorage";
 import { storage } from "../storage";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
 import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences } from "@shared/schema";
 import { DEFAULT_PREFS } from "./match-preferences";
@@ -6480,6 +6480,310 @@ router.post("/matches/recalculate-all", async (_req: Request, res: Response) => 
   } catch (err) {
     console.error("[ADMIN matches recalculate-all] error:", err);
     res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Task #1355: Sistema OTA Modulare — endpoint admin per slot + heartbeat + revert
+// ─────────────────────────────────────────────────────────────────────────────
+
+// GET /api/admin/ota/releases — lista OTA con slot, stato, successCount, ultimo heartbeat
+router.get("/ota/releases", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        r.id, r.version, r.runtime_version, r.bundle_path, r.release_notes,
+        r.status, r.slot, r.promoted_at, r.promoted_by, r.success_count,
+        r.published_at, r.created_at, r.updated_at,
+        (
+          SELECT e.created_at FROM ota_events e
+          WHERE e.release_id = r.id AND e.phase = 'loaded'
+          ORDER BY e.created_at DESC LIMIT 1
+        ) AS last_heartbeat_at
+      FROM ota_releases r
+      ORDER BY r.created_at DESC
+      LIMIT 50
+    `);
+    return res.json(result.rows);
+  } catch (err) {
+    console.error("[ADMIN ota/releases] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// POST /api/admin/ota/assign-slot — assegna un OTA a uno slot
+// body: { releaseId: string, slot: string }
+router.post("/ota/assign-slot", async (req: Request, res: Response) => {
+  try {
+    const { releaseId, slot } = req.body ?? {};
+    if (!releaseId || !slot) return res.status(400).json({ message: "releaseId e slot obbligatori" });
+    const VALID_SLOTS = ["stable", "previous-stable", "test-1", "test-2", "test-3"];
+    if (!VALID_SLOTS.includes(slot)) {
+      return res.status(400).json({ message: `slot non valido. Valori ammessi: ${VALID_SLOTS.join(", ")}` });
+    }
+    const result = await db.execute(sql`
+      UPDATE ota_releases SET slot = ${slot}, updated_at = NOW()
+      WHERE id = ${releaseId}
+      RETURNING id, version, slot, status
+    `);
+    if (!result.rows.length) return res.status(404).json({ message: "Release non trovata" });
+    // Log evento
+    try {
+      await db.insert(otaEvents).values({
+        phase: "admin-assign-slot",
+        source: "admin",
+        platform: "android",
+        releaseId: String(releaseId).substring(0, 64),
+        error: `slot=${slot}`,
+        failCount: 0,
+      });
+    } catch { /* best-effort */ }
+    // Invalida cache hash manifest
+    try {
+      const inv = req.app.locals.invalidateExpoUpdateHash;
+      if (typeof inv === "function") inv();
+    } catch { /* best-effort */ }
+    return res.json({ ok: true, release: result.rows[0] });
+  } catch (err) {
+    console.error("[ADMIN ota/assign-slot] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// POST /api/admin/ota/assign-device — assegna un device a uno slot (con scadenza opzionale)
+// body: { deviceId: string, slot: string, expiresAt?: string (ISO date) }
+router.post("/ota/assign-device", async (req: Request, res: Response) => {
+  try {
+    const { deviceId, slot, expiresAt } = req.body ?? {};
+    if (!deviceId || !slot) return res.status(400).json({ message: "deviceId e slot obbligatori" });
+    const VALID_SLOTS = ["stable", "test-1", "test-2", "test-3"];
+    if (!VALID_SLOTS.includes(slot)) {
+      return res.status(400).json({ message: `slot non valido. Valori ammessi: ${VALID_SLOTS.join(", ")}` });
+    }
+    const safeDeviceId = String(deviceId).substring(0, 128);
+    const expiresAtDate = expiresAt ? new Date(expiresAt) : null;
+
+    await db.execute(sql`
+      INSERT INTO device_ota_assignments (device_id, slot, assigned_at, assigned_by, expires_at)
+      VALUES (${safeDeviceId}, ${slot}, NOW(), ${"admin"}, ${expiresAtDate})
+      ON CONFLICT (device_id) DO UPDATE
+        SET slot = EXCLUDED.slot,
+            assigned_at = NOW(),
+            assigned_by = 'admin',
+            expires_at = EXCLUDED.expires_at
+    `);
+    // Log evento
+    try {
+      await db.insert(otaEvents).values({
+        phase: "admin-assign-device",
+        source: "admin",
+        platform: "android",
+        currentUpdateId: safeDeviceId.substring(0, 64),
+        error: `slot=${slot}${expiresAtDate ? ` expires=${expiresAtDate.toISOString()}` : ""}`,
+        failCount: 0,
+      });
+    } catch { /* best-effort */ }
+    return res.json({ ok: true, deviceId: safeDeviceId, slot, expiresAt: expiresAtDate });
+  } catch (err) {
+    console.error("[ADMIN ota/assign-device] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// GET /api/admin/ota/device-assignments — lista tutte le assegnazioni device
+router.get("/ota/device-assignments", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT device_id, slot, assigned_at, assigned_by, expires_at
+      FROM device_ota_assignments
+      ORDER BY assigned_at DESC
+    `);
+    return res.json(result.rows);
+  } catch (err) {
+    console.error("[ADMIN ota/device-assignments] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// DELETE /api/admin/ota/device-assignments/:deviceId — rimuove assegnazione di un device
+router.delete("/ota/device-assignments/:deviceId", async (req: Request, res: Response) => {
+  try {
+    const { deviceId } = req.params;
+    await db.execute(sql`DELETE FROM device_ota_assignments WHERE device_id = ${deviceId}`);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[ADMIN ota/device-assignments DELETE] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// POST /api/admin/ota/promote — promuove OTA di uno slot test a STABLE
+// Lo stable corrente diventa previous-stable. body: { fromSlot: string }
+router.post("/ota/promote", async (req: Request, res: Response) => {
+  try {
+    const { fromSlot } = req.body ?? {};
+    if (!fromSlot) return res.status(400).json({ message: "fromSlot obbligatorio" });
+    const VALID_TEST_SLOTS = ["test-1", "test-2", "test-3"];
+    if (!VALID_TEST_SLOTS.includes(fromSlot)) {
+      return res.status(400).json({ message: `fromSlot deve essere uno di: ${VALID_TEST_SLOTS.join(", ")}` });
+    }
+
+    // Verifica che ci sia un OTA attivo nel fromSlot
+    const testOta = await db.execute(sql`
+      SELECT id, version FROM ota_releases WHERE slot = ${fromSlot} AND status = 'active' LIMIT 1
+    `);
+    if (!testOta.rows.length) {
+      return res.status(400).json({ message: `Nessun OTA attivo nello slot ${fromSlot}` });
+    }
+    const testRow = testOta.rows[0] as { id: string; version: string };
+
+    // Lo stable corrente → previous-stable (sovrascrive il precedente previous-stable)
+    await db.execute(sql`
+      UPDATE ota_releases SET slot = 'previous-stable', updated_at = NOW()
+      WHERE slot = 'stable'
+    `);
+
+    // Il test slot → stable con timestamp promozione
+    await db.execute(sql`
+      UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin', updated_at = NOW()
+      WHERE id = ${testRow.id}
+    `);
+
+    // Il test slot ora è vuoto — OK (nessuna release lo occupa)
+    // Log evento
+    try {
+      await db.insert(otaEvents).values({
+        phase: "admin-promote",
+        source: "admin",
+        platform: "android",
+        releaseId: String(testRow.id).substring(0, 64),
+        error: `promoted from ${fromSlot} to stable version=${testRow.version}`,
+        failCount: 0,
+      });
+    } catch { /* best-effort */ }
+    // Invalida cache hash manifest
+    try {
+      const inv = req.app.locals.invalidateExpoUpdateHash;
+      if (typeof inv === "function") inv();
+    } catch { /* best-effort */ }
+    return res.json({ ok: true, promotedReleaseId: testRow.id, promotedVersion: testRow.version });
+  } catch (err) {
+    console.error("[ADMIN ota/promote] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// POST /api/admin/ota/revert — annulla l'ultima promozione: previous-stable → stable
+router.post("/ota/revert", async (_req: Request, res: Response) => {
+  try {
+    const prevStable = await db.execute(sql`
+      SELECT id, version FROM ota_releases WHERE slot = 'previous-stable' AND status = 'active' LIMIT 1
+    `);
+    if (!prevStable.rows.length) {
+      return res.status(400).json({ message: "Nessun previous-stable disponibile per il revert" });
+    }
+    const prevRow = prevStable.rows[0] as { id: string; version: string };
+
+    // Lo stable corrente → nessuno slot (released / no più in routing)
+    await db.execute(sql`
+      UPDATE ota_releases SET slot = NULL, updated_at = NOW()
+      WHERE slot = 'stable'
+    `);
+
+    // Il previous-stable → stable
+    await db.execute(sql`
+      UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin-revert', updated_at = NOW()
+      WHERE id = ${prevRow.id}
+    `);
+
+    // Log evento
+    try {
+      await db.insert(otaEvents).values({
+        phase: "admin-revert",
+        source: "admin",
+        platform: "android",
+        releaseId: String(prevRow.id).substring(0, 64),
+        error: `reverted to version=${prevRow.version}`,
+        failCount: 0,
+      });
+    } catch { /* best-effort */ }
+    // Invalida cache hash manifest
+    try {
+      const inv = (_req as Request & { app: { locals: { invalidateExpoUpdateHash?: unknown } } }).app.locals.invalidateExpoUpdateHash;
+      if (typeof inv === "function") (inv as () => void)();
+    } catch { /* best-effort */ }
+    return res.json({ ok: true, revertedToReleaseId: prevRow.id, revertedToVersion: prevRow.version });
+  } catch (err) {
+    console.error("[ADMIN ota/revert] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// POST /api/admin/ota/mark-broken — marca OTA come broken; i device che lo ricevono
+// torneranno automaticamente allo stable al prossimo check (slot-fallback logic)
+// body: { releaseId: string }
+router.post("/ota/mark-broken", async (req: Request, res: Response) => {
+  try {
+    const { releaseId } = req.body ?? {};
+    if (!releaseId) return res.status(400).json({ message: "releaseId obbligatorio" });
+    const result = await db.execute(sql`
+      UPDATE ota_releases SET status = 'broken', updated_at = NOW()
+      WHERE id = ${releaseId}
+      RETURNING id, version, slot, status
+    `);
+    if (!result.rows.length) return res.status(404).json({ message: "Release non trovata" });
+    // Log evento
+    try {
+      await db.insert(otaEvents).values({
+        phase: "admin-mark-broken",
+        source: "admin",
+        platform: "android",
+        releaseId: String(releaseId).substring(0, 64),
+        error: "marked broken by admin",
+        failCount: 0,
+      });
+    } catch { /* best-effort */ }
+    // Invalida cache hash manifest
+    try {
+      const inv = req.app.locals.invalidateExpoUpdateHash;
+      if (typeof inv === "function") inv();
+    } catch { /* best-effort */ }
+    return res.json({ ok: true, release: result.rows[0] });
+  } catch (err) {
+    console.error("[ADMIN ota/mark-broken] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// GET /api/admin/ota/events — ultimi N eventi ota_events filtrabili per releaseId/phase
+// query: ?releaseId=&phase=&limit=50
+router.get("/ota/events", async (req: Request, res: Response) => {
+  try {
+    const releaseId = req.query.releaseId ? String(req.query.releaseId) : null;
+    const phase = req.query.phase ? String(req.query.phase) : null;
+    const limitRaw = parseInt(String(req.query.limit ?? "50"), 10);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 && limitRaw <= 200 ? limitRaw : 50;
+
+    let query: string;
+    const params: (string | number | null)[] = [];
+    if (releaseId && phase) {
+      query = "SELECT * FROM ota_events WHERE release_id = $1 AND phase = $2 ORDER BY created_at DESC LIMIT $3";
+      params.push(releaseId, phase, limit);
+    } else if (releaseId) {
+      query = "SELECT * FROM ota_events WHERE release_id = $1 ORDER BY created_at DESC LIMIT $2";
+      params.push(releaseId, limit);
+    } else if (phase) {
+      query = "SELECT * FROM ota_events WHERE phase = $1 ORDER BY created_at DESC LIMIT $2";
+      params.push(phase, limit);
+    } else {
+      query = "SELECT * FROM ota_events ORDER BY created_at DESC LIMIT $1";
+      params.push(limit);
+    }
+    const result = await pool.query(query, params);
+    return res.json(result.rows);
+  } catch (err) {
+    console.error("[ADMIN ota/events] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
   }
 });
 

@@ -1282,6 +1282,32 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS slot VARCHAR(32)`);
+          await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMP`);
+          await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS promoted_by VARCHAR(100)`);
+          await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS success_count INTEGER NOT NULL DEFAULT 0`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_releases_slot_idx ON ota_releases(slot)`);
+          console.log("[MIGRATION] ota_releases slot/promoted_at/promoted_by/success_count ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] ota_releases slot columns:", e);
+        }
+
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS device_ota_assignments (
+              device_id VARCHAR(128) PRIMARY KEY,
+              slot VARCHAR(32) NOT NULL DEFAULT 'stable',
+              assigned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+              assigned_by VARCHAR(100),
+              expires_at TIMESTAMP
+            )
+          `);
+          console.log("[MIGRATION] device_ota_assignments table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] device_ota_assignments table:", e);
+        }
+
+        try {
           await db.execute(sql`ALTER TABLE route_points ADD COLUMN IF NOT EXISTS accel_g DOUBLE PRECISION`);
           await db.execute(sql`ALTER TABLE route_points ADD COLUMN IF NOT EXISTS tilt_deg DOUBLE PRECISION`);
           console.log("[MIGRATION] route_points.accel_g/tilt_deg ensured");

@@ -579,17 +579,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // The DB query filters by runtime_version, so no early-exit gate is needed here.
       // Requests from any runtimeVersion cycle are served their own matching release.
       const effectiveRv = runtimeVersion ?? _expectedRuntimeVersion;
-      const result = await pool.query(
-        "SELECT * FROM ota_releases WHERE status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
-        [effectiveRv]
-      );
 
-      if (!result.rows.length) {
+      // Task #1355: slot-based routing — read device ID from expo-device-id header,
+      // look up assignment in device_ota_assignments, then serve the OTA for that slot.
+      // Legacy fallback: devices without assignment or without header get 'stable'.
+      const deviceId = (req.headers["expo-device-id"] as string | undefined)?.substring(0, 128) || null;
+      let targetSlot = "stable";
+      if (deviceId) {
+        try {
+          const assignResult = await pool.query(
+            "SELECT slot, expires_at FROM device_ota_assignments WHERE device_id = $1",
+            [deviceId]
+          );
+          if (assignResult.rows.length > 0) {
+            const asgn = assignResult.rows[0];
+            const expired = asgn.expires_at && new Date(asgn.expires_at) <= new Date();
+            if (!expired) targetSlot = asgn.slot as string;
+          }
+        } catch (e) {
+          console.error("[expo-updates] assignment lookup failed:", e);
+        }
+      }
+
+      // Try slot-based query first; fall back to legacy active-only query for backward compat.
+      let release: Record<string, unknown> | null = null;
+      try {
+        const slotResult = await pool.query(
+          "SELECT * FROM ota_releases WHERE slot = $1 AND status = 'active' AND runtime_version = $2 ORDER BY published_at DESC LIMIT 1",
+          [targetSlot, effectiveRv]
+        );
+        if (slotResult.rows.length > 0) {
+          release = slotResult.rows[0] as Record<string, unknown>;
+        } else if (targetSlot !== "stable") {
+          // Slot requested but no OTA assigned to it — fall back to stable
+          await logEvent("fallback_to_stable", null, `slot=${targetSlot} no active OTA, falling back to stable`);
+          const stableResult = await pool.query(
+            "SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
+            [effectiveRv]
+          );
+          if (stableResult.rows.length > 0) {
+            release = stableResult.rows[0] as Record<string, unknown>;
+          }
+        }
+      } catch (e) {
+        console.error("[expo-updates] slot query failed:", e);
+      }
+
+      // Legacy fallback: no slot-based release found → use old status='active' query
+      // (supports pre-slot OTA records that have slot=NULL)
+      if (!release) {
+        const legacyResult = await pool.query(
+          "SELECT * FROM ota_releases WHERE status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
+          [effectiveRv]
+        );
+        if (legacyResult.rows.length > 0) {
+          release = legacyResult.rows[0] as Record<string, unknown>;
+        }
+      }
+
+      if (!release) {
         await logEvent("noUpdate-no-release", null);
         return sendNoUpdateDirective();
       }
-
-      const release = result.rows[0];
 
       if (currentUpdateId && currentUpdateId === release.id) {
         await logEvent("noUpdate-already-current", String(release.id));
@@ -695,6 +746,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).end();
     }
   });
+
+  // Task #1355: heartbeat endpoint — l'app chiama questo endpoint dopo aver
+  // caricato con successo un OTA. Registra in ota_events con phase=loaded e
+  // incrementa il contatore success_count sulla release.
+  app.post("/api/ota/heartbeat", async (req: Request, res: Response) => {
+    try {
+      const { deviceId, releaseId, runtimeVersion } = req.body ?? {};
+      if (!releaseId || typeof releaseId !== "string") {
+        return res.status(400).json({ message: "releaseId obbligatorio" });
+      }
+      const safeDeviceId = deviceId ? String(deviceId).substring(0, 128) : null;
+      const safeReleaseId = String(releaseId).substring(0, 64);
+      const safeRv = runtimeVersion ? String(runtimeVersion).substring(0, 32) : null;
+
+      const { db } = await import("./db");
+      const { otaEvents } = await import("@shared/schema");
+
+      await db.insert(otaEvents).values({
+        phase: "loaded",
+        source: safeDeviceId ?? "unknown",
+        platform: "android",
+        runtimeVersion: safeRv ?? undefined,
+        releaseId: safeReleaseId,
+        currentUpdateId: safeReleaseId,
+        failCount: 0,
+        ip: getTrustedClientIp(req),
+      });
+
+      await pool.query(
+        "UPDATE ota_releases SET success_count = success_count + 1, updated_at = NOW() WHERE id = $1",
+        [safeReleaseId]
+      );
+
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("[ota/heartbeat] Error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // ────────────────────────────────────────────────────────────────────────────
 
   app.get(["/privacy-policy", "/privacy"], (_req, res) => {
