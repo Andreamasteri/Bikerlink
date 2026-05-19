@@ -936,6 +936,7 @@ export default function AdminUsers() {
               {fzMapZone && MapView ? (
                 <MapView
                   style={{ flex: 1 }}
+                  googleMapsApiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
                   initialRegion={{
                     latitude: fzMapZone.lat,
                     longitude: fzMapZone.lng,

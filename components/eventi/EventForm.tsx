@@ -449,6 +449,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
                   </View>
                   <MapView
                     style={{ flex: 1 }}
+                    googleMapsApiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
                     region={mapRegion}
                     onRegionChangeComplete={setMapRegion}
                     onPress={(e: any) => {
