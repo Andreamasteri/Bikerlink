@@ -39,7 +39,7 @@ import { setTrackingActive, setHandsOffBroadcast, setSprintMeasuringBroadcast } 
 import * as Haptics from "expo-haptics";
 import { logGpsError } from "@/lib/gps-logger";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Accelerometer } from "expo-sensors";
+import { Accelerometer, DeviceMotion } from "expo-sensors";
 import { VolumeManager } from "react-native-volume-manager";
 import * as TaskManager from "expo-task-manager";
 import * as FileSystem from "expo-file-system/legacy";
@@ -230,6 +230,68 @@ function StatCard({
         {value}
       </Text>
       <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// ─── SensorOverlayPanel ──────────────────────────────────────────────────────
+// Convention note: displayed values use absolute magnitude for lateral/tilt peaks
+// (same as DeviceMotion source) so they reflect worst-case lean angle regardless
+// of direction. This differs from signed admin "dati finali" contexts where
+// direction is preserved. Do not change to signed without aligning the admin screen.
+
+function SensorOverlayPanel({
+  currentG,
+  currentLateralG,
+  currentTiltDeg,
+  maxAccelG,
+  colors,
+  styles: s,
+  t,
+}: {
+  currentG: number;
+  currentLateralG: number;
+  currentTiltDeg: number;
+  maxAccelG: number;
+  colors: ReturnType<typeof useColors>["Colors"];
+  styles: {
+    sensorOverlayPanel: object;
+    sensorOverlayItem: object;
+    sensorOverlayValue: object;
+    sensorOverlayLabel: object;
+    sensorOverlaySep: object;
+  };
+  t: (key: string) => string;
+}) {
+  return (
+    <View style={s.sensorOverlayPanel}>
+      <View style={s.sensorOverlayItem}>
+        <Text style={[s.sensorOverlayValue, currentG > 0.05 ? { color: colors.success } : currentG < -0.05 ? { color: colors.accentRed } : {}]}>
+          {currentG >= 0 ? "+" : ""}{currentG.toFixed(2)}
+        </Text>
+        <Text style={s.sensorOverlayLabel}>{t("tracking.gLong")}</Text>
+      </View>
+      <View style={s.sensorOverlaySep} />
+      <View style={s.sensorOverlayItem}>
+        <Text style={s.sensorOverlayValue}>
+          {currentLateralG.toFixed(2)}
+        </Text>
+        <Text style={s.sensorOverlayLabel}>{t("tracking.gLateral")}</Text>
+      </View>
+      <View style={s.sensorOverlaySep} />
+      <View style={s.sensorOverlayItem}>
+        <Text style={[s.sensorOverlayValue, { color: colors.accent }]}>
+          {currentTiltDeg.toFixed(1)}°
+        </Text>
+        <Text style={s.sensorOverlayLabel}>{t("tracking.tiltLive")}</Text>
+      </View>
+      <View style={s.sensorOverlaySep} />
+      <View style={s.sensorOverlayItem}>
+        <Text style={[s.sensorOverlayValue, { color: colors.accentRed }]}>
+          {maxAccelG.toFixed(2)}
+        </Text>
+        <Text style={s.sensorOverlayLabel}>{t("tracking.gMaxAccel")}</Text>
+      </View>
     </View>
   );
 }
@@ -626,10 +688,14 @@ export default function TrackingScreen() {
 
   // Sensor display
   const [currentG, setCurrentG] = useState(0);
+  const [currentLateralG, setCurrentLateralG] = useState(0);
+  const [currentTiltDeg, setCurrentTiltDeg] = useState(0);
   const [maxAccelG, setMaxAccelG] = useState(0);
   const [maxDecelG, setMaxDecelG] = useState(0);
+  const [maxLateralG, setMaxLateralG] = useState(0);
   const [maxTiltDeg, setMaxTiltDeg] = useState(0);
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const [showSensorOverlay, setShowSensorOverlay] = useState(false);
 
   // Countdown display
   const [countdownValue, setCountdownValue] = useState(0);
@@ -637,6 +703,7 @@ export default function TrackingScreen() {
 
   // Sprint
   const [sprintPhase, setSprintPhase] = useState<"waiting" | "measuring" | "done">("waiting");
+  const [sprintGoFired, setSprintGoFired] = useState(false);
   const [sprint0to100Ms, setSprint0to100Ms] = useState<number | null>(null);
   const [isNewRecord, setIsNewRecord] = useState(false);
   const recordAnim = useRef(new Animated.Value(0)).current;
@@ -683,7 +750,11 @@ export default function TrackingScreen() {
   const maxDecelGRef = useRef(0);
   const maxTiltDegRef = useRef(0);
   const currentAccelGRef = useRef(0);
+  const currentLateralGRef = useRef(0);
   const currentTiltDegRef = useRef(0);
+  const maxLateralGRef = useRef(0);
+  const sensorStartingRef = useRef(false);
+  const sensorSourceRef = useRef<"deviceMotion" | "accelerometer" | "none">("none");
   const sprintStartTimeRef = useRef<number | null>(null);
   const sprintPhaseRef = useRef<"waiting" | "measuring" | "done">("waiting");
   const sprintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1348,9 +1419,9 @@ export default function TrackingScreen() {
             // Persist sprint result to dedicated sprint_results table
             apiRequest("POST", "/api/sprints", {
               sprint0to100Ms: elapsed,
-              maxAccelerationG: maxAccelGRef.current,
-              maxDecelerationG: maxDecelGRef.current,
-              maxTiltDeg: maxTiltDegRef.current,
+              maxAccelerationG: maxAccelGRef.current > 0 ? maxAccelGRef.current : null,
+              maxDecelerationG: maxDecelGRef.current > 0 ? maxDecelGRef.current : null,
+              maxTiltDeg: maxTiltDegRef.current > 0 ? maxTiltDegRef.current : null,
               routeId: routeIdRef.current,
             })
               .then(() => queryClient.invalidateQueries({ queryKey: ["/api/sprints"] }))
@@ -1377,7 +1448,10 @@ export default function TrackingScreen() {
         altitude: alt,
         speedKmh,
         timestamp: new Date(now).toISOString(),
-        ...(sensorsEnabledRef.current && accelBaselineRef.current !== null
+        // Include per-point sensor data whenever calibration is complete —
+        // decoupled from sensorsEnabled (display preference) so traces are
+        // always recorded during any trip when DeviceMotion/Accelerometer is active.
+        ...(accelBaselineRef.current !== null
           ? { accelG: currentAccelGRef.current, tiltDeg: currentTiltDegRef.current }
           : {}),
       };
@@ -1486,8 +1560,13 @@ export default function TrackingScreen() {
     setTotalMs(0);
     setDisplayIdleMs(0);
     setCurrentG(0);
+    setCurrentLateralG(0);
+    setCurrentTiltDeg(0);
     setMaxAccelG(0);
     setMaxDecelG(0);
+    setMaxLateralG(0);
+    setMaxTiltDeg(0);
+    setShowSensorOverlay(false);
     setPointsBuffered(0);
     setPointsSent(0);
     setSprintPhase("waiting");
@@ -1512,8 +1591,11 @@ export default function TrackingScreen() {
     maxAccelGRef.current = 0;
     maxDecelGRef.current = 0;
     maxTiltDegRef.current = 0;
+    maxLateralGRef.current = 0;
+    sensorStartingRef.current = false;
     sprintStartTimeRef.current = null;
     sprintPhaseRef.current = "waiting";
+    setSprintGoFired(false);
     sprint0to100MsRef.current = null;
     emaSpeedRef.current = 0;
     lastAvgSpeedUpdateRef.current = 0;
@@ -1550,27 +1632,115 @@ export default function TrackingScreen() {
 
   // ── Recalibrate G on-demand ────────────────────────────────────────────────
   const handleRecalibrate = useCallback(() => {
-    setIsCalibrating(true);
-    accelBaselineRef.current = null;
-    accelCalibSamples.current = [];
+    // Reset peak aggregates regardless of sensor source
     maxAccelGRef.current = 0;
     maxDecelGRef.current = 0;
     maxTiltDegRef.current = 0;
+    maxLateralGRef.current = 0;
     setMaxAccelG(0);
     setMaxDecelG(0);
     setMaxTiltDeg(0);
+    setMaxLateralG(0);
     setCurrentG(0);
+    setCurrentLateralG(0);
+    setCurrentTiltDeg(0);
+    setShowSensorOverlay(false);
+
+    if (sensorSourceRef.current === "accelerometer") {
+      // Accelerometer path requires gravity re-calibration
+      setIsCalibrating(true);
+      accelBaselineRef.current = null;
+      accelCalibSamples.current = [];
+    }
+    // DeviceMotion path: no baseline needed — gravity is already separated by the OS.
+    // Peaks are reset above; live values will update naturally on next sample.
   }, []);
 
-  // ── Start accelerometer ────────────────────────────────────────────────────
-  const startAccelerometer = useCallback(() => {
-    if (!sensorsEnabledRef.current) return;
-    const interval = is0100EnabledRef.current ? 100 : 250;
+  // ── Start DeviceMotion sensor (with Accelerometer fallback) ───────────────
+  const startDeviceMotion = useCallback(async () => {
+    // Always attempt DeviceMotion — data is always collected regardless of display preference.
+    // sensorsEnabled only controls overlay/stats visibility, not data collection.
+    // Guard against duplicate subscriptions if called twice before first resolves
+    if (accelSubRef.current || sensorStartingRef.current) return;
+    sensorStartingRef.current = true;
+    // 100ms in race or sprint mode for higher resolution; 250ms otherwise
+    const interval = (is0100EnabledRef.current || profileRef.current === "race") ? 100 : 250;
+
+    // Try DeviceMotion first — it provides gravity-separated acceleration and
+    // rotation angles so no manual calibration is needed.
+    let deviceMotionAvailable = false;
+    try {
+      deviceMotionAvailable = await DeviceMotion.isAvailableAsync();
+    } catch (_) {}
+
+    if (deviceMotionAvailable) {
+      try {
+        DeviceMotion.setUpdateInterval(interval);
+        // Mark calibrated immediately — DeviceMotion already removes gravity
+        accelBaselineRef.current = 0;
+        setIsCalibrating(false);
+        let sampleCount = 0;
+        const sub = DeviceMotion.addListener((data) => {
+          const G = 9.81; // m/s² per G
+          let gLong = 0;
+          let gLat = 0;
+          let tiltDeg = 0;
+
+          if (data.acceleration) {
+            // acceleration = user-exerted component, gravity removed, in m/s²
+            gLong = (data.acceleration.y ?? 0) / G; // longitudinal: accel/braking
+            gLat = Math.abs((data.acceleration.x ?? 0) / G); // lateral
+          }
+
+          if (data.rotation) {
+            // gamma = lean angle around the front-back axis, in radians
+            tiltDeg = Math.abs((data.rotation.gamma ?? 0) * (180 / Math.PI));
+          } else if (data.accelerationIncludingGravity) {
+            const ag = data.accelerationIncludingGravity;
+            tiltDeg = Math.atan2(
+              Math.abs(ag.x ?? 0),
+              Math.abs(ag.z ?? 0)
+            ) * (180 / Math.PI);
+          }
+
+          currentAccelGRef.current = gLong;
+          currentLateralGRef.current = gLat;
+          currentTiltDegRef.current = tiltDeg;
+          // Deadzone filtering: ignore noise below minimum thresholds
+          if (gLong > 0.05 && gLong > maxAccelGRef.current) maxAccelGRef.current = gLong;
+          if (-gLong > 0.05 && -gLong > maxDecelGRef.current) maxDecelGRef.current = -gLong;
+          if (gLat > 0.1 && gLat > maxLateralGRef.current) maxLateralGRef.current = gLat;
+          if (tiltDeg > 2 && tiltDeg > maxTiltDegRef.current) maxTiltDegRef.current = tiltDeg;
+
+          sampleCount++;
+          const highFreq = is0100EnabledRef.current || profileRef.current === "race";
+          if (highFreq || sampleCount % 2 === 0) {
+            setCurrentG(gLong);
+            setCurrentLateralG(gLat);
+            setCurrentTiltDeg(tiltDeg);
+            setMaxAccelG(maxAccelGRef.current);
+            setMaxDecelG(maxDecelGRef.current);
+            setMaxLateralG(maxLateralGRef.current);
+            setMaxTiltDeg(maxTiltDegRef.current);
+          }
+        });
+        accelSubRef.current = sub;
+        sensorStartingRef.current = false;
+        sensorSourceRef.current = "deviceMotion";
+        return; // DeviceMotion successfully started
+      } catch (e) {
+        logGpsError(e, "startDeviceMotion");
+      }
+    }
+    // If we reach here DeviceMotion failed and we fall through to Accelerometer
+    // sensorStartingRef stays true until Accelerometer subscription is set
+
+    // Fallback: raw Accelerometer (requires gravity calibration)
     try {
       Accelerometer.setUpdateInterval(interval);
+      setIsCalibrating(true);
       let sampleCount = 0;
       const sub = Accelerometer.addListener(({ x, y, z }) => {
-        // Calibration: average first 20 samples to remove gravity offset on y
         if (accelBaselineRef.current === null) {
           accelCalibSamples.current.push(y);
           if (accelCalibSamples.current.length >= 20) {
@@ -1580,32 +1750,37 @@ export default function TrackingScreen() {
           }
           return;
         }
-        // Only update state every 2 samples to reduce re-render frequency
         sampleCount++;
         const gLong = y - accelBaselineRef.current;
-        currentAccelGRef.current = gLong;
-        if (gLong > maxAccelGRef.current) {
-          maxAccelGRef.current = gLong;
-        }
-        if (-gLong > maxDecelGRef.current) {
-          maxDecelGRef.current = -gLong;
-        }
-        // Lateral lean angle (degrees) using x and z axes
+        const gLat = Math.abs(x);
         const tiltDeg = Math.atan2(Math.abs(x), Math.abs(z)) * (180 / Math.PI);
+        currentAccelGRef.current = gLong;
+        currentLateralGRef.current = gLat;
         currentTiltDegRef.current = tiltDeg;
-        if (tiltDeg > maxTiltDegRef.current) {
-          maxTiltDegRef.current = tiltDeg;
-        }
-        if (sampleCount % 2 === 0) {
+        // Deadzone filtering: ignore noise below minimum thresholds
+        if (gLong > 0.05 && gLong > maxAccelGRef.current) maxAccelGRef.current = gLong;
+        if (-gLong > 0.05 && -gLong > maxDecelGRef.current) maxDecelGRef.current = -gLong;
+        if (gLat > 0.1 && gLat > maxLateralGRef.current) maxLateralGRef.current = gLat;
+        if (tiltDeg > 2 && tiltDeg > maxTiltDegRef.current) maxTiltDegRef.current = tiltDeg;
+        const highFreq = is0100EnabledRef.current || profileRef.current === "race";
+        if (highFreq || sampleCount % 2 === 0) {
           setCurrentG(gLong);
+          setCurrentLateralG(gLat);
+          setCurrentTiltDeg(tiltDeg);
           setMaxAccelG(maxAccelGRef.current);
           setMaxDecelG(maxDecelGRef.current);
+          setMaxLateralG(maxLateralGRef.current);
           setMaxTiltDeg(maxTiltDegRef.current);
         }
       });
       accelSubRef.current = sub;
+      sensorStartingRef.current = false;
+      sensorSourceRef.current = "accelerometer";
     } catch (e) {
-      logGpsError(e, "startAccelerometer");
+      sensorStartingRef.current = false;
+      sensorSourceRef.current = "none";
+      setIsCalibrating(false); // Ensure overlay panel is not stuck hidden if no sensor is available
+      logGpsError(e, "startAccelerometer-fallback");
     }
   }, []);
 
@@ -1666,9 +1841,9 @@ export default function TrackingScreen() {
       flushPoints();
     }, BATCH_FLUSH_MS);
 
-    // Avvia accelerometro solo se non già attivo (potrebbe essere già partito durante il countdown)
+    // Avvia sensori solo se non già attivi (potrebbe essere già partito durante il countdown)
     if (!accelSubRef.current) {
-      startAccelerometer();
+      startDeviceMotion();
     }
 
     const config = getModeConfig(profileRef.current);
@@ -1695,7 +1870,7 @@ export default function TrackingScreen() {
       }
 
     setTrackingActive(true);
-  }, [startAccelerometer, onNativeLocation, flushPoints, cleanupTracking]);
+  }, [startDeviceMotion, onNativeLocation, flushPoints, cleanupTracking]);
 
   // ── Handle START ───────────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
@@ -1735,8 +1910,8 @@ export default function TrackingScreen() {
         phaseRef.current = "countdown";
         setPhase("countdown");
 
-        // Avvia accelerometro durante il countdown (warmup) — evita freeze al GO
-        startAccelerometer();
+        // Avvia sensori durante il countdown (warmup) — evita freeze al GO
+        startDeviceMotion();
 
         let remaining = effectiveCountdownSecs;
         countdownTickRef.current = setInterval(() => {
@@ -1760,6 +1935,8 @@ export default function TrackingScreen() {
               clearInterval(countdownTickRef.current);
               countdownTickRef.current = null;
             }
+            // Show sensor overlay immediately at GO! in sprint mode
+            if (is0100EnabledRef.current) setSprintGoFired(true);
             // Pause 800ms on "GO!" before starting active tracking
             countdownGoTimeoutRef.current = setTimeout(() => {
               countdownGoTimeoutRef.current = null;
@@ -1801,7 +1978,7 @@ export default function TrackingScreen() {
     resetTrackingState,
     clearGpsBuffer,
     beginActiveTracking,
-    startAccelerometer,
+    startDeviceMotion,
     countdownAnim,
     discardSprintAttempt,
   ]);
@@ -1863,8 +2040,9 @@ export default function TrackingScreen() {
         maxAltitude: maxAltRef.current,
         durationSeconds: finalTotalSec,
         idleTimeSeconds: finalIdleSec,
-        maxAccelerationG: maxAccelGRef.current,
-        maxDecelerationG: maxDecelGRef.current,
+        maxAccelerationG: maxAccelGRef.current > 0 ? maxAccelGRef.current : null,
+        maxDecelerationG: maxDecelGRef.current > 0 ? maxDecelGRef.current : null,
+        maxLateralG: maxLateralGRef.current > 0 ? maxLateralGRef.current : null,
         maxTiltDeg: maxTiltDegRef.current > 0 ? maxTiltDegRef.current : null,
         sprint0to100Ms: sprint0to100MsRef.current,
         gpsBlackoutCount: gpsBlackoutCountRef.current,
@@ -2199,6 +2377,51 @@ export default function TrackingScreen() {
               </View>
             )}
 
+            {/* ── Race Mode sensor overlay ─────────────────────────────── */}
+            {profile === "race" && !is0100Enabled && (
+              <>
+                {/* Toggle row */}
+                <TouchableOpacity
+                  style={styles.sensorOverlayToggleRow}
+                  onPress={() => setShowSensorOverlay((v) => !v)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name="pulse-outline"
+                    size={16}
+                    color={showSensorOverlay ? Colors.accentRed : Colors.textSecondary}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.sensorOverlayToggleLabel}>
+                      {t("tracking.sensorOverlay")}
+                    </Text>
+                    <Text style={styles.sensorOverlayToggleHint}>
+                      {t("tracking.sensorOverlayHint")}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={showSensorOverlay}
+                    onValueChange={setShowSensorOverlay}
+                    trackColor={{ false: Colors.border, true: Colors.accentRed + "80" }}
+                    thumbColor={showSensorOverlay ? Colors.accentRed : Colors.textSecondary}
+                  />
+                </TouchableOpacity>
+
+                {/* Live sensor panel */}
+                {showSensorOverlay && !isCalibrating && (
+                  <SensorOverlayPanel
+                    currentG={currentG}
+                    currentLateralG={currentLateralG}
+                    currentTiltDeg={currentTiltDeg}
+                    maxAccelG={maxAccelG}
+                    colors={Colors}
+                    styles={styles}
+                    t={t}
+                  />
+                )}
+              </>
+            )}
+
             {/* Stats — 0-100 sprint mode */}
             {is0100Enabled && (
               <View style={styles.sprintContainer}>
@@ -2287,7 +2510,50 @@ export default function TrackingScreen() {
                   </Animated.View>
                 )}
 
-                {sensorsEnabled && (
+                {/* Sensor overlay toggle — 0-100 sprint (only after GO!) */}
+                {(sprintGoFired || sprintPhase !== "waiting") && (
+                  <>
+                    <TouchableOpacity
+                      style={styles.sensorOverlayToggleRow}
+                      onPress={() => setShowSensorOverlay((v) => !v)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons
+                        name="pulse-outline"
+                        size={16}
+                        color={showSensorOverlay ? Colors.accentRed : Colors.textSecondary}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.sensorOverlayToggleLabel}>
+                          {t("tracking.sensorOverlay")}
+                        </Text>
+                        <Text style={styles.sensorOverlayToggleHint}>
+                          {t("tracking.sensorOverlayHint")}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={showSensorOverlay}
+                        onValueChange={setShowSensorOverlay}
+                        trackColor={{ false: Colors.border, true: Colors.accentRed + "80" }}
+                        thumbColor={showSensorOverlay ? Colors.accentRed : Colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+
+                    {showSensorOverlay && !isCalibrating && (
+                      <SensorOverlayPanel
+                        currentG={currentG}
+                        currentLateralG={currentLateralG}
+                        currentTiltDeg={currentTiltDeg}
+                        maxAccelG={maxAccelG}
+                        colors={Colors}
+                        styles={styles}
+                        t={t}
+                      />
+                    )}
+                  </>
+                )}
+
+                {sensorsEnabled && (sprintGoFired || sprintPhase !== "waiting") && (
                   <View style={styles.statsRow}>
                     <StatCard
                       icon="trending-up-outline"
@@ -2304,7 +2570,7 @@ export default function TrackingScreen() {
                   </View>
                 )}
                 <View style={styles.statsRow}>
-                  {sensorsEnabled && (
+                  {sensorsEnabled && (sprintGoFired || sprintPhase !== "waiting") && (
                     <StatCard
                       icon="trending-down-outline"
                       color={Colors.warning}
@@ -2312,7 +2578,7 @@ export default function TrackingScreen() {
                       label={t("tracking.gMaxBrake")}
                     />
                   )}
-                  {sensorsEnabled && !isCalibrating && (
+                  {sensorsEnabled && !isCalibrating && (sprintGoFired || sprintPhase !== "waiting") && (
                     <StatCard
                       icon="compass-outline"
                       color={Colors.accent}
@@ -2774,20 +3040,31 @@ export default function TrackingScreen() {
               />
             </View>
             {sensorsEnabled && (
-              <View style={styles.statsRow}>
-                <StatCard
-                  icon="pulse-outline"
-                  color={Colors.accentRed}
-                  value={maxAccelG.toFixed(2) + " G"}
-                  label={t("tracking.gMaxAccel")}
-                />
-                <StatCard
-                  icon="compass-outline"
-                  color={Colors.accent}
-                  value={maxTiltDeg.toFixed(1) + "°"}
-                  label={t("tracking.tiltMax")}
-                />
-              </View>
+              <>
+                <View style={styles.statsRow}>
+                  <StatCard
+                    icon="pulse-outline"
+                    color={Colors.accentRed}
+                    value={maxAccelG.toFixed(2) + " G"}
+                    label={t("tracking.gMaxAccel")}
+                  />
+                  <StatCard
+                    icon="trending-down-outline"
+                    color={Colors.warning}
+                    value={maxDecelG.toFixed(2) + " G"}
+                    label={t("tracking.gMaxBrake")}
+                  />
+                </View>
+                <View style={styles.statsRow}>
+                  <StatCard
+                    icon="compass-outline"
+                    color={Colors.accent}
+                    value={maxTiltDeg.toFixed(1) + "°"}
+                    label={t("tracking.tiltMax")}
+                  />
+                  <View style={[styles.statCard, { opacity: 0 }]} />
+                </View>
+              </>
             )}
             {is0100Enabled && sprint0to100Ms !== null && (
               <View style={styles.statsRow}>
@@ -3796,6 +4073,67 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     textAlign: "center" as const,
     paddingTop: 2,
+  },
+
+  // Sensor overlay (Race Mode live panel)
+  sensorOverlayToggleRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    marginHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sensorOverlayToggleLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.text,
+  },
+  sensorOverlayToggleHint: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  sensorOverlayPanel: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-around" as const,
+    marginHorizontal: 16,
+    marginTop: 6,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.accentRed + "40",
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+  },
+  sensorOverlayItem: {
+    alignItems: "center" as const,
+    flex: 1,
+  },
+  sensorOverlayValue: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold" as const,
+    color: Colors.text,
+  },
+  sensorOverlayLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary,
+    marginTop: 2,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.4,
+  },
+  sensorOverlaySep: {
+    width: 1,
+    height: 32,
+    backgroundColor: Colors.border,
   },
   summaryDeleteBtn: {
     flexDirection: "row" as const,

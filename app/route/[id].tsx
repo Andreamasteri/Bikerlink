@@ -32,6 +32,7 @@ interface RouteDetail {
   durationSeconds: number | null;
   maxAccelerationG: number | null;
   maxDecelerationG: number | null;
+  maxLateralG: number | null;
   maxTiltDeg: number | null;
   sprint0to100Ms: number | null;
   likes: number;
@@ -193,20 +194,6 @@ export default function RouteDetailScreen() {
           label="Punti GPS"
           value={`${pts.length}`}
         />
-        {(route.maxAccelerationG ?? 0) > 0 && (
-          <StatCard
-            icon="gauge"
-            label="G max accel"
-            value={`${(route.maxAccelerationG ?? 0).toFixed(2)} G`}
-          />
-        )}
-        {(route.maxTiltDeg ?? 0) > 0 && (
-          <StatCard
-            icon="rotate-3d-variant"
-            label="Incl. max"
-            value={`${(route.maxTiltDeg ?? 0).toFixed(1)}°`}
-          />
-        )}
         {route.sprint0to100Ms !== null && (route.sprint0to100Ms ?? 0) > 0 && (
           <StatCard
             icon="timer-outline"
@@ -215,6 +202,42 @@ export default function RouteDetailScreen() {
           />
         )}
       </View>
+
+      {(route.maxAccelerationG != null || route.maxDecelerationG != null || route.maxLateralG != null || route.maxTiltDeg != null) && (
+        <View style={styles.sensorSection}>
+          <Text style={styles.sensorSectionTitle}>{t("tracking.sensorSection")}</Text>
+          <View style={styles.sensorGrid}>
+            {route.maxAccelerationG != null && (
+              <View style={styles.sensorCard}>
+                <MaterialCommunityIcons name="gauge" size={20} color={Colors.accentRed} />
+                <Text style={styles.sensorValue}>{route.maxAccelerationG.toFixed(2)} G</Text>
+                <Text style={styles.sensorLabel}>{t("tracking.gMaxAccel")}</Text>
+              </View>
+            )}
+            {route.maxDecelerationG != null && (
+              <View style={styles.sensorCard}>
+                <MaterialCommunityIcons name="gauge" size={20} color={Colors.warning} />
+                <Text style={styles.sensorValue}>{route.maxDecelerationG.toFixed(2)} G</Text>
+                <Text style={styles.sensorLabel}>{t("tracking.gMaxBrake")}</Text>
+              </View>
+            )}
+            {route.maxLateralG != null && (
+              <View style={styles.sensorCard}>
+                <MaterialCommunityIcons name="approximately-equal" size={20} color={Colors.accent} />
+                <Text style={styles.sensorValue}>{route.maxLateralG.toFixed(2)} G</Text>
+                <Text style={styles.sensorLabel}>{t("tracking.gLateral")}</Text>
+              </View>
+            )}
+            {route.maxTiltDeg != null && (
+              <View style={styles.sensorCard}>
+                <MaterialCommunityIcons name="rotate-3d-variant" size={20} color={Colors.accent} />
+                <Text style={styles.sensorValue}>{route.maxTiltDeg.toFixed(1)}°</Text>
+                <Text style={styles.sensorLabel}>{t("tracking.tiltMax")}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      )}
 
       {pts.length > 1 && (
         <View style={styles.chartSection}>
@@ -476,6 +499,40 @@ const styles = StyleSheet.create({
   chartPeak: {
     fontSize: 13,
     fontWeight: "600" as const,
+  },
+  sensorSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 4,
+  },
+  sensorSectionTitle: {
+    color: Colors.text,
+    fontSize: 16,
+    fontWeight: "600" as const,
+    marginBottom: 10,
+  },
+  sensorGrid: {
+    flexDirection: "row" as const,
+    gap: 8,
+  },
+  sensorCard: {
+    flex: 1,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    alignItems: "center" as const,
+    gap: 4,
+  },
+  sensorValue: {
+    color: Colors.text,
+    fontSize: 18,
+    fontWeight: "700" as const,
+    marginTop: 4,
+  },
+  sensorLabel: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    textAlign: "center" as const,
   },
   actionsRow: {
     flexDirection: "row",

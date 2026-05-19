@@ -126,6 +126,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       maxTiltDeg: clientMaxTilt,
       maxAccelerationG: clientMaxAccel,
       maxDecelerationG: clientMaxDecel,
+      maxLateralG: clientMaxLateralG,
       sprint0to100Ms: clientSprint0to100Ms,
       gpsBlackoutCount: clientGpsBlackoutCount,
       gpsBlackoutSeconds: clientGpsBlackoutSeconds,
@@ -137,9 +138,17 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
     let maxAltitude: number;
     let durationSeconds: number;
     let idleTimeSeconds: number;
-    const maxTiltDeg = Number(clientMaxTilt) || 0;
-    const maxAccelerationG = Number(clientMaxAccel) || 0;
-    const maxDecelerationG = Number(clientMaxDecel) || 0;
+    // Preserve null when client sends null (no sensor data collected).
+    // A null value in DB means "sensor was not active"; 0 means "active but measured near-zero".
+    const toNullableFloat = (v: unknown): number | null => {
+      if (v == null) return null;
+      const n = Number(v);
+      return isNaN(n) ? null : n;
+    };
+    const maxTiltDeg = toNullableFloat(clientMaxTilt);
+    const maxAccelerationG = toNullableFloat(clientMaxAccel);
+    const maxDecelerationG = toNullableFloat(clientMaxDecel);
+    const maxLateralG = toNullableFloat(clientMaxLateralG);
     const sprint0to100Ms = clientSprint0to100Ms != null ? Number(clientSprint0to100Ms) : null;
 
     if (
@@ -197,6 +206,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       maxTiltDeg,
       maxAccelerationG,
       maxDecelerationG,
+      maxLateralG,
       stoppedAt,
     };
     if (sprint0to100Ms !== null) {

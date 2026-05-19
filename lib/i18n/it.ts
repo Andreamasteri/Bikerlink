@@ -1113,6 +1113,12 @@ const it: Record<string, string> = {
   "tracking.gpsBlackoutTimes": "volte",
   "tracking.gpsBlackoutTotal": "totali",
   "tracking.exportGpxError": "Impossibile esportare il percorso. Riprova.",
+  "tracking.gLateral": "G laterale",
+  "tracking.gLong": "G long.",
+  "tracking.tiltLive": "Incl. live",
+  "tracking.sensorOverlay": "Visualizza sensori piega & accelerazione",
+  "tracking.sensorSection": "Dati Sensore",
+  "tracking.sensorOverlayHint": "Piega & accelerazione in tempo reale",
 
   "push.match.title": "Ehi, hai un match! 🔥",
   "push.match.body": "Tocca per vedere chi è",

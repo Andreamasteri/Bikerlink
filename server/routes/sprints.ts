@@ -23,9 +23,10 @@ router.post("/", async (req: Request, res: Response) => {
     if (typeof sprint0to100Ms !== "number" || !isFinite(sprint0to100Ms) || sprint0to100Ms <= 0) {
       return res.status(400).json({ message: "Tempo sprint non valido" });
     }
-    const safeAccelG = typeof maxAccelerationG === "number" && isFinite(maxAccelerationG) ? maxAccelerationG : 0;
-    const safeDecelG = typeof maxDecelerationG === "number" && isFinite(maxDecelerationG) ? maxDecelerationG : 0;
-    const safeTiltDeg = typeof maxTiltDeg === "number" && isFinite(maxTiltDeg) ? maxTiltDeg : 0;
+    // Preserve null to denote "sensor not active" — only store a value when it's a valid finite number.
+    const safeAccelG = typeof maxAccelerationG === "number" && isFinite(maxAccelerationG) ? maxAccelerationG : null;
+    const safeDecelG = typeof maxDecelerationG === "number" && isFinite(maxDecelerationG) ? maxDecelerationG : null;
+    const safeTiltDeg = typeof maxTiltDeg === "number" && isFinite(maxTiltDeg) ? maxTiltDeg : null;
 
     const [result] = await db
       .insert(sprintResults)

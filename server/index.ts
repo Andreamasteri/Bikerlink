@@ -1191,9 +1191,9 @@ function setupErrorHandler(app: express.Application) {
               user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
               route_id VARCHAR(36) REFERENCES routes(id) ON DELETE SET NULL,
               sprint_0to100_ms INTEGER NOT NULL,
-              max_acceleration_g DOUBLE PRECISION DEFAULT 0,
-              max_deceleration_g DOUBLE PRECISION DEFAULT 0,
-              max_tilt_deg DOUBLE PRECISION DEFAULT 0,
+              max_acceleration_g DOUBLE PRECISION,
+              max_deceleration_g DOUBLE PRECISION,
+              max_tilt_deg DOUBLE PRECISION,
               created_at TIMESTAMP NOT NULL DEFAULT NOW()
             )
           `);
@@ -1248,6 +1248,38 @@ function setupErrorHandler(app: express.Application) {
           console.log("[MIGRATION] routes.gps_blackout_count/gps_blackout_seconds ensured");
         } catch (e) {
           console.warn("[MIGRATION] routes gps blackout columns:", e);
+        }
+
+        try {
+          await db.execute(sql`ALTER TABLE routes ADD COLUMN IF NOT EXISTS max_lateral_g DOUBLE PRECISION`);
+          console.log("[MIGRATION] routes.max_lateral_g ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] routes.max_lateral_g:", e);
+        }
+
+        try {
+          // Drop DEFAULT 0 from sensor columns so null semantics are preserved:
+          // null = sensor not active; explicit value = sensor was active (even if near zero).
+          await db.execute(sql`ALTER TABLE routes ALTER COLUMN max_acceleration_g DROP DEFAULT`);
+          await db.execute(sql`ALTER TABLE routes ALTER COLUMN max_deceleration_g DROP DEFAULT`);
+          await db.execute(sql`ALTER TABLE routes ALTER COLUMN max_tilt_deg DROP DEFAULT`);
+          await db.execute(sql`ALTER TABLE routes ALTER COLUMN max_lateral_g DROP DEFAULT`);
+          // Backfill: rows where all four sensor peaks are 0 were recorded before sensor
+          // integration — treat them as no-sensor-data (null).
+          await db.execute(sql`
+            UPDATE routes
+            SET max_acceleration_g = NULL,
+                max_deceleration_g = NULL,
+                max_tilt_deg       = NULL,
+                max_lateral_g      = NULL
+            WHERE COALESCE(max_acceleration_g, 0) = 0
+              AND COALESCE(max_deceleration_g, 0) = 0
+              AND COALESCE(max_tilt_deg,       0) = 0
+              AND COALESCE(max_lateral_g,      0) = 0
+          `);
+          console.log("[MIGRATION] routes sensor columns: defaults dropped, zero rows backfilled to NULL");
+        } catch (e) {
+          console.warn("[MIGRATION] routes sensor columns null migration:", e);
         }
 
         try {
