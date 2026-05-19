@@ -14,7 +14,6 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
@@ -33,7 +32,6 @@ export default function ReadyToRideScreen() {
   const colors = useColors();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const sosEnabled = useSetting("sosEnabled");
   const t = useT();
 
@@ -258,22 +256,6 @@ export default function ReadyToRideScreen() {
           </View>
         )}
 
-        <Pressable
-          style={styles.cronoBtn}
-          onPress={() => router.push("/tracking" as any)}
-        >
-          <Ionicons name="navigate" size={20} color={Colors.accent} />
-          <Text style={styles.cronoBtnText}>Registra Giro e Performance</Text>
-        </Pressable>
-
-        <Pressable
-          style={styles.cronoBtn}
-          onPress={() => router.push("/routes" as any)}
-        >
-          <Ionicons name="map" size={20} color={Colors.accent} />
-          <Text style={styles.cronoBtnText}>I Miei Percorsi</Text>
-        </Pressable>
-
         {sosEnabled && (
           <View style={styles.sosRow}>
             <Pressable
@@ -488,23 +470,6 @@ const styles = StyleSheet.create({
     color: Colors.accentRed,
     textAlign: "center",
     maxWidth: 260,
-  },
-  cronoBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 32,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: Colors.accent + "40",
-  },
-  cronoBtnText: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.accent,
   },
   sosRow: {
     flexDirection: "row",

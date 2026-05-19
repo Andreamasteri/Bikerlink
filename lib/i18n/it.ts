@@ -54,6 +54,12 @@ const it: Record<string, string> = {
   "map.filters": "Filtri",
   "map.nearbyUsers": "Utenti nelle vicinanze",
 
+  "proposals.hub.tabTitle": "Giri &\nPerformance",
+  "proposals.hub.headerTitle": "Giri & Performance",
+  "proposals.hub.proposalsRequests": "Proposte e\nRichieste",
+  "proposals.hub.ridesPerformance": "Giri &\nPerformance",
+  "proposals.hub.myRoutes": "I Miei\nPercorsi",
+
   "proposals.title": "Proposte",
   "proposals.create": "Crea proposta",
   "proposals.ride": "Giro",

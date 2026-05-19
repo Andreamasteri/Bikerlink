@@ -49,6 +49,12 @@ const es: Record<string, string> = {
   "map.offline": "Offline",
   "map.filters": "Filtros",
   "map.nearbyUsers": "Usuarios cercanos",
+  "proposals.hub.tabTitle": "Rutas y\nRendimiento",
+  "proposals.hub.headerTitle": "Rutas y Rendimiento",
+  "proposals.hub.proposalsRequests": "Propuestas y\nSolicitudes",
+  "proposals.hub.ridesPerformance": "Rutas y\nRendimiento",
+  "proposals.hub.myRoutes": "Mis\nRutas",
+
   "proposals.title": "Propuestas",
   "proposals.create": "Crear propuesta",
   "proposals.ride": "Ruta",

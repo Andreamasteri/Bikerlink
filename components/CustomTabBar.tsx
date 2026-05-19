@@ -36,7 +36,7 @@ function TabIcon({ tab, isActive }: { tab: TabItem; isActive: boolean }) {
   return (
     <Pressable style={staticStyles.tabItem} onPress={tab.onPress}>
       {tab.icon(color, 24)}
-      <Text style={[staticStyles.tabLabel, { color }]} numberOfLines={1}>
+      <Text style={[staticStyles.tabLabel, { color }]} numberOfLines={2}>
         {tab.title}
       </Text>
     </Pressable>
@@ -60,7 +60,7 @@ function ScrollTabIcon({
       onPress={tab.onPress}
     >
       {tab.icon(color, 24)}
-      <Text style={[staticStyles.tabLabel, { color }]} numberOfLines={1}>
+      <Text style={[staticStyles.tabLabel, { color }]} numberOfLines={2}>
         {tab.title}
       </Text>
     </Pressable>

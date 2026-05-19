@@ -49,6 +49,12 @@ const el: Record<string, string> = {
   "map.offline": "Εκτός σύνδεσης",
   "map.filters": "Φίλτρα",
   "map.nearbyUsers": "Χρήστες κοντά",
+  "proposals.hub.tabTitle": "Διαδρομές &\nΑπόδοση",
+  "proposals.hub.headerTitle": "Διαδρομές & Απόδοση",
+  "proposals.hub.proposalsRequests": "Προτάσεις &\nΑιτήματα",
+  "proposals.hub.ridesPerformance": "Διαδρομές &\nΑπόδοση",
+  "proposals.hub.myRoutes": "Οι Διαδρομές\nμου",
+
   "proposals.title": "Προτάσεις",
   "proposals.create": "Δημιουργία πρότασης",
   "proposals.ride": "Βόλτα",

@@ -49,6 +49,12 @@ const tr: Record<string, string> = {
   "map.offline": "Çevrimdışı",
   "map.filters": "Filtreler",
   "map.nearbyUsers": "Yakınımdaki kullanıcılar",
+  "proposals.hub.tabTitle": "Turlar ve\nPerformans",
+  "proposals.hub.headerTitle": "Turlar ve Performans",
+  "proposals.hub.proposalsRequests": "Teklifler ve\nİstekler",
+  "proposals.hub.ridesPerformance": "Turlar ve\nPerformans",
+  "proposals.hub.myRoutes": "Benim\nRotalarım",
+
   "proposals.title": "Teklifler",
   "proposals.create": "Teklif oluştur",
   "proposals.ride": "Sürüş",

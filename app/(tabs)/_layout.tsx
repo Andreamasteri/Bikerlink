@@ -281,7 +281,7 @@ export default function TabLayout() {
         <Tabs.Screen
           name="proposals"
           options={{
-            title: "Ride!",
+            title: t("proposals.hub.tabTitle"),
             tabBarIcon: () => (
               <MaterialCommunityIcons
                 name="motorbike"
@@ -293,7 +293,7 @@ export default function TabLayout() {
                 }
               />
             ),
-            headerTitle: isBikerOrCoppia ? "Proposte e Richieste" : "Le Mie Richieste",
+            headerTitle: t("proposals.hub.headerTitle"),
             href: gpsTabHref,
           }}
         />

@@ -10,7 +10,7 @@ import {
   Platform,
   TouchableOpacity,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -178,6 +178,12 @@ function ProposalCard({ item, onPress, t, locale }: { item: ProposalItem; onPres
   );
 }
 
+const HUB_SECTIONS = [
+  { key: "proposte", i18nKey: "proposals.hub.proposalsRequests" },
+  { key: "giri", i18nKey: "proposals.hub.ridesPerformance" },
+  { key: "percorsi", i18nKey: "proposals.hub.myRoutes" },
+] as const;
+
 export default function ProposalsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -214,9 +220,33 @@ export default function ProposalsScreen() {
   allData.push({ type: "proposalHeader", key: "ph" });
   (proposals || []).forEach((p) => allData.push({ type: "proposal", key: `p-${p.id}`, data: p }));
 
+  const handleHubPress = (key: string) => {
+    if (key === "giri") {
+      router.push("/(tabs)/tracking" as Href);
+    } else if (key === "percorsi") {
+      router.push("/routes" as Href);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <InlineMiniPlayer />
+      <View style={styles.hubRow}>
+        {HUB_SECTIONS.map((section) => {
+          const isActive = section.key === "proposte";
+          return (
+            <Pressable
+              key={section.key}
+              style={[styles.hubBtn, isActive && styles.hubBtnActive]}
+              onPress={() => handleHubPress(section.key)}
+            >
+              <Text style={[styles.hubText, isActive && styles.hubTextActive]} numberOfLines={2} textBreakStrategy="simple">
+                {t(section.i18nKey)}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
       <View style={styles.filterRow}>
         {FILTER_KEYS.map((f) => (
           <Pressable
@@ -299,6 +329,32 @@ export default function ProposalsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  hubRow: { flexDirection: "row", paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4, gap: 6 },
+  hubBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
+    minHeight: 48,
+  },
+  hubBtnActive: {
+    borderColor: Colors.accent,
+    backgroundColor: Colors.accent + "18",
+  },
+  hubText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
+  hubTextActive: {
+    color: Colors.accent,
+  },
   filterRow: { flexDirection: "row", flexWrap: "wrap", padding: 6, paddingHorizontal: 8, gap: 4 },
   filterBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surface, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, height: 32 },
   filterBtnActive: { backgroundColor: Colors.accent + "20" },
