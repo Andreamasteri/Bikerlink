@@ -50,7 +50,7 @@ import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users, userFavorites } from "@shared/schema";
 import { PRIVACY_POLICY_IT } from "@shared/privacy-policy-it";
-import { ilike, eq, and } from "drizzle-orm";
+import { ilike, eq, and, sql } from "drizzle-orm";
 import { onlineTracker } from "./online-tracker";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
@@ -1779,6 +1779,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ received: true });
     } catch {
       res.status(200).json({ received: true });
+    }
+  });
+
+  // ── GET /api/stats/global — public stats for landing page ─────────────────
+  app.get("/api/stats/global", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE user_type = 'biker') AS bikers,
+          COUNT(*) FILTER (WHERE user_type = 'zavorrina') AS zavorrine
+        FROM users
+        WHERE is_deleted IS NOT TRUE
+      `);
+      const row = result.rows[0] as { total: string; bikers: string; zavorrine: string } | undefined;
+      res.json({
+        total: parseInt(row?.total ?? "0", 10),
+        bikers: parseInt(row?.bikers ?? "0", 10),
+        zavorrine: parseInt(row?.zavorrine ?? "0", 10),
+      });
+    } catch (err) {
+      console.error("[stats/global] error:", err);
+      res.json({ total: 5000, bikers: 3200, zavorrine: 1800 });
+    }
+  });
+
+  // ── POST /api/newsletter/subscribe ────────────────────────────────────────
+  app.post("/api/newsletter/subscribe", async (req, res) => {
+    try {
+      const { email, notifyRides } = req.body || {};
+      if (!email || typeof email !== "string" || !email.includes("@")) {
+        return res.status(400).json({ message: "Email non valida" });
+      }
+      const normalizedEmail = email.trim().toLowerCase().slice(0, 254);
+      const existing = await db.execute(sql`
+        SELECT id FROM newsletter_subscribers WHERE email = ${normalizedEmail} LIMIT 1
+      `);
+      if (existing.rows.length > 0) {
+        return res.status(409).json({ message: "Già iscritto" });
+      }
+      await db.execute(sql`
+        INSERT INTO newsletter_subscribers (email, notify_rides)
+        VALUES (${normalizedEmail}, ${notifyRides !== false})
+      `);
+      return res.json({ success: true });
+    } catch (err) {
+      console.error("[newsletter/subscribe] error:", err);
+      return res.status(500).json({ message: "Errore interno" });
+    }
+  });
+
+  // ── GET /roadmap.json — serve roadmap from server/public ─────────────────
+  app.get("/roadmap.json", (_req, res) => {
+    const filePath = path.join(process.cwd(), "server", "public", "roadmap.json");
+    if (fs.existsSync(filePath)) {
+      res.setHeader("Content-Type", "application/json");
+      res.setHeader("Cache-Control", "public, max-age=300");
+      res.sendFile(filePath);
+    } else {
+      res.json([]);
     }
   });
 

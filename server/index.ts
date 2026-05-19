@@ -1155,6 +1155,21 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS newsletter_subscribers (
+              id SERIAL PRIMARY KEY,
+              email VARCHAR(254) UNIQUE NOT NULL,
+              notify_rides BOOLEAN NOT NULL DEFAULT true,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS newsletter_subscribers_email_idx ON newsletter_subscribers (email)`);
+          console.log("[MIGRATION] newsletter_subscribers table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] newsletter_subscribers:", e);
+        }
+
+        try {
           await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS expo_push_token TEXT`);
           console.log("[MIGRATION] users.expo_push_token ensured");
         } catch (e) {

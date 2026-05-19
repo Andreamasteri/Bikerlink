@@ -1,0 +1,74 @@
+[
+  {
+    "id": "r1",
+    "title": "Alpha privata",
+    "titleEn": "Private Alpha",
+    "description": "Mappa GPS live, matching biker/zavarrina, chat privata, profili e garage moto.",
+    "descriptionEn": "Live GPS map, biker/pillion matching, private chat, profiles and motorcycle garage.",
+    "status": "done",
+    "date": "Gen 2026"
+  },
+  {
+    "id": "r2",
+    "title": "MotoClub",
+    "titleEn": "MotoClub",
+    "description": "Creazione e gestione club, codici invito, chat di gruppo, admin panel.",
+    "descriptionEn": "Club creation and management, invite codes, group chat, admin panel.",
+    "status": "done",
+    "date": "Mar 2026"
+  },
+  {
+    "id": "r3",
+    "title": "Contest Foto & Easter Eggs",
+    "titleEn": "Photo Contest & Easter Eggs",
+    "description": "Contest fotografico settimanale con voto community. Easter eggs nascosti lungo i percorsi.",
+    "descriptionEn": "Weekly photo contest with community voting. Easter eggs hidden along routes.",
+    "status": "done",
+    "date": "Apr 2026"
+  },
+  {
+    "id": "r4",
+    "title": "SOS Biker",
+    "titleEn": "SOS Biker",
+    "description": "Sistema di emergenza stradale: allerta i biker vicini in caso di incidente o guasto.",
+    "descriptionEn": "Road emergency system: alerts nearby bikers in case of accident or breakdown.",
+    "status": "current",
+    "date": "Mag 2026"
+  },
+  {
+    "id": "r5",
+    "title": "Lancio Play Store",
+    "titleEn": "Play Store Launch",
+    "description": "Pubblicazione ufficiale su Google Play Store. Prima campagna marketing organica.",
+    "descriptionEn": "Official launch on Google Play Store. First organic marketing campaign.",
+    "status": "upcoming",
+    "date": "Giu 2026"
+  },
+  {
+    "id": "r6",
+    "title": "Officine Partner",
+    "titleEn": "Partner Workshops",
+    "description": "Rete di officine e rivenditori moto integrati sulla mappa con recensioni community.",
+    "descriptionEn": "Network of motorcycle workshops and dealers integrated on the map with community reviews.",
+    "status": "upcoming",
+    "date": "Lug 2026"
+  },
+  {
+    "id": "r7",
+    "title": "Route Planner Curvy",
+    "titleEn": "Curvy Route Planner",
+    "description": "Algoritmo proprietario per percorsi tortuosi su OpenStreetMap. Zero costi API.",
+    "descriptionEn": "Proprietary algorithm for curvy routes on OpenStreetMap. Zero API costs.",
+    "status": "upcoming",
+    "date": "Q3 2026"
+  },
+  {
+    "id": "r8",
+    "title": "Lancio App Store (iOS)",
+    "titleEn": "App Store Launch (iOS)",
+    "description": "Pubblicazione su Apple App Store e campagna di crescita cross-platform.",
+    "descriptionEn": "Launch on Apple App Store and cross-platform growth campaign.",
+    "status": "upcoming",
+    "date": "Q4 2026"
+  }
+]

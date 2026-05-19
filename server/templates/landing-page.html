@@ -1,274 +1,1434 @@
 <!doctype html>
 <html lang="it">
   <head>
-    <title>BikerLink - U'll never ride alone</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BikerLink — U'll Never Ride Alone</title>
+    <meta name="description" content="L'app che connette motociclisti e zavorrine in tutta Italia. Trova compagni di viaggio, organizza giri, traccia percorsi e molto altro." />
+    <meta property="og:title" content="BikerLink — U'll Never Ride Alone" />
+    <meta property="og:description" content="La prima piattaforma verticale per motociclisti italiani. Community, GPS live, MotoClub, SOS e contest foto." />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="/assets/competitor-analysis.png" />
+    <meta name="theme-color" content="#0D0D0D" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
     <style>
-      * { box-sizing: border-box; margin: 0; padding: 0; }
+      :root {
+        --accent: #FF6600;
+        --accent-dim: rgba(255, 102, 0, 0.15);
+        --accent-glow: rgba(255, 102, 0, 0.35);
+        --bg: #0D0D0D;
+        --surface: #1A1A1A;
+        --surface2: #222222;
+        --border: #2A2A2A;
+        --text: #F0F0F0;
+        --text2: #999999;
+        --text3: #666666;
+        --success: #22C55E;
+        --radius: 16px;
+        --radius-sm: 10px;
+      }
+
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html { scroll-behavior: smooth; }
+
       body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: #0D0D0D;
-        color: #E8E8E8;
-        min-height: 100vh;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        overflow-x: hidden;
+      }
+
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { opacity: 0.85; }
+
+      /* ── NAVBAR ── */
+      .navbar {
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        width: 100%;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        background: rgba(13, 13, 13, 0.85);
+        border-bottom: 1px solid var(--border);
+      }
+      .navbar-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 0 24px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        gap: 32px;
+      }
+      .nav-logo {
+        font-size: 20px;
+        font-weight: 900;
+        color: var(--accent);
+        letter-spacing: -0.5px;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .nav-logo svg { flex-shrink: 0; }
+      .nav-links {
+        display: flex;
+        gap: 24px;
+        margin-left: auto;
+        align-items: center;
+      }
+      .nav-links a {
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text2);
+        transition: color 0.2s;
+      }
+      .nav-links a:hover { color: var(--text); opacity: 1; }
+      .lang-toggle {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 4px;
+        cursor: pointer;
+      }
+      .lang-btn {
+        font-size: 12px;
+        font-weight: 700;
+        padding: 4px 10px;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+        color: var(--text2);
+        cursor: pointer;
+        transition: all 0.2s;
+        font-family: inherit;
+      }
+      .lang-btn.active {
+        background: var(--accent);
+        color: #fff;
+      }
+
+      /* ── HERO ── */
+      .hero {
+        position: relative;
+        min-height: 100svh;
         display: flex;
         flex-direction: column;
         align-items: center;
-      }
-      .hero {
-        width: 100%;
-        max-width: 600px;
-        padding: 60px 24px 40px;
+        justify-content: center;
         text-align: center;
+        padding: 80px 24px 60px;
+        overflow: hidden;
       }
-      .logo-icon {
-        font-size: 64px;
+      .hero-bg {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(ellipse 80% 50% at 50% 0%, rgba(255,102,0,0.12) 0%, transparent 60%),
+          radial-gradient(ellipse 50% 40% at 80% 100%, rgba(255,102,0,0.06) 0%, transparent 60%);
+        pointer-events: none;
+      }
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--accent-dim);
+        border: 1px solid rgba(255,102,0,0.3);
+        border-radius: 100px;
+        padding: 6px 16px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 24px;
+      }
+      .hero-badge::before { content: '●'; font-size: 8px; animation: pulse 2s infinite; }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.3; }
+      }
+      .hero h1 {
+        font-size: clamp(42px, 9vw, 88px);
+        font-weight: 900;
+        letter-spacing: -2px;
+        line-height: 1;
+        color: var(--text);
+        margin-bottom: 12px;
+      }
+      .hero h1 span { color: var(--accent); }
+      .hero-tagline {
+        font-size: clamp(18px, 3.5vw, 26px);
+        font-weight: 700;
+        font-style: italic;
+        color: var(--text2);
+        margin-bottom: 20px;
+        letter-spacing: -0.3px;
+      }
+      .hero-desc {
+        max-width: 560px;
+        font-size: 16px;
+        color: var(--text2);
+        line-height: 1.7;
+        margin-bottom: 40px;
+      }
+      .hero-ctas {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 60px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 28px;
+        border-radius: var(--radius-sm);
+        font-size: 15px;
+        font-weight: 700;
+        text-decoration: none;
+        transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+        cursor: pointer;
+        border: none;
+        font-family: inherit;
+        white-space: nowrap;
+      }
+      .btn:hover { transform: translateY(-2px); opacity: 1; }
+      .btn-primary {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 0 0 0 var(--accent-glow);
+      }
+      .btn-primary:hover { box-shadow: 0 8px 28px var(--accent-glow); }
+      .btn-outline {
+        background: transparent;
+        color: var(--text);
+        border: 1.5px solid var(--border);
+      }
+      .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+      .btn-ghost {
+        background: var(--surface);
+        color: var(--text2);
+        border: 1px solid var(--border);
+      }
+      .btn-ghost:hover { color: var(--text); border-color: var(--text3); }
+
+      /* QR badge */
+      .qr-row {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px 24px;
+      }
+      .qr-box {
+        width: 80px;
+        height: 80px;
+        flex-shrink: 0;
+        background: #fff;
+        border-radius: 8px;
+        padding: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .qr-box svg { width: 100%; height: 100%; display: block; }
+      .qr-info { text-align: left; }
+      .qr-label { font-size: 11px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+      .qr-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+      .qr-sub { font-size: 12px; color: var(--text2); }
+
+      /* ── COUNTERS ── */
+      .section { padding: 80px 24px; }
+      .section-inner { max-width: 1100px; margin: 0 auto; }
+
+      .counters-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        max-width: 800px;
+        margin: 0 auto;
+      }
+      .counter-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 32px 20px;
+        text-align: center;
+        transition: border-color 0.2s, transform 0.2s;
+        position: relative;
+        overflow: hidden;
+      }
+      .counter-card::before {
+        content: '';
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        height: 2px;
+        background: var(--accent);
+        opacity: 0;
+        transition: opacity 0.3s;
+      }
+      .counter-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+      .counter-card:hover::before { opacity: 1; }
+      .counter-value {
+        font-size: clamp(36px, 6vw, 52px);
+        font-weight: 900;
+        color: var(--accent);
+        letter-spacing: -1px;
+        line-height: 1;
+        margin-bottom: 8px;
+      }
+      .counter-label {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text2);
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+      }
+      .counter-icon { font-size: 24px; margin-bottom: 10px; }
+
+      /* ── SECTION HEADERS ── */
+      .section-head {
+        text-align: center;
+        margin-bottom: 56px;
+      }
+      .section-label {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        color: var(--accent);
+        margin-bottom: 12px;
+      }
+      .section-head h2 {
+        font-size: clamp(28px, 5vw, 44px);
+        font-weight: 900;
+        letter-spacing: -1px;
+        line-height: 1.1;
+        color: var(--text);
+        margin-bottom: 14px;
+      }
+      .section-head p {
+        font-size: 16px;
+        color: var(--text2);
+        max-width: 520px;
+        margin: 0 auto;
+        line-height: 1.7;
+      }
+
+      /* ── FEATURES ── */
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+      }
+      .feature-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 28px 24px;
+        transition: border-color 0.2s, transform 0.2s;
+        position: relative;
+        overflow: hidden;
+      }
+      .feature-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+      .feature-icon {
+        width: 48px;
+        height: 48px;
+        background: var(--accent-dim);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
         margin-bottom: 16px;
       }
-      h1 {
-        font-size: 36px;
-        font-weight: 800;
-        color: #D4A017;
-        letter-spacing: -0.5px;
-      }
-      .tagline {
-        font-size: 18px;
-        font-style: italic;
-        font-weight: 700;
-        color: #B8B8B8;
-        margin-top: 8px;
-      }
-      .description {
-        margin-top: 24px;
+      .feature-card h3 {
         font-size: 16px;
-        line-height: 1.6;
-        color: #999;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 8px;
       }
-      .cta-section {
-        margin-top: 40px;
+      .feature-card p {
+        font-size: 14px;
+        color: var(--text2);
+        line-height: 1.6;
+      }
+      .feature-tag {
+        display: inline-block;
+        margin-top: 12px;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--accent);
+        background: var(--accent-dim);
+        border-radius: 4px;
+        padding: 2px 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      /* ── ROADMAP ── */
+      .roadmap-timeline {
+        position: relative;
+        max-width: 680px;
+        margin: 0 auto;
+      }
+      .roadmap-timeline::before {
+        content: '';
+        position: absolute;
+        left: 24px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--border);
+      }
+      .roadmap-item {
+        display: flex;
+        gap: 20px;
+        padding: 0 0 36px 0;
+        position: relative;
+      }
+      .roadmap-dot {
+        flex-shrink: 0;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+        position: relative;
+        z-index: 1;
+        border: 2px solid var(--border);
+        background: var(--bg);
+        transition: border-color 0.2s;
+      }
+      .roadmap-item.done .roadmap-dot {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .roadmap-item.current .roadmap-dot {
+        background: var(--surface2);
+        border-color: var(--accent);
+        box-shadow: 0 0 0 4px var(--accent-dim);
+        animation: ring-pulse 2s infinite;
+      }
+      @keyframes ring-pulse {
+        0%, 100% { box-shadow: 0 0 0 4px var(--accent-dim); }
+        50% { box-shadow: 0 0 0 8px rgba(255,102,0,0.05); }
+      }
+      .roadmap-content {
+        flex: 1;
+        padding-top: 8px;
+      }
+      .roadmap-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+      .roadmap-date {
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--text3);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .roadmap-status {
+        font-size: 11px;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .status-done { background: rgba(34,197,94,0.15); color: #22c55e; }
+      .status-current { background: var(--accent-dim); color: var(--accent); }
+      .status-upcoming { background: var(--surface2); color: var(--text3); }
+      .roadmap-content h3 {
+        font-size: 16px;
+        font-weight: 700;
+        color: var(--text);
+        margin-bottom: 6px;
+      }
+      .roadmap-content p {
+        font-size: 14px;
+        color: var(--text2);
+        line-height: 1.6;
+      }
+
+      /* ── EMAIL FORM ── */
+      .newsletter-section {
+        background: linear-gradient(135deg, rgba(255,102,0,0.08) 0%, transparent 60%);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
+      }
+      .newsletter-inner {
+        max-width: 600px;
+        margin: 0 auto;
+        text-align: center;
+      }
+      .newsletter-inner h2 {
+        font-size: clamp(24px, 4vw, 36px);
+        font-weight: 900;
+        letter-spacing: -0.8px;
+        margin-bottom: 10px;
+      }
+      .newsletter-inner p {
+        font-size: 15px;
+        color: var(--text2);
+        margin-bottom: 32px;
+      }
+      .newsletter-form {
         display: flex;
         flex-direction: column;
         gap: 12px;
         align-items: center;
       }
-      .cta-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        padding: 14px 32px;
-        border-radius: 12px;
-        font-size: 16px;
-        font-weight: 600;
-        text-decoration: none;
-        transition: transform 0.2s, box-shadow 0.2s;
-      }
-      .cta-btn:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(212, 160, 23, 0.3);
-      }
-      .cta-primary {
-        background: #D4A017;
-        color: #0D0D0D;
-      }
-      .cta-secondary {
-        background: #1E1E1E;
-        color: #E8E8E8;
-        border: 1px solid #333;
-      }
-      .features {
+      .input-row {
+        display: flex;
+        gap: 10px;
         width: 100%;
-        max-width: 600px;
-        padding: 0 24px 40px;
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
       }
-      .feature-card {
-        background: #1E1E1E;
-        border-radius: 16px;
-        padding: 20px;
-        text-align: center;
+      .input-row input {
+        flex: 1;
+        background: var(--surface);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 14px 18px;
+        font-size: 15px;
+        color: var(--text);
+        font-family: inherit;
+        outline: none;
+        transition: border-color 0.2s;
+        min-width: 0;
       }
-      .feature-card .icon { font-size: 32px; margin-bottom: 8px; }
-      .feature-card h3 {
-        font-size: 14px;
-        font-weight: 600;
-        color: #D4A017;
-        margin-bottom: 4px;
+      .input-row input:focus { border-color: var(--accent); }
+      .input-row input::placeholder { color: var(--text3); }
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        text-align: left;
       }
-      .feature-card p {
-        font-size: 12px;
-        color: #888;
+      .checkbox-row input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--accent);
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      .checkbox-row label {
+        font-size: 13px;
+        color: var(--text2);
+        cursor: pointer;
         line-height: 1.4;
       }
-      .sponsor {
-        width: 100%;
-        max-width: 600px;
-        padding: 24px;
-        text-align: center;
-        border-top: 1px solid #222;
-      }
-      .sponsor-label {
-        font-size: 12px;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 2px;
-        margin-bottom: 8px;
-      }
-      .sponsor-name {
-        font-size: 20px;
-        font-weight: 700;
-        color: #D4A017;
-      }
-      .sponsor-sub {
+      .form-feedback {
         font-size: 13px;
-        color: #777;
-        margin-top: 4px;
+        font-weight: 600;
+        padding: 10px 16px;
+        border-radius: var(--radius-sm);
+        display: none;
       }
+      .form-feedback.success { background: rgba(34,197,94,0.15); color: #22c55e; display: block; }
+      .form-feedback.error { background: rgba(239,68,68,0.15); color: #ef4444; display: block; }
+
+      /* ── COMPETITOR SECTION ── */
       .competitor-section {
-        width: 100%;
-        max-width: 600px;
-        padding: 32px 24px 40px;
-        border-top: 1px solid #222;
-        text-align: center;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        border-bottom: 1px solid var(--border);
       }
-      .competitor-section h2 {
-        font-size: 22px;
-        font-weight: 800;
-        color: #D4A017;
-        margin-bottom: 8px;
-      }
-      .competitor-section .section-desc {
-        font-size: 14px;
-        color: #888;
-        line-height: 1.5;
-        margin-bottom: 24px;
-      }
-      .competitor-img-link {
-        display: block;
-        border-radius: 12px;
+      .competitor-card {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
         overflow: hidden;
-        border: 1px solid #333;
         transition: transform 0.2s, box-shadow 0.2s;
+        display: block;
         margin-bottom: 20px;
       }
-      .competitor-img-link:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 32px rgba(212, 160, 23, 0.2);
+      .competitor-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 40px rgba(255,102,0,0.15);
+        opacity: 1;
       }
-      .competitor-img-link img {
-        width: 100%;
-        display: block;
+      .competitor-card img { width: 100%; display: block; }
+
+      /* ── STORE BADGES ── */
+      .store-badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        justify-content: center;
+        margin-top: 24px;
       }
-      .cta-pdf {
-        display: inline-flex;
+      .store-badge {
+        display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 12px 28px;
-        border-radius: 12px;
-        font-size: 15px;
+        gap: 10px;
+        background: var(--surface2);
+        border: 1.5px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 12px 20px;
+        color: var(--text2);
+        font-size: 13px;
         font-weight: 600;
-        text-decoration: none;
-        background: #1E1E1E;
-        color: #D4A017;
-        border: 1px solid #D4A017;
-        transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+        transition: border-color 0.2s, color 0.2s;
+        cursor: default;
       }
-      .cta-pdf:hover {
-        background: #D4A017;
-        color: #0D0D0D;
-        transform: translateY(-2px);
-        box-shadow: 0 8px 24px rgba(212, 160, 23, 0.3);
+      .store-badge.available {
+        cursor: pointer;
+        border-color: var(--accent);
+        color: var(--text);
       }
+      .store-badge:hover { border-color: var(--text3); }
+      .store-badge.available:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
+      .store-badge-icon { font-size: 22px; }
+      .store-badge-text { display: flex; flex-direction: column; gap: 1px; }
+      .store-badge-text small { font-size: 10px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; }
+      .store-badge-text strong { font-size: 14px; }
+
+      /* ── FOOTER ── */
       .footer {
-        padding: 24px;
-        text-align: center;
+        border-top: 1px solid var(--border);
+        padding: 48px 24px;
+      }
+      .footer-inner {
+        max-width: 1100px;
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 40px;
+      }
+      .footer-brand .footer-logo {
+        font-size: 20px;
+        font-weight: 900;
+        color: var(--accent);
+        letter-spacing: -0.5px;
+        margin-bottom: 10px;
+      }
+      .footer-brand p {
+        font-size: 13px;
+        color: var(--text3);
+        line-height: 1.6;
+        max-width: 220px;
+      }
+      .footer-col h4 {
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        color: var(--text3);
+        margin-bottom: 14px;
+      }
+      .footer-col ul { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+      .footer-col ul a { font-size: 14px; color: var(--text2); transition: color 0.2s; }
+      .footer-col ul a:hover { color: var(--text); opacity: 1; }
+      .footer-bottom {
+        max-width: 1100px;
+        margin: 32px auto 0;
+        padding-top: 24px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
         font-size: 12px;
-        color: #555;
+        color: var(--text3);
+      }
+      .footer-bottom a { color: var(--text3); }
+      .footer-bottom a:hover { color: var(--text2); opacity: 1; }
+
+      /* ── DIVIDER ── */
+      .divider { height: 1px; background: var(--border); }
+
+      /* ── RESPONSIVE ── */
+      @media (max-width: 768px) {
+        .navbar-inner { gap: 16px; }
+        .nav-links { gap: 16px; }
+        .nav-links a:not(.lang-toggle):not(.btn) { display: none; }
+        .counters-grid { grid-template-columns: 1fr 1fr 1fr; }
+        .features-grid { grid-template-columns: 1fr 1fr; }
+        .footer-inner { grid-template-columns: 1fr 1fr; }
+        .footer-brand { grid-column: 1 / -1; }
+        .qr-row { flex-direction: column; text-align: center; }
+        .qr-info { text-align: center; }
+      }
+      @media (max-width: 480px) {
+        .counters-grid { grid-template-columns: 1fr; max-width: 280px; }
+        .features-grid { grid-template-columns: 1fr; }
+        .footer-inner { grid-template-columns: 1fr; }
+        .input-row { flex-direction: column; }
+        .hero h1 { font-size: 40px; }
+        .section { padding: 56px 24px; }
+        .hero { padding: 60px 20px 48px; }
+      }
+
+      /* ── COUNT-UP ANIMATION ── */
+      .counting { transition: all 0.05s; }
+
+      /* ── SCROLL REVEAL ── */
+      .reveal {
+        opacity: 0;
+        transform: translateY(24px);
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
+      .reveal.visible {
+        opacity: 1;
+        transform: translateY(0);
       }
     </style>
   </head>
   <body>
-    <div class="hero">
-      <div class="logo-icon">🏍️</div>
-      <h1>BikerLink</h1>
-      <p class="tagline">U'll never ride alone</p>
-      <p class="description">
+
+    <!-- NAVBAR -->
+    <nav class="navbar">
+      <div class="navbar-inner">
+        <a href="/" class="nav-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="#FF6600" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          BikerLink
+        </a>
+        <div class="nav-links">
+          <a href="/about" data-i18n="nav.about">Chi siamo</a>
+          <a href="/partners" data-i18n="nav.partners">Partner</a>
+          <a href="/press" data-i18n="nav.press">Press</a>
+          <a href="/investors" data-i18n="nav.investors">Investitori</a>
+          <div class="lang-toggle">
+            <button class="lang-btn active" onclick="setLang('it')" id="btn-it">IT</button>
+            <button class="lang-btn" onclick="setLang('en')" id="btn-en">EN</button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div class="hero-bg"></div>
+      <div class="hero-badge" data-i18n="hero.badge">Disponibile su Android</div>
+      <h1>Biker<span>Link</span></h1>
+      <p class="hero-tagline" data-i18n="hero.tagline">U'll Never Ride Alone</p>
+      <p class="hero-desc" data-i18n="hero.desc">
         L'app che connette motociclisti e zavorrine in tutta Italia.
-        Trova compagni di viaggio, organizza giri, traccia i tuoi percorsi
-        e partecipa al contest fotografico della community.
+        Trova compagni di viaggio, organizza giri in gruppo, traccia i percorsi
+        e vivi la community moto come non hai mai fatto.
       </p>
-      <div class="cta-section">
-        <a href="BASE_URL_PLACEHOLDER" class="cta-btn cta-primary">
-          💻 Apri la versione Web
+      <div class="hero-ctas">
+        <a href="BASE_URL_PLACEHOLDER" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <span data-i18n="hero.cta1">Apri la versione Web</span>
         </a>
-        <a href="https://expo.dev/go" class="cta-btn cta-secondary" target="_blank">
-          📱 Scarica Expo Go
+        <a href="https://play.google.com/store/apps/details?id=com.bikerlink.app" target="_blank" class="btn btn-outline">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.24.13.52.2.8.2.39 0 .76-.12 1.07-.34L16.72 17l-3.23-3.23-10.31 9.99zM1.1 1.24C1.04 1.46 1 1.7 1 1.94v20.12c0 .24.04.48.1.7l.1.09L12.47 12V11.88L1.2 1.15l-.1.09zM20.92 10.19l-2.87-1.65-3.28 3.28 3.28 3.28 2.89-1.66c.82-.47.82-1.78-.02-2.25zM4.05.58L16.72 7l-3.25 3.25L4.05.58z"/></svg>
+          <span data-i18n="hero.cta2">Play Store</span>
         </a>
-        <a href="exp://EXPS_URL_PLACEHOLDER" class="cta-btn cta-secondary">
-          🔗 Apri in Expo Go
-        </a>
-        <a href="/investors" class="cta-btn cta-secondary">
-          📈 Per investitori
+        <a href="/investors" class="btn btn-ghost">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span data-i18n="hero.cta3">Per investitori</span>
         </a>
       </div>
-    </div>
 
-    <div class="features">
-      <div class="feature-card">
-        <div class="icon">🗺️</div>
-        <h3>Mappa Interattiva</h3>
-        <p>Trova biker e zavorrine disponibili vicino a te</p>
+      <div class="qr-row reveal">
+        <div class="qr-box">
+          <!-- Static QR code SVG (decorative placeholder pointing to Play Store page) -->
+          <svg viewBox="0 0 33 33" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+            <rect width="33" height="33" fill="white"/>
+            <!-- Top-left finder -->
+            <rect x="1" y="1" width="7" height="7" fill="#000"/>
+            <rect x="2" y="2" width="5" height="5" fill="white"/>
+            <rect x="3" y="3" width="3" height="3" fill="#000"/>
+            <!-- Top-right finder -->
+            <rect x="25" y="1" width="7" height="7" fill="#000"/>
+            <rect x="26" y="2" width="5" height="5" fill="white"/>
+            <rect x="27" y="3" width="3" height="3" fill="#000"/>
+            <!-- Bottom-left finder -->
+            <rect x="1" y="25" width="7" height="7" fill="#000"/>
+            <rect x="2" y="26" width="5" height="5" fill="white"/>
+            <rect x="3" y="27" width="3" height="3" fill="#000"/>
+            <!-- Data modules (stylized pattern) -->
+            <rect x="9" y="1" width="1" height="1" fill="#000"/>
+            <rect x="11" y="1" width="1" height="1" fill="#000"/>
+            <rect x="13" y="1" width="1" height="1" fill="#000"/>
+            <rect x="15" y="1" width="3" height="1" fill="#000"/>
+            <rect x="19" y="1" width="1" height="1" fill="#000"/>
+            <rect x="21" y="1" width="1" height="1" fill="#000"/>
+            <rect x="23" y="1" width="1" height="1" fill="#000"/>
+            <rect x="9" y="3" width="3" height="1" fill="#000"/>
+            <rect x="13" y="3" width="1" height="1" fill="#000"/>
+            <rect x="17" y="3" width="1" height="1" fill="#000"/>
+            <rect x="19" y="3" width="3" height="1" fill="#000"/>
+            <rect x="23" y="3" width="1" height="1" fill="#000"/>
+            <rect x="9" y="5" width="1" height="1" fill="#000"/>
+            <rect x="13" y="5" width="3" height="1" fill="#000"/>
+            <rect x="19" y="5" width="1" height="1" fill="#000"/>
+            <rect x="21" y="5" width="3" height="1" fill="#000"/>
+            <rect x="1" y="9" width="1" height="1" fill="#000"/>
+            <rect x="3" y="9" width="3" height="1" fill="#000"/>
+            <rect x="7" y="9" width="1" height="1" fill="#000"/>
+            <rect x="9" y="9" width="3" height="1" fill="#000"/>
+            <rect x="13" y="9" width="1" height="1" fill="#000"/>
+            <rect x="15" y="9" width="1" height="1" fill="#000"/>
+            <rect x="17" y="9" width="3" height="1" fill="#000"/>
+            <rect x="21" y="9" width="3" height="1" fill="#000"/>
+            <rect x="25" y="9" width="1" height="1" fill="#000"/>
+            <rect x="27" y="9" width="3" height="1" fill="#000"/>
+            <rect x="31" y="9" width="1" height="1" fill="#000"/>
+            <rect x="1" y="11" width="3" height="1" fill="#000"/>
+            <rect x="5" y="11" width="1" height="1" fill="#000"/>
+            <rect x="9" y="11" width="1" height="1" fill="#000"/>
+            <rect x="11" y="11" width="3" height="1" fill="#000"/>
+            <rect x="15" y="11" width="3" height="1" fill="#000"/>
+            <rect x="19" y="11" width="1" height="1" fill="#000"/>
+            <rect x="23" y="11" width="3" height="1" fill="#000"/>
+            <rect x="29" y="11" width="1" height="1" fill="#000"/>
+            <rect x="31" y="11" width="1" height="1" fill="#000"/>
+            <rect x="1" y="13" width="1" height="1" fill="#000"/>
+            <rect x="5" y="13" width="3" height="1" fill="#000"/>
+            <rect x="9" y="13" width="3" height="1" fill="#000"/>
+            <rect x="13" y="13" width="1" height="1" fill="#000"/>
+            <rect x="17" y="13" width="1" height="1" fill="#000"/>
+            <rect x="19" y="13" width="3" height="1" fill="#000"/>
+            <rect x="23" y="13" width="1" height="1" fill="#000"/>
+            <rect x="25" y="13" width="3" height="1" fill="#000"/>
+            <rect x="29" y="13" width="3" height="1" fill="#000"/>
+            <rect x="1" y="15" width="5" height="1" fill="#000"/>
+            <rect x="7" y="15" width="1" height="1" fill="#000"/>
+            <rect x="11" y="15" width="1" height="1" fill="#000"/>
+            <rect x="13" y="15" width="3" height="1" fill="#000"/>
+            <rect x="17" y="15" width="5" height="1" fill="#000"/>
+            <rect x="23" y="15" width="1" height="1" fill="#000"/>
+            <rect x="27" y="15" width="1" height="1" fill="#000"/>
+            <rect x="31" y="15" width="1" height="1" fill="#000"/>
+            <rect x="1" y="17" width="1" height="1" fill="#000"/>
+            <rect x="5" y="17" width="1" height="1" fill="#000"/>
+            <rect x="9" y="17" width="5" height="1" fill="#000"/>
+            <rect x="15" y="17" width="1" height="1" fill="#000"/>
+            <rect x="19" y="17" width="1" height="1" fill="#000"/>
+            <rect x="23" y="17" width="5" height="1" fill="#000"/>
+            <rect x="29" y="17" width="1" height="1" fill="#000"/>
+            <rect x="1" y="19" width="3" height="1" fill="#000"/>
+            <rect x="7" y="19" width="3" height="1" fill="#000"/>
+            <rect x="11" y="19" width="1" height="1" fill="#000"/>
+            <rect x="13" y="19" width="3" height="1" fill="#000"/>
+            <rect x="17" y="19" width="3" height="1" fill="#000"/>
+            <rect x="21" y="19" width="1" height="1" fill="#000"/>
+            <rect x="25" y="19" width="3" height="1" fill="#000"/>
+            <rect x="31" y="19" width="1" height="1" fill="#000"/>
+            <rect x="1" y="21" width="1" height="1" fill="#000"/>
+            <rect x="3" y="21" width="3" height="1" fill="#000"/>
+            <rect x="7" y="21" width="1" height="1" fill="#000"/>
+            <rect x="11" y="21" width="3" height="1" fill="#000"/>
+            <rect x="15" y="21" width="1" height="1" fill="#000"/>
+            <rect x="19" y="21" width="3" height="1" fill="#000"/>
+            <rect x="23" y="21" width="1" height="1" fill="#000"/>
+            <rect x="27" y="21" width="3" height="1" fill="#000"/>
+            <rect x="31" y="21" width="1" height="1" fill="#000"/>
+            <rect x="1" y="23" width="5" height="1" fill="#000"/>
+            <rect x="9" y="23" width="1" height="1" fill="#000"/>
+            <rect x="11" y="23" width="3" height="1" fill="#000"/>
+            <rect x="15" y="23" width="5" height="1" fill="#000"/>
+            <rect x="21" y="23" width="3" height="1" fill="#000"/>
+            <rect x="25" y="23" width="1" height="1" fill="#000"/>
+            <rect x="29" y="23" width="3" height="1" fill="#000"/>
+            <rect x="9" y="25" width="3" height="1" fill="#000"/>
+            <rect x="13" y="25" width="1" height="1" fill="#000"/>
+            <rect x="17" y="25" width="3" height="1" fill="#000"/>
+            <rect x="21" y="25" width="1" height="1" fill="#000"/>
+            <rect x="23" y="25" width="1" height="1" fill="#000"/>
+            <rect x="9" y="27" width="1" height="1" fill="#000"/>
+            <rect x="13" y="27" width="3" height="1" fill="#000"/>
+            <rect x="17" y="27" width="1" height="1" fill="#000"/>
+            <rect x="21" y="27" width="3" height="1" fill="#000"/>
+            <rect x="25" y="27" width="1" height="1" fill="#000"/>
+            <rect x="29" y="27" width="3" height="1" fill="#000"/>
+            <rect x="9" y="29" width="3" height="1" fill="#000"/>
+            <rect x="13" y="29" width="1" height="1" fill="#000"/>
+            <rect x="15" y="29" width="3" height="1" fill="#000"/>
+            <rect x="19" y="29" width="1" height="1" fill="#000"/>
+            <rect x="23" y="29" width="3" height="1" fill="#000"/>
+            <rect x="29" y="29" width="1" height="1" fill="#000"/>
+            <rect x="31" y="29" width="1" height="1" fill="#000"/>
+            <rect x="9" y="31" width="1" height="1" fill="#000"/>
+            <rect x="11" y="31" width="3" height="1" fill="#000"/>
+            <rect x="15" y="31" width="1" height="1" fill="#000"/>
+            <rect x="17" y="31" width="3" height="1" fill="#000"/>
+            <rect x="21" y="31" width="1" height="1" fill="#000"/>
+            <rect x="25" y="31" width="5" height="1" fill="#000"/>
+            <rect x="31" y="31" width="1" height="1" fill="#000"/>
+          </svg>
+        </div>
+        <div class="qr-info">
+          <div class="qr-label" data-i18n="hero.qr_label">Scansiona per scaricare</div>
+          <div class="qr-title" data-i18n="hero.qr_title">BikerLink su Android</div>
+          <div class="qr-sub" data-i18n="hero.qr_sub">iOS — prossimamente</div>
+        </div>
       </div>
-      <div class="feature-card">
-        <div class="icon">📍</div>
-        <h3>GPS Tracking</h3>
-        <p>Registra i tuoi percorsi con statistiche dettagliate</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon">💬</div>
-        <h3>Chat</h3>
-        <p>Messaggi privati e chat di gruppo per ogni giro</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon">📸</div>
-        <h3>Contest Foto</h3>
-        <p>Foto della settimana: vota e vinci!</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon">🔧</div>
-        <h3>Officine Partner</h3>
-        <p>Trova officine e rivenditori autorizzati</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon">🥚</div>
-        <h3>Easter Eggs</h3>
-        <p>Colleziona sorprese nascoste lungo i percorsi</p>
-      </div>
-    </div>
+    </section>
 
+    <!-- COUNTERS -->
+    <section class="section" style="background: var(--surface); border-top: 1px solid var(--border);">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <div class="section-label" data-i18n="stats.label">Community</div>
+          <h2 data-i18n="stats.title">Biker che non cavalcano soli</h2>
+          <p data-i18n="stats.desc">Ogni giorno nuovi motociclisti si uniscono alla community BikerLink.</p>
+        </div>
+        <div class="counters-grid">
+          <div class="counter-card reveal">
+            <div class="counter-icon">👥</div>
+            <div class="counter-value" id="cnt-total" data-target="5000">0</div>
+            <div class="counter-label" data-i18n="stats.total">Iscritti Totali</div>
+          </div>
+          <div class="counter-card reveal" style="transition-delay:0.1s">
+            <div class="counter-icon">🏍️</div>
+            <div class="counter-value" id="cnt-bikers" data-target="3200">0</div>
+            <div class="counter-label" data-i18n="stats.bikers">Biker</div>
+          </div>
+          <div class="counter-card reveal" style="transition-delay:0.2s">
+            <div class="counter-icon">🌸</div>
+            <div class="counter-value" id="cnt-zavorrine" data-target="1800">0</div>
+            <div class="counter-label" data-i18n="stats.zavorrine">Zavorrine</div>
+          </div>
+        </div>
+      </div>
+    </section>
 
-    <div class="competitor-section">
-      <h2>Perché BikerLink?</h2>
-      <p class="section-desc">
-        Abbiamo analizzato le principali app concorrenti per capire dove il mercato lascia scoperto il motociclista italiano.
-        BikerLink è costruita esattamente per colmare quei gap.
-      </p>
-      <a href="/assets/competitor-analysis.pdf" target="_blank" class="competitor-img-link">
-        <img src="/assets/competitor-analysis.png" alt="Analisi competitor BikerLink" loading="lazy" />
-      </a>
-      <a href="/assets/competitor-analysis.pdf" target="_blank" class="cta-pdf">
-        📄 Scarica analisi completa (PDF)
-      </a>
-    </div>
+    <!-- FEATURES -->
+    <section class="section">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <div class="section-label" data-i18n="features.label">Features</div>
+          <h2 data-i18n="features.title">Tutto per il tuo giro in moto</h2>
+          <p data-i18n="features.desc">Dalla partenza all'arrivo, BikerLink ti accompagna con funzionalità pensate per la community moto italiana.</p>
+        </div>
+        <div class="features-grid" id="features-grid">
+          <!-- populated by JS -->
+        </div>
+      </div>
+    </section>
 
-    <div class="footer">
-      <p>© 2026 BikerLink. Tutti i diritti riservati.</p>
-      <p style="margin-top:8px;font-size:13px;">
-        <a href="/privacy-policy" style="color:#D4A017;text-decoration:underline;">Privacy Policy</a>
-        &nbsp;|&nbsp;
-        <a href="/terms" style="color:#D4A017;text-decoration:underline;">Termini di Servizio</a>
-      </p>
-    </div>
+    <!-- ROADMAP -->
+    <section class="section" style="background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <div class="section-label" data-i18n="roadmap.label">Roadmap</div>
+          <h2 data-i18n="roadmap.title">Il percorso di BikerLink</h2>
+          <p data-i18n="roadmap.desc">Da dove siamo partiti a dove stiamo andando. Ogni milestone è un checkpoint della community.</p>
+        </div>
+        <div class="roadmap-timeline" id="roadmap-timeline">
+          <!-- populated by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- NEWSLETTER -->
+    <section class="section newsletter-section">
+      <div class="section-inner">
+        <div class="newsletter-inner">
+          <div class="reveal">
+            <div class="section-label" data-i18n="newsletter.label">Notifiche</div>
+            <h2 data-i18n="newsletter.title">Sii il primo a sapere</h2>
+            <p data-i18n="newsletter.desc">Ricevi notifiche quando ci sono giri organizzati nella tua zona. Niente spam, solo moto.</p>
+          </div>
+          <form class="newsletter-form reveal" onsubmit="handleNewsletterSubmit(event)">
+            <div class="input-row">
+              <input type="email" id="nl-email" placeholder="la@tua.email" required autocomplete="email" />
+              <button type="submit" class="btn btn-primary" data-i18n="newsletter.cta">Iscrivimi</button>
+            </div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="nl-notify" checked />
+              <label for="nl-notify" data-i18n="newsletter.checkbox">Voglio essere avvisato dei giri BikerLink nella mia zona</label>
+            </div>
+            <div id="nl-feedback" class="form-feedback"></div>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPETITOR -->
+    <section class="section competitor-section">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <div class="section-label" data-i18n="competitor.label">Perché BikerLink</div>
+          <h2 data-i18n="competitor.title">Il mercato lasciava un vuoto</h2>
+          <p data-i18n="competitor.desc">Abbiamo analizzato le principali app concorrenti. BikerLink colma i gap che nessuna altra app ha risolto per il motociclista italiano.</p>
+        </div>
+        <a href="/assets/competitor-analysis.pdf" target="_blank" class="competitor-card reveal">
+          <img src="/assets/competitor-analysis.png" alt="Analisi competitor BikerLink" loading="lazy" />
+        </a>
+        <div style="text-align:center;">
+          <a href="/assets/competitor-analysis.pdf" target="_blank" class="btn btn-outline reveal">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            <span data-i18n="competitor.cta">Scarica analisi completa (PDF)</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- STORE BADGES -->
+    <section class="section" style="text-align:center;">
+      <div class="section-inner">
+        <div class="section-head reveal">
+          <div class="section-label" data-i18n="download.label">Download</div>
+          <h2 data-i18n="download.title">Disponibile su Android</h2>
+          <p data-i18n="download.desc">Scarica BikerLink gratuitamente. iOS in arrivo.</p>
+        </div>
+        <div class="store-badges reveal">
+          <a href="https://play.google.com/store/apps/details?id=com.bikerlink.app" target="_blank" class="store-badge available">
+            <span class="store-badge-icon">🤖</span>
+            <div class="store-badge-text">
+              <small data-i18n="download.google_sub">Disponibile su</small>
+              <strong>Google Play</strong>
+            </div>
+          </a>
+          <div class="store-badge">
+            <span class="store-badge-icon">🍎</span>
+            <div class="store-badge-text">
+              <small data-i18n="download.apple_sub">Prossimamente su</small>
+              <strong>App Store</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer">
+      <div class="footer-inner">
+        <div class="footer-brand">
+          <div class="footer-logo">BikerLink</div>
+          <p data-i18n="footer.brand_desc">La piattaforma verticale per motociclisti italiani. Community, navigazione, sicurezza.</p>
+          <div class="store-badges" style="justify-content:flex-start;margin-top:16px;">
+            <a href="https://play.google.com/store/apps/details?id=com.bikerlink.app" target="_blank" class="store-badge available">
+              <span class="store-badge-icon">🤖</span>
+              <div class="store-badge-text">
+                <small data-i18n="download.google_sub">Disponibile su</small>
+                <strong>Google Play</strong>
+              </div>
+            </a>
+            <div class="store-badge">
+              <span class="store-badge-icon">🍎</span>
+              <div class="store-badge-text">
+                <small data-i18n="download.apple_sub">Prossimamente su</small>
+                <strong>App Store</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.app">App</h4>
+          <ul>
+            <li><a href="/about" data-i18n="nav.about">Chi siamo</a></li>
+            <li><a href="/partners" data-i18n="nav.partners">Partner</a></li>
+            <li><a href="/press" data-i18n="nav.press">Press</a></li>
+            <li><a href="/investors" data-i18n="footer.investors">Per investitori</a></li>
+            <li><a href="/privacy-policy" data-i18n="footer.privacy">Privacy Policy</a></li>
+            <li><a href="/terms" data-i18n="footer.terms">Termini di Servizio</a></li>
+          </ul>
+        </div>
+        <div class="footer-col">
+          <h4 data-i18n="footer.company">Azienda</h4>
+          <ul>
+            <li><a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a></li>
+          </ul>
+          <div style="margin-top:20px;">
+            <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;" data-i18n="hero.qr_label">Scansiona per scaricare</div>
+            <div style="width:80px;height:80px;background:#fff;border-radius:8px;padding:6px;display:flex;align-items:center;justify-content:center;">
+              <svg viewBox="0 0 33 33" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" style="width:100%;height:100%;display:block;">
+                <rect width="33" height="33" fill="white"/>
+                <rect x="1" y="1" width="7" height="7" fill="#000"/><rect x="2" y="2" width="5" height="5" fill="white"/><rect x="3" y="3" width="3" height="3" fill="#000"/>
+                <rect x="25" y="1" width="7" height="7" fill="#000"/><rect x="26" y="2" width="5" height="5" fill="white"/><rect x="27" y="3" width="3" height="3" fill="#000"/>
+                <rect x="1" y="25" width="7" height="7" fill="#000"/><rect x="2" y="26" width="5" height="5" fill="white"/><rect x="3" y="27" width="3" height="3" fill="#000"/>
+                <rect x="9" y="1" width="1" height="1" fill="#000"/><rect x="11" y="1" width="1" height="1" fill="#000"/><rect x="13" y="1" width="1" height="1" fill="#000"/><rect x="15" y="3" width="3" height="1" fill="#000"/><rect x="19" y="1" width="1" height="1" fill="#000"/><rect x="21" y="1" width="1" height="1" fill="#000"/>
+                <rect x="9" y="3" width="3" height="1" fill="#000"/><rect x="13" y="5" width="3" height="1" fill="#000"/><rect x="19" y="3" width="3" height="1" fill="#000"/>
+                <rect x="9" y="9" width="3" height="1" fill="#000"/><rect x="13" y="9" width="1" height="1" fill="#000"/><rect x="17" y="9" width="3" height="1" fill="#000"/><rect x="21" y="9" width="3" height="1" fill="#000"/><rect x="27" y="9" width="3" height="1" fill="#000"/>
+                <rect x="1" y="11" width="3" height="1" fill="#000"/><rect x="9" y="11" width="1" height="1" fill="#000"/><rect x="11" y="11" width="3" height="1" fill="#000"/><rect x="15" y="11" width="3" height="1" fill="#000"/><rect x="19" y="11" width="1" height="1" fill="#000"/><rect x="23" y="11" width="3" height="1" fill="#000"/>
+                <rect x="1" y="13" width="1" height="1" fill="#000"/><rect x="5" y="13" width="3" height="1" fill="#000"/><rect x="9" y="13" width="3" height="1" fill="#000"/><rect x="13" y="13" width="1" height="1" fill="#000"/><rect x="17" y="13" width="1" height="1" fill="#000"/><rect x="25" y="13" width="3" height="1" fill="#000"/><rect x="29" y="13" width="3" height="1" fill="#000"/>
+                <rect x="1" y="15" width="5" height="1" fill="#000"/><rect x="11" y="15" width="1" height="1" fill="#000"/><rect x="13" y="15" width="3" height="1" fill="#000"/><rect x="17" y="15" width="5" height="1" fill="#000"/><rect x="23" y="15" width="1" height="1" fill="#000"/><rect x="27" y="15" width="1" height="1" fill="#000"/>
+                <rect x="9" y="17" width="5" height="1" fill="#000"/><rect x="15" y="17" width="1" height="1" fill="#000"/><rect x="19" y="17" width="1" height="1" fill="#000"/><rect x="23" y="17" width="5" height="1" fill="#000"/>
+                <rect x="7" y="19" width="3" height="1" fill="#000"/><rect x="11" y="19" width="1" height="1" fill="#000"/><rect x="13" y="19" width="3" height="1" fill="#000"/><rect x="17" y="19" width="3" height="1" fill="#000"/><rect x="21" y="19" width="1" height="1" fill="#000"/><rect x="25" y="19" width="3" height="1" fill="#000"/>
+                <rect x="9" y="25" width="3" height="1" fill="#000"/><rect x="13" y="25" width="1" height="1" fill="#000"/><rect x="17" y="25" width="3" height="1" fill="#000"/><rect x="21" y="25" width="3" height="1" fill="#000"/>
+                <rect x="9" y="27" width="1" height="1" fill="#000"/><rect x="13" y="27" width="3" height="1" fill="#000"/><rect x="17" y="27" width="1" height="1" fill="#000"/><rect x="21" y="27" width="1" height="1" fill="#000"/><rect x="25" y="27" width="1" height="1" fill="#000"/>
+                <rect x="9" y="29" width="3" height="1" fill="#000"/><rect x="15" y="29" width="3" height="1" fill="#000"/><rect x="23" y="29" width="3" height="1" fill="#000"/><rect x="29" y="29" width="1" height="1" fill="#000"/>
+                <rect x="9" y="31" width="1" height="1" fill="#000"/><rect x="11" y="31" width="3" height="1" fill="#000"/><rect x="15" y="31" width="1" height="1" fill="#000"/><rect x="17" y="31" width="3" height="1" fill="#000"/><rect x="21" y="31" width="1" height="1" fill="#000"/><rect x="25" y="31" width="5" height="1" fill="#000"/>
+              </svg>
+            </div>
+            <div style="font-size:12px;color:var(--text3);margin-top:6px;" data-i18n="footer.qr_sub">Android · iOS prossimamente</div>
+          </div>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>© 2026 BikerLink. <span data-i18n="footer.rights">Tutti i diritti riservati.</span></span>
+        <span>
+          <a href="/privacy-policy" data-i18n="footer.privacy">Privacy Policy</a>
+          &nbsp;·&nbsp;
+          <a href="/terms" data-i18n="footer.terms">Termini</a>
+          &nbsp;·&nbsp;
+          <a href="/about" data-i18n="nav.about">Chi siamo</a>
+          &nbsp;·&nbsp;
+          <a href="/press" data-i18n="nav.press">Press</a>
+        </span>
+      </div>
+    </footer>
+
+    <script>
+      // ── i18n ─────────────────────────────────────────────────────────────────
+      const I18N = {
+        it: {
+          "nav.about": "Chi siamo",
+          "nav.partners": "Partner",
+          "nav.press": "Press",
+          "nav.investors": "Per investitori",
+          "nav.privacy": "Privacy",
+          "hero.badge": "Disponibile su Android",
+          "hero.tagline": "U'll Never Ride Alone",
+          "hero.desc": "L'app che connette motociclisti e zavorrine in tutta Italia. Trova compagni di viaggio, organizza giri in gruppo, traccia i percorsi e vivi la community moto come non hai mai fatto.",
+          "hero.cta1": "Apri la versione Web",
+          "hero.cta2": "Play Store",
+          "hero.cta3": "Per investitori",
+          "hero.qr_label": "Scansiona per scaricare",
+          "hero.qr_title": "BikerLink su Android",
+          "hero.qr_sub": "iOS — prossimamente",
+          "stats.label": "Community",
+          "stats.title": "Biker che non cavalcano soli",
+          "stats.desc": "Ogni giorno nuovi motociclisti si uniscono alla community BikerLink.",
+          "stats.total": "Iscritti Totali",
+          "stats.bikers": "Biker",
+          "stats.zavorrine": "Zavorrine",
+          "features.label": "Features",
+          "features.title": "Tutto per il tuo giro in moto",
+          "features.desc": "Dalla partenza all'arrivo, BikerLink ti accompagna con funzionalità pensate per la community moto italiana.",
+          "roadmap.label": "Roadmap",
+          "roadmap.title": "Il percorso di BikerLink",
+          "roadmap.desc": "Da dove siamo partiti a dove stiamo andando. Ogni milestone è un checkpoint della community.",
+          "roadmap.done": "Completato",
+          "roadmap.current": "In corso",
+          "roadmap.upcoming": "In arrivo",
+          "newsletter.label": "Notifiche",
+          "newsletter.title": "Sii il primo a sapere",
+          "newsletter.desc": "Ricevi notifiche quando ci sono giri organizzati nella tua zona. Niente spam, solo moto.",
+          "newsletter.cta": "Iscrivimi",
+          "newsletter.checkbox": "Voglio essere avvisato dei giri BikerLink nella mia zona",
+          "newsletter.success": "Perfetto! Ti avviseremo dei prossimi giri nella tua zona. 🏍️",
+          "newsletter.error": "Qualcosa è andato storto. Riprova tra poco.",
+          "newsletter.already": "Sei già iscritto alla newsletter.",
+          "competitor.label": "Perché BikerLink",
+          "competitor.title": "Il mercato lasciava un vuoto",
+          "competitor.desc": "Abbiamo analizzato le principali app concorrenti. BikerLink colma i gap che nessuna altra app ha risolto per il motociclista italiano.",
+          "competitor.cta": "Scarica analisi completa (PDF)",
+          "download.label": "Download",
+          "download.title": "Disponibile su Android",
+          "download.desc": "Scarica BikerLink gratuitamente. iOS in arrivo.",
+          "download.google_sub": "Disponibile su",
+          "download.apple_sub": "Prossimamente su",
+          "footer.brand_desc": "La piattaforma verticale per motociclisti italiani. Community, navigazione, sicurezza.",
+          "footer.app": "App",
+          "footer.playstore": "Play Store",
+          "footer.investors": "Per investitori",
+          "footer.privacy": "Privacy Policy",
+          "footer.terms": "Termini di Servizio",
+          "footer.company": "Azienda",
+          "footer.press": "Press Kit",
+          "footer.qr_sub": "Android · iOS prossimamente",
+          "footer.rights": "Tutti i diritti riservati.",
+        },
+        en: {
+          "nav.about": "About",
+          "nav.partners": "Partners",
+          "nav.press": "Press",
+          "nav.investors": "Investors",
+          "nav.privacy": "Privacy",
+          "hero.badge": "Available on Android",
+          "hero.tagline": "U'll Never Ride Alone",
+          "hero.desc": "The app connecting motorcyclists and passengers across Italy. Find riding companions, organize group rides, track your routes and experience the moto community like never before.",
+          "hero.cta1": "Open Web Version",
+          "hero.cta2": "Play Store",
+          "hero.cta3": "For investors",
+          "hero.qr_label": "Scan to download",
+          "hero.qr_title": "BikerLink on Android",
+          "hero.qr_sub": "iOS — coming soon",
+          "stats.label": "Community",
+          "stats.title": "Bikers who never ride alone",
+          "stats.desc": "Every day, new motorcyclists join the BikerLink community.",
+          "stats.total": "Total Members",
+          "stats.bikers": "Bikers",
+          "stats.zavorrine": "Pillions",
+          "features.label": "Features",
+          "features.title": "Everything for your ride",
+          "features.desc": "From start to finish, BikerLink accompanies you with features designed for the Italian moto community.",
+          "roadmap.label": "Roadmap",
+          "roadmap.title": "BikerLink's journey",
+          "roadmap.desc": "Where we started and where we're going. Every milestone is a community checkpoint.",
+          "roadmap.done": "Done",
+          "roadmap.current": "In Progress",
+          "roadmap.upcoming": "Upcoming",
+          "newsletter.label": "Notifications",
+          "newsletter.title": "Be the first to know",
+          "newsletter.desc": "Get notified when rides are organized in your area. No spam, just bikes.",
+          "newsletter.cta": "Subscribe",
+          "newsletter.checkbox": "I want to be notified of BikerLink rides in my area",
+          "newsletter.success": "Great! We'll let you know about upcoming rides in your area. 🏍️",
+          "newsletter.error": "Something went wrong. Please try again shortly.",
+          "newsletter.already": "You're already subscribed.",
+          "competitor.label": "Why BikerLink",
+          "competitor.title": "The market had a gap",
+          "competitor.desc": "We analyzed the main competing apps. BikerLink fills the gaps no other app has solved for the Italian motorcyclist.",
+          "competitor.cta": "Download full analysis (PDF)",
+          "download.label": "Download",
+          "download.title": "Available on Android",
+          "download.desc": "Download BikerLink for free. iOS coming soon.",
+          "download.google_sub": "Get it on",
+          "download.apple_sub": "Coming soon to",
+          "footer.brand_desc": "The vertical platform for Italian motorcyclists. Community, navigation, safety.",
+          "footer.app": "App",
+          "footer.playstore": "Play Store",
+          "footer.investors": "Investors",
+          "footer.privacy": "Privacy Policy",
+          "footer.terms": "Terms of Service",
+          "footer.company": "Company",
+          "footer.press": "Press Kit",
+          "footer.qr_sub": "Android · iOS coming soon",
+          "footer.rights": "All rights reserved.",
+        }
+      };
+
+      let currentLang = 'it';
+
+      function setLang(lang) {
+        currentLang = lang;
+        document.documentElement.lang = lang;
+        document.getElementById('btn-it').classList.toggle('active', lang === 'it');
+        document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+        const dict = I18N[lang];
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+          const key = el.getAttribute('data-i18n');
+          if (dict[key] !== undefined) el.textContent = dict[key];
+        });
+        renderFeatures();
+        renderRoadmap();
+      }
+
+      // ── FEATURES DATA ──────────────────────────────────────────────────────
+      const FEATURES = [
+        {
+          icon: '🗺️',
+          title: { it: 'Mappa GPS Live', en: 'Live GPS Map' },
+          desc: { it: 'Vedi i biker vicino a te in tempo reale. Mappa interattiva con filtri per tipo di utente e disponibilità.', en: 'See nearby bikers in real time. Interactive map with filters for user type and availability.' },
+          tag: { it: 'In app', en: 'In app' }
+        },
+        {
+          icon: '💬',
+          title: { it: 'Chat & Messaggi', en: 'Chat & Messages' },
+          desc: { it: 'Messaggi privati e di gruppo, condivisione posizione GPS, foto direttamente nella chat.', en: 'Private and group messages, GPS location sharing, photos directly in chat.' },
+          tag: { it: 'In app', en: 'In app' }
+        },
+        {
+          icon: '🏛️',
+          title: { it: 'MotoClub', en: 'MotoClub' },
+          desc: { it: 'Crea o entra in un club con codici invito, admin panel, approvazioni e chat di gruppo dedicata.', en: 'Create or join a club with invite codes, admin panel, approvals and dedicated group chat.' },
+          tag: { it: 'In app', en: 'In app' }
+        },
+        {
+          icon: '📸',
+          title: { it: 'Contest Foto', en: 'Photo Contest' },
+          desc: { it: 'Contest fotografico settimanale votato dalla community. La foto più bella vince premi e visibilità.', en: 'Weekly photo contest voted by the community. Best photo wins prizes and visibility.' },
+          tag: { it: 'Settimanale', en: 'Weekly' }
+        },
+        {
+          icon: '🚨',
+          title: { it: 'SOS Biker', en: 'SOS Biker' },
+          desc: { it: 'Sistema di emergenza stradale: avvisa i biker vicini in caso di incidente o guasto con un tap.', en: 'Road emergency system: alerts nearby bikers in case of accident or breakdown with one tap.' },
+          tag: { it: 'In arrivo', en: 'Coming soon' }
+        },
+        {
+          icon: '🥚',
+          title: { it: 'Easter Eggs', en: 'Easter Eggs' },
+          desc: { it: 'Colleziona sorprese nascoste lungo i percorsi. Sblocca badge esclusivi esplorando l\'Italia in moto.', en: 'Collect hidden surprises along routes. Unlock exclusive badges while exploring Italy by bike.' },
+          tag: { it: 'In app', en: 'In app' }
+        },
+      ];
+
+      function renderFeatures() {
+        const grid = document.getElementById('features-grid');
+        if (!grid) return;
+        const lang = currentLang;
+        grid.innerHTML = FEATURES.map((f, i) => `
+          <div class="feature-card reveal" style="transition-delay:${i * 0.07}s">
+            <div class="feature-icon">${f.icon}</div>
+            <h3>${f.title[lang]}</h3>
+            <p>${f.desc[lang]}</p>
+            <span class="feature-tag">${f.tag[lang]}</span>
+          </div>
+        `).join('');
+        observeReveal();
+      }
+
+      // ── ROADMAP ────────────────────────────────────────────────────────────
+      let roadmapData = [];
+
+      function statusLabel(status) {
+        const dict = I18N[currentLang];
+        if (status === 'done') return dict['roadmap.done'] || 'Completato';
+        if (status === 'current') return dict['roadmap.current'] || 'In corso';
+        return dict['roadmap.upcoming'] || 'In arrivo';
+      }
+
+      function statusIcon(status) {
+        if (status === 'done') return '✓';
+        if (status === 'current') return '▶';
+        return '○';
+      }
+
+      function renderRoadmap() {
+        const timeline = document.getElementById('roadmap-timeline');
+        if (!timeline || roadmapData.length === 0) return;
+        const lang = currentLang;
+        timeline.innerHTML = roadmapData.map((item, i) => `
+          <div class="roadmap-item ${item.status} reveal" style="transition-delay:${i * 0.08}s">
+            <div class="roadmap-dot">${statusIcon(item.status)}</div>
+            <div class="roadmap-content">
+              <div class="roadmap-meta">
+                <span class="roadmap-date">${item.date}</span>
+                <span class="roadmap-status status-${item.status}">${statusLabel(item.status)}</span>
+              </div>
+              <h3>${lang === 'en' && item.titleEn ? item.titleEn : item.title}</h3>
+              <p>${lang === 'en' && item.descriptionEn ? item.descriptionEn : item.description}</p>
+            </div>
+          </div>
+        `).join('');
+        observeReveal();
+      }
+
+      async function loadRoadmap() {
+        try {
+          const res = await fetch('/roadmap.json');
+          if (res.ok) {
+            roadmapData = await res.json();
+            renderRoadmap();
+          }
+        } catch (e) {
+          console.warn('Roadmap load failed', e);
+        }
+      }
+
+      // ── STATS COUNTERS ────────────────────────────────────────────────────
+      async function loadStats() {
+        try {
+          const res = await fetch('/api/stats/global');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.total != null) setTarget('cnt-total', data.total);
+            if (data.bikers != null) setTarget('cnt-bikers', data.bikers);
+            if (data.zavorrine != null) setTarget('cnt-zavorrine', data.zavorrine);
+          }
+        } catch (e) {
+          // use default targets already set in HTML
+        }
+      }
+
+      function setTarget(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.dataset.target = value;
+      }
+
+      function animateCounter(el) {
+        const target = parseInt(el.dataset.target || '0', 10);
+        const duration = 1400;
+        const start = performance.now();
+        function step(now) {
+          const progress = Math.min((now - start) / duration, 1);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          const current = Math.floor(eased * target);
+          el.textContent = current >= 1000 ? (current / 1000).toFixed(1).replace('.0', '') + 'K' : current.toString();
+          if (progress < 1) requestAnimationFrame(step);
+          else el.textContent = target >= 1000 ? (target / 1000).toFixed(1).replace('.0', '') + 'K' : target.toString();
+        }
+        requestAnimationFrame(step);
+      }
+
+      // ── NEWSLETTER ────────────────────────────────────────────────────────
+      async function handleNewsletterSubmit(e) {
+        e.preventDefault();
+        const email = document.getElementById('nl-email').value.trim();
+        const notifyRides = document.getElementById('nl-notify').checked;
+        const feedback = document.getElementById('nl-feedback');
+        const btn = e.target.querySelector('button[type=submit]');
+        const dict = I18N[currentLang];
+
+        btn.disabled = true;
+        btn.textContent = '...';
+
+        try {
+          const res = await fetch('/api/newsletter/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, notifyRides }),
+          });
+          const data = await res.json();
+          feedback.className = 'form-feedback ' + (res.ok ? 'success' : 'error');
+          if (res.status === 409) {
+            feedback.textContent = dict['newsletter.already'];
+          } else if (res.ok) {
+            feedback.textContent = dict['newsletter.success'];
+            e.target.reset();
+          } else {
+            feedback.textContent = dict['newsletter.error'];
+          }
+        } catch {
+          feedback.className = 'form-feedback error';
+          feedback.textContent = dict['newsletter.error'];
+        } finally {
+          btn.disabled = false;
+          btn.textContent = dict['newsletter.cta'];
+        }
+      }
+
+      // ── SCROLL REVEAL ─────────────────────────────────────────────────────
+      let counterAnimated = false;
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            // Animate counters when they come into view
+            if (!counterAnimated && entry.target.closest && entry.target.closest('.counters-grid')) {
+              counterAnimated = true;
+              setTimeout(() => {
+                document.querySelectorAll('.counter-value').forEach(animateCounter);
+              }, 100);
+            }
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+
+      function observeReveal() {
+        document.querySelectorAll('.reveal:not(.visible)').forEach(el => observer.observe(el));
+      }
+
+      // ── INIT ──────────────────────────────────────────────────────────────
+      document.addEventListener('DOMContentLoaded', async () => {
+        renderFeatures();
+        observeReveal();
+        await loadStats();
+        await loadRoadmap();
+        observeReveal();
+      });
+    </script>
   </body>
 </html>
