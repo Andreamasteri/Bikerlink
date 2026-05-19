@@ -1288,9 +1288,7 @@ function setupErrorHandler(app: express.Application) {
             "conversations",
           ];
           for (const t of vacuumTables) {
-            await db.execute(sql.raw(
-              `ALTER TABLE ${t} SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 10)`
-            ));
+            await db.execute(sql`ALTER TABLE ${sql.identifier(t)} SET (autovacuum_vacuum_scale_factor = 0.05, autovacuum_vacuum_threshold = 10)`);
           }
           console.log("[MIGRATION] Autovacuum aggressivo configurato su tabelle critiche (scale_factor=0.05, threshold=10)");
         } catch (e) {

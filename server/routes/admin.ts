@@ -6000,23 +6000,23 @@ router.get("/match-health", requireAdmin, async (req: Request, res: Response) =>
     const { captureSchemaSnapshot, loadSchemaSnapshot, diffSchemas, saveSchemaSnapshot } = await import("../scripts/snapshot-schema");
 
     const MATCH_TYPES = [
-      { id: 1, key: "bikerBikerBrand", label: "Biker-Biker Brand", table: "biker_biker_matches", filter: "motorcycle_brand NOT LIKE '%:%' AND motorcycle_brand NOT IN ('musica','musica_zav','distanza','distanza_zav','eventi') AND motorcycle_brand NOT LIKE 'gps_%' AND motorcycle_brand NOT LIKE 'zona_%'", prefColumn: "biker_biker_brand" },
-      { id: 2, key: "bikerZavorrinaBrand", label: "Biker-Zavarrina Brand", table: "biker_zavarrina_matches", filter: "1=1", prefColumn: "biker_zavorrina_brand" },
-      { id: 3, key: "bikerClubBrand", label: "Biker-Club Brand", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'club:%' AND motorcycle_brand NOT LIKE 'club_zav:%'", prefColumn: "biker_club_brand" },
-      { id: 4, key: "zavarrinaClubBrand", label: "Zavarrina-Club Brand", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'club_zav:%'", prefColumn: "zavorrina_club_brand" },
-      { id: 5, key: "bikerBikerTypeStyle", label: "Biker-Biker Type+Style", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'tipo:%' AND motorcycle_brand NOT LIKE 'tipo_zav:%'", prefColumn: "biker_biker_type_style" },
-      { id: 6, key: "bikerZavarrinaTypeStyle", label: "Biker-Zavarrina Type+Style", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'tipo_zav:%'", prefColumn: "biker_zavorrina_type_style" },
-      { id: 7, key: "bikerBikerDistance", label: "Biker-Biker Distance", table: "biker_biker_matches", filter: "motorcycle_brand = 'distanza'", prefColumn: "biker_biker_distance" },
-      { id: 8, key: "bikerZavarrinaDistance", label: "Biker-Zavarrina Distance", table: "biker_biker_matches", filter: "motorcycle_brand = 'distanza_zav'", prefColumn: "biker_zavorrina_distance" },
-      { id: 9, key: "bikerBikerMusic", label: "Biker-Biker Music", table: "biker_biker_matches", filter: "motorcycle_brand = 'musica'", prefColumn: "biker_biker_music" },
-      { id: 10, key: "bikerZavarrinaMusic", label: "Biker-Zavarrina Music", table: "biker_biker_matches", filter: "motorcycle_brand = 'musica_zav'", prefColumn: "biker_zavorrina_music" },
-      { id: 11, key: "bikerBikerLeanAngle", label: "Biker-Biker Lean Angle (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_tilt', 'gps_full')", prefColumn: "biker_biker_lean_angle" },
-      { id: 12, key: "bikerBikerRouteTypeZone", label: "Biker-Biker Route+Zone", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'zona_bb:%'", prefColumn: "biker_biker_route_type_zone" },
-      { id: 13, key: "bikerZavarrinaRouteTypeZone", label: "Biker-Zavarrina Route+Zone", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'zona_zav:%'", prefColumn: "biker_zavorrina_route_type_zone" },
-      { id: 14, key: "bikerBikerAvgSpeed", label: "Biker-Biker Avg Speed (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_speed', 'gps_full')", prefColumn: "biker_biker_avg_speed" },
-      { id: 15, key: "bikerBikerAvgDuration", label: "Biker-Biker Avg Duration (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_speed', 'gps_full')", prefColumn: "biker_biker_avg_duration" },
-      { id: 16, key: "bikerBikerDayTime", label: "Biker-Biker Day+Time (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_day', 'gps_full')", prefColumn: "biker_biker_day_time" },
-      { id: 17, key: "bikerBikerEvents", label: "Biker-Biker Events", table: "biker_biker_matches", filter: "motorcycle_brand = 'eventi'", prefColumn: "biker_biker_events" },
+      { id: 1,  key: "bikerBikerBrand",           label: "Biker-Biker Brand",             prefColumn: "biker_biker_brand",             countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand NOT LIKE '%:%' AND motorcycle_brand NOT IN ('musica','musica_zav','distanza','distanza_zav','eventi') AND motorcycle_brand NOT LIKE 'gps_%' AND motorcycle_brand NOT LIKE 'zona_%'` },
+      { id: 2,  key: "bikerZavorrinaBrand",        label: "Biker-Zavarrina Brand",          prefColumn: "biker_zavorrina_brand",         countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_zavarrina_matches WHERE 1=1` },
+      { id: 3,  key: "bikerClubBrand",             label: "Biker-Club Brand",               prefColumn: "biker_club_brand",              countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand LIKE 'club:%' AND motorcycle_brand NOT LIKE 'club_zav:%'` },
+      { id: 4,  key: "zavarrinaClubBrand",         label: "Zavarrina-Club Brand",           prefColumn: "zavorrina_club_brand",          countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand LIKE 'club_zav:%'` },
+      { id: 5,  key: "bikerBikerTypeStyle",        label: "Biker-Biker Type+Style",         prefColumn: "biker_biker_type_style",        countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand LIKE 'tipo:%' AND motorcycle_brand NOT LIKE 'tipo_zav:%'` },
+      { id: 6,  key: "bikerZavarrinaTypeStyle",    label: "Biker-Zavarrina Type+Style",     prefColumn: "biker_zavorrina_type_style",    countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand LIKE 'tipo_zav:%'` },
+      { id: 7,  key: "bikerBikerDistance",         label: "Biker-Biker Distance",           prefColumn: "biker_biker_distance",          countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand = 'distanza'` },
+      { id: 8,  key: "bikerZavarrinaDistance",     label: "Biker-Zavarrina Distance",       prefColumn: "biker_zavorrina_distance",      countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand = 'distanza_zav'` },
+      { id: 9,  key: "bikerBikerMusic",            label: "Biker-Biker Music",              prefColumn: "biker_biker_music",             countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand = 'musica'` },
+      { id: 10, key: "bikerZavarrinaMusic",        label: "Biker-Zavarrina Music",          prefColumn: "biker_zavorrina_music",         countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand = 'musica_zav'` },
+      { id: 11, key: "bikerBikerLeanAngle",        label: "Biker-Biker Lean Angle (GPS)",  prefColumn: "biker_biker_lean_angle",        countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand IN ('gps_tilt', 'gps_full')` },
+      { id: 12, key: "bikerBikerRouteTypeZone",    label: "Biker-Biker Route+Zone",         prefColumn: "biker_biker_route_type_zone",   countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand LIKE 'zona_bb:%'` },
+      { id: 13, key: "bikerZavarrinaRouteTypeZone",label: "Biker-Zavarrina Route+Zone",     prefColumn: "biker_zavorrina_route_type_zone", countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand LIKE 'zona_zav:%'` },
+      { id: 14, key: "bikerBikerAvgSpeed",         label: "Biker-Biker Avg Speed (GPS)",   prefColumn: "biker_biker_avg_speed",         countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand IN ('gps_speed', 'gps_full')` },
+      { id: 15, key: "bikerBikerAvgDuration",      label: "Biker-Biker Avg Duration (GPS)",prefColumn: "biker_biker_avg_duration",      countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand IN ('gps_speed', 'gps_full')` },
+      { id: 16, key: "bikerBikerDayTime",          label: "Biker-Biker Day+Time (GPS)",    prefColumn: "biker_biker_day_time",          countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand IN ('gps_day', 'gps_full')` },
+      { id: 17, key: "bikerBikerEvents",           label: "Biker-Biker Events",            prefColumn: "biker_biker_events",            countSql: sql<{cnt: string}>`SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand = 'eventi'` },
     ];
 
     const { pool } = await import("../db");
@@ -6044,10 +6044,8 @@ router.get("/match-health", requireAdmin, async (req: Request, res: Response) =>
       // 2. Match type counts
       const matchCounts: Array<{ id: number; key: string; label: string; count: number; status: "OK" | "WARN" }> = [];
       for (const mt of MATCH_TYPES) {
-        const res = await client.query<{ cnt: string }>(
-          `SELECT COUNT(*) AS cnt FROM ${mt.table} WHERE ${mt.filter}`
-        );
-        const count = parseInt(res.rows[0]?.cnt ?? "0", 10);
+        const res = await db.execute(mt.countSql);
+        const count = parseInt((res.rows[0] as { cnt?: string })?.cnt ?? "0", 10);
         matchCounts.push({ id: mt.id, key: mt.key, label: mt.label, count, status: count === 0 ? "WARN" : "OK" });
       }
 
