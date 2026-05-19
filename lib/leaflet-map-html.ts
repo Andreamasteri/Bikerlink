@@ -60,7 +60,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     try {
       oms = new OverlappingMarkerSpiderfier(map, {
         keepSpiderfied: true,
-        nearbyDistance: 34,
+        nearbyDistance: 44,   // era 34, aumentato per i fumetti nickname
         circleSpiralSwitchover: 9,
         legWeight: 1.5
       });
@@ -86,7 +86,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   postMsg({
     type: "omsStatus",
     omsReady: oms !== null,
-    nearbyDistance: oms ? 34 : null,
+    nearbyDistance: oms ? 44 : null,
     error: omsLoadError
   });
 
@@ -106,6 +106,14 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     egg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="white"><ellipse cx="12" cy="13" rx="7" ry="9"/></svg>',
     warning: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="white"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>'
   };
+
+  function escapeHtml(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
 
   function iconBadge(bg, svgStr, size) {
     size = size || 30;
@@ -260,16 +268,41 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
             iconBadge(color, svg, 36) + "</div>";
           addMarker(u.lat, u.lng, html, [52, 60], [26, 60], null, omsData);
         } else if (globalChip) {
+          var rawNick2 = u.nickname || "";
+          var truncNick2 = rawNick2.length > 10 ? rawNick2.substring(0, 10) + "\u2026" : rawNick2;
+          var safeNick2 = escapeHtml(truncNick2);
+          var labelHtml2 = "<div style=\\"background:" + color + ";padding:2px 6px;border-radius:8px;" +
+            "font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;" +
+            "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8);" +
+            "white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;" +
+            "text-align:center;\\">" + safeNick2 + "</div>";
           html = "<div style=\\"display:flex;flex-direction:column;align-items:center;\\">" +
+            labelHtml2 +
             iconBadge(color, svg, 30) +
             "<div style=\\"margin-top:2px;background:" + globalChip.color + ";" +
             "padding:1px 5px;border-radius:7px;font-size:9px;font-weight:800;color:#fff;" +
             "letter-spacing:0.4px;box-shadow:0 1px 3px rgba(0,0,0,0.45);" +
             "border:1px solid rgba(255,255,255,0.85);white-space:nowrap;\\">" +
             globalChip.label + "</div></div>";
-          addMarker(u.lat, u.lng, html, [44, 46], [22, 38], null, omsData);
+          // label(20px) + badge(30px) + chip(~18px) = ~68px totale
+          // anchor orizzontale=45, verticale=label(20)+metà badge(15)=35 dal top
+          addMarker(u.lat, u.lng, html, [90, 68], [45, 35], null, omsData);
         } else {
-          addMarker(u.lat, u.lng, iconBadge(color, svg, 30), [30, 30], [15, 15], null, omsData);
+          // Fumetto nickname sopra il badge
+          var rawNick = u.nickname || "";
+          var truncNick = rawNick.length > 10 ? rawNick.substring(0, 10) + "\u2026" : rawNick;
+          var safeNick = escapeHtml(truncNick);
+          var labelHtml = "<div style=\\"background:" + color + ";padding:2px 6px;border-radius:8px;" +
+            "font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;" +
+            "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8);" +
+            "white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;" +
+            "text-align:center;\\">" + safeNick + "</div>";
+          html = "<div style=\\"display:flex;flex-direction:column;align-items:center;\\">" +
+            labelHtml + iconBadge(color, svg, 30) + "</div>";
+          // iconSize [90, 50]: larghezza fissa 90px, altezza ~50px (label ~20px + badge 30px)
+          // iconAnchor [45, 35]: centro orizzontale=45, verticale=label(20)+metà badge(15)=35
+          // → il centro della pallina circolare è esattamente sul punto geografico
+          addMarker(u.lat, u.lng, html, [90, 50], [45, 35], null, omsData);
         }
       });
 
