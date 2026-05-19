@@ -1336,6 +1336,13 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] planned_routes/route_weather_cache:", e);
         }
 
+        try {
+          await db.execute(sql`ALTER TABLE biker_biker_matches ADD COLUMN IF NOT EXISTS pair_type VARCHAR(10) NOT NULL DEFAULT 'bb'`);
+          console.log("[MIGRATION] biker_biker_matches.pair_type ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] biker_biker_matches.pair_type:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
