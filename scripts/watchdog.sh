@@ -1,12 +1,14 @@
 #!/bin/bash
-# Watchdog — monitora solo il backend (porta 5000).
+# Watchdog — monitora backend (porta 5000) e Metro/frontend (porta 8081).
 # Backup originale in: scripts/backup/watchdog.sh.bak
 
 BACKEND_PORT=5000
+METRO_PORT=8081
 LOG_FILE="/home/runner/workspace/logs/watchdog.log"
 HEALTH_CHECK_INTERVAL=60
 CHECK_INTERVAL=10
 RESTART_COOLDOWN=60
+METRO_RESTART_COOLDOWN=90
 LOG_MAX_BYTES=1048576
 
 MAX_CRASHES_IN_WINDOW=3
@@ -56,6 +58,7 @@ is_port_open() {
   nc -z -w2 localhost "$port" >/dev/null 2>&1
 }
 
+# ── Backend crash tracking ────────────────────────────────────────────────────
 declare -a BACKEND_CRASH_TIMES=()
 BACKEND_BACKOFF_UNTIL=0
 CONSECUTIVE_CRASH_SESSIONS=0
@@ -120,12 +123,68 @@ health_check() {
   fi
 }
 
+# ── Metro crash tracking ──────────────────────────────────────────────────────
+declare -a METRO_CRASH_TIMES=()
+METRO_BACKOFF_UNTIL=0
+CONSECUTIVE_METRO_CRASH_SESSIONS=0
+metro_healthy_since=0
+
+record_metro_crash_session() {
+  local now=$1
+  local new_times=()
+  for t in "${METRO_CRASH_TIMES[@]}"; do
+    if [ $((now - t)) -lt $CRASH_WINDOW_SECS ]; then
+      new_times+=("$t")
+    fi
+  done
+  METRO_CRASH_TIMES=("${new_times[@]}" "$now")
+
+  local count=${#METRO_CRASH_TIMES[@]}
+  if [ "$count" -gt "$MAX_CRASHES_IN_WINDOW" ]; then
+    CONSECUTIVE_METRO_CRASH_SESSIONS=$((CONSECUTIVE_METRO_CRASH_SESSIONS + 1))
+    local step=$((CONSECUTIVE_METRO_CRASH_SESSIONS - 1))
+    local max_step=$(( ${#BACKOFF_STEPS[@]} - 1 ))
+    if [ "$step" -gt "$max_step" ]; then step=$max_step; fi
+    local backoff_secs=${BACKOFF_STEPS[$step]}
+    METRO_BACKOFF_UNTIL=$((now + backoff_secs))
+    local backoff_until_str
+    backoff_until_str=$(date -d "@$METRO_BACKOFF_UNTIL" '+%H:%M:%S' 2>/dev/null || echo "${backoff_secs}s da ora")
+    log "METRO CRASH LOOP RILEVATO: $count crash negli ultimi ${CRASH_WINDOW_SECS}s (sessione #${CONSECUTIVE_METRO_CRASH_SESSIONS}) — backoff ${backoff_secs}s fino alle $backoff_until_str"
+    METRO_CRASH_TIMES=()
+    return 1
+  fi
+  return 0
+}
+
+restart_metro() {
+  log "METRO CRASH: porta $METRO_PORT non risponde. Pulizia cache e riavvio..."
+
+  lsof -ti:"$METRO_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
+  pkill -f "expo start" 2>/dev/null || true
+  pkill -f "react-native/cli" 2>/dev/null || true
+  sleep 2
+
+  log "METRO CLEAN: esecuzione clean-metro.sh prima del riavvio..."
+  if bash /home/runner/workspace/scripts/clean-metro.sh >> "$LOG_FILE" 2>&1; then
+    log "METRO CLEAN: completata con successo"
+  else
+    log "METRO CLEAN: errore durante la pulizia (continuando comunque con il riavvio)"
+  fi
+
+  log "METRO RIAVVIO: avvio start-expo.sh in background..."
+  bash /home/runner/workspace/scripts/start-expo.sh >> "$LOG_FILE" 2>&1 &
+  log "METRO RIAVVIO: processo frontend avviato in background (PID: $!)"
+}
+
+# ── Main loop ─────────────────────────────────────────────────────────────────
 log "========================================="
 log "WATCHDOG AVVIATO"
 log "  Backend port: $BACKEND_PORT"
+log "  Metro port:   $METRO_PORT"
 log "  Health check interval: ${HEALTH_CHECK_INTERVAL}s"
 log "  Check interval: ${CHECK_INTERVAL}s"
 log "  Restart cooldown backend: ${RESTART_COOLDOWN}s"
+log "  Restart cooldown Metro:   ${METRO_RESTART_COOLDOWN}s"
 log "  Crash loop: max ${MAX_CRASHES_IN_WINDOW} crash in ${CRASH_WINDOW_SECS}s → backoff ${BACKOFF_STEPS[*]}s (esponenziale)"
 log "  Log max size: $((LOG_MAX_BYTES / 1024))KB (rotazione automatica)"
 log "========================================="
@@ -136,9 +195,14 @@ backend_down_since=0
 check_count=0
 backend_crash_session_counted=0
 
+last_metro_restart=0
+metro_down_since=0
+metro_crash_session_counted=0
+
 while [ "$RUNNING" -eq 1 ]; do
   now=$(date +%s)
 
+  # ── Backend monitor ────────────────────────────────────────────────────────
   if is_port_open "$BACKEND_PORT"; then
     if [ "$backend_down_since" -gt 0 ]; then
       log "BACKEND RECUPERATO: porta $BACKEND_PORT risponde di nuovo"
@@ -178,6 +242,47 @@ while [ "$RUNNING" -eq 1 ]; do
     fi
   fi
 
+  # ── Metro monitor ──────────────────────────────────────────────────────────
+  if is_port_open "$METRO_PORT"; then
+    if [ "$metro_down_since" -gt 0 ]; then
+      log "METRO RECUPERATO: porta $METRO_PORT risponde di nuovo"
+      metro_down_since=0
+      metro_crash_session_counted=0
+      metro_healthy_since=$now
+    fi
+    if [ "$metro_healthy_since" -gt 0 ] && [ $((now - metro_healthy_since)) -ge 600 ] && [ "$CONSECUTIVE_METRO_CRASH_SESSIONS" -gt 0 ]; then
+      log "METRO STABILE: 10+ min uptime — reset contatore sessioni crash (era $CONSECUTIVE_METRO_CRASH_SESSIONS)"
+      CONSECUTIVE_METRO_CRASH_SESSIONS=0
+    fi
+  else
+    if [ "$metro_down_since" -eq 0 ]; then
+      metro_down_since=$now
+      metro_healthy_since=0
+    fi
+    time_since_last_metro_restart=$((now - last_metro_restart))
+    if [ "$time_since_last_metro_restart" -ge "$METRO_RESTART_COOLDOWN" ]; then
+      if [ "$METRO_BACKOFF_UNTIL" -gt "$now" ]; then
+        remaining=$((METRO_BACKOFF_UNTIL - now))
+        log "METRO GIU': crash loop backoff attivo — attendo ancora ${remaining}s"
+      else
+        if [ "$metro_crash_session_counted" -eq 0 ]; then
+          metro_crash_session_counted=1
+          if ! record_metro_crash_session "$now"; then
+            log "METRO GIU': backoff appena attivato — skip restart questo ciclo"
+            last_metro_restart=$now
+            sleep "$CHECK_INTERVAL"
+            continue
+          fi
+        fi
+        restart_metro
+        last_metro_restart=$now
+      fi
+    else
+      log "METRO ANCORA GIU': prossimo tentativo di riavvio tra $((METRO_RESTART_COOLDOWN - time_since_last_metro_restart))s"
+    fi
+  fi
+
+  # ── Health check & log rotation ────────────────────────────────────────────
   if [ $((now - last_health_check)) -ge "$HEALTH_CHECK_INTERVAL" ]; then
     health_check
     last_health_check=$now

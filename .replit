@@ -69,6 +69,10 @@ args = "admin-privacy-filter"
 task = "workflow.run"
 args = "ota-export-stage1"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Clean Metro"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -196,6 +200,18 @@ outputType = "console"
 task = "shell.exec"
 args = "rm -rf /tmp/metro-* /tmp/haste-map-* && BIKERLINK_ADMIN_EMAIL=admin@bikerlink.it bash scripts/publish-ota.sh export \"Ciclo 9.x: schema versione 46.29.9 + rv 9.0.0 (#1525), fix brace-expansion build (#1526)\""
 
+[[workflows.workflow]]
+name = "Clean Metro"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/clean-metro-restart.sh"
+waitForPort = 8081
+
+[workflows.workflow.metadata]
+outputType = "console"
+
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
 
@@ -230,3 +246,7 @@ externalPort = 3001
 [[ports]]
 localPort = 8081
 externalPort = 8081
+
+[[ports]]
+localPort = 8082
+externalPort = 3002
