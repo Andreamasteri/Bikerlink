@@ -219,6 +219,7 @@ const tr: Record<string, string> = {
   "profile.coupleType": "Çift",
   "garage.passengerLooking": "Zavorrina arıyor...",
   "garage.noMotoInGarage": "Garajda motosiklet yok",
+  "garage.garageDesc": "Motosikletlerin eşleştirme sistemini besler — uyumlu biniciler bulmak için bir tane ekle",
   "garage.addFirstMoto": "İlk motosikletini ekle!",
   "garage.whoAmI": "Ben Kimim",
   "garage.descPlaceholder": "Kendini, isteklerini ve seyahat alışkanlıklarını anlat...",

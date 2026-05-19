@@ -574,9 +574,13 @@ function GarageContent() {
           refreshControl={<RefreshControl refreshing={false} onRefresh={refetch} tintColor={Colors.accent} />}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <MaterialCommunityIcons name="motorbike" size={64} color={Colors.textSecondary} />
+              <MaterialCommunityIcons name="motorbike" size={72} color={Colors.accent} />
               <Text style={styles.emptyText}>{t("garage.noMotoInGarage")}</Text>
-              <Text style={styles.emptySubtext}>{t("garage.addFirstMoto")}</Text>
+              <Text style={styles.emptyDesc}>{t("garage.garageDesc")}</Text>
+              <View style={styles.emptyCtaHint}>
+                <Text style={styles.emptyCtaLabel}>{t("garage.addFirstMoto")}</Text>
+                <Ionicons name="chevron-down" size={26} color={Colors.accent} />
+              </View>
             </View>
           }
           scrollEnabled={motorcycles.length > 0}
@@ -741,8 +745,11 @@ const styles = StyleSheet.create({
   cardDetails: { flexDirection: "row", gap: 12, marginTop: 12 },
   detailChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surfaceLight, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   detailText: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  empty: { alignItems: "center", paddingTop: 80, gap: 12 },
-  emptyText: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
+  empty: { alignItems: "center", paddingTop: 80, paddingHorizontal: 32, gap: 14 },
+  emptyText: { fontSize: 20, fontFamily: "Inter_600SemiBold", color: Colors.text, textAlign: "center" },
+  emptyDesc: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", lineHeight: 20 },
+  emptyCtaHint: { alignItems: "center", gap: 2, marginTop: 8 },
+  emptyCtaLabel: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.accent },
   emptySubtext: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   addBtn: {
     position: "absolute",

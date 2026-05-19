@@ -219,6 +219,7 @@ const de: Record<string, string> = {
   "profile.coupleType": "Paar",
   "garage.passengerLooking": "Sozia sucht...",
   "garage.noMotoInGarage": "Kein Motorrad in der Garage",
+  "garage.garageDesc": "Deine Motorräder treiben das Matching an — füge eines hinzu, um kompatible Biker zu finden",
   "garage.addFirstMoto": "Füge dein erstes Motorrad hinzu!",
   "garage.whoAmI": "Über mich",
   "garage.descPlaceholder": "Beschreibe dich, deine Wünsche und Reisegewohnheiten...",

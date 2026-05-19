@@ -248,6 +248,7 @@ const en: Record<string, string> = {
 
   "garage.passengerLooking": "Pillion looking for...",
   "garage.noMotoInGarage": "No motorcycles in garage",
+  "garage.garageDesc": "Your bikes power the matching system — add one to start meeting compatible riders",
   "garage.addFirstMoto": "Add your first motorcycle!",
   "garage.whoAmI": "About Me",
   "garage.descPlaceholder": "Describe yourself, your wishes and travel habits...",

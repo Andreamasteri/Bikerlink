@@ -219,6 +219,7 @@ const el: Record<string, string> = {
   "profile.coupleType": "Ζευγάρι",
   "garage.passengerLooking": "Ο/η συνεπιβάτης/ιδα ψάχνει...",
   "garage.noMotoInGarage": "Καμία μοτοσυκλέτα στο γκαράζ",
+  "garage.garageDesc": "Τα μοτοσυκλέτα σου τροφοδοτούν το σύστημα matching — πρόσθεσε ένα για να βρεις συμβατούς bikers",
   "garage.addFirstMoto": "Πρόσθεσε την πρώτη σου μοτοσυκλέτα!",
   "garage.whoAmI": "Ποιος/α Είμαι",
   "garage.descPlaceholder": "Περίγραψε τον εαυτό σου, τις επιθυμίες σου και τις ταξιδιωτικές σου συνήθειες...",
