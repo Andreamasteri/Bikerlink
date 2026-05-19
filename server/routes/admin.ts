@@ -405,6 +405,7 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
 router.post("/client-error", clientErrorLimiter, clientErrorJson, (req: Request, res: Response) => {
   try {
     const { message, stack, componentStack, platform, appVersion, isFatal } = req.body || {};
+    // GDPR/CCPA compliance: do NOT log req.ip — client IP must not appear in error logs
     console.error("[CLIENT-ERROR]", JSON.stringify({
       message: message || "unknown",
       stack: (stack || "").substring(0, 2000),

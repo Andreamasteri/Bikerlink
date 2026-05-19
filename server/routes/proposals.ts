@@ -889,6 +889,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
     if (b.maxParticipants !== undefined) updateData.maxParticipants = b.maxParticipants;
     if (b.status !== undefined) updateData.status = b.status;
 
+    // Security: use explicit property access (not dynamic bracket notation) to avoid prototype-pollution vectors
     if (updateData.scheduledAt) updateData.scheduledAt = new Date(updateData.scheduledAt as string);
     if (updateData.departureTimeFrom) updateData.departureTimeFrom = new Date(updateData.departureTimeFrom as string);
     if (updateData.departureTimeTo) updateData.departureTimeTo = new Date(updateData.departureTimeTo as string);
