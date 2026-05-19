@@ -922,7 +922,34 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-19T22:31:01.196Z"
+  },
+  {
+    "updateNumber": 3,
+    "version": "47.3.9",
+    "cycle": "9.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-3 rv9.0.0: Ciclo 9.x: schema versione 46.29.9 + rv 9.0.0 (#1525), fix brace-expansion build (#1526)",
+    "note": "CURRENT_OTA_NUMBER=3. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "9.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "1c8dd26ca1dcd93c8d076765289722812c2555d1",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]

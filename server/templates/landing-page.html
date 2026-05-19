@@ -190,7 +190,7 @@
         inset: 0;
         pointer-events: none;
         background:
-          linear-gradient(to top, rgba(10,10,10,0.97) 0%, rgba(10,10,10,0.70) 35%, rgba(10,10,10,0.45) 60%, rgba(10,10,10,0.55) 100%);
+          linear-gradient(to top, rgba(10,10,10,0.95) 0%, rgba(10,10,10,0.55) 30%, rgba(10,10,10,0.30) 60%, rgba(10,10,10,0.45) 100%);
         z-index: 0;
       }
       .hero-mesh {
@@ -1005,49 +1005,44 @@
       }
       .racemode-grid {
         display: grid;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template-columns: repeat(4, 1fr);
         gap: 2px;
-        max-width: 900px;
-        margin: 0 auto;
+        max-width: none;
+        margin: 0;
+        background: var(--border);
       }
       .racemode-card {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.08);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        padding: 32px 24px;
-        text-align: left;
-        transition: border-color 0.25s, background 0.25s;
+        background: var(--surface);
+        padding: 22px 16px;
+        text-align: center;
+        transition: background 0.2s;
       }
-      .racemode-card:hover {
-        border-color: rgba(255,59,48,0.3);
-        background: rgba(255,59,48,0.04);
-      }
-      .racemode-card-icon {
-        width: 40px; height: 40px;
-        border: 1px solid rgba(255,59,48,0.3);
-        background: var(--accent-dim);
-        border-radius: 2px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 20px;
-      }
-      .racemode-card-icon svg { width: 20px; height: 20px; }
-      .racemode-card-title {
+      .racemode-card:hover { background: rgba(255,59,48,0.04); }
+      .racemode-card-val {
         font-family: var(--font-display);
-        font-size: 22px;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        color: var(--text);
-        margin-bottom: 10px;
+        font-size: 40px;
+        letter-spacing: 2px;
+        color: var(--accent);
+        line-height: 1;
+        font-weight: 900;
+      }
+      .racemode-card-unit {
+        font-size: 11px;
         font-weight: 700;
+        letter-spacing: 1px;
+        color: var(--text3);
+        text-transform: uppercase;
+        margin-top: 2px;
       }
-      .racemode-card-desc {
-        font-size: 14px;
-        color: var(--text2);
-        line-height: 1.7;
+      .racemode-card-title {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text3);
+        margin-top: 8px;
       }
+      @media (max-width: 600px) { .racemode-grid { grid-template-columns: repeat(2,1fr); } }
 
       /* ── MOTOCLUB SECTION ────────────────────────────────────────────────── */
       .motoclub-section {
@@ -1668,6 +1663,171 @@
         .auth-inline-form-row { grid-template-columns: 1fr; }
       }
 
+      /* ── SECOND SCENE: CONNETTI LA TUA PASSIONE ────────────────────────── */
+      .second-scene {
+        position: relative;
+        min-height: 90vh;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        overflow: hidden;
+        border-top: 1px solid var(--border);
+      }
+      .second-scene-content {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 80px 60px 80px 80px;
+        background: var(--bg);
+        position: relative;
+        z-index: 1;
+      }
+      .second-scene-title {
+        font-family: var(--font-display);
+        font-size: clamp(52px, 8vw, 100px);
+        line-height: 0.9;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        color: var(--text);
+        font-weight: 800;
+        margin-bottom: 28px;
+      }
+      .second-scene-title .accent { color: var(--accent); }
+      .second-scene-sub {
+        font-size: 17px;
+        color: var(--text2);
+        line-height: 1.75;
+        max-width: 440px;
+        margin-bottom: 40px;
+      }
+      .second-scene-btns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+      .second-scene-photo {
+        position: relative;
+        overflow: hidden;
+      }
+      .second-scene-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: center;
+        display: block;
+      }
+      .second-scene-photo::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to right, var(--bg) 0%, transparent 30%);
+        z-index: 1;
+        pointer-events: none;
+      }
+      @media (max-width: 768px) {
+        .second-scene { grid-template-columns: 1fr; min-height: auto; }
+        .second-scene-photo { aspect-ratio: 16/9; }
+        .second-scene-content { padding: 48px 20px; }
+        .second-scene-photo::before { background: linear-gradient(to bottom, var(--bg) 0%, transparent 20%); }
+      }
+
+      /* ── PIC CONTEST PHOTO CARDS ────────────────────────────────────────── */
+      .contest-photo-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 48px;
+      }
+      .contest-photo-card {
+        position: relative;
+        aspect-ratio: 3/4;
+        border-radius: 4px;
+        overflow: hidden;
+        border: 1px solid var(--border);
+        transition: border-color 0.25s, transform 0.3s;
+      }
+      .contest-photo-card:hover { border-color: rgba(255,59,48,0.4); transform: translateY(-4px); }
+      .contest-photo-card img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        transition: transform 0.5s;
+      }
+      .contest-photo-card:hover img { transform: scale(1.05); }
+      .contest-photo-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(5,5,5,0.9) 0%, rgba(5,5,5,0.3) 50%, transparent 100%);
+      }
+      .contest-photo-meta {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 1;
+      }
+      .contest-photo-author {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        color: rgba(240,240,240,0.9);
+      }
+      .contest-photo-likes {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .contest-photo-rank {
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        background: rgba(10,10,10,0.85);
+        border: 1px solid var(--border-mid);
+        border-radius: 2px;
+        padding: 4px 10px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        color: var(--text2);
+        text-transform: uppercase;
+        backdrop-filter: blur(8px);
+        z-index: 1;
+      }
+      .contest-photo-rank.gold { border-color: rgba(255,215,0,0.4); color: #FFD700; }
+      .contest-hashtags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+        margin-bottom: 32px;
+        overflow: hidden;
+        max-height: 32px;
+      }
+      .contest-hashtag {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        color: var(--text3);
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        padding: 4px 12px;
+        border-radius: 2px;
+        white-space: nowrap;
+        transition: color 0.2s, border-color 0.2s;
+      }
+      .contest-hashtag:hover { color: var(--accent); border-color: rgba(255,59,48,0.3); }
+      @media (max-width: 768px) {
+        .contest-photo-grid { grid-template-columns: 1fr; }
+        .contest-photo-card { aspect-ratio: 16/9; }
+      }
+
       /* ── SCROLL REVEAL ───────────────────────────────────────────────────── */
       .reveal {
         opacity: 0;
@@ -1960,6 +2120,30 @@
       <div class="hero-line"></div>
     </section>
 
+    <!-- ── SECOND SCENE: CONNETTI LA TUA PASSIONE ───────────────────────── -->
+    <section class="second-scene" id="connetti">
+      <div class="second-scene-content reveal-left">
+        <div class="sec-label">La community</div>
+        <h2 class="second-scene-title">
+          CONNETTI<br>LA TUA<br><span class="accent">PASSIONE.</span>
+        </h2>
+        <p class="second-scene-sub">Ogni strada nasconde una storia. BikerLink ti mette in contatto con migliaia di biker reali: trova il tuo riding partner, crea il tuo club e vivi ogni giro come un'avventura condivisa.</p>
+        <div class="second-scene-btns">
+          <a href="https://play.google.com/store/apps/details?id=com.bikerlink.app" target="_blank" rel="noopener" class="btn btn-primary">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.24.13.52.2.8.2.39 0 .76-.12 1.07-.34L16.72 17l-3.23-3.23-10.31 9.99zM1.1 1.24C1.04 1.46 1 1.7 1 1.94v20.12c0 .24.04.48.1.7l.1.09L12.47 12V11.88L1.2 1.15l-.1.09zM20.92 10.19l-2.87-1.65-3.28 3.28 3.28 3.28 2.89-1.66c.82-.47.82-1.78-.02-2.25zM4.05.58L16.72 7l-3.25 3.25L4.05.58z"/></svg>
+            Google Play
+          </a>
+          <a href="https://apps.apple.com/it/app/bikerlink/id6746682447" target="_blank" rel="noopener" class="btn btn-ghost">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            App Store
+          </a>
+        </div>
+      </div>
+      <div class="second-scene-photo">
+        <img src="/assets/images/hero-mountain-rider.jpg" alt="Biker su strada di montagna" width="800" height="900" loading="lazy" />
+      </div>
+    </section>
+
     <!-- ── FEATURE 01: MATCHING ──────────────────────────────────────────── -->
     <section class="feature-section" id="features">
       <div class="feature-section-inner">
@@ -2196,7 +2380,7 @@
     <section class="racemode-section" id="racemode">
       <div class="racemode-layout">
         <div class="racemode-img-col reveal-left">
-          <img src="https://static.prod-images.emergentagent.com/jobs/c52ae50d-f554-4341-a9ff-4380f336dee8/images/7c093e67604bc6c4d54808463c031df425c11810b8cc798b93cc18f6244ab229.png" alt="Race Mode Screenshot" loading="lazy" />
+          <img src="/assets/images/telemetry-dash.jpg" alt="Race Mode telemetry dashboard" width="600" height="600" loading="lazy" />
           <div class="racemode-img-badge">
             <span class="racemode-badge-dot"></span>
             LIVE TELEMETRY
@@ -2209,27 +2393,26 @@
           </div>
           <h2 class="racemode-title" style="text-align:left;font-size:clamp(40px,6vw,80px);">GPS <span class="accent">RACE</span><br>MODE</h2>
           <p class="racemode-desc" style="text-align:left;margin:0 0 32px;">Tachimetro live, G-force, altitudine, velocità curva. Ogni giro registrato con precisione millimetrica. I tuoi dati di guida non sono mai stati così dettagliati.</p>
-          <div class="racemode-grid" style="max-width:none;">
-            <div class="racemode-card reveal">
-              <div class="racemode-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              </div>
-              <div class="racemode-card-title">Live Speed</div>
-              <div class="racemode-card-desc">Velocità in tempo reale aggiornata ogni secondo. Tachimetro digitale con picco e media.</div>
+          <div class="racemode-grid" role="list" aria-label="Metriche in tempo reale">
+            <div class="racemode-card reveal" role="listitem">
+              <div class="racemode-card-val">287</div>
+              <div class="racemode-card-unit">km/h</div>
+              <div class="racemode-card-title">Velocità max</div>
             </div>
-            <div class="racemode-card reveal" style="transition-delay:0.1s;">
-              <div class="racemode-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
-              </div>
-              <div class="racemode-card-title">G-Force</div>
-              <div class="racemode-card-desc">Accelerazione laterale e longitudinale. Senti ogni curva misurata in G.</div>
+            <div class="racemode-card reveal" style="transition-delay:0.08s;" role="listitem">
+              <div class="racemode-card-val">3.4</div>
+              <div class="racemode-card-unit">sec</div>
+              <div class="racemode-card-title">0–100</div>
             </div>
-            <div class="racemode-card reveal" style="transition-delay:0.2s;">
-              <div class="racemode-card-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-              </div>
-              <div class="racemode-card-title">Altimetria</div>
-              <div class="racemode-card-desc">Profilo altimetrico completo del percorso. Dislivello totale, salite e discese.</div>
+            <div class="racemode-card reveal" style="transition-delay:0.16s;" role="listitem">
+              <div class="racemode-card-val">52°</div>
+              <div class="racemode-card-unit">&nbsp;</div>
+              <div class="racemode-card-title">Piega max</div>
+            </div>
+            <div class="racemode-card reveal" style="transition-delay:0.24s;" role="listitem">
+              <div class="racemode-card-val">428</div>
+              <div class="racemode-card-unit">km</div>
+              <div class="racemode-card-title">Distanza giro</div>
             </div>
           </div>
         </div>
@@ -2240,7 +2423,7 @@
     <section class="motoclub-section" id="motoclub">
       <div class="motoclub-inner">
         <div class="motoclub-img-col reveal-left">
-          <img src="https://images.unsplash.com/photo-1489731007795-388eee095ff6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwyfHxtb3RvcmN5Y2xlJTIwZ3JvdXAlMjByaWRlcnN8ZW58MHx8fHwxNzc5MTUyNTgxfDA&ixlib=rb-4.1.0&q=85" alt="MotoClub Sunday Ride" loading="lazy" />
+          <img src="/assets/images/motoclub-ride.jpg" alt="MotoClub Sunday Ride — gruppo di motociclisti" loading="lazy" />
           <div class="motoclub-img-overlay"></div>
           <div class="motoclub-img-badges">
             <span class="motoclub-img-badge live">
@@ -2307,28 +2490,28 @@
         </h2>
         <div class="usertypes-grid">
           <div class="usertype-card reveal">
-            <div class="usertype-card-bg" style="background-image:url('https://images.unsplash.com/photo-1768507109219-4408445c8762?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHw0fHxtb3RvcmN5Y2xlJTIwcmlkZXIlMjBkYXJrJTIwcm9hZHxlbnwwfHx8fDE3NzkxNTI1NjR8MA&ixlib=rb-4.1.0&q=85');"></div>
+            <div class="usertype-card-bg" style="background-image:url('/assets/images/card-biker.jpg');"></div>
             <div class="usertype-card-overlay"></div>
             <div class="usertype-card-content">
-              <span class="usertype-num">01</span>
+              <span class="usertype-num">/01</span>
               <div class="usertype-title">IL <span class="accent">BIKER</span></div>
               <p class="usertype-desc">Guidi una moto? Trova compagni di viaggio, traccia ogni giro, unisciti a un club e partecipa ai contest settimanali.</p>
             </div>
           </div>
           <div class="usertype-card reveal" style="transition-delay:0.1s;">
-            <div class="usertype-card-bg" style="background-image:url('https://images.unsplash.com/photo-1591259966748-4e4b9916858f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHwxfHxtb3RvcmN5Y2xlJTIwcmlkZXIlMjBkYXJrJTIwcm9hZHxlbnwwfHx8fDE3NzkxNTI1NjR8MA&ixlib=rb-4.1.0&q=85');"></div>
+            <div class="usertype-card-bg" style="background-image:url('/assets/images/card-zavorrine.jpg');"></div>
             <div class="usertype-card-overlay"></div>
             <div class="usertype-card-content">
-              <span class="usertype-num">02</span>
+              <span class="usertype-num">/02</span>
               <div class="usertype-title">LA ZAVORRINA</div>
               <p class="usertype-desc">Passeggera per passione. Chi viaggia in sella ha il suo spazio, la sua community e il suo matching dedicato.</p>
             </div>
           </div>
           <div class="usertype-card reveal" style="transition-delay:0.2s;">
-            <div class="usertype-card-bg" style="background-image:url('https://static.prod-images.emergentagent.com/jobs/c52ae50d-f554-4341-a9ff-4380f336dee8/images/121db819839f9d1268e1a48fd6a2cd9cca693c8349a94887d700a35a8b26aa05.png');"></div>
+            <div class="usertype-card-bg" style="background-image:url('/assets/images/card-coppie.jpg');"></div>
             <div class="usertype-card-overlay"></div>
             <div class="usertype-card-content">
-              <span class="usertype-num">03</span>
+              <span class="usertype-num">/03</span>
               <div class="usertype-title">LE <span class="accent">COPPIE</span></div>
               <p class="usertype-desc">Biker e Zavorrina insieme. Il matching coppia trova altri duo compatibili per uscite, eventi e avventure condivise.</p>
             </div>
@@ -2343,22 +2526,56 @@
         <div class="piccontest-week reveal">📸 Contest Settimanale</div>
         <h2 class="piccontest-title reveal">OGNI SETTIMANA<br><span class="accent">UN NUOVO PALCO</span></h2>
         <p class="piccontest-desc reveal">Carica la tua foto migliore — moto, percorso, panorama. La community vota, il vincitore conquista la gallery della settimana e la visibilità di tutta la piattaforma.</p>
-        <a href="/registrati" class="btn btn-primary reveal">
+        <div class="contest-hashtags reveal">
+          <span class="contest-hashtag">#sunsetride</span>
+          <span class="contest-hashtag">#curvy</span>
+          <span class="contest-hashtag">#brotherhood</span>
+          <span class="contest-hashtag">#track</span>
+          <span class="contest-hashtag">#touring</span>
+          <span class="contest-hashtag">#alpineroads</span>
+          <span class="contest-hashtag">#nightride</span>
+          <span class="contest-hashtag">#solo</span>
+        </div>
+        <a href="/registrati" class="btn btn-primary reveal" style="margin-bottom:0;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
           Partecipa al contest
         </a>
-        <div class="piccontest-podium reveal">
-          <div class="piccontest-place second">
-            <div class="piccontest-place-medal">🥈</div>
-            <div class="piccontest-place-label">2° posto</div>
+        <div class="contest-photo-grid reveal">
+          <div class="contest-photo-card">
+            <img src="/assets/images/contest-1.jpg" alt="Contest foto #1 — Moto on the road" width="400" height="533" loading="lazy" />
+            <div class="contest-photo-overlay"></div>
+            <div class="contest-photo-rank gold">🏆 1°</div>
+            <div class="contest-photo-meta">
+              <span class="contest-photo-author">@marco_v4</span>
+              <span class="contest-photo-likes">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                1247
+              </span>
+            </div>
           </div>
-          <div class="piccontest-place first">
-            <div class="piccontest-place-medal">🏆</div>
-            <div class="piccontest-place-label">Campione</div>
+          <div class="contest-photo-card">
+            <img src="/assets/images/contest-2.jpg" alt="Contest foto #2 — Biker on mountain road" width="400" height="533" loading="lazy" />
+            <div class="contest-photo-overlay"></div>
+            <div class="contest-photo-rank">🥈 2°</div>
+            <div class="contest-photo-meta">
+              <span class="contest-photo-author">@giulia.rides</span>
+              <span class="contest-photo-likes">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                983
+              </span>
+            </div>
           </div>
-          <div class="piccontest-place third">
-            <div class="piccontest-place-medal">🥉</div>
-            <div class="piccontest-place-label">3° posto</div>
+          <div class="contest-photo-card">
+            <img src="/assets/images/contest-3.jpg" alt="Contest foto #3 — Moto sul passo" width="400" height="533" loading="lazy" />
+            <div class="contest-photo-overlay"></div>
+            <div class="contest-photo-rank">🥉 3°</div>
+            <div class="contest-photo-meta">
+              <span class="contest-photo-author">@duke_790</span>
+              <span class="contest-photo-likes">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                821
+              </span>
+            </div>
           </div>
         </div>
       </div>
