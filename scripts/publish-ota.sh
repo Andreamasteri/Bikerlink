@@ -364,7 +364,11 @@ do_export() {
      grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | grep -qxF "CURRENT_OTA_NUMBER=${NEXT_OTA}"; then
     FOUND_OTA="$NEXT_OTA"
   else
-    FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | grep -oE "[0-9]+$" | sort -n | tail -1 || true)
+    if grep -qoa "CURRENT_OTA_NUMBER=${NEXT_OTA}[^0-9]" "$BUNDLE_FILE" 2>/dev/null; then
+      FOUND_OTA="$NEXT_OTA"
+    else
+      FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | grep -oE "[0-9]+$" | sort -n | tail -1 || true)
+    fi
   fi
 
   if [ -z "$FOUND_OTA" ]; then
