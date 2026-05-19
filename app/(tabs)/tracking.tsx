@@ -3429,11 +3429,44 @@ export default function TrackingScreen() {
                   size={18}
                   color={sensorsEnabled ? Colors.accentRed : Colors.textSecondary}
                 />
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <Text style={styles.triggerLabel}>Sensori telefono (G)</Text>
                   <View style={{ backgroundColor: Colors.warning + "30", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
                     <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.warning, letterSpacing: 0.5 }}>BETA</Text>
                   </View>
+                  {sensorsEnabled && (
+                    <TouchableOpacity
+                      onPress={() => setShowMountCalibWizard(true)}
+                      activeOpacity={0.75}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        gap: 3,
+                        backgroundColor: mountAxisCalib ? Colors.success + "22" : Colors.warning + "22",
+                        borderRadius: 6,
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderWidth: 1,
+                        borderColor: mountAxisCalib ? Colors.success + "55" : Colors.warning + "55",
+                      }}
+                    >
+                      <Ionicons
+                        name={mountAxisCalib ? "checkmark-circle" : "warning"}
+                        size={11}
+                        color={mountAxisCalib ? Colors.success : Colors.warning}
+                      />
+                      <Text style={{
+                        fontFamily: "Inter_600SemiBold" as const,
+                        fontSize: 10,
+                        color: mountAxisCalib ? Colors.success : Colors.warning,
+                        letterSpacing: 0.2,
+                      }}>
+                        {mountAxisCalib
+                          ? `${t("tracking.mountCalib.calibratedBadge")} · ${mountAxisCalib.longAxis.toUpperCase()}/${mountAxisCalib.latAxis.toUpperCase()}`
+                          : t("tracking.mountCalib.chipDefault")}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
               <Switch

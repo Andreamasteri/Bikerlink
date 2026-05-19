@@ -1159,6 +1159,7 @@ const it: Record<string, string> = {
   "tracking.mountCalib.calibrateBtn": "Calibra posizione manubrio",
   "tracking.mountCalib.calibratedBadge": "Calibrato",
   "tracking.mountCalib.notCalibrated": "Non calibrato — usa assi predefiniti",
+  "tracking.mountCalib.chipDefault": "Assi predefiniti",
 
   "push.match.title": "Ehi, hai un match! 🔥",
   "push.match.body": "Tocca per vedere chi è",
