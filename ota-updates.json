@@ -868,5 +868,33 @@
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
     "status": "published",
     "publishedAt": "2026-05-19T21:24:25.639Z"
+  },
+  {
+    "updateNumber": 1,
+    "version": "46.1.9",
+    "cycle": "9.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-1 rv9.0.0: Ciclo 9.x: schema versione 46.29.9 + rv 9.0.0 (#1525), fix brace-expansion build (#1526)",
+    "note": "CURRENT_OTA_NUMBER=1. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "9.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "d61c8b2e-5c95-4c07-860b-f962c90ad3a6",
+    "bundleUrl": "private/ota/ota-46.1.9-1779229041837.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "e6f503977469a1fa742aa79fb345b8e3a44412c5",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-19T22:17:27.969Z"
   }
 ]

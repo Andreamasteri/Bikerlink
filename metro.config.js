@@ -97,7 +97,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 
 config.maxWorkers = 1;
 
-config.cacheVersion = "v8";
+config.cacheVersion = "v9";
 
 config.cacheStores = [
   new FileStore({ root: path.join(__dirname, ".metro-cache") }),

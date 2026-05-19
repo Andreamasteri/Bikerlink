@@ -65,6 +65,10 @@ args = "injection-safety"
 task = "workflow.run"
 args = "admin-privacy-filter"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ota-export-stage1"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -180,6 +184,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx vitest run --config vitest.config.server.ts"
+
+[[workflows.workflow]]
+name = "ota-export-stage1"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "rm -rf /tmp/metro-* /tmp/haste-map-* && BIKERLINK_ADMIN_EMAIL=admin@bikerlink.it bash scripts/publish-ota.sh export \"Ciclo 9.x: schema versione 46.29.9 + rv 9.0.0 (#1525), fix brace-expansion build (#1526)\""
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"

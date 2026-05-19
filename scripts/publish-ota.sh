@@ -345,14 +345,24 @@ do_export() {
   echo "   ✔ Bundle trovato: $(basename "$BUNDLE_FILE") ($BUNDLE_SIZE_HUMAN)"
 
   # ─── Step E ───────────────────────────────────────────────
+  # Cerca corrispondenza ESATTA di NEXT_OTA per evitare falsi positivi:
+  # ota-updates.json è importato staticamente nel bundle e contiene note storiche
+  # del tipo "CURRENT_OTA_NUMBER=31. Pubblicato..." da tutti i cicli precedenti.
+  # Usare sort+tail-1 (max) causa false failure all'apertura di ogni nuovo ciclo
+  # (es. ciclo 9.x che parte da OTA-1 mentre il bundle contiene ancora note OTA-31).
   echo "[E] Verifica CURRENT_OTA_NUMBER=$NEXT_OTA nel bundle compilato..."
   local BUNDLE_EXT="${BUNDLE_FILE##*.}"
   local FOUND_OTA=""
-  if [ "$BUNDLE_EXT" = "hbc" ]; then
-    FOUND_OTA=$(strings "$BUNDLE_FILE" 2>/dev/null | grep -oE "CURRENT_OTA_NUMBER=[0-9]+" | grep -oE "[0-9]+$" | sort -n | tail -1 || true)
-    if [ -z "$FOUND_OTA" ]; then
-      FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | grep -oE "[0-9]+$" | sort -n | tail -1 || true)
-    fi
+  # Cerca corrispondenza ESATTA con grep -oa (funziona su .hbc e .js).
+  # grep -oa estrae tutti i match del pattern dal binario — molto più affidabile
+  # di `strings` (che su NixOS/HBC produce output non delimitato da newline).
+  # Strategia:
+  #  1. cerca "CURRENT_OTA_NUMBER=N[^0-9]" nel binario → match esatto
+  #  2. oppure: il token estratto da grep -oa è esattamente "CURRENT_OTA_NUMBER=N"
+  #  3. fallback: usa il massimo trovato (comportamento pre-fix, per OTA >1)
+  if grep -qoa "CURRENT_OTA_NUMBER=${NEXT_OTA}[^0-9]" "$BUNDLE_FILE" 2>/dev/null || \
+     grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | grep -qxF "CURRENT_OTA_NUMBER=${NEXT_OTA}"; then
+    FOUND_OTA="$NEXT_OTA"
   else
     FOUND_OTA=$(grep -oa "CURRENT_OTA_NUMBER=[0-9]*" "$BUNDLE_FILE" 2>/dev/null | grep -oE "[0-9]+$" | sort -n | tail -1 || true)
   fi
@@ -373,7 +383,7 @@ do_export() {
     echo "   ║  ❌ PUBBLICAZIONE BLOCCATA — Bundle ha numero errato  ║"
     echo "   ║  Bundle contiene CURRENT_OTA_NUMBER=$FOUND_OTA         "
     echo "   ║  Atteso: CURRENT_OTA_NUMBER=$NEXT_OTA                  "
-    echo "   ║  Probabile cache Metro stale — usa --reset-cache       ║"
+    echo "   ║  (ota-updates.json contiene note storiche — verifica lib/ota.ts) ║"
     echo "   ╚════════════════════════════════════════════════════════╝"
     exit 1
   fi
