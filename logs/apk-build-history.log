@@ -68,3 +68,7 @@
 2026-04-30T18:01:22Z  APK BUILD MANUAL (sandbox skip auto-commit) — profilo=release-apk commit=1e61243d versionName=3.3.0 versionCode=44 committed=no
 2026-04-30T18:03:23Z  APK BUILD INVIATA (manual --no-wait, sandbox skip auto-commit) — profilo=release-apk buildId=b148edc3-de25-4f55-b5c4-c4466b4ccc0b versionName=3.3.0 versionCode=44 dashboard=https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/b148edc3-de25-4f55-b5c4-c4466b4ccc0b
 2026-04-30T18:14:46Z  APK BUILD COMPLETATA (FINISHED) — buildId=b148edc3-de25-4f55-b5c4-c4466b4ccc0b versionCode=44 versionName=3.3.0 duration=12min APK=https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk curl_check=HTTP_307_redirect_to_CDN_OK task=#1151
+2026-05-19T01:54:50Z  APK BUILD AVVIATA — profilo=release-apk commit=898a75f2 utente=runner versionName=3.4.0 versionCode=45 committed=yes
+2026-05-19T01:54:50Z  APK BUILD INVIATA (--no-wait) — profilo=release-apk commit=898a75f2 utente=runner versionName=3.4.0 versionCode=45 committed=yes
+2026-05-19T01:54:50Z  APK BUILD ID: 91cfde53-66e7-45fc-83f0-d7f72a98fcde — versionCode=45 versionName=3.4.0 dashboard=https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/91cfde53-66e7-45fc-83f0-d7f72a98fcde
+2026-05-19T02:11:17Z  APK BUILD COMPLETATA (FINISHED) — buildId=91cfde53-66e7-45fc-83f0-d7f72a98fcde versionCode=45 versionName=3.4.0 APK=https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk task=#1346

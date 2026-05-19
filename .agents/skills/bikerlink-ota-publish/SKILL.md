@@ -53,10 +53,10 @@ bash scripts/build-apk.sh production   # AAB Play Store
 
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
-- **Runtime Version**: `8.0.0` (ciclo corrente, APK v44) ← CICLO V3
-- **APK corrente**: versionCode **44**, versionName **3.3.0** (buildId: `b148edc3-de25-4f55-b5c4-c4466b4ccc0b`, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk — STABILE, baseline pulita per device piantati su OTA-19)
-- **APK precedente (STABILE distribuita)**: versionCode 43, versionName 3.2.0 (buildId: `38cb1b32-4316-4f63-9799-1b9ab36888e8`, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk)
-- **OTA corrente**: OTA-25 (releaseId: `501f77ef-755f-482d-be35-7ad55213be57`)
+- **Runtime Version**: `8.0.0` (ciclo corrente, APK v45) ← CICLO V3
+- **APK corrente**: versionCode **45**, versionName **3.4.0** (buildId: `91cfde53-66e7-45fc-83f0-d7f72a98fcde`, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk — STABILE)
+- **APK precedente (STABILE distribuita)**: versionCode 44, versionName 3.3.0 (buildId: `b148edc3-de25-4f55-b5c4-c4466b4ccc0b`, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk)
+- **OTA corrente**: OTA-26 (releaseId: `62fd5d01-8ca9-452c-be61-362ad4d24fd5`)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
