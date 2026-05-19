@@ -10,7 +10,7 @@ import {
   Platform,
   TouchableOpacity,
 } from "react-native";
-import { useRouter, type Href } from "expo-router";
+import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,6 +18,8 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
+import TrackingScreen from "@/app/(tabs)/tracking";
+import RoutesScreen from "@/app/routes/index";
 
 interface ProposalItem {
   id: string;
@@ -191,6 +193,7 @@ export default function ProposalsScreen() {
   const t = useT();
   const locale = useLocale();
   const [activeFilter, setActiveFilter] = useState("all");
+  const [activeHub, setActiveHub] = useState<"proposte" | "giri" | "percorsi">("proposte");
 
   const queryKey =
     activeFilter === "all"
@@ -220,12 +223,8 @@ export default function ProposalsScreen() {
   allData.push({ type: "proposalHeader", key: "ph" });
   (proposals || []).forEach((p) => allData.push({ type: "proposal", key: `p-${p.id}`, data: p }));
 
-  const handleHubPress = (key: string) => {
-    if (key === "giri") {
-      router.push("/(tabs)/tracking" as Href);
-    } else if (key === "percorsi") {
-      router.push("/routes" as Href);
-    }
+  const handleHubPress = (key: "proposte" | "giri" | "percorsi") => {
+    setActiveHub(key);
   };
 
   return (
@@ -233,7 +232,7 @@ export default function ProposalsScreen() {
       <InlineMiniPlayer />
       <View style={styles.hubRow}>
         {HUB_SECTIONS.map((section) => {
-          const isActive = section.key === "proposte";
+          const isActive = section.key === activeHub;
           return (
             <Pressable
               key={section.key}
@@ -247,6 +246,17 @@ export default function ProposalsScreen() {
           );
         })}
       </View>
+
+      {activeHub === "giri" ? (
+        <View style={{ flex: 1 }}>
+          <TrackingScreen />
+        </View>
+      ) : activeHub === "percorsi" ? (
+        <View style={{ flex: 1 }}>
+          <RoutesScreen />
+        </View>
+      ) : (
+        <>
       <View style={styles.filterRow}>
         {FILTER_KEYS.map((f) => (
           <Pressable
@@ -323,6 +333,8 @@ export default function ProposalsScreen() {
       <Pressable style={styles.fab} onPress={handleCreatePress}>
         <Ionicons name="add" size={28} color={Colors.background} />
       </Pressable>
+        </>
+      )}
     </View>
   );
 }
