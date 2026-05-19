@@ -50,6 +50,13 @@
       "when": 1747872000000,
       "tag": "0005_media_library",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1747958400000,
+      "tag": "0006_push_notifications_enabled",
+      "breakpoints": true
     }
   ]
 }

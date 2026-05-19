@@ -121,6 +121,7 @@ export const userProfiles = pgTable("user_profiles", {
     .$type<{ matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean }>()
     .notNull()
     .default(sql`'{"matches":true,"zoneProposals":true,"chat":true,"motoclub":true,"eventi":true}'::jsonb`),
+  pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(true),
   hideFromMap: boolean("hide_from_map").notNull().default(false),
   positionFuzz: boolean("position_fuzz").notNull().default(false),
   positionFuzzKm: integer("position_fuzz_km").notNull().default(1),

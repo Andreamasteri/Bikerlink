@@ -1283,6 +1283,13 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS push_notifications_enabled BOOLEAN NOT NULL DEFAULT true`);
+          console.log("[MIGRATION] user_profiles.push_notifications_enabled ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] user_profiles.push_notifications_enabled:", e);
+        }
+
+        try {
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS slot VARCHAR(32)`);
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMP`);
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS promoted_by VARCHAR(100)`);

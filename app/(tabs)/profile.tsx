@@ -91,6 +91,7 @@ interface ProfileData {
       motoclub?: boolean;
       eventi?: boolean;
     } | null;
+    pushNotificationsEnabled?: boolean;
   };
   photos?: Array<{
     id: string;
@@ -149,6 +150,8 @@ export default function ProfileScreen() {
   const [pushTogglePending, setPushTogglePending] = useState<boolean>(false);
 
   useEffect(() => {
+    // Seed local state from AsyncStorage immediately for instant UI,
+    // then override with the authoritative server value once the profile loads.
     AsyncStorage.getItem(PUSH_NOTIFICATIONS_ENABLED_KEY).then((val) => {
       setPushNotificationsEnabled(val === null ? true : val === "true");
     }).catch(() => {});
@@ -161,6 +164,8 @@ export default function ProfileScreen() {
       e instanceof Error ? e.message : typeof e === "string" ? e : "Operazione non riuscita";
     try {
       await AsyncStorage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, next ? "true" : "false");
+      // Persist master toggle server-side so it survives reinstalls
+      await apiRequest("PUT", "/api/users/profile/dynamic", { pushNotificationsEnabled: next });
       if (next) {
         const Notifications = require("expo-notifications");
         const { status: existing } = await Notifications.getPermissionsAsync();
@@ -237,6 +242,15 @@ export default function ProfileScreen() {
   useEffect(() => {
     setFailedPhotos(new Set());
   }, [profileQuery.dataUpdatedAt]);
+
+  // Sync master push toggle from server (survives reinstalls — server is authoritative)
+  const profilePushEnabled = profile?.profile?.pushNotificationsEnabled;
+  useEffect(() => {
+    if (profilePushEnabled !== undefined) {
+      setPushNotificationsEnabled(profilePushEnabled);
+      AsyncStorage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, profilePushEnabled ? "true" : "false").catch(() => {});
+    }
+  }, [profilePushEnabled]);
 
   // Apply country-based unit defaults (only once, only if no stored preference)
   useEffect(() => {

@@ -354,7 +354,7 @@ router.get("/profile", requireAuth, async (req: Request, res: Response) => {
 router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications, notificationPreferences } = req.body;
+    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications, notificationPreferences, pushNotificationsEnabled } = req.body;
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
@@ -385,6 +385,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
       updateData.preferredMapStyle = preferredMapStyle;
     }
     if (typeof emailChatNotifications === "boolean") updateData.emailChatNotifications = emailChatNotifications;
+    if (typeof pushNotificationsEnabled === "boolean") updateData.pushNotificationsEnabled = pushNotificationsEnabled;
     if (notificationPreferences && typeof notificationPreferences === "object") {
       const current = (existingProfile?.notificationPreferences ?? { matches: true, zoneProposals: true, chat: true, motoclub: true, eventi: true }) as { matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean };
       const merged = { ...current };

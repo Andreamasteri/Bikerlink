@@ -15,6 +15,7 @@ async function filterUserIdsByPreference(
       .select({
         userId: userProfiles.userId,
         prefs: userProfiles.notificationPreferences,
+        pushNotificationsEnabled: userProfiles.pushNotificationsEnabled,
       })
       .from(userProfiles)
       .where(inArray(userProfiles.userId, userIds));
@@ -23,12 +24,16 @@ async function filterUserIdsByPreference(
     // or with no stored prefs default to allowed, matching the column default
     // {matches:true, zoneProposals:true, chat:true, motoclub:true, eventi:true}.
     // Only explicit `false` skips the push.
-    const prefByUser = new Map<string, typeof rows[number]["prefs"]>();
+    // pushNotificationsEnabled=false (master toggle) also blocks all categories.
+    const prefByUser = new Map<string, typeof rows[number]>();
     for (const r of rows) {
-      prefByUser.set(r.userId, r.prefs);
+      prefByUser.set(r.userId, r);
     }
     return userIds.filter((id) => {
-      const p = prefByUser.get(id);
+      const row = prefByUser.get(id);
+      if (!row) return true;
+      if (row.pushNotificationsEnabled === false) return false;
+      const p = row.prefs;
       if (!p) return true;
       return p[prefKey] !== false;
     });

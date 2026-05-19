@@ -414,8 +414,22 @@ function PushTokenRegistrar() {
 
     (async () => {
       try {
-        const pref = await AsyncStorage.getItem(PUSH_NOTIFICATIONS_ENABLED_KEY);
-        if (pref === "false") {
+        // Check server-side master toggle first (survives reinstalls),
+        // then fall back to local AsyncStorage for instant offline response.
+        let pushEnabled = true;
+        try {
+          const profileResp = await apiRequest("GET", "/api/users/profile");
+          const profileData = await profileResp.json() as { pushNotificationsEnabled?: boolean };
+          if (profileData?.pushNotificationsEnabled === false) {
+            pushEnabled = false;
+          }
+        } catch {
+          // If server unreachable, fall back to local pref
+          const localPref = await AsyncStorage.getItem(PUSH_NOTIFICATIONS_ENABLED_KEY);
+          if (localPref === "false") pushEnabled = false;
+        }
+
+        if (!pushEnabled) {
           try {
             await apiRequest("PUT", "/api/users/me/push-token", { token: null });
           } catch {}
