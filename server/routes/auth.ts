@@ -285,7 +285,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
           await storage.createNotification({
             userId: adminUser.id,
             title: "Nuova registrazione - Verifica Email",
-            body: `L'utente ${user.nickname} (${user.email}) si è registrato. Codice verifica: ${token}${emailStatusMsg}`,
+            body: `L'utente ${user.nickname} (ID: ${user.id}) si è registrato. Codice verifica: ${token}${emailStatusMsg}`,
             notificationType: "system",
             referenceType: "user",
             referenceId: user.id,

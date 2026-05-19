@@ -289,10 +289,12 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
       if (mf === null) {
         profileUpdate.mapFilters = null;
       } else {
-        const sanitized: Record<string, boolean> = {};
-        for (const key of ["biker", "zavorrina", "clubs", "events"] as const) {
-          if (typeof mf[key] === "boolean") sanitized[key] = mf[key];
-        }
+        const sanitized: Record<string, boolean> = {
+          ...(typeof mf.biker === "boolean" && { biker: mf.biker }),
+          ...(typeof mf.zavorrina === "boolean" && { zavorrina: mf.zavorrina }),
+          ...(typeof mf.clubs === "boolean" && { clubs: mf.clubs }),
+          ...(typeof mf.events === "boolean" && { events: mf.events }),
+        };
         profileUpdate.mapFilters = sanitized;
       }
     }

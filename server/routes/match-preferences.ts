@@ -80,13 +80,11 @@ router.put("/", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const body = req.body as Partial<typeof DEFAULT_PREFS>;
 
-    const allowedKeys = Object.keys(DEFAULT_PREFS) as Array<keyof typeof DEFAULT_PREFS>;
-    const updates: Record<string, boolean> = {};
-    for (const key of allowedKeys) {
-      if (typeof body[key] === "boolean") {
-        updates[key] = body[key] as boolean;
-      }
-    }
+    const updates: Record<string, boolean> = Object.fromEntries(
+      (Object.keys(DEFAULT_PREFS) as Array<keyof typeof DEFAULT_PREFS>)
+        .filter((key) => typeof body[key] === "boolean")
+        .map((key) => [key, body[key] as boolean])
+    );
 
     const [existing] = await db
       .select({ id: matchPreferences.id })
