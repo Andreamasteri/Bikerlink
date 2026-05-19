@@ -45,6 +45,7 @@
     "expo-asset": "~55.0.17",
     "expo-audio": "^55.0.14",
     "expo-auth-session": "~55.0.16",
+    "expo-battery": "^55.0.13",
     "expo-build-properties": "~55.0.14",
     "expo-camera": "~55.0.18",
     "expo-clipboard": "^55.0.13",

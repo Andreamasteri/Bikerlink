@@ -44,6 +44,7 @@ import { VolumeManager } from "react-native-volume-manager";
 import * as TaskManager from "expo-task-manager";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
+import * as Battery from "expo-battery";
 
 // ─── Background location task (must be defined at module top level) ───────────
 
@@ -248,10 +249,68 @@ function getModeConfigBackground(profile: UpdateProfile): {
 // Stima statica del consumo batteria per ora in tracking in background.
 // Valori approssimativi basati su intervallo di campionamento e accuracy GPS
 // di getModeConfigBackground(). Non sono misure reali.
-function getEstimatedBatteryDrainPerHour(profile: UpdateProfile): string {
-  if (profile === "race") return "~9%/h";
-  if (profile === "easy") return "~3%/h";
-  return "~5%/h";
+function getStaticBatteryDrainPerHour(profile: UpdateProfile): number {
+  if (profile === "race") return 9;
+  if (profile === "easy") return 3;
+  return 5;
+}
+
+// ─── Battery drain stats (measured per-device, per-mode) ──────────────────────
+
+const BATTERY_DRAIN_STATS_KEY = "@bikerlink/battery_drain_stats_v1";
+const BATTERY_MIN_RIDE_MINUTES = 5;
+const BATTERY_MAX_SAMPLES = 10;
+
+interface BatteryDrainStats {
+  easy: number[];
+  medium: number[];
+  race: number[];
+}
+
+function normalizeBatteryDrainStats(raw: unknown): BatteryDrainStats {
+  const isNumArr = (v: unknown): v is number[] =>
+    Array.isArray(v) && v.every((x) => typeof x === "number" && isFinite(x));
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const r = raw as Record<string, unknown>;
+    return {
+      easy: isNumArr(r.easy) ? r.easy : [],
+      medium: isNumArr(r.medium) ? r.medium : [],
+      race: isNumArr(r.race) ? r.race : [],
+    };
+  }
+  return { easy: [], medium: [], race: [] };
+}
+
+async function loadBatteryDrainStats(): Promise<BatteryDrainStats> {
+  try {
+    const raw = await AsyncStorage.getItem(BATTERY_DRAIN_STATS_KEY);
+    if (raw) return normalizeBatteryDrainStats(JSON.parse(raw));
+  } catch (e) {
+    if (__DEV__) console.warn("[BikerLink] loadBatteryDrainStats error:", e);
+  }
+  return { easy: [], medium: [], race: [] };
+}
+
+async function appendBatteryDrainSample(
+  profile: UpdateProfile,
+  drainPerHour: number
+): Promise<BatteryDrainStats> {
+  const stats = await loadBatteryDrainStats();
+  const arr = [...stats[profile], drainPerHour].slice(-BATTERY_MAX_SAMPLES);
+  const updated: BatteryDrainStats = { ...stats, [profile]: arr };
+  try {
+    await AsyncStorage.setItem(BATTERY_DRAIN_STATS_KEY, JSON.stringify(updated));
+    if (__DEV__) console.log(`[BikerLink] Battery drain sample saved — profile=${profile} value=${drainPerHour.toFixed(2)}%/h samples=${arr.length}`);
+  } catch (e) {
+    if (__DEV__) console.warn("[BikerLink] appendBatteryDrainSample persist error:", e);
+  }
+  return updated;
+}
+
+function getMeasuredDrainPerHour(stats: BatteryDrainStats, profile: UpdateProfile): number | null {
+  const samples = stats[profile];
+  if (samples.length === 0) return null;
+  return samples.reduce((a, b) => a + b, 0) / samples.length;
 }
 
 
@@ -758,6 +817,12 @@ export default function TrackingScreen() {
   const [pointsSent, setPointsSent] = useState(0);
   const [pointsBuffered, setPointsBuffered] = useState(0);
 
+  // Battery drain stats (measured per-device, per-mode)
+  const [batteryDrainStats, setBatteryDrainStats] = useState<BatteryDrainStats>({ easy: [], medium: [], race: [] });
+  const rideStartBatteryLevelRef = useRef<number | null>(null);
+  const rideStartBatteryTimeRef = useRef<number>(0);
+  const rideBatteryProfileRef = useRef<UpdateProfile>("medium");
+
   // Refs
   const profileRef = useRef<UpdateProfile>("medium");
   const handsOffEnabledRef = useRef(false);
@@ -865,6 +930,11 @@ export default function TrackingScreen() {
       personalBestMsRef.current = null;
     }
   }, [sprintHistory]);
+
+  // ── Load battery drain stats from AsyncStorage on mount ───────────────────
+  useEffect(() => {
+    loadBatteryDrainStats().then((stats) => setBatteryDrainStats(stats)).catch(() => {});
+  }, []);
 
   // ── Admin flag: sensori telefono visibili ──────────────────────────────────
   const { data: phoneSensorsData } = useQuery<{ enabled: boolean }>({
@@ -1859,6 +1929,22 @@ export default function TrackingScreen() {
     phaseRef.current = "active";
     setPhase("active");
     startTimeRef.current = Date.now();
+
+    // Capture battery level at ride start for drain measurement
+    rideStartBatteryLevelRef.current = null;
+    rideStartBatteryTimeRef.current = Date.now();
+    rideBatteryProfileRef.current = profileRef.current;
+    try {
+      if (Platform.OS !== "web") {
+        const level = await Battery.getBatteryLevelAsync();
+        if (level >= 0) {
+          rideStartBatteryLevelRef.current = level;
+          if (__DEV__) console.log(`[BikerLink] Battery at ride start: ${(level * 100).toFixed(1)}% (profile=${profileRef.current})`);
+        }
+      }
+    } catch (e) {
+      if (__DEV__) console.warn("[BikerLink] Battery read at ride start failed:", e);
+    }
     lastAvgSpeedUpdateRef.current = Date.now(); // first avg update after 6 minutes
 
     timerRef.current = setInterval(() => {
@@ -2075,6 +2161,41 @@ export default function TrackingScreen() {
       idleMsRef.current += Date.now() - idleStartRef.current;
       idleStartRef.current = null;
     }
+
+    // Measure battery drain before cleaning up
+    const stopTime = Date.now();
+    const rideStartBattery = rideStartBatteryLevelRef.current;
+    const rideStartTime = rideStartBatteryTimeRef.current;
+    const rideDurationMs = stopTime - rideStartTime;
+    const rideDurationMinutes = rideDurationMs / 60000;
+    if (
+      Platform.OS !== "web" &&
+      rideStartBattery !== null &&
+      rideDurationMinutes >= BATTERY_MIN_RIDE_MINUTES
+    ) {
+      try {
+        const endLevel = await Battery.getBatteryLevelAsync();
+        if (__DEV__) console.log(`[BikerLink] Battery at ride stop: ${(endLevel * 100).toFixed(1)}% (start=${(rideStartBattery * 100).toFixed(1)}%)`);
+        if (endLevel >= 0 && endLevel <= rideStartBattery) {
+          const drainFraction = rideStartBattery - endLevel;
+          const drainPercent = drainFraction * 100;
+          const rideDurationHours = rideDurationMs / 3600000;
+          const drainPerHour = drainPercent / rideDurationHours;
+          // Sanity check: ignore implausible values (>30%/h or <0.1%/h)
+          if (drainPerHour >= 0.1 && drainPerHour <= 30) {
+            const updatedStats = await appendBatteryDrainSample(rideBatteryProfileRef.current, drainPerHour);
+            setBatteryDrainStats(updatedStats);
+          } else if (__DEV__) {
+            console.warn(`[BikerLink] Battery drain out of sanity range — ${drainPerHour.toFixed(2)}%/h, skipping sample`);
+          }
+        } else if (__DEV__) {
+          console.warn(`[BikerLink] Battery end level (${endLevel}) >= start (${rideStartBattery}) — skipping sample (possibly charging)`);
+        }
+      } catch (e) {
+        if (__DEV__) console.warn("[BikerLink] Battery read at ride stop failed:", e);
+      }
+    }
+    rideStartBatteryLevelRef.current = null;
 
     cleanupTracking();
     phaseRef.current = "idle";
@@ -2767,20 +2888,48 @@ export default function TrackingScreen() {
                       size={10}
                       color={profile === p ? Colors.accent : Colors.textSecondary + "AA"}
                     />
-                    <Text
-                      style={[
-                        styles.profileBtnBattery,
-                        profile === p && styles.profileBtnBatteryActive,
-                      ]}
-                    >
-                      {getEstimatedBatteryDrainPerHour(p)}
-                    </Text>
+                    {(() => {
+                      const measured = getMeasuredDrainPerHour(batteryDrainStats, p);
+                      const isMeasured = measured !== null;
+                      const valueText = isMeasured
+                        ? `${measured.toFixed(1)}%/h`
+                        : `~${getStaticBatteryDrainPerHour(p)}%/h`;
+                      const labelText = isMeasured
+                        ? t("tracking.battery.measured")
+                        : t("tracking.battery.estimated");
+                      return (
+                        <View style={{ flexDirection: "column" as const, alignItems: "flex-start" as const }}>
+                          <Text
+                            style={[
+                              styles.profileBtnBattery,
+                              profile === p && styles.profileBtnBatteryActive,
+                            ]}
+                          >
+                            {valueText}
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 8,
+                              fontFamily: "Inter_400Regular" as const,
+                              color: isMeasured
+                                ? (profile === p ? Colors.success : Colors.success + "99")
+                                : (profile === p ? Colors.textSecondary : Colors.textSecondary + "77"),
+                              fontStyle: "italic" as const,
+                            }}
+                          >
+                            {labelText}
+                          </Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 </TouchableOpacity>
               ))}
             </View>
             <Text style={styles.profileBatteryNote}>
-              {t("tracking.batteryEstimateNote")}
+              {batteryDrainStats.easy.length > 0 || batteryDrainStats.medium.length > 0 || batteryDrainStats.race.length > 0
+                ? t("tracking.batteryMeasuredNote")
+                : t("tracking.batteryEstimateNote")}
             </Text>
             <View style={styles.profileWarning}>
               <Ionicons name="warning-outline" size={14} color={Colors.warning} />
