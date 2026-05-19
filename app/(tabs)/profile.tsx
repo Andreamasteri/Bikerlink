@@ -47,6 +47,12 @@ import LeafletPickerMap from "@/components/LeafletPickerMap";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 import { MATCH_PREF_ITEMS, DEFAULT_MATCH_PREFS, type MatchPrefsPayload } from "@/lib/match-pref-items";
+import {
+  MountAxisCalibration,
+  MountCalibWizard,
+  loadMountCalibration,
+  clearMountCalibration,
+} from "@/components/MountCalibWizard";
 
 
 interface ProfileData {
@@ -141,6 +147,8 @@ export default function ProfileScreen() {
   const { timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit, applyCountryDefault } = useUnits();
   const [unitsExpanded, setUnitsExpanded] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [mountCalib, setMountCalib] = useState<MountAxisCalibration | null>(null);
+  const [showMountCalibWizard, setShowMountCalibWizard] = useState(false);
   const [isDownloadingManual, setIsDownloadingManual] = useState(false);
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
@@ -155,6 +163,10 @@ export default function ProfileScreen() {
     AsyncStorage.getItem(PUSH_NOTIFICATIONS_ENABLED_KEY).then((val) => {
       setPushNotificationsEnabled(val === null ? true : val === "true");
     }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    loadMountCalibration().then(setMountCalib).catch(() => {});
   }, []);
 
   const togglePushNotifications = useCallback(async (next: boolean) => {
@@ -1264,6 +1276,78 @@ export default function ProfileScreen() {
       </View>
       )}
 
+      {/* ─── Sensori & Calibrazione ──────────────────────────────────────── */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>{t("profile.sensorsCalib")}</Text>
+
+        {/* Status row */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12, padding: 12, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border }}>
+          <Ionicons
+            name="compass-outline"
+            size={20}
+            color={mountCalib ? Colors.success : colors.textSecondary}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: "Inter_500Medium" as const, fontSize: 14, color: Colors.text }}>
+              {mountCalib ? t("tracking.mountCalib.calibratedBadge") : t("tracking.mountCalib.notCalibrated")}
+            </Text>
+            {mountCalib && (
+              <Text style={{ fontFamily: "Inter_400Regular" as const, fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                {t("tracking.mountCalib.longAxisLabel")}: {mountCalib.longAxis.toUpperCase()} · {t("tracking.mountCalib.latAxisLabel")}: {mountCalib.latAxis.toUpperCase()} · {t("tracking.mountCalib.vertAxisLabel")}: {mountCalib.vertAxis.toUpperCase()}
+              </Text>
+            )}
+            {mountCalib && (
+              <Text style={{ fontFamily: "Inter_400Regular" as const, fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
+                {t("profile.sensorsCalib.calibratedOn")} {new Date(mountCalib.timestamp).toLocaleDateString("it-IT")}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Recalibrate button */}
+        <Pressable
+          testID="recalibrate-btn"
+          style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: Colors.accent + "14", borderRadius: 12, marginBottom: 8 }}
+          onPress={() => setShowMountCalibWizard(true)}
+        >
+          <Ionicons name="refresh-circle-outline" size={20} color={Colors.accent} />
+          <Text style={{ fontFamily: "Inter_600SemiBold" as const, fontSize: 14, color: Colors.accent, flex: 1 }}>
+            {t("profile.sensorsCalib.recalibrate")}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.accent} />
+        </Pressable>
+
+        {/* Reset button */}
+        {mountCalib && (
+          <Pressable
+            testID="reset-calib-btn"
+            style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border }}
+            onPress={() => {
+              Alert.alert(
+                t("profile.sensorsCalib.resetConfirmTitle"),
+                t("profile.sensorsCalib.resetConfirmMsg"),
+                [
+                  { text: t("profile.sensorsCalib.resetConfirmCancel"), style: "cancel" },
+                  {
+                    text: t("profile.sensorsCalib.resetConfirmOk"),
+                    style: "destructive",
+                    onPress: () => {
+                      clearMountCalibration().catch(() => {});
+                      setMountCalib(null);
+                    },
+                  },
+                ]
+              );
+            }}
+          >
+            <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
+            <Text style={{ fontFamily: "Inter_500Medium" as const, fontSize: 14, color: colors.textSecondary, flex: 1 }}>
+              {t("profile.sensorsCalib.reset")}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
       <View style={styles.section}>
         <Pressable style={styles.accordionHeader} onPress={() => setDocsExpanded(v => !v)}>
           <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t("profile.documentation")}</Text>
@@ -1481,6 +1565,16 @@ export default function ProfileScreen() {
       </Text>
       <View style={{ height: 40 }} />
     </ScrollView>
+
+    {showMountCalibWizard && (
+      <MountCalibWizard
+        onComplete={(calib) => {
+          setMountCalib(calib);
+          setShowMountCalibWizard(false);
+        }}
+        onDismiss={() => setShowMountCalibWizard(false)}
+      />
+    )}
     </View>
   );
 }

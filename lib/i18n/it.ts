@@ -1176,6 +1176,16 @@ const it: Record<string, string> = {
 
   "gps_error_title": "Errore GPS",
   "gps_error_body": "Impossibile salvare i punti GPS. Coordinate non valide rilevate.",
+
+  "profile.sensorsCalib": "Sensori & Calibrazione",
+  "profile.sensorsCalib.statusLabel": "Stato calibrazione",
+  "profile.sensorsCalib.calibratedOn": "Calibrato il",
+  "profile.sensorsCalib.recalibrate": "Ricalibra posizione manubrio",
+  "profile.sensorsCalib.reset": "Reimposta predefiniti",
+  "profile.sensorsCalib.resetConfirmTitle": "Reimposta calibrazione",
+  "profile.sensorsCalib.resetConfirmMsg": "Verranno usati gli assi predefiniti fino alla prossima calibrazione.",
+  "profile.sensorsCalib.resetConfirmOk": "Reimposta",
+  "profile.sensorsCalib.resetConfirmCancel": "Annulla",
 };
 
 export default it;
