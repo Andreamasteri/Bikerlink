@@ -21,6 +21,7 @@ import { eq, and, ilike, or, sql, desc, ne, count, notInArray } from "drizzle-or
 import { PROTECTED_NICKNAMES } from "../constants";
 import { systemAccountConditions } from "../lib/system-account-filter";
 import { sendEmail } from "../email";
+import { sendMotoclubPushNotifications } from "../push-notifications";
 
 const router = Router();
 
@@ -234,6 +235,11 @@ export async function createRegionalClubInvite(userId: string, region: string): 
         referenceType: "motoclub",
         referenceId: regionalClub.id,
       });
+      sendMotoclubPushNotifications([userId], {
+        title: "Invito al club regionale",
+        body: `Sei stato invitato nel club "${regionalClub.name}"`,
+        clubId: regionalClub.id,
+      }).catch(() => {});
       return;
     }
 
@@ -334,6 +340,11 @@ export async function createClubInvitesForMoto(userId: string, brand: string, mo
           referenceType: "motoclub",
           referenceId: club.id,
         });
+        sendMotoclubPushNotifications([userId], {
+          title: "Invito al club",
+          body: `Sei stato invitato nel club "${club.name}"`,
+          clubId: club.id,
+        }).catch(() => {});
         continue;
       }
 

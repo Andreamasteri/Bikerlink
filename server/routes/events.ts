@@ -33,6 +33,7 @@ import { systemAccountConditions } from "../lib/system-account-filter";
 import { uploadBuffer, deleteObject } from "../objectStorage";
 import { allLimited } from "../lib/concurrency";
 import { sendNewEventNotificationEmail } from "../email";
+import { sendEventiPushNotifications } from "../push-notifications";
 
 const router = Router();
 
@@ -706,6 +707,24 @@ router.put("/:id", async (req: Request, res: Response) => {
     if (autoInviteBrand !== undefined) updates.autoInviteBrand = autoInviteBrand ? (autoInviteBrand as string).trim() : null;
 
     const [updated] = await db.update(events).set(updates).where(eq(events.id, id)).returning();
+
+    // Notify participants about the update (fire-and-forget, only for approved events)
+    if (existing.status === "approved") {
+      db.select({ userId: eventParticipants.userId })
+        .from(eventParticipants)
+        .where(and(eq(eventParticipants.eventId, id), ne(eventParticipants.userId, userId)))
+        .then((participants) => {
+          if (participants.length > 0) {
+            sendEventiPushNotifications(participants.map((p) => p.userId), {
+              title: "Evento aggiornato",
+              body: `L'evento "${updated.title}" ha ricevuto degli aggiornamenti`,
+              eventId: id,
+            }).catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
+
     return res.json(updated);
   } catch (err) {
     console.error("[events] PUT /:id error:", err);
@@ -907,6 +926,13 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
       referenceId: id,
     });
 
+    // Push al creatore: evento pubblicato
+    sendEventiPushNotifications([evt.creatorId], {
+      title: "Evento approvato!",
+      body: `Il tuo evento "${evt.title}" è ora visibile a tutti.`,
+      eventId: id,
+    }).catch(() => {});
+
     // Inviti automatici ai club (se autoInviteReason valorizzato)
     if (evt.autoInviteReason) {
       await sendClubInvites(evt, id);
@@ -990,6 +1016,7 @@ async function sendClubInvitesByIds(evt: Event, eventId: string, clubIds: string
         }
 
         // Notifiche ai singoli membri
+        const notifiedMemberIds: string[] = [];
         await allLimited(members.map((member) => async () => {
           if (member.userId === evt.creatorId) return;
           try {
@@ -1001,8 +1028,17 @@ async function sendClubInvitesByIds(evt: Event, eventId: string, clubIds: string
               referenceType: "event",
               referenceId: eventId,
             });
+            notifiedMemberIds.push(member.userId);
           } catch {}
         }));
+
+        if (notifiedMemberIds.length > 0) {
+          sendEventiPushNotifications(notifiedMemberIds, {
+            title: "Evento per il tuo club!",
+            body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}".`,
+            eventId,
+          }).catch(() => {});
+        }
       } catch {}
     }
   } catch (err) {
@@ -1035,6 +1071,7 @@ async function sendClubInvites(evt: Event, approvedEventId: string): Promise<voi
           .from(motoClubMembers)
           .where(eq(motoClubMembers.clubId, club.id));
 
+        const notifiedMemberIds: string[] = [];
         await allLimited(members.map((member) => async () => {
           if (member.userId === evt.creatorId) return;
           try {
@@ -1046,8 +1083,17 @@ async function sendClubInvites(evt: Event, approvedEventId: string): Promise<voi
               referenceType: "event",
               referenceId: approvedEventId,
             });
+            notifiedMemberIds.push(member.userId);
           } catch {}
         }));
+
+        if (notifiedMemberIds.length > 0) {
+          sendEventiPushNotifications(notifiedMemberIds, {
+            title: "Evento per il tuo club!",
+            body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}".`,
+            eventId: approvedEventId,
+          }).catch(() => {});
+        }
       } catch {}
     }
   } catch (err) {

@@ -5,7 +5,7 @@ import { db } from "../db";
 import { motoClubs, motoClubMembers, users, messages, conversationParticipants } from "@shared/schema";
 import { eq, and, ne, inArray, desc } from "drizzle-orm";
 import { sendEmail } from "../email";
-import { sendChatPushNotifications } from "../push-notifications";
+import { sendChatPushNotifications, sendMotoclubPushNotifications } from "../push-notifications";
 import { uploadBuffer, downloadBuffer } from "../objectStorage";
 import { addSseClient, removeSseClient, notifyChatEvent } from "../chat-sse";
 
@@ -921,6 +921,17 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
 
     const senderUser = await storage.getUser(userId);
 
+    // For motoclub conversations: resolve club metadata once, reused per recipient
+    let motoclubMeta: { id: string; name: string } | null = null;
+    if (conversation?.conversationType === "motoclub") {
+      const clubRow = await db
+        .select({ id: motoClubs.id, name: motoClubs.name })
+        .from(motoClubs)
+        .where(eq(motoClubs.conversationId, id))
+        .limit(1);
+      motoclubMeta = clubRow[0] ?? null;
+    }
+
     for (const p of participants) {
       if (p.userId !== userId) {
         const targetUser = await storage.getUser(p.userId);
@@ -976,7 +987,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
             }
           }, delay);
         } else if (targetUser && !senderUser?.isFake) {
-          // Push notification (rispetta notification_preferences.chat)
+          // Push notification
           {
             let pushPreview: string;
             if (messageType === "image") pushPreview = "📸 Foto";
@@ -985,11 +996,21 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
               const rawText = finalContent ?? "";
               pushPreview = rawText.length > 120 ? rawText.substring(0, 120) + "…" : rawText;
             }
-            sendChatPushNotifications([p.userId], {
-              senderNickname: senderUser?.nickname ?? "Un utente",
-              preview: pushPreview,
-              conversationId: id,
-            });
+            if (conversation?.conversationType === "motoclub") {
+              // Club chat: rispetta notification_preferences.motoclub
+              sendMotoclubPushNotifications([p.userId], {
+                title: motoclubMeta ? motoclubMeta.name : "Club chat",
+                body: `${senderUser?.nickname ?? "Un membro"}: ${pushPreview}`,
+                clubId: motoclubMeta?.id,
+              });
+            } else {
+              // Conversazione diretta/privata/gruppo: rispetta notification_preferences.chat
+              sendChatPushNotifications([p.userId], {
+                senderNickname: senderUser?.nickname ?? "Un utente",
+                preview: pushPreview,
+                conversationId: id,
+              });
+            }
           }
 
           // Notifica email se utente reale offline con preferenza attiva
