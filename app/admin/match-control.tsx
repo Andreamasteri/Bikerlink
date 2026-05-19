@@ -32,6 +32,7 @@ export default function MatchControlScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [recalcStatus, setRecalcStatus] = useState<"idle" | "running" | "done">("idle");
+  const [resetStatus, setResetStatus] = useState<"idle" | "running" | "done">("idle");
 
   const { data, isLoading, refetch } = useQuery<MatchSettingsResponse>({
     queryKey: ["/api/admin/match-settings"],
@@ -48,6 +49,37 @@ export default function MatchControlScreen() {
     },
     onError: () => Alert.alert("Errore", "Impossibile aggiornare l'impostazione"),
   });
+
+  const handleResetAll = () => {
+    Alert.alert(
+      "Reset preferenze",
+      "Riportare TUTTE le preferenze di matching degli utenti ai valori di default (tutto attivo)? Operazione non reversibile.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setResetStatus("running");
+              const res = await apiRequest("POST", "/api/admin/match-settings/reset-all");
+              const json = await res.json();
+              setResetStatus("done");
+              Alert.alert(
+                "Reset completato",
+                `Preferenze ripristinate per ${json.affected ?? 0} utenti.`,
+              );
+              setTimeout(() => setResetStatus("idle"), 3000);
+              refetch();
+            } catch {
+              setResetStatus("idle");
+              Alert.alert("Errore", "Impossibile resettare le preferenze.");
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleRecalcAll = async () => {
     Alert.alert(
@@ -151,6 +183,37 @@ export default function MatchControlScreen() {
               : recalcStatus === "done"
               ? "Ciclo avviato!"
               : "Ricalcola tutto"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.resetAllBtn,
+            resetStatus === "running" && { opacity: 0.7 },
+            resetStatus === "done" && { backgroundColor: Colors.success, borderColor: Colors.success },
+          ]}
+          onPress={handleResetAll}
+          disabled={resetStatus === "running"}
+          activeOpacity={0.8}
+        >
+          {resetStatus === "running" ? (
+            <ActivityIndicator size="small" color={Colors.warning} />
+          ) : resetStatus === "done" ? (
+            <Ionicons name="checkmark-circle" size={20} color="#fff" />
+          ) : (
+            <MaterialCommunityIcons name="restore" size={20} color={Colors.warning} />
+          )}
+          <Text
+            style={[
+              styles.resetAllText,
+              resetStatus === "done" && { color: "#fff" },
+            ]}
+          >
+            {resetStatus === "running"
+              ? "Reset in corso..."
+              : resetStatus === "done"
+              ? "Reset completato!"
+              : "Reset preferenze utenti"}
           </Text>
         </TouchableOpacity>
 
@@ -271,6 +334,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   recalcAllText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
+  resetAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    backgroundColor: Colors.warning + "15",
+    borderRadius: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.warning + "55",
+  },
+  resetAllText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.warning },
   anomalyBanner: {
     flexDirection: "row",
     alignItems: "center",

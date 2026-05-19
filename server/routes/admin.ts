@@ -9,7 +9,8 @@ import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "
 import { storage } from "../storage";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences } from "@shared/schema";
+import { DEFAULT_PREFS } from "./match-preferences";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, notInArray, lte, isNull, or, ilike } from "drizzle-orm";
 import { sendEmail, sendEmailDetailed, getEmailDiagnostics } from "../email";
@@ -6391,6 +6392,23 @@ router.post("/users/:userId/matches/recalculate", handleMatchInspectorRecalculat
 router.get("/match-inspector/users", handleMatchInspectorUsers);
 router.get("/match-inspector/users/:userId", handleMatchInspectorUserDetail);
 router.post("/match-inspector/users/:userId/recalculate", handleMatchInspectorRecalculate);
+
+// POST /api/admin/match-settings/reset-all
+// Resetta TUTTE le preferenze di matching degli utenti ai valori di default (tutto attivo).
+// Utile dopo aver aggiunto nuovi tipi di match.
+router.post("/match-settings/reset-all", async (_req: Request, res: Response) => {
+  try {
+    // Use drizzle to derive column updates from the canonical DEFAULT_PREFS map
+    // — this keeps the reset in sync with new preference columns automatically.
+    const updates: Record<string, boolean | Date> = { ...DEFAULT_PREFS, updatedAt: new Date() };
+    const result = await db.update(matchPreferences).set(updates as never);
+    const affected = (result as { rowCount?: number }).rowCount ?? 0;
+    return res.json({ ok: true, affected });
+  } catch (err) {
+    console.error("[ADMIN match-settings reset-all] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
 
 // POST /api/admin/matches/recalculate-all
 router.post("/matches/recalculate-all", async (_req: Request, res: Response) => {

@@ -13,7 +13,7 @@ function requireAuth(req: Request, res: Response, next: () => void) {
   next();
 }
 
-const DEFAULT_PREFS = {
+export const DEFAULT_PREFS = {
   bikerBikerBrand: true,
   bikerZavorrinaBrand: true,
   bikerClubBrand: true,
