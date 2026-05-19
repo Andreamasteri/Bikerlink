@@ -1152,6 +1152,7 @@ export class DatabaseStorage implements IStorage {
     // so ghost mode = visible on map with ±20km randomized position, not hidden.
     const conditions = [
       eq(users.status, "active"),
+      eq(users.isFake, false),
       ...systemAccountConditions(users),
       sql`${userProfiles.latitude} IS NOT NULL`,
       sql`${userProfiles.longitude} IS NOT NULL`,
@@ -1230,7 +1231,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async countOnlineUsers(since: Date, countries?: string[]): Promise<number> {
-    const conditions: any[] = [eq(users.status, "active"), gte(users.lastLoginAt, since), eq(users.ghostMode, false), ...systemAccountConditions(users)];
+    const conditions: any[] = [eq(users.status, "active"), eq(users.isFake, false), gte(users.lastLoginAt, since), eq(users.ghostMode, false), ...systemAccountConditions(users)];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(...conditions));
     return result[0]?.count ?? 0;
@@ -1238,7 +1239,7 @@ export class DatabaseStorage implements IStorage {
 
   async countAvailableUsers(): Promise<number> {
     // Task #1212: notInArray(users.role, ["admin"]) — admins excluded from available-user count.
-    const conditions = [eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), ...systemAccountConditions(users)];
+    const conditions = [eq(users.status, "active"), eq(users.isFake, false), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), ...systemAccountConditions(users)];
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(userProfiles).innerJoin(users, eq(users.id, userProfiles.userId)).where(and(...conditions));
     return result[0]?.count ?? 0;
   }
@@ -1248,7 +1249,7 @@ export class DatabaseStorage implements IStorage {
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
     // Task #1212: notInArray(users.role, ["admin"]) — admins excluded from heartbeat list.
-    const conditions: any[] = [eq(users.status, "active"), eq(users.ghostMode, false), ...systemAccountConditions(users)];
+    const conditions: any[] = [eq(users.status, "active"), eq(users.isFake, false), eq(users.ghostMode, false), ...systemAccountConditions(users)];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
     } else if (!onlineIds) {
@@ -1276,7 +1277,7 @@ export class DatabaseStorage implements IStorage {
       .select({ user: users, profile: userProfiles, distance: distanceExpr })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(eq(users.status, "active"), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), ...systemAccountConditions(users)))
+      .where(and(eq(users.status, "active"), eq(users.isFake, false), eq(userProfiles.isAvailable, true), eq(users.ghostMode, false), ...systemAccountConditions(users)))
       .orderBy(sql`distance`);
     // Privacy: null out derived distance for users who opted out of map visibility
     return maskHiddenLocationRows(results);
@@ -1663,6 +1664,7 @@ export class DatabaseStorage implements IStorage {
       : sql<number>`0`.as("distance");
     const conditions: any[] = [
       eq(users.status, "active"),
+      eq(users.isFake, false),
       eq(userProfiles.isAvailable, true),
       or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
       eq(users.ghostMode, false),
@@ -1690,6 +1692,7 @@ export class DatabaseStorage implements IStorage {
       : sql<number>`0`.as("distance");
     const conditions: any[] = [
       eq(users.status, "active"),
+      eq(users.isFake, false),
       eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"),
       eq(users.ghostMode, false),

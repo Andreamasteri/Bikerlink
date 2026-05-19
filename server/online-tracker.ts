@@ -8,6 +8,7 @@ interface TrackedUser {
   isAvailable: boolean;
   ghostMode: boolean;
   country: string | null;
+  isFake: boolean;
   lastSeen: Date;
 }
 
@@ -48,7 +49,9 @@ export class OnlineTracker {
   setOnline(userId: string, data: Omit<TrackedUser, "lastSeen">): void {
     // Task #1236: system accounts (admin role OR protected nickname) are never
     // tracked — they must not appear in map counters or heartbeat lists.
-    if (isSystemEntry(data) || data.status !== "active") {
+    // Task #1533: fake/seed accounts (isFake=true) are also excluded from the
+    // tracker so that map counters and lists only reflect real users.
+    if (isSystemEntry(data) || data.status !== "active" || data.isFake) {
       this.users.delete(userId);
       return;
     }
@@ -95,7 +98,7 @@ export class OnlineTracker {
   countOnlineUsers(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {
-      if (isSystemEntry(entry) || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active" || entry.isFake) continue;
       if (entry.ghostMode) continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
       count++;
@@ -106,7 +109,7 @@ export class OnlineTracker {
   countAvailableBikers(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {
-      if (isSystemEntry(entry) || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active" || entry.isFake) continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "biker" && entry.userType !== "coppia") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
@@ -118,7 +121,7 @@ export class OnlineTracker {
   countAvailableZavorrine(countries?: string[]): number {
     let count = 0;
     for (const entry of this.users.values()) {
-      if (isSystemEntry(entry) || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active" || entry.isFake) continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "zavorrina") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
@@ -130,7 +133,7 @@ export class OnlineTracker {
   getOnlineUserIds(countries?: string[]): string[] {
     const ids: string[] = [];
     for (const [userId, entry] of this.users) {
-      if (isSystemEntry(entry) || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active" || entry.isFake) continue;
       if (entry.ghostMode) continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
       ids.push(userId);
@@ -141,7 +144,7 @@ export class OnlineTracker {
   getAvailableBikerIds(countries?: string[]): string[] {
     const ids: string[] = [];
     for (const [userId, entry] of this.users) {
-      if (isSystemEntry(entry) || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active" || entry.isFake) continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "biker" && entry.userType !== "coppia") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;
@@ -153,7 +156,7 @@ export class OnlineTracker {
   getAvailableZavorrinaIds(countries?: string[]): string[] {
     const ids: string[] = [];
     for (const [userId, entry] of this.users) {
-      if (isSystemEntry(entry) || entry.status !== "active") continue;
+      if (isSystemEntry(entry) || entry.status !== "active" || entry.isFake) continue;
       if (!entry.isAvailable || entry.ghostMode) continue;
       if (entry.userType !== "zavorrina") continue;
       if (countries && countries.length > 0 && (!entry.country || !countries.includes(entry.country))) continue;

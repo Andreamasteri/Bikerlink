@@ -158,6 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               isAvailable: (profile?.isAvailable ?? false) && !(user.ghostMode ?? false),
               ghostMode: user.ghostMode ?? false,
               country: user.country ?? null,
+              isFake: user.isFake ?? false,
             });
           }
           if (user.lastLoginAt) {

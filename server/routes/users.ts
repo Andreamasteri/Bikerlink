@@ -925,7 +925,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
         : sqlTag<number>`0`.as("distance");
       // Ghost users: always treated as offline regardless of lastLoginAt, but should appear in the
       // offline set so they show with a randomized position (not hidden) when offlinePositionRandomize is enabled.
-      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt), eq(usersTable.ghostMode, true)), ...systemAccountConditions(usersTable)];
+      const offlineConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.isFake, false), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt), eq(usersTable.ghostMode, true)), ...systemAccountConditions(usersTable)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResultsRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
@@ -1088,7 +1088,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const bikerConds: any[] = [eq(usersTable.status, "active"), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia")), eq(usersTable.ghostMode, false), ...systemAccountConditions(usersTable)];
+      const bikerConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.isFake, false), or(eq(usersTable.userType, "biker"), eq(usersTable.userType, "coppia")), eq(usersTable.ghostMode, false), ...systemAccountConditions(usersTable)];
       if (countriesParam && countriesParam.length > 0) bikerConds.push(inArr(usersTable.country, countriesParam));
       const allBikersRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
@@ -1183,7 +1183,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.userType, "zavorrina"), eq(usersTable.ghostMode, false), ...systemAccountConditions(usersTable)];
+      const zavConds: any[] = [eq(usersTable.status, "active"), eq(usersTable.isFake, false), eq(usersTable.userType, "zavorrina"), eq(usersTable.ghostMode, false), ...systemAccountConditions(usersTable)];
       if (countriesParam && countriesParam.length > 0) zavConds.push(inArr(usersTable.country, countriesParam));
       const allZavRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
