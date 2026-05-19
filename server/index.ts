@@ -1477,6 +1477,82 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[INIT] autoSeedFakeUsers error:", e);
         }
 
+        // Phase 5.5: auto-trigger mass seed if new geographic zones (IN, AU, ID, TH, ZA, NG, KE)
+        // are not yet populated. Runs in background so it does not block startup.
+        // Uses a one-time flag (mass_seed_new_zones_v1) to skip checks on subsequent boots
+        // once the seed has completed successfully.
+        setTimeout(async () => {
+          try {
+            const { storage: stPhase55 } = await import("./storage");
+
+            // One-time flag: skip entirely on subsequent deploys after a verified successful seed
+            const newZonesDone = await stPhase55.getAppSetting("mass_seed_new_zones_v1");
+            if (newZonesDone?.value === "done") {
+              console.log("[INIT] Phase 5.5 mass seed check skipped (new zones already seeded)");
+              return;
+            }
+
+            const fakeUsersSetting55 = await stPhase55.getAppSetting("fake_users_enabled");
+            if (fakeUsersSetting55?.value !== "true") {
+              console.log("[INIT] Phase 5.5 mass seed check skipped (fake users disabled)");
+              return;
+            }
+
+            const { EUROPEAN_ZONES: EZ55 } = await import("./mass-seed-data");
+            const NEW_ZONE_COUNTRIES = new Set(["IN", "AU", "ID", "TH", "ZA", "NG", "KE"]);
+            // Build per-country expected zone counts so we can check per-country presence,
+            // not just an aggregate total that could mask a partially populated set.
+            const zonesPerCountry = new Map<string, number>();
+            for (const z of EZ55) {
+              if (NEW_ZONE_COUNTRIES.has(z.country)) {
+                zonesPerCountry.set(z.country, (zonesPerCountry.get(z.country) ?? 0) + 1);
+              }
+            }
+
+            // Returns true only when EVERY new country has at least minPerZone users per zone.
+            const checkCoverage = async (minPerZone: number): Promise<boolean> => {
+              const rows = await pool.query<{ country: string; cnt: number }>(
+                `SELECT country, COUNT(*)::int AS cnt FROM users
+                 WHERE invitation_code = 'mass_seed_5k_v1' AND country = ANY($1::text[])
+                 GROUP BY country`,
+                [Array.from(NEW_ZONE_COUNTRIES)]
+              );
+              const countByCountry = new Map(rows.rows.map(r => [r.country, r.cnt]));
+              for (const [country, zoneCount] of zonesPerCountry) {
+                const have = countByCountry.get(country) ?? 0;
+                if (have < zoneCount * minPerZone) return false;
+              }
+              return true;
+            };
+
+            const alreadyCovered = await checkCoverage(1);
+
+            if (!alreadyCovered) {
+              console.log("[INIT] Phase 5.5 new-zone users missing — triggering mass seed in background");
+              const { massSeedFakeUsers } = await import("./mass-seed");
+              // massSeedFakeUsers() swallows internal errors and always resolves.
+              // Write the completion flag only after verifying per-country coverage
+              // via a fresh DB query — not by trusting the return value of the function.
+              massSeedFakeUsers()
+                .then(async () => {
+                  const succeeded = await checkCoverage(1).catch(() => false);
+                  if (succeeded) {
+                    await stPhase55.upsertAppSetting("mass_seed_new_zones_v1", "done").catch(() => {});
+                    console.log("[mass-seed] Phase 5.5 completion flag written — all new zones populated");
+                  } else {
+                    console.warn("[mass-seed] Phase 5.5 seed completed but coverage check failed — flag NOT written; will retry on next boot");
+                  }
+                })
+                .catch((err: unknown) => console.error("[mass-seed] auto-trigger error:", err));
+            } else {
+              console.log("[INIT] Phase 5.5 new-zone users OK (per-country coverage verified) — writing completion flag");
+              await stPhase55.upsertAppSetting("mass_seed_new_zones_v1", "done").catch(() => {});
+            }
+          } catch (e) {
+            console.warn("[INIT] Phase 5.5 mass seed auto-check error:", e);
+          }
+        }, 5_000);
+
         // Phase 6: club conversation sync
         await delay(2_000);
         try {
