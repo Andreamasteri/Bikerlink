@@ -8,7 +8,7 @@
     "message": "OTA-1 rv8.0.0: prima OTA del ciclo V3",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #974: apertura ciclo V3 — versionName 3.0.0, versionCode 39, runtimeVersion 8.0.0, New Architecture abilitata (newArchEnabled=true). Prima OTA del ciclo 8.x. CURRENT_OTA_NUMBER=1. APK build inviata Task #982 (2026-04-26T12:17:55Z, commit 5da5977).",
+    "note": "Task #974: apertura ciclo V3 \u2014 versionName 3.0.0, versionCode 39, runtimeVersion 8.0.0, New Architecture abilitata (newArchEnabled=true). Prima OTA del ciclo 8.x. CURRENT_OTA_NUMBER=1. APK build inviata Task #982 (2026-04-26T12:17:55Z, commit 5da5977).",
     "platforms": [
       "android"
     ],
@@ -25,7 +25,7 @@
     "apkUrl": "https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk",
     "apkCompletedAt": "2026-04-26T12:35:18.932Z",
     "deviceTestStatus": "pending",
-    "deviceTestNote": "Task #996: APK v39 (versionCode 39, versionName 3.0.0, rv 8.0.0) da verificare su Android — no crash al boot, login funzionante, mappe visibili. URL: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk",
+    "deviceTestNote": "Task #996: APK v39 (versionCode 39, versionName 3.0.0, rv 8.0.0) da verificare su Android \u2014 no crash al boot, login funzionante, mappe visibili. URL: https://expo.dev/artifacts/eas/nUADFAf6ddBUzcbZMjKBxR.apk",
     "status": "superseded"
   },
   {
@@ -37,7 +37,7 @@
     "message": "APK v40: build nativa ottimizzata (expo-battery rimosso, WebP compression, icon compressa)",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1012: APK v40 (versionCode 40, versionName 3.0.0, rv 8.0.0, New Architecture). Ottimizzazioni: expo-battery rimosso (Task #1010), WebP compression (Tasks #1005/#1007/#1008), android-icon-background.png compressa (1.2MB→359KB), EAS_NO_VCS=1 aggiunto a build-apk.sh.",
+    "note": "Task #1012: APK v40 (versionCode 40, versionName 3.0.0, rv 8.0.0, New Architecture). Ottimizzazioni: expo-battery rimosso (Task #1010), WebP compression (Tasks #1005/#1007/#1008), android-icon-background.png compressa (1.2MB\u2192359KB), EAS_NO_VCS=1 aggiunto a build-apk.sh.",
     "platforms": [
       "android"
     ],
@@ -54,7 +54,7 @@
     "apkUrl": null,
     "apkCompletedAt": null,
     "deviceTestStatus": "pending",
-    "deviceTestNote": "APK v40 in build su EAS — da verificare su Android dopo completamento (no crash al boot, login funzionante, mappe visibili).",
+    "deviceTestNote": "APK v40 in build su EAS \u2014 da verificare su Android dopo completamento (no crash al boot, login funzionante, mappe visibili).",
     "status": "superseded"
   },
   {
@@ -92,7 +92,7 @@
     "message": "OTA-3 rv8.0.0: rifiniture spiderfy + allineamento codice corrente",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1018: pubblicazione di allineamento. Distribuisce le rifiniture finali del task #1016 (spiderfy markers — commit 5bb18fc, 022cf4d post-OTA-2) e il bundle riflette CURRENT_OTA_NUMBER=3. Nota: la lingua greca del task #1015 era già stata distribuita via OTA-2 (commit d768a0c5 conteneva già lib/i18n/el.ts e relative integrazioni).",
+    "note": "Task #1018: pubblicazione di allineamento. Distribuisce le rifiniture finali del task #1016 (spiderfy markers \u2014 commit 5bb18fc, 022cf4d post-OTA-2) e il bundle riflette CURRENT_OTA_NUMBER=3. Nota: la lingua greca del task #1015 era gi\u00e0 stata distribuita via OTA-2 (commit d768a0c5 conteneva gi\u00e0 lib/i18n/el.ts e relative integrazioni).",
     "platforms": [
       "android"
     ],
@@ -141,7 +141,7 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-5 rv8.0.0: fix versione app nel profilo (v? → v39 3.0.0)",
+    "message": "OTA-5 rv8.0.0: fix versione app nel profilo (v? \u2192 v39 3.0.0)",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
     "note": "Task #1043: fix visualizzazione versione app nel profilo utente. Sostituito Constants.expoConfig?.android?.versionCode (undefined a runtime) con Application.nativeBuildVersion (expo-application v55.0.14). Mostra ora 'v{versionCode}  {versionName}' es. 'v39  3.0.0'. CURRENT_OTA_NUMBER=5.",
@@ -167,10 +167,10 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-6 rv8.0.0: Fix Bearer Token: priorità su cookie stale — risolto redirect al login da System Monitor",
+    "message": "OTA-6 rv8.0.0: Fix Bearer Token: priorit\u00e0 su cookie stale \u2014 risolto redirect al login da System Monitor",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1044: fix middleware Bridge Bearer→Cookie in server/routes.ts. Rimossa la guard `!req.headers.cookie.includes('connect.sid=')`: ora quando è presente un header Authorization: Bearer, il cookie connect.sid stale viene sempre rimosso e sostituito con il token Bearer. Risolve il redirect al login su Android quando si clicca 'System Monitor' nel pannello admin (cookie stale ignorato, Bearer token ha sempre la precedenza). CURRENT_OTA_NUMBER=6.",
+    "note": "Task #1044: fix middleware Bridge Bearer\u2192Cookie in server/routes.ts. Rimossa la guard `!req.headers.cookie.includes('connect.sid=')`: ora quando \u00e8 presente un header Authorization: Bearer, il cookie connect.sid stale viene sempre rimosso e sostituito con il token Bearer. Risolve il redirect al login su Android quando si clicca 'System Monitor' nel pannello admin (cookie stale ignorato, Bearer token ha sempre la precedenza). CURRENT_OTA_NUMBER=6.",
     "platforms": [
       "android"
     ],
@@ -196,7 +196,7 @@
     "message": "OTA-7 rv8.0.0: trigger OTA check on login + better error logging (phase/source/platform)",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Refactor OTA check in lib/ota-check.ts. Aggiunto trigger su login/register success (force, bypass cooldown, delay 1500ms) per evitare il caso 'app aperta da prima della pubblicazione → AppState mai cambiato → check non scatta'. Migliorato logging errori: phase (check/fetch/reload), source (startup/appstate/login/register), platform, currentUpdateId. Eventi 'ok:no-update'/'ok:fetched' segnalati come INFO. CURRENT_OTA_NUMBER=7.",
+    "note": "Refactor OTA check in lib/ota-check.ts. Aggiunto trigger su login/register success (force, bypass cooldown, delay 1500ms) per evitare il caso 'app aperta da prima della pubblicazione \u2192 AppState mai cambiato \u2192 check non scatta'. Migliorato logging errori: phase (check/fetch/reload), source (startup/appstate/login/register), platform, currentUpdateId. Eventi 'ok:no-update'/'ok:fetched' segnalati come INFO. CURRENT_OTA_NUMBER=7.",
     "platforms": [
       "android"
     ],
@@ -219,10 +219,10 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-8 rv8.0.0: System Monitor — errori chiari (sessione/403/5xx) + log diagnostici admin",
+    "message": "OTA-8 rv8.0.0: System Monitor \u2014 errori chiari (sessione/403/5xx) + log diagnostici admin",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1051: il pulsante 'Riprova' nel pannello admin → System Monitor mostrava un errore generico anche quando la sessione era scaduta. Ora il fetch /api/admin/system-health distingue 401 (sessione scaduta), 403 (non admin), 5xx (errore server) e network. La schermata di errore mostra titolo, descrizione e azione corretta. Server: requireAdmin emette log [admin-auth] con motivo (no_session/not_admin/db_error) e include 'reason' nel JSON di risposta. CURRENT_OTA_NUMBER=8.",
+    "note": "Task #1051: il pulsante 'Riprova' nel pannello admin \u2192 System Monitor mostrava un errore generico anche quando la sessione era scaduta. Ora il fetch /api/admin/system-health distingue 401 (sessione scaduta), 403 (non admin), 5xx (errore server) e network. La schermata di errore mostra titolo, descrizione e azione corretta. Server: requireAdmin emette log [admin-auth] con motivo (no_session/not_admin/db_error) e include 'reason' nel JSON di risposta. CURRENT_OTA_NUMBER=8.",
     "platforms": [
       "android"
     ],
@@ -245,10 +245,10 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-9 rv8.0.0: Riprova → silent re-auth + 'Vai al login' + tipi puliti",
+    "message": "OTA-9 rv8.0.0: Riprova \u2192 silent re-auth + 'Vai al login' + tipi puliti",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1051 (revisione code review): (1) lib/query-client.ts esporta silentAuthRecheck() — one-shot fetch /api/auth/me che il chiamante usa per distinguere 401 transitorio (cookie stale, Bearer ancora valido) da sessione realmente scaduta. (2) app/admin/system.tsx: queryFn invoca silentAuthRecheck e ritenta una sola volta se la sessione è valida. La schermata di errore usa useAuth().sessionExpired e mostra CTA 'Vai al login' (logout + router.replace) quando la sessione è davvero persa. Tipo errore strutturato (class AdminFetchError) — eliminati tutti i cast `any`. (3) server/routes/admin.ts: log [admin-auth] include sessionId troncato (sid=XXXXXXXX…) per diagnostica. CURRENT_OTA_NUMBER=9.",
+    "note": "Task #1051 (revisione code review): (1) lib/query-client.ts esporta silentAuthRecheck() \u2014 one-shot fetch /api/auth/me che il chiamante usa per distinguere 401 transitorio (cookie stale, Bearer ancora valido) da sessione realmente scaduta. (2) app/admin/system.tsx: queryFn invoca silentAuthRecheck e ritenta una sola volta se la sessione \u00e8 valida. La schermata di errore usa useAuth().sessionExpired e mostra CTA 'Vai al login' (logout + router.replace) quando la sessione \u00e8 davvero persa. Tipo errore strutturato (class AdminFetchError) \u2014 eliminati tutti i cast `any`. (3) server/routes/admin.ts: log [admin-auth] include sessionId troncato (sid=XXXXXXXX\u2026) per diagnostica. CURRENT_OTA_NUMBER=9.",
     "platforms": [
       "android"
     ],
@@ -274,7 +274,7 @@
     "message": "OTA-10 rv8.0.0: silent re-auth admin centralizzato in getQueryFn",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1051 (revisione code review #2): centralizzata la logica di silent re-auth one-shot per tutte le chiamate /api/admin/* nel default getQueryFn di lib/query-client.ts (non più solo in app/admin/system.tsx). silentAuthRecheck() ora invalida esplicitamente la query /api/auth/me quando la sessione risulta persa, così auth-context setta sessionExpired globalmente per tutte le pagine admin. CURRENT_OTA_NUMBER=10.",
+    "note": "Task #1051 (revisione code review #2): centralizzata la logica di silent re-auth one-shot per tutte le chiamate /api/admin/* nel default getQueryFn di lib/query-client.ts (non pi\u00f9 solo in app/admin/system.tsx). silentAuthRecheck() ora invalida esplicitamente la query /api/auth/me quando la sessione risulta persa, cos\u00ec auth-context setta sessionExpired globalmente per tutte le pagine admin. CURRENT_OTA_NUMBER=10.",
     "platforms": [
       "android"
     ],
@@ -300,7 +300,7 @@
     "message": "OTA-11 rv8.0.0: AdminFetchError a livello modulo + reason hyphenated",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1051 (rev. code review #3): (1) AdminFetchError + isAdminError spostati a livello modulo in app/admin/system.tsx — dichiararli dentro il componente faceva fallire instanceof tra render quando React Query restituisce un errore cached. isAdminError ora ha anche un fallback duck-type (e.name === 'AdminFetchError'). (2) server/routes/admin.ts: reason values hyphenated (no-session/user-not-found/not-admin/db-error) e sessionId truncato agli ultimi 6 caratteri (sid=…XXXXXX). CURRENT_OTA_NUMBER=11.",
+    "note": "Task #1051 (rev. code review #3): (1) AdminFetchError + isAdminError spostati a livello modulo in app/admin/system.tsx \u2014 dichiararli dentro il componente faceva fallire instanceof tra render quando React Query restituisce un errore cached. isAdminError ora ha anche un fallback duck-type (e.name === 'AdminFetchError'). (2) server/routes/admin.ts: reason values hyphenated (no-session/user-not-found/not-admin/db-error) e sessionId truncato agli ultimi 6 caratteri (sid=\u2026XXXXXX). CURRENT_OTA_NUMBER=11.",
     "platforms": [
       "android"
     ],
@@ -326,7 +326,7 @@
     "message": "OTA-12 rv8.0.0: fix matching reason 403 (not-admin/not_admin)",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1051 (rev. code review #4 — APPROVED_WITH_COMMENTS): fix non-blocking comment. app/admin/system.tsx ora accetta sia 'not-admin' (formato server corrente) sia 'not_admin' (legacy) per mostrare il messaggio esplicito 'Il tuo account non ha i permessi di amministratore' nello stato 403. CURRENT_OTA_NUMBER=12.",
+    "note": "Task #1051 (rev. code review #4 \u2014 APPROVED_WITH_COMMENTS): fix non-blocking comment. app/admin/system.tsx ora accetta sia 'not-admin' (formato server corrente) sia 'not_admin' (legacy) per mostrare il messaggio esplicito 'Il tuo account non ha i permessi di amministratore' nello stato 403. CURRENT_OTA_NUMBER=12.",
     "platforms": [
       "android"
     ],
@@ -376,10 +376,10 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-14 rv8.0.0: Fix audio expo-audio — shouldPlayInBackground corretto, AudioControlsService aggiunto al manifest",
+    "message": "OTA-14 rv8.0.0: Fix audio expo-audio \u2014 shouldPlayInBackground corretto, AudioControlsService aggiunto al manifest",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Fix bug audio: staysActiveInBackground (non esiste in expo-audio) → shouldPlayInBackground:true + interruptionMode:duckOthers in setAudioModeAsync. Aggiunto expo-audio plugin in app.json. Aggiunto AudioControlsService service declaration in AndroidManifest.xml (necessario per MediaSessionService). Questi fix risolvono nessun suono nell'app. CURRENT_OTA_NUMBER=14.",
+    "note": "Fix bug audio: staysActiveInBackground (non esiste in expo-audio) \u2192 shouldPlayInBackground:true + interruptionMode:duckOthers in setAudioModeAsync. Aggiunto expo-audio plugin in app.json. Aggiunto AudioControlsService service declaration in AndroidManifest.xml (necessario per MediaSessionService). Questi fix risolvono nessun suono nell'app. CURRENT_OTA_NUMBER=14.",
     "platforms": [
       "android"
     ],
@@ -403,7 +403,7 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-15 rv8.0.0: Fix audio — stop/overlap/background/lock screen controls",
+    "message": "OTA-15 rv8.0.0: Fix audio \u2014 stop/overlap/background/lock screen controls",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
     "note": "Set completo di fix audio: task #1061 (STOP audio non funzionante + sovrapposizione tracce risolti), #1064 (costanti AUDIO_MODE_ACTIVE/AUDIO_MODE_INACTIVE centralizzate per setAudioModeAsync), #1065 (audio in background + controlli MediaSession su lock screen via Android foreground service). CURRENT_OTA_NUMBER=15.",
@@ -430,10 +430,10 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-16 rv8.0.0: Fix ventaglio biker sovrapposti — OMS bundlato inline (CDN unpkg /oms.min.js era 404)",
+    "message": "OTA-16 rv8.0.0: Fix ventaglio biker sovrapposti \u2014 OMS bundlato inline (CDN unpkg /oms.min.js era 404)",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1077: il ventaglio biker non ha mai funzionato in produzione perché la WebView caricava lo script https://unpkg.com/overlapping-marker-spiderfier-leaflet@0.2.7/dist/oms.min.js — questo URL restituisce 404 (il file pubblicato sul package è dist/oms.js senza .min). Di conseguenza OverlappingMarkerSpiderfier non veniva mai definito e il fallback al click classico veniva sempre attivato (vedi OTA-2..OTA-15 tutte rotte). Fix in lib/leaflet-map-html.ts: (1) plugin OMS v0.2.7 bundlato inline (5374 byte) — nessuna dipendenza CDN runtime; (2) nearbyDistance 22 -> 34px per allinearla alla dimensione effettiva delle icone (30px); (3) postMsg diagnostico {type:'omsStatus', omsReady, error} all'avvio per autodiagnosi futura. CURRENT_OTA_NUMBER=16.",
+    "note": "Task #1077: il ventaglio biker non ha mai funzionato in produzione perch\u00e9 la WebView caricava lo script https://unpkg.com/overlapping-marker-spiderfier-leaflet@0.2.7/dist/oms.min.js \u2014 questo URL restituisce 404 (il file pubblicato sul package \u00e8 dist/oms.js senza .min). Di conseguenza OverlappingMarkerSpiderfier non veniva mai definito e il fallback al click classico veniva sempre attivato (vedi OTA-2..OTA-15 tutte rotte). Fix in lib/leaflet-map-html.ts: (1) plugin OMS v0.2.7 bundlato inline (5374 byte) \u2014 nessuna dipendenza CDN runtime; (2) nearbyDistance 22 -> 34px per allinearla alla dimensione effettiva delle icone (30px); (3) postMsg diagnostico {type:'omsStatus', omsReady, error} all'avvio per autodiagnosi futura. CURRENT_OTA_NUMBER=16.",
     "platforms": [
       "android"
     ],
@@ -457,10 +457,10 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-17 rv8.0.0: sicurezza, autorizzazioni, fix profilo — task #1083 #1086-#1096",
+    "message": "OTA-17 rv8.0.0: sicurezza, autorizzazioni, fix profilo \u2014 task #1083 #1086-#1096",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1077 (già in OTA-16), #1083 (profilo spaziatura tab bar), #1086 (seeded/demo credentials), #1087 (chat authorization), #1088 (auth session control), #1089 (public endpoints SSRF), #1090 (security scan), #1091 (auth session control rev.), #1092 (media access control), #1093 (motoclub proposal authorization), #1094 (telemetry reporting abuse), #1095/#1096 (user discovery location privacy). CURRENT_OTA_NUMBER=17.",
+    "note": "Task #1077 (gi\u00e0 in OTA-16), #1083 (profilo spaziatura tab bar), #1086 (seeded/demo credentials), #1087 (chat authorization), #1088 (auth session control), #1089 (public endpoints SSRF), #1090 (security scan), #1091 (auth session control rev.), #1092 (media access control), #1093 (motoclub proposal authorization), #1094 (telemetry reporting abuse), #1095/#1096 (user discovery location privacy). CURRENT_OTA_NUMBER=17.",
     "platforms": [
       "android"
     ],
@@ -484,7 +484,7 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-18 rv8.0.0: fix bundle OTA-17 (Metro cache stale — CURRENT_OTA_NUMBER mostrava 15)",
+    "message": "OTA-18 rv8.0.0: fix bundle OTA-17 (Metro cache stale \u2014 CURRENT_OTA_NUMBER mostrava 15)",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
     "note": "Fix: OTA-17 aveva CURRENT_OTA_NUMBER=15 nel bundle a causa di Metro transform cache stale. Ripubblicazione con --reset-cache. Stessi task inclusi di OTA-17: #1083 #1086-#1096. CURRENT_OTA_NUMBER=18.",
@@ -567,7 +567,7 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-21 rv8.0.0: OTA-21 rv8.0.0: security — codice verifica email 8 char + validazione URL annunci",
+    "message": "OTA-21 rv8.0.0: OTA-21 rv8.0.0: security \u2014 codice verifica email 8 char + validazione URL annunci",
     "note": "CURRENT_OTA_NUMBER=21. Pubblicato da publish-ota.sh (un comando solo).",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
@@ -595,7 +595,7 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-22 rv8.0.0: Task #1132: default stile taskbar da admin — admin imposta default tutti/scorri/altro/raggruppa; utenti senza preferenza ricevono il default; label in profilo; sezione admin settings",
+    "message": "OTA-22 rv8.0.0: Task #1132: default stile taskbar da admin \u2014 admin imposta default tutti/scorri/altro/raggruppa; utenti senza preferenza ricevono il default; label in profilo; sezione admin settings",
     "note": "CURRENT_OTA_NUMBER=22. Pubblicato da publish-ota.sh (un comando solo).",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
@@ -651,7 +651,7 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-24 rv8.0.0: Menù profilo: flag admin stile mappa + preferenze unità con default paese (US/GB→imperiale) + taskbar semplificata (raggruppa/scorri) + popup aggiornamento app non bloccante + pulizia codice",
+    "message": "OTA-24 rv8.0.0: Men\u00f9 profilo: flag admin stile mappa + preferenze unit\u00e0 con default paese (US/GB\u2192imperiale) + taskbar semplificata (raggruppa/scorri) + popup aggiornamento app non bloccante + pulizia codice",
     "note": "CURRENT_OTA_NUMBER=24. Pubblicato da publish-ota.sh (un comando solo).",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
@@ -679,7 +679,7 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-25 rv8.0.0: OTA-25 rv8.0.0: riavvio differito al backgrounding — update si applica silenziosamente alla prossima uscita dall'app (Task #1164)",
+    "message": "OTA-25 rv8.0.0: OTA-25 rv8.0.0: riavvio differito al backgrounding \u2014 update si applica silenziosamente alla prossima uscita dall'app (Task #1164)",
     "note": "CURRENT_OTA_NUMBER=25. Pubblicato da publish-ota.sh (un comando solo).",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
@@ -736,7 +736,7 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-27 rv8.0.0: OTA-27: test OTA — scritta ciaociao blu in basso a destra nel profilo utente",
+    "message": "OTA-27 rv8.0.0: OTA-27: test OTA \u2014 scritta ciaociao blu in basso a destra nel profilo utente",
     "note": "CURRENT_OTA_NUMBER=27. Pubblicato da publish-ota.sh (un comando solo).",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
@@ -764,7 +764,7 @@
     "cycle": "8.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-28 rv8.0.0: Fix crash app: isWeb undefined in welcome.tsx → Platform.OS === web",
+    "message": "OTA-28 rv8.0.0: Fix crash app: isWeb undefined in welcome.tsx \u2192 Platform.OS === web",
     "note": "CURRENT_OTA_NUMBER=28. Pubblicato da publish-ota.sh (un comando solo).",
     "runtimeVersion": "8.0.0",
     "jsEngine": "hermes",
@@ -783,7 +783,34 @@
     "apkVersionCode": 41,
     "apkVersionName": null,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-19T12:20:43.953Z"
+  },
+  {
+    "updateNumber": 29,
+    "version": "1.29.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-29 rv8.0.0: OTA-29: fumetti nickname mappa, icone adattive Android, calibrazione assi sensori, rank sprint profilo, filtri privacy ricerca utenti, notifiche push MotoClub/eventi, preferenze notifiche persistenti, reset preferenze admin, storico consumi batteria, esclusione ricarica da campioni batteria, grafico combinato batteria, hardening OTA device-id+heartbeat",
+    "note": "CURRENT_OTA_NUMBER=29. Pubblicato da publish-ota.sh (un comando solo).",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "c24193bb-167f-4740-a7f8-4dcbb3880aa1",
+    "bundleUrl": "private/ota/ota-1.29.0-1779205782983.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "e9531d015536367e2713df39a8592160bdb99d34",
+    "easDashboard": null,
+    "apkBuildId": "1e2d143e-0615-47e8-b4a2-d6fe831b6d21",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/1e2d143e-0615-47e8-b4a2-d6fe831b6d21",
+    "apkVersionCode": 41,
+    "apkVersionName": null,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published"
   }
 ]

@@ -56,7 +56,7 @@ bash scripts/build-apk.sh production   # AAB Play Store
 - **Runtime Version**: `8.0.0` (ciclo corrente, APK v45) ← CICLO V3
 - **APK corrente**: versionCode **45**, versionName **3.4.0** (buildId: `91cfde53-66e7-45fc-83f0-d7f72a98fcde`, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk — STABILE)
 - **APK precedente (STABILE distribuita)**: versionCode 44, versionName 3.3.0 (buildId: `b148edc3-de25-4f55-b5c4-c4466b4ccc0b`, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk)
-- **OTA corrente**: OTA-26 (releaseId: `62fd5d01-8ca9-452c-be61-362ad4d24fd5`)
+- **OTA corrente**: OTA-29 (releaseId: `c24193bb-167f-4740-a7f8-4dcbb3880aa1`)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
