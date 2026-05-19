@@ -354,6 +354,29 @@ function configureExpoAndLanding(app: express.Application) {
     }
   });
 
+  // ── Public App Config ─────────────────────────────────────────────────────
+  // Returns non-sensitive app-wide settings for the mobile client to consume.
+  // Keys exposed: play_store_url, website_url, maintenance_enabled, maintenance_message.
+  app.get("/api/config", async (_req: Request, res: Response) => {
+    try {
+      const [playStore, website, maintenanceEnabled, maintenanceMessage] = await Promise.all([
+        storage.getAppSetting("play_store_url"),
+        storage.getAppSetting("website_url"),
+        storage.getAppSetting("maintenance_enabled"),
+        storage.getAppSetting("maintenance_message"),
+      ]);
+      return res.json({
+        play_store_url: playStore?.value?.trim() || null,
+        website_url: website?.value?.trim() || null,
+        maintenance_enabled: maintenanceEnabled?.value === "true",
+        maintenance_message: maintenanceMessage?.value?.trim() || "",
+      });
+    } catch (err) {
+      console.error("[api/config] error:", err);
+      return res.status(500).json({ message: "Errore interno" });
+    }
+  });
+
   // ── Web Portal SPA routes ────────────────────────────────────────────────
   // Serve the web portal HTML at specific SPA routes.
   // The client-side JS handles routing internally.

@@ -1521,6 +1521,7 @@ async function renderAdminSettings() {
       </div>
       <div id="settings-alert" class="alert"></div>
 
+      <!-- ── APK Download ── -->
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:28px;margin-top:24px">
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:20px">
           Download APK
@@ -1542,6 +1543,75 @@ async function renderAdminSettings() {
         </div>
       </div>
 
+      <!-- ── Link Esterni ── -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:28px;margin-top:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:20px">
+          Link Esterni
+        </div>
+
+        <div class="form-group" style="margin-bottom:20px">
+          <label class="form-label" style="font-size:13px">Google Play Store URL</label>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:8px">
+            Link alla scheda dell'app su Google Play. Usato dall'app mobile per rimandare gli utenti allo store.
+          </div>
+          <div style="display:flex;gap:8px;align-items:stretch">
+            <input class="form-input" id="play-store-url-input" type="url"
+              placeholder="https://play.google.com/store/apps/details?id=..." autocomplete="off"
+              style="flex:1;font-size:13px;font-family:monospace"/>
+            <button class="btn btn-primary btn-sm" id="play-store-url-save-btn" onclick="savePlayStoreUrl()" style="white-space:nowrap;padding:0 18px">
+              Salva
+            </button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size:13px">Sito Ufficiale URL</label>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:8px">
+            URL del sito ufficiale del progetto. Esposto via <code style="background:var(--surface2);padding:1px 6px;border-radius:3px;font-size:11px">/api/config</code> per l'app mobile.
+          </div>
+          <div style="display:flex;gap:8px;align-items:stretch">
+            <input class="form-input" id="website-url-input" type="url"
+              placeholder="https://bikerlink.it" autocomplete="off"
+              style="flex:1;font-size:13px;font-family:monospace"/>
+            <button class="btn btn-primary btn-sm" id="website-url-save-btn" onclick="saveWebsiteUrl()" style="white-space:nowrap;padding:0 18px">
+              Salva
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Manutenzione ── -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:28px;margin-top:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:20px">
+          Banner Manutenzione In-App
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:16px">
+          Quando attivo, l'app mobile mostra un banner di avviso agli utenti. Il contenuto è gestito dal campo testo qui sotto.
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px">
+          <label class="form-label" style="font-size:13px">Stato</label>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+            <label class="toggle-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="maintenance-enabled-toggle" onchange="onMaintenanceToggle()" style="width:16px;height:16px;cursor:pointer"/>
+              <span id="maintenance-status-text" style="font-size:13px;color:var(--text2)">Disattivata</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" style="font-size:13px">Messaggio per gli utenti</label>
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <textarea class="form-input" id="maintenance-message-input" rows="3"
+              placeholder="Es: Stiamo effettuando manutenzione. Torneremo operativi a breve."
+              style="flex:1;font-size:13px;resize:vertical;min-height:72px"></textarea>
+            <button class="btn btn-primary btn-sm" id="maintenance-save-btn" onclick="saveMaintenance()" style="white-space:nowrap;padding:0 18px;align-self:flex-start">
+              Salva
+            </button>
+          </div>
+        </div>
+      </div>
+
       <div style="margin-top:16px">
         <button class="btn btn-ghost btn-sm" onclick="navigate('/admin/media')">← Torna al pannello media</button>
       </div>
@@ -1549,7 +1619,12 @@ async function renderAdminSettings() {
     ${renderFooter()}
   `);
 
-  await loadApkUrlSetting();
+  await Promise.all([
+    loadApkUrlSetting(),
+    loadPlayStoreUrlSetting(),
+    loadWebsiteUrlSetting(),
+    loadMaintenanceSetting(),
+  ]);
 }
 
 async function loadApkUrlSetting() {
@@ -1598,6 +1673,141 @@ async function saveApkUrl() {
     } else {
       showAlert('settings-alert', 'URL APK salvato con successo', 'success');
       await loadApkUrlSetting();
+    }
+  } catch {
+    showAlert('settings-alert', 'Errore di rete. Riprova.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salva';
+  }
+}
+
+async function loadPlayStoreUrlSetting() {
+  try {
+    const res = await fetch('/api/admin/settings/play-store-url', { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const input = document.getElementById('play-store-url-input');
+    if (input) input.value = data.url || '';
+  } catch { /* silent */ }
+}
+
+async function savePlayStoreUrl() {
+  const input = document.getElementById('play-store-url-input');
+  const btn = document.getElementById('play-store-url-save-btn');
+  const url = input ? input.value.trim() : '';
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+
+  try {
+    const res = await fetch('/api/admin/settings/play-store-url', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('settings-alert', data.message || 'Errore durante il salvataggio');
+    } else {
+      showAlert('settings-alert', 'Link Play Store salvato con successo', 'success');
+    }
+  } catch {
+    showAlert('settings-alert', 'Errore di rete. Riprova.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salva';
+  }
+}
+
+async function loadWebsiteUrlSetting() {
+  try {
+    const res = await fetch('/api/admin/settings/website-url', { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const input = document.getElementById('website-url-input');
+    if (input) input.value = data.url || '';
+  } catch { /* silent */ }
+}
+
+async function saveWebsiteUrl() {
+  const input = document.getElementById('website-url-input');
+  const btn = document.getElementById('website-url-save-btn');
+  const url = input ? input.value.trim() : '';
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+
+  try {
+    const res = await fetch('/api/admin/settings/website-url', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('settings-alert', data.message || 'Errore durante il salvataggio');
+    } else {
+      showAlert('settings-alert', 'URL sito ufficiale salvato con successo', 'success');
+    }
+  } catch {
+    showAlert('settings-alert', 'Errore di rete. Riprova.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salva';
+  }
+}
+
+async function loadMaintenanceSetting() {
+  try {
+    const res = await fetch('/api/admin/settings/maintenance', { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const toggle = document.getElementById('maintenance-enabled-toggle');
+    const statusText = document.getElementById('maintenance-status-text');
+    const messageInput = document.getElementById('maintenance-message-input');
+    if (toggle) toggle.checked = !!data.enabled;
+    if (statusText) {
+      statusText.textContent = data.enabled ? 'Attiva' : 'Disattivata';
+      statusText.style.color = data.enabled ? 'var(--error)' : 'var(--text2)';
+    }
+    if (messageInput) messageInput.value = data.message || '';
+  } catch { /* silent */ }
+}
+
+function onMaintenanceToggle() {
+  const toggle = document.getElementById('maintenance-enabled-toggle');
+  const statusText = document.getElementById('maintenance-status-text');
+  if (statusText) {
+    statusText.textContent = toggle.checked ? 'Attiva' : 'Disattivata';
+    statusText.style.color = toggle.checked ? 'var(--error)' : 'var(--text2)';
+  }
+}
+
+async function saveMaintenance() {
+  const toggle = document.getElementById('maintenance-enabled-toggle');
+  const messageInput = document.getElementById('maintenance-message-input');
+  const btn = document.getElementById('maintenance-save-btn');
+  const enabled = toggle ? toggle.checked : false;
+  const message = messageInput ? messageInput.value.trim() : '';
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+
+  try {
+    const res = await fetch('/api/admin/settings/maintenance', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, message }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('settings-alert', data.message || 'Errore durante il salvataggio');
+    } else {
+      showAlert('settings-alert', 'Impostazioni manutenzione salvate', 'success');
     }
   } catch {
     showAlert('settings-alert', 'Errore di rete. Riprova.');

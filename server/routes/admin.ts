@@ -7030,5 +7030,99 @@ router.put("/settings/apk-url", async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/admin/settings/play-store-url ────────────────────────────────
+router.get("/settings/play-store-url", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("play_store_url");
+    return res.json({ url: setting?.value?.trim() || null });
+  } catch (err) {
+    console.error("[ADMIN play-store-url] get error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── PUT /api/admin/settings/play-store-url ────────────────────────────────
+router.put("/settings/play-store-url", async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body as { url?: string };
+    const trimmed = typeof url === "string" ? url.trim() : "";
+    if (trimmed && trimmed.length > 2048) {
+      return res.status(400).json({ message: "URL troppo lungo (max 2048 caratteri)" });
+    }
+    if (trimmed && !/^https?:\/\/.+/i.test(trimmed)) {
+      return res.status(400).json({ message: "L'URL deve iniziare con http:// o https://" });
+    }
+    await storage.upsertAppSetting("play_store_url", trimmed, undefined);
+    return res.json({ ok: true, url: trimmed || null });
+  } catch (err) {
+    console.error("[ADMIN play-store-url] put error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── GET /api/admin/settings/website-url ───────────────────────────────────
+router.get("/settings/website-url", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("website_url");
+    return res.json({ url: setting?.value?.trim() || null });
+  } catch (err) {
+    console.error("[ADMIN website-url] get error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── PUT /api/admin/settings/website-url ───────────────────────────────────
+router.put("/settings/website-url", async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body as { url?: string };
+    const trimmed = typeof url === "string" ? url.trim() : "";
+    if (trimmed && trimmed.length > 2048) {
+      return res.status(400).json({ message: "URL troppo lungo (max 2048 caratteri)" });
+    }
+    if (trimmed && !/^https?:\/\/.+/i.test(trimmed)) {
+      return res.status(400).json({ message: "L'URL deve iniziare con http:// o https://" });
+    }
+    await storage.upsertAppSetting("website_url", trimmed, undefined);
+    return res.json({ ok: true, url: trimmed || null });
+  } catch (err) {
+    console.error("[ADMIN website-url] put error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── GET /api/admin/settings/maintenance ───────────────────────────────────
+// Restituisce lo stato manutenzione (enabled + messaggio).
+router.get("/settings/maintenance", async (_req: Request, res: Response) => {
+  try {
+    const [enabledSetting, messageSetting] = await Promise.all([
+      storage.getAppSetting("maintenance_enabled"),
+      storage.getAppSetting("maintenance_message"),
+    ]);
+    return res.json({
+      enabled: enabledSetting?.value === "true",
+      message: messageSetting?.value?.trim() || "",
+    });
+  } catch (err) {
+    console.error("[ADMIN maintenance] get error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── PUT /api/admin/settings/maintenance ───────────────────────────────────
+// Aggiorna lo stato manutenzione e il messaggio.
+router.put("/settings/maintenance", async (req: Request, res: Response) => {
+  try {
+    const { enabled, message } = req.body as { enabled?: boolean; message?: string };
+    await Promise.all([
+      storage.upsertAppSetting("maintenance_enabled", enabled ? "true" : "false", undefined),
+      storage.upsertAppSetting("maintenance_message", typeof message === "string" ? message.trim() : "", undefined),
+    ]);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[ADMIN maintenance] put error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 export default router;
 
