@@ -1,0 +1,365 @@
+import React, { useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  TextInput,
+  Image,
+  ActivityIndicator,
+} from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Colors from "@/constants/colors";
+import { getApiUrl } from "@/lib/query-client";
+
+type MatchCounts = Record<string, number>;
+
+interface InspectorUser {
+  id: string;
+  nickname: string;
+  avatarUrl: string | null;
+  userType: string;
+  role: string;
+  status: string;
+  totalMatches: number;
+  bbMatches: number;
+  bzMatches: number;
+  matchCounts: MatchCounts;
+}
+
+interface UsersResponse {
+  users: InspectorUser[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+const TYPE_LABELS: { key: string; label: string; color: string }[] = [
+  { key: "bikerBikerBrand",         label: "B-B",     color: Colors.accent },
+  { key: "bikerZavorrinaBrand",      label: "B-Z",     color: "#E91E8C" },
+  { key: "bikerClubBrand",           label: "B-Club",  color: "#9C27B0" },
+  { key: "zavarrinaClubBrand",       label: "Z-Club",  color: "#673AB7" },
+  { key: "bikerBikerTypeStyle",      label: "Tipo BB", color: "#2196F3" },
+  { key: "bikerZavarrinaTypeStyle",  label: "Tipo BZ", color: "#03A9F4" },
+  { key: "bikerBikerDistance",       label: "Dist BB", color: Colors.success },
+  { key: "bikerZavarrinaDistance",   label: "Dist BZ", color: "#66BB6A" },
+  { key: "bikerBikerMusic",          label: "Mus BB",  color: "#FF5722" },
+  { key: "bikerZavarrinaMusic",      label: "Mus BZ",  color: "#FF7043" },
+  { key: "bikerBikerLeanAngle",      label: "Piega",   color: "#795548" },
+  { key: "bikerBikerRouteTypeZone",  label: "Zona BB", color: "#607D8B" },
+  { key: "bikerZavarrinaRouteTypeZone", label: "Zona BZ", color: "#78909C" },
+  { key: "bikerBikerAvgSpeed",       label: "Speed",   color: Colors.warning },
+  { key: "bikerBikerAvgDuration",    label: "Dur",     color: "#FFA726" },
+  { key: "bikerBikerDayTime",        label: "Orario",  color: "#FFCC02" },
+  { key: "bikerBikerEvents",         label: "Eventi",  color: "#26C6DA" },
+];
+
+function userTypeColor(userType: string): string {
+  switch (userType) {
+    case "biker": return Colors.maleIcon;
+    case "zavorrina": return Colors.femaleIcon;
+    case "coppia": return Colors.coupleIcon;
+    default: return Colors.textSecondary;
+  }
+}
+
+function userTypeLabel(userType: string): string {
+  switch (userType) {
+    case "biker": return "B";
+    case "zavorrina": return "Z";
+    case "coppia": return "C";
+    default: return "?";
+  }
+}
+
+function userRoleText(userType: string): string {
+  switch (userType) {
+    case "biker": return "biker";
+    case "zavorrina": return "zavorrina";
+    case "coppia": return "coppia";
+    default: return userType;
+  }
+}
+
+export default function MatchInspectorScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleSearchChange = useCallback((text: string) => {
+    setSearch(text);
+    setPage(1);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedSearch(text), 400);
+  }, []);
+
+  const queryKey = ["/api/admin/users/match-summary", debouncedSearch, page];
+
+  const { data, isLoading, refetch } = useQuery<UsersResponse>({
+    queryKey,
+    queryFn: async () => {
+      const base = getApiUrl();
+      const url = new URL("/api/admin/users/match-summary", base);
+      url.searchParams.set("page", String(page));
+      url.searchParams.set("limit", "30");
+      if (debouncedSearch) url.searchParams.set("search", debouncedSearch);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("Errore caricamento");
+      return res.json();
+    },
+    refetchInterval: 10000,
+    staleTime: 5000,
+  });
+
+  const users = data?.users ?? [];
+  const total = data?.total ?? 0;
+
+  const renderUser = ({ item }: { item: InspectorUser }) => {
+    const nonZeroTypes = TYPE_LABELS.filter(
+      (tl) => (item.matchCounts?.[tl.key] ?? 0) > 0
+    );
+
+    return (
+      <TouchableOpacity
+        style={styles.userRow}
+        onPress={() =>
+          router.push({ pathname: "/admin/match-inspector-detail", params: { userId: item.id } })
+        }
+        activeOpacity={0.7}
+      >
+        <View style={styles.avatarWrap}>
+          {item.avatarUrl ? (
+            <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatarPlaceholder, { backgroundColor: userTypeColor(item.userType) + "33" }]}>
+              <Text style={[styles.avatarLetter, { color: userTypeColor(item.userType) }]}>
+                {item.nickname.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={[styles.typeBadge, { backgroundColor: userTypeColor(item.userType) }]}>
+            <Text style={styles.typeBadgeText}>{userTypeLabel(item.userType)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.userInfo}>
+          <View style={styles.nameRow}>
+            <Text style={styles.nickname} numberOfLines={1}>{item.nickname}</Text>
+            <Text style={[styles.roleTag, { color: userTypeColor(item.userType) }]}>
+              {userRoleText(item.userType)}
+            </Text>
+          </View>
+
+          {nonZeroTypes.length > 0 ? (
+            <View style={styles.countChipsRow}>
+              {nonZeroTypes.map((tl) => (
+                <View key={tl.key} style={[styles.countChip, { borderColor: tl.color + "55" }]}>
+                  <Text style={[styles.countChipLabel, { color: tl.color }]}>{tl.label}</Text>
+                  <Text style={[styles.countChipNum, { color: tl.color }]}>
+                    {item.matchCounts[tl.key]}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.noMatchText}>Nessun match</Text>
+          )}
+        </View>
+
+        <View style={styles.totalBadge}>
+          <Text style={styles.totalText}>{item.totalMatches}</Text>
+          <Text style={styles.totalLabel}>tot</Text>
+        </View>
+
+        <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+      </TouchableOpacity>
+    );
+  };
+
+  return (
+    <View style={[styles.container, { paddingBottom: insets.bottom }]}>
+      <View style={styles.searchBar}>
+        <Ionicons name="search" size={18} color={Colors.textSecondary} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Cerca utente..."
+          placeholderTextColor={Colors.textSecondary}
+          value={search}
+          onChangeText={handleSearchChange}
+          autoCapitalize="none"
+          returnKeyType="search"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => handleSearchChange("")}>
+            <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.headerRow}>
+        <Text style={styles.totalCount}>{total} utenti</Text>
+        <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
+          <Ionicons name="refresh" size={16} color={Colors.accent} />
+          <Text style={styles.refreshText}>Aggiorna</Text>
+        </TouchableOpacity>
+      </View>
+
+      {isLoading ? (
+        <ActivityIndicator color={Colors.accent} style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={users}
+          keyExtractor={(u) => u.id}
+          renderItem={renderUser}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          contentContainerStyle={{ paddingBottom: 20 }}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <MaterialCommunityIcons name="account-search" size={48} color={Colors.textSecondary} />
+              <Text style={styles.emptyText}>Nessun utente trovato</Text>
+            </View>
+          }
+        />
+      )}
+
+      {data?.hasMore && (
+        <TouchableOpacity style={styles.loadMore} onPress={() => setPage((p) => p + 1)}>
+          <Text style={styles.loadMoreText}>Carica altri</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    margin: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  searchIcon: { marginRight: 8 },
+  searchInput: {
+    flex: 1,
+    color: Colors.text,
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+    padding: 0,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  totalCount: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  refreshBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
+  refreshText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.accent },
+  userRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.background,
+    gap: 12,
+  },
+  avatarWrap: { position: "relative", width: 44, height: 44 },
+  avatar: { width: 44, height: 44, borderRadius: 22 },
+  avatarPlaceholder: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarLetter: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  typeBadge: {
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1.5,
+    borderColor: Colors.background,
+  },
+  typeBadgeText: { fontFamily: "Inter_700Bold", fontSize: 8, color: "#fff" },
+  userInfo: { flex: 1, gap: 4 },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  nickname: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.text,
+    flexShrink: 1,
+  },
+  roleTag: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    textTransform: "lowercase",
+  },
+  countChipsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+  },
+  countChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  countChipLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 9,
+  },
+  countChipNum: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+  },
+  noMatchText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+  },
+  totalBadge: { alignItems: "center", minWidth: 36 },
+  totalText: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.accent },
+  totalLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  separator: { height: 1, backgroundColor: Colors.border, marginLeft: 72 },
+  empty: { alignItems: "center", paddingTop: 60, gap: 12 },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.textSecondary },
+  loadMore: {
+    margin: 16,
+    padding: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  loadMoreText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.accent },
+});

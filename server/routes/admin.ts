@@ -26,7 +26,7 @@ import {
   VERIFY_ATTEMPT_WINDOW_MS,
 } from "./auth";
 import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
-import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser } from "../matching-engine";
+import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser, triggerMatchingRun } from "../matching-engine";
 import { isProtectedUser, PROTECTED_EMAILS } from "../constants";
 import { closeSseClient } from "../chat-sse";
 import { SERVER_START_TIME, uptimeState } from "../uptime";
@@ -5809,12 +5809,90 @@ router.get("/newsletter/subscribers/export", async (req: Request, res: Response)
 });
 
 // GET /api/admin/match-settings
-// Restituisce la visibilità globale delle preferenze di matching
+// Restituisce la visibilità globale delle preferenze di matching + statistiche aggregate per tipo
 router.get("/match-settings", async (_req: Request, res: Response) => {
   try {
     const setting = await storage.getAppSetting("match_preferences_visible");
     const visible = setting?.value === "true";
-    return res.json({ visible });
+
+    // Aggregate stats per match type
+    const totalUsersRow = await db.execute(sql`
+      SELECT COUNT(*) as cnt FROM users WHERE is_fake = false AND role != 'admin' AND status = 'active'
+    `);
+    const totalUsers = parseInt(String((totalUsersRow.rows[0] as { cnt: string }).cnt ?? "0"), 10);
+
+    const prefCountsRow = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE mp.biker_biker_brand = false) as bb_brand_off,
+        COUNT(*) FILTER (WHERE mp.biker_zavorrina_brand = false) as bz_brand_off,
+        COUNT(*) FILTER (WHERE mp.biker_club_brand = false) as biker_club_off,
+        COUNT(*) FILTER (WHERE mp.zavorrina_club_brand = false) as zav_club_off,
+        COUNT(*) FILTER (WHERE mp.biker_biker_type_style = false) as bb_type_off,
+        COUNT(*) FILTER (WHERE mp.biker_zavorrina_type_style = false) as bz_type_off,
+        COUNT(*) FILTER (WHERE mp.biker_biker_distance = false) as bb_dist_off,
+        COUNT(*) FILTER (WHERE mp.biker_zavorrina_distance = false) as bz_dist_off,
+        COUNT(*) FILTER (WHERE mp.biker_biker_music = false) as bb_music_off,
+        COUNT(*) FILTER (WHERE mp.biker_zavorrina_music = false) as bz_music_off,
+        COUNT(*) FILTER (WHERE mp.biker_biker_lean_angle = false) as bb_lean_off,
+        COUNT(*) FILTER (WHERE mp.biker_biker_route_type_zone = false) as bb_zone_off,
+        COUNT(*) FILTER (WHERE mp.biker_zavorrina_route_type_zone = false) as bz_zone_off,
+        COUNT(*) FILTER (WHERE mp.biker_biker_avg_speed = false) as bb_speed_off,
+        COUNT(*) FILTER (WHERE mp.biker_biker_avg_duration = false) as bb_dur_off,
+        COUNT(*) FILTER (WHERE mp.biker_biker_day_time = false) as bb_day_off,
+        COUNT(*) FILTER (WHERE mp.biker_biker_events = false) as bb_events_off
+      FROM match_preferences mp
+      JOIN users u ON u.id = mp.user_id
+      WHERE u.is_fake = false AND u.role != 'admin' AND u.status = 'active'
+    `);
+    const pc = prefCountsRow.rows[0] as Record<string, string>;
+    const activeOf = (offKey: string) => totalUsers - parseInt(String(pc[offKey] ?? "0"), 10);
+
+    const bbMatchCountsRow = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE motorcycle_brand NOT LIKE 'tipo%' AND motorcycle_brand NOT LIKE 'club%' AND motorcycle_brand NOT LIKE 'distanza%' AND motorcycle_brand NOT LIKE 'musica%' AND motorcycle_brand NOT LIKE 'gps%' AND motorcycle_brand NOT LIKE 'zona%' AND motorcycle_brand NOT LIKE 'eventi%') as brand_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'club:%') as biker_club_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'club_zav:%') as zav_club_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'tipo:%') as bb_type_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'tipo_zav:%') as bz_type_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand = 'distanza') as bb_dist_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand = 'distanza_zav') as bz_dist_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand = 'musica') as bb_music_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand = 'musica_zav') as bz_music_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand = 'gps_tilt') as bb_lean_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'zona_bb:%') as bb_zone_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'zona_zav:%') as bz_zone_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand IN ('gps_speed','gps_full')) as bb_speed_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand IN ('gps_speed','gps_full')) as bb_dur_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand = 'gps_day') as bb_day_cnt,
+        COUNT(*) FILTER (WHERE motorcycle_brand = 'eventi') as bb_events_cnt
+      FROM biker_biker_matches
+    `);
+    const bbc = bbMatchCountsRow.rows[0] as Record<string, string>;
+
+    const bzTotalRow = await db.execute(sql`SELECT COUNT(*) as cnt FROM biker_zavorrina_matches`);
+    const bzTotal = parseInt(String((bzTotalRow.rows[0] as { cnt: string }).cnt ?? "0"), 10);
+
+    const stats = [
+      { typeKey: "bikerBikerBrand", typeName: "Biker-Biker Brand", usersActive: activeOf("bb_brand_off"), totalMatches: parseInt(bbc.brand_cnt ?? "0", 10) },
+      { typeKey: "bikerZavorrinaBrand", typeName: "Biker-Zavarrina Brand", usersActive: activeOf("bz_brand_off"), totalMatches: bzTotal },
+      { typeKey: "bikerClubBrand", typeName: "Biker-Club Brand", usersActive: activeOf("biker_club_off"), totalMatches: parseInt(bbc.biker_club_cnt ?? "0", 10) },
+      { typeKey: "zavarrinaClubBrand", typeName: "Zavarrina-Club Brand", usersActive: activeOf("zav_club_off"), totalMatches: parseInt(bbc.zav_club_cnt ?? "0", 10) },
+      { typeKey: "bikerBikerTypeStyle", typeName: "Biker-Biker Tipo+Stile", usersActive: activeOf("bb_type_off"), totalMatches: parseInt(bbc.bb_type_cnt ?? "0", 10) },
+      { typeKey: "bikerZavarrinaTypeStyle", typeName: "Biker-Zavarrina Tipo+Stile", usersActive: activeOf("bz_type_off"), totalMatches: parseInt(bbc.bz_type_cnt ?? "0", 10) },
+      { typeKey: "bikerBikerDistance", typeName: "Biker-Biker Distanza GPS", usersActive: activeOf("bb_dist_off"), totalMatches: parseInt(bbc.bb_dist_cnt ?? "0", 10) },
+      { typeKey: "bikerZavarrinaDistance", typeName: "Biker-Zavarrina Distanza GPS", usersActive: activeOf("bz_dist_off"), totalMatches: parseInt(bbc.bz_dist_cnt ?? "0", 10) },
+      { typeKey: "bikerBikerMusic", typeName: "Biker-Biker Musica", usersActive: activeOf("bb_music_off"), totalMatches: parseInt(bbc.bb_music_cnt ?? "0", 10) },
+      { typeKey: "bikerZavarrinaMusic", typeName: "Biker-Zavarrina Musica", usersActive: activeOf("bz_music_off"), totalMatches: parseInt(bbc.bz_music_cnt ?? "0", 10) },
+      { typeKey: "bikerBikerLeanAngle", typeName: "Biker-Biker Angolo Piega", usersActive: activeOf("bb_lean_off"), totalMatches: parseInt(bbc.bb_lean_cnt ?? "0", 10) },
+      { typeKey: "bikerBikerRouteTypeZone", typeName: "Biker-Biker Zona+Tipo Percorso", usersActive: activeOf("bb_zone_off"), totalMatches: parseInt(bbc.bb_zone_cnt ?? "0", 10) },
+      { typeKey: "bikerZavarrinaRouteTypeZone", typeName: "Biker-Zavarrina Zona+Tipo", usersActive: activeOf("bz_zone_off"), totalMatches: parseInt(bbc.bz_zone_cnt ?? "0", 10) },
+      { typeKey: "bikerBikerAvgSpeed", typeName: "Biker-Biker Velocità Media", usersActive: activeOf("bb_speed_off"), totalMatches: parseInt(bbc.bb_speed_cnt ?? "0", 10) },
+      { typeKey: "bikerBikerAvgDuration", typeName: "Biker-Biker Durata Media", usersActive: activeOf("bb_dur_off"), totalMatches: parseInt(bbc.bb_dur_cnt ?? "0", 10) },
+      { typeKey: "bikerBikerDayTime", typeName: "Biker-Biker Orario Giorno", usersActive: activeOf("bb_day_off"), totalMatches: parseInt(bbc.bb_day_cnt ?? "0", 10) },
+      { typeKey: "bikerBikerEvents", typeName: "Biker-Biker Eventi", usersActive: activeOf("bb_events_off"), totalMatches: parseInt(bbc.bb_events_cnt ?? "0", 10) },
+    ].map(s => ({ ...s, isAnomaly: s.totalMatches === 0 }));
+
+    return res.json({ visible, stats });
   } catch (err) {
     console.error("[ADMIN match-settings] GET error:", err);
     return res.status(500).json({ message: "Errore interno" });
@@ -5837,6 +5915,321 @@ router.put("/match-settings", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[ADMIN match-settings] PUT error:", err);
     return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── MATCH INSPECTOR ───────────────────────────────────────────────────────────
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function classifyBBBrand(brand: string): string {
+  if (brand.startsWith("tipo_zav:")) return "bikerZavarrinaTypeStyle";
+  if (brand.startsWith("tipo:")) return "bikerBikerTypeStyle";
+  if (brand.startsWith("club_zav:")) return "zavarrinaClubBrand";
+  if (brand.startsWith("club:")) return "bikerClubBrand";
+  if (brand === "distanza") return "bikerBikerDistance";
+  if (brand === "distanza_zav") return "bikerZavarrinaDistance";
+  if (brand === "musica") return "bikerBikerMusic";
+  if (brand === "musica_zav") return "bikerZavarrinaMusic";
+  if (brand === "gps_tilt") return "bikerBikerLeanAngle";
+  if (brand.startsWith("zona_bb:")) return "bikerBikerRouteTypeZone";
+  if (brand.startsWith("zona_zav:")) return "bikerZavarrinaRouteTypeZone";
+  if (brand === "gps_speed" || brand === "gps_full") return "bikerBikerAvgSpeed";
+  if (brand === "gps_day") return "bikerBikerDayTime";
+  if (brand === "eventi") return "bikerBikerEvents";
+  return "bikerBikerBrand";
+}
+
+// Explicit map typeKey → DB column name (accounts for schema naming inconsistencies
+// where TypeScript fields use "Zavarrina" but DB columns use "zavorrina")
+const TYPE_KEY_TO_PREF_COL: Record<string, string> = {
+  bikerBikerBrand: "biker_biker_brand",
+  bikerZavorrinaBrand: "biker_zavorrina_brand",
+  bikerClubBrand: "biker_club_brand",
+  zavarrinaClubBrand: "zavorrina_club_brand",
+  bikerBikerTypeStyle: "biker_biker_type_style",
+  bikerZavarrinaTypeStyle: "biker_zavorrina_type_style",
+  bikerBikerDistance: "biker_biker_distance",
+  bikerZavarrinaDistance: "biker_zavorrina_distance",
+  bikerBikerMusic: "biker_biker_music",
+  bikerZavarrinaMusic: "biker_zavorrina_music",
+  bikerBikerLeanAngle: "biker_biker_lean_angle",
+  bikerBikerRouteTypeZone: "biker_biker_route_type_zone",
+  bikerZavarrinaRouteTypeZone: "biker_zavorrina_route_type_zone",
+  bikerBikerAvgSpeed: "biker_biker_avg_speed",
+  bikerBikerAvgDuration: "biker_biker_avg_duration",
+  bikerBikerDayTime: "biker_biker_day_time",
+  bikerBikerEvents: "biker_biker_events",
+};
+
+const MI_TYPE_NAMES: Record<string, string> = {
+  bikerBikerBrand: "B-B Brand",
+  bikerZavorrinaBrand: "B-Z Brand",
+  bikerClubBrand: "B-Club Brand",
+  zavarrinaClubBrand: "Z-Club Brand",
+  bikerBikerTypeStyle: "B-B Tipo+Stile",
+  bikerZavarrinaTypeStyle: "B-Z Tipo+Stile",
+  bikerBikerDistance: "B-B Distanza GPS",
+  bikerZavarrinaDistance: "B-Z Distanza GPS",
+  bikerBikerMusic: "B-B Musica",
+  bikerZavarrinaMusic: "B-Z Musica",
+  bikerBikerLeanAngle: "B-B Angolo Piega",
+  bikerBikerRouteTypeZone: "B-B Zona+Tipo",
+  bikerZavarrinaRouteTypeZone: "B-Z Zona+Tipo",
+  bikerBikerAvgSpeed: "B-B Velocità Media",
+  bikerBikerAvgDuration: "B-B Durata Media",
+  bikerBikerDayTime: "B-B Orario Giorno",
+  bikerBikerEvents: "B-B Eventi",
+};
+
+const MI_ALL_TYPE_KEYS = Object.keys(MI_TYPE_NAMES);
+
+const MI_GPS_TYPES = new Set([
+  "bikerBikerDistance", "bikerZavarrinaDistance", "bikerBikerLeanAngle",
+  "bikerBikerRouteTypeZone", "bikerZavarrinaRouteTypeZone",
+  "bikerBikerAvgSpeed", "bikerBikerAvgDuration", "bikerBikerDayTime",
+]);
+
+// Handler: GET /api/admin/users/match-summary  (also: /api/admin/match-inspector/users)
+// Paginated list of users with total + per-type match counts
+async function handleMatchInspectorUsers(req: Request, res: Response): Promise<void> {
+  try {
+    const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
+    const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit ?? "20"), 10)));
+    const search = String(req.query.search ?? "").trim();
+    const offset = (page - 1) * limit;
+
+    const searchClause = search
+      ? sql`AND LOWER(u.nickname) LIKE ${"%" + search.toLowerCase() + "%"}`
+      : sql``;
+
+    const totalRow = await db.execute(sql`
+      SELECT COUNT(*) as cnt FROM users u
+      WHERE u.is_fake = false AND u.role != 'admin'
+      ${searchClause}
+    `);
+    const total = parseInt(String((totalRow.rows[0] as { cnt: string }).cnt ?? "0"), 10);
+
+    const rows = await db.execute(sql`
+      SELECT
+        u.id, u.nickname, u.avatar_url, u.user_type, u.role, u.status,
+        (SELECT COUNT(*) FROM biker_biker_matches bbm WHERE bbm.biker1_id = u.id OR bbm.biker2_id = u.id) AS bb_count,
+        (SELECT COUNT(*) FROM biker_zavorrina_matches bzm WHERE bzm.biker_id = u.id OR bzm.zavorrina_id = u.id) AS bz_count,
+        (
+          SELECT json_build_object(
+            'bbBrand', COUNT(*) FILTER (WHERE motorcycle_brand NOT LIKE 'tipo%' AND motorcycle_brand NOT LIKE 'club%' AND motorcycle_brand NOT LIKE 'distanza%' AND motorcycle_brand NOT LIKE 'musica%' AND motorcycle_brand NOT LIKE 'gps%' AND motorcycle_brand NOT LIKE 'zona%' AND motorcycle_brand != 'eventi'),
+            'bikerClub', COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'club:%'),
+            'zavClub', COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'club_zav:%'),
+            'bbType', COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'tipo:%'),
+            'bzType', COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'tipo_zav:%'),
+            'bbDist', COUNT(*) FILTER (WHERE motorcycle_brand = 'distanza'),
+            'bzDist', COUNT(*) FILTER (WHERE motorcycle_brand = 'distanza_zav'),
+            'bbMusic', COUNT(*) FILTER (WHERE motorcycle_brand = 'musica'),
+            'bzMusic', COUNT(*) FILTER (WHERE motorcycle_brand = 'musica_zav'),
+            'bbLean', COUNT(*) FILTER (WHERE motorcycle_brand = 'gps_tilt'),
+            'bbZone', COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'zona_bb:%'),
+            'bzZone', COUNT(*) FILTER (WHERE motorcycle_brand LIKE 'zona_zav:%'),
+            'bbSpeed', COUNT(*) FILTER (WHERE motorcycle_brand IN ('gps_speed', 'gps_full')),
+            'bbDur', COUNT(*) FILTER (WHERE motorcycle_brand IN ('gps_speed', 'gps_full')),
+            'bbDay', COUNT(*) FILTER (WHERE motorcycle_brand = 'gps_day'),
+            'bbEvents', COUNT(*) FILTER (WHERE motorcycle_brand = 'eventi')
+          )
+          FROM biker_biker_matches WHERE biker1_id = u.id OR biker2_id = u.id
+        ) AS bb_counts
+      FROM users u
+      WHERE u.is_fake = false AND u.role != 'admin'
+      ${searchClause}
+      ORDER BY (bb_count + bz_count) DESC, u.nickname ASC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    interface UserRow {
+      id: string; nickname: string; avatar_url: string | null;
+      user_type: string; role: string; status: string;
+      bb_count: string; bz_count: string;
+      bb_counts: Record<string, number> | null;
+    }
+
+    const n = (v: number | string | undefined | null) => typeof v === "number" ? v : parseInt(String(v ?? "0"), 10);
+    const users2 = (rows.rows as UserRow[]).map((r) => {
+      const bb = r.bb_counts ?? {};
+      return {
+        id: r.id, nickname: r.nickname, avatarUrl: r.avatar_url,
+        userType: r.user_type, role: r.role, status: r.status,
+        totalMatches: n(r.bb_count) + n(r.bz_count),
+        bbMatches: n(r.bb_count),
+        bzMatches: n(r.bz_count),
+        matchCounts: {
+          bikerBikerBrand: n(bb.bbBrand),
+          bikerZavorrinaBrand: n(r.bz_count),
+          bikerClubBrand: n(bb.bikerClub),
+          zavarrinaClubBrand: n(bb.zavClub),
+          bikerBikerTypeStyle: n(bb.bbType),
+          bikerZavarrinaTypeStyle: n(bb.bzType),
+          bikerBikerDistance: n(bb.bbDist),
+          bikerZavarrinaDistance: n(bb.bzDist),
+          bikerBikerMusic: n(bb.bbMusic),
+          bikerZavarrinaMusic: n(bb.bzMusic),
+          bikerBikerLeanAngle: n(bb.bbLean),
+          bikerBikerRouteTypeZone: n(bb.bbZone),
+          bikerZavarrinaRouteTypeZone: n(bb.bzZone),
+          bikerBikerAvgSpeed: n(bb.bbSpeed),
+          bikerBikerAvgDuration: n(bb.bbDur),
+          bikerBikerDayTime: n(bb.bbDay),
+          bikerBikerEvents: n(bb.bbEvents),
+        },
+      };
+    });
+
+    res.json({ users: users2, total, page, limit, hasMore: offset + users2.length < total });
+  } catch (err) {
+    console.error("[ADMIN match-inspector users] error:", err);
+    res.status(500).json({ message: "Errore interno" });
+  }
+}
+
+// Handler: GET /api/admin/users/:userId/matches  (also: /api/admin/match-inspector/users/:userId)
+// Detailed match inspection for a single user, grouped by all 17 match types
+async function handleMatchInspectorUserDetail(req: Request, res: Response): Promise<void> {
+  try {
+    const { userId } = req.params;
+    const user = await storage.getUser(userId);
+    if (!user) { res.status(404).json({ message: "Utente non trovato" }); return; }
+
+    const profile = await storage.getUserProfile(userId);
+    const prefRows = await db.execute(sql`SELECT * FROM match_preferences WHERE user_id = ${userId}`);
+    const prefs = (prefRows.rows[0] ?? {}) as Record<string, boolean | null>;
+    const gpsCountRow = await db.execute(sql`SELECT COUNT(*) as cnt FROM routes WHERE user_id = ${userId} AND duration_seconds > 0`);
+    const gpsRouteCount = parseInt(String((gpsCountRow.rows[0] as { cnt: string })?.cnt ?? "0"), 10);
+
+    const bbRows = await db.execute(sql`
+      SELECT bbm.id, bbm.motorcycle_brand, bbm.motorcycle_model, bbm.status, bbm.is_supermatch, bbm.created_at,
+        CASE WHEN bbm.biker1_id = ${userId} THEN bbm.biker2_id ELSE bbm.biker1_id END AS other_id,
+        u.nickname AS other_nickname, u.avatar_url AS other_avatar,
+        up.latitude AS other_lat, up.longitude AS other_lng
+      FROM biker_biker_matches bbm
+      JOIN users u ON u.id = CASE WHEN bbm.biker1_id = ${userId} THEN bbm.biker2_id ELSE bbm.biker1_id END
+      LEFT JOIN user_profiles up ON up.user_id = u.id
+      WHERE bbm.biker1_id = ${userId} OR bbm.biker2_id = ${userId}
+      ORDER BY bbm.created_at DESC
+    `);
+
+    const bzRows = await db.execute(sql`
+      SELECT bzm.id, bzm.status, bzm.is_supermatch, bzm.created_at,
+        CASE WHEN bzm.biker_id = ${userId} THEN bzm.zavorrina_id ELSE bzm.biker_id END AS other_id,
+        u.nickname AS other_nickname, u.avatar_url AS other_avatar,
+        up.latitude AS other_lat, up.longitude AS other_lng
+      FROM biker_zavorrina_matches bzm
+      JOIN users u ON u.id = CASE WHEN bzm.biker_id = ${userId} THEN bzm.zavorrina_id ELSE bzm.biker_id END
+      LEFT JOIN user_profiles up ON up.user_id = u.id
+      WHERE bzm.biker_id = ${userId} OR bzm.zavorrina_id = ${userId}
+      ORDER BY bzm.created_at DESC
+    `);
+
+    interface BBRow {
+      id: string; motorcycle_brand: string; motorcycle_model: string; status: string;
+      is_supermatch: boolean; created_at: string;
+      other_id: string; other_nickname: string; other_avatar: string | null;
+      other_lat: number | null; other_lng: number | null;
+    }
+    interface BZRow {
+      id: string; status: string; is_supermatch: boolean; created_at: string;
+      other_id: string; other_nickname: string; other_avatar: string | null;
+      other_lat: number | null; other_lng: number | null;
+    }
+
+    const userLat = profile?.latitude ?? null;
+    const userLng = profile?.longitude ?? null;
+
+    const toMatchItem = (otherId: string, otherNickname: string, otherAvatar: string | null, otherLat: number | null, otherLng: number | null, id: string, status: string, isSupermatch: boolean, createdAt: string) => ({
+      id, matchedUserId: otherId, matchedNickname: otherNickname, matchedAvatarUrl: otherAvatar,
+      distanceKm: (userLat != null && userLng != null && otherLat != null && otherLng != null)
+        ? Math.round(haversineKm(userLat, userLng, otherLat, otherLng) * 10) / 10 : null,
+      status, isSupermatch, createdAt,
+    });
+
+    const typeGroups: Record<string, ReturnType<typeof toMatchItem>[]> = {};
+
+    for (const row of bbRows.rows as BBRow[]) {
+      const typeKey = classifyBBBrand(row.motorcycle_brand);
+      if (!typeGroups[typeKey]) typeGroups[typeKey] = [];
+      typeGroups[typeKey].push(toMatchItem(row.other_id, row.other_nickname, row.other_avatar, row.other_lat, row.other_lng, row.id, row.status, row.is_supermatch, row.created_at));
+      if (typeKey === "bikerBikerAvgSpeed") {
+        if (!typeGroups["bikerBikerAvgDuration"]) typeGroups["bikerBikerAvgDuration"] = [];
+        typeGroups["bikerBikerAvgDuration"].push(toMatchItem(row.other_id, row.other_nickname, row.other_avatar, row.other_lat, row.other_lng, row.id, row.status, row.is_supermatch, row.created_at));
+      }
+      if (row.motorcycle_brand === "gps_full") {
+        for (const extra of ["bikerBikerLeanAngle", "bikerBikerDayTime"] as const) {
+          if (typeKey !== extra) {
+            if (!typeGroups[extra]) typeGroups[extra] = [];
+            typeGroups[extra].push(toMatchItem(row.other_id, row.other_nickname, row.other_avatar, row.other_lat, row.other_lng, row.id, row.status, row.is_supermatch, row.created_at));
+          }
+        }
+      }
+    }
+
+    for (const row of bzRows.rows as BZRow[]) {
+      if (!typeGroups["bikerZavorrinaBrand"]) typeGroups["bikerZavorrinaBrand"] = [];
+      typeGroups["bikerZavorrinaBrand"].push(toMatchItem(row.other_id, row.other_nickname, row.other_avatar, row.other_lat, row.other_lng, row.id, row.status, row.is_supermatch, row.created_at));
+    }
+
+    const matchesByType = MI_ALL_TYPE_KEYS.map((typeKey) => {
+      const matches = typeGroups[typeKey] ?? [];
+      const prefCol = TYPE_KEY_TO_PREF_COL[typeKey];
+      const disabled = prefCol ? prefs[prefCol] === false : false;
+      const insufficientData = MI_GPS_TYPES.has(typeKey) && gpsRouteCount === 0;
+      return { typeKey, typeName: MI_TYPE_NAMES[typeKey], count: matches.length, disabled, insufficientData, matches: matches.slice(0, 50) };
+    });
+
+    res.json({
+      user: { id: user.id, nickname: user.nickname, avatarUrl: user.avatarUrl, userType: user.userType, role: user.role, status: user.status },
+      gpsRouteCount,
+      matchesByType,
+    });
+  } catch (err) {
+    console.error("[ADMIN match-inspector user detail] error:", err);
+    res.status(500).json({ message: "Errore interno" });
+  }
+}
+
+// Handler: POST /api/admin/users/:userId/matches/recalculate  (also: /api/admin/match-inspector/users/:userId/recalculate)
+async function handleMatchInspectorRecalculate(req: Request, res: Response): Promise<void> {
+  try {
+    const { userId } = req.params;
+    const user = await storage.getUser(userId);
+    if (!user) { res.status(404).json({ message: "Utente non trovato" }); return; }
+    const result = await runMatchingForUser(userId);
+    res.json({ ok: true, bikerBiker: result.bikerBiker, zavarrina: result.zavarrina });
+  } catch (err) {
+    console.error("[ADMIN match-inspector recalculate] error:", err);
+    res.status(500).json({ message: "Errore interno" });
+  }
+}
+
+// Route registrations — spec-required paths
+router.get("/users/match-summary", handleMatchInspectorUsers);
+router.get("/users/:userId/matches", handleMatchInspectorUserDetail);
+router.post("/users/:userId/matches/recalculate", handleMatchInspectorRecalculate);
+
+// Route registrations — legacy alias paths (backward compat)
+router.get("/match-inspector/users", handleMatchInspectorUsers);
+router.get("/match-inspector/users/:userId", handleMatchInspectorUserDetail);
+router.post("/match-inspector/users/:userId/recalculate", handleMatchInspectorRecalculate);
+
+// POST /api/admin/matches/recalculate-all
+router.post("/matches/recalculate-all", async (_req: Request, res: Response) => {
+  try {
+    const result = triggerMatchingRun();
+    res.json({ ok: true, started: result.started, reason: result.reason ?? null });
+  } catch (err) {
+    console.error("[ADMIN matches recalculate-all] error:", err);
+    res.status(500).json({ message: "Errore interno" });
   }
 });
 

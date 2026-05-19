@@ -79,6 +79,15 @@ const adminGroups: AdminGroup[] = [
     ],
   },
   {
+    title: "Matching",
+    headerIcon: "link-variant",
+    headerIconSet: "MaterialCommunityIcons",
+    items: [
+      { key: "match-inspector", label: "Match Inspector", icon: "account-search", iconSet: "MaterialCommunityIcons", route: "/admin/match-inspector", accentColor: "#2196F3" },
+      { key: "match-control", label: "Controllo Sistema", icon: "tune-variant", iconSet: "MaterialCommunityIcons", route: "/admin/match-control", accentColor: "#9C27B0" },
+    ],
+  },
+  {
     title: "Sistema",
     headerIcon: "settings",
     headerIconSet: "MaterialIcons",

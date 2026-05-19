@@ -1,0 +1,318 @@
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Colors from "@/constants/colors";
+import { apiRequest } from "@/lib/query-client";
+
+interface MatchStat {
+  typeKey: string;
+  typeName: string;
+  usersActive: number;
+  totalMatches: number;
+  isAnomaly: boolean;
+}
+
+interface MatchSettingsResponse {
+  visible: boolean;
+  stats: MatchStat[];
+}
+
+export default function MatchControlScreen() {
+  const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+  const [recalcStatus, setRecalcStatus] = useState<"idle" | "running" | "done">("idle");
+
+  const { data, isLoading, refetch } = useQuery<MatchSettingsResponse>({
+    queryKey: ["/api/admin/match-settings"],
+    refetchInterval: 15000,
+    staleTime: 5000,
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async (val: boolean) => {
+      await apiRequest("PUT", "/api/admin/match-settings", { visible: val });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/match-settings"] });
+    },
+    onError: () => Alert.alert("Errore", "Impossibile aggiornare l'impostazione"),
+  });
+
+  const handleRecalcAll = async () => {
+    Alert.alert(
+      "Ricalcola tutto",
+      "Avviare un ciclo completo del motore di matching per tutti gli utenti?",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Avvia",
+          style: "default",
+          onPress: async () => {
+            try {
+              setRecalcStatus("running");
+              const res = await apiRequest("POST", "/api/admin/matches/recalculate-all");
+              const json = await res.json();
+              setRecalcStatus("done");
+              if (json.started) {
+                Alert.alert("Ciclo avviato", "Il motore di matching è stato avviato in background.");
+              } else {
+                Alert.alert("Non avviato", json.reason ?? "Il ciclo non è stato avviato.");
+              }
+              setTimeout(() => setRecalcStatus("idle"), 3000);
+              refetch();
+            } catch {
+              setRecalcStatus("idle");
+              Alert.alert("Errore", "Impossibile avviare il ricalcolo.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const visible = data?.visible ?? false;
+  const stats = data?.stats ?? [];
+  const anomalies = stats.filter((s) => s.isAnomaly);
+
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+    >
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Visibilità Preferenze</Text>
+        <View style={styles.toggleCard}>
+          <View style={styles.toggleLeft}>
+            <MaterialCommunityIcons
+              name={visible ? "eye" : "eye-off"}
+              size={24}
+              color={visible ? Colors.success : Colors.textSecondary}
+            />
+            <View style={styles.toggleTextWrap}>
+              <Text style={styles.toggleLabel}>
+                Sezione preferenze match visibile agli utenti
+              </Text>
+              <Text style={styles.toggleSubtext}>
+                {visible
+                  ? "Gli utenti vedono e gestiscono i propri switch"
+                  : "La sezione è nascosta per tutti gli utenti"}
+              </Text>
+            </View>
+          </View>
+          <Switch
+            value={visible}
+            onValueChange={(val) => toggleMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.success + "88" }}
+            thumbColor={visible ? Colors.success : Colors.textSecondary}
+            disabled={toggleMutation.isPending}
+          />
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Motore Matching</Text>
+          <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
+            <Ionicons name="refresh" size={15} color={Colors.accent} />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.recalcAllBtn,
+            recalcStatus === "running" && { opacity: 0.7 },
+            recalcStatus === "done" && { backgroundColor: Colors.success },
+          ]}
+          onPress={handleRecalcAll}
+          disabled={recalcStatus === "running"}
+          activeOpacity={0.8}
+        >
+          {recalcStatus === "running" ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : recalcStatus === "done" ? (
+            <Ionicons name="checkmark-circle" size={20} color="#fff" />
+          ) : (
+            <MaterialCommunityIcons name="refresh-circle" size={20} color="#fff" />
+          )}
+          <Text style={styles.recalcAllText}>
+            {recalcStatus === "running"
+              ? "Avvio in corso..."
+              : recalcStatus === "done"
+              ? "Ciclo avviato!"
+              : "Ricalcola tutto"}
+          </Text>
+        </TouchableOpacity>
+
+        {anomalies.length > 0 && (
+          <View style={styles.anomalyBanner}>
+            <Ionicons name="warning" size={16} color={Colors.warning} />
+            <Text style={styles.anomalyText}>
+              {anomalies.length} tipo{anomalies.length > 1 ? "i" : ""} con 0 match — verifica configurazione
+            </Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Statistiche per Tipo di Match</Text>
+
+        {isLoading ? (
+          <ActivityIndicator color={Colors.accent} style={{ marginTop: 20 }} />
+        ) : (
+          <View style={styles.statsTable}>
+            <View style={styles.tableHeader}>
+              <Text style={[styles.tableCell, { flex: 3 }]}>Tipo</Text>
+              <Text style={[styles.tableCell, styles.tableCellCenter, { flex: 1.2 }]}>Utenti attivi</Text>
+              <Text style={[styles.tableCell, styles.tableCellCenter, { flex: 1 }]}>Match</Text>
+              <Text style={[styles.tableCell, styles.tableCellCenter, { flex: 0.8 }]}>Stato</Text>
+            </View>
+
+            {stats.map((stat, idx) => (
+              <View
+                key={stat.typeKey}
+                style={[
+                  styles.tableRow,
+                  idx % 2 === 0 && { backgroundColor: Colors.surfaceLight + "44" },
+                  stat.isAnomaly && styles.anomalyRow,
+                ]}
+              >
+                <Text style={[styles.tableCell, styles.tableTypeName, { flex: 3 }]} numberOfLines={2}>
+                  {stat.typeName}
+                </Text>
+                <Text style={[styles.tableCell, styles.tableCellCenter, { flex: 1.2 }]}>
+                  {stat.usersActive}
+                </Text>
+                <Text
+                  style={[
+                    styles.tableCell,
+                    styles.tableCellCenter,
+                    { flex: 1 },
+                    stat.isAnomaly && { color: Colors.warning },
+                  ]}
+                >
+                  {stat.totalMatches}
+                </Text>
+                <View style={[styles.tableCell, styles.tableCellCenter, { flex: 0.8 }]}>
+                  {stat.isAnomaly ? (
+                    <Ionicons name="warning" size={14} color={Colors.warning} />
+                  ) : (
+                    <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  section: { marginHorizontal: 12, marginTop: 16 },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  toggleCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 12,
+  },
+  toggleLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+  toggleTextWrap: { flex: 1, gap: 2 },
+  toggleLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  toggleSubtext: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
+  refreshBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  recalcAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 14,
+    backgroundColor: Colors.accent,
+    borderRadius: 14,
+    marginBottom: 12,
+  },
+  recalcAllText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#fff" },
+  anomalyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.warning + "22",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.warning + "55",
+  },
+  anomalyText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.warning, flex: 1 },
+  statsTable: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  tableHeader: {
+    flexDirection: "row",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    backgroundColor: Colors.surfaceLight,
+  },
+  tableRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    minHeight: 44,
+  },
+  anomalyRow: {
+    backgroundColor: Colors.warning + "11",
+  },
+  tableCell: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.text,
+  },
+  tableCellCenter: { textAlign: "center", alignItems: "center", justifyContent: "center" },
+  tableTypeName: { fontFamily: "Inter_500Medium", fontSize: 12 },
+});

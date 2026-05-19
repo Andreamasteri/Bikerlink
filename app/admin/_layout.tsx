@@ -38,6 +38,9 @@ export default function AdminLayout() {
       <Stack.Screen name="blocks" options={{ title: "Blocchi tra utenti" }} />
       <Stack.Screen name="crash-logs" options={{ title: "Log Riavvii App" }} />
       <Stack.Screen name="newsletter" options={{ title: "Iscritti Newsletter" }} />
+      <Stack.Screen name="match-inspector" options={{ title: "Match Inspector" }} />
+      <Stack.Screen name="match-inspector-detail" options={{ title: "Dettaglio Match" }} />
+      <Stack.Screen name="match-control" options={{ title: "Controllo Matching" }} />
     </Stack>
   );
 }
