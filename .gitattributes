@@ -3,3 +3,4 @@ attached_assets/application-1203dffe-09c2-4ce7-8a1d-1d80ab74df72_1776951281439.a
 attached_assets/application-43e0732d-b32c-4962-a3f5-20524ca5fad2_1776954828311.aab filter=lfs diff=lfs merge=lfs -text
 attached_assets/generated_videos/bikerlink_promo_final.mp4 filter=lfs diff=lfs merge=lfs -text
 attached_assets/generated_videos/*.mp4 filter=lfs diff=lfs merge=lfs -text
+attached_assets/application-f08e7c5d-aae8-4674-b748-b99707ab1dc9_1779232788073.apk filter=lfs diff=lfs merge=lfs -text
