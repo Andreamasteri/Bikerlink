@@ -10,6 +10,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/assets/images/playstore-icon.png" />
     <meta name="theme-color" content="#0D0D0D" />
+    <link rel="preload" href="/assets/images/hero-biker.jpg" as="image" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -177,15 +178,28 @@
         text-align: center;
         padding: 120px 24px 80px;
         overflow: hidden;
+        background-image: url('/assets/images/hero-biker.jpg');
+        background-size: cover;
+        background-position: center 40%;
+        background-repeat: no-repeat;
+      }
+      .hero-photo-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(to top, rgba(10,10,10,0.97) 0%, rgba(10,10,10,0.70) 35%, rgba(10,10,10,0.45) 60%, rgba(10,10,10,0.55) 100%);
+        z-index: 0;
       }
       .hero-mesh {
         position: absolute;
         inset: 0;
         pointer-events: none;
+        z-index: 1;
         background:
-          radial-gradient(ellipse 70% 55% at 50% -10%, rgba(255,102,0,0.16) 0%, transparent 70%),
-          radial-gradient(ellipse 40% 30% at 85% 90%, rgba(255,102,0,0.07) 0%, transparent 60%),
-          radial-gradient(ellipse 30% 25% at 10% 80%, rgba(255,102,0,0.05) 0%, transparent 60%);
+          radial-gradient(ellipse 70% 55% at 50% -10%, rgba(255,59,48,0.18) 0%, transparent 70%),
+          radial-gradient(ellipse 40% 30% at 85% 90%, rgba(255,59,48,0.08) 0%, transparent 60%),
+          radial-gradient(ellipse 30% 25% at 10% 80%, rgba(255,59,48,0.06) 0%, transparent 60%);
       }
       .hero-line {
         position: absolute;
@@ -196,6 +210,17 @@
       }
 
       /* ── HERO STAGGERED ENTRANCE ── */
+      .hero-badge,
+      .hero-name,
+      .hero-tagline,
+      .hero-desc,
+      .hero-ctas,
+      .hero-live,
+      .hero-login-hint,
+      .hero-logo-wrap {
+        position: relative;
+        z-index: 2;
+      }
       .hero-badge,
       .hero-name,
       .hero-tagline,
@@ -341,6 +366,7 @@
         opacity: 0.8;
         transform: skewX(-15deg);
         pointer-events: none;
+        z-index: 3;
       }
 
       /* ── LIVE COUNTER HERO ───────────────────────────────────────────────── */
@@ -1623,6 +1649,7 @@
 
     <!-- ── HERO ───────────────────────────────────────────────────────────── -->
     <section class="hero" id="hero">
+      <div class="hero-photo-overlay"></div>
       <div class="hero-race-stripe"></div>
       <div class="hero-mesh" id="hero-mesh"></div>
 
