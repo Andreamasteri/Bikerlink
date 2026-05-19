@@ -101,7 +101,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
   useEffect(() => { unreadNotifRef.current = unreadNotifications; }, [unreadNotifications]);
 
   useEffect(() => {
-    if (Platform.OS !== "android" || !isLoggedIn || !Notifications) return;
+    if ((Platform.OS !== "android" && Platform.OS !== "ios") || !isLoggedIn || !Notifications) return;
 
     let permissionGranted = false;
 
@@ -110,7 +110,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
       try {
         const { status } = await Notifications.requestPermissionsAsync();
         permissionGranted = status === "granted";
-        if (permissionGranted) {
+        if (permissionGranted && Platform.OS === "android") {
           await Notifications.setNotificationChannelAsync("bikerlink-bg", {
             name: "BikerLink in background",
             importance: Notifications.AndroidImportance.DEFAULT,
@@ -147,7 +147,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
   }, [isLoggedIn]);
 
   useEffect(() => {
-    if (Platform.OS !== "android" || !Notifications) return;
+    if ((Platform.OS !== "android" && Platform.OS !== "ios") || !Notifications) return;
     (async () => {
       if (AppState.currentState !== "active") {
         await scheduleBackgroundNotif(unreadChatRef.current, unreadNotifRef.current);
