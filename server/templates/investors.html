@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <title>BikerLink — Per Investitori</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0D0D0D;
+        color: #E8E8E8;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+
+      /* ── Header ── */
+      .page-header {
+        width: 100%;
+        max-width: 720px;
+        padding: 48px 24px 32px;
+        text-align: center;
+      }
+      .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: #777;
+        text-decoration: none;
+        margin-bottom: 32px;
+        transition: color 0.2s;
+      }
+      .back-link:hover { color: #D4A017; }
+      .logo-icon { font-size: 56px; margin-bottom: 12px; }
+      .badge {
+        display: inline-block;
+        background: #1E1E1E;
+        border: 1px solid #D4A017;
+        color: #D4A017;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        padding: 4px 14px;
+        border-radius: 20px;
+        margin-bottom: 16px;
+      }
+      h1 {
+        font-size: 34px;
+        font-weight: 800;
+        color: #D4A017;
+        letter-spacing: -0.5px;
+        line-height: 1.2;
+      }
+      .subtitle {
+        font-size: 16px;
+        color: #999;
+        margin-top: 10px;
+        line-height: 1.5;
+      }
+
+      /* ── Sections ── */
+      .section {
+        width: 100%;
+        max-width: 720px;
+        padding: 32px 24px;
+        border-top: 1px solid #1E1E1E;
+      }
+      .section h2 {
+        font-size: 20px;
+        font-weight: 800;
+        color: #D4A017;
+        margin-bottom: 6px;
+      }
+      .section .section-desc {
+        font-size: 14px;
+        color: #888;
+        margin-bottom: 24px;
+        line-height: 1.6;
+      }
+
+      /* ── Metrics grid ── */
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-bottom: 8px;
+      }
+      @media (max-width: 520px) {
+        .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+      .metric-card {
+        background: #1A1A1A;
+        border: 1px solid #2A2A2A;
+        border-radius: 14px;
+        padding: 18px 14px;
+        text-align: center;
+      }
+      .metric-card .metric-value {
+        font-size: 26px;
+        font-weight: 800;
+        color: #D4A017;
+        line-height: 1;
+      }
+      .metric-card .metric-label {
+        font-size: 11px;
+        color: #888;
+        margin-top: 6px;
+        line-height: 1.3;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      /* ── Differenziatori ── */
+      .diff-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .diff-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        background: #1A1A1A;
+        border: 1px solid #2A2A2A;
+        border-radius: 12px;
+        padding: 16px;
+      }
+      .diff-icon {
+        font-size: 24px;
+        flex-shrink: 0;
+        margin-top: 2px;
+      }
+      .diff-content h3 {
+        font-size: 14px;
+        font-weight: 700;
+        color: #E8E8E8;
+        margin-bottom: 3px;
+      }
+      .diff-content p {
+        font-size: 13px;
+        color: #888;
+        line-height: 1.4;
+      }
+
+      /* ── Competitor section ── */
+      .competitor-img-link {
+        display: block;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #2A2A2A;
+        transition: transform 0.2s, box-shadow 0.2s;
+        margin-bottom: 20px;
+      }
+      .competitor-img-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(212, 160, 23, 0.2);
+      }
+      .competitor-img-link img {
+        width: 100%;
+        display: block;
+      }
+
+      /* ── Revenue model ── */
+      .revenue-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+      }
+      @media (max-width: 480px) {
+        .revenue-grid { grid-template-columns: 1fr; }
+      }
+      .revenue-card {
+        background: #1A1A1A;
+        border: 1px solid #2A2A2A;
+        border-radius: 14px;
+        padding: 18px;
+      }
+      .revenue-card .rev-icon { font-size: 22px; margin-bottom: 8px; }
+      .revenue-card h3 {
+        font-size: 13px;
+        font-weight: 700;
+        color: #D4A017;
+        margin-bottom: 4px;
+      }
+      .revenue-card p {
+        font-size: 12px;
+        color: #888;
+        line-height: 1.4;
+      }
+
+      /* ── CTA buttons ── */
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .cta-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 13px 26px;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+      }
+      .cta-primary {
+        background: #D4A017;
+        color: #0D0D0D;
+      }
+      .cta-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(212, 160, 23, 0.35);
+      }
+      .cta-outline {
+        background: #1E1E1E;
+        color: #D4A017;
+        border: 1px solid #D4A017;
+      }
+      .cta-outline:hover {
+        background: #D4A017;
+        color: #0D0D0D;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(212, 160, 23, 0.3);
+      }
+
+      /* ── Footer ── */
+      .footer {
+        padding: 32px 24px;
+        text-align: center;
+        font-size: 12px;
+        color: #555;
+        border-top: 1px solid #1E1E1E;
+        width: 100%;
+        max-width: 720px;
+      }
+      .footer a { color: #D4A017; text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+
+    <!-- Header -->
+    <div class="page-header">
+      <a href="/" class="back-link">← Torna alla home</a>
+      <div class="logo-icon">🏍️</div>
+      <div class="badge">Investor Deck</div>
+      <h1>BikerLink</h1>
+      <p class="subtitle">
+        La prima piattaforma verticale per motociclisti in Italia.<br>
+        Community, navigazione curvy, marketplace e sicurezza stradale — tutto in un'unica app.
+      </p>
+    </div>
+
+    <!-- Metriche chiave -->
+    <div class="section">
+      <h2>Mercato &amp; Opportunità</h2>
+      <p class="section-desc">
+        L'Italia conta oltre 7 milioni di motociclisti attivi. Nessuna app verticale ha ancora catturato questa community in modo sistematico.
+      </p>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-value">7M+</div>
+          <div class="metric-label">Motociclisti attivi in Italia</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">€2,1B</div>
+          <div class="metric-label">Mercato accessori &amp; servizi moto (IT)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">0</div>
+          <div class="metric-label">App verticali dominanti nel segmento</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">5000+</div>
+          <div class="metric-label">Utenti seed caricati</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">MotoClub</div>
+          <div class="metric-label">Sistema club con admin e chat di gruppo</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">SOS</div>
+          <div class="metric-label">Emergenza stradale integrata (in sviluppo)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Differenziatori -->
+    <div class="section">
+      <h2>Perché BikerLink vince</h2>
+      <p class="section-desc">
+        Non siamo un'altra app di navigazione. Siamo la piattaforma sociale che il motociclista usa prima, durante e dopo ogni giro.
+      </p>
+      <div class="diff-list">
+        <div class="diff-item">
+          <div class="diff-icon">🗺️</div>
+          <div class="diff-content">
+            <h3>Algoritmo percorsi curvy proprietario</h3>
+            <p>Calcola percorsi privilegiando strade tortuose su OSM + GraphHopper a costo zero. Nessun competitor lo fa nativamente per l'utente italiano.</p>
+          </div>
+        </div>
+        <div class="diff-item">
+          <div class="diff-icon">👥</div>
+          <div class="diff-content">
+            <h3>Matching biker + zavorra in tempo reale</h3>
+            <p>GPS live, filtri per brand/modello/disponibilità. Trova compagni di viaggio vicino a te come Tinder, ma per le moto.</p>
+          </div>
+        </div>
+        <div class="diff-item">
+          <div class="diff-icon">🏛️</div>
+          <div class="diff-content">
+            <h3>MotoClub con governance integrata</h3>
+            <p>Crea o entra in club con codici invito, admin panel, approvazioni e chat di gruppo dedicata per ogni club.</p>
+          </div>
+        </div>
+        <div class="diff-item">
+          <div class="diff-icon">🚨</div>
+          <div class="diff-content">
+            <h3>SOS Biker — Emergenza stradale</h3>
+            <p>Sistema di allerta d'emergenza in sviluppo: notifica i biker vicini in caso di incidente, con integrazione contatti d'emergenza.</p>
+          </div>
+        </div>
+        <div class="diff-item">
+          <div class="diff-icon">🔧</div>
+          <div class="diff-content">
+            <h3>Marketplace verticale officine &amp; partner</h3>
+            <p>Officine partner, rivenditori e sponsor integrati nella mappa. Revenue B2B nativo senza dipendere da ads generici.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analisi Competitor -->
+    <div class="section">
+      <h2>Analisi Competitor</h2>
+      <p class="section-desc">
+        Abbiamo mappato le principali app concorrenti — da Rever a Waze Rider — identificando i gap che BikerLink risolve in modo nativo.
+        Nessuno copre l'intero stack: social + navigazione curvy + community verticale + marketplace.
+      </p>
+      <a href="/assets/competitor-analysis.pdf" target="_blank" class="competitor-img-link">
+        <img src="/assets/competitor-analysis.png" alt="Analisi competitor BikerLink" loading="lazy" />
+      </a>
+      <div class="cta-row">
+        <a href="/assets/competitor-analysis.pdf" target="_blank" class="cta-outline">
+          📄 Scarica analisi completa (PDF)
+        </a>
+      </div>
+    </div>
+
+    <!-- Revenue model -->
+    <div class="section">
+      <h2>Modello di Revenue</h2>
+      <p class="section-desc">
+        Strategia freemium progressiva senza abbonamenti obbligatori nelle fasi iniziali. Revenue verticale e B2B sin dal lancio.
+      </p>
+      <div class="revenue-grid">
+        <div class="revenue-card">
+          <div class="rev-icon">🏪</div>
+          <h3>Partner Commerciali</h3>
+          <p>Officine, rivenditori e brand moto pagano per visibilità geolocalizzata sulla mappa e nella community.</p>
+        </div>
+        <div class="revenue-card">
+          <div class="rev-icon">⭐</div>
+          <h3>Freemium Premium</h3>
+          <p>Feature avanzate (statistiche dettagliate, route saving illimitato, badge esclusivi) sbloccabili con abbonamento.</p>
+        </div>
+        <div class="revenue-card">
+          <div class="rev-icon">🎯</div>
+          <h3>Branded Content</h3>
+          <p>Sponsorizzazioni native nei contest foto settimanali e negli eventi organizzati tramite l'app.</p>
+        </div>
+        <div class="revenue-card">
+          <div class="rev-icon">📊</div>
+          <h3>Dati Aggregati</h3>
+          <p>Insights anonimi su percorsi, preferenze e comportamenti — utili a assicurazioni e case produttrici.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Contatto -->
+    <div class="section">
+      <h2>Parliamoci</h2>
+      <p class="section-desc">
+        Siamo in fase early — il momento giusto per entrare. Se sei un angel investor, un fondo verticale o un partner strategico nel settore moto, scrivici.
+      </p>
+      <div class="cta-row">
+        <a href="mailto:invest@bikerlink.app" class="cta-primary">
+          📩 Contattaci
+        </a>
+        <a href="/" class="cta-outline">
+          🏍️ Vedi l'app
+        </a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>© 2026 BikerLink. Tutti i diritti riservati.</p>
+      <p style="margin-top:8px;">
+        <a href="/privacy-policy">Privacy Policy</a>
+        &nbsp;|&nbsp;
+        <a href="/terms">Termini di Servizio</a>
+      </p>
+    </div>
+
+  </body>
+</html>

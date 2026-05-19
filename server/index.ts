@@ -310,6 +310,7 @@ function configureExpoAndLanding(app: express.Application) {
     "/privacy-policy": "privacy-policy.html",
     "/terms":          "terms.html",
     "/delete-account": "delete-account.html",
+    "/investors":      "investors.html",
   };
   for (const [route, file] of Object.entries(htmlPages)) {
     const filePath = path.resolve(process.cwd(), "server", "templates", file);
