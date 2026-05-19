@@ -4668,13 +4668,44 @@ router.post("/ota", async (req: Request, res: Response) => {
 router.post("/ota/:id/publish", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    await db.execute(sql`UPDATE ota_releases SET status = 'inactive', updated_at = NOW() WHERE status = 'active'`);
-    const result = await db.execute(sql`
-      UPDATE ota_releases
-      SET status = 'active', published_at = NOW(), updated_at = NOW()
-      WHERE id = ${id}
-      RETURNING *
-    `);
+    // Task #1355: Do NOT globally deactivate other active releases.
+    // Multiple releases can be active simultaneously (one per slot).
+    // Just activate this release. If the caller also wants to assign a slot,
+    // they must call /api/admin/ota/assign-slot afterwards (or use assignSlot body param).
+    const { assignSlot } = req.body ?? {};
+
+    await pool.query("BEGIN");
+    let result: { rows: unknown[] };
+    try {
+      if (assignSlot) {
+        // Validate slot if provided
+        if (!/^(stable|previous-stable|test-\d+)$/.test(assignSlot)) {
+          await pool.query("ROLLBACK");
+          return res.status(400).json({ message: "assignSlot non valido. Formati ammessi: stable, test-1, test-2, ..." });
+        }
+        // Clear previous occupant of the target slot (set to archived)
+        await pool.query(
+          "UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = $1 AND id != $2",
+          [assignSlot, id]
+        );
+        const r = await pool.query(
+          "UPDATE ota_releases SET status = 'active', slot = $1, published_at = NOW(), updated_at = NOW() WHERE id = $2 RETURNING *",
+          [assignSlot, id]
+        );
+        result = r;
+      } else {
+        const r = await pool.query(
+          "UPDATE ota_releases SET status = 'active', published_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *",
+          [id]
+        );
+        result = r;
+      }
+      await pool.query("COMMIT");
+    } catch (txErr) {
+      await pool.query("ROLLBACK");
+      throw txErr;
+    }
+
     if (!result.rows.length) return res.status(404).json({ message: "Release non trovata" });
     // Invalida l'intera cache hash dei manifest /api/expo-updates: la release
     // appena pubblicata potrebbe avere lo stesso releaseId di una entry vecchia
@@ -6527,14 +6558,14 @@ router.post("/ota/assign-slot", async (req: Request, res: Response) => {
     await pool.query("BEGIN");
     let assignedRow: Record<string, unknown> | null = null;
     try {
-      // Rimuovi qualsiasi altra release che occupa già questo slot
+      // Evict previous occupant of this slot → archived (not slot=NULL, to keep legacy fallback clean)
       await pool.query(
-        "UPDATE ota_releases SET slot = NULL, updated_at = NOW() WHERE slot = $1 AND id != $2",
+        "UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = $1 AND id != $2",
         [slot, releaseId]
       );
-      // Assegna il nuovo occupante
+      // Assign the new occupant and activate it so it can be served
       const result = await pool.query(
-        "UPDATE ota_releases SET slot = $1, updated_at = NOW() WHERE id = $2 RETURNING id, version, slot, status",
+        "UPDATE ota_releases SET slot = $1, status = 'active', published_at = COALESCE(published_at, NOW()), updated_at = NOW() WHERE id = $2 RETURNING id, version, slot, status",
         [slot, releaseId]
       );
       if (!result.rows.length) {
@@ -6667,11 +6698,11 @@ router.post("/ota/promote", async (req: Request, res: Response) => {
     // Transazione atomica
     await pool.query("BEGIN");
     try {
-      // Il previous-stable corrente → storico (slot=NULL)
+      // Il previous-stable corrente → archived (non slot=NULL: riserviamo NULL ai record pre-slot-system)
       await pool.query(
-        "UPDATE ota_releases SET slot = NULL, updated_at = NOW() WHERE slot = 'previous-stable'"
+        "UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = 'previous-stable'"
       );
-      // Lo stable corrente → previous-stable
+      // Lo stable corrente → previous-stable (resta active: è il candidato al revert)
       await pool.query(
         "UPDATE ota_releases SET slot = 'previous-stable', updated_at = NOW() WHERE slot = 'stable'"
       );
@@ -6728,11 +6759,11 @@ router.post("/ota/revert", async (req: Request, res: Response) => {
     // Transazione atomica
     await pool.query("BEGIN");
     try {
-      // Lo stable corrente → storico (slot=NULL, non più in routing)
+      // Lo stable corrente → archived (non slot=NULL: riserviamo NULL ai record pre-slot-system)
       await pool.query(
-        "UPDATE ota_releases SET slot = NULL, updated_at = NOW() WHERE slot = 'stable'"
+        "UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = 'stable'"
       );
-      // Il previous-stable → stable
+      // Il previous-stable → stable (resta active)
       await pool.query(
         "UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin-revert', updated_at = NOW() WHERE id = $1",
         [prevRow.id]
