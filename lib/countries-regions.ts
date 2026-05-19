@@ -1,3 +1,16 @@
+export interface CityData {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface RegionData {
+  name: string;
+  latitude: number;
+  longitude: number;
+  cities?: CityData[];
+}
+
 export interface CountryData {
   code: string;
   name: string;
@@ -5,13 +18,13 @@ export interface CountryData {
   regions: RegionData[];
 }
 
-export interface RegionData {
-  name: string;
-  latitude: number;
-  longitude: number;
+export interface ContinentData {
+  key: string;
+  label: string;
+  countryCodes: string[];
 }
 
-export const EUROPEAN_COUNTRIES: CountryData[] = [
+export const ALL_COUNTRIES: CountryData[] = [
   {
     code: "IT", name: "Italia", flag: "🇮🇹",
     regions: [
@@ -602,74 +615,461 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
   {
     code: "US", name: "United States", flag: "🇺🇸",
     regions: [
-      { name: "Alabama", latitude: 32.3617, longitude: -86.2792 },
-      { name: "Alaska", latitude: 64.2008, longitude: -153.4937 },
-      { name: "Arizona", latitude: 34.0489, longitude: -111.0937 },
-      { name: "Arkansas", latitude: 34.9697, longitude: -92.3731 },
-      { name: "California", latitude: 36.7783, longitude: -119.4179 },
-      { name: "Colorado", latitude: 39.5501, longitude: -105.7821 },
-      { name: "Connecticut", latitude: 41.6032, longitude: -73.0877 },
-      { name: "Delaware", latitude: 38.9108, longitude: -75.5277 },
-      { name: "Florida", latitude: 27.6648, longitude: -81.5158 },
-      { name: "Georgia", latitude: 32.1656, longitude: -82.9001 },
-      { name: "Hawaii", latitude: 19.8968, longitude: -155.5828 },
-      { name: "Idaho", latitude: 44.0682, longitude: -114.7420 },
-      { name: "Illinois", latitude: 40.6331, longitude: -89.3985 },
-      { name: "Indiana", latitude: 40.2672, longitude: -86.1349 },
-      { name: "Iowa", latitude: 41.8780, longitude: -93.0977 },
-      { name: "Kansas", latitude: 39.0119, longitude: -98.4842 },
-      { name: "Kentucky", latitude: 37.8393, longitude: -84.2700 },
-      { name: "Louisiana", latitude: 30.9843, longitude: -91.9623 },
-      { name: "Maine", latitude: 45.2538, longitude: -69.4455 },
-      { name: "Maryland", latitude: 39.0458, longitude: -76.6413 },
-      { name: "Massachusetts", latitude: 42.4072, longitude: -71.3824 },
-      { name: "Michigan", latitude: 44.3148, longitude: -85.6024 },
-      { name: "Minnesota", latitude: 46.7296, longitude: -94.6859 },
-      { name: "Mississippi", latitude: 32.3547, longitude: -89.3985 },
-      { name: "Missouri", latitude: 37.9643, longitude: -91.8318 },
-      { name: "Montana", latitude: 46.8797, longitude: -110.3626 },
-      { name: "Nebraska", latitude: 41.4925, longitude: -99.9018 },
-      { name: "Nevada", latitude: 38.8026, longitude: -116.4194 },
-      { name: "New Hampshire", latitude: 43.1939, longitude: -71.5724 },
-      { name: "New Jersey", latitude: 40.0583, longitude: -74.4057 },
-      { name: "New Mexico", latitude: 34.5199, longitude: -105.8701 },
-      { name: "New York", latitude: 42.1657, longitude: -74.9481 },
-      { name: "North Carolina", latitude: 35.7596, longitude: -79.0193 },
-      { name: "North Dakota", latitude: 47.5515, longitude: -101.0020 },
-      { name: "Ohio", latitude: 40.4173, longitude: -82.9071 },
-      { name: "Oklahoma", latitude: 35.4676, longitude: -97.5164 },
-      { name: "Oregon", latitude: 43.8041, longitude: -120.5542 },
-      { name: "Pennsylvania", latitude: 41.2033, longitude: -77.1945 },
-      { name: "Rhode Island", latitude: 41.6809, longitude: -71.5118 },
-      { name: "South Carolina", latitude: 33.8361, longitude: -81.1637 },
-      { name: "South Dakota", latitude: 43.9695, longitude: -99.9018 },
-      { name: "Tennessee", latitude: 35.5175, longitude: -86.5804 },
-      { name: "Texas", latitude: 31.9686, longitude: -99.9018 },
-      { name: "Utah", latitude: 39.3210, longitude: -111.0937 },
-      { name: "Vermont", latitude: 44.5588, longitude: -72.5778 },
-      { name: "Virginia", latitude: 37.4316, longitude: -78.6569 },
-      { name: "Washington", latitude: 47.7511, longitude: -120.7401 },
-      { name: "West Virginia", latitude: 38.5976, longitude: -80.4549 },
-      { name: "Wisconsin", latitude: 43.7844, longitude: -88.7879 },
-      { name: "Wyoming", latitude: 43.0760, longitude: -107.2903 },
+      { name: "Alabama", latitude: 32.3617, longitude: -86.2792, cities: [
+        { name: "Birmingham", latitude: 33.5186, longitude: -86.8104 },
+        { name: "Montgomery", latitude: 32.3668, longitude: -86.2999 },
+        { name: "Huntsville", latitude: 34.7304, longitude: -86.5861 },
+        { name: "Mobile", latitude: 30.6954, longitude: -88.0399 },
+        { name: "Tuscaloosa", latitude: 33.2098, longitude: -87.5692 },
+      ]},
+      { name: "Alaska", latitude: 64.2008, longitude: -153.4937, cities: [
+        { name: "Anchorage", latitude: 61.2181, longitude: -149.9003 },
+        { name: "Fairbanks", latitude: 64.8378, longitude: -147.7164 },
+        { name: "Juneau", latitude: 58.3005, longitude: -134.4197 },
+        { name: "Sitka", latitude: 57.0531, longitude: -135.3300 },
+        { name: "Ketchikan", latitude: 55.3422, longitude: -131.6461 },
+      ]},
+      { name: "Arizona", latitude: 34.0489, longitude: -111.0937, cities: [
+        { name: "Phoenix", latitude: 33.4484, longitude: -112.0740 },
+        { name: "Tucson", latitude: 32.2226, longitude: -110.9747 },
+        { name: "Mesa", latitude: 33.4152, longitude: -111.8315 },
+        { name: "Chandler", latitude: 33.3062, longitude: -111.8413 },
+        { name: "Scottsdale", latitude: 33.4942, longitude: -111.9261 },
+        { name: "Tempe", latitude: 33.4255, longitude: -111.9400 },
+      ]},
+      { name: "Arkansas", latitude: 34.9697, longitude: -92.3731, cities: [
+        { name: "Little Rock", latitude: 34.7465, longitude: -92.2896 },
+        { name: "Fort Smith", latitude: 35.3859, longitude: -94.3985 },
+        { name: "Fayetteville", latitude: 36.0822, longitude: -94.1719 },
+        { name: "Springdale", latitude: 36.1867, longitude: -94.1288 },
+        { name: "Jonesboro", latitude: 35.8423, longitude: -90.7043 },
+      ]},
+      { name: "California", latitude: 36.7783, longitude: -119.4179, cities: [
+        { name: "Los Angeles", latitude: 34.0522, longitude: -118.2437 },
+        { name: "San Francisco", latitude: 37.7749, longitude: -122.4194 },
+        { name: "San Diego", latitude: 32.7157, longitude: -117.1611 },
+        { name: "San Jose", latitude: 37.3382, longitude: -121.8863 },
+        { name: "Sacramento", latitude: 38.5816, longitude: -121.4944 },
+        { name: "Fresno", latitude: 36.7378, longitude: -119.7871 },
+        { name: "Long Beach", latitude: 33.7701, longitude: -118.1937 },
+      ]},
+      { name: "Colorado", latitude: 39.5501, longitude: -105.7821, cities: [
+        { name: "Denver", latitude: 39.7392, longitude: -104.9903 },
+        { name: "Colorado Springs", latitude: 38.8339, longitude: -104.8214 },
+        { name: "Aurora", latitude: 39.7294, longitude: -104.8319 },
+        { name: "Fort Collins", latitude: 40.5853, longitude: -105.0844 },
+        { name: "Boulder", latitude: 40.0150, longitude: -105.2705 },
+      ]},
+      { name: "Connecticut", latitude: 41.6032, longitude: -73.0877, cities: [
+        { name: "Bridgeport", latitude: 41.1865, longitude: -73.1952 },
+        { name: "New Haven", latitude: 41.3082, longitude: -72.9282 },
+        { name: "Stamford", latitude: 41.0534, longitude: -73.5387 },
+        { name: "Hartford", latitude: 41.7658, longitude: -72.6851 },
+        { name: "Waterbury", latitude: 41.5582, longitude: -73.0515 },
+      ]},
+      { name: "Delaware", latitude: 38.9108, longitude: -75.5277, cities: [
+        { name: "Wilmington", latitude: 39.7447, longitude: -75.5484 },
+        { name: "Dover", latitude: 39.1582, longitude: -75.5244 },
+        { name: "Newark", latitude: 39.6837, longitude: -75.7497 },
+        { name: "Middletown", latitude: 39.4496, longitude: -75.7163 },
+        { name: "Smyrna", latitude: 39.2998, longitude: -75.6052 },
+      ]},
+      { name: "Florida", latitude: 27.6648, longitude: -81.5158, cities: [
+        { name: "Jacksonville", latitude: 30.3322, longitude: -81.6557 },
+        { name: "Miami", latitude: 25.7617, longitude: -80.1918 },
+        { name: "Tampa", latitude: 27.9506, longitude: -82.4572 },
+        { name: "Orlando", latitude: 28.5383, longitude: -81.3792 },
+        { name: "St. Petersburg", latitude: 27.7676, longitude: -82.6403 },
+        { name: "Hialeah", latitude: 25.8576, longitude: -80.2781 },
+      ]},
+      { name: "Georgia", latitude: 32.1656, longitude: -82.9001, cities: [
+        { name: "Atlanta", latitude: 33.7490, longitude: -84.3880 },
+        { name: "Augusta", latitude: 33.4735, longitude: -82.0105 },
+        { name: "Columbus", latitude: 32.4610, longitude: -84.9877 },
+        { name: "Macon", latitude: 32.8407, longitude: -83.6324 },
+        { name: "Savannah", latitude: 32.0835, longitude: -81.0998 },
+        { name: "Athens", latitude: 33.9519, longitude: -83.3576 },
+      ]},
+      { name: "Hawaii", latitude: 19.8968, longitude: -155.5828, cities: [
+        { name: "Honolulu", latitude: 21.3069, longitude: -157.8583 },
+        { name: "Hilo", latitude: 19.7297, longitude: -155.0900 },
+        { name: "Kailua", latitude: 21.4022, longitude: -157.7394 },
+        { name: "Kapolei", latitude: 21.3352, longitude: -158.0736 },
+        { name: "Kaneohe", latitude: 21.4022, longitude: -157.8008 },
+      ]},
+      { name: "Idaho", latitude: 44.0682, longitude: -114.7420, cities: [
+        { name: "Boise", latitude: 43.6150, longitude: -116.2023 },
+        { name: "Nampa", latitude: 43.5407, longitude: -116.5635 },
+        { name: "Meridian", latitude: 43.6121, longitude: -116.3915 },
+        { name: "Idaho Falls", latitude: 43.4917, longitude: -112.0340 },
+        { name: "Pocatello", latitude: 42.8713, longitude: -112.4455 },
+      ]},
+      { name: "Illinois", latitude: 40.6331, longitude: -89.3985, cities: [
+        { name: "Chicago", latitude: 41.8781, longitude: -87.6298 },
+        { name: "Aurora", latitude: 41.7606, longitude: -88.3201 },
+        { name: "Naperville", latitude: 41.7508, longitude: -88.1535 },
+        { name: "Rockford", latitude: 42.2711, longitude: -89.0940 },
+        { name: "Springfield", latitude: 39.7817, longitude: -89.6501 },
+        { name: "Joliet", latitude: 41.5250, longitude: -88.0817 },
+      ]},
+      { name: "Indiana", latitude: 40.2672, longitude: -86.1349, cities: [
+        { name: "Indianapolis", latitude: 39.7684, longitude: -86.1581 },
+        { name: "Fort Wayne", latitude: 41.1306, longitude: -85.1289 },
+        { name: "Evansville", latitude: 37.9716, longitude: -87.5711 },
+        { name: "South Bend", latitude: 41.6764, longitude: -86.2520 },
+        { name: "Carmel", latitude: 39.9784, longitude: -86.1180 },
+      ]},
+      { name: "Iowa", latitude: 41.8780, longitude: -93.0977, cities: [
+        { name: "Des Moines", latitude: 41.6005, longitude: -93.6091 },
+        { name: "Cedar Rapids", latitude: 41.9779, longitude: -91.6656 },
+        { name: "Davenport", latitude: 41.5236, longitude: -90.5776 },
+        { name: "Sioux City", latitude: 42.4999, longitude: -96.4003 },
+        { name: "Iowa City", latitude: 41.6611, longitude: -91.5302 },
+      ]},
+      { name: "Kansas", latitude: 39.0119, longitude: -98.4842, cities: [
+        { name: "Wichita", latitude: 37.6872, longitude: -97.3301 },
+        { name: "Overland Park", latitude: 38.9822, longitude: -94.6708 },
+        { name: "Kansas City", latitude: 39.1155, longitude: -94.6268 },
+        { name: "Topeka", latitude: 39.0473, longitude: -95.6752 },
+        { name: "Olathe", latitude: 38.8814, longitude: -94.8191 },
+      ]},
+      { name: "Kentucky", latitude: 37.8393, longitude: -84.2700, cities: [
+        { name: "Louisville", latitude: 38.2527, longitude: -85.7585 },
+        { name: "Lexington", latitude: 38.0406, longitude: -84.5037 },
+        { name: "Bowling Green", latitude: 36.9903, longitude: -86.4436 },
+        { name: "Owensboro", latitude: 37.7719, longitude: -87.1112 },
+        { name: "Covington", latitude: 39.0837, longitude: -84.5086 },
+      ]},
+      { name: "Louisiana", latitude: 30.9843, longitude: -91.9623, cities: [
+        { name: "New Orleans", latitude: 29.9511, longitude: -90.0715 },
+        { name: "Baton Rouge", latitude: 30.4515, longitude: -91.1871 },
+        { name: "Shreveport", latitude: 32.5252, longitude: -93.7502 },
+        { name: "Metairie", latitude: 29.9999, longitude: -90.1731 },
+        { name: "Lafayette", latitude: 30.2241, longitude: -92.0198 },
+      ]},
+      { name: "Maine", latitude: 45.2538, longitude: -69.4455, cities: [
+        { name: "Portland", latitude: 43.6615, longitude: -70.2553 },
+        { name: "Lewiston", latitude: 44.1004, longitude: -70.2148 },
+        { name: "Bangor", latitude: 44.8012, longitude: -68.7778 },
+        { name: "South Portland", latitude: 43.6415, longitude: -70.2409 },
+        { name: "Auburn", latitude: 44.0978, longitude: -70.2312 },
+      ]},
+      { name: "Maryland", latitude: 39.0458, longitude: -76.6413, cities: [
+        { name: "Baltimore", latitude: 39.2904, longitude: -76.6122 },
+        { name: "Frederick", latitude: 39.4143, longitude: -77.4105 },
+        { name: "Rockville", latitude: 39.0840, longitude: -77.1528 },
+        { name: "Gaithersburg", latitude: 39.1434, longitude: -77.2014 },
+        { name: "Annapolis", latitude: 38.9784, longitude: -76.4922 },
+      ]},
+      { name: "Massachusetts", latitude: 42.4072, longitude: -71.3824, cities: [
+        { name: "Boston", latitude: 42.3601, longitude: -71.0589 },
+        { name: "Worcester", latitude: 42.2626, longitude: -71.8023 },
+        { name: "Springfield", latitude: 42.1015, longitude: -72.5898 },
+        { name: "Cambridge", latitude: 42.3736, longitude: -71.1097 },
+        { name: "Lowell", latitude: 42.6334, longitude: -71.3162 },
+      ]},
+      { name: "Michigan", latitude: 44.3148, longitude: -85.6024, cities: [
+        { name: "Detroit", latitude: 42.3314, longitude: -83.0458 },
+        { name: "Grand Rapids", latitude: 42.9634, longitude: -85.6681 },
+        { name: "Warren", latitude: 42.5145, longitude: -83.0147 },
+        { name: "Sterling Heights", latitude: 42.5803, longitude: -83.0302 },
+        { name: "Ann Arbor", latitude: 42.2808, longitude: -83.7430 },
+      ]},
+      { name: "Minnesota", latitude: 46.7296, longitude: -94.6859, cities: [
+        { name: "Minneapolis", latitude: 44.9778, longitude: -93.2650 },
+        { name: "Saint Paul", latitude: 44.9537, longitude: -93.0900 },
+        { name: "Rochester", latitude: 44.0121, longitude: -92.4802 },
+        { name: "Duluth", latitude: 46.7867, longitude: -92.1005 },
+        { name: "Bloomington", latitude: 44.8408, longitude: -93.3477 },
+      ]},
+      { name: "Mississippi", latitude: 32.3547, longitude: -89.3985, cities: [
+        { name: "Jackson", latitude: 32.2988, longitude: -90.1848 },
+        { name: "Gulfport", latitude: 30.3674, longitude: -89.0928 },
+        { name: "Southaven", latitude: 34.9890, longitude: -90.0023 },
+        { name: "Hattiesburg", latitude: 31.3271, longitude: -89.2903 },
+        { name: "Biloxi", latitude: 30.3960, longitude: -88.8853 },
+      ]},
+      { name: "Missouri", latitude: 37.9643, longitude: -91.8318, cities: [
+        { name: "Kansas City", latitude: 39.0997, longitude: -94.5786 },
+        { name: "Saint Louis", latitude: 38.6270, longitude: -90.1994 },
+        { name: "Springfield", latitude: 37.2090, longitude: -93.2923 },
+        { name: "Columbia", latitude: 38.9517, longitude: -92.3341 },
+        { name: "Independence", latitude: 39.0911, longitude: -94.4155 },
+      ]},
+      { name: "Montana", latitude: 46.8797, longitude: -110.3626, cities: [
+        { name: "Billings", latitude: 45.7833, longitude: -108.5007 },
+        { name: "Missoula", latitude: 46.8721, longitude: -113.9940 },
+        { name: "Great Falls", latitude: 47.4941, longitude: -111.2833 },
+        { name: "Bozeman", latitude: 45.6770, longitude: -111.0429 },
+        { name: "Butte", latitude: 45.9991, longitude: -112.5348 },
+      ]},
+      { name: "Nebraska", latitude: 41.4925, longitude: -99.9018, cities: [
+        { name: "Omaha", latitude: 41.2565, longitude: -95.9345 },
+        { name: "Lincoln", latitude: 40.8136, longitude: -96.7026 },
+        { name: "Bellevue", latitude: 41.1544, longitude: -95.9146 },
+        { name: "Grand Island", latitude: 40.9250, longitude: -98.3420 },
+        { name: "Kearney", latitude: 40.6993, longitude: -99.0817 },
+      ]},
+      { name: "Nevada", latitude: 38.8026, longitude: -116.4194, cities: [
+        { name: "Las Vegas", latitude: 36.1699, longitude: -115.1398 },
+        { name: "Henderson", latitude: 36.0395, longitude: -114.9817 },
+        { name: "Reno", latitude: 39.5296, longitude: -119.8138 },
+        { name: "North Las Vegas", latitude: 36.1989, longitude: -115.1175 },
+        { name: "Sparks", latitude: 39.5349, longitude: -119.7527 },
+      ]},
+      { name: "New Hampshire", latitude: 43.1939, longitude: -71.5724, cities: [
+        { name: "Manchester", latitude: 42.9956, longitude: -71.4548 },
+        { name: "Nashua", latitude: 42.7654, longitude: -71.4676 },
+        { name: "Concord", latitude: 43.2081, longitude: -71.5376 },
+        { name: "Derry", latitude: 42.8809, longitude: -71.3273 },
+        { name: "Dover", latitude: 43.1979, longitude: -70.8737 },
+      ]},
+      { name: "New Jersey", latitude: 40.0583, longitude: -74.4057, cities: [
+        { name: "Newark", latitude: 40.7357, longitude: -74.1724 },
+        { name: "Jersey City", latitude: 40.7178, longitude: -74.0431 },
+        { name: "Paterson", latitude: 40.9168, longitude: -74.1718 },
+        { name: "Elizabeth", latitude: 40.6640, longitude: -74.2107 },
+        { name: "Edison", latitude: 40.5187, longitude: -74.4121 },
+      ]},
+      { name: "New Mexico", latitude: 34.5199, longitude: -105.8701, cities: [
+        { name: "Albuquerque", latitude: 35.0844, longitude: -106.6504 },
+        { name: "Las Cruces", latitude: 32.3199, longitude: -106.7637 },
+        { name: "Rio Rancho", latitude: 35.2334, longitude: -106.6640 },
+        { name: "Santa Fe", latitude: 35.6870, longitude: -105.9378 },
+        { name: "Roswell", latitude: 33.3943, longitude: -104.5230 },
+      ]},
+      { name: "New York", latitude: 42.1657, longitude: -74.9481, cities: [
+        { name: "New York City", latitude: 40.7128, longitude: -74.0060 },
+        { name: "Buffalo", latitude: 42.8864, longitude: -78.8784 },
+        { name: "Rochester", latitude: 43.1566, longitude: -77.6088 },
+        { name: "Yonkers", latitude: 40.9312, longitude: -73.8988 },
+        { name: "Syracuse", latitude: 43.0481, longitude: -76.1474 },
+        { name: "Albany", latitude: 42.6526, longitude: -73.7562 },
+      ]},
+      { name: "North Carolina", latitude: 35.7596, longitude: -79.0193, cities: [
+        { name: "Charlotte", latitude: 35.2271, longitude: -80.8431 },
+        { name: "Raleigh", latitude: 35.7796, longitude: -78.6382 },
+        { name: "Greensboro", latitude: 36.0726, longitude: -79.7920 },
+        { name: "Durham", latitude: 35.9940, longitude: -78.8986 },
+        { name: "Winston-Salem", latitude: 36.0999, longitude: -80.2442 },
+      ]},
+      { name: "North Dakota", latitude: 47.5515, longitude: -101.0020, cities: [
+        { name: "Fargo", latitude: 46.8772, longitude: -96.7898 },
+        { name: "Bismarck", latitude: 46.8083, longitude: -100.7837 },
+        { name: "Grand Forks", latitude: 47.9253, longitude: -97.0329 },
+        { name: "Minot", latitude: 48.2325, longitude: -101.2963 },
+        { name: "West Fargo", latitude: 46.8749, longitude: -96.8998 },
+      ]},
+      { name: "Ohio", latitude: 40.4173, longitude: -82.9071, cities: [
+        { name: "Columbus", latitude: 39.9612, longitude: -82.9988 },
+        { name: "Cleveland", latitude: 41.4993, longitude: -81.6944 },
+        { name: "Cincinnati", latitude: 39.1031, longitude: -84.5120 },
+        { name: "Toledo", latitude: 41.6639, longitude: -83.5552 },
+        { name: "Akron", latitude: 41.0814, longitude: -81.5190 },
+      ]},
+      { name: "Oklahoma", latitude: 35.4676, longitude: -97.5164, cities: [
+        { name: "Oklahoma City", latitude: 35.4676, longitude: -97.5164 },
+        { name: "Tulsa", latitude: 36.1540, longitude: -95.9928 },
+        { name: "Norman", latitude: 35.2226, longitude: -97.4395 },
+        { name: "Broken Arrow", latitude: 36.0526, longitude: -95.7908 },
+        { name: "Edmond", latitude: 35.6528, longitude: -97.4781 },
+      ]},
+      { name: "Oregon", latitude: 43.8041, longitude: -120.5542, cities: [
+        { name: "Portland", latitude: 45.5051, longitude: -122.6750 },
+        { name: "Eugene", latitude: 44.0521, longitude: -123.0868 },
+        { name: "Salem", latitude: 44.9429, longitude: -123.0351 },
+        { name: "Gresham", latitude: 45.5001, longitude: -122.4302 },
+        { name: "Hillsboro", latitude: 45.5229, longitude: -122.9898 },
+      ]},
+      { name: "Pennsylvania", latitude: 41.2033, longitude: -77.1945, cities: [
+        { name: "Philadelphia", latitude: 39.9526, longitude: -75.1652 },
+        { name: "Pittsburgh", latitude: 40.4406, longitude: -79.9959 },
+        { name: "Allentown", latitude: 40.6084, longitude: -75.4902 },
+        { name: "Erie", latitude: 42.1292, longitude: -80.0851 },
+        { name: "Reading", latitude: 40.3356, longitude: -75.9269 },
+      ]},
+      { name: "Rhode Island", latitude: 41.6809, longitude: -71.5118, cities: [
+        { name: "Providence", latitude: 41.8240, longitude: -71.4128 },
+        { name: "Cranston", latitude: 41.7798, longitude: -71.4373 },
+        { name: "Warwick", latitude: 41.7001, longitude: -71.4162 },
+        { name: "Pawtucket", latitude: 41.8787, longitude: -71.3826 },
+        { name: "East Providence", latitude: 41.8137, longitude: -71.3706 },
+      ]},
+      { name: "South Carolina", latitude: 33.8361, longitude: -81.1637, cities: [
+        { name: "Charleston", latitude: 32.7765, longitude: -79.9311 },
+        { name: "Columbia", latitude: 34.0007, longitude: -81.0348 },
+        { name: "North Charleston", latitude: 32.8546, longitude: -79.9748 },
+        { name: "Mount Pleasant", latitude: 32.8323, longitude: -79.8284 },
+        { name: "Rock Hill", latitude: 34.9249, longitude: -81.0251 },
+      ]},
+      { name: "South Dakota", latitude: 43.9695, longitude: -99.9018, cities: [
+        { name: "Sioux Falls", latitude: 43.5473, longitude: -96.7283 },
+        { name: "Rapid City", latitude: 44.0805, longitude: -103.2310 },
+        { name: "Aberdeen", latitude: 45.4647, longitude: -98.4865 },
+        { name: "Brookings", latitude: 44.3114, longitude: -96.7984 },
+        { name: "Watertown", latitude: 44.8994, longitude: -97.1209 },
+      ]},
+      { name: "Tennessee", latitude: 35.5175, longitude: -86.5804, cities: [
+        { name: "Nashville", latitude: 36.1627, longitude: -86.7816 },
+        { name: "Memphis", latitude: 35.1495, longitude: -90.0490 },
+        { name: "Knoxville", latitude: 35.9606, longitude: -83.9207 },
+        { name: "Chattanooga", latitude: 35.0456, longitude: -85.3097 },
+        { name: "Clarksville", latitude: 36.5298, longitude: -87.3595 },
+      ]},
+      { name: "Texas", latitude: 31.9686, longitude: -99.9018, cities: [
+        { name: "Houston", latitude: 29.7604, longitude: -95.3698 },
+        { name: "San Antonio", latitude: 29.4241, longitude: -98.4936 },
+        { name: "Dallas", latitude: 32.7767, longitude: -96.7970 },
+        { name: "Austin", latitude: 30.2672, longitude: -97.7431 },
+        { name: "Fort Worth", latitude: 32.7555, longitude: -97.3308 },
+        { name: "El Paso", latitude: 31.7619, longitude: -106.4850 },
+      ]},
+      { name: "Utah", latitude: 39.3210, longitude: -111.0937, cities: [
+        { name: "Salt Lake City", latitude: 40.7608, longitude: -111.8910 },
+        { name: "West Valley City", latitude: 40.6916, longitude: -112.0011 },
+        { name: "Provo", latitude: 40.2338, longitude: -111.6585 },
+        { name: "West Jordan", latitude: 40.6097, longitude: -111.9391 },
+        { name: "Orem", latitude: 40.2969, longitude: -111.6946 },
+      ]},
+      { name: "Vermont", latitude: 44.5588, longitude: -72.5778, cities: [
+        { name: "Burlington", latitude: 44.4759, longitude: -73.2121 },
+        { name: "Essex", latitude: 44.4912, longitude: -73.1121 },
+        { name: "South Burlington", latitude: 44.4670, longitude: -73.1710 },
+        { name: "Colchester", latitude: 44.5432, longitude: -73.1540 },
+        { name: "Rutland", latitude: 43.6106, longitude: -72.9726 },
+      ]},
+      { name: "Virginia", latitude: 37.4316, longitude: -78.6569, cities: [
+        { name: "Virginia Beach", latitude: 36.8529, longitude: -75.9780 },
+        { name: "Norfolk", latitude: 36.8508, longitude: -76.2859 },
+        { name: "Chesapeake", latitude: 36.7682, longitude: -76.2875 },
+        { name: "Richmond", latitude: 37.5407, longitude: -77.4360 },
+        { name: "Arlington", latitude: 38.8816, longitude: -77.0910 },
+      ]},
+      { name: "Washington", latitude: 47.7511, longitude: -120.7401, cities: [
+        { name: "Seattle", latitude: 47.6062, longitude: -122.3321 },
+        { name: "Spokane", latitude: 47.6588, longitude: -117.4260 },
+        { name: "Tacoma", latitude: 47.2529, longitude: -122.4443 },
+        { name: "Vancouver", latitude: 45.6387, longitude: -122.6615 },
+        { name: "Bellevue", latitude: 47.6101, longitude: -122.2015 },
+      ]},
+      { name: "West Virginia", latitude: 38.5976, longitude: -80.4549, cities: [
+        { name: "Charleston", latitude: 38.3498, longitude: -81.6326 },
+        { name: "Huntington", latitude: 38.4192, longitude: -82.4452 },
+        { name: "Morgantown", latitude: 39.6295, longitude: -79.9559 },
+        { name: "Parkersburg", latitude: 39.2667, longitude: -81.5615 },
+        { name: "Wheeling", latitude: 40.0639, longitude: -80.7209 },
+      ]},
+      { name: "Wisconsin", latitude: 43.7844, longitude: -88.7879, cities: [
+        { name: "Milwaukee", latitude: 43.0389, longitude: -87.9065 },
+        { name: "Madison", latitude: 43.0731, longitude: -89.4012 },
+        { name: "Green Bay", latitude: 44.5133, longitude: -88.0133 },
+        { name: "Kenosha", latitude: 42.5847, longitude: -87.8212 },
+        { name: "Racine", latitude: 42.7261, longitude: -87.7829 },
+      ]},
+      { name: "Wyoming", latitude: 43.0760, longitude: -107.2903, cities: [
+        { name: "Cheyenne", latitude: 41.1400, longitude: -104.8202 },
+        { name: "Casper", latitude: 42.8501, longitude: -106.3252 },
+        { name: "Laramie", latitude: 41.3114, longitude: -105.5911 },
+        { name: "Gillette", latitude: 44.2911, longitude: -105.5022 },
+        { name: "Rock Springs", latitude: 41.5875, longitude: -109.2029 },
+      ]},
     ],
   },
   {
     code: "CA", name: "Canada", flag: "🇨🇦",
     regions: [
-      { name: "Alberta", latitude: 53.9333, longitude: -116.5765 },
-      { name: "British Columbia", latitude: 53.7267, longitude: -127.6476 },
-      { name: "Manitoba", latitude: 53.7609, longitude: -98.8139 },
-      { name: "New Brunswick", latitude: 46.5653, longitude: -66.4619 },
-      { name: "Newfoundland and Labrador", latitude: 53.1355, longitude: -57.6604 },
-      { name: "Nova Scotia", latitude: 44.6820, longitude: -63.7443 },
-      { name: "Ontario", latitude: 51.2538, longitude: -85.3232 },
-      { name: "Prince Edward Island", latitude: 46.5107, longitude: -63.4168 },
-      { name: "Quebec", latitude: 52.9399, longitude: -73.5491 },
-      { name: "Saskatchewan", latitude: 52.9399, longitude: -106.4509 },
-      { name: "Northwest Territories", latitude: 64.8255, longitude: -124.8457 },
-      { name: "Nunavut", latitude: 70.2998, longitude: -83.1076 },
-      { name: "Yukon", latitude: 64.2823, longitude: -135.0000 },
+      { name: "Alberta", latitude: 53.9333, longitude: -116.5765, cities: [
+        { name: "Calgary", latitude: 51.0447, longitude: -114.0719 },
+        { name: "Edmonton", latitude: 53.5461, longitude: -113.4938 },
+        { name: "Red Deer", latitude: 52.2690, longitude: -113.8116 },
+        { name: "Lethbridge", latitude: 49.6956, longitude: -112.8451 },
+        { name: "Medicine Hat", latitude: 50.0405, longitude: -110.6764 },
+      ]},
+      { name: "British Columbia", latitude: 53.7267, longitude: -127.6476, cities: [
+        { name: "Vancouver", latitude: 49.2827, longitude: -123.1207 },
+        { name: "Victoria", latitude: 48.4284, longitude: -123.3656 },
+        { name: "Kelowna", latitude: 49.8880, longitude: -119.4960 },
+        { name: "Abbotsford", latitude: 49.0504, longitude: -122.3045 },
+        { name: "Burnaby", latitude: 49.2488, longitude: -122.9805 },
+      ]},
+      { name: "Manitoba", latitude: 53.7609, longitude: -98.8139, cities: [
+        { name: "Winnipeg", latitude: 49.8951, longitude: -97.1384 },
+        { name: "Brandon", latitude: 49.8437, longitude: -99.9529 },
+        { name: "Steinbach", latitude: 49.5258, longitude: -96.6843 },
+        { name: "Thompson", latitude: 55.7435, longitude: -97.8553 },
+        { name: "Portage la Prairie", latitude: 49.9728, longitude: -98.2921 },
+      ]},
+      { name: "New Brunswick", latitude: 46.5653, longitude: -66.4619, cities: [
+        { name: "Moncton", latitude: 46.0878, longitude: -64.7782 },
+        { name: "Saint John", latitude: 45.2733, longitude: -66.0633 },
+        { name: "Fredericton", latitude: 45.9636, longitude: -66.6431 },
+        { name: "Miramichi", latitude: 47.0028, longitude: -65.4994 },
+        { name: "Bathurst", latitude: 47.6199, longitude: -65.6515 },
+      ]},
+      { name: "Newfoundland and Labrador", latitude: 53.1355, longitude: -57.6604, cities: [
+        { name: "St. John's", latitude: 47.5615, longitude: -52.7126 },
+        { name: "Corner Brook", latitude: 48.9500, longitude: -57.9500 },
+        { name: "Gander", latitude: 48.9540, longitude: -54.6081 },
+        { name: "Grand Falls-Windsor", latitude: 48.9335, longitude: -55.6647 },
+        { name: "Mount Pearl", latitude: 47.5138, longitude: -52.8058 },
+      ]},
+      { name: "Nova Scotia", latitude: 44.6820, longitude: -63.7443, cities: [
+        { name: "Halifax", latitude: 44.6488, longitude: -63.5752 },
+        { name: "Dartmouth", latitude: 44.6667, longitude: -63.5667 },
+        { name: "Sydney", latitude: 46.1368, longitude: -60.1942 },
+        { name: "Truro", latitude: 45.3647, longitude: -63.2825 },
+        { name: "New Glasgow", latitude: 45.5833, longitude: -62.6500 },
+      ]},
+      { name: "Ontario", latitude: 51.2538, longitude: -85.3232, cities: [
+        { name: "Toronto", latitude: 43.6532, longitude: -79.3832 },
+        { name: "Ottawa", latitude: 45.4215, longitude: -75.6972 },
+        { name: "Mississauga", latitude: 43.5890, longitude: -79.6441 },
+        { name: "Brampton", latitude: 43.7315, longitude: -79.7624 },
+        { name: "Hamilton", latitude: 43.2557, longitude: -79.8711 },
+        { name: "London", latitude: 42.9849, longitude: -81.2453 },
+      ]},
+      { name: "Prince Edward Island", latitude: 46.5107, longitude: -63.4168, cities: [
+        { name: "Charlottetown", latitude: 46.2382, longitude: -63.1311 },
+        { name: "Summerside", latitude: 46.3962, longitude: -63.7898 },
+        { name: "Stratford", latitude: 46.2186, longitude: -63.0832 },
+        { name: "Cornwall", latitude: 46.2311, longitude: -63.2084 },
+        { name: "Montague", latitude: 46.1670, longitude: -62.6432 },
+      ]},
+      { name: "Quebec", latitude: 52.9399, longitude: -73.5491, cities: [
+        { name: "Montreal", latitude: 45.5017, longitude: -73.5673 },
+        { name: "Quebec City", latitude: 46.8139, longitude: -71.2080 },
+        { name: "Laval", latitude: 45.5833, longitude: -73.7500 },
+        { name: "Gatineau", latitude: 45.4765, longitude: -75.7013 },
+        { name: "Longueuil", latitude: 45.5313, longitude: -73.5185 },
+      ]},
+      { name: "Saskatchewan", latitude: 52.9399, longitude: -106.4509, cities: [
+        { name: "Saskatoon", latitude: 52.1332, longitude: -106.6700 },
+        { name: "Regina", latitude: 50.4452, longitude: -104.6189 },
+        { name: "Prince Albert", latitude: 53.2033, longitude: -105.7531 },
+        { name: "Moose Jaw", latitude: 50.3930, longitude: -105.5350 },
+        { name: "Swift Current", latitude: 50.2881, longitude: -107.7939 },
+      ]},
+      { name: "Northwest Territories", latitude: 64.8255, longitude: -124.8457, cities: [
+        { name: "Yellowknife", latitude: 62.4540, longitude: -114.3718 },
+        { name: "Hay River", latitude: 60.8156, longitude: -115.7997 },
+        { name: "Inuvik", latitude: 68.3607, longitude: -133.7230 },
+        { name: "Fort Smith", latitude: 60.0005, longitude: -111.8879 },
+        { name: "Behchokò", latitude: 62.7933, longitude: -116.0316 },
+      ]},
+      { name: "Nunavut", latitude: 70.2998, longitude: -83.1076, cities: [
+        { name: "Iqaluit", latitude: 63.7467, longitude: -68.5170 },
+        { name: "Rankin Inlet", latitude: 62.8082, longitude: -92.0853 },
+        { name: "Arviat", latitude: 61.1065, longitude: -94.0693 },
+        { name: "Baker Lake", latitude: 64.3183, longitude: -96.0221 },
+        { name: "Cambridge Bay", latitude: 69.1169, longitude: -105.0530 },
+      ]},
+      { name: "Yukon", latitude: 64.2823, longitude: -135.0000, cities: [
+        { name: "Whitehorse", latitude: 60.7212, longitude: -135.0568 },
+        { name: "Dawson City", latitude: 64.0599, longitude: -139.4322 },
+        { name: "Watson Lake", latitude: 60.0634, longitude: -128.7065 },
+        { name: "Haines Junction", latitude: 60.7534, longitude: -137.5119 },
+        { name: "Faro", latitude: 62.2333, longitude: -133.3500 },
+      ]},
     ],
   },
   {
@@ -820,6 +1220,27 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
       { name: "Galápagos", latitude: -0.9538, longitude: -90.9656 },
       { name: "Imbabura", latitude: 0.3500, longitude: -78.1167 },
       { name: "Loja", latitude: -3.9931, longitude: -79.2042 },
+      { name: "Tungurahua", latitude: -1.2543, longitude: -78.6237 },
+    ],
+  },
+  {
+    code: "GY", name: "Guyana", flag: "🇬🇾",
+    regions: [
+      { name: "Georgetown", latitude: 6.8013, longitude: -58.1551 },
+      { name: "Linden", latitude: 5.9998, longitude: -58.2930 },
+      { name: "New Amsterdam", latitude: 6.2477, longitude: -57.5170 },
+      { name: "Berbice", latitude: 6.3667, longitude: -57.5167 },
+      { name: "Essequibo", latitude: 6.5833, longitude: -58.4667 },
+    ],
+  },
+  {
+    code: "SR", name: "Suriname", flag: "🇸🇷",
+    regions: [
+      { name: "Paramaribo", latitude: 5.8520, longitude: -55.2038 },
+      { name: "Wanica", latitude: 5.7500, longitude: -55.2500 },
+      { name: "Nickerie", latitude: 5.9334, longitude: -56.9833 },
+      { name: "Marowijne", latitude: 5.4500, longitude: -54.2167 },
+      { name: "Sipaliwini", latitude: 3.6666, longitude: -56.0000 },
     ],
   },
   {
@@ -948,17 +1369,499 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
     ],
   },
   {
-    code: "MR", name: "Mauritania", flag: "🇲🇷",
+    code: "AO", name: "Angola", flag: "🇦🇴",
     regions: [
-      { name: "Nouakchott-Ouest", latitude: 18.0858, longitude: -15.9785 },
-      { name: "Nouakchott-Nord", latitude: 18.1167, longitude: -15.9500 },
-      { name: "Nouakchott-Sud", latitude: 17.9833, longitude: -15.9833 },
-      { name: "Hodh Ech Chargui", latitude: 18.0000, longitude: -7.0000 },
-      { name: "Assaba", latitude: 16.7500, longitude: -11.5000 },
-      { name: "Gorgol", latitude: 15.9167, longitude: -12.6833 },
-      { name: "Brakna", latitude: 17.2167, longitude: -13.7000 },
-      { name: "Trarza", latitude: 18.0000, longitude: -15.0000 },
-      { name: "Adrar", latitude: 20.5000, longitude: -13.0000 },
+      { name: "Luanda", latitude: -8.8368, longitude: 13.2343 },
+      { name: "Huambo", latitude: -12.7761, longitude: 15.7394 },
+      { name: "Lubango", latitude: -14.9177, longitude: 13.4927 },
+      { name: "Benguela", latitude: -12.5763, longitude: 13.4055 },
+      { name: "Cabinda", latitude: -5.5500, longitude: 12.2000 },
+    ],
+  },
+  {
+    code: "BF", name: "Burkina Faso", flag: "🇧🇫",
+    regions: [
+      { name: "Ouagadougou", latitude: 12.3647, longitude: -1.5333 },
+      { name: "Bobo-Dioulasso", latitude: 11.1771, longitude: -4.2979 },
+      { name: "Koudougou", latitude: 12.2500, longitude: -2.3667 },
+      { name: "Banfora", latitude: 10.6333, longitude: -4.7667 },
+      { name: "Ouahigouya", latitude: 13.5833, longitude: -2.4333 },
+    ],
+  },
+  {
+    code: "BI", name: "Burundi", flag: "🇧🇮",
+    regions: [
+      { name: "Bujumbura", latitude: -3.3822, longitude: 29.3644 },
+      { name: "Gitega", latitude: -3.4271, longitude: 29.9249 },
+      { name: "Muyinga", latitude: -2.8452, longitude: 30.3376 },
+      { name: "Ngozi", latitude: -2.9076, longitude: 29.8301 },
+      { name: "Rumonge", latitude: -3.9747, longitude: 29.4387 },
+    ],
+  },
+  {
+    code: "BJ", name: "Bénin", flag: "🇧🇯",
+    regions: [
+      { name: "Cotonou", latitude: 6.3654, longitude: 2.4183 },
+      { name: "Porto-Novo", latitude: 6.4966, longitude: 2.6289 },
+      { name: "Parakou", latitude: 9.3373, longitude: 2.6278 },
+      { name: "Abomey", latitude: 7.1836, longitude: 1.9886 },
+      { name: "Natitingou", latitude: 10.3167, longitude: 1.3833 },
+    ],
+  },
+  {
+    code: "BW", name: "Botswana", flag: "🇧🇼",
+    regions: [
+      { name: "Gaborone", latitude: -24.6282, longitude: 25.9231 },
+      { name: "Francistown", latitude: -21.1664, longitude: 27.5078 },
+      { name: "Molepolole", latitude: -24.4065, longitude: 25.4957 },
+      { name: "Maun", latitude: -19.9833, longitude: 23.4167 },
+      { name: "Serowe", latitude: -22.3914, longitude: 26.7119 },
+    ],
+  },
+  {
+    code: "CD", name: "DR Congo", flag: "🇨🇩",
+    regions: [
+      { name: "Kinshasa", latitude: -4.3217, longitude: 15.3222 },
+      { name: "Lubumbashi", latitude: -11.6609, longitude: 27.4794 },
+      { name: "Mbuji-Mayi", latitude: -6.1500, longitude: 23.6000 },
+      { name: "Kisangani", latitude: 0.5154, longitude: 25.1988 },
+      { name: "Bukavu", latitude: -2.5085, longitude: 28.8612 },
+      { name: "Goma", latitude: -1.6777, longitude: 29.2285 },
+    ],
+  },
+  {
+    code: "CF", name: "Centrafrique", flag: "🇨🇫",
+    regions: [
+      { name: "Bangui", latitude: 4.3612, longitude: 18.5550 },
+      { name: "Bimbo", latitude: 4.2565, longitude: 18.4148 },
+      { name: "Berbérati", latitude: 4.2614, longitude: 15.7883 },
+      { name: "Bambari", latitude: 5.7656, longitude: 20.6703 },
+      { name: "Bouar", latitude: 5.9333, longitude: 15.5667 },
+    ],
+  },
+  {
+    code: "CG", name: "Congo", flag: "🇨🇬",
+    regions: [
+      { name: "Brazzaville", latitude: -4.2694, longitude: 15.2712 },
+      { name: "Pointe-Noire", latitude: -4.7692, longitude: 11.8660 },
+      { name: "Dolisie", latitude: -4.1980, longitude: 12.6667 },
+      { name: "Nkayi", latitude: -4.1667, longitude: 13.2833 },
+      { name: "Impfondo", latitude: 1.6167, longitude: 18.0667 },
+    ],
+  },
+  {
+    code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮",
+    regions: [
+      { name: "Abidjan", latitude: 5.3600, longitude: -4.0083 },
+      { name: "Yamoussoukro", latitude: 6.8276, longitude: -5.2893 },
+      { name: "Bouaké", latitude: 7.6900, longitude: -5.0302 },
+      { name: "Daloa", latitude: 6.8771, longitude: -6.4501 },
+      { name: "Korhogo", latitude: 9.4582, longitude: -5.6290 },
+    ],
+  },
+  {
+    code: "CM", name: "Cameroun", flag: "🇨🇲",
+    regions: [
+      { name: "Yaoundé", latitude: 3.8480, longitude: 11.5021 },
+      { name: "Douala", latitude: 4.0483, longitude: 9.7043 },
+      { name: "Garoua", latitude: 9.3017, longitude: 13.3968 },
+      { name: "Bamenda", latitude: 5.9527, longitude: 10.1466 },
+      { name: "Bafoussam", latitude: 5.4737, longitude: 10.4179 },
+    ],
+  },
+  {
+    code: "CV", name: "Cabo Verde", flag: "🇨🇻",
+    regions: [
+      { name: "Praia", latitude: 14.9330, longitude: -23.5133 },
+      { name: "Mindelo", latitude: 16.8918, longitude: -24.9800 },
+      { name: "Santa Maria", latitude: 16.5986, longitude: -22.9003 },
+      { name: "Assomada", latitude: 15.0956, longitude: -23.6713 },
+      { name: "Sal Rei", latitude: 16.1769, longitude: -22.9167 },
+    ],
+  },
+  {
+    code: "DJ", name: "Djibouti", flag: "🇩🇯",
+    regions: [
+      { name: "Djibouti Ville", latitude: 11.5886, longitude: 43.1451 },
+      { name: "Arta", latitude: 11.5252, longitude: 42.8440 },
+      { name: "Ali Sabieh", latitude: 11.1574, longitude: 42.7138 },
+      { name: "Dikhil", latitude: 11.1053, longitude: 42.3697 },
+      { name: "Tadjoura", latitude: 11.7840, longitude: 42.8832 },
+    ],
+  },
+  {
+    code: "ER", name: "Eritrea", flag: "🇪🇷",
+    regions: [
+      { name: "Asmara", latitude: 15.3394, longitude: 38.9318 },
+      { name: "Keren", latitude: 15.7765, longitude: 38.4537 },
+      { name: "Massawa", latitude: 15.6092, longitude: 39.4675 },
+      { name: "Assab", latitude: 13.0009, longitude: 42.7344 },
+      { name: "Mendefera", latitude: 14.8833, longitude: 38.8167 },
+    ],
+  },
+  {
+    code: "ET", name: "Ethiopia", flag: "🇪🇹",
+    regions: [
+      { name: "Addis Ababa", latitude: 9.0054, longitude: 38.7636 },
+      { name: "Dire Dawa", latitude: 9.5931, longitude: 41.8661 },
+      { name: "Mekelle", latitude: 13.4967, longitude: 39.4753 },
+      { name: "Gondar", latitude: 12.6080, longitude: 37.4682 },
+      { name: "Bahir Dar", latitude: 11.5742, longitude: 37.3614 },
+      { name: "Hawassa", latitude: 7.0600, longitude: 38.4800 },
+    ],
+  },
+  {
+    code: "GA", name: "Gabon", flag: "🇬🇦",
+    regions: [
+      { name: "Libreville", latitude: 0.3901, longitude: 9.4544 },
+      { name: "Port-Gentil", latitude: -0.7193, longitude: 8.7815 },
+      { name: "Franceville", latitude: -1.6333, longitude: 13.5833 },
+      { name: "Oyem", latitude: 1.5994, longitude: 11.5786 },
+      { name: "Moanda", latitude: -1.5667, longitude: 13.2000 },
+    ],
+  },
+  {
+    code: "GH", name: "Ghana", flag: "🇬🇭",
+    regions: [
+      { name: "Accra", latitude: 5.6037, longitude: -0.1870 },
+      { name: "Kumasi", latitude: 6.6885, longitude: -1.6244 },
+      { name: "Tamale", latitude: 9.4008, longitude: -0.8393 },
+      { name: "Sekondi-Takoradi", latitude: 4.9016, longitude: -1.7556 },
+      { name: "Sunyani", latitude: 7.3349, longitude: -2.3295 },
+    ],
+  },
+  {
+    code: "GM", name: "Gambia", flag: "🇬🇲",
+    regions: [
+      { name: "Banjul", latitude: 13.4531, longitude: -16.5775 },
+      { name: "Serekunda", latitude: 13.4383, longitude: -16.6785 },
+      { name: "Brikama", latitude: 13.2714, longitude: -16.6485 },
+      { name: "Farafenni", latitude: 13.5676, longitude: -15.5985 },
+      { name: "Janjanbureh", latitude: 13.5424, longitude: -14.7704 },
+    ],
+  },
+  {
+    code: "GN", name: "Guinée", flag: "🇬🇳",
+    regions: [
+      { name: "Conakry", latitude: 9.5370, longitude: -13.6773 },
+      { name: "N'Zérékoré", latitude: 7.7564, longitude: -8.8179 },
+      { name: "Kankan", latitude: 10.3852, longitude: -9.3058 },
+      { name: "Kindia", latitude: 10.0667, longitude: -12.8667 },
+      { name: "Labé", latitude: 11.3167, longitude: -12.2833 },
+    ],
+  },
+  {
+    code: "GQ", name: "Guinea Ecuatorial", flag: "🇬🇶",
+    regions: [
+      { name: "Malabo", latitude: 3.7500, longitude: 8.7833 },
+      { name: "Bata", latitude: 1.8650, longitude: 9.7700 },
+      { name: "Ebebiyín", latitude: 2.1500, longitude: 11.3333 },
+      { name: "Aconibe", latitude: 1.3000, longitude: 10.9333 },
+      { name: "Mongomo", latitude: 1.6333, longitude: 13.6167 },
+    ],
+  },
+  {
+    code: "GW", name: "Guinée-Bissau", flag: "🇬🇼",
+    regions: [
+      { name: "Bissau", latitude: 11.8636, longitude: -15.5977 },
+      { name: "Bafatá", latitude: 12.1703, longitude: -14.6550 },
+      { name: "Gabú", latitude: 12.2800, longitude: -14.2167 },
+      { name: "Bissorã", latitude: 12.2167, longitude: -15.5000 },
+      { name: "Bolama", latitude: 11.5745, longitude: -15.4759 },
+    ],
+  },
+  {
+    code: "KE", name: "Kenya", flag: "🇰🇪",
+    regions: [
+      { name: "Nairobi", latitude: -1.2921, longitude: 36.8219 },
+      { name: "Mombasa", latitude: -4.0435, longitude: 39.6682 },
+      { name: "Kisumu", latitude: -0.1022, longitude: 34.7617 },
+      { name: "Nakuru", latitude: -0.3031, longitude: 36.0800 },
+      { name: "Eldoret", latitude: 0.5143, longitude: 35.2698 },
+      { name: "Turkana", latitude: 3.1192, longitude: 35.5956 },
+    ],
+  },
+  {
+    code: "KM", name: "Comores", flag: "🇰🇲",
+    regions: [
+      { name: "Moroni", latitude: -11.7004, longitude: 43.2551 },
+      { name: "Mutsamudu", latitude: -12.1693, longitude: 44.4018 },
+      { name: "Fomboni", latitude: -12.2941, longitude: 43.7406 },
+      { name: "Domoni", latitude: -12.2500, longitude: 44.5333 },
+    ],
+  },
+  {
+    code: "LR", name: "Liberia", flag: "🇱🇷",
+    regions: [
+      { name: "Monrovia", latitude: 6.3005, longitude: -10.7969 },
+      { name: "Gbarnga", latitude: 6.9982, longitude: -9.4720 },
+      { name: "Kakata", latitude: 6.5263, longitude: -10.3509 },
+      { name: "Bensonville", latitude: 6.4460, longitude: -10.6068 },
+      { name: "Harper", latitude: 4.3750, longitude: -7.7167 },
+    ],
+  },
+  {
+    code: "LS", name: "Lesotho", flag: "🇱🇸",
+    regions: [
+      { name: "Maseru", latitude: -29.3167, longitude: 27.4833 },
+      { name: "Teyateyaneng", latitude: -29.1500, longitude: 27.7333 },
+      { name: "Mafeteng", latitude: -29.8167, longitude: 27.2333 },
+      { name: "Hlotse", latitude: -28.8833, longitude: 28.0500 },
+      { name: "Mohale's Hoek", latitude: -30.1500, longitude: 27.4667 },
+    ],
+  },
+  {
+    code: "MG", name: "Madagascar", flag: "🇲🇬",
+    regions: [
+      { name: "Antananarivo", latitude: -18.9137, longitude: 47.5361 },
+      { name: "Toamasina", latitude: -18.1443, longitude: 49.3956 },
+      { name: "Antsirabe", latitude: -19.8659, longitude: 47.0339 },
+      { name: "Fianarantsoa", latitude: -21.4531, longitude: 47.0866 },
+      { name: "Mahajanga", latitude: -15.7167, longitude: 46.3167 },
+      { name: "Toliara", latitude: -23.3568, longitude: 43.6714 },
+    ],
+  },
+  {
+    code: "ML", name: "Mali", flag: "🇲🇱",
+    regions: [
+      { name: "Bamako", latitude: 12.6392, longitude: -8.0029 },
+      { name: "Sikasso", latitude: 11.3167, longitude: -5.6667 },
+      { name: "Mopti", latitude: 14.4833, longitude: -4.2000 },
+      { name: "Ségou", latitude: 13.4500, longitude: -6.2667 },
+      { name: "Timbuktu", latitude: 16.7667, longitude: -3.0026 },
+    ],
+  },
+  {
+    code: "MR", name: "Mauritanie", flag: "🇲🇷",
+    regions: [
+      { name: "Nouakchott", latitude: 18.0735, longitude: -15.9582 },
+      { name: "Nouadhibou", latitude: 20.9313, longitude: -17.0347 },
+      { name: "Kiffa", latitude: 16.6167, longitude: -11.4000 },
+      { name: "Kaédi", latitude: 16.1500, longitude: -13.5000 },
+      { name: "Rosso", latitude: 16.5130, longitude: -15.8054 },
+    ],
+  },
+  {
+    code: "MU", name: "Maurice", flag: "🇲🇺",
+    regions: [
+      { name: "Port Louis", latitude: -20.1609, longitude: 57.4978 },
+      { name: "Beau Bassin-Rose Hill", latitude: -20.2333, longitude: 57.4667 },
+      { name: "Vacoas-Phoenix", latitude: -20.2997, longitude: 57.4822 },
+      { name: "Curepipe", latitude: -20.3163, longitude: 57.5180 },
+      { name: "Quatre Bornes", latitude: -20.2667, longitude: 57.4833 },
+    ],
+  },
+  {
+    code: "MW", name: "Malawi", flag: "🇲🇼",
+    regions: [
+      { name: "Lilongwe", latitude: -13.9626, longitude: 33.7741 },
+      { name: "Blantyre", latitude: -15.7861, longitude: 35.0058 },
+      { name: "Mzuzu", latitude: -11.4658, longitude: 33.6481 },
+      { name: "Zomba", latitude: -15.3833, longitude: 35.3333 },
+      { name: "Kasungu", latitude: -13.0333, longitude: 33.4833 },
+    ],
+  },
+  {
+    code: "MZ", name: "Moçambique", flag: "🇲🇿",
+    regions: [
+      { name: "Maputo", latitude: -25.9692, longitude: 32.5732 },
+      { name: "Matola", latitude: -25.9667, longitude: 32.4667 },
+      { name: "Beira", latitude: -19.8437, longitude: 34.8389 },
+      { name: "Nampula", latitude: -15.1165, longitude: 39.2666 },
+      { name: "Quelimane", latitude: -17.8786, longitude: 36.8883 },
+    ],
+  },
+  {
+    code: "NA", name: "Namibia", flag: "🇳🇦",
+    regions: [
+      { name: "Windhoek", latitude: -22.5597, longitude: 17.0832 },
+      { name: "Rundu", latitude: -17.9333, longitude: 19.7667 },
+      { name: "Walvis Bay", latitude: -22.9575, longitude: 14.5053 },
+      { name: "Oshakati", latitude: -17.7833, longitude: 15.6833 },
+      { name: "Swakopmund", latitude: -22.6783, longitude: 14.5269 },
+    ],
+  },
+  {
+    code: "NE", name: "Niger", flag: "🇳🇪",
+    regions: [
+      { name: "Niamey", latitude: 13.5137, longitude: 2.1098 },
+      { name: "Zinder", latitude: 13.8000, longitude: 8.9833 },
+      { name: "Maradi", latitude: 13.4997, longitude: 7.1000 },
+      { name: "Agadez", latitude: 16.9742, longitude: 7.9901 },
+      { name: "Tahoua", latitude: 14.8889, longitude: 5.2680 },
+    ],
+  },
+  {
+    code: "NG", name: "Nigeria", flag: "🇳🇬",
+    regions: [
+      { name: "Lagos", latitude: 6.5244, longitude: 3.3792 },
+      { name: "Abuja", latitude: 9.0579, longitude: 7.4951 },
+      { name: "Kano", latitude: 12.0022, longitude: 8.5920 },
+      { name: "Ibadan", latitude: 7.3775, longitude: 3.9470 },
+      { name: "Port Harcourt", latitude: 4.8156, longitude: 7.0498 },
+      { name: "Kaduna", latitude: 10.5264, longitude: 7.4382 },
+    ],
+  },
+  {
+    code: "RW", name: "Rwanda", flag: "🇷🇼",
+    regions: [
+      { name: "Kigali", latitude: -1.9441, longitude: 30.0619 },
+      { name: "Butare", latitude: -2.5967, longitude: 29.7403 },
+      { name: "Gitarama", latitude: -2.0748, longitude: 29.7564 },
+      { name: "Ruhengeri", latitude: -1.4990, longitude: 29.6330 },
+      { name: "Gisenyi", latitude: -1.7028, longitude: 29.2565 },
+    ],
+  },
+  {
+    code: "SC", name: "Seychelles", flag: "🇸🇨",
+    regions: [
+      { name: "Victoria", latitude: -4.6191, longitude: 55.4513 },
+      { name: "Anse Boileau", latitude: -4.7200, longitude: 55.4833 },
+      { name: "Beau Vallon", latitude: -4.6167, longitude: 55.4333 },
+      { name: "Takamaka", latitude: -4.7667, longitude: 55.5167 },
+    ],
+  },
+  {
+    code: "SD", name: "Sudan", flag: "🇸🇩",
+    regions: [
+      { name: "Khartoum", latitude: 15.5518, longitude: 32.5324 },
+      { name: "Omdurman", latitude: 15.6500, longitude: 32.4833 },
+      { name: "Port Sudan", latitude: 19.6152, longitude: 37.2162 },
+      { name: "Kassala", latitude: 15.4500, longitude: 36.4000 },
+      { name: "Nyala", latitude: 12.0500, longitude: 24.8833 },
+    ],
+  },
+  {
+    code: "SL", name: "Sierra Leone", flag: "🇸🇱",
+    regions: [
+      { name: "Freetown", latitude: 8.4897, longitude: -13.2344 },
+      { name: "Bo", latitude: 7.9647, longitude: -11.7383 },
+      { name: "Kenema", latitude: 7.8773, longitude: -11.1865 },
+      { name: "Makeni", latitude: 8.8833, longitude: -12.0500 },
+      { name: "Koidu", latitude: 8.6386, longitude: -10.9797 },
+    ],
+  },
+  {
+    code: "SN", name: "Sénégal", flag: "🇸🇳",
+    regions: [
+      { name: "Dakar", latitude: 14.6928, longitude: -17.4467 },
+      { name: "Touba", latitude: 14.8653, longitude: -15.8828 },
+      { name: "Thiès", latitude: 14.7910, longitude: -16.9256 },
+      { name: "Kaolack", latitude: 14.1500, longitude: -16.0833 },
+      { name: "Ziguinchor", latitude: 12.5667, longitude: -16.2667 },
+    ],
+  },
+  {
+    code: "SO", name: "Somalia", flag: "🇸🇴",
+    regions: [
+      { name: "Mogadishu", latitude: 2.0469, longitude: 45.3182 },
+      { name: "Hargeisa", latitude: 9.5596, longitude: 44.0650 },
+      { name: "Kismayo", latitude: -0.3582, longitude: 42.5454 },
+      { name: "Bosaso", latitude: 11.2753, longitude: 49.1875 },
+      { name: "Garowe", latitude: 8.4054, longitude: 48.4845 },
+    ],
+  },
+  {
+    code: "SS", name: "Sudan del Sud", flag: "🇸🇸",
+    regions: [
+      { name: "Juba", latitude: 4.8594, longitude: 31.5713 },
+      { name: "Wau", latitude: 7.7040, longitude: 28.0000 },
+      { name: "Malakal", latitude: 9.5340, longitude: 31.6604 },
+      { name: "Bor", latitude: 6.2100, longitude: 31.5593 },
+      { name: "Yambio", latitude: 4.5696, longitude: 28.3962 },
+    ],
+  },
+  {
+    code: "ST", name: "São Tomé e Príncipe", flag: "🇸🇹",
+    regions: [
+      { name: "São Tomé", latitude: 0.3365, longitude: 6.7273 },
+      { name: "Santo António", latitude: 1.6477, longitude: 7.4167 },
+      { name: "Neves", latitude: 0.3617, longitude: 6.5533 },
+    ],
+  },
+  {
+    code: "SZ", name: "Eswatini", flag: "🇸🇿",
+    regions: [
+      { name: "Mbabane", latitude: -26.3186, longitude: 31.1410 },
+      { name: "Manzini", latitude: -26.4833, longitude: 31.3667 },
+      { name: "Lobamba", latitude: -26.4333, longitude: 31.2000 },
+      { name: "Nhlangano", latitude: -27.1167, longitude: 31.2000 },
+      { name: "Siteki", latitude: -26.4500, longitude: 31.9500 },
+    ],
+  },
+  {
+    code: "TD", name: "Tchad", flag: "🇹🇩",
+    regions: [
+      { name: "N'Djamena", latitude: 12.1048, longitude: 15.0445 },
+      { name: "Moundou", latitude: 8.5654, longitude: 16.0871 },
+      { name: "Sarh", latitude: 9.1443, longitude: 18.3869 },
+      { name: "Abéché", latitude: 13.8314, longitude: 20.8325 },
+      { name: "Kélo", latitude: 9.3000, longitude: 15.8000 },
+    ],
+  },
+  {
+    code: "TG", name: "Togo", flag: "🇹🇬",
+    regions: [
+      { name: "Lomé", latitude: 6.1375, longitude: 1.2123 },
+      { name: "Sokodé", latitude: 8.9833, longitude: 1.1333 },
+      { name: "Kara", latitude: 9.5500, longitude: 1.1833 },
+      { name: "Atakpamé", latitude: 7.5333, longitude: 1.1333 },
+      { name: "Bassar", latitude: 9.2500, longitude: 0.7833 },
+    ],
+  },
+  {
+    code: "TZ", name: "Tanzania", flag: "🇹🇿",
+    regions: [
+      { name: "Dar es Salaam", latitude: -6.7924, longitude: 39.2083 },
+      { name: "Dodoma", latitude: -6.1722, longitude: 35.7395 },
+      { name: "Mwanza", latitude: -2.5167, longitude: 32.9000 },
+      { name: "Arusha", latitude: -3.3869, longitude: 36.6822 },
+      { name: "Zanzibar", latitude: -6.1659, longitude: 39.2026 },
+      { name: "Kilimanjaro", latitude: -3.2167, longitude: 37.0333 },
+    ],
+  },
+  {
+    code: "UG", name: "Uganda", flag: "🇺🇬",
+    regions: [
+      { name: "Kampala", latitude: 0.3476, longitude: 32.5825 },
+      { name: "Gulu", latitude: 2.7751, longitude: 32.2990 },
+      { name: "Lira", latitude: 2.2498, longitude: 32.8998 },
+      { name: "Mbarara", latitude: -0.6075, longitude: 30.6568 },
+      { name: "Jinja", latitude: 0.4478, longitude: 33.2026 },
+    ],
+  },
+  {
+    code: "ZA", name: "South Africa", flag: "🇿🇦",
+    regions: [
+      { name: "Gauteng", latitude: -26.2708, longitude: 28.1123 },
+      { name: "Western Cape", latitude: -33.9249, longitude: 18.4241 },
+      { name: "KwaZulu-Natal", latitude: -29.8587, longitude: 31.0218 },
+      { name: "Eastern Cape", latitude: -32.2968, longitude: 26.4193 },
+      { name: "Limpopo", latitude: -23.9045, longitude: 29.4685 },
+      { name: "Mpumalanga", latitude: -25.5653, longitude: 30.5279 },
+      { name: "Free State", latitude: -28.4541, longitude: 26.7968 },
+      { name: "North West", latitude: -26.6638, longitude: 25.2838 },
+      { name: "Northern Cape", latitude: -29.0467, longitude: 21.8569 },
+    ],
+  },
+  {
+    code: "ZM", name: "Zambia", flag: "🇿🇲",
+    regions: [
+      { name: "Lusaka", latitude: -15.4167, longitude: 28.2833 },
+      { name: "Kitwe", latitude: -12.8167, longitude: 28.2000 },
+      { name: "Ndola", latitude: -12.9667, longitude: 28.6333 },
+      { name: "Livingstone", latitude: -17.8500, longitude: 25.8500 },
+      { name: "Chipata", latitude: -13.6333, longitude: 32.6500 },
+    ],
+  },
+  {
+    code: "ZW", name: "Zimbabwe", flag: "🇿🇼",
+    regions: [
+      { name: "Harare", latitude: -17.8252, longitude: 31.0335 },
+      { name: "Bulawayo", latitude: -20.1500, longitude: 28.5833 },
+      { name: "Chitungwiza", latitude: -18.0127, longitude: 31.0756 },
+      { name: "Mutare", latitude: -18.9667, longitude: 32.6667 },
+      { name: "Gweru", latitude: -19.4500, longitude: 29.8167 },
     ],
   },
   {
@@ -1017,109 +1920,211 @@ export const EUROPEAN_COUNTRIES: CountryData[] = [
     code: "IN", name: "India", flag: "🇮🇳",
     regions: [
       { name: "Andhra Pradesh", latitude: 15.9129, longitude: 79.7400 },
-      { name: "Delhi", latitude: 28.6139, longitude: 77.2090 },
+      { name: "Arunachal Pradesh", latitude: 28.2180, longitude: 94.7278 },
+      { name: "Assam", latitude: 26.2006, longitude: 92.9376 },
+      { name: "Bihar", latitude: 25.0961, longitude: 85.3131 },
+      { name: "Chhattisgarh", latitude: 21.2787, longitude: 81.8661 },
       { name: "Goa", latitude: 15.2993, longitude: 74.1240 },
       { name: "Gujarat", latitude: 22.2587, longitude: 71.1924 },
+      { name: "Haryana", latitude: 29.0588, longitude: 76.0856 },
+      { name: "Himachal Pradesh", latitude: 31.1048, longitude: 77.1734 },
+      { name: "Jharkhand", latitude: 23.6102, longitude: 85.2799 },
       { name: "Karnataka", latitude: 15.3173, longitude: 75.7139 },
       { name: "Kerala", latitude: 10.8505, longitude: 76.2711 },
       { name: "Madhya Pradesh", latitude: 22.9734, longitude: 78.6569 },
       { name: "Maharashtra", latitude: 19.7515, longitude: 75.7139 },
+      { name: "Manipur", latitude: 24.6637, longitude: 93.9063 },
+      { name: "Meghalaya", latitude: 25.4670, longitude: 91.3662 },
+      { name: "Mizoram", latitude: 23.1645, longitude: 92.9376 },
+      { name: "Nagaland", latitude: 26.1584, longitude: 94.5624 },
+      { name: "Odisha", latitude: 20.9517, longitude: 85.0985 },
       { name: "Punjab", latitude: 31.1471, longitude: 75.3412 },
       { name: "Rajasthan", latitude: 27.0238, longitude: 74.2179 },
+      { name: "Sikkim", latitude: 27.5330, longitude: 88.5122 },
       { name: "Tamil Nadu", latitude: 11.1271, longitude: 78.6569 },
       { name: "Telangana", latitude: 18.1124, longitude: 79.0193 },
+      { name: "Tripura", latitude: 23.9408, longitude: 91.9882 },
       { name: "Uttar Pradesh", latitude: 26.8467, longitude: 80.9462 },
+      { name: "Uttarakhand", latitude: 30.0668, longitude: 79.0193 },
       { name: "West Bengal", latitude: 22.9868, longitude: 87.8550 },
-    ],
-  },
-  {
-    code: "ID", name: "Indonesia", flag: "🇮🇩",
-    regions: [
-      { name: "Bali", latitude: -8.3405, longitude: 115.0920 },
-      { name: "DKI Jakarta", latitude: -6.2088, longitude: 106.8456 },
-      { name: "Jawa Barat", latitude: -7.0909, longitude: 107.6689 },
-      { name: "Jawa Tengah", latitude: -7.1500, longitude: 110.1403 },
-      { name: "Jawa Timur", latitude: -7.5361, longitude: 112.2384 },
-      { name: "Kalimantan Timur", latitude: 1.6407, longitude: 116.4194 },
-      { name: "Sulawesi Selatan", latitude: -3.6688, longitude: 119.9741 },
-      { name: "Sumatera Utara", latitude: 2.1154, longitude: 99.5451 },
-      { name: "Papua", latitude: -4.2699, longitude: 138.0804 },
-      { name: "Lombok (NTB)", latitude: -8.6529, longitude: 116.3242 },
-    ],
-  },
-  {
-    code: "TH", name: "Thailand", flag: "🇹🇭",
-    regions: [
-      { name: "Bangkok", latitude: 13.7563, longitude: 100.5018 },
-      { name: "Chiang Mai", latitude: 18.7883, longitude: 98.9853 },
-      { name: "Chiang Rai", latitude: 19.9105, longitude: 99.8406 },
-      { name: "Kanchanaburi", latitude: 14.0023, longitude: 99.5312 },
-      { name: "Khon Kaen", latitude: 16.4419, longitude: 102.8360 },
-      { name: "Ko Samui (Surat Thani)", latitude: 9.5120, longitude: 100.0136 },
-      { name: "Krabi", latitude: 8.0863, longitude: 98.9063 },
-      { name: "Nakhon Ratchasima", latitude: 14.9799, longitude: 102.0978 },
-      { name: "Pattaya (Chonburi)", latitude: 12.9236, longitude: 100.8825 },
-      { name: "Phuket", latitude: 7.8804, longitude: 98.3923 },
-    ],
-  },
-  {
-    code: "ZA", name: "South Africa", flag: "🇿🇦",
-    regions: [
-      { name: "Eastern Cape", latitude: -32.2968, longitude: 26.4194 },
-      { name: "Free State", latitude: -28.4541, longitude: 26.7968 },
-      { name: "Gauteng", latitude: -26.2708, longitude: 28.1123 },
-      { name: "KwaZulu-Natal", latitude: -28.5306, longitude: 30.8958 },
-      { name: "Limpopo", latitude: -23.4013, longitude: 29.4179 },
-      { name: "Mpumalanga", latitude: -25.5653, longitude: 30.5279 },
-      { name: "Northern Cape", latitude: -29.0467, longitude: 21.8569 },
-      { name: "North West", latitude: -26.6639, longitude: 25.2837 },
-      { name: "Western Cape", latitude: -33.2278, longitude: 21.8569 },
-    ],
-  },
-  {
-    code: "NG", name: "Nigeria", flag: "🇳🇬",
-    regions: [
-      { name: "Abuja (FCT)", latitude: 9.0579, longitude: 7.4951 },
-      { name: "Anambra", latitude: 6.2209, longitude: 6.9370 },
-      { name: "Delta", latitude: 5.5320, longitude: 5.8987 },
-      { name: "Enugu", latitude: 6.4584, longitude: 7.5464 },
-      { name: "Kano", latitude: 11.9964, longitude: 8.5167 },
-      { name: "Lagos", latitude: 6.5244, longitude: 3.3792 },
-      { name: "Ogun", latitude: 6.9980, longitude: 3.4737 },
-      { name: "Oyo", latitude: 7.8500, longitude: 3.9300 },
-      { name: "Rivers", latitude: 4.7500, longitude: 6.9800 },
-    ],
-  },
-  {
-    code: "KE", name: "Kenya", flag: "🇰🇪",
-    regions: [
-      { name: "Central", latitude: -0.4167, longitude: 36.9500 },
-      { name: "Coast", latitude: -3.3019, longitude: 40.0332 },
-      { name: "Eastern", latitude: 0.5667, longitude: 38.4500 },
-      { name: "Nairobi", latitude: -1.2921, longitude: 36.8219 },
-      { name: "North Eastern", latitude: 1.5000, longitude: 40.0000 },
-      { name: "Nyanza", latitude: -0.1022, longitude: 34.7617 },
-      { name: "Rift Valley", latitude: 1.0000, longitude: 35.5000 },
-      { name: "Western", latitude: 0.4667, longitude: 34.7000 },
+      { name: "Andaman and Nicobar Islands", latitude: 11.7401, longitude: 92.6586 },
+      { name: "Chandigarh", latitude: 30.7333, longitude: 76.7794 },
+      { name: "Dadra and Nagar Haveli and Daman and Diu", latitude: 20.1809, longitude: 73.0169 },
+      { name: "Delhi (NCT)", latitude: 28.7041, longitude: 77.1025 },
+      { name: "Jammu and Kashmir", latitude: 33.7782, longitude: 76.5762 },
+      { name: "Ladakh", latitude: 34.2268, longitude: 77.5619 },
+      { name: "Lakshadweep", latitude: 10.5667, longitude: 72.6417 },
+      { name: "Puducherry", latitude: 11.9416, longitude: 79.8083 },
     ],
   },
   {
     code: "AU", name: "Australia", flag: "🇦🇺",
     regions: [
-      { name: "Australian Capital Territory", latitude: -35.4735, longitude: 149.0124 },
-      { name: "New South Wales", latitude: -31.2532, longitude: 146.9211 },
-      { name: "Northern Territory", latitude: -19.4914, longitude: 132.5510 },
-      { name: "Queensland", latitude: -22.5750, longitude: 144.0850 },
-      { name: "South Australia", latitude: -30.0002, longitude: 136.2092 },
-      { name: "Tasmania", latitude: -41.4545, longitude: 145.9707 },
-      { name: "Victoria", latitude: -37.0201, longitude: 144.9646 },
-      { name: "Western Australia", latitude: -27.6728, longitude: 121.6283 },
+      { name: "New South Wales", latitude: -33.8688, longitude: 151.2093 },
+      { name: "Victoria", latitude: -37.8136, longitude: 144.9631 },
+      { name: "Queensland", latitude: -27.4705, longitude: 153.0260 },
+      { name: "Western Australia", latitude: -31.9505, longitude: 115.8605 },
+      { name: "South Australia", latitude: -34.9285, longitude: 138.6007 },
+      { name: "Tasmania", latitude: -42.8821, longitude: 147.3272 },
+      { name: "Northern Territory", latitude: -12.4634, longitude: 130.8456 },
+      { name: "Australian Capital Territory", latitude: -35.2809, longitude: 149.1300 },
+    ],
+  },
+  {
+    code: "NZ", name: "New Zealand", flag: "🇳🇿",
+    regions: [
+      { name: "Auckland", latitude: -36.8485, longitude: 174.7633 },
+      { name: "Wellington", latitude: -41.2865, longitude: 174.7762 },
+      { name: "Canterbury", latitude: -43.5321, longitude: 172.6362 },
+      { name: "Waikato", latitude: -37.7870, longitude: 175.2793 },
+      { name: "Bay of Plenty", latitude: -37.7870, longitude: 176.1651 },
+      { name: "Otago", latitude: -45.8788, longitude: 170.5028 },
+      { name: "Northland", latitude: -35.7275, longitude: 174.3238 },
+    ],
+  },
+  {
+    code: "PG", name: "Papua Nuova Guinea", flag: "🇵🇬",
+    regions: [
+      { name: "Port Moresby", latitude: -9.4438, longitude: 147.1803 },
+      { name: "Lae", latitude: -6.7286, longitude: 146.9980 },
+      { name: "Mount Hagen", latitude: -5.8597, longitude: 144.2256 },
+      { name: "Madang", latitude: -5.2189, longitude: 145.7939 },
+      { name: "Wewak", latitude: -3.5535, longitude: 143.6335 },
+    ],
+  },
+  {
+    code: "FJ", name: "Figi", flag: "🇫🇯",
+    regions: [
+      { name: "Suva", latitude: -18.1416, longitude: 178.4419 },
+      { name: "Nadi", latitude: -17.8000, longitude: 177.4167 },
+      { name: "Lautoka", latitude: -17.6167, longitude: 177.4500 },
+      { name: "Labasa", latitude: -16.4333, longitude: 179.3667 },
+      { name: "Ba", latitude: -17.5333, longitude: 177.6833 },
+    ],
+  },
+  {
+    code: "SB", name: "Isole Salomone", flag: "🇸🇧",
+    regions: [
+      { name: "Honiara", latitude: -9.4319, longitude: 159.9550 },
+      { name: "Gizo", latitude: -8.1000, longitude: 156.8333 },
+      { name: "Auki", latitude: -8.7667, longitude: 160.7000 },
+      { name: "Kirakira", latitude: -10.4540, longitude: 161.9205 },
+    ],
+  },
+  {
+    code: "VU", name: "Vanuatu", flag: "🇻🇺",
+    regions: [
+      { name: "Port Vila", latitude: -17.7334, longitude: 168.3210 },
+      { name: "Luganville", latitude: -15.5333, longitude: 167.1667 },
+      { name: "Lakatoro", latitude: -16.1000, longitude: 167.4167 },
+      { name: "Isangel", latitude: -19.5500, longitude: 169.2667 },
+    ],
+  },
+  {
+    code: "WS", name: "Samoa", flag: "🇼🇸",
+    regions: [
+      { name: "Apia", latitude: -13.8314, longitude: -171.8672 },
+      { name: "Vaitele", latitude: -13.8500, longitude: -171.9000 },
+      { name: "Salelologa", latitude: -13.7333, longitude: -172.3500 },
+      { name: "Falealupo", latitude: -13.4833, longitude: -172.7833 },
+    ],
+  },
+  {
+    code: "TO", name: "Tonga", flag: "🇹🇴",
+    regions: [
+      { name: "Nukuʻalofa", latitude: -21.1320, longitude: -175.2018 },
+      { name: "Neiafu", latitude: -18.6500, longitude: -173.9833 },
+      { name: "Haveluloto", latitude: -21.1667, longitude: -175.1667 },
+      { name: "Pangai", latitude: -19.8000, longitude: -174.3500 },
+    ],
+  },
+  {
+    code: "FM", name: "Micronesia", flag: "🇫🇲",
+    regions: [
+      { name: "Palikir", latitude: 6.9248, longitude: 158.1610 },
+      { name: "Weno", latitude: 7.4589, longitude: 151.8481 },
+      { name: "Tofol", latitude: 5.3231, longitude: 163.0148 },
+      { name: "Kolonia", latitude: 6.9600, longitude: 158.2100 },
+    ],
+  },
+  {
+    code: "PW", name: "Palau", flag: "🇵🇼",
+    regions: [
+      { name: "Ngerulmud", latitude: 7.5000, longitude: 134.6241 },
+      { name: "Koror", latitude: 7.3419, longitude: 134.4790 },
+      { name: "Airai", latitude: 7.3667, longitude: 134.5667 },
+    ],
+  },
+  {
+    code: "MH", name: "Isole Marshall", flag: "🇲🇭",
+    regions: [
+      { name: "Majuro", latitude: 7.1164, longitude: 171.1858 },
+      { name: "Ebeye", latitude: 8.7833, longitude: 167.7333 },
+      { name: "Jabor", latitude: 5.9167, longitude: 169.6667 },
+    ],
+  },
+  {
+    code: "NR", name: "Nauru", flag: "🇳🇷",
+    regions: [
+      { name: "Yaren", latitude: -0.5477, longitude: 166.9209 },
+      { name: "Aiwo", latitude: -0.5333, longitude: 166.9167 },
+      { name: "Boe", latitude: -0.5333, longitude: 166.9333 },
+    ],
+  },
+  {
+    code: "TV", name: "Tuvalu", flag: "🇹🇻",
+    regions: [
+      { name: "Funafuti", latitude: -8.5211, longitude: 179.1983 },
+      { name: "Vaiaku", latitude: -8.5167, longitude: 179.2167 },
+    ],
+  },
+  {
+    code: "KI", name: "Kiribati", flag: "🇰🇮",
+    regions: [
+      { name: "South Tarawa", latitude: 1.3290, longitude: 172.9790 },
+      { name: "Betio", latitude: 1.3517, longitude: 172.9327 },
+      { name: "London", latitude: 1.9828, longitude: -157.4729 },
     ],
   },
 ];
 
+export const EUROPEAN_COUNTRIES: CountryData[] = ALL_COUNTRIES;
+
+export const CONTINENT_MAP: ContinentData[] = [
+  {
+    key: "AF",
+    label: "Africa",
+    countryCodes: ["AO","BF","BI","BJ","BW","CD","CF","CG","CI","CM","CV","DJ","DZ","EG","ER","ET","GA","GH","GM","GN","GQ","GW","KE","KM","LR","LS","LY","MA","MG","ML","MR","MU","MW","MZ","NA","NE","NG","RW","SC","SD","SL","SN","SO","SS","ST","SZ","TD","TG","TN","TZ","UG","ZA","ZM","ZW"],
+  },
+  {
+    key: "AS",
+    label: "Asia",
+    countryCodes: ["IN","JP"],
+  },
+  {
+    key: "EU",
+    label: "Europa",
+    countryCodes: ["AD","AL","AM","AT","AZ","BA","BE","BG","BY","CH","CY","CZ","DE","DK","EE","ES","FI","FR","GB","GE","GR","HR","HU","IE","IS","IT","LI","LT","LU","LV","MC","MD","ME","MK","MT","NL","NO","PL","PT","RO","RS","RU","SE","SI","SK","SM","TR","UA","VA","XK"],
+  },
+  {
+    key: "NA",
+    label: "Nord America",
+    countryCodes: ["CA","US"],
+  },
+  {
+    key: "OC",
+    label: "Oceania",
+    countryCodes: ["AU","FJ","FM","KI","MH","NR","NZ","PG","PW","SB","TO","TV","VU","WS"],
+  },
+  {
+    key: "SA",
+    label: "Sud America",
+    countryCodes: ["AR","BO","BR","CL","CO","EC","GY","PE","PY","SR","UY","VE"],
+  },
+];
+
 export function getCountryByCode(code: string): CountryData | undefined {
-  return EUROPEAN_COUNTRIES.find((c) => c.code === code);
+  return ALL_COUNTRIES.find((c) => c.code === code);
 }
 
 export function getRegionsForCountry(code: string): RegionData[] {
@@ -1148,7 +2153,7 @@ export function getRegionCoordinates(countryCode: string | null | undefined, reg
     }
   }
   if (regionName) {
-    for (const c of EUROPEAN_COUNTRIES) {
+    for (const c of ALL_COUNTRIES) {
       const r = c.regions.find((reg) => reg.name === regionName);
       if (r) return { latitude: r.latitude, longitude: r.longitude };
     }
@@ -1157,10 +2162,23 @@ export function getRegionCoordinates(countryCode: string | null | undefined, reg
 }
 
 export function findCountryByRegion(regionName: string): string | null {
-  for (const c of EUROPEAN_COUNTRIES) {
+  for (const c of ALL_COUNTRIES) {
     if (c.regions.some((r) => r.name === regionName)) {
       return c.code;
     }
   }
   return null;
+}
+
+export function getContinentForCountry(code: string): ContinentData | undefined {
+  return CONTINENT_MAP.find((c) => c.countryCodes.includes(code));
+}
+
+export function getCountriesForContinent(continentKey: string): CountryData[] {
+  const continent = CONTINENT_MAP.find((c) => c.key === continentKey);
+  if (!continent) return [];
+  return continent.countryCodes
+    .map((code) => getCountryByCode(code))
+    .filter((c): c is CountryData => !!c)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

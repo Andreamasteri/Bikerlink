@@ -30,7 +30,7 @@ import { useSynecoVisible } from "@/lib/syneco-context";
 import { useSetting } from "@/lib/settings-context";
 import InteractiveMap, { type ClubMapPin, type InteractiveMapHandle } from "@/components/InteractiveMap";
 import { getRegionCoordinates } from "@/constants/regions";
-import { getCountryFlag, getCountryName, EUROPEAN_COUNTRIES } from "@/lib/countries-regions";
+import { getCountryFlag, getCountryName, getCountryByCode, EUROPEAN_COUNTRIES, CONTINENT_MAP, getCountriesForContinent, getContinentForCountry, type CountryData, type RegionData } from "@/lib/countries-regions";
 import { useT, useLocale } from "@/lib/language-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { User } from "@shared/schema";
@@ -98,6 +98,8 @@ export default function MapScreen() {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [countriesLoaded, setCountriesLoaded] = useState(false);
+  const [expandedContinents, setExpandedContinents] = useState<Set<string>>(new Set());
+  const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set());
   const [showHomeMessage, setShowHomeMessage] = useState(false);
   const [showInviteEventModal, setShowInviteEventModal] = useState(false);
   const [inviteSending, setInviteSending] = useState(false);
@@ -187,36 +189,44 @@ export default function MapScreen() {
     queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-count"] });
   }, []);
 
-  const toggleCountry = useCallback((code: string) => {
+  const toggleCountryInModal = useCallback((code: string) => {
     setSelectedCountries((prev) => {
       if (prev.includes(code)) {
-        if (prev.length === 1) return prev;
         return prev.filter((c) => c !== code);
       }
       return [...prev, code];
     });
   }, []);
 
-  const continentSections = useMemo(() => {
-    const CONTINENT_GROUPS: { label: string; codes: string[] }[] = [
-      { label: "🌍 Europa", codes: ["IT","DE","FR","ES","PT","GB","NL","BE","CH","AT","PL","CZ","SK","HU","RO","BG","HR","SI","RS","BA","MK","AL","ME","XK","GR","CY","MT","SE","NO","DK","FI","EE","LV","LT","IE","IS","LU","MC","AD","LI","SM","VA","BY","MD","UA"] },
-      { label: "🌍 Nord Africa", codes: ["MA","DZ","TN","LY","EG","MR"] },
-      { label: "🌐 Nord America", codes: ["US","CA","MX"] },
-      { label: "🌎 Sud America", codes: ["BR","AR","CL","CO","PE","VE","UY","PY","BO","EC","GY","SR","GF"] },
-      { label: "🌏 Asia", codes: ["JP","IN","ID","TH","CN","KR","VN","PH","MY","SG","PK","BD","LK","NP","MM"] },
-      { label: "🌍 Africa sub-sahariana", codes: ["ZA","NG","KE","ET","GH","TZ","UG","SN","CI","CM","AO","MZ","ZM","ZW"] },
-      { label: "🌏 Oceania", codes: ["AU","NZ","FJ","PG"] },
-      { label: "🌏 Altro", codes: ["RU","TR","GE","AM","AZ"] },
-    ];
-    const countryMap = new Map(EUROPEAN_COUNTRIES.map((c) => [c.code, c]));
-    return CONTINENT_GROUPS.map((group) => ({
-      title: group.label,
-      data: group.codes
-        .map((code) => countryMap.get(code))
-        .filter(Boolean)
-        .sort((a, b) => a!.name.localeCompare(b!.name)) as typeof EUROPEAN_COUNTRIES,
-    })).filter((section) => section.data.length > 0);
+  const toggleContinentInModal = useCallback((continentKey: string) => {
+    const continent = CONTINENT_MAP.find((c) => c.key === continentKey);
+    if (!continent) return;
+    const codes = continent.countryCodes;
+    setSelectedCountries((prev) => {
+      const allSelected = codes.every((code) => prev.includes(code));
+      if (allSelected) {
+        return prev.filter((c) => !codes.includes(c));
+      }
+      const toAdd = codes.filter((c) => !prev.includes(c));
+      return [...prev, ...toAdd];
+    });
   }, []);
+
+  const areaLabel = useMemo(() => {
+    if (selectedCountries.length === 0) return "🌍 Tutto il mondo";
+    for (const continent of CONTINENT_MAP) {
+      const allInContinent = continent.countryCodes.every((c) => selectedCountries.includes(c));
+      const onlyContinent = selectedCountries.every((c) => continent.countryCodes.includes(c));
+      if (allInContinent && onlyContinent && selectedCountries.length === continent.countryCodes.length) {
+        return `${continent.label}`;
+      }
+    }
+    if (selectedCountries.length === 1) {
+      const country = getCountryByCode(selectedCountries[0]);
+      return country ? `${country.flag} ${country.name}` : selectedCountries[0];
+    }
+    return `${selectedCountries.length} paesi`;
+  }, [selectedCountries]);
 
   const getRegionFallback = useCallback(() => {
     if (user?.region) {
@@ -795,11 +805,7 @@ export default function MapScreen() {
         </TouchableOpacity>
         <Pressable style={styles.defineAreaBtnInline} onPress={() => setShowAreaModal(true)}>
           <Ionicons name="globe-outline" size={14} color={Colors.accent} />
-          <Text style={styles.defineAreaBtnInlineText}>
-            {selectedCountries.length === 1
-              ? `${getCountryFlag(selectedCountries[0])} 1 ${t("home.defineAreaCountry")}`
-              : `${selectedCountries.length} ${t("home.defineAreaCountries")}`}
-          </Text>
+          <Text style={styles.defineAreaBtnInlineText} numberOfLines={1}>{areaLabel}</Text>
           <Ionicons name="chevron-down" size={14} color={Colors.accent} />
         </Pressable>
         <Pressable onPress={() => router.push("/chat" as any)}>
@@ -933,11 +939,7 @@ export default function MapScreen() {
             onPress={() => setShowAreaModal(true)}
           >
             <Ionicons name="globe-outline" size={16} color={Colors.text} />
-            <Text style={styles.defineAreaBtnText}>
-              {selectedCountries.length === 1
-                ? `${getCountryFlag(selectedCountries[0])} 1 ${t("home.defineAreaCountry")}`
-                : `${selectedCountries.length} ${t("home.defineAreaCountries")}`}
-            </Text>
+            <Text style={styles.defineAreaBtnText} numberOfLines={1}>{areaLabel}</Text>
           </Pressable>
           <View style={[styles.fullscreenBottomStats, { bottom: insets.bottom + 16 }]}>
             <View style={styles.statsChip}>
@@ -1614,7 +1616,7 @@ export default function MapScreen() {
         </Pressable>
       </Modal>
 
-      <Modal visible={showAreaModal} transparent animationType="slide" onRequestClose={() => setShowAreaModal(false)}>
+      <Modal visible={showAreaModal} transparent animationType="slide" onRequestClose={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}>
         <Pressable style={styles.detailOverlay} onPress={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}>
           <Pressable style={styles.areaSheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.detailHandle} />
@@ -1626,39 +1628,166 @@ export default function MapScreen() {
               </Pressable>
             </View>
             <Text style={styles.areaSubtitle}>{t("home.defineAreaDesc")}</Text>
-            <SectionList
-              sections={continentSections}
-              keyExtractor={(item) => item.code}
-              style={{ maxHeight: 420 }}
-              stickySectionHeadersEnabled={false}
-              renderSectionHeader={({ section }) => (
-                <View style={styles.continentHeader}>
-                  <Text style={styles.continentHeaderText}>{section.title}</Text>
-                </View>
-              )}
-              renderItem={({ item }) => {
-                const isSelected = selectedCountries.includes(item.code);
+            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
+              {/* Mondo */}
+              <Pressable
+                style={[styles.continentRow, selectedCountries.length === 0 && styles.continentRowSelected]}
+                onPress={() => { setSelectedCountries([]); }}
+              >
+                <Text style={styles.countryFlag}>🌍</Text>
+                <Text style={[styles.continentLabel, selectedCountries.length === 0 && { color: Colors.accent }]}>Tutto il mondo</Text>
+                <Ionicons
+                  name={selectedCountries.length === 0 ? "radio-button-on" : "radio-button-off"}
+                  size={20}
+                  color={selectedCountries.length === 0 ? Colors.accent : Colors.textSecondary}
+                />
+              </Pressable>
+
+              {CONTINENT_MAP.map((continent) => {
+                const isContinentExpanded = expandedContinents.has(continent.key);
+                const continentCountries = getCountriesForContinent(continent.key);
+                const selectedInContinent = continent.countryCodes.filter((c) => selectedCountries.includes(c));
+                const allSelected = selectedInContinent.length === continent.countryCodes.length;
+                const partialSelected = selectedInContinent.length > 0 && !allSelected;
+
                 return (
-                  <Pressable
-                    style={[styles.countryRow, isSelected && styles.countryRowSelected]}
-                    onPress={() => toggleCountry(item.code)}
-                  >
-                    <Text style={styles.countryFlag}>{item.flag}</Text>
-                    <Text style={[styles.countryName, isSelected && { color: Colors.accent }]}>{item.name}</Text>
-                    <Ionicons
-                      name={isSelected ? "checkbox" : "square-outline"}
-                      size={22}
-                      color={isSelected ? Colors.accent : Colors.textSecondary}
-                    />
-                  </Pressable>
+                  <View key={continent.key}>
+                    {/* Continent header */}
+                    <View style={[styles.continentRow, allSelected && styles.continentRowSelected]}>
+                      <Pressable
+                        style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }}
+                        onPress={() => {
+                          setExpandedContinents((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(continent.key)) next.delete(continent.key);
+                            else next.add(continent.key);
+                            return next;
+                          });
+                        }}
+                      >
+                        <Ionicons
+                          name={isContinentExpanded ? "chevron-down" : "chevron-forward"}
+                          size={16}
+                          color={Colors.textSecondary}
+                        />
+                        <Text style={[styles.continentLabel, (allSelected || partialSelected) && { color: Colors.accent }]}>
+                          {continent.label}
+                        </Text>
+                        {partialSelected && (
+                          <View style={styles.partialBadge}>
+                            <Text style={styles.partialBadgeText}>{selectedInContinent.length}</Text>
+                          </View>
+                        )}
+                      </Pressable>
+                      <Pressable onPress={() => toggleContinentInModal(continent.key)}>
+                        <Ionicons
+                          name={allSelected ? "checkbox" : partialSelected ? "remove-circle" : "square-outline"}
+                          size={22}
+                          color={allSelected || partialSelected ? Colors.accent : Colors.textSecondary}
+                        />
+                      </Pressable>
+                    </View>
+
+                    {/* Countries within continent */}
+                    {isContinentExpanded && continentCountries.map((country) => {
+                      const isSelected = selectedCountries.includes(country.code);
+                      const isCountryExpanded = expandedCountries.has(country.code);
+                      const hasSubLevel = country.regions.length > 0;
+                      const hasCities = country.regions.some((r) => r.cities && r.cities.length > 0);
+
+                      return (
+                        <View key={country.code}>
+                          <View style={[styles.countryRow, { paddingLeft: 32 }, isSelected && styles.countryRowSelected]}>
+                            {hasSubLevel ? (
+                              <Pressable
+                                onPress={() => {
+                                  setExpandedCountries((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(country.code)) next.delete(country.code);
+                                    else next.add(country.code);
+                                    return next;
+                                  });
+                                }}
+                                style={{ paddingRight: 4 }}
+                              >
+                                <Ionicons
+                                  name={isCountryExpanded ? "chevron-down" : "chevron-forward"}
+                                  size={14}
+                                  color={Colors.textSecondary}
+                                />
+                              </Pressable>
+                            ) : (
+                              <View style={{ width: 18 }} />
+                            )}
+                            <Text style={styles.countryFlag}>{country.flag}</Text>
+                            <Pressable style={{ flex: 1 }} onPress={() => toggleCountryInModal(country.code)}>
+                              <Text style={[styles.countryName, isSelected && { color: Colors.accent }]}>{country.name}</Text>
+                            </Pressable>
+                            <Pressable onPress={() => toggleCountryInModal(country.code)}>
+                              <Ionicons
+                                name={isSelected ? "checkbox" : "square-outline"}
+                                size={20}
+                                color={isSelected ? Colors.accent : Colors.textSecondary}
+                              />
+                            </Pressable>
+                          </View>
+
+                          {/* Regions / Cities (3rd level) */}
+                          {isCountryExpanded && country.regions.map((region) => (
+                            <View key={region.name}>
+                              <View style={[styles.regionRow, { paddingLeft: hasCities ? 56 : 56 }]}>
+                                {hasCities && region.cities && region.cities.length > 0 ? (
+                                  <Pressable
+                                    onPress={() => {
+                                      const key = `${country.code}:${region.name}`;
+                                      setExpandedCountries((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(key)) next.delete(key);
+                                        else next.add(key);
+                                        return next;
+                                      });
+                                    }}
+                                    style={{ paddingRight: 4 }}
+                                  >
+                                    <Ionicons
+                                      name={expandedCountries.has(`${country.code}:${region.name}`) ? "chevron-down" : "chevron-forward"}
+                                      size={12}
+                                      color={Colors.textSecondary}
+                                    />
+                                  </Pressable>
+                                ) : (
+                                  <View style={styles.regionDot} />
+                                )}
+                                <Text style={styles.regionName}>{region.name}</Text>
+                              </View>
+                              {/* Cities (4th level for US/CA) */}
+                              {hasCities && region.cities && expandedCountries.has(`${country.code}:${region.name}`) &&
+                                region.cities.map((city) => (
+                                  <View key={city.name} style={[styles.regionRow, { paddingLeft: 76 }]}>
+                                    <View style={[styles.regionDot, { backgroundColor: Colors.textSecondary + "60" }]} />
+                                    <Text style={[styles.regionName, { fontSize: 12, color: Colors.textSecondary }]}>{city.name}</Text>
+                                  </View>
+                                ))
+                              }
+                            </View>
+                          ))}
+                        </View>
+                      );
+                    })}
+                  </View>
                 );
-              }}
-            />
+              })}
+            </ScrollView>
+
             <Pressable
               style={styles.areaSaveBtn}
               onPress={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}
             >
-              <Text style={styles.areaSaveBtnText}>{t("common.confirm")} ({selectedCountries.length})</Text>
+              <Text style={styles.areaSaveBtnText}>
+                {selectedCountries.length === 0
+                  ? `${t("common.confirm")} — Tutto il mondo`
+                  : `${t("common.confirm")} (${selectedCountries.length})`}
+              </Text>
             </Pressable>
           </Pressable>
         </Pressable>
@@ -2274,38 +2403,74 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: 12,
   },
-  continentHeader: {
+  continentRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingVertical: 11,
     paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 4,
+    borderRadius: 8,
+    marginBottom: 1,
+    gap: 8,
   },
-  continentHeaderText: {
-    fontSize: 13,
+  continentRowSelected: {
+    backgroundColor: Colors.accent + "15",
+  },
+  continentLabel: {
+    flex: 1,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.textSecondary,
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
+    color: Colors.text,
+  },
+  partialBadge: {
+    backgroundColor: Colors.accent + "30",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  partialBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
   },
   countryRow: {
     flexDirection: "row" as const,
     alignItems: "center" as const,
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    marginBottom: 2,
-    gap: 10,
+    marginBottom: 1,
+    gap: 8,
   },
   countryRowSelected: {
-    backgroundColor: Colors.accent + "15",
+    backgroundColor: Colors.accent + "10",
   },
   countryFlag: {
-    fontSize: 20,
+    fontSize: 18,
   },
   countryName: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: "Inter_500Medium",
     color: Colors.text,
+  },
+  regionRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  regionDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Colors.textSecondary + "80",
+  },
+  regionName: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    flex: 1,
   },
   areaSaveBtn: {
     backgroundColor: Colors.accent,
