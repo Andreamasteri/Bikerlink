@@ -17,12 +17,15 @@ Motivazione: esportare il bundle a fine task rischia di includere commit parzial
 
 # BikerLink — Pubblicazione OTA
 
-## ⚡ REGOLA FONDAMENTALE — Un comando solo
+## ⚡ REGOLA FONDAMENTALE — Flusso a due stage nel sandbox Replit
 **Quando l'utente dice "crea l'OTA", "prepara l'OTA", "fai l'OTA" o qualsiasi variante:**
 - La pubblicazione è **inclusa automaticamente** — non è opzionale
 - **Non chiedere conferma separata** prima di eseguire lo script
 - **Non modificare manualmente** `lib/ota.ts` né `ota-updates.json` — lo script lo fa in automatico
-- Eseguire un unico comando e attenderne il completamento
+- **Nel sandbox Replit** (bash tool ~120s + cgroup reaper): esegui prima `export "msg"`,
+  poi in un secondo bash tool esegui `publish`. Vedi la sezione "PROCEDURA" sotto.
+- **Solo in terminale long-running (CI, shell desktop)**: puoi usare la modalità legacy
+  single-shot `publish-ota.sh "msg"` che fa entrambi gli stage in sequenza.
 
 ## 🚫 EAS UPDATES — DISMESSO (Task #980)
 **EAS Updates non è più usato per la delivery OTA.** L'unico canale OTA attivo è il
@@ -71,37 +74,69 @@ bash scripts/build-apk.sh production   # AAB Play Store
 - `lib/ota.ts` — contiene `CURRENT_OTA_NUMBER` (aggiornato dallo script)
 - `ota-updates.json` — registro OTA attivo (aggiornato dallo script)
 - `ota-updates-archive.json` — registro storico cicli 2.x-7.x (solo lettura)
-- `scripts/publish-ota.sh` — script di pubblicazione completo (un comando solo)
+- `scripts/publish-ota.sh` — script di pubblicazione (3 comandi: `export`, `publish`, `rollback` + modalità legacy single-shot)
 - `scripts/rollback-ota.sh` — rollback a release storica
 - `scripts/validate-ota.sh` — validatore post pubblicazione
 
 ---
 
-## 🚀 PROCEDURA — Un comando solo
+## 🚀 PROCEDURA — Due stage (sandbox Replit) o legacy un comando
 
+Lo script `publish-ota.sh` ha tre comandi principali. **Nel sandbox Replit (bash tool con
+limite ~120s e cgroup reaper che killa i processi background al termine del tool) è
+obbligatorio usare i due stage separati** — la modalità legacy single-shot funziona solo
+in terminali long-running (CI, shell desktop).
+
+### Stage 1 — `export` (~80s, dentro il bash tool)
+```bash
+BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
+BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
+bash scripts/publish-ota.sh export "Descrizione breve delle modifiche"
+```
+Esegue: calcolo updateNumber, bump `CURRENT_OTA_NUMBER`, entry pending in
+`ota-updates.json`, `expo export --reset-cache`, verifica marker nel bundle. Scrive
+`.local/ota-state.json` + backup `.local/ota-state.lib-ota.ts.bak` e
+`.local/ota-state.ota-updates.json.bak`. Lascia `dist-ota/` su disco per lo Stage 2.
+
+### Stage 2 — `publish` (~30s, dentro un nuovo bash tool)
+```bash
+BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
+BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
+bash scripts/publish-ota.sh publish
+```
+Legge lo state file e completa: upload bundle, login admin, creazione release draft,
+pubblicazione (`/publish`), **promozione a slot=stable** (`/assign-slot`), verifica live
+con backoff 30s, finalizzazione `ota-updates.json` (status=published). Al successo cancella
+state file, backup e `dist-ota/`.
+
+> ⚠️ **Promozione slot=stable obbligatoria**: i client leggono solo dallo slot `stable`.
+> Lo stage 2 chiama `/api/admin/ota/assign-slot` con `slot:"stable"` dopo `/publish` —
+> senza questa chiamata la release resta `archived` e nessun dispositivo la riceve.
+
+### Rollback dell'export (prima di pubblicare)
+Se dopo `export` decidi di non procedere:
+```bash
+bash scripts/publish-ota.sh rollback
+```
+Ripristina `lib/ota.ts` e `ota-updates.json` dai backup e rimuove `dist-ota/`.
+
+### Legacy single-shot (solo terminali long-running, NON sandbox Replit)
 ```bash
 BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
 BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
 bash scripts/publish-ota.sh "Descrizione breve delle modifiche"
 ```
+Esegue export + publish in sequenza nello stesso processo (~110s totali). **Non usare nel
+bash tool Replit**: lo step C (Metro export) viene reaped al termine del tool.
 
-### Cosa fa lo script automaticamente
-1. **Calcola il prossimo updateNumber** da `ota-updates.json` (es. 18→19)
-2. **Aggiorna `CURRENT_OTA_NUMBER`** in `lib/ota.ts`
-3. **Inserisce entry pending** in `ota-updates.json` con `commitBase = HEAD`
-4. **Esporta il bundle** con `expo export --platform android --reset-cache`
-5. **Verifica** che `CURRENT_OTA_NUMBER=<N>` sia nel bundle (blocca se errato)
-6. **Carica** il bundle su object storage
-7. **Si autentica** sul backend di PRODUZIONE (`https://biker-link.replit.app`)
-8. **Crea** la release draft e la pubblica
-9. **Verifica live** con backoff (max 30s) che la produzione serva il nuovo releaseId
-10. **Finalizza** `ota-updates.json` con ID reali e `status: published`
+### Rollback automatico in caso di errore
+Se uno step fallisce in `export` (prima di scrivere lo state file finale) o in `publish`
+(prima della finalizzazione K), il trap EXIT ripristina automaticamente `lib/ota.ts` e
+`ota-updates.json` dai backup. Nessuna modifica permanente rimane.
 
-### Rollback automatico
-Se qualsiasi passo fallisce:
-- `lib/ota.ts` viene ripristinato al numero originale
-- `ota-updates.json` viene ripristinato (entry pending rimossa)
-- Nessuna modifica permanente rimane in caso di errore
+L'unica eccezione è il fallimento dello step K (finalizzazione `ota-updates.json`) DOPO
+che la release è già live in produzione: in quel caso lo script avvisa di aggiornare
+manualmente `ota-updates.json` e NON ripristina (la release è già attiva).
 
 ### Versioning automatico
 Lo script calcola la versione come `1.<updateNumber>.0` (es. OTA-19 → `1.19.0`).
