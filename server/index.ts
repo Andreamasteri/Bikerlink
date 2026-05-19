@@ -321,6 +321,16 @@ function configureExpoAndLanding(app: express.Application) {
     });
   }
 
+  // ── APK Direct Download ──────────────────────────────────────────────────
+  // Reads APK_DOWNLOAD_URL env var and redirects. Returns 404 if not set.
+  app.get("/api/download/apk/latest", (_req: Request, res: Response) => {
+    const apkUrl = process.env.APK_DOWNLOAD_URL;
+    if (!apkUrl) {
+      return res.status(404).json({ error: "APK not available" });
+    }
+    return res.redirect(302, apkUrl);
+  });
+
   // ── Web Portal SPA routes ────────────────────────────────────────────────
   // Serve the web portal HTML at specific SPA routes.
   // The client-side JS handles routing internally.

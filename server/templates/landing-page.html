@@ -1424,6 +1424,160 @@
         padding-top: 20px;
       }
 
+      /* ── AUTH INLINE SECTION ────────────────────────────────────────────── */
+      .auth-inline-section {
+        padding: 120px 24px;
+        background: var(--bg-alt);
+        border-top: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
+      }
+      .auth-inline-section::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255,59,48,0.07) 0%, transparent 70%);
+        pointer-events: none;
+      }
+      .auth-inline-inner {
+        max-width: var(--max);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 80px;
+        align-items: start;
+      }
+      .auth-inline-title {
+        font-family: var(--font-display);
+        font-size: clamp(40px, 6vw, 72px);
+        line-height: 0.95;
+        letter-spacing: 3px;
+        color: var(--text);
+        text-transform: uppercase;
+        margin-bottom: 20px;
+        font-weight: 800;
+      }
+      .auth-inline-title .accent { color: var(--accent); }
+      .auth-inline-desc {
+        font-size: 16px;
+        color: var(--text2);
+        line-height: 1.75;
+        max-width: 380px;
+      }
+      .auth-inline-card {
+        background: var(--surface);
+        border: 1px solid var(--border-mid);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .auth-inline-card::before {
+        content: '';
+        display: block;
+        height: 3px;
+        background: var(--accent);
+      }
+      .auth-inline-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--border);
+      }
+      .auth-inline-tab {
+        flex: 1;
+        padding: 16px 24px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        background: transparent;
+        border: none;
+        color: var(--text3);
+        cursor: pointer;
+        font-family: var(--font-body);
+        transition: color 0.2s, background 0.2s;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+      }
+      .auth-inline-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(255,59,48,0.04); }
+      .auth-inline-tab:hover:not(.active) { color: var(--text2); }
+      .auth-inline-panel { display: none; padding: 28px; }
+      .auth-inline-panel.active { display: block; }
+      .auth-inline-field { margin-bottom: 16px; }
+      .auth-inline-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .auth-inline-label {
+        display: block;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        color: var(--text3);
+        margin-bottom: 8px;
+      }
+      .auth-inline-input {
+        width: 100%;
+        padding: 11px 14px;
+        background: var(--surface2);
+        border: 1px solid var(--border-mid);
+        border-radius: var(--radius);
+        color: var(--text);
+        font-family: var(--font-body);
+        font-size: 14px;
+        transition: border-color 0.2s;
+      }
+      .auth-inline-input:focus { outline: none; border-color: var(--accent); }
+      .auth-inline-input::placeholder { color: var(--text3); }
+      .auth-inline-check {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+        margin-bottom: 20px;
+        margin-top: 4px;
+      }
+      .auth-inline-check input[type="checkbox"] { width: 15px; height: 15px; margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+      .auth-inline-check span { font-size: 12px; color: var(--text2); line-height: 1.5; }
+      .auth-inline-check a { color: var(--accent); }
+      .auth-inline-btn {
+        width: 100%;
+        padding: 13px 28px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        border: none;
+        border-radius: var(--radius);
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        font-family: var(--font-body);
+        transition: background 0.2s, transform 0.18s;
+      }
+      .auth-inline-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
+      .auth-inline-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+      .auth-inline-alert {
+        display: none;
+        padding: 10px 14px;
+        border-radius: var(--radius);
+        font-size: 13px;
+        margin-bottom: 14px;
+        background: rgba(239,68,68,0.12);
+        border: 1px solid rgba(239,68,68,0.3);
+        color: #fca5a5;
+      }
+      .auth-inline-alert.show { display: block; }
+      .auth-inline-success {
+        padding: 14px 16px;
+        border-radius: var(--radius);
+        font-size: 14px;
+        margin-bottom: 14px;
+        background: rgba(34,197,94,0.12);
+        border: 1px solid rgba(34,197,94,0.3);
+        color: #86efac;
+        text-align: center;
+      }
+      @media (max-width: 768px) {
+        .auth-inline-inner { grid-template-columns: 1fr; gap: 40px; }
+        .auth-inline-form-row { grid-template-columns: 1fr; }
+      }
+
       /* ── SCROLL REVEAL ───────────────────────────────────────────────────── */
       .reveal {
         opacity: 0;
@@ -2197,10 +2351,89 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.24.13.52.2.8.2.39 0 .76-.12 1.07-.34L16.72 17l-3.23-3.23-10.31 9.99zM1.1 1.24C1.04 1.46 1 1.7 1 1.94v20.12c0 .24.04.48.1.7l.1.09L12.47 12V11.88L1.2 1.15l-.1.09zM20.92 10.19l-2.87-1.65-3.28 3.28 3.28 3.28 2.89-1.66c.82-.47.82-1.78-.02-2.25zM4.05.58L16.72 7l-3.25 3.25L4.05.58z"/></svg>
             <span data-i18n="free.cta_play">Scarica su Android</span>
           </a>
+          <a href="/api/download/apk/latest" class="btn btn-white" data-i18n-href="free.cta_apk_href">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span data-i18n="free.cta_apk">Scarica APK diretto</span>
+          </a>
           <a href="#" class="btn btn-white">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
             <span data-i18n="free.cta_apple">App Store — Presto</span>
           </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── AUTH INLINE SECTION ────────────────────────────────────────── -->
+    <section class="auth-inline-section" id="accedi">
+      <div class="auth-inline-inner">
+        <div class="auth-inline-header reveal">
+          <div class="sec-label" data-i18n="auth_inline.label">Accedi o Registrati</div>
+          <h2 class="auth-inline-title"><span data-i18n="auth_inline.t1">ENTRA NELLA</span><br><span class="accent" data-i18n="auth_inline.t2">COMMUNITY</span></h2>
+          <p class="auth-inline-desc" data-i18n="auth_inline.desc">Registrati in pochi secondi o accedi al tuo account. È gratis, sempre.</p>
+        </div>
+        <div class="auth-inline-card reveal">
+          <div class="auth-inline-tabs">
+            <button class="auth-inline-tab active" id="tab-register" onclick="showAuthTab('register')" data-i18n="auth_inline.tab_register">Registrati</button>
+            <button class="auth-inline-tab" id="tab-login" onclick="showAuthTab('login')" data-i18n="auth_inline.tab_login">Accedi</button>
+          </div>
+
+          <!-- REGISTER FORM -->
+          <div id="auth-panel-register" class="auth-inline-panel active">
+            <div id="inline-reg-alert" class="auth-inline-alert"></div>
+            <div id="inline-reg-success" class="auth-inline-success" style="display:none"></div>
+            <form id="inline-reg-form" onsubmit="inlineRegister(event)" novalidate>
+              <div class="auth-inline-form-row">
+                <div class="auth-inline-field">
+                  <label class="auth-inline-label" data-i18n="auth_inline.nickname">Nickname</label>
+                  <input class="auth-inline-input" id="il-reg-nick" type="text" placeholder="Il tuo nickname" required autocomplete="username"/>
+                </div>
+                <div class="auth-inline-field">
+                  <label class="auth-inline-label" data-i18n="auth_inline.birthYear">Anno di nascita</label>
+                  <input class="auth-inline-input" id="il-reg-year" type="number" placeholder="es. 1990" min="1900"/>
+                </div>
+              </div>
+              <div class="auth-inline-field">
+                <label class="auth-inline-label" data-i18n="auth_inline.email">Email</label>
+                <input class="auth-inline-input" id="il-reg-email" type="email" placeholder="email@esempio.it" required autocomplete="email"/>
+              </div>
+              <div class="auth-inline-form-row">
+                <div class="auth-inline-field">
+                  <label class="auth-inline-label" data-i18n="auth_inline.password">Password</label>
+                  <input class="auth-inline-input" id="il-reg-pass" type="password" placeholder="Min. 8 car., A-Z, a-z, 0-9" required autocomplete="new-password"/>
+                </div>
+                <div class="auth-inline-field">
+                  <label class="auth-inline-label" data-i18n="auth_inline.confirmPassword">Conferma</label>
+                  <input class="auth-inline-input" id="il-reg-pass2" type="password" placeholder="Ripeti password" required autocomplete="new-password"/>
+                </div>
+              </div>
+              <label class="auth-inline-check">
+                <input type="checkbox" id="il-reg-privacy" required/>
+                <span data-i18n-html="auth_inline.privacyText">Accetto la <a href="/privacy" target="_blank">Privacy Policy</a> e i <a href="/terms" target="_blank">Termini di Servizio</a></span>
+              </label>
+              <button type="submit" class="auth-inline-btn" id="il-reg-btn">
+                <span data-i18n="auth_inline.tab_register">Registrati</span>
+              </button>
+            </form>
+          </div>
+
+          <!-- LOGIN FORM -->
+          <div id="auth-panel-login" class="auth-inline-panel">
+            <div id="inline-login-alert" class="auth-inline-alert"></div>
+            <div id="inline-login-success" class="auth-inline-success" style="display:none"></div>
+            <form id="inline-login-form" onsubmit="inlineLogin(event)" novalidate>
+              <div class="auth-inline-field">
+                <label class="auth-inline-label" data-i18n="auth_inline.emailOrNickname">Email o Nickname</label>
+                <input class="auth-inline-input" id="il-login-id" type="text" placeholder="email o nickname" required autocomplete="username"/>
+              </div>
+              <div class="auth-inline-field">
+                <label class="auth-inline-label" data-i18n="auth_inline.password">Password</label>
+                <input class="auth-inline-input" id="il-login-pass" type="password" placeholder="••••••••" required autocomplete="current-password"/>
+              </div>
+              <button type="submit" class="auth-inline-btn" id="il-login-btn">
+                <span data-i18n="auth_inline.tab_login">Accedi</span>
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </section>
@@ -2263,6 +2496,113 @@
     </footer>
 
     <script>
+    // ── INLINE AUTH ───────────────────────────────────────────────────────────
+    function showAuthTab(tab) {
+      document.getElementById('tab-register').classList.toggle('active', tab === 'register');
+      document.getElementById('tab-login').classList.toggle('active', tab === 'login');
+      document.getElementById('auth-panel-register').classList.toggle('active', tab === 'register');
+      document.getElementById('auth-panel-login').classList.toggle('active', tab === 'login');
+    }
+
+    function showInlineAlert(id, msg) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+    function hideInlineAlert(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove('show');
+    }
+
+    async function inlineRegister(e) {
+      e.preventDefault();
+      const nick = document.getElementById('il-reg-nick').value.trim();
+      const email = document.getElementById('il-reg-email').value.trim();
+      const pass = document.getElementById('il-reg-pass').value;
+      const pass2 = document.getElementById('il-reg-pass2').value;
+      const year = document.getElementById('il-reg-year').value;
+      const privacy = document.getElementById('il-reg-privacy').checked;
+
+      hideInlineAlert('inline-reg-alert');
+      document.getElementById('inline-reg-success').style.display = 'none';
+
+      if (!nick || !email || !pass) return showInlineAlert('inline-reg-alert', 'Compila tutti i campi obbligatori');
+      if (pass !== pass2) return showInlineAlert('inline-reg-alert', 'Le password non coincidono');
+      if (pass.length < 8) return showInlineAlert('inline-reg-alert', 'La password deve avere almeno 8 caratteri');
+      if (!/[A-Z]/.test(pass)) return showInlineAlert('inline-reg-alert', 'La password deve contenere almeno una lettera maiuscola');
+      if (!/[a-z]/.test(pass)) return showInlineAlert('inline-reg-alert', 'La password deve contenere almeno una lettera minuscola');
+      if (!/[0-9]/.test(pass)) return showInlineAlert('inline-reg-alert', 'La password deve contenere almeno un numero');
+      if (!privacy) return showInlineAlert('inline-reg-alert', 'Devi accettare la Privacy Policy');
+
+      const btn = document.getElementById('il-reg-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;"></span>';
+
+      try {
+        const body = { nickname: nick, email, password: pass, userType: 'biker', eulaAccepted: true };
+        if (year) body.birthYear = parseInt(year);
+        const res = await fetch('/api/auth/register', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showInlineAlert('inline-reg-alert', data.message || 'Errore durante la registrazione');
+        } else if (data.requiresEmailVerification) {
+          const s = document.getElementById('inline-reg-success');
+          s.textContent = 'Email di verifica inviata. Controlla la casella di posta.';
+          s.style.display = 'block';
+          document.getElementById('inline-reg-form').reset();
+        } else {
+          window.location.href = '/area-utente';
+        }
+      } catch {
+        showInlineAlert('inline-reg-alert', 'Errore di rete. Riprova.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>' + (I18N[currentLang]['auth_inline.tab_register'] || 'Registrati') + '</span>';
+      }
+    }
+
+    async function inlineLogin(e) {
+      e.preventDefault();
+      const identifier = document.getElementById('il-login-id').value.trim();
+      const password = document.getElementById('il-login-pass').value;
+
+      hideInlineAlert('inline-login-alert');
+      document.getElementById('inline-login-success').style.display = 'none';
+
+      if (!identifier || !password) return showInlineAlert('inline-login-alert', 'Compila tutti i campi');
+
+      const btn = document.getElementById('il-login-btn');
+      btn.disabled = true;
+      btn.innerHTML = '<span style="display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin 0.7s linear infinite;"></span>';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showInlineAlert('inline-login-alert', data.message || 'Credenziali non valide');
+        } else {
+          const s = document.getElementById('inline-login-success');
+          s.innerHTML = 'Accesso effettuato! <a href="/area-utente" style="color:inherit;text-decoration:underline;font-weight:700;">Vai alla tua area</a>';
+          s.style.display = 'block';
+          setTimeout(function() { window.location.href = '/area-utente'; }, 1800);
+        }
+      } catch {
+        showInlineAlert('inline-login-alert', 'Errore di rete. Riprova.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>' + (I18N[currentLang]['auth_inline.tab_login'] || 'Accedi') + '</span>';
+      }
+    }
+
     // ── FAQ ACCORDION ─────────────────────────────────────────────────────────
     function toggleFaq(btn) {
       const item = btn.closest('.faq-item');
@@ -2318,7 +2658,20 @@
         "free.t1": "GRATUITA.", "free.t2": "SEMPRE.",
         "free.desc": "Nessun paywall. Nessun abbonamento premium. Nessuna funzionalità nascosta. BikerLink è e resterà gratuita per ogni biker, per sempre. Perché la passione non ha un prezzo.",
         "free.cta_play": "Scarica su Android",
+        "free.cta_apk": "Scarica APK diretto",
         "free.cta_apple": "App Store — Presto",
+        "auth_inline.label": "Community",
+        "auth_inline.t1": "ENTRA NELLA", "auth_inline.t2": "COMMUNITY",
+        "auth_inline.desc": "Registrati in pochi secondi o accedi al tuo account. È gratis, sempre.",
+        "auth_inline.tab_register": "Registrati",
+        "auth_inline.tab_login": "Accedi",
+        "auth_inline.nickname": "Nickname",
+        "auth_inline.birthYear": "Anno di nascita",
+        "auth_inline.email": "Email",
+        "auth_inline.password": "Password",
+        "auth_inline.confirmPassword": "Conferma",
+        "auth_inline.privacyText": "Accetto la <a href=\"/privacy\" target=\"_blank\">Privacy Policy</a> e i <a href=\"/terms\" target=\"_blank\">Termini di Servizio</a>",
+        "auth_inline.emailOrNickname": "Email o Nickname",
         "footer.tagline": "La piattaforma verticale per motociclisti italiani. Community, GPS live, MotoClub, SOS, Contest foto. Gratuita, sempre.",
         "footer.soon": "Presto",
         "footer.col_app": "App", "footer.col_legal": "Legale",
@@ -2366,7 +2719,20 @@
         "free.t1": "FREE.", "free.t2": "FOREVER.",
         "free.desc": "No paywall. No premium subscription. No hidden features. BikerLink is and will remain free for every biker, forever. Because passion has no price.",
         "free.cta_play": "Download on Android",
+        "free.cta_apk": "Download APK directly",
         "free.cta_apple": "App Store — Coming Soon",
+        "auth_inline.label": "Community",
+        "auth_inline.t1": "JOIN THE", "auth_inline.t2": "COMMUNITY",
+        "auth_inline.desc": "Sign up in seconds or log in to your account. It's free, forever.",
+        "auth_inline.tab_register": "Sign Up",
+        "auth_inline.tab_login": "Log In",
+        "auth_inline.nickname": "Nickname",
+        "auth_inline.birthYear": "Year of birth",
+        "auth_inline.email": "Email",
+        "auth_inline.password": "Password",
+        "auth_inline.confirmPassword": "Confirm",
+        "auth_inline.privacyText": "I accept the <a href=\"/privacy\" target=\"_blank\">Privacy Policy</a> and <a href=\"/terms\" target=\"_blank\">Terms of Service</a>",
+        "auth_inline.emailOrNickname": "Email or Nickname",
         "footer.tagline": "The vertical platform for Italian motorcyclists. Community, live GPS, MotoClub, SOS, Photo contest. Free, forever.",
         "footer.soon": "Soon",
         "footer.col_app": "App", "footer.col_legal": "Legal",
@@ -2391,6 +2757,10 @@
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         if (dict[key] !== undefined) el.textContent = dict[key];
+      });
+      document.querySelectorAll('[data-i18n-html]').forEach(el => {
+        const key = el.getAttribute('data-i18n-html');
+        if (dict[key] !== undefined) el.innerHTML = dict[key];
       });
     }
 
