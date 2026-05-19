@@ -659,6 +659,19 @@ router.post("/verify-password", async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/users
+// Returns the full user list for admin moderation purposes.
+//
+// INTENTIONAL EXCEPTION — map_visibility_filter does NOT apply here.
+// map_visibility_filter is a user-facing privacy control that determines
+// which users are visible to other *regular* users on the public map
+// (options: "all" | "online_only" | "available_only"). Applying it to
+// admin endpoints would hide suspended, offline, or ghost-mode users
+// from moderators, breaking moderation workflows. Admins must always
+// see the complete user roster regardless of visibility settings.
+//
+// Access is restricted to verified admin sessions via requireAdmin (see
+// router.use(requireAdmin) above). No regular user can reach this route.
 router.get("/users", async (_req: Request, res: Response) => {
   try {
     const users = await storage.getAllUsers();
@@ -6242,6 +6255,13 @@ const MI_GPS_TYPES = new Set([
 
 // Handler: GET /api/admin/users/match-summary  (also: /api/admin/match-inspector/users)
 // Paginated list of users with total + per-type match counts
+// Handler for GET /api/admin/users/match-summary and GET /api/admin/match-inspector/users.
+// Returns a paginated list of real (non-fake) non-admin users for the match inspector panel.
+//
+// INTENTIONAL EXCEPTION — map_visibility_filter does NOT apply here.
+// This is an admin-only endpoint (protected by requireAdmin). The filter
+// is a user-facing privacy feature for the public map; admins must always
+// see all users to audit match quality regardless of online/available status.
 async function handleMatchInspectorUsers(req: Request, res: Response): Promise<void> {
   try {
     const page = Math.max(1, parseInt(String(req.query.page ?? "1"), 10));
