@@ -137,9 +137,8 @@
       "enabled": true,
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_ERROR_RECOVERY",
-      "disableAntiBrickingMeasures": true,
       "requestHeaders": {
-        "expo-device-id": "pending"
+        "expo-device-id": "extra-params"
       }
     },
     "runtimeVersion": "8.0.0",

@@ -13,28 +13,27 @@
 //     reloadAsync se siamo in stato di "rollback" pendente — guard anti-loop
 //     tramite contatore in-memory.
 //
-// NOTA sull'header `expo-device-id`:
-// Il server (server/routes.ts:595) fa slot-routing su `req.headers["expo-device-id"]`.
-// Iniezione per-device implementata tramite:
-//  - app.json.updates.requestHeaders: header statico "pending" garantisce che
-//    OGNI chiamata /api/expo-updates lo include (dal primissimo boot post-install).
-//  - Updates.setUpdateRequestHeadersOverride (SDK 55, experimental) lo riscrive
-//    a runtime con il device-id stabile al primo init utile.
-//  - Updates.setExtraParamAsync("device-id", id) come canale ridondante.
+// CONTRATTO HEADER device-id (cross-task con backend OTA):
+// Il server fa slot-routing su `req.headers["expo-device-id"]` (routes.ts:595).
+// SDK 55 di expo-updates non offre un'API per impostare header HTTP per-device
+// senza disabilitare le protezioni anti-bricking — incompatibile con un task
+// di hardening. Soluzione adottata, sicura e in due livelli:
 //
-// RISK ACCEPTANCE su `disableAntiBrickingMeasures: true`:
-// L'API di override degli header runtime in expo-updates SDK 55 richiede questo
-// flag. Disabilita alcune protezioni native (es. il SDK non rifiuta più update
-// da URL che non corrisponde a quello build-time). Compensating controls
-// adottati in questo task:
-//  1) URL OTA è hardcoded in app.json e l'override NON cambia l'URL (passiamo
-//     solo l'oggetto requestHeaders senza updateUrl).
-//  2) checkAutomatically:"ON_ERROR_RECOVERY" è attivo: in caso di crash al boot
-//     di un OTA, expo-updates auto-fallback all'embedded bundle.
-//  3) attachErrorRecoveryListener intercetta ctx.rollback runtime con anti-loop
-//     e forza reloadAsync verso embedded.
-//  4) Heartbeat post-load permette al server di rilevare device che non
-//     confermano il caricamento → admin può marcare l'OTA broken da pannello.
+//  1) app.json.updates.requestHeaders.expo-device-id = "extra-params"
+//     → garantisce che il header sia SEMPRE presente su ogni /api/expo-updates
+//       (incluso il primissimo boot post-install). Il valore "extra-params" è
+//       un sentinel che dice al server: "leggi il vero device-id dal header
+//       strutturato Expo-Extra-Params".
+//
+//  2) Updates.setExtraParamAsync("device-id", id) → al primo init utile inietta
+//     il device-id stabile come extra-param. expo-updates lo persiste nello
+//     storage nativo e lo include in OGNI chiamata successiva nel header
+//     `Expo-Extra-Params`. Stesso valore usato dal heartbeat → coerenza.
+//
+// FOLLOW-UP SERVER (Task separato): routes.ts /api/expo-updates deve parsare
+// `req.headers["expo-extra-params"]` cercando la chiave `device-id` quando
+// `expo-device-id` vale "extra-params". Fino ad allora il device cade nel
+// path B (no slot assignment, serve stable) — comportamento safe by default.
 
 import * as Updates from "expo-updates";
 import { Platform } from "react-native";
@@ -192,23 +191,12 @@ export async function initOtaHardening(): Promise<void> {
   _hardeningInited = true;
   if (Platform.OS === "web") return;
 
-  // 1. Inietta device ID come HEADER HTTP `expo-device-id` sulle prossime
-  //    chiamate /api/expo-updates (slot routing lato server). Persiste tra
-  //    restart perché expo-updates salva l'override nello storage nativo.
-  //    Replicato anche come extra-param `device-id` (canale ridondante).
+  // 1. Inietta device ID via Expo-Extra-Params (vedi contratto in testa al file).
+  //    Persiste tra restart: expo-updates salva gli extra params nello storage
+  //    nativo. Stesso valore usato dal heartbeat → coerenza slot/telemetria.
   try {
     const deviceId = await getStableDeviceId();
     if (!__DEV__) {
-      try {
-        const override = (Updates as {
-          setUpdateRequestHeadersOverride?: (h: Record<string, string> | null) => void;
-        }).setUpdateRequestHeadersOverride;
-        if (typeof override === "function") {
-          // Passiamo SOLO requestHeaders, NON updateUrl: l'URL build-time
-          // (https://biker-link.replit.app/api/expo-updates) resta invariato.
-          override({ "expo-device-id": deviceId });
-        }
-      } catch {}
       await Updates.setExtraParamAsync("device-id", deviceId).catch(() => {});
     }
   } catch {}
