@@ -1247,7 +1247,8 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
       storage.getConversationParticipants(conversationId),
     ]);
 
-    let authorized = !!participants.find((p) => p.userId === userId);
+    const isInParticipants = !!participants.find((p) => p.userId === userId);
+    let authorized = isInParticipants;
 
     // Block check (fail-closed, anti-regressione Task #1115): per QUALUNQUE
     // conversazione direct/private/contact, se il requester ha una relazione di
@@ -1270,7 +1271,7 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
       }
     }
 
-    if (!authorized && conversation?.conversationType === "motoclub") {
+    if (conversation?.conversationType === "motoclub") {
       const clubRow = await db
         .select({ id: motoClubs.id })
         .from(motoClubs)
@@ -1286,7 +1287,9 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
             eq(motoClubMembers.status, "active"),
           ))
           .limit(1);
-        if (membership[0]) authorized = true;
+        authorized = !!membership[0];
+      } else {
+        authorized = false;
       }
     }
 

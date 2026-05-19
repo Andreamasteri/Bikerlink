@@ -1006,6 +1006,20 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
     if (proposal.userId !== userId) {
       return res.status(403).json({ message: "Solo il creatore può eliminare questa proposta" });
     }
+    if (proposal.clubId) {
+      const [membership] = await db
+        .select({ userId: motoClubMembers.userId })
+        .from(motoClubMembers)
+        .where(and(
+          eq(motoClubMembers.clubId, proposal.clubId),
+          eq(motoClubMembers.userId, userId),
+          eq(motoClubMembers.status, "active"),
+        ))
+        .limit(1);
+      if (!membership) {
+        return res.status(403).json({ message: "Non sei più membro attivo del club" });
+      }
+    }
     await storage.deleteProposal(proposalId);
     return res.json({ message: "Proposta eliminata" });
   } catch (error) {

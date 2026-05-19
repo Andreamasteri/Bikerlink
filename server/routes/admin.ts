@@ -1753,6 +1753,20 @@ router.put("/settings/motoclub_include_zav", async (req: Request, res: Response)
       if (zavIds.length > 0) {
         await db.delete(motoClubInvites).where(inArray(motoClubInvites.userId, zavIds));
         await db.delete(motoClubMembers).where(inArray(motoClubMembers.userId, zavIds));
+        const motoclubConvRows = await db
+          .select({ conversationId: motoClubs.conversationId })
+          .from(motoClubs)
+          .where(sql`${motoClubs.conversationId} IS NOT NULL`);
+        const motoclubConvIds = motoclubConvRows
+          .map((r) => r.conversationId)
+          .filter((id): id is string => id !== null && id !== undefined);
+        if (motoclubConvIds.length > 0) {
+          await db.delete(conversationParticipants)
+            .where(and(
+              inArray(conversationParticipants.conversationId, motoclubConvIds),
+              inArray(conversationParticipants.userId, zavIds),
+            ));
+        }
       }
     } else if (!wasEnabled && newEnabled) {
       const wishlists = await db
@@ -3713,6 +3727,18 @@ router.delete("/motoclubs/:id/members/:userId", async (req: Request, res: Respon
 
     await db.delete(motoClubMembers)
       .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.userId, userId)));
+
+    const [club] = await db.select({ conversationId: motoClubs.conversationId })
+      .from(motoClubs)
+      .where(eq(motoClubs.id, clubId))
+      .limit(1);
+    if (club?.conversationId) {
+      await db.delete(conversationParticipants)
+        .where(and(
+          eq(conversationParticipants.conversationId, club.conversationId),
+          eq(conversationParticipants.userId, userId),
+        ));
+    }
 
     await db.insert(moderatorLogs).values({
       moderatorId: adminId,
