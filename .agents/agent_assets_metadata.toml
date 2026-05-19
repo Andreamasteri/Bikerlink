@@ -342,6 +342,12 @@ uri = "file://assets/screenshots/chromebook/ScreenChromebook-04.png"
 type = "image"
 title = "bikerlink tracking chromebook landscape"
 
+[[generated]]
+id = "l2HxUXR-OFCd9NnKpLwT5"
+uri = "file://assets/images/playstore-feature-graphic.png"
+type = "image"
+title = "bikerlink feature graphic clean"
+
 [[outputs]]
 id = "4Y78ngKHwO0VLy8lAIKVp"
 uri = "file://manuale-utente-bikerlink.docx"
