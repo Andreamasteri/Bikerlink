@@ -794,11 +794,17 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const distanceCounterSetting = await storage.getAppSetting("show_distance_in_online_counter");
+    const [distanceCounterSetting, offlineRandomSetting, mapFilterSetting] = await Promise.all([
+      storage.getAppSetting("show_distance_in_online_counter"),
+      storage.getAppSetting("offline_position_randomize_default"),
+      storage.getAppSetting("map_visibility_filter"),
+    ]);
     const showDistanceInCounter = distanceCounterSetting?.value !== "false";
+    const globalOfflineRandomize = offlineRandomSetting?.value !== "false";
+    const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
-    const includeOffline = req.query.includeOffline === "true";
+    const includeOffline = (req.query.includeOffline === "true" || mapVisibilityFilter === "available_only") && mapVisibilityFilter !== "online_only";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const trackerOnlineIds = onlineTracker.getOnlineUserIds(countriesParam);
@@ -830,7 +836,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
       // instead of the real latitude/longitude.
       const offlineResults = offlineResultsRaw.map((r: any) => {
         if (r.profile?.hideFromMap) return { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null };
-        const useOfflineCoords = r.profile?.offlinePositionRandomize !== false;
+        const useOfflineCoords = globalOfflineRandomize && r.profile?.offlinePositionRandomize !== false;
         const hasFuzzedCoords = r.profile?.lastOfflineLat != null && r.profile?.lastOfflineLng != null;
         const offLat = (useOfflineCoords && hasFuzzedCoords) ? r.profile.lastOfflineLat : r.profile?.latitude;
         const offLng = (useOfflineCoords && hasFuzzedCoords) ? r.profile.lastOfflineLng : r.profile?.longitude;
@@ -865,10 +871,17 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
           distance: (!showDistanceInCounter || item.profile?.hideFromMap) ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance)) ? Math.round(item.distance * 10) / 10 : null,
           latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude ?? null),
           longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude ?? null),
-          isAvailable: (item.profile?.isAvailable || false) && onlineIdSet.has(item.user.id),
+          isAvailable: mapVisibilityFilter === "available_only"
+            ? (item.profile?.isAvailable || false)
+            : (item.profile?.isAvailable || false) && onlineIdSet.has(item.user.id),
           isOnline: onlineIdSet.has(item.user.id),
           lastLoginAt: item.user.lastLoginAt ?? null,
         };
+      })
+      .filter((u: any) => {
+        if (mapVisibilityFilter === "online_only") return u.isOnline;
+        if (mapVisibilityFilter === "available_only") return u.isAvailable;
+        return true;
       });
     return res.json(mapped);
   } catch (error) {

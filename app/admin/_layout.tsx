@@ -21,6 +21,7 @@ export default function AdminLayout() {
       <Stack.Screen name="reports" options={{ title: "Bugs & Co" }} />
       <Stack.Screen name="analytics" options={{ title: "Analytics" }} />
       <Stack.Screen name="settings" options={{ title: "Impostazioni" }} />
+      <Stack.Screen name="privacy" options={{ title: "Gestione Privacy" }} />
       <Stack.Screen name="performance" options={{ title: "Record Performance" }} />
       <Stack.Screen name="stregatti" options={{ title: "Stregatti" }} />
       <Stack.Screen name="db-debug" options={{ title: "DB Debug" }} />

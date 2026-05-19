@@ -94,6 +94,7 @@ const adminGroups: AdminGroup[] = [
     headerIconSet: "MaterialIcons",
     items: [
       { key: "settings", label: "Impostazioni", icon: "settings", iconSet: "MaterialIcons", route: "/admin/settings" },
+      { key: "privacy", label: "Gestione Privacy", icon: "shield-lock", iconSet: "MaterialCommunityIcons", route: "/admin/privacy", accentColor: "#4CAF50" },
       { key: "invite-codes", label: "Codici Invito", icon: "gift", iconSet: "Ionicons", route: "/admin/invite-codes" },
       { key: "backup", label: "Backup automatici", icon: "cloud-upload", iconSet: "MaterialCommunityIcons", route: "/admin/backup" },
     ],

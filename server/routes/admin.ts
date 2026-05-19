@@ -5472,6 +5472,68 @@ router.patch("/settings/show-distance-counter", requireAdmin, async (req: Reques
   }
 });
 
+// Privacy rules (admin-controlled global toggles)
+// - show_distance_in_online_counter: also exposed via /settings/show-distance-counter
+// - offline_position_randomize_default: global kill-switch; when false, offline coords are NOT fuzzed
+// - map_visibility_filter: "all" | "online_only" | "available_only" — filters map results
+router.get("/privacy-rules", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const [distance, offlineRandom, mapFilter] = await Promise.all([
+      storage.getAppSetting("show_distance_in_online_counter"),
+      storage.getAppSetting("offline_position_randomize_default"),
+      storage.getAppSetting("map_visibility_filter"),
+    ]);
+    return res.json({
+      showDistanceInCounter: distance?.value !== "false",
+      offlinePositionRandomize: offlineRandom?.value !== "false",
+      mapVisibilityFilter: (mapFilter?.value as "all" | "online_only" | "available_only") || "all",
+    });
+  } catch (error) {
+    console.error("Get privacy-rules error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.patch("/privacy-rules", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { showDistanceInCounter, offlinePositionRandomize, mapVisibilityFilter } = req.body as {
+      showDistanceInCounter?: boolean;
+      offlinePositionRandomize?: boolean;
+      mapVisibilityFilter?: string;
+    };
+    const validFilters = ["all", "online_only", "available_only"];
+    if (showDistanceInCounter !== undefined) {
+      if (typeof showDistanceInCounter !== "boolean") {
+        return res.status(400).json({ message: "showDistanceInCounter deve essere un booleano" });
+      }
+      await storage.upsertAppSetting("show_distance_in_online_counter", showDistanceInCounter ? "true" : "false");
+    }
+    if (offlinePositionRandomize !== undefined) {
+      if (typeof offlinePositionRandomize !== "boolean") {
+        return res.status(400).json({ message: "offlinePositionRandomize deve essere un booleano" });
+      }
+      await storage.upsertAppSetting("offline_position_randomize_default", offlinePositionRandomize ? "true" : "false");
+    }
+    if (mapVisibilityFilter !== undefined) {
+      if (!validFilters.includes(mapVisibilityFilter)) {
+        return res.status(400).json({ message: "mapVisibilityFilter non valido" });
+      }
+      await storage.upsertAppSetting("map_visibility_filter", mapVisibilityFilter);
+    }
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "setting",
+      targetId: "privacy_rules",
+      details: "Regole di privacy aggiornate",
+    });
+    return res.json({ message: "Regole di privacy aggiornate" });
+  } catch (error) {
+    console.error("Update privacy-rules error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/native-version", async (req: Request, res: Response) => {
   try {
     const { android, ios } = req.body as {
