@@ -3,7 +3,9 @@ import { Tabs, useRouter, usePathname, type Href } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { View, Pressable, Text, StyleSheet, Linking, Modal, Animated } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +14,8 @@ import { useT } from "@/lib/language-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { registerHandsOffCallback, registerSprintMeasuringCallback, registerTrackingActiveCallback } from "@/lib/tracking-active";
+
+const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";
 
 export default function TabLayout() {
   const t = useT();
@@ -157,6 +161,27 @@ export default function TabLayout() {
   const hasActiveMatches = (proposalMatchesData ?? []).some(
     (m) => m.status === "pending" || m.status === "accepted"
   );
+
+  // ── Fake Home first-access global gate (shown at login/startup) ──────────
+  const [showFakeHomeGlobal, setShowFakeHomeGlobal] = useState(false);
+  const [fakeHomeDontShowGlobal, setFakeHomeDontShowGlobal] = useState(false);
+
+  const { data: meData } = useQuery({
+    queryKey: ["/api/users/me"],
+    enabled: !!user,
+  });
+
+  useEffect(() => {
+    if (!meData || !user) return;
+    const p = (meData as any)?.profile;
+    if (!p) return;
+    const unconfigured = p.fakeHomeLatitude == null || p.fakeHomeLongitude == null;
+    if (unconfigured) {
+      AsyncStorage.getItem(FAKE_HOME_INTRO_KEY).then((val) => {
+        if (val !== "dismissed") setShowFakeHomeGlobal(true);
+      }).catch(() => {});
+    }
+  }, [meData, user]);
 
   // ── Stato visibilità mappa (per icona cromatica "Status") ────────────────
   const ghostMode = profileData?.ghostMode || false;
@@ -405,6 +430,15 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
+          name="ride"
+          options={{
+            title: "Privacy & GPS",
+            tabBarIcon: () => null,
+            headerTitle: "Privacy & GPS",
+            href: null,
+          }}
+        />
+        <Tabs.Screen
           name="tracking"
           options={{
             title: t("tracking.tabTitle"),
@@ -496,6 +530,32 @@ export default function TabLayout() {
               }}
             >
               <Text style={reminderStyles.btnText}>Ok</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={showFakeHomeGlobal} transparent animationType="fade" onRequestClose={() => setShowFakeHomeGlobal(false)}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", padding: 24 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 24, width: "100%" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 }}>
+              <Ionicons name="home" size={28} color={colors.accent} />
+              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: colors.text, flex: 1 }}>Configura Fake Home</Text>
+            </View>
+            <Text style={{ fontSize: 14, fontFamily: "Inter_400Regular", color: colors.textSecondary, lineHeight: 20, marginBottom: 16 }}>
+              La zona Fake Home non è ancora configurata.{"\n\n"}Vai in Privacy & GPS per impostare la posizione reale di casa e quella fittizia: quando sei nel raggio, la tua posizione visibile verrà sostituita automaticamente.
+            </Text>
+            <Pressable style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 }} onPress={() => setFakeHomeDontShowGlobal(!fakeHomeDontShowGlobal)}>
+              <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: fakeHomeDontShowGlobal ? colors.accent : colors.border, backgroundColor: fakeHomeDontShowGlobal ? colors.accent : "transparent", alignItems: "center", justifyContent: "center" }}>
+                {fakeHomeDontShowGlobal && <Ionicons name="checkmark" size={12} color="#fff" />}
+              </View>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.textSecondary }}>Non mostrare più</Text>
+            </Pressable>
+            <Pressable style={{ backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: "center" }} onPress={() => {
+              if (fakeHomeDontShowGlobal) AsyncStorage.setItem(FAKE_HOME_INTRO_KEY, "dismissed").catch(() => {});
+              setShowFakeHomeGlobal(false);
+            }}>
+              <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" }}>OK</Text>
             </Pressable>
           </View>
         </View>

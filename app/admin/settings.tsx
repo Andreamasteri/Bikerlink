@@ -557,6 +557,7 @@ export default function AdminSettings() {
   const [docsExpanded, setDocsExpanded] = useState(false);
   const [bgLocationExpanded, setBgLocationExpanded] = useState(false);
   const [floatingWidgetExpanded, setFloatingWidgetExpanded] = useState(false);
+  const [distanceCounterExpanded, setDistanceCounterExpanded] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem("uptime_widget_enabled").then((val) => {
@@ -1126,6 +1127,30 @@ export default function AdminSettings() {
     staleTime: 30_000,
   });
   const floatingWidgetEnabled = floatingWidgetData?.enabled !== false;
+
+  const { data: distanceCounterData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/admin/settings/show-distance-counter"],
+    staleTime: 30_000,
+  });
+  const distanceCounterEnabled = distanceCounterData?.enabled !== false;
+
+  const distanceCounterMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/show-distance-counter", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ enabled }),
+      });
+      if (!res.ok) throw new Error("Errore aggiornamento counter");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/show-distance-counter"] });
+    },
+  });
 
   const coordMaxAgeMutation = useMutation({
     mutationFn: async (seconds: string) => {
@@ -3100,6 +3125,38 @@ export default function AdminSettings() {
                   trackColor={{ false: Colors.border, true: Colors.accent }}
                   thumbColor="#fff"
                   disabled={protectedToggleMutation.isPending}
+                />
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.accordionPanel}>
+        <Pressable style={styles.accordionPanelHeader} onPress={() => setDistanceCounterExpanded((v) => !v)}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="people-outline" size={20} color={Colors.accent} />
+            <Text style={styles.accordionPanelTitle}>Gestione Counter</Text>
+          </View>
+          <Ionicons name={distanceCounterExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {distanceCounterExpanded && (
+          <View style={styles.accordionPanelContent}>
+            <View style={styles.paidCard}>
+              <Text style={{ color: Colors.textSecondary, fontSize: 13, marginBottom: 14, lineHeight: 18 }}>
+                Mostra o nascondi il conteggio dei km percorsi nel counter degli utenti online sulla mappa.
+              </Text>
+              <View style={styles.synecoHeader}>
+                <View style={styles.synecoInfo}>
+                  <Ionicons name="speedometer-outline" size={20} color={Colors.accent} />
+                  <Text style={styles.synecoLabel}>Mostra distanza nel counter</Text>
+                </View>
+                <Switch
+                  value={distanceCounterEnabled}
+                  onValueChange={(val) => distanceCounterMutation.mutate(val)}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor="#fff"
+                  disabled={distanceCounterMutation.isPending}
                 />
               </View>
             </View>

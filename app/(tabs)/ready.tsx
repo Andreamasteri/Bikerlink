@@ -231,6 +231,14 @@ export default function ReadyToRideScreen() {
           </View>
         )}
 
+        <Pressable
+          style={[styles.cronoBtn, { borderColor: Colors.accent + "60" }]}
+          onPress={() => router.push("/ride" as any)}
+        >
+          <Ionicons name="shield-outline" size={20} color={Colors.accent} />
+          <Text style={styles.cronoBtnText}>Privacy & GPS</Text>
+        </Pressable>
+
         {ghostModeFeatureEnabled && (
           <View style={styles.ghostBlock}>
             <Pressable

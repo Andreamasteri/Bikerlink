@@ -1131,9 +1131,11 @@ export class DatabaseStorage implements IStorage {
   async getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
     // Task #1212: notInArray(users.role, ["admin"]) ensures admins are excluded
     // from the nearby-users list and map pin count.
+    // Ghost users are included intentionally: route handler applies fuzzed offline coords
+    // (lastOfflineLat/Lng) for non-online users when offlinePositionRandomize is enabled,
+    // so ghost mode = visible on map with ±20km randomized position, not hidden.
     const conditions = [
       eq(users.status, "active"),
-      eq(users.ghostMode, false),
       ...systemAccountConditions(users),
       sql`${userProfiles.latitude} IS NOT NULL`,
       sql`${userProfiles.longitude} IS NOT NULL`,

@@ -18,10 +18,21 @@ function isSystemEntry(entry: Pick<TrackedUser, "role" | "nickname">): boolean {
 export class OnlineTracker {
   private users = new Map<string, TrackedUser>();
   private cleanupInterval: NodeJS.Timeout;
+  private offlineCallback?: (userId: string) => void;
 
   constructor() {
     this.cleanupInterval = setInterval(() => this.cleanup(), 60_000);
     this.cleanupInterval.unref();
+  }
+
+  setOfflineCallback(cb: (userId: string) => void): void {
+    this.offlineCallback = cb;
+  }
+
+  private triggerOffline(userId: string): void {
+    if (this.offlineCallback) {
+      try { this.offlineCallback(userId); } catch {}
+    }
   }
 
   private cleanup(): void {
@@ -29,6 +40,7 @@ export class OnlineTracker {
     for (const [userId, entry] of this.users) {
       if (entry.lastSeen < cutoff) {
         this.users.delete(userId);
+        this.triggerOffline(userId);
       }
     }
   }
@@ -44,7 +56,10 @@ export class OnlineTracker {
   }
 
   setOffline(userId: string): void {
-    this.users.delete(userId);
+    if (this.users.has(userId)) {
+      this.users.delete(userId);
+      this.triggerOffline(userId);
+    }
   }
 
   setAvailability(userId: string, isAvailable: boolean): void {

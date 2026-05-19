@@ -100,6 +100,38 @@ function applyFakeHome(
   return { lat, lng, applied: false };
 }
 
+function applyFakeZones(
+  lat: number,
+  lng: number,
+  profile: any
+): { lat: number; lng: number; applied: boolean } {
+  if (profile?.fakeHomeEnabled &&
+      profile.homeLatitude != null && profile.homeLongitude != null &&
+      profile.fakeHomeLatitude != null && profile.fakeHomeLongitude != null) {
+    const dist = haversineKm(lat, lng, profile.homeLatitude, profile.homeLongitude);
+    if (dist <= (profile.fakeHomeRadius ?? 2)) {
+      return { lat: profile.fakeHomeLatitude, lng: profile.fakeHomeLongitude, applied: true };
+    }
+  }
+  if (profile?.fakeWorkEnabled &&
+      profile.workLatitude != null && profile.workLongitude != null &&
+      profile.fakeWorkLatitude != null && profile.fakeWorkLongitude != null) {
+    const dist = haversineKm(lat, lng, profile.workLatitude, profile.workLongitude);
+    if (dist <= (profile.fakeWorkRadius ?? 2)) {
+      return { lat: profile.fakeWorkLatitude, lng: profile.fakeWorkLongitude, applied: true };
+    }
+  }
+  if (profile?.fakeWhateverEnabled &&
+      profile.whateverLatitude != null && profile.whateverLongitude != null &&
+      profile.fakeWhateverLatitude != null && profile.fakeWhateverLongitude != null) {
+    const dist = haversineKm(lat, lng, profile.whateverLatitude, profile.whateverLongitude);
+    if (dist <= (profile.fakeWhateverRadius ?? 2)) {
+      return { lat: profile.fakeWhateverLatitude, lng: profile.fakeWhateverLongitude, applied: true };
+    }
+  }
+  return { lat, lng, applied: false };
+}
+
 router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
@@ -299,7 +331,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
       let fLat = latitude;
       let fLng = longitude;
       if (latitude != null && longitude != null) {
-        const fakeResult = applyFakeHome(latitude, longitude, existingProfile);
+        const fakeResult = applyFakeZones(latitude, longitude, existingProfile);
         if (fakeResult.applied) {
           fLat = fakeResult.lat;
           fLng = fakeResult.lng;
@@ -348,6 +380,14 @@ router.post("/app-close", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     await storage.updateUser(userId, { lastAppCloseAt: new Date() } as any);
+    const profile = await storage.getUserProfile(userId);
+    if (profile?.offlinePositionRandomize !== false && profile?.latitude != null && profile?.longitude != null) {
+      const fuzzed = applyPositionFuzz(profile.latitude, profile.longitude, 20);
+      await storage.updateUserProfile(userId, {
+        lastOfflineLat: fuzzed.lat,
+        lastOfflineLng: fuzzed.lng,
+      } as any);
+    }
     return res.json({ ok: true });
   } catch (error) {
     console.error("App close error:", error);
@@ -387,7 +427,13 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
     if (enabled) {
       const existingProfile = await storage.getUserProfile(userId);
       if (existingProfile) {
-        await storage.updateUserProfile(userId, { isAvailable: false } as any);
+        const profileUpdate: Record<string, unknown> = { isAvailable: false };
+        if (existingProfile.offlinePositionRandomize !== false && existingProfile.latitude != null && existingProfile.longitude != null) {
+          const fuzzed = applyPositionFuzz(existingProfile.latitude, existingProfile.longitude, 20);
+          profileUpdate.lastOfflineLat = fuzzed.lat;
+          profileUpdate.lastOfflineLng = fuzzed.lng;
+        }
+        await storage.updateUserProfile(userId, profileUpdate as any);
       }
     }
     onlineTracker.setGhostMode(userId, enabled);
@@ -401,7 +447,13 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
 router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { hideFromMap, positionFuzz, positionFuzzKm, fakeHomeEnabled, homeLatitude, homeLongitude, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, gpsPrecision } = req.body;
+    const {
+      hideFromMap, positionFuzz, positionFuzzKm,
+      fakeHomeEnabled, homeLatitude, homeLongitude, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius,
+      gpsPrecision, offlinePositionRandomize,
+      fakeWorkEnabled, workLatitude, workLongitude, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius,
+      fakeWhateverEnabled, whateverLatitude, whateverLongitude, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius,
+    } = req.body;
     const updateData: Record<string, unknown> = {};
     if (typeof hideFromMap === "boolean") updateData.hideFromMap = hideFromMap;
     if (typeof positionFuzz === "boolean") updateData.positionFuzz = positionFuzz;
@@ -455,6 +507,75 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
       }
       updateData.gpsPrecision = gpsPrecision;
     }
+    if (typeof offlinePositionRandomize === "boolean") updateData.offlinePositionRandomize = offlinePositionRandomize;
+    if (typeof fakeWorkEnabled === "boolean") updateData.fakeWorkEnabled = fakeWorkEnabled;
+    if (workLatitude !== undefined) {
+      if (workLatitude !== null) {
+        const lat = Number(workLatitude);
+        if (!Number.isFinite(lat) || lat < -90 || lat > 90) return res.status(400).json({ message: "workLatitude non valida" });
+        updateData.workLatitude = lat;
+      } else { updateData.workLatitude = null; }
+    }
+    if (workLongitude !== undefined) {
+      if (workLongitude !== null) {
+        const lng = Number(workLongitude);
+        if (!Number.isFinite(lng) || lng < -180 || lng > 180) return res.status(400).json({ message: "workLongitude non valida" });
+        updateData.workLongitude = lng;
+      } else { updateData.workLongitude = null; }
+    }
+    if (fakeWorkLatitude !== undefined) {
+      if (fakeWorkLatitude !== null) {
+        const lat = Number(fakeWorkLatitude);
+        if (!Number.isFinite(lat) || lat < -90 || lat > 90) return res.status(400).json({ message: "fakeWorkLatitude non valida" });
+        updateData.fakeWorkLatitude = lat;
+      } else { updateData.fakeWorkLatitude = null; }
+    }
+    if (fakeWorkLongitude !== undefined) {
+      if (fakeWorkLongitude !== null) {
+        const lng = Number(fakeWorkLongitude);
+        if (!Number.isFinite(lng) || lng < -180 || lng > 180) return res.status(400).json({ message: "fakeWorkLongitude non valida" });
+        updateData.fakeWorkLongitude = lng;
+      } else { updateData.fakeWorkLongitude = null; }
+    }
+    if (fakeWorkRadius !== undefined) {
+      const r = Number(fakeWorkRadius);
+      if (!Number.isInteger(r) || r < 1 || r > 100) return res.status(400).json({ message: "fakeWorkRadius deve essere un intero tra 1 e 100" });
+      updateData.fakeWorkRadius = r;
+    }
+    if (typeof fakeWhateverEnabled === "boolean") updateData.fakeWhateverEnabled = fakeWhateverEnabled;
+    if (whateverLatitude !== undefined) {
+      if (whateverLatitude !== null) {
+        const lat = Number(whateverLatitude);
+        if (!Number.isFinite(lat) || lat < -90 || lat > 90) return res.status(400).json({ message: "whateverLatitude non valida" });
+        updateData.whateverLatitude = lat;
+      } else { updateData.whateverLatitude = null; }
+    }
+    if (whateverLongitude !== undefined) {
+      if (whateverLongitude !== null) {
+        const lng = Number(whateverLongitude);
+        if (!Number.isFinite(lng) || lng < -180 || lng > 180) return res.status(400).json({ message: "whateverLongitude non valida" });
+        updateData.whateverLongitude = lng;
+      } else { updateData.whateverLongitude = null; }
+    }
+    if (fakeWhateverLatitude !== undefined) {
+      if (fakeWhateverLatitude !== null) {
+        const lat = Number(fakeWhateverLatitude);
+        if (!Number.isFinite(lat) || lat < -90 || lat > 90) return res.status(400).json({ message: "fakeWhateverLatitude non valida" });
+        updateData.fakeWhateverLatitude = lat;
+      } else { updateData.fakeWhateverLatitude = null; }
+    }
+    if (fakeWhateverLongitude !== undefined) {
+      if (fakeWhateverLongitude !== null) {
+        const lng = Number(fakeWhateverLongitude);
+        if (!Number.isFinite(lng) || lng < -180 || lng > 180) return res.status(400).json({ message: "fakeWhateverLongitude non valida" });
+        updateData.fakeWhateverLongitude = lng;
+      } else { updateData.fakeWhateverLongitude = null; }
+    }
+    if (fakeWhateverRadius !== undefined) {
+      const r = Number(fakeWhateverRadius);
+      if (!Number.isInteger(r) || r < 1 || r > 100) return res.status(400).json({ message: "fakeWhateverRadius deve essere un intero tra 1 e 100" });
+      updateData.fakeWhateverRadius = r;
+    }
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ message: "Nessun campo da aggiornare" });
     }
@@ -479,7 +600,7 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Latitudine e longitudine richieste" });
     }
     const existingProfile = await storage.getUserProfile(userId);
-    const fakeResult = applyFakeHome(latitude, longitude, existingProfile);
+    const fakeResult = applyFakeZones(latitude, longitude, existingProfile);
     if (fakeResult.applied) {
       latitude = fakeResult.lat;
       longitude = fakeResult.lng;
@@ -516,7 +637,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     let fuzzedLat = latitude;
     let fuzzedLng = longitude;
     if (latitude != null && longitude != null) {
-      const fakeResult = applyFakeHome(latitude, longitude, existingProfile);
+      const fakeResult = applyFakeZones(latitude, longitude, existingProfile);
       if (fakeResult.applied) {
         fuzzedLat = fakeResult.lat;
         fuzzedLng = fakeResult.lng;
@@ -668,6 +789,8 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
   try {
     const requesterId = req.session.userId!;
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const distanceCounterSetting = await storage.getAppSetting("show_distance_in_online_counter");
+    const showDistanceInCounter = distanceCounterSetting?.value !== "false";
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const includeOffline = req.query.includeOffline === "true";
@@ -687,7 +810,9 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
       const distanceExpr = lat != null && lng != null
         ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
         : sqlTag<number>`0`.as("distance");
-      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt)), eq(usersTable.ghostMode, false), ...systemAccountConditions(usersTable)];
+      // Ghost users: always treated as offline regardless of lastLoginAt, but should appear in the
+      // offline set so they show with a randomized position (not hidden) when offlinePositionRandomize is enabled.
+      const offlineConds: any[] = [eq(usersTable.status, "active"), or(lt(usersTable.lastLoginAt, fifteenMinutesAgo), isNull(usersTable.lastLoginAt), eq(usersTable.ghostMode, true)), ...systemAccountConditions(usersTable)];
       if (countriesParam && countriesParam.length > 0) offlineConds.push(inArr(usersTable.country, countriesParam));
       const offlineResultsRaw = await db
         .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
@@ -696,9 +821,18 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
         .where(and(...offlineConds))
         .orderBy(sqlTag`distance`);
       // Defense-in-depth: strip stored coordinates and derived distance for users with hideFromMap=true.
-      const offlineResults = offlineResultsRaw.map((r: any) => r.profile?.hideFromMap
-        ? { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null }
-        : r);
+      // For offline users with offlinePositionRandomize enabled, serve lastOfflineLat/Lng (fuzzed)
+      // instead of the real latitude/longitude.
+      const offlineResults = offlineResultsRaw.map((r: any) => {
+        if (r.profile?.hideFromMap) return { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null };
+        const useOfflineCoords = r.profile?.offlinePositionRandomize !== false;
+        const hasFuzzedCoords = r.profile?.lastOfflineLat != null && r.profile?.lastOfflineLng != null;
+        const offLat = (useOfflineCoords && hasFuzzedCoords) ? r.profile.lastOfflineLat : r.profile?.latitude;
+        const offLng = (useOfflineCoords && hasFuzzedCoords) ? r.profile.lastOfflineLng : r.profile?.longitude;
+        // Null distance when serving fuzzed coords — SQL distance was computed from real position
+        const offDist = (useOfflineCoords && hasFuzzedCoords) ? null : r.distance;
+        return { ...r, profile: { ...r.profile, latitude: offLat, longitude: offLng }, distance: offDist };
+      });
       const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...allResults, ...offlineOnly];
     }
@@ -723,7 +857,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
           bio: item.profile?.bio || null,
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
-          distance: item.profile?.hideFromMap ? null : (lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null),
+          distance: (!showDistanceInCounter || item.profile?.hideFromMap) ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance)) ? Math.round(item.distance * 10) / 10 : null,
           latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude ?? null),
           longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude ?? null),
           isAvailable: (item.profile?.isAvailable || false) && onlineIdSet.has(item.user.id),
@@ -962,6 +1096,13 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
       .filter((item) => !item.profile?.hideFromMap)
       .map((item) => {
         const isOnlineNearby = !item.user.ghostMode && item.user.lastLoginAt != null && new Date(item.user.lastLoginAt) >= fifteenMinutesAgoNearby;
+        // Offline users with randomize enabled: serve fuzzed coords to protect real position
+        const useOfflineCoords = !isOnlineNearby && item.profile?.offlinePositionRandomize !== false;
+        const hasFuzzedCoords = item.profile?.lastOfflineLat != null && item.profile?.lastOfflineLng != null;
+        const servedLat = (useOfflineCoords && hasFuzzedCoords) ? item.profile!.lastOfflineLat : item.profile?.latitude;
+        const servedLng = (useOfflineCoords && hasFuzzedCoords) ? item.profile!.lastOfflineLng : item.profile?.longitude;
+        // Distance was computed from real stored coords in SQL; null it for fuzzed users to avoid leaking position signal
+        const servedDistance = (useOfflineCoords && hasFuzzedCoords) ? null : (typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null);
         return {
           id: item.user.id,
           nickname: item.user.nickname,
@@ -971,14 +1112,14 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
           region: item.user.region,
           country: item.user.country,
           avatarUrl: item.user.avatarUrl,
-          latitude: item.profile?.latitude,
-          longitude: item.profile?.longitude,
+          latitude: servedLat,
+          longitude: servedLng,
           isAvailable: (item.profile?.isAvailable || false) && isOnlineNearby,
           bio: item.profile?.bio || null,
-          distance: Math.round(item.distance * 10) / 10,
+          distance: servedDistance,
         };
       })
-      .filter((item) => item.latitude != null && item.longitude != null && !isNaN(item.latitude) && !isNaN(item.longitude));
+      .filter((item) => item.latitude != null && item.longitude != null && !isNaN(item.latitude as number) && !isNaN(item.longitude as number));
 
     return res.json(results);
   } catch (error) {

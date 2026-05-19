@@ -5447,6 +5447,30 @@ router.patch("/settings/floating-widget", async (req: Request, res: Response) =>
 });
 
 
+router.get("/settings/show-distance-counter", requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("show_distance_in_online_counter");
+    return res.json({ enabled: setting?.value !== "false" });
+  } catch (error) {
+    console.error("Get show-distance-counter error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.patch("/settings/show-distance-counter", requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return res.status(400).json({ message: "enabled deve essere un booleano" });
+    }
+    await storage.upsertAppSetting("show_distance_in_online_counter", enabled ? "true" : "false");
+    return res.json({ enabled });
+  } catch (error) {
+    console.error("Update show-distance-counter error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/native-version", async (req: Request, res: Response) => {
   try {
     const { android, ios } = req.body as {

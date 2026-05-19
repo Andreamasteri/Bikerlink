@@ -515,6 +515,36 @@ function setupErrorHandler(app: express.Application) {
 
   setupErrorHandler(app);
 
+  // Wire offline position randomization into the OnlineTracker lifecycle.
+  // When a user times out or is explicitly set offline, apply ±20km fuzz if enabled.
+  try {
+    const { onlineTracker: tracker } = await import("./online-tracker");
+    tracker.setOfflineCallback(async (userId: string) => {
+      try {
+        const profile = await storage.getUserProfile(userId);
+        if (!profile || profile.offlinePositionRandomize === false) return;
+        const lat = (profile as any).latitude;
+        const lng = (profile as any).longitude;
+        if (lat == null || lng == null) return;
+        const R = 6371;
+        const radiusKm = 20;
+        const u = Math.random();
+        const v = Math.random();
+        const w = radiusKm / R;
+        const t = 2 * Math.PI * v;
+        const x = w * Math.sqrt(u);
+        const fuzzedLat = lat + (x * Math.cos(t)) * (180 / Math.PI);
+        const fuzzedLng = lng + (x * Math.sin(t)) * (180 / Math.PI / Math.cos(lat * Math.PI / 180));
+        await storage.updateUserProfile(userId, {
+          lastOfflineLat: fuzzedLat,
+          lastOfflineLng: fuzzedLng,
+        } as any);
+      } catch {}
+    });
+  } catch (e) {
+    console.warn("[INIT] Failed to wire online tracker offline callback:", e);
+  }
+
   const port = parseInt(process.env.PORT || "5000", 10);
 
   // Best-effort pre-listen cache warm-up: downloads any active campaign image
@@ -883,6 +913,27 @@ function setupErrorHandler(app: express.Application) {
           await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS gps_precision INTEGER NOT NULL DEFAULT 100`);
         } catch (e) {
           console.warn("[MIGRATION] user_profiles gps_precision:", e);
+        }
+
+        try {
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS offline_position_randomize BOOLEAN NOT NULL DEFAULT true`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_work_enabled BOOLEAN NOT NULL DEFAULT false`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_latitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_longitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_work_latitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_work_longitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_work_radius INTEGER NOT NULL DEFAULT 2`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_whatever_enabled BOOLEAN NOT NULL DEFAULT false`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS whatever_latitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS whatever_longitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_whatever_latitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_whatever_longitude DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_whatever_radius INTEGER NOT NULL DEFAULT 2`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_offline_lat DOUBLE PRECISION`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_offline_lng DOUBLE PRECISION`);
+          console.log("[MIGRATION] user_profiles privacy extended columns ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] user_profiles privacy extended columns:", e);
         }
 
         try {
