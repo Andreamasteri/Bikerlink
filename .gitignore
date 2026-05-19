@@ -61,3 +61,4 @@ server_dist/index.js
 # android/ NON è ignorato — android/.gitignore gestisce i build artifacts
 # I file critici (build.gradle, AndroidManifest.xml, adi-registration.properties)
 # devono rimanere tracciati in git per le build EAS/Play Console
+server/data/schema-snapshot.json
