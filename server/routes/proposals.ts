@@ -6,6 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { isSystemAccount } from "../lib/system-account-filter";
 import { runMatchingForUser, runProposalMatchingForUser, triggerProposalCreatedMatching } from "../matching-engine";
 import { allLimited, matchEnrichmentSemaphore, SemaphoreQueueFullError } from "../lib/concurrency";
+import { sendZoneMatchedPushNotifications } from "../push-notifications";
 
 const router = Router();
 
@@ -468,6 +469,10 @@ router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Respon
             console.error("[zone-match-notify] Failed to notify user", uid, notifErr);
           }
         }
+
+        sendZoneMatchedPushNotifications(recipientIds).catch((err) => {
+          console.error("[zone-match-notify] Push notification error (non-fatal):", err);
+        });
       } catch (zoneErr) {
         console.error("[zone-match-notify] Error fetching zone notification recipients:", zoneErr);
       }

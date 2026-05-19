@@ -218,6 +218,40 @@ export async function sendZoneProposalPushNotifications(userIds: string[]): Prom
   }
 }
 
+export async function sendZoneMatchedPushNotifications(userIds: string[]): Promise<void> {
+  if (!userIds.length) return;
+  try {
+    const filteredIds = await filterUserIdsByPreference(userIds, "zoneProposals");
+    if (!filteredIds.length) return;
+    const rows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(inArray(users.id, filteredIds));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+
+    for (const row of rows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: "Proposta abbinata nella tua zona! 🏍️🔥",
+          body: "Una proposta vicina a te ha trovato match — creane una tu!",
+          sound: "default" as const,
+          data: { type: "zone_matched" },
+          channelId: "matches",
+        });
+      }
+    }
+
+    if (messages.length === 0) return;
+    await sendExpoMessages(messages, userIdByToken);
+  } catch (err) {
+    console.warn("[Push] sendZoneMatchedPushNotifications error (non-fatal):", err);
+  }
+}
+
 export async function sendMotoclubPushNotifications(
   userIds: string[],
   opts: { title: string; body: string; clubId?: string },
