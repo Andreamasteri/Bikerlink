@@ -826,8 +826,8 @@
     "platforms": [
       "android"
     ],
-    "releaseId": null,
-    "bundleUrl": null,
+    "releaseId": "c7abeba0-9625-4bdb-9b90-0e0973bbb73b",
+    "bundleUrl": "private/ota/ota-1.30.0-1779219454803.js",
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
@@ -838,6 +838,7 @@
     "apkVersionCode": 41,
     "apkVersionName": null,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "pending"
+    "status": "published",
+    "publishedAt": "2026-05-19T19:41:35.121Z"
   }
 ]
