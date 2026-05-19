@@ -106,6 +106,8 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     var msg = JSON.stringify({ type: "tap", lat: e.latlng.lat, lng: e.latlng.lng });
     if (window.ReactNativeWebView) {
       window.ReactNativeWebView.postMessage(msg);
+    } else {
+      window.postMessage(msg, window.location.origin);
     }
   });
 
