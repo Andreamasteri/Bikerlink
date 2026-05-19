@@ -2043,13 +2043,15 @@ export class DatabaseStorage implements IStorage {
     const isSupermatch = data.isSupermatch ?? false;
     const status = data.status || "new";
 
+    const pairType = data.pairType ?? "bb";
     const result = await db.execute(sql`
-      INSERT INTO biker_biker_matches (id, biker1_id, biker2_id, motorcycle_brand, motorcycle_model, status, is_supermatch)
-      VALUES (gen_random_uuid(), ${idA}, ${idB}, ${data.motorcycleBrand}, ${data.motorcycleModel}, ${status}, ${isSupermatch})
+      INSERT INTO biker_biker_matches (id, biker1_id, biker2_id, motorcycle_brand, motorcycle_model, status, is_supermatch, pair_type)
+      VALUES (gen_random_uuid(), ${idA}, ${idB}, ${data.motorcycleBrand}, ${data.motorcycleModel}, ${status}, ${isSupermatch}, ${pairType})
       ON CONFLICT (LEAST(biker1_id, biker2_id), GREATEST(biker1_id, biker2_id), motorcycle_brand, motorcycle_model)
       DO UPDATE SET
         status = 'new',
-        is_supermatch = EXCLUDED.is_supermatch
+        is_supermatch = EXCLUDED.is_supermatch,
+        pair_type = EXCLUDED.pair_type
       WHERE biker_biker_matches.status = 'rejected'
       RETURNING *`);
 
@@ -2063,6 +2065,7 @@ export class DatabaseStorage implements IStorage {
       motorcycleModel: row.motorcycle_model,
       status: row.status,
       isSupermatch: row.is_supermatch,
+      pairType: row.pair_type ?? "bb",
       createdAt: row.created_at,
     } as BikerBikerMatch;
   }

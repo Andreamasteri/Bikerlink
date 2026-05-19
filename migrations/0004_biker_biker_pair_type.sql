@@ -1,0 +1,2 @@
+ALTER TABLE biker_biker_matches
+  ADD COLUMN IF NOT EXISTS pair_type VARCHAR(10) NOT NULL DEFAULT 'bb';

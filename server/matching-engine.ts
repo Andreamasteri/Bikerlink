@@ -1,9 +1,55 @@
 import { storage } from "./storage";
 import { db } from "./db";
-import { motoClubMembers, proposalZoneNotifications, userProfiles, users, type Proposal } from "@shared/schema";
-import { and, eq, inArray, isNotNull, gt, sql } from "drizzle-orm";
+import {
+  motoClubs,
+  motoClubMembers,
+  proposalZoneNotifications,
+  proposals,
+  userProfiles,
+  users,
+  userMusicTracks,
+  routes,
+  routePoints,
+  eventParticipants,
+  matchPreferences,
+  zavarrinaWishlists,
+  zavarrinaWishlistMotos,
+  type Proposal,
+} from "@shared/schema";
+import { and, avg, eq, inArray, isNotNull, gt, sql, ne } from "drizzle-orm";
 import { sendMatchPushNotifications, sendZoneProposalPushNotifications } from "./push-notifications";
 import it from "../lib/i18n/it";
+
+type MatchPrefRow = typeof matchPreferences.$inferSelect;
+
+async function loadMatchPreferencesMap(): Promise<Map<string, MatchPrefRow>> {
+  const rows = await db.select().from(matchPreferences);
+  const map = new Map<string, MatchPrefRow>();
+  for (const row of rows) {
+    map.set(row.userId, row);
+  }
+  return map;
+}
+
+function prefEnabled(
+  map: Map<string, MatchPrefRow>,
+  userId: string,
+  key: keyof Omit<MatchPrefRow, "id" | "userId" | "updatedAt">
+): boolean {
+  const row = map.get(userId);
+  if (!row) return true;
+  const val = row[key];
+  return val !== false;
+}
+
+function bothPrefsEnabled(
+  map: Map<string, MatchPrefRow>,
+  userId1: string,
+  userId2: string,
+  key: keyof Omit<MatchPrefRow, "id" | "userId" | "updatedAt">
+): boolean {
+  return prefEnabled(map, userId1, key) && prefEnabled(map, userId2, key);
+}
 
 /**
  * Task #1124 vuln 2: club-boundary enforcement for proposal matching.
@@ -155,7 +201,10 @@ async function runMatching(): Promise<number> {
     const clubUserIds = [...new Set(clubProposals.map((p) => p.userId))];
     const clubIds = [...new Set(clubProposals.map((p) => p.clubId as string))];
     const membershipKeys = await getActiveClubMembershipKeys(clubUserIds, clubIds);
+    const proposalPrefsMap = await loadMatchPreferencesMap();
     let matchCount = 0;
+
+    const BB_SEARCH_TYPES = new Set(["find_a_friend", "hitcher", "hitchhiker"]);
 
     for (let i = 0; i < activeProposals.length; i++) {
       for (let j = i + 1; j < activeProposals.length; j++) {
@@ -163,6 +212,14 @@ async function runMatching(): Promise<number> {
         const p2 = activeProposals[j];
 
         if (!areCompatible(p1, p2)) continue;
+
+        const isBikerBikerProposal = BB_SEARCH_TYPES.has(p1.searchType ?? "") && BB_SEARCH_TYPES.has(p2.searchType ?? "");
+        if (isBikerBikerProposal) {
+          if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerBikerDistance")) continue;
+        } else {
+          if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerZavarrinaDistance")) continue;
+        }
+
         // Task #1124 vuln 2: enforce club boundary. Blocks public<->club,
         // cross-club, and former-member matches BEFORE the row is created
         // — the safest place since downstream consumers (GET
@@ -240,6 +297,7 @@ export async function runWishlistMatching(): Promise<number> {
       return 0;
     }
 
+    const prefsMap = await loadMatchPreferencesMap();
     const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
     let matchCount = 0;
     let skipCount = 0;
@@ -260,17 +318,16 @@ export async function runWishlistMatching(): Promise<number> {
 
         let compatible = false;
 
-        if (wish.brand) {
-          if (moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
-            compatible = true;
-          }
-        } else if (wish.motorcycleType) {
-          if (moto.motorcycleType && wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
-            compatible = true;
-          }
+        if (wish.brand && moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
+          compatible = true;
+        } else if (wish.motorcycleType && moto.motorcycleType &&
+                   wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
+          compatible = true;
         }
 
         if (!compatible) continue;
+
+        if (!bothPrefsEnabled(prefsMap, bikerId, zavarrinaId, "bikerZavorrinaBrand")) { skipCount++; continue; }
 
         const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
         if (existingKeys.has(key)) { skipCount++; continue; }
@@ -281,7 +338,7 @@ export async function runWishlistMatching(): Promise<number> {
           wish.brand.toLowerCase() === moto.brand.toLowerCase() &&
           wish.model &&
           moto.model &&
-          wish.model.toLowerCase() === moto.model.toLowerCase() &&
+          baseModelName(wish.model) === baseModelName(moto.model) &&
           wish.motorcycleType &&
           moto.motorcycleType &&
           wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase() &&
@@ -367,6 +424,7 @@ export async function runBikerBikerMatching(): Promise<number> {
       allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
     );
     const isPairBlocked = (id1: string, id2: string) => blockedSet.has(`${id1}:${id2}`);
+    const prefsMap = await loadMatchPreferencesMap();
 
     let matchCount = 0;
     let skipCount = 0;
@@ -395,6 +453,7 @@ export async function runBikerBikerMatching(): Promise<number> {
           const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
 
           if (isPairBlocked(m1.userId, m2.userId)) { skipCount++; continue; }
+          if (!bothPrefsEnabled(prefsMap, m1.userId, m2.userId, "bikerBikerBrand")) { skipCount++; continue; }
 
           const isSupermatch = !!(
             m1.model && m2.model &&
@@ -430,6 +489,786 @@ export async function runBikerBikerMatching(): Promise<number> {
   }
 }
 
+export async function runBikerBikerTypeStyleMatching(): Promise<number> {
+  try {
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    if (bikerMotorcycles.length < 2) return 0;
+
+    const prefsMap = await loadMatchPreferencesMap();
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+
+    const typeStyleBuckets = new Map<string, Array<{ userId: string; motorcycleType: string; ridingStyle: string }>>();
+    for (const bm of bikerMotorcycles) {
+      const mtype = bm.motorcycle.motorcycleType?.toLowerCase();
+      const rstyle = bm.motorcycle.ridingStyle?.toLowerCase();
+      if (!mtype || !rstyle) continue;
+      const key = `${mtype}|${rstyle}`;
+      if (!typeStyleBuckets.has(key)) typeStyleBuckets.set(key, []);
+      typeStyleBuckets.get(key)!.push({ userId: bm.userId, motorcycleType: mtype, ridingStyle: rstyle });
+    }
+
+    let matchCount = 0;
+    let skipCount = 0;
+    const MAX_PER_BUCKET = 50;
+
+    for (const members of typeStyleBuckets.values()) {
+      if (members.length < 2) continue;
+      const unique = members
+        .filter((m, i) => members.findIndex(x => x.userId === m.userId) === i)
+        .sort(() => Math.random() - 0.5);
+      if (unique.length < 2) continue;
+
+      let bucketCount = 0;
+      outer:
+      for (let i = 0; i < unique.length; i++) {
+        for (let j = i + 1; j < unique.length; j++) {
+          if (bucketCount >= MAX_PER_BUCKET) break outer;
+          const m1 = unique[i];
+          const m2 = unique[j];
+          if (m1.userId === m2.userId) continue;
+          if (blockedSet.has(`${m1.userId}:${m2.userId}`)) { skipCount++; continue; }
+          if (!bothPrefsEnabled(prefsMap, m1.userId, m2.userId, "bikerBikerTypeStyle")) { skipCount++; continue; }
+
+          const idA = m1.userId < m2.userId ? m1.userId : m2.userId;
+          const idB = m1.userId < m2.userId ? m2.userId : m1.userId;
+
+          const inserted = await storage.createBikerBikerMatch({
+            biker1Id: idA,
+            biker2Id: idB,
+            motorcycleBrand: "tipo:" + m1.motorcycleType,
+            motorcycleModel: m1.ridingStyle,
+            status: "new",
+            isSupermatch: false,
+          });
+          if (inserted) {
+            matchCount++; bucketCount++;
+            sendMatchPushNotifications([idA, idB]);
+          } else skipCount++;
+        }
+      }
+    }
+
+    console.log(`[TypeStyleMatching] nuovi match: ${matchCount}, saltati: ${skipCount}`);
+    return matchCount;
+  } catch (error) {
+    console.error("[TypeStyleMatching] error:", error);
+    return 0;
+  }
+}
+
+export async function runClubBrandMatching(): Promise<number> {
+  try {
+    const prefsMap = await loadMatchPreferencesMap();
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+
+    const allClubs = await db
+      .select({ id: motoClubs.id, brandName: motoClubs.brandName })
+      .from(motoClubs)
+      .where(and(isNotNull(motoClubs.brandName), eq(motoClubs.isApproved, true)));
+
+    if (allClubs.length === 0) return 0;
+
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    if (bikerMotorcycles.length === 0) return 0;
+
+    let matchCount = 0;
+    let skipCount = 0;
+    const MAX_CLUB_MATCHES = 200;
+
+    for (const club of allClubs) {
+      if (!club.brandName || matchCount >= MAX_CLUB_MATCHES) break;
+      const brand = club.brandName.toLowerCase();
+
+      const memberRows = await db
+        .select({ userId: motoClubMembers.userId })
+        .from(motoClubMembers)
+        .where(and(
+          eq(motoClubMembers.clubId, club.id),
+          eq(motoClubMembers.status, "active")
+        ));
+      if (memberRows.length === 0) continue;
+      const memberIds = memberRows.map(m => m.userId);
+
+      const brandOwners = bikerMotorcycles.filter(bm =>
+        bm.motorcycle.brand?.toLowerCase() === brand
+      );
+
+      for (const bm of brandOwners) {
+        if (matchCount >= MAX_CLUB_MATCHES) break;
+        if (!prefEnabled(prefsMap, bm.userId, "bikerClubBrand")) continue;
+
+        for (const memberId of memberIds) {
+          if (matchCount >= MAX_CLUB_MATCHES) break;
+          if (memberId === bm.userId) continue;
+          if (blockedSet.has(`${bm.userId}:${memberId}`)) { skipCount++; continue; }
+          if (!prefEnabled(prefsMap, memberId, "bikerClubBrand")) { skipCount++; continue; }
+
+          const idA = bm.userId < memberId ? bm.userId : memberId;
+          const idB = bm.userId < memberId ? memberId : bm.userId;
+          const inserted = await storage.createBikerBikerMatch({
+            biker1Id: idA,
+            biker2Id: idB,
+            motorcycleBrand: `club:${brand}`,
+            motorcycleModel: club.id,
+            status: "new",
+            isSupermatch: false,
+          });
+          if (inserted) { matchCount++; sendMatchPushNotifications([idA, idB]); }
+          else skipCount++;
+        }
+      }
+
+      const zavWishRows = await db
+        .select({ userId: zavarrinaWishlists.userId })
+        .from(zavarrinaWishlists)
+        .innerJoin(
+          zavarrinaWishlistMotos,
+          eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id)
+        )
+        .where(sql`LOWER(${zavarrinaWishlistMotos.brand}) = ${brand}`);
+
+      for (const zavRow of zavWishRows) {
+        if (matchCount >= MAX_CLUB_MATCHES) break;
+        if (!prefEnabled(prefsMap, zavRow.userId, "zavarrinaClubBrand")) continue;
+
+        for (const memberId of memberIds) {
+          if (matchCount >= MAX_CLUB_MATCHES) break;
+          if (memberId === zavRow.userId) continue;
+          if (blockedSet.has(`${zavRow.userId}:${memberId}`)) { skipCount++; continue; }
+          if (!prefEnabled(prefsMap, memberId, "bikerClubBrand")) { skipCount++; continue; }
+
+          const idA = zavRow.userId < memberId ? zavRow.userId : memberId;
+          const idB = zavRow.userId < memberId ? memberId : zavRow.userId;
+          const inserted = await storage.createBikerBikerMatch({
+            biker1Id: idA,
+            biker2Id: idB,
+            motorcycleBrand: `club_zav:${brand}`,
+            motorcycleModel: club.id,
+            status: "new",
+            isSupermatch: false,
+            pairType: "bz",
+          });
+          if (inserted) { matchCount++; sendMatchPushNotifications([idA, idB]); }
+          else skipCount++;
+        }
+      }
+    }
+
+    console.log(`[ClubBrandMatching] ${matchCount} club-brand matches persisted, saltati: ${skipCount}`);
+    return matchCount;
+  } catch (error) {
+    console.error("[ClubBrandMatching] error:", error);
+    return 0;
+  }
+}
+
+export async function runMusicMatchBikerZavarrina(): Promise<number> {
+  try {
+    const prefsMap = await loadMatchPreferencesMap();
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+
+    const allTrackRows = await db
+      .selectDistinct({ userId: userMusicTracks.userId, userType: users.userType })
+      .from(userMusicTracks)
+      .innerJoin(users, eq(userMusicTracks.userId, users.id))
+      .where(eq(users.isFake, false));
+
+    if (allTrackRows.length < 2) return 0;
+
+    const tracksByUser = new Map<string, Set<string>>();
+    const userTypeMap = new Map<string, string>();
+    for (const row of allTrackRows) {
+      userTypeMap.set(row.userId, row.userType);
+      const tracks = await db
+        .select({ lastfmTrackId: userMusicTracks.lastfmTrackId })
+        .from(userMusicTracks)
+        .where(eq(userMusicTracks.userId, row.userId));
+      if (tracks.length > 0) {
+        tracksByUser.set(row.userId, new Set(tracks.map(t => t.lastfmTrackId)));
+      }
+    }
+
+    const userArr = allTrackRows.map(r => r.userId);
+    let matchCount = 0;
+    let skipCount = 0;
+    const THRESHOLD = 0.65;
+    const MAX_MATCHES = 200;
+
+    const isBikerType = (t: string) => t === "biker" || t === "coppia";
+    const isZavType = (t: string) => t === "zavorrina" || t === "coppia";
+
+    outer:
+    for (let i = 0; i < userArr.length; i++) {
+      for (let j = i + 1; j < userArr.length; j++) {
+        if (matchCount >= MAX_MATCHES) break outer;
+        const uid1 = userArr[i];
+        const uid2 = userArr[j];
+        if (blockedSet.has(`${uid1}:${uid2}`)) { skipCount++; continue; }
+
+        const t1 = userTypeMap.get(uid1) ?? "";
+        const t2 = userTypeMap.get(uid2) ?? "";
+        const isBikerPair = isBikerType(t1) && isBikerType(t2);
+        const isZavPair = (isBikerType(t1) && isZavType(t2)) || (isZavType(t1) && isBikerType(t2));
+
+        let brand = "";
+        let musicPairType = "bb";
+        if (isBikerPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerBikerMusic")) {
+          brand = "musica"; musicPairType = "bb";
+        } else if (isZavPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerZavarrinaMusic")) {
+          brand = "musica_zav"; musicPairType = "bz";
+        } else { skipCount++; continue; }
+
+        const set1 = tracksByUser.get(uid1);
+        const set2 = tracksByUser.get(uid2);
+        if (!set1 || !set2) { skipCount++; continue; }
+
+        const shared = [...set2].filter(t => set1.has(t)).length;
+        const smaller = Math.min(set1.size, set2.size);
+        if (smaller === 0 || shared / smaller < THRESHOLD) { skipCount++; continue; }
+
+        const idA = uid1 < uid2 ? uid1 : uid2;
+        const idB = uid1 < uid2 ? uid2 : uid1;
+        const inserted = await storage.createBikerBikerMatch({
+          biker1Id: idA,
+          biker2Id: idB,
+          motorcycleBrand: brand,
+          motorcycleModel: "",
+          status: "new",
+          isSupermatch: false,
+          pairType: musicPairType,
+        });
+        if (inserted) {
+          matchCount++;
+          sendMatchPushNotifications([idA, idB]);
+        } else skipCount++;
+      }
+    }
+
+    console.log(`[MusicMatch] ${matchCount} music affinity matches (≥65% overlap), saltati: ${skipCount}`);
+    return matchCount;
+  } catch (error) {
+    console.error("[MusicMatch] error:", error);
+    return 0;
+  }
+}
+
+export async function runGpsBasedMatching(): Promise<number> {
+  try {
+    const prefsMap = await loadMatchPreferencesMap();
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+
+    const routeRows = await db
+      .select({
+        userId: routes.userId,
+        avgSpeedKmh: routes.avgSpeedKmh,
+        durationSeconds: routes.durationSeconds,
+        maxTiltDeg: routes.maxTiltDeg,
+      })
+      .from(routes)
+      .innerJoin(users, eq(routes.userId, users.id))
+      .where(and(
+        isNotNull(routes.avgSpeedKmh),
+        isNotNull(routes.durationSeconds),
+        eq(users.isFake, false),
+        gt(routes.durationSeconds!, 0),
+      ));
+
+    if (routeRows.length === 0) {
+      console.log("[GpsBasedMatching] Nessun dato telemetrico, skip.");
+      return 0;
+    }
+
+    const proposalRows = await db
+      .select({
+        userId: proposals.userId,
+        scheduledAt: proposals.scheduledAt,
+        departureTimeFrom: proposals.departureTimeFrom,
+      })
+      .from(proposals)
+      .innerJoin(users, eq(proposals.userId, users.id))
+      .where(and(
+        eq(users.isFake, false),
+        eq(proposals.status, "active"),
+      ));
+
+    type UserStats = {
+      userId: string;
+      avgSpeed: number;
+      avgDuration: number;
+      avgTilt: number;
+      dayBracket: string;
+      count: number;
+    };
+
+    const userStatsMap = new Map<string, { totalSpeed: number; totalDuration: number; totalTilt: number; count: number; dayHours: number[] }>();
+
+    for (const row of routeRows) {
+      if (!row.avgSpeedKmh || !row.durationSeconds) continue;
+      const uid = row.userId;
+      if (!userStatsMap.has(uid)) {
+        userStatsMap.set(uid, { totalSpeed: 0, totalDuration: 0, totalTilt: 0, count: 0, dayHours: [] });
+      }
+      const s = userStatsMap.get(uid)!;
+      s.totalSpeed += row.avgSpeedKmh;
+      s.totalDuration += row.durationSeconds;
+      s.totalTilt += row.maxTiltDeg ?? 0;
+      s.count++;
+    }
+
+    for (const row of proposalRows) {
+      const uid = row.userId;
+      const ts = row.departureTimeFrom ?? row.scheduledAt;
+      if (!ts) continue;
+      if (!userStatsMap.has(uid)) {
+        userStatsMap.set(uid, { totalSpeed: 0, totalDuration: 0, totalTilt: 0, count: 0, dayHours: [] });
+      }
+      const d = new Date(ts);
+      userStatsMap.get(uid)!.dayHours.push(d.getDay() * 24 + d.getHours());
+    }
+
+    const userStats: UserStats[] = [];
+    for (const [userId, s] of userStatsMap.entries()) {
+      if (s.count === 0) continue;
+      const avgSpeed = s.totalSpeed / s.count;
+      const avgDuration = s.totalDuration / s.count;
+      const avgTilt = s.totalTilt / s.count;
+      const medianDayHour = s.dayHours.length > 0 ? s.dayHours.sort((a, b) => a - b)[Math.floor(s.dayHours.length / 2)] : -1;
+      const dayBracket = medianDayHour >= 0 ? `${Math.floor(medianDayHour / 24)}_${medianDayHour % 24 < 12 ? "morning" : medianDayHour % 24 < 18 ? "afternoon" : "evening"}` : "unknown";
+      userStats.push({ userId, avgSpeed, avgDuration, avgTilt, dayBracket, count: s.count });
+    }
+
+    if (userStats.length < 2) return 0;
+
+    const speedBracket = (spd: number) => spd < 50 ? "slow" : spd < 80 ? "medium" : "fast";
+    const durationBracket = (secs: number) => secs < 7200 ? "short" : secs < 21600 ? "medium" : "long";
+    const tiltBracket = (tilt: number) => tilt < 20 ? "low" : tilt < 35 ? "medium" : "high";
+
+    let matchCount = 0;
+    let skipCount = 0;
+    const MAX_GPS_MATCHES = 300;
+
+    outer:
+    for (let i = 0; i < userStats.length; i++) {
+      for (let j = i + 1; j < userStats.length; j++) {
+        if (matchCount >= MAX_GPS_MATCHES) break outer;
+        const a = userStats[i];
+        const b = userStats[j];
+        if (blockedSet.has(`${a.userId}:${b.userId}`)) { skipCount++; continue; }
+
+        const idA = a.userId < b.userId ? a.userId : b.userId;
+        const idB = a.userId < b.userId ? b.userId : a.userId;
+
+        const sameSpeed = speedBracket(a.avgSpeed) === speedBracket(b.avgSpeed);
+        const sameDuration = durationBracket(a.avgDuration) === durationBracket(b.avgDuration);
+        const sameTilt = tiltBracket(a.avgTilt) === tiltBracket(b.avgTilt);
+        const sameDay = a.dayBracket !== "unknown" && a.dayBracket === b.dayBracket;
+
+        let gpsLabel: string | null = null;
+        if (sameSpeed && sameDuration && sameTilt && sameDay &&
+            bothPrefsEnabled(prefsMap, a.userId, b.userId, "bikerBikerAvgSpeed") &&
+            bothPrefsEnabled(prefsMap, a.userId, b.userId, "bikerBikerAvgDuration") &&
+            bothPrefsEnabled(prefsMap, a.userId, b.userId, "bikerBikerLeanAngle") &&
+            bothPrefsEnabled(prefsMap, a.userId, b.userId, "bikerBikerDayTime")) {
+          gpsLabel = "gps_full";
+        } else if (sameSpeed && sameDuration && bothPrefsEnabled(prefsMap, a.userId, b.userId, "bikerBikerAvgSpeed") &&
+                   bothPrefsEnabled(prefsMap, a.userId, b.userId, "bikerBikerAvgDuration")) {
+          gpsLabel = "gps_speed";
+        } else if (sameTilt && a.count >= 3 && b.count >= 3 &&
+                   bothPrefsEnabled(prefsMap, a.userId, b.userId, "bikerBikerLeanAngle")) {
+          gpsLabel = "gps_tilt";
+        } else if (sameDay && bothPrefsEnabled(prefsMap, a.userId, b.userId, "bikerBikerDayTime")) {
+          gpsLabel = "gps_day";
+        }
+
+        if (!gpsLabel) { skipCount++; continue; }
+
+        const inserted = await storage.createBikerBikerMatch({
+          biker1Id: idA,
+          biker2Id: idB,
+          motorcycleBrand: gpsLabel,
+          motorcycleModel: "",
+          status: "new",
+          isSupermatch: gpsLabel === "gps_full",
+        });
+        if (inserted) {
+          matchCount++;
+          sendMatchPushNotifications([idA, idB]);
+        } else skipCount++;
+      }
+    }
+
+    console.log(`[GpsBasedMatching] ${matchCount} GPS-based matches persisted, saltati: ${skipCount}`);
+    return matchCount;
+  } catch (error) {
+    console.error("[GpsBasedMatching] error:", error);
+    return 0;
+  }
+}
+
+export async function runEventMatching(): Promise<number> {
+  try {
+    const rows = await db
+      .select({ userId: eventParticipants.userId, eventId: eventParticipants.eventId })
+      .from(eventParticipants)
+      .innerJoin(users, eq(eventParticipants.userId, users.id))
+      .where(eq(users.isFake, false));
+
+    if (rows.length === 0) {
+      console.log("[EventMatching] Nessun partecipante eventi, skip.");
+      return 0;
+    }
+
+    const prefsMap = await loadMatchPreferencesMap();
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+
+    const eventBuckets = new Map<string, Set<string>>();
+    for (const row of rows) {
+      if (!eventBuckets.has(row.eventId)) eventBuckets.set(row.eventId, new Set());
+      eventBuckets.get(row.eventId)!.add(row.userId);
+    }
+
+    let matchCount = 0;
+    let skipCount = 0;
+    const MAX_EVENT_MATCHES = 200;
+
+    outer:
+    for (const [, members] of eventBuckets.entries()) {
+      const arr = [...members];
+      if (arr.length < 2) continue;
+      for (let i = 0; i < arr.length; i++) {
+        for (let j = i + 1; j < arr.length; j++) {
+          if (matchCount >= MAX_EVENT_MATCHES) break outer;
+          const uid1 = arr[i];
+          const uid2 = arr[j];
+          if (blockedSet.has(`${uid1}:${uid2}`)) { skipCount++; continue; }
+          if (!bothPrefsEnabled(prefsMap, uid1, uid2, "bikerBikerEvents")) { skipCount++; continue; }
+
+          const idA = uid1 < uid2 ? uid1 : uid2;
+          const idB = uid1 < uid2 ? uid2 : uid1;
+
+          const inserted = await storage.createBikerBikerMatch({
+            biker1Id: idA,
+            biker2Id: idB,
+            motorcycleBrand: "eventi",
+            motorcycleModel: "",
+            status: "new",
+            isSupermatch: false,
+          });
+          if (inserted) {
+            matchCount++;
+            sendMatchPushNotifications([idA, idB]);
+          } else skipCount++;
+        }
+      }
+    }
+
+    console.log(`[EventMatching] ${matchCount} event-based matches persisted, saltati: ${skipCount}`);
+    return matchCount;
+  } catch (error) {
+    console.error("[EventMatching] error:", error);
+    return 0;
+  }
+}
+
+export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
+  try {
+    const prefsMap = await loadMatchPreferencesMap();
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+
+    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers();
+    if (bikerMotorcycles.length === 0) return 0;
+
+    const zavWishRows = await db
+      .select({
+        userId: zavarrinaWishlists.userId,
+        motorcycleType: zavarrinaWishlistMotos.motorcycleType,
+        ridingStyle: zavarrinaWishlistMotos.ridingStyle,
+      })
+      .from(zavarrinaWishlists)
+      .innerJoin(zavarrinaWishlistMotos, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id))
+      .where(and(isNotNull(zavarrinaWishlistMotos.motorcycleType), isNotNull(zavarrinaWishlistMotos.ridingStyle)));
+
+    if (zavWishRows.length === 0) return 0;
+
+    const zavByTypeStyle = new Map<string, string[]>();
+    for (const row of zavWishRows) {
+      if (!row.motorcycleType || !row.ridingStyle) continue;
+      const key = `${row.motorcycleType.toLowerCase()}|${row.ridingStyle.toLowerCase()}`;
+      if (!zavByTypeStyle.has(key)) zavByTypeStyle.set(key, []);
+      zavByTypeStyle.get(key)!.push(row.userId);
+    }
+
+    let matchCount = 0;
+    let skipCount = 0;
+    const MAX = 200;
+
+    for (const bm of bikerMotorcycles) {
+      if (matchCount >= MAX) break;
+      const mtype = bm.motorcycle.motorcycleType?.toLowerCase();
+      const rstyle = bm.motorcycle.ridingStyle?.toLowerCase();
+      if (!mtype || !rstyle) continue;
+      if (!prefEnabled(prefsMap, bm.userId, "bikerZavarrinaTypeStyle")) continue;
+
+      const key = `${mtype}|${rstyle}`;
+      const zavIds = zavByTypeStyle.get(key);
+      if (!zavIds || zavIds.length === 0) continue;
+
+      for (const zavId of zavIds) {
+        if (matchCount >= MAX) break;
+        if (zavId === bm.userId) continue;
+        if (blockedSet.has(`${bm.userId}:${zavId}`)) { skipCount++; continue; }
+        if (!prefEnabled(prefsMap, zavId, "bikerZavarrinaTypeStyle")) { skipCount++; continue; }
+
+        const idA = bm.userId < zavId ? bm.userId : zavId;
+        const idB = bm.userId < zavId ? zavId : bm.userId;
+        const inserted = await storage.createBikerBikerMatch({
+          biker1Id: idA,
+          biker2Id: idB,
+          motorcycleBrand: `tipo_zav:${mtype}`,
+          motorcycleModel: rstyle,
+          status: "new",
+          isSupermatch: false,
+          pairType: "bz",
+        });
+        if (inserted) { matchCount++; sendMatchPushNotifications([idA, idB]); }
+        else skipCount++;
+      }
+    }
+
+    console.log(`[ZavTypeStyleMatching] ${matchCount} biker-zavarrina type+style matches, saltati: ${skipCount}`);
+    return matchCount;
+  } catch (error) {
+    console.error("[ZavTypeStyleMatching] error:", error);
+    return 0;
+  }
+}
+
+export async function runDistanceMatching(): Promise<number> {
+  try {
+    const prefsMap = await loadMatchPreferencesMap();
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+
+    const centroidRows = await db
+      .select({
+        userId: routes.userId,
+        userType: users.userType,
+        avgLat: avg(routePoints.latitude),
+        avgLng: avg(routePoints.longitude),
+      })
+      .from(routes)
+      .innerJoin(routePoints, eq(routePoints.routeId, routes.id))
+      .innerJoin(users, eq(routes.userId, users.id))
+      .where(eq(users.isFake, false))
+      .groupBy(routes.userId, users.userType);
+
+    const userCentroids = new Map<string, { lat: number; lng: number; userType: string }>();
+    for (const row of centroidRows) {
+      const lat = parseFloat(row.avgLat ?? "0");
+      const lng = parseFloat(row.avgLng ?? "0");
+      if (lat === 0 && lng === 0) continue;
+      userCentroids.set(row.userId, { lat, lng, userType: row.userType });
+    }
+
+    const userArr = [...userCentroids.entries()];
+    if (userArr.length < 2) return 0;
+
+    const DISTANCE_THRESHOLD_KM = 150;
+    let matchCount = 0;
+    let skipCount = 0;
+    const MAX = 200;
+    const isBikerType = (t: string) => t === "biker" || t === "coppia";
+    const isZavType = (t: string) => t === "zavorrina" || t === "coppia";
+
+    outer:
+    for (let i = 0; i < userArr.length; i++) {
+      for (let j = i + 1; j < userArr.length; j++) {
+        if (matchCount >= MAX) break outer;
+        const [uid1, c1] = userArr[i];
+        const [uid2, c2] = userArr[j];
+        if (uid1 === uid2) continue;
+        if (blockedSet.has(`${uid1}:${uid2}`)) { skipCount++; continue; }
+
+        const distKm = haversineDistance(c1.lat, c1.lng, c2.lat, c2.lng);
+        if (distKm > DISTANCE_THRESHOLD_KM) { skipCount++; continue; }
+
+        const isBikerPair = isBikerType(c1.userType) && isBikerType(c2.userType);
+        const isZavPair = (isBikerType(c1.userType) && isZavType(c2.userType)) ||
+                          (isZavType(c1.userType) && isBikerType(c2.userType));
+
+        let brand = "";
+        let pairType = "bb";
+        if (isBikerPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerBikerDistance")) {
+          brand = "distanza"; pairType = "bb";
+        } else if (isZavPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerZavarrinaDistance")) {
+          brand = "distanza_zav"; pairType = "bz";
+        } else { skipCount++; continue; }
+
+        const idA = uid1 < uid2 ? uid1 : uid2;
+        const idB = uid1 < uid2 ? uid2 : uid1;
+        const inserted = await storage.createBikerBikerMatch({
+          biker1Id: idA,
+          biker2Id: idB,
+          motorcycleBrand: brand,
+          motorcycleModel: "",
+          status: "new",
+          isSupermatch: false,
+          pairType,
+        });
+        if (inserted) { matchCount++; sendMatchPushNotifications([idA, idB]); }
+        else skipCount++;
+      }
+    }
+
+    console.log(`[DistanceMatching] ${matchCount} Haversine-centroid distance matches persisted (<${DISTANCE_THRESHOLD_KM}km), saltati: ${skipCount}`);
+    return matchCount;
+  } catch (error) {
+    console.error("[DistanceMatching] error:", error);
+    return 0;
+  }
+}
+
+export async function runRouteTypeZoneMatching(): Promise<number> {
+  try {
+    const prefsMap = await loadMatchPreferencesMap();
+    const allBlockedPairs = await storage.getAllBlockedPairs();
+    const blockedSet = new Set(
+      allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
+    );
+
+    const centroidRows = await db
+      .select({
+        userId: routes.userId,
+        userType: users.userType,
+        avgLat: avg(routePoints.latitude),
+        avgLng: avg(routePoints.longitude),
+      })
+      .from(routes)
+      .innerJoin(routePoints, eq(routePoints.routeId, routes.id))
+      .innerJoin(users, eq(routes.userId, users.id))
+      .where(eq(users.isFake, false))
+      .groupBy(routes.userId, users.userType);
+
+    const routeStatsRows = await db
+      .select({
+        userId: routes.userId,
+        avgSpeed: avg(routes.avgSpeedKmh),
+        avgTilt: avg(routes.maxTiltDeg),
+        avgDist: avg(routes.totalDistanceKm),
+      })
+      .from(routes)
+      .innerJoin(users, eq(routes.userId, users.id))
+      .where(and(eq(users.isFake, false), gt(routes.durationSeconds!, 0)))
+      .groupBy(routes.userId);
+
+    const routeProfileOf = (avgSpeed: number, avgTilt: number, avgDist: number): string => {
+      if (avgTilt > 30) return "curvy";
+      if (avgSpeed > 100) return "highway";
+      if (avgDist < 30) return "city";
+      return "mixed";
+    };
+
+    const userProfiles2 = new Map<string, string>();
+    for (const row of routeStatsRows) {
+      const spd = parseFloat(row.avgSpeed ?? "0");
+      const tilt = parseFloat(row.avgTilt ?? "0");
+      const dist = parseFloat(row.avgDist ?? "0");
+      userProfiles2.set(row.userId, routeProfileOf(spd, tilt, dist));
+    }
+
+    const userCentroids = new Map<string, { lat: number; lng: number; userType: string }>();
+    for (const row of centroidRows) {
+      const lat = parseFloat(row.avgLat ?? "0");
+      const lng = parseFloat(row.avgLng ?? "0");
+      if (lat === 0 && lng === 0) continue;
+      userCentroids.set(row.userId, { lat, lng, userType: row.userType });
+    }
+
+    const userArr = [...userCentroids.entries()];
+    if (userArr.length < 2) {
+      console.log("[RouteTypeZoneMatching] Nessun dato centroide route disponibile — skip");
+      return 0;
+    }
+
+    const ZONE_THRESHOLD_KM = 50;
+    let matchCount = 0;
+    let skipCount = 0;
+    const MAX = 150;
+    const isBikerType = (t: string) => t === "biker" || t === "coppia";
+    const isZavType = (t: string) => t === "zavorrina" || t === "coppia";
+
+    outer:
+    for (let i = 0; i < userArr.length; i++) {
+      for (let j = i + 1; j < userArr.length; j++) {
+        if (matchCount >= MAX) break outer;
+        const [uid1, c1] = userArr[i];
+        const [uid2, c2] = userArr[j];
+        if (uid1 === uid2) continue;
+        if (blockedSet.has(`${uid1}:${uid2}`)) { skipCount++; continue; }
+
+        const distKm = haversineDistance(c1.lat, c1.lng, c2.lat, c2.lng);
+        if (distKm > ZONE_THRESHOLD_KM) { skipCount++; continue; }
+
+        const prof1 = userProfiles2.get(uid1);
+        const prof2 = userProfiles2.get(uid2);
+        if (!prof1 || !prof2 || prof1 !== prof2) { skipCount++; continue; }
+
+        const isBikerPair = isBikerType(c1.userType) && isBikerType(c2.userType);
+        const isZavPair = (isBikerType(c1.userType) && isZavType(c2.userType)) ||
+                          (isZavType(c1.userType) && isBikerType(c2.userType));
+
+        let brand = "";
+        let pairType = "bb";
+        if (isBikerPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerBikerRouteTypeZone")) {
+          brand = `zona_bb:${prof1}`; pairType = "bb";
+        } else if (isZavPair && bothPrefsEnabled(prefsMap, uid1, uid2, "bikerZavarrinaRouteTypeZone")) {
+          brand = `zona_zav:${prof1}`; pairType = "bz";
+        } else { skipCount++; continue; }
+
+        const idA = uid1 < uid2 ? uid1 : uid2;
+        const idB = uid1 < uid2 ? uid2 : uid1;
+        const inserted = await storage.createBikerBikerMatch({
+          biker1Id: idA,
+          biker2Id: idB,
+          motorcycleBrand: brand,
+          motorcycleModel: "",
+          status: "new",
+          isSupermatch: false,
+          pairType,
+        });
+        if (inserted) { matchCount++; sendMatchPushNotifications([idA, idB]); }
+        else skipCount++;
+      }
+    }
+
+    console.log(`[RouteTypeZoneMatching] ${matchCount} zone+type matches persisted (<${ZONE_THRESHOLD_KM}km, same route profile), saltati: ${skipCount}`);
+    return matchCount;
+  } catch (error) {
+    console.error("[RouteTypeZoneMatching] error:", error);
+    return 0;
+  }
+}
+
 export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: number; zavarrina: number }> {
   try {
     const user = await storage.getUser(userId);
@@ -452,6 +1291,8 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
 
     const allBikerMotos = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
     const userMotos = allBikerMotos.filter(bm => bm.userId === userId);
+
+    const prefsMap = await loadMatchPreferencesMap();
 
     // 1. BIKER-BIKER: match this user with ALL brand-compatible bikers
     if (isBiker && userMotos.length > 0) {
@@ -478,9 +1319,10 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
           const idA = userId < other.userId ? userId : other.userId;
           const idB = userId < other.userId ? other.userId : userId;
           if (acceptedBikerPairs.has(`${idA}:${idB}`)) continue;
+          if (!bothPrefsEnabled(prefsMap, userId, other.userId, "bikerBikerBrand")) continue;
           const isSupermatch = !!(
             userMotoBrand.motorcycle.model && other.motorcycle.model &&
-            userMotoBrand.motorcycle.model.toLowerCase() === other.motorcycle.model.toLowerCase() &&
+            baseModelName(userMotoBrand.motorcycle.model) === baseModelName(other.motorcycle.model) &&
             userMotoBrand.motorcycle.motorcycleType && other.motorcycle.motorcycleType &&
             userMotoBrand.motorcycle.motorcycleType.toLowerCase() === other.motorcycle.motorcycleType.toLowerCase() &&
             userMotoBrand.motorcycle.ridingStyle && other.motorcycle.ridingStyle &&
@@ -516,10 +1358,12 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
           if (wm.userId === userId) continue;
           const wish = wm.wishlistMoto;
 
+          if (!bothPrefsEnabled(prefsMap, userId, wm.userId, "bikerZavorrinaBrand")) continue;
+
           let compatible = false;
           if (wish.brand && bike.brand && wish.brand.toLowerCase() === bike.brand.toLowerCase()) {
             compatible = true;
-          } else if (!wish.brand && wish.motorcycleType && bike.motorcycleType &&
+          } else if (wish.motorcycleType && bike.motorcycleType &&
                      wish.motorcycleType.toLowerCase() === bike.motorcycleType.toLowerCase()) {
             compatible = true;
           }
@@ -564,10 +1408,12 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
             if (bm.userId === userId) continue;
             const bike = bm.motorcycle;
 
+            if (!bothPrefsEnabled(prefsMap, bm.userId, userId, "bikerZavorrinaBrand")) continue;
+
             let compatible = false;
             if (wish.brand && bike.brand && wish.brand.toLowerCase() === bike.brand.toLowerCase()) {
               compatible = true;
-            } else if (!wish.brand && wish.motorcycleType && bike.motorcycleType &&
+            } else if (wish.motorcycleType && bike.motorcycleType &&
                        wish.motorcycleType.toLowerCase() === bike.motorcycleType.toLowerCase()) {
               compatible = true;
             }
@@ -929,6 +1775,58 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
 
         bikerBikerMatchCount = await runBikerBikerMatching();
         if (bikerBikerMatchCount > 0) console.log(`[Matching] Found ${bikerBikerMatchCount} new biker-biker matches`);
+
+        try {
+          const typeStyleCount = await runBikerBikerTypeStyleMatching();
+          if (typeStyleCount > 0) console.log(`[Matching] Found ${typeStyleCount} new type-style matches`);
+        } catch (err) {
+          console.error("[Matching] TypeStyle matching error (non-blocking):", err);
+        }
+
+        try {
+          await runClubBrandMatching();
+        } catch (err) {
+          console.error("[Matching] ClubBrand matching error (non-blocking):", err);
+        }
+
+        try {
+          await runMusicMatchBikerZavarrina();
+        } catch (err) {
+          console.error("[Matching] MusicBikerZav matching error (non-blocking):", err);
+        }
+
+        try {
+          await runGpsBasedMatching();
+        } catch (err) {
+          console.error("[Matching] GpsBased matching error (non-blocking):", err);
+        }
+
+        try {
+          await runEventMatching();
+        } catch (err) {
+          console.error("[Matching] Event matching error (non-blocking):", err);
+        }
+
+        try {
+          const zavTypeStyleCount = await runBikerZavarrinaTypeStyleMatching();
+          if (zavTypeStyleCount > 0) console.log(`[Matching] Found ${zavTypeStyleCount} new zav type-style matches`);
+        } catch (err) {
+          console.error("[Matching] ZavTypeStyle matching error (non-blocking):", err);
+        }
+
+        try {
+          const distCount = await runDistanceMatching();
+          if (distCount > 0) console.log(`[Matching] Found ${distCount} new distance matches`);
+        } catch (err) {
+          console.error("[Matching] Distance matching error (non-blocking):", err);
+        }
+
+        try {
+          const zoneCount = await runRouteTypeZoneMatching();
+          if (zoneCount > 0) console.log(`[Matching] Found ${zoneCount} new route-zone matches`);
+        } catch (err) {
+          console.error("[Matching] RouteTypeZone matching error (non-blocking):", err);
+        }
       } else {
         console.log("[Matching] Auto matching disabilitato dall'admin, skip");
       }

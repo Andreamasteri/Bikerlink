@@ -1453,6 +1453,21 @@ export default function AdminSettings() {
     },
   });
 
+  const { data: matchGateData, refetch: refetchMatchGate } = useQuery<{ visible: boolean }>({
+    queryKey: ["/api/admin/match-settings"],
+  });
+  const matchPrefsVisible = matchGateData?.visible === true;
+
+  const matchGateMutation = useMutation({
+    mutationFn: async (val: boolean) => {
+      await apiRequest("PUT", "/api/admin/match-settings", { visible: val });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/match-settings"] });
+      refetchMatchGate();
+    },
+  });
+
   const [otaRetentionInput, setOtaRetentionInput] = useState("90");
   useEffect(() => {
     const found = settings.find((s) => s.key === "ota_cleanup_retention_days");
@@ -3424,6 +3439,27 @@ export default function AdminSettings() {
           {uptimeWidgetEnabled
             ? "Pannello fluttuante uptime attivo — visibile solo agli admin"
             : "Pannello fluttuante uptime nascosto"}
+        </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="swap-horizontal-outline" size={20} color={Colors.accent} />
+            <Text style={styles.synecoLabel}>Preferenze Matching</Text>
+          </View>
+          <Switch
+            value={matchPrefsVisible}
+            onValueChange={(val) => matchGateMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor={matchPrefsVisible ? Colors.text : Colors.textSecondary}
+            disabled={matchGateMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {matchPrefsVisible
+            ? "Sezione preferenze matching visibile agli utenti nel profilo"
+            : "Sezione preferenze matching nascosta agli utenti"}
         </Text>
       </View>
 

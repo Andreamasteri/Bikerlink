@@ -22,6 +22,27 @@
       "when": 1747785600000,
       "tag": "0002_planned_routes",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779149581627,
+      "tag": "0003_match_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1779153600000,
+      "tag": "0004_biker_biker_pair_type",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1779153600000,
+      "tag": "0003_biker_biker_pair_type",
+      "breakpoints": true
     }
   ]
 }

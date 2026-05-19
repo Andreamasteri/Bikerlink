@@ -247,6 +247,81 @@ export default function ProfileScreen() {
   });
   const showSearchPref = showSearchPrefData?.enabled === true;
 
+  const { data: matchPrefGateData } = useQuery<{ visible: boolean }>({
+    queryKey: ["/api/match-preferences/gate"],
+    staleTime: 120_000,
+    enabled: !!user,
+  });
+  const matchPrefGateVisible = matchPrefGateData?.visible === true;
+
+  type MatchPrefsPayload = {
+    bikerBikerBrand: boolean;
+    bikerZavorrinaBrand: boolean;
+    bikerClubBrand: boolean;
+    zavarrinaClubBrand: boolean;
+    bikerBikerTypeStyle: boolean;
+    bikerZavarrinaTypeStyle: boolean;
+    bikerBikerDistance: boolean;
+    bikerZavarrinaDistance: boolean;
+    bikerBikerMusic: boolean;
+    bikerZavarrinaMusic: boolean;
+    bikerBikerLeanAngle: boolean;
+    bikerBikerRouteTypeZone: boolean;
+    bikerZavarrinaRouteTypeZone: boolean;
+    bikerBikerAvgSpeed: boolean;
+    bikerBikerAvgDuration: boolean;
+    bikerBikerDayTime: boolean;
+    bikerBikerEvents: boolean;
+    directMatch: boolean;
+  };
+
+  const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
+    bikerBikerBrand: true,
+    bikerZavorrinaBrand: true,
+    bikerClubBrand: true,
+    zavarrinaClubBrand: true,
+    bikerBikerTypeStyle: true,
+    bikerZavarrinaTypeStyle: true,
+    bikerBikerDistance: true,
+    bikerZavarrinaDistance: true,
+    bikerBikerMusic: true,
+    bikerZavarrinaMusic: true,
+    bikerBikerLeanAngle: true,
+    bikerBikerRouteTypeZone: true,
+    bikerZavarrinaRouteTypeZone: true,
+    bikerBikerAvgSpeed: true,
+    bikerBikerAvgDuration: true,
+    bikerBikerDayTime: true,
+    bikerBikerEvents: true,
+    directMatch: true,
+  };
+
+  const { data: matchPrefsData } = useQuery<{ preferences: MatchPrefsPayload }>({
+    queryKey: ["/api/match-preferences"],
+    staleTime: 120_000,
+    enabled: !!user && matchPrefGateVisible,
+  });
+  const matchPrefs = matchPrefsData?.preferences ?? DEFAULT_MATCH_PREFS;
+
+  const [matchPrefsExpanded, setMatchPrefsExpanded] = useState(false);
+
+  const saveMatchPrefMutation = useMutation({
+    mutationFn: async (updates: Partial<MatchPrefsPayload>) => {
+      const res = await apiRequest("PUT", "/api/match-preferences", updates);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/match-preferences"] });
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message);
+    },
+  });
+
+  const toggleMatchPref = (key: keyof MatchPrefsPayload, value: boolean) => {
+    saveMatchPrefMutation.mutate({ [key]: value });
+  };
+
   const { data: donationData } = useQuery<{ enabled: boolean; text: string; paypalEmail: string }>({
     queryKey: ["/api/settings/donation"],
   });
@@ -843,6 +918,65 @@ export default function ProfileScreen() {
               );
             })}
           </View>
+        </View>
+      )}
+
+      {matchPrefGateVisible && (
+        <View style={styles.section}>
+          <Pressable style={styles.accordionHeader} onPress={() => setMatchPrefsExpanded(v => !v)}>
+            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Preferenze Matching</Text>
+            <Ionicons name={matchPrefsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+          </Pressable>
+          {matchPrefsExpanded && (
+            <View style={{ paddingTop: 8, gap: 2 }}>
+              <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular", marginBottom: 8 }}>
+                Scegli i criteri con cui vuoi essere abbinato/a. Disabilitando un tipo di match non comparirai nei risultati di quella categoria.
+              </Text>
+              {([
+                { key: "bikerBikerBrand" as const, label: "Biker ↔ Biker — Marca moto" },
+                { key: "bikerZavorrinaBrand" as const, label: "Biker ↔ Zavorra — Marca moto" },
+                { key: "bikerClubBrand" as const, label: "Biker ↔ Club — Marca moto" },
+                { key: "zavarrinaClubBrand" as const, label: "Zavorra ↔ Club — Marca moto" },
+                { key: "bikerBikerTypeStyle" as const, label: "Biker ↔ Biker — Tipo + Stile guida" },
+                { key: "bikerZavarrinaTypeStyle" as const, label: "Biker ↔ Zavorra — Tipo + Stile guida" },
+                { key: "bikerBikerDistance" as const, label: "Biker ↔ Biker — Distanza giro" },
+                { key: "bikerZavarrinaDistance" as const, label: "Biker ↔ Zavorra — Distanza giro" },
+                { key: "bikerBikerMusic" as const, label: "Biker ↔ Biker — Musica (≥65%)" },
+                { key: "bikerZavarrinaMusic" as const, label: "Biker ↔ Zavorra — Musica (≥65%)" },
+                { key: "bikerBikerLeanAngle" as const, label: "Biker ↔ Biker — Angolo piega" },
+                { key: "bikerBikerRouteTypeZone" as const, label: "Biker ↔ Biker — Tipo + Zona percorso" },
+                { key: "bikerZavarrinaRouteTypeZone" as const, label: "Biker ↔ Zavorra — Tipo + Zona percorso" },
+                { key: "bikerBikerAvgSpeed" as const, label: "Biker ↔ Biker — Velocità media" },
+                { key: "bikerBikerAvgDuration" as const, label: "Biker ↔ Biker — Durata media uscita" },
+                { key: "bikerBikerDayTime" as const, label: "Biker ↔ Biker — Giorno/Fascia oraria" },
+                { key: "bikerBikerEvents" as const, label: "Biker ↔ Biker — Raduni frequentati" },
+                { key: "directMatch" as const, label: "Match Diretto (Richiedi Match)" },
+              ]).map((item) => (
+                <View
+                  key={item.key}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    paddingVertical: 10,
+                    borderBottomWidth: 1,
+                    borderBottomColor: Colors.border,
+                  }}
+                >
+                  <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.text, marginRight: 12 }}>
+                    {item.label}
+                  </Text>
+                  <Switch
+                    value={matchPrefs[item.key]}
+                    onValueChange={(val) => toggleMatchPref(item.key, val)}
+                    trackColor={{ false: Colors.border, true: Colors.accent }}
+                    thumbColor="#fff"
+                    disabled={saveMatchPrefMutation.isPending}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
         </View>
       )}
 

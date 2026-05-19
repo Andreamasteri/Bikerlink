@@ -40,6 +40,7 @@ import sosRoutes from "./routes/sos";
 import motoclubsRoutes from "./routes/motoclubs";
 import friendsRoutes from "./routes/friends";
 import { handleMusicMatch } from "./routes/music-match";
+import matchPreferencesRoutes from "./routes/match-preferences";
 import lastfmRoutes from "./routes/lastfm";
 import radioRoutes from "./routes/radio";
 import eventsRoutes from "./routes/events";
@@ -191,6 +192,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json({ latestVersion: CURRENT_APP_VERSION });
   });
 
+  app.use("/api/match-preferences", matchPreferencesRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
   app.use("/api/motorcycles", motorcycleRoutes);

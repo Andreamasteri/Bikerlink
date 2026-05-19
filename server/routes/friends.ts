@@ -7,6 +7,7 @@ import {
   directMatchRequests,
   users,
   notifications,
+  matchPreferences,
 } from "@shared/schema";
 import { and, eq, or } from "drizzle-orm";
 
@@ -280,6 +281,15 @@ router.post("/request/:userId", requireAuth, async (req: Request, res: Response)
       .from(users)
       .where(eq(users.id, currentUserId))
       .limit(1);
+
+    const receiverPrefs = await db
+      .select({ directMatch: matchPreferences.directMatch })
+      .from(matchPreferences)
+      .where(eq(matchPreferences.userId, targetUserId))
+      .limit(1);
+    if (receiverPrefs.length > 0 && receiverPrefs[0].directMatch === false) {
+      return res.status(403).json({ message: "Questo utente non accetta richieste di direct match" });
+    }
 
     const rejectedOutgoing = await db
       .select({ id: directMatchRequests.id })

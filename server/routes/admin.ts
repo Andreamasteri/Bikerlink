@@ -5808,5 +5808,37 @@ router.get("/newsletter/subscribers/export", async (req: Request, res: Response)
   }
 });
 
+// GET /api/admin/match-settings
+// Restituisce la visibilità globale delle preferenze di matching
+router.get("/match-settings", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("match_preferences_visible");
+    const visible = setting?.value === "true";
+    return res.json({ visible });
+  } catch (err) {
+    console.error("[ADMIN match-settings] GET error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// PUT /api/admin/match-settings
+// Attiva/disattiva la sezione preferenze matching per tutti gli utenti
+router.put("/match-settings", async (req: Request, res: Response) => {
+  try {
+    const { visible } = req.body as { visible: boolean };
+    if (typeof visible !== "boolean") {
+      return res.status(400).json({ message: "visible deve essere boolean" });
+    }
+    await storage.upsertAppSetting(
+      "match_preferences_visible",
+      visible ? "true" : "false"
+    );
+    return res.json({ ok: true, visible });
+  } catch (err) {
+    console.error("[ADMIN match-settings] PUT error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 export default router;
 

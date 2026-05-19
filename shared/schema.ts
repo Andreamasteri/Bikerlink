@@ -783,6 +783,7 @@ export const bikerBikerMatches = pgTable("biker_biker_matches", {
   motorcycleModel: varchar("motorcycle_model", { length: 100 }).notNull(),
   status: varchar("status", { length: 20 }).notNull().default("new"),
   isSupermatch: boolean("is_supermatch").notNull().default(false),
+  pairType: varchar("pair_type", { length: 10 }).notNull().default("bb"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("biker_biker_biker1_idx").on(table.biker1Id),
@@ -1572,3 +1573,37 @@ export const directMatchRequests = pgTable("direct_match_requests", {
 
 export type DirectMatchRequest = typeof directMatchRequests.$inferSelect;
 export type InsertDirectMatchRequest = typeof directMatchRequests.$inferInsert;
+
+export const matchPreferences = pgTable("match_preferences", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  bikerBikerBrand: boolean("biker_biker_brand").notNull().default(true),
+  bikerZavorrinaBrand: boolean("biker_zavorrina_brand").notNull().default(true),
+  bikerClubBrand: boolean("biker_club_brand").notNull().default(true),
+  zavarrinaClubBrand: boolean("zavorrina_club_brand").notNull().default(true),
+  bikerBikerTypeStyle: boolean("biker_biker_type_style").notNull().default(true),
+  bikerZavarrinaTypeStyle: boolean("biker_zavorrina_type_style").notNull().default(true),
+  bikerBikerDistance: boolean("biker_biker_distance").notNull().default(true),
+  bikerZavarrinaDistance: boolean("biker_zavorrina_distance").notNull().default(true),
+  bikerBikerMusic: boolean("biker_biker_music").notNull().default(true),
+  bikerZavarrinaMusic: boolean("biker_zavorrina_music").notNull().default(true),
+  bikerBikerLeanAngle: boolean("biker_biker_lean_angle").notNull().default(true),
+  bikerBikerRouteTypeZone: boolean("biker_biker_route_type_zone").notNull().default(true),
+  bikerZavarrinaRouteTypeZone: boolean("biker_zavorrina_route_type_zone").notNull().default(true),
+  bikerBikerAvgSpeed: boolean("biker_biker_avg_speed").notNull().default(true),
+  bikerBikerAvgDuration: boolean("biker_biker_avg_duration").notNull().default(true),
+  bikerBikerDayTime: boolean("biker_biker_day_time").notNull().default(true),
+  bikerBikerEvents: boolean("biker_biker_events").notNull().default(true),
+  directMatch: boolean("direct_match").notNull().default(true),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("match_preferences_user_id_idx").on(table.userId),
+]);
+
+export type MatchPreferences = typeof matchPreferences.$inferSelect;
+export type InsertMatchPreferences = typeof matchPreferences.$inferInsert;
