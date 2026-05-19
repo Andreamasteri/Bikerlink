@@ -83,6 +83,11 @@ interface ProfileData {
     fakeHomeLatitude?: number | null;
     fakeHomeLongitude?: number | null;
     fakeHomeRadius?: number;
+    notificationPreferences?: {
+      matches?: boolean;
+      zoneProposals?: boolean;
+      chat?: boolean;
+    } | null;
   };
   photos?: Array<{
     id: string;
@@ -355,6 +360,7 @@ export default function ProfileScreen() {
   const matchPrefs = matchPrefsData?.preferences ?? DEFAULT_MATCH_PREFS;
 
   const [matchPrefsExpanded, setMatchPrefsExpanded] = useState(false);
+  const [notifPrefsExpanded, setNotifPrefsExpanded] = useState(false);
 
   const saveMatchPrefMutation = useMutation({
     mutationFn: async (updates: Partial<MatchPrefsPayload>) => {
@@ -371,6 +377,28 @@ export default function ProfileScreen() {
 
   const toggleMatchPref = (key: keyof MatchPrefsPayload, value: boolean) => {
     saveMatchPrefMutation.mutate({ [key]: value });
+  };
+
+  const notifPrefs = {
+    matches: profile?.profile?.notificationPreferences?.matches ?? true,
+    zoneProposals: profile?.profile?.notificationPreferences?.zoneProposals ?? true,
+    chat: profile?.profile?.notificationPreferences?.chat ?? true,
+  };
+
+  const notifPrefsMutation = useMutation({
+    mutationFn: async (updates: Partial<{ matches: boolean; zoneProposals: boolean; chat: boolean }>) => {
+      await apiRequest("PUT", "/api/users/profile/dynamic", { notificationPreferences: updates });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore", error.message);
+    },
+  });
+
+  const toggleNotifPref = (key: "matches" | "zoneProposals" | "chat", value: boolean) => {
+    notifPrefsMutation.mutate({ [key]: value });
   };
 
   const { data: donationData } = useQuery<{ enabled: boolean; text: string; paypalEmail: string }>({
@@ -971,6 +999,51 @@ export default function ProfileScreen() {
           </View>
         </View>
       )}
+
+      <View style={styles.section}>
+        <Pressable style={styles.accordionHeader} onPress={() => setNotifPrefsExpanded(v => !v)}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons name="notifications-outline" size={20} color={Colors.accent} />
+            <Text style={[styles.sectionTitle, { marginBottom: 0, color: Colors.text }]}>Notifiche</Text>
+          </View>
+          <Ionicons name={notifPrefsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {notifPrefsExpanded && (
+          <View style={{ paddingTop: 8, gap: 2 }}>
+            <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular", marginBottom: 8 }}>
+              Scegli quali notifiche push vuoi ricevere. Le notifiche disattivate non ti arriveranno sul telefono.
+            </Text>
+            {([
+              { key: "matches" as const, label: "Match (nuovi abbinamenti)" },
+              { key: "zoneProposals" as const, label: "Proposte nella tua zona" },
+              { key: "chat" as const, label: "Messaggi in chat" },
+            ]).map((item) => (
+              <View
+                key={item.key}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: 10,
+                  borderBottomWidth: 1,
+                  borderBottomColor: Colors.border,
+                }}
+              >
+                <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.text, marginRight: 12 }}>
+                  {item.label}
+                </Text>
+                <Switch
+                  value={notifPrefs[item.key]}
+                  onValueChange={(val) => toggleNotifPref(item.key, val)}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor="#fff"
+                  disabled={notifPrefsMutation.isPending}
+                />
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
 
       {matchPrefGateVisible && (
         <View style={styles.section}>

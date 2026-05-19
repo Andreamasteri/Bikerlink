@@ -1,7 +1,42 @@
 import { db } from "./db";
-import { users } from "@shared/schema";
+import { users, userProfiles } from "@shared/schema";
 import { inArray, eq } from "drizzle-orm";
 import it from "../lib/i18n/it";
+
+type NotificationPrefKey = "matches" | "zoneProposals" | "chat";
+
+async function filterUserIdsByPreference(
+  userIds: string[],
+  prefKey: NotificationPrefKey,
+): Promise<string[]> {
+  if (!userIds.length) return [];
+  try {
+    const rows = await db
+      .select({
+        userId: userProfiles.userId,
+        prefs: userProfiles.notificationPreferences,
+      })
+      .from(userProfiles)
+      .where(inArray(userProfiles.userId, userIds));
+
+    // Only opt-out is honored. Users without a profile row (legacy/edge cases)
+    // or with no stored prefs default to allowed, matching the column default
+    // {matches:true, zoneProposals:true, chat:true}. Only explicit `false`
+    // skips the push.
+    const prefByUser = new Map<string, typeof rows[number]["prefs"]>();
+    for (const r of rows) {
+      prefByUser.set(r.userId, r.prefs);
+    }
+    return userIds.filter((id) => {
+      const p = prefByUser.get(id);
+      if (!p) return true;
+      return p[prefKey] !== false;
+    });
+  } catch (err) {
+    console.warn("[Push] filterUserIdsByPreference error — failing closed, no push sent:", err);
+    return [];
+  }
+}
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
@@ -76,10 +111,12 @@ async function sendExpoMessages(
 export async function sendMatchPushNotifications(userIds: string[]): Promise<void> {
   if (!userIds.length) return;
   try {
+    const filteredIds = await filterUserIdsByPreference(userIds, "matches");
+    if (!filteredIds.length) return;
     const rows = await db
       .select({ id: users.id, expoPushToken: users.expoPushToken })
       .from(users)
-      .where(inArray(users.id, userIds));
+      .where(inArray(users.id, filteredIds));
 
     const userIdByToken = new Map<string, string>();
     const messages: ExpoPushMessage[] = [];
@@ -105,13 +142,52 @@ export async function sendMatchPushNotifications(userIds: string[]): Promise<voi
   }
 }
 
-export async function sendZoneProposalPushNotifications(userIds: string[]): Promise<void> {
+export async function sendChatPushNotifications(
+  userIds: string[],
+  opts: { senderNickname: string; preview: string; conversationId: string },
+): Promise<void> {
   if (!userIds.length) return;
   try {
+    const filteredIds = await filterUserIdsByPreference(userIds, "chat");
+    if (!filteredIds.length) return;
     const rows = await db
       .select({ id: users.id, expoPushToken: users.expoPushToken })
       .from(users)
-      .where(inArray(users.id, userIds));
+      .where(inArray(users.id, filteredIds));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+
+    for (const row of rows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: `Nuovo messaggio da ${opts.senderNickname}`,
+          body: opts.preview || "Apri BikerLink per leggere",
+          sound: "default" as const,
+          data: { type: "chat", conversationId: opts.conversationId },
+          channelId: "matches",
+        });
+      }
+    }
+
+    if (messages.length === 0) return;
+    await sendExpoMessages(messages, userIdByToken);
+  } catch (err) {
+    console.warn("[Push] sendChatPushNotifications error (non-fatal):", err);
+  }
+}
+
+export async function sendZoneProposalPushNotifications(userIds: string[]): Promise<void> {
+  if (!userIds.length) return;
+  try {
+    const filteredIds = await filterUserIdsByPreference(userIds, "zoneProposals");
+    if (!filteredIds.length) return;
+    const rows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(inArray(users.id, filteredIds));
 
     const userIdByToken = new Map<string, string>();
     const messages: ExpoPushMessage[] = [];

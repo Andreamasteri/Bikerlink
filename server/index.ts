@@ -1268,6 +1268,20 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS notification_preferences JSONB NOT NULL DEFAULT '{"matches":true,"zoneProposals":true,"chat":true}'::jsonb`);
+          console.log("[MIGRATION] user_profiles.notification_preferences ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] user_profiles.notification_preferences:", e);
+        }
+
+        try {
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS map_filters JSONB`);
+          console.log("[MIGRATION] user_profiles.map_filters ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] user_profiles.map_filters:", e);
+        }
+
+        try {
           await db.execute(sql`ALTER TABLE route_points ADD COLUMN IF NOT EXISTS accel_g DOUBLE PRECISION`);
           await db.execute(sql`ALTER TABLE route_points ADD COLUMN IF NOT EXISTS tilt_deg DOUBLE PRECISION`);
           console.log("[MIGRATION] route_points.accel_g/tilt_deg ensured");

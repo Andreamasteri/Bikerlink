@@ -5,6 +5,7 @@ import { db } from "../db";
 import { motoClubs, motoClubMembers, users, messages, conversationParticipants } from "@shared/schema";
 import { eq, and, ne, inArray, desc } from "drizzle-orm";
 import { sendEmail } from "../email";
+import { sendChatPushNotifications } from "../push-notifications";
 import { uploadBuffer, downloadBuffer } from "../objectStorage";
 import { addSseClient, removeSseClient, notifyChatEvent } from "../chat-sse";
 
@@ -975,6 +976,22 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
             }
           }, delay);
         } else if (targetUser && !senderUser?.isFake) {
+          // Push notification (rispetta notification_preferences.chat)
+          {
+            let pushPreview: string;
+            if (messageType === "image") pushPreview = "📸 Foto";
+            else if (messageType === "location") pushPreview = "📍 Posizione";
+            else {
+              const rawText = finalContent ?? "";
+              pushPreview = rawText.length > 120 ? rawText.substring(0, 120) + "…" : rawText;
+            }
+            sendChatPushNotifications([p.userId], {
+              senderNickname: senderUser?.nickname ?? "Un utente",
+              preview: pushPreview,
+              conversationId: id,
+            });
+          }
+
           // Notifica email se utente reale offline con preferenza attiva
           const targetProfile = await storage.getUserProfile(p.userId);
           if (targetProfile?.emailChatNotifications && targetUser.email) {
