@@ -128,6 +128,29 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     return "#FF6600";
   }
 
+  /* Country chips for new global regions (India, Australia, Indonesia,
+     Thailand, South Africa, Nigeria, Kenya) — show flag + country name
+     with a distinct brand color so users can visually identify
+     BikerLink's global reach. Flag emoji + ISO code fallback keep the
+     chip readable even where color-emoji fonts are missing. */
+  var GLOBAL_COUNTRY_CHIPS = {
+    IN: { flag: "🇮🇳", name: "India", color: "#FF9933" },
+    AU: { flag: "🇦🇺", name: "Australia", color: "#00843D" },
+    ID: { flag: "🇮🇩", name: "Indonesia", color: "#E70011" },
+    TH: { flag: "🇹🇭", name: "Thailand", color: "#A51931" },
+    ZA: { flag: "🇿🇦", name: "South Africa", color: "#007749" },
+    NG: { flag: "🇳🇬", name: "Nigeria", color: "#008753" },
+    KE: { flag: "🇰🇪", name: "Kenya", color: "#BB0000" }
+  };
+
+  function getGlobalCountryChip(country) {
+    if (!country) return null;
+    var code = String(country).toUpperCase();
+    var c = GLOBAL_COUNTRY_CHIPS[code];
+    if (!c) return null;
+    return { label: c.flag + " " + c.name, color: c.color };
+  }
+
   function getUserSvg(userType, sex) {
     if (userType === "coppia") return SVG.couple;
     if (sex === "F") return SVG.passenger;
@@ -227,6 +250,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
         var color = getUserColor(u.userType, u.sex);
         var svg = getUserSvg(u.userType, u.sex);
         var omsData = { type: "user", id: u.id };
+        var globalChip = getGlobalCountryChip(u.country);
         var html;
         if (u.isCurrentUser) {
           html = "<div style=\\"display:flex;flex-direction:column;align-items:center;\\">" +
@@ -235,6 +259,15 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
             "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8)\\">Tu</div>" +
             iconBadge(color, svg, 36) + "</div>";
           addMarker(u.lat, u.lng, html, [52, 60], [26, 60], null, omsData);
+        } else if (globalChip) {
+          html = "<div style=\\"display:flex;flex-direction:column;align-items:center;\\">" +
+            iconBadge(color, svg, 30) +
+            "<div style=\\"margin-top:2px;background:" + globalChip.color + ";" +
+            "padding:1px 5px;border-radius:7px;font-size:9px;font-weight:800;color:#fff;" +
+            "letter-spacing:0.4px;box-shadow:0 1px 3px rgba(0,0,0,0.45);" +
+            "border:1px solid rgba(255,255,255,0.85);white-space:nowrap;\\">" +
+            globalChip.label + "</div></div>";
+          addMarker(u.lat, u.lng, html, [44, 46], [22, 38], null, omsData);
         } else {
           addMarker(u.lat, u.lng, iconBadge(color, svg, 30), [30, 30], [15, 15], null, omsData);
         }

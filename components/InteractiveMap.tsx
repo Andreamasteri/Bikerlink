@@ -253,6 +253,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           userType: u.userType,
           sex: u.sex ?? null,
           nickname: u.nickname,
+          country: u.country ?? null,
           isCurrentUser: currentUserId != null && u.id === currentUserId,
         })),
         workshops: workshops.map((ws) => ({
