@@ -269,7 +269,7 @@ function WishlistScreen() {
 
       <Modal visible={showMotoForm} animationType="slide" onRequestClose={() => setShowMotoForm(false)}>
         <View style={styles.fullscreenModal}>
-          <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} bottomOffset={20}>
+          <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }} bottomOffset={20}>
               <View style={[styles.modalHeader, { paddingTop: insets.top + 8 }]}>
                   <Text style={styles.modalTitle}>{editingMotoId ? t("garage.editMoto") : t("garage.addDesiredMoto")}</Text>
                 <Pressable onPress={() => setShowMotoForm(false)}>
@@ -321,15 +321,17 @@ function WishlistScreen() {
                   <OptionButton key={s.value} label={t(`garage.style.${s.value}`)} selected={motoForm.ridingStyle === s.value} onPress={() => setMotoForm(p => ({ ...p, ridingStyle: s.value }))} />
                 ))}
               </View>
-
-              <Pressable style={styles.saveBtn} onPress={handleSaveMoto} disabled={addMotoMutation.isPending || updateMotoMutation.isPending}>
-                {(addMotoMutation.isPending || updateMotoMutation.isPending) ? (
-                  <ActivityIndicator color={Colors.background} />
-                ) : (
-                  <Text style={styles.saveBtnText}>{editingMotoId ? t("garage.saveChanges") : t("garage.addToWishlist")}</Text>
-                )}
-              </Pressable>
           </KeyboardAwareScrollViewCompat>
+
+          <View style={[styles.modalSaveBar, { paddingBottom: insets.bottom + 16 }]}>
+            <Pressable style={styles.saveBtn} onPress={handleSaveMoto} disabled={addMotoMutation.isPending || updateMotoMutation.isPending}>
+              {(addMotoMutation.isPending || updateMotoMutation.isPending) ? (
+                <ActivityIndicator color={Colors.background} />
+              ) : (
+                <Text style={styles.saveBtnText}>{editingMotoId ? t("garage.saveChanges") : t("garage.addToWishlist")}</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       </Modal>
     </View>
@@ -581,13 +583,14 @@ function GarageContent() {
         />
       )}
 
-      <Pressable style={[styles.fab, { bottom: 16 }]} onPress={openAdd}>
-        <Ionicons name="add" size={28} color={Colors.background} />
+      <Pressable style={[styles.addBtn, { bottom: insets.bottom + 16 }]} onPress={openAdd}>
+        <Ionicons name="add" size={22} color={Colors.background} />
+        <Text style={styles.addBtnText}>{t("garage.addMoto")}</Text>
       </Pressable>
 
       <Modal visible={showForm} animationType="slide" onRequestClose={() => { setShowForm(false); resetForm(); }}>
         <View style={styles.fullscreenModal}>
-          <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }} bottomOffset={20}>
+          <KeyboardAwareScrollViewCompat keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 100 }} bottomOffset={20}>
               <View style={[styles.modalHeader, { paddingTop: insets.top + 8 }]}>
                 <Text style={styles.modalTitle}>{editingId ? t("garage.editMoto") : t("garage.addMoto")}</Text>
                 <Pressable onPress={() => { setShowForm(false); resetForm(); }}>
@@ -703,15 +706,17 @@ function GarageContent() {
                   )}
                 </>
               )}
-
-              <Pressable style={styles.saveBtn} onPress={handleSave} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? (
-                  <ActivityIndicator color={Colors.background} />
-                ) : (
-                  <Text style={styles.saveBtnText}>{editingId ? t("garage.saveChanges") : t("garage.addToGarage")}</Text>
-                )}
-              </Pressable>
           </KeyboardAwareScrollViewCompat>
+
+          <View style={[styles.modalSaveBar, { paddingBottom: insets.bottom + 16 }]}>
+            <Pressable style={styles.saveBtn} onPress={handleSave} disabled={saveMutation.isPending}>
+              {saveMutation.isPending ? (
+                <ActivityIndicator color={Colors.background} />
+              ) : (
+                <Text style={styles.saveBtnText}>{editingId ? t("garage.saveChanges") : t("garage.addToGarage")}</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
       </Modal>
     </View>
@@ -739,18 +744,32 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", paddingTop: 80, gap: 12 },
   emptyText: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
   emptySubtext: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  fab: {
+  addBtn: {
     position: "absolute",
-    right: 20,
-    width: 56,
+    alignSelf: "center",
+    width: "80%",
     height: 56,
-    borderRadius: 28,
+    borderRadius: 16,
     backgroundColor: Colors.accent,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    elevation: 4,
+    gap: 8,
+    elevation: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
   },
+  addBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.background },
   fullscreenModal: { flex: 1, backgroundColor: Colors.background, paddingHorizontal: 24 },
+  modalSaveBar: {
+    paddingTop: 12,
+    paddingHorizontal: 0,
+    backgroundColor: Colors.background,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
   modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
   modalTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text },
   warningBox: {
