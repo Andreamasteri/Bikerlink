@@ -16,7 +16,7 @@ import {
   zavarrinaWishlistMotos,
   type Proposal,
 } from "@shared/schema";
-import { and, avg, eq, inArray, isNotNull, gt, sql, ne } from "drizzle-orm";
+import { and, avg, eq, inArray, isNotNull, gt, lt, sql, ne } from "drizzle-orm";
 import { sendMatchPushNotifications, sendZoneProposalPushNotifications } from "./push-notifications";
 import it from "../lib/i18n/it";
 
@@ -1705,6 +1705,20 @@ async function runCleanup(): Promise<number> {
   }
 }
 
+async function pruneOldZoneNotifications(): Promise<number> {
+  try {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const result = await db
+      .delete(proposalZoneNotifications)
+      .where(lt(proposalZoneNotifications.sentAt, cutoff))
+      .returning({ id: proposalZoneNotifications.id });
+    return result.length;
+  } catch (error) {
+    console.error("[Cleanup] Errore prune proposal_zone_notifications:", error);
+    return 0;
+  }
+}
+
 async function runFakeZavorrineRotation(): Promise<void> {
   try {
     await storage.toggleFakeZavorrineAvailability();
@@ -1877,6 +1891,8 @@ export function startMatchingEngine(): void {
       if (expired > 0) console.log(`[Cleanup] Scadute ${expired} proposte`);
       const deleted = await storage.deleteExpiredProposals();
       if (deleted > 0) console.log(`[Cleanup] Eliminate ${deleted} proposte scadute`);
+      const prunedZoneNotifs = await pruneOldZoneNotifications();
+      if (prunedZoneNotifs > 0) console.log(`[Cleanup] Eliminate ${prunedZoneNotifs} zone notifications più vecchie di 30 giorni`);
     } catch (err) {
       console.error("[Cleanup] Errore pulizia oraria:", err);
     }
