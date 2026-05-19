@@ -125,6 +125,61 @@
         color: #777;
         margin-top: 4px;
       }
+      .competitor-section {
+        width: 100%;
+        max-width: 600px;
+        padding: 32px 24px 40px;
+        border-top: 1px solid #222;
+        text-align: center;
+      }
+      .competitor-section h2 {
+        font-size: 22px;
+        font-weight: 800;
+        color: #D4A017;
+        margin-bottom: 8px;
+      }
+      .competitor-section .section-desc {
+        font-size: 14px;
+        color: #888;
+        line-height: 1.5;
+        margin-bottom: 24px;
+      }
+      .competitor-img-link {
+        display: block;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid #333;
+        transition: transform 0.2s, box-shadow 0.2s;
+        margin-bottom: 20px;
+      }
+      .competitor-img-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(212, 160, 23, 0.2);
+      }
+      .competitor-img-link img {
+        width: 100%;
+        display: block;
+      }
+      .cta-pdf {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 28px;
+        border-radius: 12px;
+        font-size: 15px;
+        font-weight: 600;
+        text-decoration: none;
+        background: #1E1E1E;
+        color: #D4A017;
+        border: 1px solid #D4A017;
+        transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+      }
+      .cta-pdf:hover {
+        background: #D4A017;
+        color: #0D0D0D;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 24px rgba(212, 160, 23, 0.3);
+      }
       .footer {
         padding: 24px;
         text-align: center;
@@ -189,6 +244,20 @@
       </div>
     </div>
 
+
+    <div class="competitor-section">
+      <h2>Perché BikerLink?</h2>
+      <p class="section-desc">
+        Abbiamo analizzato le principali app concorrenti per capire dove il mercato lascia scoperto il motociclista italiano.
+        BikerLink è costruita esattamente per colmare quei gap.
+      </p>
+      <a href="/assets/competitor-analysis.pdf" target="_blank" class="competitor-img-link">
+        <img src="/assets/competitor-analysis.png" alt="Analisi competitor BikerLink" loading="lazy" />
+      </a>
+      <a href="/assets/competitor-analysis.pdf" target="_blank" class="cta-pdf">
+        📄 Scarica analisi completa (PDF)
+      </a>
+    </div>
 
     <div class="footer">
       <p>© 2026 BikerLink. Tutti i diritti riservati.</p>
