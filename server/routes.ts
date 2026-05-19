@@ -1787,6 +1787,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── GET /api/stats/public — real user counts for landing page (no auth) ───
+  app.get("/api/stats/public", async (_req, res) => {
+    try {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const result = await db.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE is_fake = false AND status = 'active' AND COALESCE(role, 'user') != 'admin') AS total,
+          COUNT(*) FILTER (WHERE is_fake = false AND status = 'active' AND COALESCE(role, 'user') != 'admin' AND last_login_at >= ${fiveMinAgo}) AS online
+        FROM users
+      `);
+      const row = result.rows[0] as { total: string; online: string } | undefined;
+      res.json({
+        total: parseInt(row?.total ?? "0", 10),
+        online: parseInt(row?.online ?? "0", 10),
+      });
+    } catch (err) {
+      console.error("[stats/public] error:", err);
+      res.status(500).json({ total: 0, online: 0 });
+    }
+  });
+
   // ── GET /api/stats/global — public stats for landing page ─────────────────
   app.get("/api/stats/global", async (_req, res) => {
     try {
