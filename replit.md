@@ -24,6 +24,8 @@ BikerLink is a React Native (Expo SDK 55) mobile application designed to connect
 ## User Preferences
 I prefer detailed explanations and iterative development. Ask before making major changes. Do not make changes to folder `node_modules`. Do not make changes to file `package-lock.json`.
 
+**Sistema OTA — esecuzione sequenziale**: quando si lavora con il sistema OTA (publish-ota.sh, step export/publish, verifica bundle, rollback), eseguire sempre le operazioni in **sequenza**, un passo alla volta. Non parallelizzare tool call o script OTA. Aspettare il completamento e il log di ogni step prima di procedere con il successivo.
+
 **"Pubblica l'OTA"** significa SOLO pubblicare una OTA (Over-the-Air update). NON avviare mai una build EAS (APK/AAB) in risposta a questo comando. La build EAS è un'operazione separata e richiede autorizzazione esplicita come da sezione "APK Build — Regola Obbligatoria".
 
 ## NOTA CRITICA — Dispositivo utente
