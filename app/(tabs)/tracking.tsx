@@ -2330,8 +2330,16 @@ export default function TrackingScreen() {
     rideBatteryProfileRef.current = profileRef.current;
     try {
       if (Platform.OS !== "web") {
-        const level = await Battery.getBatteryLevelAsync();
-        if (level >= 0) {
+        const [level, state] = await Promise.all([
+          Battery.getBatteryLevelAsync(),
+          Battery.getBatteryStateAsync(),
+        ]);
+        const isCharging =
+          state === Battery.BatteryState.CHARGING ||
+          state === Battery.BatteryState.FULL;
+        if (isCharging) {
+          if (__DEV__) console.log(`[BikerLink] Battery at ride start: device is charging (state=${state}) — skipping battery drain tracking`);
+        } else if (level >= 0) {
           rideStartBatteryLevelRef.current = level;
           if (__DEV__) console.log(`[BikerLink] Battery at ride start: ${(level * 100).toFixed(1)}% (profile=${profileRef.current})`);
         }
@@ -2568,22 +2576,32 @@ export default function TrackingScreen() {
       rideDurationMinutes >= BATTERY_MIN_RIDE_MINUTES
     ) {
       try {
-        const endLevel = await Battery.getBatteryLevelAsync();
-        if (__DEV__) console.log(`[BikerLink] Battery at ride stop: ${(endLevel * 100).toFixed(1)}% (start=${(rideStartBattery * 100).toFixed(1)}%)`);
-        if (endLevel >= 0 && endLevel <= rideStartBattery) {
-          const drainFraction = rideStartBattery - endLevel;
-          const drainPercent = drainFraction * 100;
-          const rideDurationHours = rideDurationMs / 3600000;
-          const drainPerHour = drainPercent / rideDurationHours;
-          // Sanity check: ignore implausible values (>30%/h or <0.1%/h)
-          if (drainPerHour >= 0.1 && drainPerHour <= 30) {
-            const updatedStats = await appendBatteryDrainSample(rideBatteryProfileRef.current, drainPerHour);
-            setBatteryDrainStats(updatedStats);
+        const [endLevel, endState] = await Promise.all([
+          Battery.getBatteryLevelAsync(),
+          Battery.getBatteryStateAsync(),
+        ]);
+        const isChargingAtStop =
+          endState === Battery.BatteryState.CHARGING ||
+          endState === Battery.BatteryState.FULL;
+        if (isChargingAtStop) {
+          if (__DEV__) console.log(`[BikerLink] Battery at ride stop: device is charging (state=${endState}) — skipping battery drain sample`);
+        } else {
+          if (__DEV__) console.log(`[BikerLink] Battery at ride stop: ${(endLevel * 100).toFixed(1)}% (start=${(rideStartBattery * 100).toFixed(1)}%)`);
+          if (endLevel >= 0 && endLevel <= rideStartBattery) {
+            const drainFraction = rideStartBattery - endLevel;
+            const drainPercent = drainFraction * 100;
+            const rideDurationHours = rideDurationMs / 3600000;
+            const drainPerHour = drainPercent / rideDurationHours;
+            // Sanity check: ignore implausible values (>30%/h or <0.1%/h)
+            if (drainPerHour >= 0.1 && drainPerHour <= 30) {
+              const updatedStats = await appendBatteryDrainSample(rideBatteryProfileRef.current, drainPerHour);
+              setBatteryDrainStats(updatedStats);
+            } else if (__DEV__) {
+              console.warn(`[BikerLink] Battery drain out of sanity range — ${drainPerHour.toFixed(2)}%/h, skipping sample`);
+            }
           } else if (__DEV__) {
-            console.warn(`[BikerLink] Battery drain out of sanity range — ${drainPerHour.toFixed(2)}%/h, skipping sample`);
+            console.warn(`[BikerLink] Battery end level (${endLevel}) >= start (${rideStartBattery}) — skipping sample (possibly charging)`);
           }
-        } else if (__DEV__) {
-          console.warn(`[BikerLink] Battery end level (${endLevel}) >= start (${rideStartBattery}) — skipping sample (possibly charging)`);
         }
       } catch (e) {
         if (__DEV__) console.warn("[BikerLink] Battery read at ride stop failed:", e);
