@@ -5,6 +5,7 @@ import { db } from "../db";
 import { users } from "@shared/schema";
 import { sql } from "drizzle-orm";
 import { renderPage, getBaseUrl } from "./render";
+import { ensureVisitorId, recordVisit } from "../lib/visitor-tracking";
 import {
   buildHome,
   buildFeatures,
@@ -134,6 +135,28 @@ async function getCommunityStats() {
 }
 
 export function registerSiteRoutes(app: Express) {
+  // Task #1524: counter visitatori. Tracking middleware for marketing pages.
+  // Esegue PRIMA delle route delle pagine, ma filtra strettamente per evitare
+  // di loggare API, asset, route admin/portal, expo manifest, ecc.
+  const TRACKABLE_PATHS = new Set<string>([
+    ...PAGES.map((p) => p.route),
+    ...Object.keys(STATIC_HTML_PAGES),
+  ]);
+  app.use((req: Request, res: Response, next) => {
+    if (req.method !== "GET") return next();
+    // Expo client manifest fetch: ha sempre l'header expo-platform.
+    if (req.header("expo-platform")) return next();
+    const p = req.path || "";
+    if (!TRACKABLE_PATHS.has(p)) return next();
+    try {
+      const vid = ensureVisitorId(req, res);
+      recordVisit({ req, visitorId: vid, event: "view", path: p });
+    } catch (err) {
+      console.warn("[site-visits] middleware error:", err);
+    }
+    return next();
+  });
+
   // Community stats API (used by /community map).
   app.get("/api/community/stats", async (_req: Request, res: Response) => {
     const data = await getCommunityStats();

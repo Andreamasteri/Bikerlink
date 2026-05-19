@@ -1669,3 +1669,34 @@ export const gpsRejectionStats = pgTable("gps_rejection_stats", {
 
 export type GpsRejectionStat = typeof gpsRejectionStats.$inferSelect;
 export type InsertGpsRejectionStat = typeof gpsRejectionStats.$inferInsert;
+
+// ── SITE VISITS (Counter Visitatori Sito — Task #1524) ──────────────────────
+// Tracking lato server delle visite al sito marketing. Privacy:
+//  - IP non viene mai salvato in chiaro: ipHash = sha256(ip + salt),
+//    ipPrefix = /24 IPv4 o /48 IPv6 (per geografia/anti-abuse aggregata).
+//  - userId è correlato solo agli eventi register/login (cookie bl_vid).
+export const siteVisits = pgTable("site_visits", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  visitorId: varchar("visitor_id", { length: 64 }).notNull(),
+  userId: varchar("user_id", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  event: varchar("event", { length: 20 }).notNull().default("view"),
+  path: text("path").notNull(),
+  referrer: text("referrer"),
+  userAgent: text("user_agent"),
+  ipHash: varchar("ip_hash", { length: 64 }),
+  ipPrefix: varchar("ip_prefix", { length: 48 }),
+  lang: varchar("lang", { length: 10 }),
+  country: varchar("country", { length: 2 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("site_visits_created_at_idx").on(table.createdAt),
+  index("site_visits_visitor_id_idx").on(table.visitorId),
+  index("site_visits_event_idx").on(table.event),
+  index("site_visits_user_id_idx").on(table.userId),
+]);
+
+export type SiteVisit = typeof siteVisits.$inferSelect;
+export type InsertSiteVisit = typeof siteVisits.$inferInsert;

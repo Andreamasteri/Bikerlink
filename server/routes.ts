@@ -869,6 +869,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Task #1524: Pannello admin "Counter Visitatori Sito".
+  // Stessa logica admin-gate del /admin/ota — risponde con pagina secca a
+  // non-admin così è chiaro perché non vede nulla. Il template è statico e
+  // chiama gli endpoint REST /api/admin/site-visits*.
+  app.get("/admin/visitatori", async (req: Request, res: Response) => {
+    try {
+      const userId = (req as any).session?.userId;
+      if (!userId) {
+        res.status(401).setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.send('<html><body style="background:#000;color:#888;font-family:sans-serif;padding:40px;text-align:center"><h1>401</h1><p>Sessione admin richiesta.</p></body></html>');
+      }
+      const user = await storage.getUser(userId);
+      if (!user || user.role !== "admin") {
+        res.status(403).setHeader("Content-Type", "text/html; charset=utf-8");
+        return res.send('<html><body style="background:#000;color:#888;font-family:sans-serif;padding:40px;text-align:center"><h1>403</h1><p>Accesso riservato agli admin.</p></body></html>');
+      }
+      const templatePath = path.resolve(process.cwd(), "server", "templates", "admin-visitatori.html");
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      return res.sendFile(templatePath);
+    } catch (err) {
+      console.error("[admin/visitatori] error:", err);
+      return res.status(500).send("Errore interno");
+    }
+  });
+
   app.get(["/privacy-policy", "/privacy"], (_req, res) => {
     const templatePath = path.resolve(
       process.cwd(),

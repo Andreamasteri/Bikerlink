@@ -9,7 +9,7 @@ import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "
 import { storage } from "../storage";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats, siteVisits } from "@shared/schema";
 import { DEFAULT_PREFS } from "./match-preferences";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, notInArray, lte, isNull, or, ilike } from "drizzle-orm";
@@ -7231,6 +7231,133 @@ router.put("/settings/maintenance", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[ADMIN maintenance] put error:", err);
     return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── SITE VISITS (Counter Visitatori Sito — Task #1524) ─────────────────────
+// Endpoint admin-only (protetti da router.use(requireAdmin) sopra).
+void siteVisits;
+
+router.get("/site-visits/summary", async (_req: Request, res: Response) => {
+  try {
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const start7d = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const start30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [row] = await db.execute(sql`
+      SELECT
+        COUNT(*) FILTER (WHERE event = 'view') AS total_views,
+        COUNT(*) FILTER (WHERE event = 'view' AND created_at >= ${startToday}) AS views_today,
+        COUNT(*) FILTER (WHERE event = 'view' AND created_at >= ${start7d}) AS views_7d,
+        COUNT(*) FILTER (WHERE event = 'view' AND created_at >= ${start30d}) AS views_30d,
+        COUNT(DISTINCT visitor_id) FILTER (WHERE event = 'view') AS unique_total,
+        COUNT(DISTINCT visitor_id) FILTER (WHERE event = 'view' AND created_at >= ${startToday}) AS unique_today,
+        COUNT(DISTINCT visitor_id) FILTER (WHERE event = 'view' AND created_at >= ${start7d}) AS unique_7d,
+        COUNT(DISTINCT visitor_id) FILTER (WHERE event = 'view' AND created_at >= ${start30d}) AS unique_30d,
+        COUNT(*) FILTER (WHERE event = 'register') AS registrations_total,
+        COUNT(*) FILTER (WHERE event = 'register' AND created_at >= ${start30d}) AS registrations_30d,
+        COUNT(*) FILTER (WHERE event = 'login') AS logins_total,
+        COUNT(*) FILTER (WHERE event = 'login' AND created_at >= ${start30d}) AS logins_30d
+      FROM site_visits
+    `).then((r: any) => (Array.isArray(r) ? r : (r?.rows ?? [])));
+
+    const num = (v: unknown) => Number(v ?? 0) || 0;
+    return res.json({
+      views: {
+        today: num(row?.views_today),
+        last7d: num(row?.views_7d),
+        last30d: num(row?.views_30d),
+        total: num(row?.total_views),
+      },
+      uniqueVisitors: {
+        today: num(row?.unique_today),
+        last7d: num(row?.unique_7d),
+        last30d: num(row?.unique_30d),
+        total: num(row?.unique_total),
+      },
+      registrations: {
+        last30d: num(row?.registrations_30d),
+        total: num(row?.registrations_total),
+      },
+      logins: {
+        last30d: num(row?.logins_30d),
+        total: num(row?.logins_total),
+      },
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("[admin/site-visits/summary] error:", err);
+    return res.status(500).json({ message: "Errore caricamento summary visite" });
+  }
+});
+
+router.get("/site-visits", async (req: Request, res: Response) => {
+  try {
+    const fromStr = paramStr(req.query.from as any);
+    const toStr = paramStr(req.query.to as any);
+    const eventFilter = paramStr(req.query.event as any);
+    const loggedOnly = String(req.query.loggedOnly ?? "") === "1" || String(req.query.loggedOnly ?? "") === "true";
+    const limit = Math.max(1, Math.min(500, parseInt(String(req.query.limit ?? "100"), 10) || 100));
+    const offset = Math.max(0, parseInt(String(req.query.offset ?? "0"), 10) || 0);
+
+    const conditions: any[] = [];
+    if (fromStr) {
+      const d = new Date(fromStr);
+      if (!isNaN(d.getTime())) conditions.push(sql`sv.created_at >= ${d}`);
+    }
+    if (toStr) {
+      const d = new Date(toStr);
+      if (!isNaN(d.getTime())) conditions.push(sql`sv.created_at < ${d}`);
+    }
+    if (eventFilter && ["view", "register", "login"].includes(eventFilter)) {
+      conditions.push(sql`sv.event = ${eventFilter}`);
+    }
+    if (loggedOnly) {
+      conditions.push(sql`sv.user_id IS NOT NULL`);
+    }
+    const whereSql = conditions.length
+      ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+      : sql``;
+
+    const rowsRaw = await db.execute(sql`
+      SELECT sv.id, sv.visitor_id, sv.user_id, sv.event, sv.path, sv.referrer,
+             sv.user_agent, sv.ip_prefix, sv.lang, sv.country, sv.created_at,
+             u.nickname AS user_nickname
+      FROM site_visits sv
+      LEFT JOIN users u ON u.id = sv.user_id
+      ${whereSql}
+      ORDER BY sv.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+    const rows = (Array.isArray(rowsRaw) ? rowsRaw : (rowsRaw as any)?.rows ?? []) as any[];
+
+    const countRaw = await db.execute(sql`SELECT COUNT(*) AS c FROM site_visits sv ${whereSql}`);
+    const countArr = (Array.isArray(countRaw) ? countRaw : (countRaw as any)?.rows ?? []) as any[];
+    const total = Number(countArr[0]?.c ?? 0) || 0;
+
+    return res.json({
+      total,
+      limit,
+      offset,
+      visits: rows.map((r: any) => ({
+        id: r.id,
+        visitorId: r.visitor_id,
+        userId: r.user_id,
+        userNickname: r.user_nickname,
+        event: r.event,
+        path: r.path,
+        referrer: r.referrer,
+        userAgent: r.user_agent,
+        ipPrefix: r.ip_prefix,
+        lang: r.lang,
+        country: r.country,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("[admin/site-visits] error:", err);
+    return res.status(500).json({ message: "Errore caricamento visite" });
   }
 });
 

@@ -10,6 +10,7 @@ import { createClubInvitesForMoto, createRegionalClubInvite } from "./motoclubs"
 import { onlineTracker } from "../online-tracker";
 import { revokeAllUserSessions } from "../session-utils";
 import { closeSseClient } from "../chat-sse";
+import { parseVisitorCookie, recordVisit } from "../lib/visitor-tracking";
 
 /**
  * Calcola il token Bearer da restituire al client mobile.
@@ -308,6 +309,11 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       req.session.save((err) => { if (err) reject(err); else resolve(); });
     });
 
+    try {
+      const vid = parseVisitorCookie(req);
+      if (vid) recordVisit({ req, visitorId: vid, event: "register", userId: user.id, path: "/api/auth/register" });
+    } catch {}
+
     const { password: _, ...safeUser } = user;
     return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
@@ -382,6 +388,11 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     await new Promise<void>((resolve, reject) => {
       req.session.save((err) => { if (err) reject(err); else resolve(); });
     });
+
+    try {
+      const vid = parseVisitorCookie(req);
+      if (vid) recordVisit({ req, visitorId: vid, event: "login", userId: user.id, path: "/api/auth/login" });
+    } catch {}
 
     const userProfile = await storage.getUserProfile(user.id).catch(() => null);
     const isGhost = userRecord?.ghostMode ?? false;
