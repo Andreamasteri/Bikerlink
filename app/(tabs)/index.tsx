@@ -763,8 +763,8 @@ export default function MapScreen() {
     setShowSearchResults(false);
     setSearchText("");
     setSearchResults([]);
-    handleUserPress(u);
-  }, []);
+    router.push(`/profile/${u.id}` as any);
+  }, [router]);
 
   if (authLoading || locationLoading) {
     return (
