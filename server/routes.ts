@@ -627,12 +627,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         if (slotResult.rows.length > 0) {
           release = slotResult.rows[0] as Record<string, unknown>;
-          // Telemetry: log if we served a broken OTA that is still routing (edge case)
-          if ((release.status as string) === "broken") {
-            await logEvent("serving_broken_ota", String(release.id), `slot=${assignedSlot} OTA is broken but still routing`);
-          }
+          // Note: `serving_broken_ota` telemetry is intentionally omitted here because
+          // the query above already requires `status='active'`, so a broken OTA (status='broken')
+          // will never be returned here. Broken OTAs are handled by the else-branch below,
+          // which logs `fallback_to_stable` when the assigned slot has no active release.
         } else {
-          // Assigned slot has no active OTA — fall back to stable (never to legacy)
+          // Assigned slot has no active OTA (either empty or all releases are broken/archived)
+          // → fall back to stable (never to legacy)
           const reason = `slot=${assignedSlot} no active OTA`;
           await logEvent("fallback_to_stable", null, reason);
           const stableResult = await pool.query(

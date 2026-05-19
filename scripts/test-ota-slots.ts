@@ -274,6 +274,46 @@ async function runTests() {
     console.log();
   }
 
+  // ── Test 5c: mark-broken → device che usa quello slot deve ricevere stable ──
+  if (adminCookie && test1Release && stableRelease) {
+    // Marca il test-1 come broken
+    const mbRes = await adminFetch(`/api/admin/ota/mark-broken`, {
+      method: "POST",
+      body: JSON.stringify({ releaseId: test1Release.id }),
+    }, adminCookie);
+    if (!mbRes.ok) {
+      fail(`mark-broken HTTP ${mbRes.status}`, await mbRes.text());
+    } else {
+      pass(`mark-broken → HTTP ${mbRes.status}`, `releaseId=${test1Release.id.substring(0, 8)}…`);
+
+      // Ora un device assegnato a test-1 deve fallbackare su stable
+      const TEST_DEVICE_MB = "test-mark-broken-device";
+      await adminFetch("/api/admin/ota/device-assignments", {
+        method: "POST",
+        body: JSON.stringify({ deviceId: TEST_DEVICE_MB, slot: "test-1" }),
+      }, adminCookie);
+
+      const result = await checkExpoUpdates(TEST_DEVICE_MB);
+      if (result.releaseId === stableRelease.id) {
+        pass("mark-broken → device riceve stable (fallback corretto)", `releaseId=${result.releaseId?.substring(0, 8)}…`);
+      } else if (!result.hasUpdate) {
+        // stable slot could be empty in test env
+        pass("mark-broken → noUpdateAvailable (stable vuoto, comportamento corretto)");
+      } else {
+        fail("mark-broken → device riceve OTA sbagliato", `atteso stable=${stableRelease.id.substring(0, 8)}… ricevuto=${result.releaseId?.substring(0, 8) ?? "n/a"}`);
+      }
+
+      // Ripristina test-1 allo stato precedente (riassegna slot)
+      await adminFetch("/api/admin/ota/assign-slot", {
+        method: "POST",
+        body: JSON.stringify({ releaseId: test1Release.id, slot: "test-1" }),
+      }, adminCookie);
+      // Rimuovi l'assegnazione temporanea
+      await adminFetch(`/api/admin/ota/device-assignments/${encodeURIComponent(TEST_DEVICE_MB)}`, { method: "DELETE" }, adminCookie);
+    }
+    console.log();
+  }
+
   // ── Test 6: GET /api/admin/ota/events con filtri ──
   if (adminCookie) {
     const evRes = await adminFetch("/api/admin/ota/events?limit=5", {}, adminCookie);
