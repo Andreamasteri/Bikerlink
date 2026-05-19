@@ -7,7 +7,7 @@ import { isProtectedUser } from "../constants";
 import { isSystemAccount, systemAccountConditions } from "../lib/system-account-filter";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
-import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos, gpsRejectionStats } from "@shared/schema";
+import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos, gpsRejectionStats, users as usersTable } from "@shared/schema";
 import { db } from "../db";
 import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
 import { sendAdminGpsAlertPush } from "../push-notifications";

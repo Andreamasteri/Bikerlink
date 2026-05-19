@@ -25,6 +25,8 @@ interface GpsRejectionStat {
   lastSource: string | null;
 }
 
+const ALERT_BADGE_COLOR = "#FF3B30";
+
 function formatDate(iso: string): string {
   try {
     const d = new Date(iso);
@@ -49,7 +51,11 @@ function RejectionCard({ item, alertThreshold }: { item: GpsRejectionStat; alert
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={[
+        styles.card,
+        { backgroundColor: colors.surface, borderColor: isOverThreshold ? ALERT_BADGE_COLOR : colors.border },
+        isOverThreshold && styles.cardAlert,
+      ]}
       onPress={() => setExpanded((v) => !v)}
       activeOpacity={0.8}
     >
@@ -128,6 +134,7 @@ export default function GpsRejectionsScreen() {
 
   const stats = data?.stats ?? [];
   const alertThreshold = data?.alertThreshold ?? 100;
+  const alertCount = stats.filter((s) => s.rejectionCount >= alertThreshold).length;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -135,9 +142,16 @@ export default function GpsRejectionsScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           GPS Rifiutati per Utente
         </Text>
-        <Text style={[styles.headerCount, { color: colors.textSecondary }]}>
-          {stats.length} utenti
-        </Text>
+        <View style={styles.headerRight}>
+          {alertCount > 0 && (
+            <View style={styles.headerAlertBadge}>
+              <Text style={styles.headerAlertBadgeText}>⚠️ {alertCount}</Text>
+            </View>
+          )}
+          <Text style={[styles.headerCount, { color: colors.textSecondary }]}>
+            {stats.length} utenti
+          </Text>
+        </View>
       </View>
 
       <FlatList
@@ -183,6 +197,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
   },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  headerAlertBadge: {
+    backgroundColor: "#FF3B30",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  headerAlertBadgeText: {
+    color: "#fff",
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+  },
   headerCount: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
@@ -197,6 +227,9 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
     gap: 8,
+  },
+  cardAlert: {
+    borderWidth: 2,
   },
   cardHeader: {
     flexDirection: "row",
@@ -222,9 +255,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Inter_700Bold",
   },
+  nicknameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+  },
   nickname: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+  },
+  alertBadge: {
+    backgroundColor: "#FF3B30",
+    borderRadius: 5,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  alertBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
   },
   deviceId: {
     fontSize: 10,
