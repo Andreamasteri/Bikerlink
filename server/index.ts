@@ -307,6 +307,59 @@ function configureExpoAndLanding(app: express.Application) {
     next();
   });
 
+  // ── SEO: robots.txt ─────────────────────────────────────────────────────────
+  app.get("/robots.txt", (_req: Request, res: Response) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send([
+      "User-agent: *",
+      "Allow: /$",
+      "Allow: /privacy",
+      "Allow: /privacy-policy",
+      "Allow: /terms",
+      "Disallow: /api/",
+      "Disallow: /admin",
+      "Disallow: /investors",
+      "Disallow: /apple-review",
+      "Disallow: /delete-account",
+      "Disallow: /uploads/",
+      "Disallow: /*.pdf$",
+      "Disallow: /matching-system.pdf",
+      "Disallow: /assets/competitor-analysis.pdf",
+      "",
+      `Sitemap: https://biker-link.replit.app/sitemap.xml`,
+    ].join("\n"));
+  });
+
+  // ── SEO: sitemap.xml ─────────────────────────────────────────────────────────
+  app.get("/sitemap.xml", (_req: Request, res: Response) => {
+    const base = "https://biker-link.replit.app";
+    const today = new Date().toISOString().split("T")[0];
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>${base}/</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>${base}/privacy</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>${base}/terms</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.5</priority>
+  </url>
+</urlset>`);
+  });
+
   // ── Pagine HTML statiche (privacy, termini, cancella account) ──────────────
   // DEVONO essere prima di qualsiasi express.static — in produzione
   // static-build/index.html esiste e la SPA catch-all intercetterebbe queste
