@@ -38,7 +38,7 @@
         --font-body: 'Manrope', system-ui, sans-serif;
         --radius: 3px;
         --max: 1140px;
-        --section-pad: 120px 24px;
+        --section-pad: 72px 24px;
       }
 
       *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -124,14 +124,14 @@
         letter-spacing: 1px;
         text-transform: uppercase;
         padding: 8px 18px;
-        border: 1px solid var(--border-mid);
+        border: 1px solid rgba(255,255,255,0.35);
         border-radius: var(--radius);
-        color: var(--text2) !important;
+        color: var(--text) !important;
         background: transparent;
         transition: border-color 0.2s, color 0.2s !important;
         white-space: nowrap;
       }
-      .nav-btn-login:hover { border-color: var(--text2) !important; color: var(--text) !important; opacity: 1 !important; }
+      .nav-btn-login:hover { border-color: rgba(255,255,255,0.65) !important; color: #fff !important; opacity: 1 !important; }
       .nav-btn-register {
         font-size: 12px;
         font-weight: 700;
@@ -911,12 +911,11 @@
 
       /* ── RACEMODE SECTION ────────────────────────────────────────────────── */
       .racemode-section {
-        padding: 120px 24px;
+        padding: var(--section-pad);
         background: var(--surface);
         border-top: 1px solid var(--border);
         position: relative;
         overflow: hidden;
-        text-align: center;
       }
       .racemode-section::before {
         content: '';
@@ -925,6 +924,47 @@
         background: radial-gradient(ellipse 60% 80% at 50% 100%, rgba(255,59,48,0.18) 0%, transparent 70%);
         pointer-events: none;
       }
+      .racemode-layout {
+        max-width: var(--max);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 64px;
+        align-items: center;
+        position: relative;
+        z-index: 1;
+      }
+      .racemode-img-col {
+        position: relative;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 32px 80px rgba(0,0,0,0.5), 0 0 0 1px var(--border);
+      }
+      .racemode-img-col img {
+        width: 100%;
+        height: auto;
+        display: block;
+        border-radius: 12px;
+      }
+      .racemode-img-badge {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        background: rgba(10,10,10,0.85);
+        border: 1px solid var(--accent);
+        padding: 6px 14px;
+        border-radius: 2px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        color: var(--accent);
+        text-transform: uppercase;
+        backdrop-filter: blur(8px);
+      }
+      .racemode-content-col { text-align: left; }
       .racemode-badge {
         display: inline-flex;
         align-items: center;
@@ -1011,7 +1051,7 @@
 
       /* ── MOTOCLUB SECTION ────────────────────────────────────────────────── */
       .motoclub-section {
-        padding: 120px 24px;
+        padding: var(--section-pad);
         background: var(--bg-alt);
         border-top: 1px solid var(--border);
         position: relative;
@@ -1022,8 +1062,59 @@
         margin: 0 auto;
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 80px;
+        gap: 64px;
         align-items: center;
+      }
+      .motoclub-img-col {
+        position: relative;
+        aspect-ratio: 4/5;
+        max-height: 480px;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+      .motoclub-img-col img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .motoclub-img-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(10,10,10,0.75) 0%, rgba(10,10,10,0.1) 50%, transparent 100%);
+      }
+      .motoclub-img-badges {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .motoclub-img-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(10,10,10,0.85);
+        border: 1px solid var(--border-mid);
+        padding: 5px 12px;
+        border-radius: 2px;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        color: var(--text2);
+        text-transform: uppercase;
+        backdrop-filter: blur(8px);
+      }
+      .motoclub-img-badge.live {
+        border-color: var(--success);
+        color: var(--success);
+      }
+      .motoclub-img-badge-dot {
+        width: 6px; height: 6px;
+        border-radius: 50%;
+        background: var(--success);
+        animation: pulse 1.5s infinite;
       }
       .motoclub-card {
         background: rgba(255,255,255,0.03);
@@ -1101,7 +1192,7 @@
 
       /* ── SAFETY / SOS SECTION ────────────────────────────────────────────── */
       .sos-section {
-        padding: 120px 24px;
+        padding: var(--section-pad);
         background: var(--surface);
         border-top: 1px solid var(--border);
         position: relative;
@@ -1191,84 +1282,76 @@
 
       /* ── USER TYPES SECTION ──────────────────────────────────────────────── */
       .usertypes-section {
-        padding: 120px 24px;
+        padding: var(--section-pad);
         background: var(--bg-alt);
         border-top: 1px solid var(--border);
       }
       .usertypes-inner { max-width: var(--max); margin: 0 auto; }
       .usertypes-grid {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
-        margin-top: 64px;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-top: 48px;
       }
       .usertype-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 4px;
-        padding: 48px 40px;
         position: relative;
+        height: 360px;
+        border-radius: 6px;
         overflow: hidden;
-        transition: border-color 0.25s;
+        border: 1px solid var(--border);
+        transition: border-color 0.25s, transform 0.25s;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
       }
-      .usertype-card:hover { border-color: var(--border-mid); }
-      .usertype-card.biker { border-top: 3px solid var(--accent); }
-      .usertype-card.zavorrina { border-top: 3px solid rgba(255,255,255,0.2); }
-      .usertype-emoji {
-        font-size: 48px;
-        margin-bottom: 20px;
-        display: block;
+      .usertype-card:hover { border-color: rgba(255,59,48,0.3); transform: translateY(-4px); }
+      .usertype-card-bg {
+        position: absolute;
+        inset: 0;
+        background-size: cover;
+        background-position: center;
+        transition: transform 0.4s;
       }
-      .usertype-label {
-        font-size: 10px;
+      .usertype-card:hover .usertype-card-bg { transform: scale(1.04); }
+      .usertype-card-overlay {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(to top, rgba(5,5,5,0.92) 0%, rgba(5,5,5,0.55) 50%, rgba(5,5,5,0.15) 100%);
+      }
+      .usertype-card-content {
+        position: relative;
+        z-index: 1;
+        padding: 24px;
+      }
+      .usertype-num {
+        font-family: var(--font-display);
+        font-size: 11px;
         font-weight: 700;
         letter-spacing: 3px;
-        text-transform: uppercase;
-        color: var(--text3);
-        margin-bottom: 12px;
+        color: var(--accent);
+        margin-bottom: 8px;
+        display: block;
       }
       .usertype-title {
         font-family: var(--font-display);
-        font-size: clamp(36px, 5vw, 56px);
+        font-size: clamp(28px, 3vw, 42px);
         letter-spacing: 2px;
         text-transform: uppercase;
         color: var(--text);
         line-height: 1;
-        margin-bottom: 20px;
+        margin-bottom: 12px;
         font-weight: 800;
       }
       .usertype-title .accent { color: var(--accent); }
       .usertype-desc {
-        font-size: 15px;
-        color: var(--text2);
-        line-height: 1.75;
-        margin-bottom: 28px;
-      }
-      .usertype-perks {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-      }
-      .usertype-perk {
         font-size: 13px;
-        color: var(--text2);
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-      .usertype-perk-dot {
-        width: 5px; height: 5px;
-        border-radius: 50%;
-        background: var(--accent);
-        flex-shrink: 0;
-      }
-      .usertype-card.zavorrina .usertype-perk-dot {
-        background: var(--text3);
+        color: rgba(240,240,240,0.8);
+        line-height: 1.65;
       }
 
       /* ── PIC CONTEST SECTION ─────────────────────────────────────────────── */
       .piccontest-section {
-        padding: 120px 24px;
+        padding: var(--section-pad);
         background: var(--bg);
         border-top: 1px solid var(--border);
         position: relative;
@@ -1353,16 +1436,20 @@
 
       /* ── FAQ ACCORDION ───────────────────────────────────────────────────── */
       .faq-section {
-        padding: 120px 24px;
+        padding: var(--section-pad);
         background: var(--surface);
         border-top: 1px solid var(--border);
       }
       .faq-inner {
-        max-width: 760px;
+        max-width: var(--max);
         margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1.6fr;
+        gap: 80px;
+        align-items: start;
       }
+      .faq-title-col { position: sticky; top: 88px; }
       .faq-list {
-        margin-top: 64px;
         display: flex;
         flex-direction: column;
         gap: 2px;
@@ -1407,11 +1494,12 @@
         transition: transform 0.3s, background 0.2s;
       }
       .faq-item.open .faq-chevron {
-        transform: rotate(45deg);
         background: var(--accent-dim);
         border-color: rgba(255,59,48,0.3);
       }
       .faq-chevron svg { width: 10px; height: 10px; color: var(--text2); }
+      .faq-chevron svg line:first-child { transition: opacity 0.2s; }
+      .faq-item.open .faq-chevron svg line:first-child { opacity: 0; }
       .faq-answer {
         max-height: 0;
         overflow: hidden;
@@ -1428,7 +1516,7 @@
 
       /* ── AUTH INLINE SECTION ────────────────────────────────────────────── */
       .auth-inline-section {
-        padding: 120px 24px;
+        padding: var(--section-pad);
         background: var(--bg-alt);
         border-top: 1px solid var(--border);
         position: relative;
@@ -1605,8 +1693,11 @@
         .stats-grid { grid-template-columns: repeat(2, 1fr); }
         .feature-section-inner { gap: 48px; }
         .racemode-grid { grid-template-columns: 1fr 1fr; }
-        .motoclub-inner { gap: 48px; }
+        .racemode-layout { gap: 40px; }
+        .motoclub-inner { gap: 40px; }
         .sos-inner { gap: 48px; }
+        .faq-inner { gap: 48px; }
+        .usertypes-grid { grid-template-columns: repeat(3, 1fr); }
       }
       /* ── HAMBURGER BUTTON ────────────────────────────────────────────────── */
       .nav-hamburger {
@@ -1695,11 +1786,11 @@
         transition: all 0.2s;
       }
       .mobile-menu-actions .mob-login {
-        border: 1px solid var(--border-mid);
-        color: var(--text2);
+        border: 1px solid rgba(255,255,255,0.35);
+        color: #fff;
         background: transparent;
       }
-      .mobile-menu-actions .mob-login:hover { border-color: var(--text2); color: var(--text); opacity: 1; }
+      .mobile-menu-actions .mob-login:hover { border-color: rgba(255,255,255,0.65); color: #fff; opacity: 1; }
       .mobile-menu-actions .mob-register {
         background: var(--accent);
         color: #fff;
@@ -1724,15 +1815,17 @@
       }
 
       @media (max-width: 768px) {
-        :root { --section-pad: 80px 24px; }
+        :root { --section-pad: 48px 20px; }
         .navbar-inner { padding: 0 20px; }
         .nav-links a:not(.lang-toggle):not(.nav-btn-login):not(.nav-btn-register) { display: none; }
         .nav-hamburger { display: inline-flex; }
         .mobile-menu { display: block; }
         .feature-section-inner,
         .community-inner,
-        .motoclub-inner,
         .sos-inner { grid-template-columns: 1fr; gap: 40px; direction: ltr !important; }
+        .motoclub-inner { grid-template-columns: 1fr; gap: 32px; }
+        .motoclub-img-col { aspect-ratio: 16/9; max-height: 240px; }
+        .racemode-layout { grid-template-columns: 1fr; gap: 32px; }
         .feature-section:nth-child(even) .feature-section-inner { direction: ltr; }
         .feature-visual { aspect-ratio: 16/9; }
         .footer-top { grid-template-columns: 1fr; gap: 40px; }
@@ -1741,6 +1834,9 @@
         .sec-num { display: none; }
         .racemode-grid { grid-template-columns: 1fr; }
         .usertypes-grid { grid-template-columns: 1fr; }
+        .usertype-card { height: 300px; }
+        .faq-inner { grid-template-columns: 1fr; gap: 32px; }
+        .faq-title-col { position: static; }
         .piccontest-podium { gap: 8px; }
         .sos-visual { aspect-ratio: 16/9; }
         .nav-btn-login { display: none; }
@@ -1765,6 +1861,7 @@
         <div class="nav-links">
           <a href="#features" data-i18n="nav.features">Features</a>
           <a href="#community" data-i18n="nav.community">Community</a>
+          <a href="#faq" data-i18n="nav.faq">FAQ</a>
           <a href="/investors" data-i18n="nav.investors">Investors</a>
           <a href="/privacy" data-i18n="nav.privacy">Privacy</a>
           <div class="lang-toggle">
@@ -1787,6 +1884,7 @@
       <div class="mobile-menu-links">
         <a href="#features" data-i18n="nav.features">Features</a>
         <a href="#community" data-i18n="nav.community">Community</a>
+        <a href="#faq" data-i18n="nav.faq">FAQ</a>
         <a href="/investors" data-i18n="nav.investors">Investors</a>
         <a href="/privacy" data-i18n="nav.privacy">Privacy</a>
       </div>
@@ -1823,9 +1921,8 @@
       <p class="hero-tagline" data-i18n="hero.tagline">U'LL NEVER RIDE ALONE</p>
 
       <p class="hero-desc" data-i18n="hero.desc">
-        The first vertical platform for motorcyclists worldwide.
-        Find riding companions, track your routes, manage your club
-        and live the most authentic moto community on the planet.
+        Real-time map, matching between Bikers and Passengers, roadside SOS
+        and Race Mode. Everything you need to live the road with your tribe.
       </p>
 
       <div class="hero-ctas">
@@ -2097,34 +2194,43 @@
 
     <!-- ── RACEMODE SECTION ──────────────────────────────────────────────── -->
     <section class="racemode-section" id="racemode">
-      <div class="section-inner" style="position:relative;z-index:1;">
-        <div class="racemode-badge reveal">
-          <span class="racemode-badge-dot"></span>
-          LIVE TELEMETRY
+      <div class="racemode-layout">
+        <div class="racemode-img-col reveal-left">
+          <img src="https://static.prod-images.emergentagent.com/jobs/c52ae50d-f554-4341-a9ff-4380f336dee8/images/7c093e67604bc6c4d54808463c031df425c11810b8cc798b93cc18f6244ab229.png" alt="Race Mode Screenshot" loading="lazy" />
+          <div class="racemode-img-badge">
+            <span class="racemode-badge-dot"></span>
+            LIVE TELEMETRY
+          </div>
         </div>
-        <h2 class="racemode-title reveal">GPS <span class="accent">RACE</span><br>MODE</h2>
-        <p class="racemode-desc reveal">Tachimetro live, G-force, altitudine, velocità curva. Ogni giro registrato con precisione millimetrica. I tuoi dati di guida non sono mai stati così dettagliati.</p>
-        <div class="racemode-grid">
-          <div class="racemode-card reveal">
-            <div class="racemode-card-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-            </div>
-            <div class="racemode-card-title">Live Speed</div>
-            <div class="racemode-card-desc">Velocità in tempo reale aggiornata ogni secondo. Tachimetro digitale con picco e media.</div>
+        <div class="racemode-content-col reveal-right">
+          <div class="racemode-badge" style="margin-bottom:20px;">
+            <span class="racemode-badge-dot"></span>
+            Race Mode
           </div>
-          <div class="racemode-card reveal" style="transition-delay:0.1s;">
-            <div class="racemode-card-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+          <h2 class="racemode-title" style="text-align:left;font-size:clamp(40px,6vw,80px);">GPS <span class="accent">RACE</span><br>MODE</h2>
+          <p class="racemode-desc" style="text-align:left;margin:0 0 32px;">Tachimetro live, G-force, altitudine, velocità curva. Ogni giro registrato con precisione millimetrica. I tuoi dati di guida non sono mai stati così dettagliati.</p>
+          <div class="racemode-grid" style="max-width:none;">
+            <div class="racemode-card reveal">
+              <div class="racemode-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <div class="racemode-card-title">Live Speed</div>
+              <div class="racemode-card-desc">Velocità in tempo reale aggiornata ogni secondo. Tachimetro digitale con picco e media.</div>
             </div>
-            <div class="racemode-card-title">G-Force</div>
-            <div class="racemode-card-desc">Accelerazione laterale e longitudinale. Senti ogni curva misurata in G.</div>
-          </div>
-          <div class="racemode-card reveal" style="transition-delay:0.2s;">
-            <div class="racemode-card-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <div class="racemode-card reveal" style="transition-delay:0.1s;">
+              <div class="racemode-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+              </div>
+              <div class="racemode-card-title">G-Force</div>
+              <div class="racemode-card-desc">Accelerazione laterale e longitudinale. Senti ogni curva misurata in G.</div>
             </div>
-            <div class="racemode-card-title">Altimetria</div>
-            <div class="racemode-card-desc">Profilo altimetrico completo del percorso. Dislivello totale, salite e discese.</div>
+            <div class="racemode-card reveal" style="transition-delay:0.2s;">
+              <div class="racemode-card-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              </div>
+              <div class="racemode-card-title">Altimetria</div>
+              <div class="racemode-card-desc">Profilo altimetrico completo del percorso. Dislivello totale, salite e discese.</div>
+            </div>
           </div>
         </div>
       </div>
@@ -2133,28 +2239,39 @@
     <!-- ── MOTOCLUB SECTION ───────────────────────────────────────────────── -->
     <section class="motoclub-section" id="motoclub">
       <div class="motoclub-inner">
-        <div>
-          <div class="sec-label reveal">MotoClub</div>
-          <h2 class="feature-h reveal">IL TUO CLUB<br><span class="accent">SEMPRE IN TASCA</span></h2>
-          <p class="feature-p reveal">Crea o entra in un club con codici invito. Admin panel, chat di gruppo, approvazioni, organizzazione uscite. I MotoClub sono il cuore pulsante della community BikerLink.</p>
-          <a href="/registrati" class="btn btn-primary reveal" style="margin-top:12px;">
+        <div class="motoclub-img-col reveal-left">
+          <img src="https://images.unsplash.com/photo-1489731007795-388eee095ff6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1NjZ8MHwxfHNlYXJjaHwyfHxtb3RvcmN5Y2xlJTIwZ3JvdXAlMjByaWRlcnN8ZW58MHx8fHwxNzc5MTUyNTgxfDA&ixlib=rb-4.1.0&q=85" alt="MotoClub Sunday Ride" loading="lazy" />
+          <div class="motoclub-img-overlay"></div>
+          <div class="motoclub-img-badges">
+            <span class="motoclub-img-badge live">
+              <span class="motoclub-img-badge-dot"></span>
+              LIVE
+            </span>
+            <span class="motoclub-img-badge">Sunday Ride</span>
+          </div>
+        </div>
+        <div class="reveal-right">
+          <div class="sec-label">MotoClub</div>
+          <h2 class="feature-h">IL TUO CLUB<br><span class="accent">SEMPRE IN TASCA</span></h2>
+          <p class="feature-p">Crea o entra in un club con codici invito. Admin panel, chat di gruppo, approvazioni, organizzazione uscite. I MotoClub sono il cuore pulsante della community BikerLink.</p>
+          <div class="motoclub-card" style="margin-top:24px;">
+            <div class="motoclub-online-row">
+              <span class="motoclub-online-dot"></span>
+              Club attivi ora
+            </div>
+            <div class="motoclub-count">42<span>+</span></div>
+            <div class="motoclub-count-label">MotoClub registrati</div>
+            <div class="motoclub-features">
+              <div class="motoclub-feature-row">Chat di gruppo in tempo reale</div>
+              <div class="motoclub-feature-row">Codici invito privati</div>
+              <div class="motoclub-feature-row">Admin panel con approvazioni</div>
+              <div class="motoclub-feature-row">Organizzazione uscite di gruppo</div>
+            </div>
+          </div>
+          <a href="/registrati" class="btn btn-primary" style="margin-top:20px;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
             Unisciti ora
           </a>
-        </div>
-        <div class="motoclub-card reveal">
-          <div class="motoclub-online-row">
-            <span class="motoclub-online-dot"></span>
-            Club attivi ora
-          </div>
-          <div class="motoclub-count">42<span>+</span></div>
-          <div class="motoclub-count-label">MotoClub registrati</div>
-          <div class="motoclub-features">
-            <div class="motoclub-feature-row">Chat di gruppo in tempo reale</div>
-            <div class="motoclub-feature-row">Codici invito privati</div>
-            <div class="motoclub-feature-row">Admin panel con approvazioni</div>
-            <div class="motoclub-feature-row">Organizzazione uscite di gruppo</div>
-          </div>
         </div>
       </div>
     </section>
@@ -2189,28 +2306,31 @@
           PER OGNI<br><span style="color:var(--accent);">TIPO DI BIKER</span>
         </h2>
         <div class="usertypes-grid">
-          <div class="usertype-card biker reveal">
-            <span class="usertype-emoji">🏍️</span>
-            <div class="usertype-label">Profilo</div>
-            <div class="usertype-title">IL <span class="accent">BIKER</span></div>
-            <p class="usertype-desc">Guidi una moto? Sei nel posto giusto. Trova compagni di viaggio, traccia ogni giro, unisciti a un club e partecipa ai contest settimanali.</p>
-            <div class="usertype-perks">
-              <div class="usertype-perk"><span class="usertype-perk-dot"></span>GPS tracking & telemetria live</div>
-              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Matching con riding partner</div>
-              <div class="usertype-perk"><span class="usertype-perk-dot"></span>SOS emergenza stradale</div>
-              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Garage digitale & vendita moto</div>
+          <div class="usertype-card reveal">
+            <div class="usertype-card-bg" style="background-image:url('https://images.unsplash.com/photo-1768507109219-4408445c8762?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHw0fHxtb3RvcmN5Y2xlJTIwcmlkZXIlMjBkYXJrJTIwcm9hZHxlbnwwfHx8fDE3NzkxNTI1NjR8MA&ixlib=rb-4.1.0&q=85');"></div>
+            <div class="usertype-card-overlay"></div>
+            <div class="usertype-card-content">
+              <span class="usertype-num">01</span>
+              <div class="usertype-title">IL <span class="accent">BIKER</span></div>
+              <p class="usertype-desc">Guidi una moto? Trova compagni di viaggio, traccia ogni giro, unisciti a un club e partecipa ai contest settimanali.</p>
             </div>
           </div>
-          <div class="usertype-card zavorrina reveal" style="transition-delay:0.15s;">
-            <span class="usertype-emoji">🏍️</span>
-            <div class="usertype-label">Profilo</div>
-            <div class="usertype-title">LA ZAVORRINA</div>
-            <p class="usertype-desc">Passeggera per passione. BikerLink non è solo per chi guida — chi viaggia in sella ha il suo spazio, la sua community e il suo matching.</p>
-            <div class="usertype-perks">
-              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Matching con biker compatibili</div>
-              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Community chat & eventi</div>
-              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Contest foto & votazioni</div>
-              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Accesso a tutti i MotoClub</div>
+          <div class="usertype-card reveal" style="transition-delay:0.1s;">
+            <div class="usertype-card-bg" style="background-image:url('https://images.unsplash.com/photo-1591259966748-4e4b9916858f?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2MTJ8MHwxfHNlYXJjaHwxfHxtb3RvcmN5Y2xlJTIwcmlkZXIlMjBkYXJrJTIwcm9hZHxlbnwwfHx8fDE3NzkxNTI1NjR8MA&ixlib=rb-4.1.0&q=85');"></div>
+            <div class="usertype-card-overlay"></div>
+            <div class="usertype-card-content">
+              <span class="usertype-num">02</span>
+              <div class="usertype-title">LA ZAVORRINA</div>
+              <p class="usertype-desc">Passeggera per passione. Chi viaggia in sella ha il suo spazio, la sua community e il suo matching dedicato.</p>
+            </div>
+          </div>
+          <div class="usertype-card reveal" style="transition-delay:0.2s;">
+            <div class="usertype-card-bg" style="background-image:url('https://static.prod-images.emergentagent.com/jobs/c52ae50d-f554-4341-a9ff-4380f336dee8/images/121db819839f9d1268e1a48fd6a2cd9cca693c8349a94887d700a35a8b26aa05.png');"></div>
+            <div class="usertype-card-overlay"></div>
+            <div class="usertype-card-content">
+              <span class="usertype-num">03</span>
+              <div class="usertype-title">LE <span class="accent">COPPIE</span></div>
+              <p class="usertype-desc">Biker e Zavorrina insieme. Il matching coppia trova altri duo compatibili per uscite, eventi e avventure condivise.</p>
             </div>
           </div>
         </div>
@@ -2314,54 +2434,66 @@
     <!-- ── FAQ SECTION ───────────────────────────────────────────────────── -->
     <section class="faq-section" id="faq">
       <div class="faq-inner">
-        <div class="sec-label reveal">FAQ</div>
-        <h2 style="font-family:var(--font-display);font-size:clamp(40px,7vw,80px);letter-spacing:3px;text-transform:uppercase;color:var(--text);line-height:0.95;font-weight:800;margin-bottom:0;" class="reveal">
-          DOMANDE<br><span style="color:var(--accent);">FREQUENTI</span>
-        </h2>
+        <div class="faq-title-col reveal">
+          <div class="sec-label">FAQ</div>
+          <h2 style="font-family:var(--font-display);font-size:clamp(36px,5vw,72px);letter-spacing:3px;text-transform:uppercase;color:var(--text);line-height:0.95;font-weight:800;margin-bottom:20px;">
+            DOMANDE<br><span style="color:var(--accent);">FREQUENTI</span>
+          </h2>
+          <p style="font-size:14px;color:var(--text2);line-height:1.7;max-width:280px;">Tutto quello che devi sapere su BikerLink, prima di scaricarla.</p>
+        </div>
         <div class="faq-list">
           <div class="faq-item">
             <button class="faq-question" onclick="toggleFaq(this)">
-              BikerLink è davvero gratuita?
+              <span data-i18n="faq.q1">BikerLink è davvero gratuita?</span>
               <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
             </button>
             <div class="faq-answer">
-              <div class="faq-answer-inner">Sì, totalmente. Nessun abbonamento, nessun paywall, nessuna funzionalità nascosta. BikerLink è e rimarrà gratuita per sempre. Il modello è community-first: la piattaforma cresce grazie ai biker, non grazie ai loro portafogli.</div>
+              <div class="faq-answer-inner" data-i18n="faq.a1">Sì, totalmente. Nessun abbonamento, nessun paywall, nessuna funzionalità nascosta. BikerLink è e rimarrà gratuita per sempre. Il modello è community-first: la piattaforma cresce grazie ai biker, non grazie ai loro portafogli.</div>
             </div>
           </div>
           <div class="faq-item">
             <button class="faq-question" onclick="toggleFaq(this)">
-              Come funziona il sistema di matching?
+              <span data-i18n="faq.q2">Come funziona il sistema di matching?</span>
               <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
             </button>
             <div class="faq-answer">
-              <div class="faq-answer-inner">Il matching analizza moto, stile di guida, zona geografica e (opzionalmente) gusti musicali via Last.fm. L'algoritmo suggerisce biker compatibili vicino a te. Dopo il match reciproco si apre la chat privata. Niente swipe casuali — solo connessioni reali tra biker compatibili.</div>
+              <div class="faq-answer-inner" data-i18n="faq.a2">Il matching analizza moto, stile di guida, zona geografica e (opzionalmente) gusti musicali via Last.fm. L'algoritmo suggerisce biker compatibili vicino a te. Dopo il match reciproco si apre la chat privata. Niente swipe casuali — solo connessioni reali tra biker compatibili.</div>
             </div>
           </div>
           <div class="faq-item">
             <button class="faq-question" onclick="toggleFaq(this)">
-              Il GPS funziona in background?
+              <span data-i18n="faq.q3">Il GPS funziona in background?</span>
               <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
             </button>
             <div class="faq-answer">
-              <div class="faq-answer-inner">Sì, il tracking GPS è ottimizzato per funzionare durante la guida con lo schermo spento. Puoi scegliere quando attivarlo e quando fermarlo. La modalità Ghost Mode ti permette di essere invisibile sulla mappa degli altri utenti pur continuando a tracciare il tuo percorso privatamente.</div>
+              <div class="faq-answer-inner" data-i18n="faq.a3">Sì, il tracking GPS è ottimizzato per funzionare durante la guida con lo schermo spento. Puoi scegliere quando attivarlo e quando fermarlo. La modalità Ghost Mode ti permette di essere invisibile sulla mappa degli altri utenti pur continuando a tracciare il tuo percorso privatamente.</div>
             </div>
           </div>
           <div class="faq-item">
             <button class="faq-question" onclick="toggleFaq(this)">
-              Come creo o entro in un MotoClub?
+              <span data-i18n="faq.q4">Come creo o entro in un MotoClub?</span>
               <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
             </button>
             <div class="faq-answer">
-              <div class="faq-answer-inner">Puoi creare un nuovo MotoClub in pochi tap dall'app e invitare i tuoi biker tramite un codice invito. Per entrare in un club esistente ti basta avere il codice oppure richiedere l'accesso e aspettare l'approvazione dell'admin. Ogni club ha chat di gruppo, eventi e pannello amministrativo.</div>
+              <div class="faq-answer-inner" data-i18n="faq.a4">Puoi creare un nuovo MotoClub in pochi tap dall'app e invitare i tuoi biker tramite un codice invito. Per entrare in un club esistente ti basta avere il codice oppure richiedere l'accesso e aspettare l'approvazione dell'admin. Ogni club ha chat di gruppo, eventi e pannello amministrativo.</div>
             </div>
           </div>
           <div class="faq-item">
             <button class="faq-question" onclick="toggleFaq(this)">
-              BikerLink è disponibile su iPhone?
+              <span data-i18n="faq.q5">BikerLink è disponibile su iPhone?</span>
               <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
             </button>
             <div class="faq-answer">
-              <div class="faq-answer-inner">Al momento BikerLink è disponibile su Android tramite Google Play. La versione iOS per App Store è in sviluppo e sarà disponibile a breve. Registrati ora sulla piattaforma web per essere tra i primi ad accedere alla versione iPhone.</div>
+              <div class="faq-answer-inner" data-i18n="faq.a5">Al momento BikerLink è disponibile su Android tramite Google Play. La versione iOS per App Store è in sviluppo e sarà disponibile a breve. Registrati ora sulla piattaforma web per essere tra i primi ad accedere alla versione iPhone.</div>
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              <span data-i18n="faq.q6">Cos'è il Race Mode e come si usa?</span>
+              <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner" data-i18n="faq.a6">Il Race Mode attiva la telemetria completa durante la guida: tachimetro live, G-force laterale e longitudinale, altitudine e profilo altimetrico del percorso. Ogni sessione viene salvata e consultabile in qualsiasi momento. Basta un tap dalla schermata principale per attivarlo prima di partire.</div>
             </div>
           </div>
         </div>
@@ -2651,13 +2783,14 @@
       it: {
         "nav.features": "Features",
         "nav.community": "Community",
+        "nav.faq": "FAQ",
         "nav.investors": "Investitori",
         "nav.privacy": "Privacy",
         "nav.login": "Accedi",
         "nav.register": "Registrati",
         "hero.badge": "Disponibile su Android",
         "hero.tagline": "U'LL NEVER RIDE ALONE",
-        "hero.desc": "La prima piattaforma verticale per motociclisti italiani. Trova compagni di viaggio, traccia i tuoi percorsi, gestisci il tuo club e vivi la community moto più autentica d'Italia.",
+        "hero.desc": "Mappa in tempo reale, matching tra Biker e Zavorrine, SOS stradale e Race Mode. Tutto ciò che serve per vivere la strada con la tua tribù.",
         "hero.cta_register": "Registrati — È gratis",
         "hero.cta_play": "Google Play",
         "hero.cta_apple": "App Store — Soon",
@@ -2712,17 +2845,30 @@
         "footer.terms": "Termini", "footer.delete": "Cancella account",
         "footer.rights": "Tutti i diritti riservati.",
         "footer.matching_pdf": "Sistema Matching (PDF)",
+        "faq.q1": "BikerLink è davvero gratuita?",
+        "faq.a1": "Sì, totalmente. Nessun abbonamento, nessun paywall, nessuna funzionalità nascosta. BikerLink è e rimarrà gratuita per sempre. Il modello è community-first: la piattaforma cresce grazie ai biker, non grazie ai loro portafogli.",
+        "faq.q2": "Come funziona il sistema di matching?",
+        "faq.a2": "Il matching analizza moto, stile di guida, zona geografica e (opzionalmente) gusti musicali via Last.fm. L'algoritmo suggerisce biker compatibili vicino a te. Dopo il match reciproco si apre la chat privata. Niente swipe casuali — solo connessioni reali tra biker compatibili.",
+        "faq.q3": "Il GPS funziona in background?",
+        "faq.a3": "Sì, il tracking GPS è ottimizzato per funzionare durante la guida con lo schermo spento. Puoi scegliere quando attivarlo e quando fermarlo. La modalità Ghost Mode ti permette di essere invisibile sulla mappa degli altri utenti pur continuando a tracciare il tuo percorso privatamente.",
+        "faq.q4": "Come creo o entro in un MotoClub?",
+        "faq.a4": "Puoi creare un nuovo MotoClub in pochi tap dall'app e invitare i tuoi biker tramite un codice invito. Per entrare in un club esistente ti basta avere il codice oppure richiedere l'accesso e aspettare l'approvazione dell'admin. Ogni club ha chat di gruppo, eventi e pannello amministrativo.",
+        "faq.q5": "BikerLink è disponibile su iPhone?",
+        "faq.a5": "Al momento BikerLink è disponibile su Android tramite Google Play. La versione iOS per App Store è in sviluppo e sarà disponibile a breve. Registrati ora sulla piattaforma web per essere tra i primi ad accedere alla versione iPhone.",
+        "faq.q6": "Cos'è il Race Mode e come si usa?",
+        "faq.a6": "Il Race Mode attiva la telemetria completa durante la guida: tachimetro live, G-force laterale e longitudinale, altitudine e profilo altimetrico del percorso. Ogni sessione viene salvata e consultabile in qualsiasi momento. Basta un tap dalla schermata principale per attivarlo prima di partire.",
       },
       en: {
         "nav.features": "Features",
         "nav.community": "Community",
+        "nav.faq": "FAQ",
         "nav.investors": "Investors",
         "nav.privacy": "Privacy",
         "nav.login": "Log in",
         "nav.register": "Sign up",
         "hero.badge": "Available on Android",
         "hero.tagline": "U'LL NEVER RIDE ALONE",
-        "hero.desc": "The first vertical platform for motorcyclists worldwide. Find riding companions, track your routes, manage your club and live the most authentic moto community on the planet.",
+        "hero.desc": "Real-time map, matching between Bikers and Passengers, roadside SOS and Race Mode. Everything you need to live the road with your tribe.",
         "hero.cta_register": "Sign up — It's free",
         "hero.cta_play": "Google Play",
         "hero.cta_apple": "App Store — Soon",
@@ -2777,6 +2923,18 @@
         "footer.terms": "Terms", "footer.delete": "Delete account",
         "footer.rights": "All rights reserved.",
         "footer.matching_pdf": "Matching System (PDF)",
+        "faq.q1": "Is BikerLink really free?",
+        "faq.a1": "Yes, completely. No subscription, no paywall, no hidden features. BikerLink is and will remain free forever. The model is community-first: the platform grows thanks to bikers, not thanks to their wallets.",
+        "faq.q2": "How does the matching system work?",
+        "faq.a2": "Matching analyzes bike model, riding style, location and (optionally) music taste via Last.fm. The algorithm suggests compatible bikers near you. After a mutual match, a private chat opens. No random swiping — only real connections between compatible bikers.",
+        "faq.q3": "Does GPS work in the background?",
+        "faq.a3": "Yes, GPS tracking is optimized to run while riding with the screen off. You choose when to enable and disable it. Ghost Mode lets you be invisible on other users' maps while still privately tracking your own route.",
+        "faq.q4": "How do I create or join a MotoClub?",
+        "faq.a4": "You can create a new MotoClub in a few taps from the app and invite your bikers via an invite code. To join an existing club you just need the code, or request access and wait for admin approval. Every club has group chat, events and an admin panel.",
+        "faq.q5": "Is BikerLink available on iPhone?",
+        "faq.a5": "BikerLink is currently available on Android via Google Play. The iOS App Store version is in development and will be available soon. Sign up now on the web platform to be among the first to access the iPhone version.",
+        "faq.q6": "What is Race Mode and how do I use it?",
+        "faq.a6": "Race Mode activates full telemetry while riding: live speedometer, lateral and longitudinal G-force, altitude and elevation profile of the route. Every session is saved and can be reviewed at any time. Just one tap from the main screen to activate it before you ride.",
       }
     };
 
