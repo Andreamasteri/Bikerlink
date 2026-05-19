@@ -181,7 +181,7 @@ export interface IStorage {
   expireOldProposals(): Promise<number>;
   deleteExpiredProposals(): Promise<number>;
 
-  getConversations(userId: string): Promise<Conversation[]>;
+  getConversations(userId: string, limit?: number, offset?: number): Promise<Conversation[]>;
   getAllConversations(): Promise<Conversation[]>;
   getConversation(id: string): Promise<Conversation | undefined>;
   createConversation(conv: InsertConversation): Promise<Conversation>;
@@ -764,11 +764,16 @@ export class DatabaseStorage implements IStorage {
     return deleted.length;
   }
 
-  async getConversations(userId: string): Promise<Conversation[]> {
-    const participantRows = await db.select().from(conversationParticipants).where(eq(conversationParticipants.userId, userId));
-    if (participantRows.length === 0) return [];
-    const convIds = participantRows.map((p) => p.conversationId);
-    return db.select().from(conversations).where(inArray(conversations.id, convIds)).orderBy(desc(conversations.updatedAt));
+  async getConversations(userId: string, limit = 200, offset = 0): Promise<Conversation[]> {
+    const rows = await db
+      .select({ conv: conversations })
+      .from(conversations)
+      .innerJoin(conversationParticipants, eq(conversationParticipants.conversationId, conversations.id))
+      .where(eq(conversationParticipants.userId, userId))
+      .orderBy(desc(conversations.updatedAt))
+      .limit(limit)
+      .offset(offset);
+    return rows.map((r) => r.conv);
   }
 
   async getAllConversations(): Promise<Conversation[]> {

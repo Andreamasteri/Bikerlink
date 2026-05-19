@@ -32,6 +32,32 @@ const router = Router();
 const fakeBotMessageCounts = new Map<string, number>();
 const fakeBotLastReplies = new Map<string, string[]>();
 
+const CONV_CACHE_TTL_MS = 15_000;
+const CONV_CACHE_MAX_SIZE = 500;
+interface ConvCacheEntry { data: unknown[]; expiresAt: number }
+const convCache = new Map<string, ConvCacheEntry>();
+function convCacheKey(userId: string, limit: number, offset: number) { return `${userId}:${limit}:${offset}`; }
+function invalidateConvCache(userId: string) {
+  for (const key of convCache.keys()) {
+    if (key.startsWith(`${userId}:`)) convCache.delete(key);
+  }
+}
+function pruneConvCache() {
+  const now = Date.now();
+  for (const [key, entry] of convCache.entries()) {
+    if (entry.expiresAt <= now) convCache.delete(key);
+  }
+  if (convCache.size > CONV_CACHE_MAX_SIZE) {
+    const excess = convCache.size - CONV_CACHE_MAX_SIZE;
+    let removed = 0;
+    for (const key of convCache.keys()) {
+      if (removed >= excess) break;
+      convCache.delete(key);
+      removed++;
+    }
+  }
+}
+
 interface FakeUserContext {
   nickname: string;
   region?: string;
@@ -458,13 +484,28 @@ router.get("/conversations", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
+    const rawLimit = parseInt(String(req.query.limit ?? "200"), 10);
+    const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 200) : 200;
+    const rawOffset = parseInt(String(req.query.offset ?? "0"), 10);
+    const offset = Number.isFinite(rawOffset) ? Math.max(rawOffset, 0) : 0;
+    const cacheKey = convCacheKey(userId, limit, offset);
+    const cached = convCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return res.json(cached.data);
+    }
+
     const [blockedIds, convs] = await Promise.all([
       storage.getBlockedUserIds(userId),
-      storage.getConversations(userId),
+      storage.getConversations(userId, limit, offset),
     ]);
     const blockedSet = new Set(blockedIds);
 
-    if (convs.length === 0) return res.json([]);
+    if (convs.length === 0) {
+      const empty: unknown[] = [];
+      pruneConvCache();
+      convCache.set(cacheKey, { data: empty, expiresAt: Date.now() + CONV_CACHE_TTL_MS });
+      return res.json(empty);
+    }
 
     const convIds = convs.map(c => c.id);
 
@@ -529,6 +570,8 @@ router.get("/conversations", async (req: Request, res: Response) => {
       };
     }).filter(Boolean);
 
+    pruneConvCache();
+    convCache.set(cacheKey, { data: result, expiresAt: Date.now() + CONV_CACHE_TTL_MS });
     return res.json(result);
   } catch (error) {
     console.error("Get conversations error:", error);
@@ -587,6 +630,8 @@ router.post("/conversations", async (req: Request, res: Response) => {
         conversationId: conv.id,
         userId,
       });
+      invalidateConvCache(userId);
+      invalidateConvCache(targetUserId);
 
       return res.status(201).json(conv);
     }
@@ -642,6 +687,11 @@ router.post("/conversations", async (req: Request, res: Response) => {
       }
     }
 
+    invalidateConvCache(userId);
+    if (participantIds && Array.isArray(participantIds)) {
+      for (const pid of participantIds) invalidateConvCache(pid);
+    }
+
     return res.status(201).json(conv);
   } catch (error) {
     console.error("Create conversation error:", error);
@@ -661,6 +711,7 @@ router.delete("/conversations/:id", async (req: Request, res: Response) => {
     }
 
     await storage.deleteConversation(id);
+    participants.forEach(p => invalidateConvCache(p.userId));
     return res.json({ message: "Conversazione eliminata" });
   } catch (error) {
     console.error("Delete conversation error:", error);
@@ -779,6 +830,7 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     }));
 
     await storage.updateConversationLastRead(id, userId);
+    invalidateConvCache(userId);
 
     return res.json(result);
   } catch (error) {
@@ -864,6 +916,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     });
 
     await storage.updateConversationTimestamp(id);
+    participants.forEach(p => invalidateConvCache(p.userId));
 
     const senderUser = await storage.getUser(userId);
 
@@ -912,6 +965,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
                 isFiltered: false,
               });
               await storage.updateConversationTimestamp(convId);
+              participants.forEach(p => invalidateConvCache(p.userId));
               notifyChatEvent(
                 participants.map(p => p.userId),
                 { type: "new_message", conversationId: convId, message: { ...fakeMsg, sender: { id: fakeUserId, nickname: targetUser.nickname, avatarUrl: targetUser.avatarUrl, userType: targetUser.userType } } }
@@ -1022,6 +1076,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
                   isFiltered: false,
                 });
                 await storage.updateConversationTimestamp(id);
+                participants.forEach(p => invalidateConvCache(p.userId));
                 notifyChatEvent(
                   participants.map(p => p.userId),
                   { type: "new_message", conversationId: id, message: { ...fakeMsg, sender: { id: fakeUserId, nickname: fakeUser?.nickname, avatarUrl: fakeUser?.avatarUrl, userType: fakeUser?.userType } } }
@@ -1111,6 +1166,7 @@ router.post("/conversations/:id/images", chatImageUpload.single("image"), async 
     });
 
     await storage.updateConversationTimestamp(conversationId);
+    participants.forEach(p => invalidateConvCache(p.userId));
 
     const sender = await storage.getUser(userId);
     const imagePayload = {
