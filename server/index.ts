@@ -1289,7 +1289,11 @@ function setupErrorHandler(app: express.Application) {
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS success_count INTEGER NOT NULL DEFAULT 0`);
           await db.execute(sql`ALTER TABLE ota_releases ALTER COLUMN slot SET DEFAULT 'archived'`);
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_releases_slot_idx ON ota_releases(slot)`);
-          console.log("[MIGRATION] ota_releases slot/promoted_at/promoted_by/success_count ensured (slot default=archived)");
+          // Task #1356: indici per debug agente su ota_events.
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_events_release_phase_idx ON ota_events(release_id, phase)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_events_source_created_idx ON ota_events(source, created_at DESC)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_events_phase_created_idx ON ota_events(phase, created_at DESC)`);
+          console.log("[MIGRATION] ota_releases slot/success + ota_events debug indices ensured");
         } catch (e) {
           console.warn("[MIGRATION] ota_releases slot columns:", e);
         }
