@@ -1344,6 +1344,9 @@ export default function ProfileScreen() {
           Beta
         </Text>
       </View>
+      <Text style={{ color: "#1976D2", fontSize: 14, fontFamily: "Inter_600SemiBold", textAlign: "right", marginRight: 20, marginTop: 8 }}>
+        ciaociao
+      </Text>
       <View style={{ height: 40 }} />
     </ScrollView>
     </View>
