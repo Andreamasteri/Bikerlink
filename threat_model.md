@@ -26,6 +26,7 @@ Production assumptions for this scan:
 - **Unauthenticated to authenticated routes** — some pages and APIs are public, while most user data requires a valid session. This boundary must be enforced on every route, not inferred from frontend behavior.
 - **Authenticated user to admin/moderator functionality** — admin and moderator routes expose account management, content control, and operational data. Role checks must happen server-side for every privileged action.
 - **Authenticated user to other users' private content** — chat media, profile photos, garage photos, exact coordinates, club memberships, and pending club proposal data must be treated as scoped private objects, not merely hidden in the UI.
+- **Authenticated user to other users' private preference objects** — wishlist motorcycles, wishlist photos, and other match-linked records are private user-scoped data and must enforce owner checks on read and write paths, even when a related match or notification exists.
 - **Authenticated member to moderator-only club data** — club members may legitimately access club content, but pending location proposals and moderation-only metadata still require narrower server-side filtering than the raw club row.
 - **Backend to PostgreSQL** — the API server has broad read/write database access; injection or broken authorization at the API layer can become full data compromise.
 - **Backend to object storage / local uploads** — file names and object paths cross from untrusted input into durable storage and file-serving routes. Public serving must not expose private content by guessable paths alone.
@@ -36,9 +37,9 @@ Production assumptions for this scan:
 ## Scan Anchors
 
 - **Production backend entry points:** `server/index.ts`, `server/routes.ts`, route modules under `server/routes/`.
-- **Highest-risk areas:** auth/session handling in `server/routes/auth.ts`; startup seeding in `server/auto-seed.ts`; admin/moderation in `server/routes/admin.ts` and `server/routes/moderator.ts`; uploads and file serving in `server/routes/users.ts`, `server/routes/chat.ts`, `server/routes/contest.ts`, `server/routes/events.ts`, `server/routes/motorcycles.ts`; user discovery/privacy logic in `server/routes/users.ts`; club authorization boundaries in `server/routes/motoclubs.ts`; outbound fetch/proxy logic in `server/routes/radio.ts` and music integrations.
+- **Highest-risk areas:** auth/session handling in `server/routes/auth.ts`; startup seeding in `server/auto-seed.ts`; admin/moderation in `server/routes/admin.ts` and `server/routes/moderator.ts`; uploads and file serving in `server/routes/users.ts`, `server/routes/chat.ts`, `server/routes/contest.ts`, `server/routes/events.ts`, `server/routes/motorcycles.ts`; wishlist and match-linked preference objects in `server/routes/wishlist.ts` and `server/routes/proposals.ts`; user discovery/privacy logic in `server/routes/users.ts`; club authorization boundaries in `server/routes/motoclubs.ts`; outbound fetch/proxy logic in `server/routes/radio.ts` and music integrations.
 - **Public surfaces:** `/apple-review`, public settings endpoints, public media/file routes, unauthenticated or pre-auth telemetry/reporting endpoints, and radio preview/proxy endpoints.
-- **Authenticated surfaces:** most `/api/users`, `/api/chat`, `/api/contest`, `/api/events`, `/api/motoclubs`, `/api/routes`, `/api/lastfm` routes.
+- **Authenticated surfaces:** most `/api/users`, `/api/chat`, `/api/contest`, `/api/events`, `/api/motoclubs`, `/api/routes`, `/api/lastfm`, `/api/wishlist`, and `/api/proposals` routes.
 - **Admin/mod surfaces:** `/api/admin/*`, `/api/moderator/*`, admin-only uploads and system-management paths.
 - **Usually dev-only / lower priority unless proven production-reachable:** `scripts/`, documentation files, generated artifacts, mock data helpers, local workflow helpers, Expo frontend-only scaffolding.
 
@@ -47,16 +48,18 @@ Production assumptions for this scan:
 - Treat any production startup seeding or reviewer/demo-account provisioning as a first-class auth risk; default or resettable credentials are in scope even when introduced as operational convenience.
 - Treat platform-created fake or synthetic users as real production principals if they can log in or interact with ordinary users; shared credentials on those accounts are in scope.
 - Treat email-verification and password-recovery codes as authentication factors: short codes, missing attempt limits, or flows that automatically create a session on success are in scope as account-takeover risks.
-- Treat exact user coordinates, club rosters/proposals, profile photos, garage photos, and chat attachments as sensitive data that require server-side audience checks, not just frontend hiding or unguessable URLs.
+- Treat exact user coordinates, club rosters/proposals, profile photos, garage photos, chat attachments, and wishlist preference objects as sensitive data that require server-side audience checks, not just frontend hiding or unguessable URLs.
 - Treat any proxy/fetch endpoint that accepts attacker-controlled destinations as SSRF-prone unless it validates resolved IPs, redirect targets, and response-handling boundaries.
 - Re-check current account status on authenticated requests; blocking or suspension is not an effective control if long-lived sessions remain usable after the status change.
-- Treat user safety controls such as blocking as message-delivery boundaries that must be enforced consistently across text, image, and attachment endpoints, not only on one send path or on later read paths.
+- Treat user safety controls such as blocking as message-delivery boundaries that must be enforced consistently across text, image, attachment, and match-adjacent endpoints, not only on one send path or on later read paths.
 - Treat public or pre-auth operational telemetry ingestion as an availability surface that needs payload caps, rate limits, and strict field truncation.
-- Re-check long-lived authenticated channels such as SSE or other streaming responses when account status changes; per-request session invalidation alone does not revoke already-open streams.
+ - Re-check long-lived authenticated channels such as SSE or other streaming responses whenever sessions are revoked or account state changes; deleting server-side session rows alone does not revoke already-open streams.
 - Treat `hideFromMap` as protection against derived distance leakage as well as raw coordinate leakage across every discovery and availability endpoint.
-- Treat club-scoped proposals as private club objects whose active-membership checks must be enforced on create, read, and join flows, not only on list endpoints.
+ - Treat club-scoped proposals as private club objects whose active-membership checks must be enforced on create, read, update, delete, and join flows, not only on list endpoints.
+ - Treat club membership revocation as a cross-table authorization event: removing a member from `motoClubMembers` must also revoke any linked `conversationParticipants` access for the club chat.
 - Treat public or low-friction telemetry and reporting endpoints that trigger email or durable storage as abuse surfaces: they should rely on trusted proxy-derived client identity (`req.ip`/Express proxy handling), and authenticated reporting still needs quotas and body caps.
 - Treat admin-authored OTA metadata and moderator-authored client-rendered URLs as untrusted inputs that cross into public endpoints or end-user devices; privileged content pipelines still need server-side source restrictions.
+- Treat match-linked object identifiers as sensitive capability references; if a route leaks another user's object ID, every downstream mutation path must still verify ownership server-side.
 
 ## Threat Categories
 
@@ -66,7 +69,7 @@ Users authenticate with server-side sessions stored in PostgreSQL, with a mobile
 
 ### Tampering
 
-Clients can submit profile data, geo coordinates, messages, uploads, club/event actions, and administrative content changes. The backend must validate all user-controlled fields and enforce ownership and role checks server-side. Upload and storage paths must not let users overwrite or manipulate content outside their intended scope. Conversation-creation paths must not let one user insert themselves into an unrelated private thread.
+Clients can submit profile data, geo coordinates, messages, uploads, club/event actions, wishlist objects, and administrative content changes. The backend must validate all user-controlled fields and enforce ownership and role checks server-side. Upload and storage paths must not let users overwrite or manipulate content outside their intended scope. Conversation-creation paths must not let one user insert themselves into an unrelated private thread.
 
 ### Information Disclosure
 
@@ -78,7 +81,7 @@ The backend accepts uploads, auth attempts, background location updates, error r
 
 ### Elevation of Privilege
 
-The largest risks are broken admin/moderator boundaries, hardcoded or resettable privileged credentials, long-lived sessions that survive suspension, IDORs over user/chat/media objects, and SSRF or similar issues that let an attacker pivot through backend network trust. All privileged routes must independently verify admin/mod roles and current account status, and startup seed code must not grant durable default credentials in production.
+The largest risks are broken admin/moderator boundaries, hardcoded or resettable privileged credentials, long-lived sessions that survive suspension, IDORs over user/chat/media/wishlist objects, and SSRF or similar issues that let an attacker pivot through backend network trust. All privileged routes must independently verify admin/mod roles and current account status, and startup seed code must not grant durable default credentials in production.
 
 ### Repudiation
 
