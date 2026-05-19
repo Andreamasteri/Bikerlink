@@ -1,6 +1,8 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
+import { registerSiteRoutes } from "./site/routes";
 import { initState } from "./init-state";
 import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount, seedGooglePlayReviewerAccount, ensureBikerLinkOfficialOnBoot } from "./auto-seed";
@@ -239,43 +241,7 @@ async function serveExpoManifest(platform: string, req: Request, res: Response) 
   return res.status(503).json({ error: `Bundle non disponibile per ${platform}. Riprova tra qualche secondo.` });
 }
 
-function serveLandingPage({
-  req,
-  res,
-  landingPageTemplate,
-  appName,
-}: {
-  req: Request;
-  res: Response;
-  landingPageTemplate: string;
-  appName: string;
-}) {
-  const forwardedProto = req.header("x-forwarded-proto");
-  const protocol = forwardedProto || req.protocol || "https";
-  const forwardedHost = req.header("x-forwarded-host");
-  const host = forwardedHost || req.get("host");
-  const baseUrl = `${protocol}://${host}`;
-  const expsUrl = `${host}`;
-
-  const html = landingPageTemplate
-    .replace(/BASE_URL_PLACEHOLDER/g, baseUrl)
-    .replace(/EXPS_URL_PLACEHOLDER/g, expsUrl)
-    .replace(/APP_NAME_PLACEHOLDER/g, appName);
-
-  res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.status(200).send(html);
-}
-
 function configureExpoAndLanding(app: express.Application) {
-  const templatePath = path.resolve(
-    process.cwd(),
-    "server",
-    "templates",
-    "landing-page.html",
-  );
-  const landingPageTemplate = fs.readFileSync(templatePath, "utf-8");
-  const appName = getAppName();
-
   log("Serving static Expo files with dynamic manifest routing");
 
   app.use((req: Request, res: Response, next: NextFunction) => {
@@ -295,90 +261,16 @@ function configureExpoAndLanding(app: express.Application) {
       });
     }
 
-    if (req.path === "/") {
-      return serveLandingPage({
-        req,
-        res,
-        landingPageTemplate,
-        appName,
-      });
-    }
-
+    // Task #1520: when no expo-platform header is present, fall through to
+    // registerSiteRoutes() which serves the new multi-page marketing site.
+    // The old monolithic landing-page.html is no longer used as the home.
     next();
   });
 
-  // ── SEO: robots.txt ─────────────────────────────────────────────────────────
-  app.get("/robots.txt", (_req: Request, res: Response) => {
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    res.send([
-      "User-agent: *",
-      "Allow: /$",
-      "Allow: /privacy",
-      "Allow: /privacy-policy",
-      "Allow: /terms",
-      "Disallow: /api/",
-      "Disallow: /admin",
-      "Disallow: /investors",
-      "Disallow: /apple-review",
-      "Disallow: /delete-account",
-      "Disallow: /uploads/",
-      "Disallow: /*.pdf$",
-      "Disallow: /matching-system.pdf",
-      "Disallow: /assets/competitor-analysis.pdf",
-      "",
-      `Sitemap: https://biker-link.replit.app/sitemap.xml`,
-    ].join("\n"));
-  });
-
-  // ── SEO: sitemap.xml ─────────────────────────────────────────────────────────
-  app.get("/sitemap.xml", (_req: Request, res: Response) => {
-    const base = "https://biker-link.replit.app";
-    const today = new Date().toISOString().split("T")[0];
-    res.setHeader("Content-Type", "application/xml; charset=utf-8");
-    res.setHeader("Cache-Control", "public, max-age=86400");
-    res.send(`<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>${base}/</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>${base}/privacy</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
-    <loc>${base}/terms</loc>
-    <lastmod>${today}</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-</urlset>`);
-  });
-
-  // ── Pagine HTML statiche (privacy, termini, cancella account) ──────────────
-  // DEVONO essere prima di qualsiasi express.static — in produzione
-  // static-build/index.html esiste e la SPA catch-all intercetterebbe queste
-  // route se registrate dopo i middleware di file statici.
-  const htmlPages: Record<string, string> = {
-    "/privacy":        "privacy-policy.html",
-    "/privacy-policy": "privacy-policy.html",
-    "/terms":          "terms.html",
-    "/delete-account": "delete-account.html",
-    "/investors":      "investors.html",
-  };
-  for (const [route, file] of Object.entries(htmlPages)) {
-    const filePath = path.resolve(process.cwd(), "server", "templates", file);
-    app.get(route, (_req: Request, res: Response) => {
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store");
-      res.sendFile(filePath);
-    });
-  }
+  // SEO (robots.txt, sitemap.xml), favicon, static HTML legal pages and the
+  // marketing site itself are all registered by registerSiteRoutes() — kept
+  // in server/site/routes.ts for maintainability.
+  registerSiteRoutes(app);
 
   // ── APK Status (no redirect) ─────────────────────────────────────────────
   // Returns { available: true } if an APK URL is configured, { available: false } otherwise.
@@ -631,6 +523,50 @@ function setupErrorHandler(app: express.Application) {
         limit: MATCH_ENRICHMENT_GLOBAL_LIMIT,
       },
     });
+  });
+
+  // Task #1520: gzip/brotli compression for all HTML/CSS/JS/JSON responses.
+  // Improves audit perf score and reduces bandwidth, especially for the
+  // marketing site rendered server-side at every request.
+  app.use(compression());
+
+  // Task #1520: security headers applied to every response. These satisfy
+  // squirrelscan's security/csp, security/x-frame-options, and related
+  // checks. CSP is intentionally permissive enough to allow:
+  //   - inline <style> blocks (renderPage embeds shared CSS)
+  //   - inline <script> blocks (small nav-burger toggle, Leaflet bootstrap)
+  //   - Google Fonts (fonts.googleapis.com / fonts.gstatic.com)
+  //   - Leaflet from unpkg + CARTO tile servers on /community
+  //   - Replit dev tooling iframes during local development
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader(
+      "Permissions-Policy",
+      "camera=(self), microphone=(self), geolocation=(self), payment=()",
+    );
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://unpkg.com https://replit.com",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com",
+        "font-src 'self' https://fonts.gstatic.com data:",
+        "img-src 'self' data: blob: https:",
+        "connect-src 'self' https: wss:",
+        "frame-src 'self' https://replit.com",
+        "frame-ancestors 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "form-action 'self' mailto:",
+      ].join("; "),
+    );
+    next();
   });
 
   setupCors(app);
