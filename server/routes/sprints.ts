@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
-import { sprintResults } from "@shared/schema";
-import { eq, asc } from "drizzle-orm";
+import { sprintResults, users, userMotorcycles } from "@shared/schema";
+import { eq, asc, and, gte, lte, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -62,6 +62,98 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(sprints);
   } catch (error) {
     console.error("Get sprints error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/leaderboard", async (req: Request, res: Response) => {
+  try {
+    const currentUserId = requireAuth(req, res);
+    if (!currentUserId) return;
+
+    const limitRaw = parseInt(String(req.query.limit ?? "100"), 10);
+    const limit = Math.min(Math.max(isFinite(limitRaw) ? limitRaw : 100, 1), 200);
+
+    const motorcycleType = typeof req.query.motorcycleType === "string" && req.query.motorcycleType.length > 0
+      ? req.query.motorcycleType
+      : null;
+    const minDispRaw = parseInt(String(req.query.minDisplacement ?? ""), 10);
+    const maxDispRaw = parseInt(String(req.query.maxDisplacement ?? ""), 10);
+    const minDisplacement = isFinite(minDispRaw) ? minDispRaw : null;
+    const maxDisplacement = isFinite(maxDispRaw) ? maxDispRaw : null;
+
+    const needsMotoFilter = motorcycleType !== null || minDisplacement !== null || maxDisplacement !== null;
+
+    // Pick exactly one best row per user with a deterministic tie-break
+    // (earliest createdAt, then lowest id). This avoids LIMIT consuming
+    // slots with duplicate rows when a rider has tied best times.
+    const bestPerUser = db
+      .selectDistinctOn([sprintResults.userId], {
+        id: sprintResults.id,
+        userId: sprintResults.userId,
+        sprint0to100Ms: sprintResults.sprint0to100Ms,
+        maxAccelerationG: sprintResults.maxAccelerationG,
+        maxTiltDeg: sprintResults.maxTiltDeg,
+        createdAt: sprintResults.createdAt,
+      })
+      .from(sprintResults)
+      .orderBy(
+        asc(sprintResults.userId),
+        asc(sprintResults.sprint0to100Ms),
+        asc(sprintResults.createdAt),
+        asc(sprintResults.id),
+      )
+      .as("best_per_user");
+
+    const motoConditions = [eq(userMotorcycles.userId, users.id), eq(userMotorcycles.isDefault, true)];
+    if (motorcycleType) motoConditions.push(eq(userMotorcycles.motorcycleType, motorcycleType));
+    if (minDisplacement !== null) motoConditions.push(gte(userMotorcycles.displacement, minDisplacement));
+    if (maxDisplacement !== null) motoConditions.push(lte(userMotorcycles.displacement, maxDisplacement));
+
+    const baseQuery = db
+      .select({
+        userId: users.id,
+        nickname: users.nickname,
+        avatarUrl: users.avatarUrl,
+        sprint0to100Ms: bestPerUser.sprint0to100Ms,
+        maxAccelerationG: bestPerUser.maxAccelerationG,
+        maxTiltDeg: bestPerUser.maxTiltDeg,
+        createdAt: bestPerUser.createdAt,
+        motorcycleBrand: userMotorcycles.brand,
+        motorcycleModel: userMotorcycles.model,
+        motorcycleType: userMotorcycles.motorcycleType,
+        displacement: userMotorcycles.displacement,
+      })
+      .from(bestPerUser)
+      .innerJoin(users, eq(users.id, bestPerUser.userId));
+
+    const withMoto = needsMotoFilter
+      ? baseQuery.innerJoin(userMotorcycles, and(...motoConditions))
+      : baseQuery.leftJoin(userMotorcycles, and(...motoConditions));
+
+    const rows = await withMoto
+      .orderBy(asc(bestPerUser.sprint0to100Ms), asc(bestPerUser.createdAt))
+      .limit(limit);
+
+    const leaderboard = rows.map((r, idx) => ({
+      rank: idx + 1,
+      userId: r.userId,
+      nickname: r.nickname,
+      avatarUrl: r.avatarUrl,
+      sprint0to100Ms: r.sprint0to100Ms,
+      maxAccelerationG: r.maxAccelerationG,
+      maxTiltDeg: r.maxTiltDeg,
+      createdAt: r.createdAt,
+      motorcycleBrand: r.motorcycleBrand,
+      motorcycleModel: r.motorcycleModel,
+      motorcycleType: r.motorcycleType,
+      displacement: r.displacement,
+      isCurrentUser: r.userId === currentUserId,
+    }));
+
+    return res.json(leaderboard);
+  } catch (error) {
+    console.error("Get sprint leaderboard error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

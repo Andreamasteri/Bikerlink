@@ -11,6 +11,7 @@ import {
   Pressable,
   TextInput,
   Alert,
+  Image,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,6 +35,24 @@ interface SprintResult {
   createdAt: string;
 }
 
+interface LeaderboardEntry {
+  rank: number;
+  userId: string;
+  nickname: string;
+  avatarUrl: string | null;
+  sprint0to100Ms: number;
+  maxAccelerationG: number | null;
+  maxTiltDeg: number | null;
+  createdAt: string;
+  motorcycleBrand: string | null;
+  motorcycleModel: string | null;
+  motorcycleType: string | null;
+  displacement: number | null;
+  isCurrentUser: boolean;
+}
+
+type Tab = "mine" | "leaderboard";
+
 function formatSprintTime(ms: number): string {
   return (ms / 1000).toFixed(3) + "s";
 }
@@ -54,6 +73,7 @@ export default function SprintHistoryScreen() {
   const { speedUnit, timeFormat } = useUnits();
   const locale = getCurrentLocale();
   const listRef = useRef<FlatList>(null);
+  const [tab, setTab] = useState<Tab>("mine");
 
   const targetSpeed = speedUnit === "mph" ? 62 : 100;
   const targetLabel = speedUnit === "mph" ? "62 mph" : "100 km/h";
@@ -68,6 +88,20 @@ export default function SprintHistoryScreen() {
     queryFn: getQueryFn({ on401: "throw" }),
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
+    enabled: tab === "mine",
+  });
+
+  const {
+    data: leaderboard,
+    isLoading: isLoadingLeaderboard,
+    refetch: refetchLeaderboard,
+    isRefetching: isRefetchingLeaderboard,
+  } = useQuery<LeaderboardEntry[]>({
+    queryKey: ["/api/sprints/leaderboard"],
+    queryFn: getQueryFn({ on401: "throw" }),
+    staleTime: 60 * 1000,
+    gcTime: 5 * 60 * 1000,
+    enabled: tab === "leaderboard",
   });
 
   const personalBest: SprintResult | null = sprints && sprints.length > 0 ? sprints[0] : null;
@@ -174,8 +208,84 @@ export default function SprintHistoryScreen() {
     [targetLabel, locale, timeFormat]
   );
 
+  const renderLeaderboardItem = useCallback(
+    ({ item, index }: { item: LeaderboardEntry; index: number }) => {
+      const isRecord = index === 0;
+      const medal = getMedalIcon(index);
+      const motoLabel = [item.motorcycleBrand, item.motorcycleModel].filter(Boolean).join(" ");
+
+      return (
+        <View
+          style={[
+            styles.sprintItem,
+            isRecord && styles.sprintItemRecord,
+            item.isCurrentUser && styles.sprintItemMe,
+          ]}
+        >
+          <View style={styles.sprintRank}>
+            {medal ? (
+              <Ionicons name={medal.name} size={20} color={medal.color} />
+            ) : (
+              <Text style={styles.rankNumber}>#{item.rank}</Text>
+            )}
+          </View>
+
+          {item.avatarUrl ? (
+            <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarFallback]}>
+              <Text style={styles.avatarInitial}>
+                {(item.nickname || "?").charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.lbMain}>
+            <Text style={styles.lbNickname} numberOfLines={1}>
+              {item.nickname}
+              {item.isCurrentUser ? " (tu)" : ""}
+            </Text>
+            <Text
+              style={[
+                styles.sprintTime,
+                styles.lbTime,
+                isRecord && styles.sprintTimeRecord,
+              ]}
+            >
+              {formatSprintTime(item.sprint0to100Ms)}
+            </Text>
+            {motoLabel.length > 0 && (
+              <Text style={styles.lbMoto} numberOfLines={1}>
+                {motoLabel}
+                {item.displacement ? ` · ${item.displacement}cc` : ""}
+              </Text>
+            )}
+          </View>
+
+          <View style={styles.sprintStats}>
+            {(item.maxAccelerationG ?? 0) > 0 && (
+              <Text style={styles.statChip}>
+                <Ionicons name="pulse-outline" size={11} color={Colors.accentRed} />
+                {" "}{(item.maxAccelerationG ?? 0).toFixed(2)}G
+              </Text>
+            )}
+            {(item.maxTiltDeg ?? 0) > 0 && (
+              <Text style={styles.statChip}>
+                <Ionicons name="compass-outline" size={11} color={Colors.accent} />
+                {" "}{(item.maxTiltDeg ?? 0).toFixed(1)}°
+              </Text>
+            )}
+          </View>
+        </View>
+      );
+    },
+    []
+  );
+
   const topPadding = insets.top;
   const bottomPad = insets.bottom;
+
+  const isMineTab = tab === "mine";
 
   return (
     <View style={[styles.container, { paddingTop: topPadding }]}>
@@ -190,62 +300,135 @@ export default function SprintHistoryScreen() {
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Ionicons name="speedometer-outline" size={20} color={Colors.accentRed} />
-          <Text style={styles.headerTitle}>I miei sprint</Text>
+          <Text style={styles.headerTitle}>Sprint 0→{targetLabel}</Text>
         </View>
         <View style={styles.backBtn} />
       </View>
 
-      {/* Personal best banner */}
-      {personalBest && (
-        <View style={styles.pbBanner}>
-          <Ionicons name="trophy" size={22} color="#FFD700" />
-          <View style={styles.pbInfo}>
-            <Text style={styles.pbLabel}>Record personale</Text>
-            <Text style={styles.pbTime}>
-              {formatSprintTime(personalBest.sprint0to100Ms ?? 0)}
-            </Text>
-          </View>
-          <Text style={styles.pbSince}>
-            {formatDateTime(personalBest.createdAt, locale, timeFormat)}
+      {/* Tabs */}
+      <View style={styles.tabs}>
+        <TouchableOpacity
+          style={[styles.tabBtn, isMineTab && styles.tabBtnActive]}
+          onPress={() => setTab("mine")}
+          testID="tab-mine"
+        >
+          <Ionicons
+            name="person-outline"
+            size={16}
+            color={isMineTab ? Colors.accentRed : Colors.textSecondary}
+          />
+          <Text style={[styles.tabLabel, isMineTab && styles.tabLabelActive]}>
+            I miei sprint
           </Text>
-        </View>
-      )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, !isMineTab && styles.tabBtnActive]}
+          onPress={() => setTab("leaderboard")}
+          testID="tab-leaderboard"
+        >
+          <Ionicons
+            name="trophy-outline"
+            size={16}
+            color={!isMineTab ? Colors.accentRed : Colors.textSecondary}
+          />
+          <Text style={[styles.tabLabel, !isMineTab && styles.tabLabelActive]}>
+            Classifica
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* List */}
-      {isLoading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={Colors.accent} />
-        </View>
-      ) : !sprints || sprints.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="timer-outline" size={56} color={Colors.textSecondary} />
-          <Text style={styles.emptyTitle}>Nessun sprint ancora</Text>
-          <Text style={styles.emptySubtitle}>
-            {t("sprint.enableHint")}
-          </Text>
-        </View>
-      ) : (
-        <FlatList
-          ref={listRef}
-          data={sprints}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: bottomPad + 16, paddingTop: 8 }}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
-              tintColor={Colors.accent}
-              colors={[Colors.accent]}
+      {isMineTab ? (
+        <>
+          {/* Personal best banner */}
+          {personalBest && (
+            <View style={styles.pbBanner}>
+              <Ionicons name="trophy" size={22} color="#FFD700" />
+              <View style={styles.pbInfo}>
+                <Text style={styles.pbLabel}>Record personale</Text>
+                <Text style={styles.pbTime}>
+                  {formatSprintTime(personalBest.sprint0to100Ms ?? 0)}
+                </Text>
+              </View>
+              <Text style={styles.pbSince}>
+                {formatDateTime(personalBest.createdAt, locale, timeFormat)}
+              </Text>
+            </View>
+          )}
+
+          {/* List */}
+          {isLoading ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color={Colors.accent} />
+            </View>
+          ) : !sprints || sprints.length === 0 ? (
+            <View style={styles.center}>
+              <Ionicons name="timer-outline" size={56} color={Colors.textSecondary} />
+              <Text style={styles.emptyTitle}>Nessun sprint ancora</Text>
+              <Text style={styles.emptySubtitle}>
+                {t("sprint.enableHint")}
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              ref={listRef}
+              data={sprints}
+              keyExtractor={(item) => item.id}
+              renderItem={renderItem}
+              contentContainerStyle={{ paddingBottom: bottomPad + 16, paddingTop: 8 }}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefetching}
+                  onRefresh={refetch}
+                  tintColor={Colors.accent}
+                  colors={[Colors.accent]}
+                />
+              }
+              ListHeaderComponent={
+                <Text style={styles.listHeader}>
+                  {sprints.length} {sprints.length === 1 ? "sessione" : "sessioni"} — ordinate per tempo
+                </Text>
+              }
             />
-          }
-          ListHeaderComponent={
-            <Text style={styles.listHeader}>
-              {sprints.length} {sprints.length === 1 ? "sessione" : "sessioni"} — ordinate per tempo
-            </Text>
-          }
-        />
+          )}
+        </>
+      ) : (
+        <>
+          {isLoadingLeaderboard ? (
+            <View style={styles.center}>
+              <ActivityIndicator size="large" color={Colors.accent} />
+            </View>
+          ) : !leaderboard || leaderboard.length === 0 ? (
+            <View style={styles.center}>
+              <Ionicons name="trophy-outline" size={56} color={Colors.textSecondary} />
+              <Text style={styles.emptyTitle}>Nessuno sprint registrato</Text>
+              <Text style={styles.emptySubtitle}>
+                Sii il primo a registrare uno sprint per apparire in classifica!
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={leaderboard}
+              keyExtractor={(item) => item.userId}
+              renderItem={renderLeaderboardItem}
+              contentContainerStyle={{ paddingBottom: bottomPad + 16, paddingTop: 8 }}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={isRefetchingLeaderboard}
+                  onRefresh={refetchLeaderboard}
+                  tintColor={Colors.accent}
+                  colors={[Colors.accent]}
+                />
+              }
+              ListHeaderComponent={
+                <Text style={styles.listHeader}>
+                  Top {leaderboard.length} — miglior tempo per pilota
+                </Text>
+              }
+            />
+          )}
+        </>
       )}
 
       {/* ── PUBLISH MODAL ────────────────────────────────────────────────── */}
@@ -361,6 +544,35 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.text,
   },
+  tabs: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    gap: 8,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  tabBtnActive: {
+    borderColor: Colors.accentRed + "80",
+  },
+  tabLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.textSecondary,
+  },
+  tabLabelActive: {
+    color: Colors.text,
+  },
   pbBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -417,6 +629,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 8,
     textAlign: "center",
   },
@@ -434,6 +647,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#FFD700" + "60",
     backgroundColor: Colors.surface,
+  },
+  sprintItemMe: {
+    borderWidth: 1,
+    borderColor: Colors.accentRed + "80",
   },
   sprintRank: {
     width: 28,
@@ -572,5 +789,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: "#fff",
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.background,
+  },
+  avatarFallback: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitial: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: Colors.text,
+  },
+  lbMain: {
+    flex: 1,
+    minWidth: 100,
+  },
+  lbNickname: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  lbTime: {
+    fontSize: 20,
+  },
+  lbMoto: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
 });
