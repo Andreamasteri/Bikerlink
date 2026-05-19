@@ -590,7 +590,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       //   B) Device has NO assignment (or no header) → serve stable slot.
       //      - If stable slot is empty → legacy fallback (slot IS NULL, status='active'),
       //        to support pre-slot OTA records that pre-date the new slot system.
-      const deviceId = (req.headers["expo-device-id"] as string | undefined)?.substring(0, 128) || null;
+      // Identify the device: prefer expo-device-id, fall back to expo-installation-id (Expo SDK standard)
+      const rawDeviceId =
+        (req.headers["expo-device-id"] as string | undefined) ||
+        (req.headers["expo-installation-id"] as string | undefined) ||
+        null;
+      const deviceId = rawDeviceId?.substring(0, 128) || null;
       let assignedSlot: string | null = null;
       let hasSlotAssignment = false;
       if (deviceId) {

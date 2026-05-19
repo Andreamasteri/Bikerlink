@@ -1134,7 +1134,7 @@ export const otaReleases = pgTable("ota_releases", {
   scheduledAt: timestamp("scheduled_at"),
   publishedAt: timestamp("published_at"),
   status: varchar("status", { length: 20 }).notNull().default("draft"),
-  slot: varchar("slot", { length: 32 }),
+  slot: varchar("slot", { length: 32 }).default("archived"),
   promotedAt: timestamp("promoted_at"),
   promotedBy: varchar("promoted_by", { length: 100 }),
   successCount: integer("success_count").notNull().default(0),

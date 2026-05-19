@@ -6518,9 +6518,9 @@ router.post("/ota/assign-slot", async (req: Request, res: Response) => {
   try {
     const { releaseId, slot } = req.body ?? {};
     if (!releaseId || !slot) return res.status(400).json({ message: "releaseId e slot obbligatori" });
-    const VALID_SLOTS = ["stable", "previous-stable", "test-1", "test-2", "test-3"];
-    if (!VALID_SLOTS.includes(slot)) {
-      return res.status(400).json({ message: `slot non valido. Valori ammessi: ${VALID_SLOTS.join(", ")}` });
+    // Accetta: stable, previous-stable, test-N (N intero ≥1) — N configurable
+    if (!/^(stable|previous-stable|test-\d+)$/.test(slot)) {
+      return res.status(400).json({ message: "slot non valido. Formati ammessi: stable, previous-stable, test-1, test-2, ..." });
     }
 
     // Transazione: garantisce un solo occupante per slot
@@ -6577,9 +6577,9 @@ router.post("/ota/assign-device", async (req: Request, res: Response) => {
   try {
     const { deviceId, slot, expiresAt } = req.body ?? {};
     if (!deviceId || !slot) return res.status(400).json({ message: "deviceId e slot obbligatori" });
-    const VALID_SLOTS = ["stable", "test-1", "test-2", "test-3"];
-    if (!VALID_SLOTS.includes(slot)) {
-      return res.status(400).json({ message: `slot non valido. Valori ammessi: ${VALID_SLOTS.join(", ")}` });
+    // Accetta: stable, test-N (N intero ≥1) — N configurable; previous-stable non usabile per device
+    if (!/^(stable|test-\d+)$/.test(slot)) {
+      return res.status(400).json({ message: "slot non valido. Formati ammessi: stable, test-1, test-2, ..." });
     }
     const safeDeviceId = String(deviceId).substring(0, 128);
     const expiresAtDate = expiresAt ? new Date(expiresAt) : null;
@@ -6649,9 +6649,9 @@ router.post("/ota/promote", async (req: Request, res: Response) => {
   try {
     const { fromSlot } = req.body ?? {};
     if (!fromSlot) return res.status(400).json({ message: "fromSlot obbligatorio" });
-    const VALID_TEST_SLOTS = ["test-1", "test-2", "test-3"];
-    if (!VALID_TEST_SLOTS.includes(fromSlot)) {
-      return res.status(400).json({ message: `fromSlot deve essere uno di: ${VALID_TEST_SLOTS.join(", ")}` });
+    // Accetta qualsiasi test-N (N intero ≥1) — N configurable
+    if (!/^test-\d+$/.test(fromSlot)) {
+      return res.status(400).json({ message: "fromSlot deve essere un test slot: test-1, test-2, ..." });
     }
 
     // Leggi candidato prima di aprire la transazione (read-only)

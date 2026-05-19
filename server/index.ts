@@ -1286,8 +1286,9 @@ function setupErrorHandler(app: express.Application) {
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMP`);
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS promoted_by VARCHAR(100)`);
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS success_count INTEGER NOT NULL DEFAULT 0`);
+          await db.execute(sql`ALTER TABLE ota_releases ALTER COLUMN slot SET DEFAULT 'archived'`);
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_releases_slot_idx ON ota_releases(slot)`);
-          console.log("[MIGRATION] ota_releases slot/promoted_at/promoted_by/success_count ensured");
+          console.log("[MIGRATION] ota_releases slot/promoted_at/promoted_by/success_count ensured (slot default=archived)");
         } catch (e) {
           console.warn("[MIGRATION] ota_releases slot columns:", e);
         }
