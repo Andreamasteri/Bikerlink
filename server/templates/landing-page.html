@@ -12,27 +12,28 @@
     <meta name="theme-color" content="#0D0D0D" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@700;800;900&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <style>
       /* ── CSS VARIABLES ─────────────────────────────────────────────────── */
       :root {
-        --accent: #FF6600;
-        --accent-dim: rgba(255,102,0,0.12);
-        --accent-glow: rgba(255,102,0,0.30);
-        --accent-mid: rgba(255,102,0,0.50);
-        --bg: #0D0D0D;
-        --bg-alt: #111111;
-        --surface: #161616;
-        --surface2: #1E1E1E;
+        --accent: #FF3B30;
+        --accent-hover: #FF6A00;
+        --accent-dim: rgba(255,59,48,0.12);
+        --accent-glow: rgba(255,59,48,0.30);
+        --accent-mid: rgba(255,59,48,0.50);
+        --bg: #0A0A0A;
+        --bg-alt: #0E0E0E;
+        --surface: #121212;
+        --surface2: #1A1A1A;
         --border: rgba(255,255,255,0.07);
         --border-mid: rgba(255,255,255,0.12);
-        --text: #F2F2F2;
-        --text2: #999999;
-        --text3: #555555;
+        --text: #F0F0F0;
+        --text2: #909090;
+        --text3: #4A4A4A;
         --success: #22C55E;
-        --font-display: 'Bebas Neue', 'Barlow Condensed', sans-serif;
-        --font-body: 'DM Sans', system-ui, sans-serif;
-        --radius: 4px;
+        --font-display: 'Barlow Condensed', 'Bebas Neue', sans-serif;
+        --font-body: 'Manrope', system-ui, sans-serif;
+        --radius: 3px;
         --max: 1140px;
         --section-pad: 120px 24px;
       }
@@ -107,13 +108,41 @@
       }
       .nav-links a {
         font-size: 13px;
-        font-weight: 500;
+        font-weight: 600;
         letter-spacing: 0.5px;
         color: var(--text3);
         text-transform: uppercase;
         transition: color 0.2s;
       }
       .nav-links a:hover { color: var(--text); opacity: 1; }
+      .nav-btn-login {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        padding: 8px 18px;
+        border: 1px solid var(--border-mid);
+        border-radius: var(--radius);
+        color: var(--text2) !important;
+        background: transparent;
+        transition: border-color 0.2s, color 0.2s !important;
+        white-space: nowrap;
+      }
+      .nav-btn-login:hover { border-color: var(--text2) !important; color: var(--text) !important; opacity: 1 !important; }
+      .nav-btn-register {
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        padding: 8px 20px;
+        border: none;
+        border-radius: var(--radius);
+        color: #fff !important;
+        background: var(--accent);
+        transition: background 0.2s, transform 0.18s !important;
+        white-space: nowrap;
+      }
+      .nav-btn-register:hover { background: var(--accent-hover) !important; opacity: 1 !important; transform: translateY(-1px); }
       .lang-toggle {
         display: flex;
         align-items: center;
@@ -286,6 +315,33 @@
         border: 1px solid var(--border);
       }
       .btn-ghost:hover { color: var(--text); border-color: var(--border-mid); }
+
+      /* ── HERO LOGIN HINT ─────────────────────────────────────────────────── */
+      .hero-login-hint {
+        font-size: 13px;
+        color: var(--text3);
+        margin-bottom: 40px;
+        margin-top: -12px;
+      }
+      .hero-login-hint a {
+        color: var(--text2);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        transition: color 0.2s;
+      }
+      .hero-login-hint a:hover { color: var(--text); opacity: 1; }
+
+      /* ── HERO RACE STRIPE ────────────────────────────────────────────────── */
+      .hero-race-stripe {
+        position: absolute;
+        top: 0; left: -10%;
+        width: 120%;
+        height: 4px;
+        background: linear-gradient(90deg, transparent 0%, var(--accent) 30%, var(--accent-hover) 70%, transparent 100%);
+        opacity: 0.8;
+        transform: skewX(-15deg);
+        pointer-events: none;
+      }
 
       /* ── LIVE COUNTER HERO ───────────────────────────────────────────────── */
       .hero-live {
@@ -749,7 +805,7 @@
       }
       .footer-top {
         display: grid;
-        grid-template-columns: 2fr 1fr 1fr;
+        grid-template-columns: 2fr 1fr 1.2fr;
         gap: 60px;
         padding-bottom: 60px;
         border-bottom: 1px solid var(--border);
@@ -825,6 +881,523 @@
         margin: 0;
       }
 
+      /* ── RACEMODE SECTION ────────────────────────────────────────────────── */
+      .racemode-section {
+        padding: 120px 24px;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+      .racemode-section::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 60% 80% at 50% 100%, rgba(255,59,48,0.18) 0%, transparent 70%);
+        pointer-events: none;
+      }
+      .racemode-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--accent);
+        padding: 6px 18px;
+        border-radius: 2px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 3px;
+        color: var(--accent);
+        text-transform: uppercase;
+        margin-bottom: 32px;
+      }
+      .racemode-badge-dot {
+        width: 7px; height: 7px;
+        border-radius: 50%;
+        background: var(--accent);
+        animation: pulse 1.4s infinite;
+      }
+      .racemode-title {
+        font-family: var(--font-display);
+        font-size: clamp(48px, 10vw, 110px);
+        line-height: 0.92;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        color: var(--text);
+        margin-bottom: 24px;
+        font-weight: 800;
+      }
+      .racemode-title .accent { color: var(--accent); }
+      .racemode-desc {
+        font-size: 16px;
+        color: var(--text2);
+        line-height: 1.8;
+        max-width: 520px;
+        margin: 0 auto 48px;
+      }
+      .racemode-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 2px;
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      .racemode-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.08);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        padding: 32px 24px;
+        text-align: left;
+        transition: border-color 0.25s, background 0.25s;
+      }
+      .racemode-card:hover {
+        border-color: rgba(255,59,48,0.3);
+        background: rgba(255,59,48,0.04);
+      }
+      .racemode-card-icon {
+        width: 40px; height: 40px;
+        border: 1px solid rgba(255,59,48,0.3);
+        background: var(--accent-dim);
+        border-radius: 2px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 20px;
+      }
+      .racemode-card-icon svg { width: 20px; height: 20px; }
+      .racemode-card-title {
+        font-family: var(--font-display);
+        font-size: 22px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--text);
+        margin-bottom: 10px;
+        font-weight: 700;
+      }
+      .racemode-card-desc {
+        font-size: 14px;
+        color: var(--text2);
+        line-height: 1.7;
+      }
+
+      /* ── MOTOCLUB SECTION ────────────────────────────────────────────────── */
+      .motoclub-section {
+        padding: 120px 24px;
+        background: var(--bg-alt);
+        border-top: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
+      }
+      .motoclub-inner {
+        max-width: var(--max);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 80px;
+        align-items: center;
+      }
+      .motoclub-card {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.1);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-radius: 4px;
+        padding: 40px;
+        position: relative;
+        overflow: hidden;
+      }
+      .motoclub-card::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 3px;
+        background: var(--accent);
+      }
+      .motoclub-online-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 2px;
+        color: var(--success);
+        text-transform: uppercase;
+        margin-bottom: 24px;
+      }
+      .motoclub-online-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: var(--success);
+        animation: pulse 1.8s infinite;
+      }
+      .motoclub-count {
+        font-family: var(--font-display);
+        font-size: 80px;
+        letter-spacing: 2px;
+        color: var(--text);
+        line-height: 1;
+        margin-bottom: 8px;
+        font-weight: 800;
+      }
+      .motoclub-count span { color: var(--accent); }
+      .motoclub-count-label {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text3);
+        margin-bottom: 32px;
+      }
+      .motoclub-features {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .motoclub-feature-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 14px;
+        color: var(--text2);
+      }
+      .motoclub-feature-row::before {
+        content: '';
+        display: block;
+        width: 16px; height: 16px;
+        border: 1px solid var(--accent);
+        border-radius: 2px;
+        background: var(--accent-dim);
+        flex-shrink: 0;
+      }
+
+      /* ── SAFETY / SOS SECTION ────────────────────────────────────────────── */
+      .sos-section {
+        padding: 120px 24px;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
+      }
+      .sos-section::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 50% 60% at 0% 50%, rgba(220,38,38,0.10) 0%, transparent 60%);
+        pointer-events: none;
+      }
+      .sos-inner {
+        max-width: var(--max);
+        margin: 0 auto;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 80px;
+        align-items: center;
+      }
+      .sos-accent-bar {
+        display: inline-block;
+        background: #DC2626;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        padding: 5px 14px;
+        border-radius: 2px;
+        margin-bottom: 24px;
+      }
+      .sos-visual {
+        aspect-ratio: 1;
+        background: var(--bg);
+        border: 1px solid rgba(220,38,38,0.25);
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .sos-visual::before {
+        content: '';
+        position: absolute;
+        left: 0; top: 0; bottom: 0;
+        width: 3px;
+        background: #DC2626;
+        opacity: 0.8;
+      }
+      .sos-visual-glyph {
+        font-family: var(--font-display);
+        font-size: clamp(80px, 14vw, 160px);
+        color: rgba(220,38,38,0.08);
+        letter-spacing: 4px;
+        user-select: none;
+        font-weight: 900;
+      }
+      .sos-btn-ring {
+        position: absolute;
+        width: 120px; height: 120px;
+        border: 2px solid rgba(220,38,38,0.4);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        animation: sosPulse 2s infinite;
+      }
+      @keyframes sosPulse {
+        0%,100% { transform: scale(1); opacity: 0.8; }
+        50% { transform: scale(1.08); opacity: 0.4; }
+      }
+      .sos-btn-inner {
+        width: 80px; height: 80px;
+        border-radius: 50%;
+        background: #DC2626;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: var(--font-display);
+        font-size: 24px;
+        letter-spacing: 2px;
+        color: #fff;
+        font-weight: 800;
+      }
+
+      /* ── USER TYPES SECTION ──────────────────────────────────────────────── */
+      .usertypes-section {
+        padding: 120px 24px;
+        background: var(--bg-alt);
+        border-top: 1px solid var(--border);
+      }
+      .usertypes-inner { max-width: var(--max); margin: 0 auto; }
+      .usertypes-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px;
+        margin-top: 64px;
+      }
+      .usertype-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 48px 40px;
+        position: relative;
+        overflow: hidden;
+        transition: border-color 0.25s;
+      }
+      .usertype-card:hover { border-color: var(--border-mid); }
+      .usertype-card.biker { border-top: 3px solid var(--accent); }
+      .usertype-card.zavorrina { border-top: 3px solid rgba(255,255,255,0.2); }
+      .usertype-emoji {
+        font-size: 48px;
+        margin-bottom: 20px;
+        display: block;
+      }
+      .usertype-label {
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--text3);
+        margin-bottom: 12px;
+      }
+      .usertype-title {
+        font-family: var(--font-display);
+        font-size: clamp(36px, 5vw, 56px);
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text);
+        line-height: 1;
+        margin-bottom: 20px;
+        font-weight: 800;
+      }
+      .usertype-title .accent { color: var(--accent); }
+      .usertype-desc {
+        font-size: 15px;
+        color: var(--text2);
+        line-height: 1.75;
+        margin-bottom: 28px;
+      }
+      .usertype-perks {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .usertype-perk {
+        font-size: 13px;
+        color: var(--text2);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .usertype-perk-dot {
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        flex-shrink: 0;
+      }
+      .usertype-card.zavorrina .usertype-perk-dot {
+        background: var(--text3);
+      }
+
+      /* ── PIC CONTEST SECTION ─────────────────────────────────────────────── */
+      .piccontest-section {
+        padding: 120px 24px;
+        background: var(--bg);
+        border-top: 1px solid var(--border);
+        position: relative;
+        overflow: hidden;
+        text-align: center;
+      }
+      .piccontest-section::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 50% 40% at 50% 0%, rgba(255,106,0,0.08) 0%, transparent 70%);
+        pointer-events: none;
+      }
+      .piccontest-week {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 3px;
+        color: var(--accent-hover);
+        text-transform: uppercase;
+        border: 1px solid rgba(255,106,0,0.3);
+        padding: 5px 14px;
+        border-radius: 2px;
+        background: rgba(255,106,0,0.07);
+        margin-bottom: 32px;
+      }
+      .piccontest-title {
+        font-family: var(--font-display);
+        font-size: clamp(44px, 9vw, 100px);
+        line-height: 0.92;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        color: var(--text);
+        margin-bottom: 24px;
+        font-weight: 800;
+      }
+      .piccontest-title .accent { color: var(--accent); }
+      .piccontest-desc {
+        font-size: 16px;
+        color: var(--text2);
+        line-height: 1.8;
+        max-width: 500px;
+        margin: 0 auto 48px;
+      }
+      .piccontest-podium {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 60px;
+        align-items: flex-end;
+      }
+      .piccontest-place {
+        flex: 1;
+        max-width: 200px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 4px 4px 0 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        position: relative;
+        overflow: hidden;
+      }
+      .piccontest-place.first { height: 180px; border-color: rgba(255,215,0,0.25); }
+      .piccontest-place.second { height: 140px; }
+      .piccontest-place.third { height: 110px; }
+      .piccontest-place-medal {
+        font-size: 28px;
+        margin-top: 20px;
+      }
+      .piccontest-place-label {
+        font-family: var(--font-display);
+        font-size: 14px;
+        letter-spacing: 2px;
+        text-transform: uppercase;
+        color: var(--text3);
+        font-weight: 700;
+        padding-bottom: 16px;
+      }
+
+      /* ── FAQ ACCORDION ───────────────────────────────────────────────────── */
+      .faq-section {
+        padding: 120px 24px;
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+      }
+      .faq-inner {
+        max-width: 760px;
+        margin: 0 auto;
+      }
+      .faq-list {
+        margin-top: 64px;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .faq-item {
+        border: 1px solid var(--border);
+        background: var(--bg);
+        overflow: hidden;
+        transition: border-color 0.2s;
+      }
+      .faq-item:hover { border-color: var(--border-mid); }
+      .faq-item.open { border-color: rgba(255,59,48,0.25); }
+      .faq-question {
+        width: 100%;
+        background: none;
+        border: none;
+        color: var(--text);
+        font-family: var(--font-display);
+        font-size: 20px;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        font-weight: 700;
+        text-align: left;
+        padding: 24px 28px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        transition: color 0.2s;
+      }
+      .faq-question:hover { color: var(--accent); }
+      .faq-item.open .faq-question { color: var(--accent); }
+      .faq-chevron {
+        flex-shrink: 0;
+        width: 20px; height: 20px;
+        border: 1px solid var(--border-mid);
+        border-radius: 2px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.3s, background 0.2s;
+      }
+      .faq-item.open .faq-chevron {
+        transform: rotate(45deg);
+        background: var(--accent-dim);
+        border-color: rgba(255,59,48,0.3);
+      }
+      .faq-chevron svg { width: 10px; height: 10px; color: var(--text2); }
+      .faq-answer {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.4s cubic-bezier(0.22,1,0.36,1);
+      }
+      .faq-answer-inner {
+        padding: 0 28px 24px;
+        font-size: 15px;
+        color: var(--text2);
+        line-height: 1.8;
+        border-top: 1px solid var(--border);
+        padding-top: 20px;
+      }
+
       /* ── SCROLL REVEAL ───────────────────────────────────────────────────── */
       .reveal {
         opacity: 0;
@@ -849,25 +1422,36 @@
       @media (max-width: 1024px) {
         .stats-grid { grid-template-columns: repeat(2, 1fr); }
         .feature-section-inner { gap: 48px; }
+        .racemode-grid { grid-template-columns: 1fr 1fr; }
+        .motoclub-inner { gap: 48px; }
+        .sos-inner { gap: 48px; }
       }
       @media (max-width: 768px) {
         :root { --section-pad: 80px 24px; }
         .navbar-inner { padding: 0 20px; }
-        .nav-links a:not(.lang-toggle):not(.btn) { display: none; }
+        .nav-links a:not(.lang-toggle):not(.nav-btn-login):not(.nav-btn-register) { display: none; }
         .feature-section-inner,
-        .community-inner { grid-template-columns: 1fr; gap: 40px; direction: ltr !important; }
+        .community-inner,
+        .motoclub-inner,
+        .sos-inner { grid-template-columns: 1fr; gap: 40px; direction: ltr !important; }
         .feature-section:nth-child(even) .feature-section-inner { direction: ltr; }
         .feature-visual { aspect-ratio: 16/9; }
         .footer-top { grid-template-columns: 1fr; gap: 40px; }
         .hero-live { flex-direction: column; gap: 20px; }
         .hero-live-sep { width: 60px; height: 1px; }
         .sec-num { display: none; }
+        .racemode-grid { grid-template-columns: 1fr; }
+        .usertypes-grid { grid-template-columns: 1fr; }
+        .piccontest-podium { gap: 8px; }
+        .sos-visual { aspect-ratio: 16/9; }
+        .nav-btn-login { display: none; }
       }
       @media (max-width: 480px) {
         .hero-name { font-size: 64px; }
         .stats-grid { grid-template-columns: 1fr 1fr; }
         .community-stats { grid-template-columns: 1fr; }
         .free-section::before { display: none; }
+        .nav-btn-register { padding: 7px 14px; font-size: 11px; }
       }
     </style>
   </head>
@@ -888,12 +1472,15 @@
             <button class="lang-btn active" id="btn-it" onclick="setLang('it')">IT</button>
             <button class="lang-btn" id="btn-en" onclick="setLang('en')">EN</button>
           </div>
+          <a href="/accedi" class="nav-btn-login" data-i18n="nav.login">Accedi</a>
+          <a href="/registrati" class="nav-btn-register" data-i18n="nav.register">Registrati</a>
         </div>
       </div>
     </nav>
 
     <!-- ── HERO ───────────────────────────────────────────────────────────── -->
     <section class="hero" id="hero">
+      <div class="hero-race-stripe"></div>
       <div class="hero-mesh" id="hero-mesh"></div>
 
       <div class="hero-badge">
@@ -916,19 +1503,20 @@
       </p>
 
       <div class="hero-ctas">
-        <a href="https://play.google.com/store/apps/details?id=com.bikerlink.app" target="_blank" rel="noopener" class="btn btn-primary">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.24.13.52.2.8.2.39 0 .76-.12 1.07-.34L16.72 17l-3.23-3.23-10.31 9.99zM1.1 1.24C1.04 1.46 1 1.7 1 1.94v20.12c0 .24.04.48.1.7l.1.09L12.47 12V11.88L1.2 1.15l-.1.09zM20.92 10.19l-2.87-1.65-3.28 3.28 3.28 3.28 2.89-1.66c.82-.47.82-1.78-.02-2.25zM4.05.58L16.72 7l-3.25 3.25L4.05.58z"/></svg>
-          <span data-i18n="hero.cta_play">Google Play</span>
+        <a href="/registrati" class="btn btn-primary">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+          Registrati — È gratis
         </a>
-        <a href="#" class="btn btn-outline">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-          <span data-i18n="hero.cta_apple">App Store — Soon</span>
+        <a href="https://play.google.com/store/apps/details?id=com.bikerlink.app" target="_blank" rel="noopener" class="btn btn-ghost">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3.18 23.76c.24.13.52.2.8.2.39 0 .76-.12 1.07-.34L16.72 17l-3.23-3.23-10.31 9.99zM1.1 1.24C1.04 1.46 1 1.7 1 1.94v20.12c0 .24.04.48.1.7l.1.09L12.47 12V11.88L1.2 1.15l-.1.09zM20.92 10.19l-2.87-1.65-3.28 3.28 3.28 3.28 2.89-1.66c.82-.47.82-1.78-.02-2.25zM4.05.58L16.72 7l-3.25 3.25L4.05.58z"/></svg>
+          <span data-i18n="hero.cta_play">Google Play</span>
         </a>
         <a href="/investors" class="btn btn-ghost">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
           <span data-i18n="hero.cta_investors">Investitori</span>
         </a>
       </div>
+      <p class="hero-login-hint">Hai già un account? <a href="/accedi">Accedi</a></p>
 
       <div class="hero-live reveal">
         <div class="hero-live-item">
@@ -1155,6 +1743,155 @@
       </div>
     </section>
 
+    <!-- ── RACEMODE SECTION ──────────────────────────────────────────────── -->
+    <section class="racemode-section" id="racemode">
+      <div class="section-inner" style="position:relative;z-index:1;">
+        <div class="racemode-badge reveal">
+          <span class="racemode-badge-dot"></span>
+          LIVE TELEMETRY
+        </div>
+        <h2 class="racemode-title reveal">GPS <span class="accent">RACE</span><br>MODE</h2>
+        <p class="racemode-desc reveal">Tachimetro live, G-force, altitudine, velocità curva. Ogni giro registrato con precisione millimetrica. I tuoi dati di guida non sono mai stati così dettagliati.</p>
+        <div class="racemode-grid">
+          <div class="racemode-card reveal">
+            <div class="racemode-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="racemode-card-title">Live Speed</div>
+            <div class="racemode-card-desc">Velocità in tempo reale aggiornata ogni secondo. Tachimetro digitale con picco e media.</div>
+          </div>
+          <div class="racemode-card reveal" style="transition-delay:0.1s;">
+            <div class="racemode-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg>
+            </div>
+            <div class="racemode-card-title">G-Force</div>
+            <div class="racemode-card-desc">Accelerazione laterale e longitudinale. Senti ogni curva misurata in G.</div>
+          </div>
+          <div class="racemode-card reveal" style="transition-delay:0.2s;">
+            <div class="racemode-card-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            </div>
+            <div class="racemode-card-title">Altimetria</div>
+            <div class="racemode-card-desc">Profilo altimetrico completo del percorso. Dislivello totale, salite e discese.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── MOTOCLUB SECTION ───────────────────────────────────────────────── -->
+    <section class="motoclub-section" id="motoclub">
+      <div class="motoclub-inner">
+        <div>
+          <div class="sec-label reveal">MotoClub</div>
+          <h2 class="feature-h reveal">IL TUO CLUB<br><span class="accent">SEMPRE IN TASCA</span></h2>
+          <p class="feature-p reveal">Crea o entra in un club con codici invito. Admin panel, chat di gruppo, approvazioni, organizzazione uscite. I MotoClub sono il cuore pulsante della community BikerLink.</p>
+          <a href="/registrati" class="btn btn-primary reveal" style="margin-top:12px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+            Unisciti ora
+          </a>
+        </div>
+        <div class="motoclub-card reveal">
+          <div class="motoclub-online-row">
+            <span class="motoclub-online-dot"></span>
+            Club attivi ora
+          </div>
+          <div class="motoclub-count">42<span>+</span></div>
+          <div class="motoclub-count-label">MotoClub registrati</div>
+          <div class="motoclub-features">
+            <div class="motoclub-feature-row">Chat di gruppo in tempo reale</div>
+            <div class="motoclub-feature-row">Codici invito privati</div>
+            <div class="motoclub-feature-row">Admin panel con approvazioni</div>
+            <div class="motoclub-feature-row">Organizzazione uscite di gruppo</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SAFETY / SOS SECTION ──────────────────────────────────────────── -->
+    <section class="sos-section" id="sos">
+      <div class="sos-inner">
+        <div class="reveal-left">
+          <span class="sos-accent-bar">⚠ Emergenza Stradale</span>
+          <h2 class="feature-h">UN TAP<br><span class="accent">E NON SEI SOLO</span></h2>
+          <p class="feature-p">Il tasto SOS invia la tua posizione GPS ai biker più vicini in caso di incidente o guasto. La community risponde in tempo reale. Perché sulla strada è importante sapere che qualcuno arriva.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+            <span class="feature-tag" style="border-color:rgba(220,38,38,0.4);color:#DC2626;background:rgba(220,38,38,0.08);">Localizzazione GPS</span>
+            <span class="feature-tag" style="border-color:rgba(220,38,38,0.4);color:#DC2626;background:rgba(220,38,38,0.08);">Alert istantaneo</span>
+            <span class="feature-tag" style="border-color:rgba(220,38,38,0.4);color:#DC2626;background:rgba(220,38,38,0.08);">Notifica contatti</span>
+          </div>
+        </div>
+        <div class="sos-visual reveal-right">
+          <div class="sos-visual-glyph">SOS</div>
+          <div class="sos-btn-ring">
+            <div class="sos-btn-inner">SOS</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── USER TYPES SECTION ─────────────────────────────────────────────── -->
+    <section class="usertypes-section" id="usertypes">
+      <div class="usertypes-inner">
+        <div class="sec-label reveal">Chi usa BikerLink</div>
+        <h2 style="font-family:var(--font-display);font-size:clamp(40px,7vw,84px);letter-spacing:3px;text-transform:uppercase;color:var(--text);line-height:0.95;font-weight:800;" class="reveal">
+          PER OGNI<br><span style="color:var(--accent);">TIPO DI BIKER</span>
+        </h2>
+        <div class="usertypes-grid">
+          <div class="usertype-card biker reveal">
+            <span class="usertype-emoji">🏍️</span>
+            <div class="usertype-label">Profilo</div>
+            <div class="usertype-title">IL <span class="accent">BIKER</span></div>
+            <p class="usertype-desc">Guidi una moto? Sei nel posto giusto. Trova compagni di viaggio, traccia ogni giro, unisciti a un club e partecipa ai contest settimanali.</p>
+            <div class="usertype-perks">
+              <div class="usertype-perk"><span class="usertype-perk-dot"></span>GPS tracking & telemetria live</div>
+              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Matching con riding partner</div>
+              <div class="usertype-perk"><span class="usertype-perk-dot"></span>SOS emergenza stradale</div>
+              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Garage digitale & vendita moto</div>
+            </div>
+          </div>
+          <div class="usertype-card zavorrina reveal" style="transition-delay:0.15s;">
+            <span class="usertype-emoji">🏍️</span>
+            <div class="usertype-label">Profilo</div>
+            <div class="usertype-title">LA ZAVORRINA</div>
+            <p class="usertype-desc">Passeggera per passione. BikerLink non è solo per chi guida — chi viaggia in sella ha il suo spazio, la sua community e il suo matching.</p>
+            <div class="usertype-perks">
+              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Matching con biker compatibili</div>
+              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Community chat & eventi</div>
+              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Contest foto & votazioni</div>
+              <div class="usertype-perk"><span class="usertype-perk-dot"></span>Accesso a tutti i MotoClub</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PIC CONTEST SECTION ───────────────────────────────────────────── -->
+    <section class="piccontest-section" id="contest">
+      <div class="section-inner" style="position:relative;z-index:1;">
+        <div class="piccontest-week reveal">📸 Contest Settimanale</div>
+        <h2 class="piccontest-title reveal">OGNI SETTIMANA<br><span class="accent">UN NUOVO PALCO</span></h2>
+        <p class="piccontest-desc reveal">Carica la tua foto migliore — moto, percorso, panorama. La community vota, il vincitore conquista la gallery della settimana e la visibilità di tutta la piattaforma.</p>
+        <a href="/registrati" class="btn btn-primary reveal">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+          Partecipa al contest
+        </a>
+        <div class="piccontest-podium reveal">
+          <div class="piccontest-place second">
+            <div class="piccontest-place-medal">🥈</div>
+            <div class="piccontest-place-label">2° posto</div>
+          </div>
+          <div class="piccontest-place first">
+            <div class="piccontest-place-medal">🏆</div>
+            <div class="piccontest-place-label">Campione</div>
+          </div>
+          <div class="piccontest-place third">
+            <div class="piccontest-place-medal">🥉</div>
+            <div class="piccontest-place-label">3° posto</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ── LIVE STATS SECTION ─────────────────────────────────────────── -->
     <section class="stats-section">
       <div class="section-inner">
@@ -1222,6 +1959,63 @@
       </div>
     </section>
 
+    <!-- ── FAQ SECTION ───────────────────────────────────────────────────── -->
+    <section class="faq-section" id="faq">
+      <div class="faq-inner">
+        <div class="sec-label reveal">FAQ</div>
+        <h2 style="font-family:var(--font-display);font-size:clamp(40px,7vw,80px);letter-spacing:3px;text-transform:uppercase;color:var(--text);line-height:0.95;font-weight:800;margin-bottom:0;" class="reveal">
+          DOMANDE<br><span style="color:var(--accent);">FREQUENTI</span>
+        </h2>
+        <div class="faq-list">
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              BikerLink è davvero gratuita?
+              <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">Sì, totalmente. Nessun abbonamento, nessun paywall, nessuna funzionalità nascosta. BikerLink è e rimarrà gratuita per sempre. Il modello è community-first: la piattaforma cresce grazie ai biker, non grazie ai loro portafogli.</div>
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Come funziona il sistema di matching?
+              <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">Il matching analizza moto, stile di guida, zona geografica e (opzionalmente) gusti musicali via Last.fm. L'algoritmo suggerisce biker compatibili vicino a te. Dopo il match reciproco si apre la chat privata. Niente swipe casuali — solo connessioni reali tra biker compatibili.</div>
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Il GPS funziona in background?
+              <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">Sì, il tracking GPS è ottimizzato per funzionare durante la guida con lo schermo spento. Puoi scegliere quando attivarlo e quando fermarlo. La modalità Ghost Mode ti permette di essere invisibile sulla mappa degli altri utenti pur continuando a tracciare il tuo percorso privatamente.</div>
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              Come creo o entro in un MotoClub?
+              <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">Puoi creare un nuovo MotoClub in pochi tap dall'app e invitare i tuoi biker tramite un codice invito. Per entrare in un club esistente ti basta avere il codice oppure richiedere l'accesso e aspettare l'approvazione dell'admin. Ogni club ha chat di gruppo, eventi e pannello amministrativo.</div>
+            </div>
+          </div>
+          <div class="faq-item">
+            <button class="faq-question" onclick="toggleFaq(this)">
+              BikerLink è disponibile su iPhone?
+              <span class="faq-chevron"><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="5" y1="2" x2="5" y2="8"/><line x1="2" y1="5" x2="8" y2="5"/></svg></span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">Al momento BikerLink è disponibile su Android tramite Google Play. La versione iOS per App Store è in sviluppo e sarà disponibile a breve. Registrati ora sulla piattaforma web per essere tra i primi ad accedere alla versione iPhone.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- ── FREE SECTION ───────────────────────────────────────────────── -->
     <section class="free-section">
       <div class="free-section-inner">
@@ -1264,13 +2058,19 @@
             <ul>
               <li><a href="#features" data-i18n="footer.features">Features</a></li>
               <li><a href="#community" data-i18n="footer.community">Community</a></li>
+              <li><a href="#faq">FAQ</a></li>
               <li><a href="/investors" data-i18n="footer.investors">Investitori</a></li>
               <li><a href="https://play.google.com/store/apps/details?id=com.bikerlink.app" target="_blank" rel="noopener">Google Play</a></li>
               <li><a href="/matching-system.pdf" target="_blank" rel="noopener" data-i18n="footer.matching_pdf">Sistema Matching (PDF)</a></li>
             </ul>
           </div>
           <div class="footer-col">
-            <div class="footer-col-h" data-i18n="footer.col_legal">Legale</div>
+            <div class="footer-col-h">Account</div>
+            <ul>
+              <li><a href="/registrati" style="color:var(--accent);font-weight:600;">Registrati — Gratis</a></li>
+              <li><a href="/accedi">Accedi</a></li>
+            </ul>
+            <div class="footer-col-h" style="margin-top:28px;" data-i18n="footer.col_legal">Legale</div>
             <ul>
               <li><a href="/privacy" data-i18n="footer.privacy">Privacy Policy</a></li>
               <li><a href="/terms" data-i18n="footer.terms">Termini</a></li>
@@ -1293,6 +2093,21 @@
     </footer>
 
     <script>
+    // ── FAQ ACCORDION ─────────────────────────────────────────────────────────
+    function toggleFaq(btn) {
+      const item = btn.closest('.faq-item');
+      const answer = item.querySelector('.faq-answer');
+      const isOpen = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(function(el) {
+        el.classList.remove('open');
+        el.querySelector('.faq-answer').style.maxHeight = '0';
+      });
+      if (!isOpen) {
+        item.classList.add('open');
+        answer.style.maxHeight = answer.scrollHeight + 'px';
+      }
+    }
+
     // ── i18n ──────────────────────────────────────────────────────────────────
     const I18N = {
       it: {
@@ -1300,6 +2115,8 @@
         "nav.community": "Community",
         "nav.investors": "Investitori",
         "nav.privacy": "Privacy",
+        "nav.login": "Accedi",
+        "nav.register": "Registrati",
         "hero.badge": "Disponibile su Android",
         "hero.tagline": "U'LL NEVER RIDE ALONE",
         "hero.desc": "La prima piattaforma verticale per motociclisti italiani. Trova compagni di viaggio, traccia i tuoi percorsi, gestisci il tuo club e vivi la community moto più autentica d'Italia.",
@@ -1346,6 +2163,8 @@
         "nav.community": "Community",
         "nav.investors": "Investors",
         "nav.privacy": "Privacy",
+        "nav.login": "Log in",
+        "nav.register": "Sign up",
         "hero.badge": "Available on Android",
         "hero.tagline": "U'LL NEVER RIDE ALONE",
         "hero.desc": "The first vertical platform for Italian motorcyclists. Find riding companions, track your routes, manage your club and live the most authentic moto community in Italy.",
