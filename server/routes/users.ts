@@ -1260,13 +1260,29 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
     if (q.length < 2) {
       return res.json([]);
     }
-    const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+
+    const [blockedIds, mapFilterSetting] = await Promise.all([
+      storage.getBlockedUserIds(requesterId),
+      storage.getAppSetting("map_visibility_filter"),
+    ]);
+    const blockedSet = new Set(blockedIds);
+    const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
+
+    const onlineIdSet = mapVisibilityFilter !== "all" ? new Set(onlineTracker.getOnlineUserIds()) : null;
+    const availableIdSet = mapVisibilityFilter === "available_only"
+      ? new Set([...onlineTracker.getAvailableBikerIds(), ...onlineTracker.getAvailableZavorrinaIds()])
+      : null;
+
     const results = await storage.searchUsers(q);
-    const fifteenMinutesAgoSearch = new Date(Date.now() - 15 * 60 * 1000);
     const safeResults = results
-      .filter((item: any) => !blockedIds.has(item.user.id))
+      .filter((item: any) => !blockedSet.has(item.user.id))
+      .filter((item: any) => {
+        if (mapVisibilityFilter === "online_only") return onlineIdSet!.has(item.user.id);
+        if (mapVisibilityFilter === "available_only") return availableIdSet!.has(item.user.id);
+        return true;
+      })
       .map((item: any) => {
-        const isOnlineSearch = !item.user.ghostMode && item.user.lastLoginAt != null && new Date(item.user.lastLoginAt) >= fifteenMinutesAgoSearch;
+        const isOnlineSearch = onlineIdSet ? onlineIdSet.has(item.user.id) : onlineTracker.isOnline(item.user.id);
         return {
           id: item.user.id,
           nickname: item.user.nickname,
