@@ -34,6 +34,35 @@ const ALLOW_SKIP_ADMIN = process.env.ALLOW_SKIP_ADMIN === "1";
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 /**
+ * Poll /api/health until the backend responds (max ~60s).
+ * When this script is run as a Replit validation/workflow at boot, the
+ * backend on :5000 may not yet be listening. Without this wait the very first
+ * fetch fails with ECONNREFUSED and aborts the whole suite.
+ */
+async function waitForBackend(maxSeconds = 60): Promise<void> {
+  const deadline = Date.now() + maxSeconds * 1000;
+  let attempts = 0;
+  while (Date.now() < deadline) {
+    attempts++;
+    try {
+      const res = await fetch(`${BASE}/api/health`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (res.ok) {
+        if (attempts > 1) console.log(`  ✔ Backend pronto dopo ${attempts} tentativi`);
+        return;
+      }
+    } catch {
+      // ignore — backend not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  throw new Error(
+    `Backend non raggiungibile su ${BASE}/api/health dopo ${maxSeconds}s — abort.`,
+  );
+}
+
+/**
  * Login and return a Bearer token.
  * The server exposes a middleware that converts "Authorization: Bearer <token>"
  * back into a connect.sid cookie so express-session can authenticate the request.
@@ -332,6 +361,10 @@ async function runTests() {
     console.log(`  Modalità: admin tests obbligatori (usa ALLOW_SKIP_ADMIN=1 per saltare)`);
   }
   console.log(`════════════════════════════════════════════════════════`);
+
+  // Backend potrebbe non essere ancora pronto se questo script gira al boot
+  // come validation workflow. Attendi /api/health prima di procedere.
+  await waitForBackend();
 
   let adminCookie = "";
   if (ADMIN_PASSWORD) {
