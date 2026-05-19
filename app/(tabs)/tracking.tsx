@@ -51,6 +51,7 @@ import * as Battery from "expo-battery";
 const BACKGROUND_LOCATION_TASK = "bikerlink-bg-location";
 const BG_POINTS_KEY = "@bikerlink/bg_points_pending";
 const BG_NOTIF_CONFIG_KEY = "@bikerlink/bg_notif_config";
+const BG_SENSOR_SNAPSHOT_KEY = "@bikerlink/bg_sensor_snapshot";
 const BG_NOTIF_THROTTLE = 5;
 
 if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
@@ -59,13 +60,16 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
     const { locations } = data as { locations: Location.LocationObject[] };
     try {
       const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
-      const existing: { latitude: number; longitude: number; altitude: number; speedKmh: number; timestamp: string }[] = raw ? JSON.parse(raw) : [];
+      const existing: { latitude: number; longitude: number; altitude: number; speedKmh: number; timestamp: string; accelG?: number; tiltDeg?: number }[] = raw ? JSON.parse(raw) : [];
+      const sensorRaw = await AsyncStorage.getItem(BG_SENSOR_SNAPSHOT_KEY);
+      const sensorSnapshot: { accelG: number; tiltDeg: number } | null = sensorRaw ? JSON.parse(sensorRaw) : null;
       const newPoints = locations.map((loc) => ({
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
         altitude: loc.coords.altitude ?? 0,
         speedKmh: (loc.coords.speed ?? 0) * 3.6,
         timestamp: new Date(loc.timestamp).toISOString(),
+        ...(sensorSnapshot ? { accelG: sensorSnapshot.accelG, tiltDeg: sensorSnapshot.tiltDeg } : {}),
       }));
       const newCount = existing.length + newPoints.length;
       await AsyncStorage.setItem(BG_POINTS_KEY, JSON.stringify([...existing, ...newPoints]));
@@ -1226,6 +1230,7 @@ export default function TrackingScreen() {
   const sensorStartingRef = useRef(false);
   const sensorSourceRef = useRef<"deviceMotion" | "accelerometer" | "none">("none");
   const mountAxisCalibRef = useRef<MountAxisCalibration | null>(null);
+  const bgSensorSnapshotLastWriteRef = useRef(0);
   const sprintStartTimeRef = useRef<number | null>(null);
   const sprintPhaseRef = useRef<"waiting" | "measuring" | "done">("waiting");
   const sprintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1555,9 +1560,26 @@ export default function TrackingScreen() {
           //    samples are no-ops and just get cleared from the key).
           try {
             const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
-            const bgPoints: { latitude: number; longitude: number; altitude: number; speedKmh: number; timestamp: string }[] =
+            const bgPoints: { latitude: number; longitude: number; altitude: number; speedKmh: number; timestamp: string; accelG?: number; tiltDeg?: number }[] =
               raw ? JSON.parse(raw) : [];
             for (const pt of bgPoints) {
+              // Temporarily override sensor refs with the per-point snapshot
+              // so onNativeLocation attaches the correct accelG/tiltDeg values
+              // instead of the current (post-return) sensor readings.
+              const hasSensor = pt.accelG !== undefined && pt.tiltDeg !== undefined;
+              let prevAccelG: number | undefined;
+              let prevTiltDeg: number | undefined;
+              let prevBaseline: number | null | undefined;
+              if (hasSensor) {
+                prevAccelG = currentAccelGRef.current;
+                prevTiltDeg = currentTiltDegRef.current;
+                prevBaseline = accelBaselineRef.current;
+                currentAccelGRef.current = pt.accelG!;
+                currentTiltDegRef.current = pt.tiltDeg!;
+                // Ensure baseline is non-null so the sensor spread is included
+                if (accelBaselineRef.current === null) accelBaselineRef.current = 0;
+              }
+
               // Reconstruct a LocationObject so onNativeLocation processes it
               // identically to a foreground sample: haversine distance,
               // mapCoords, batch buffer, offline append, flush.
@@ -1574,6 +1596,13 @@ export default function TrackingScreen() {
                 timestamp: new Date(pt.timestamp).getTime(),
               };
               onNativeLocationRef.current(fakeLoc);
+
+              // Restore sensor refs after each point
+              if (hasSensor) {
+                currentAccelGRef.current = prevAccelG!;
+                currentTiltDegRef.current = prevTiltDeg!;
+                accelBaselineRef.current = prevBaseline!;
+              }
             }
             await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
           } catch {}
@@ -2231,6 +2260,12 @@ export default function TrackingScreen() {
           currentAccelGRef.current = gLong;
           currentLateralGRef.current = gLat;
           currentTiltDegRef.current = tiltDeg;
+          // Throttled background sensor snapshot: write at most once per second
+          const now = Date.now();
+          if (now - bgSensorSnapshotLastWriteRef.current >= 1000) {
+            bgSensorSnapshotLastWriteRef.current = now;
+            AsyncStorage.setItem(BG_SENSOR_SNAPSHOT_KEY, JSON.stringify({ accelG: gLong, tiltDeg })).catch(() => {});
+          }
           // Deadzone filtering: ignore noise below minimum thresholds
           if (gLong > 0.05 && gLong > maxAccelGRef.current) maxAccelGRef.current = gLong;
           if (-gLong > 0.05 && -gLong > maxDecelGRef.current) maxDecelGRef.current = -gLong;
@@ -2291,6 +2326,12 @@ export default function TrackingScreen() {
         currentAccelGRef.current = gLong;
         currentLateralGRef.current = gLat;
         currentTiltDegRef.current = tiltDeg;
+        // Throttled background sensor snapshot: write at most once per second
+        const nowAccel = Date.now();
+        if (nowAccel - bgSensorSnapshotLastWriteRef.current >= 1000) {
+          bgSensorSnapshotLastWriteRef.current = nowAccel;
+          AsyncStorage.setItem(BG_SENSOR_SNAPSHOT_KEY, JSON.stringify({ accelG: gLong, tiltDeg })).catch(() => {});
+        }
         // Deadzone filtering: ignore noise below minimum thresholds
         if (gLong > 0.05 && gLong > maxAccelGRef.current) maxAccelGRef.current = gLong;
         if (-gLong > 0.05 && -gLong > maxDecelGRef.current) maxDecelGRef.current = -gLong;
