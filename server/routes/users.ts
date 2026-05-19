@@ -142,6 +142,20 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const blockedIds = await storage.getBlockedUserIds(requesterId);
     const blockedSet = new Set(blockedIds);
 
+    const mapFilterSetting = await storage.getAppSetting("map_visibility_filter");
+    const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
+
+    const onlineIdSet = mapVisibilityFilter !== "all" ? new Set(onlineTracker.getOnlineUserIds()) : null;
+    const availableIdSet = mapVisibilityFilter === "available_only"
+      ? new Set([...onlineTracker.getAvailableBikerIds(), ...onlineTracker.getAvailableZavorrinaIds()])
+      : null;
+
+    function passesVisibilityFilter(userId: string): boolean {
+      if (mapVisibilityFilter === "online_only") return onlineIdSet!.has(userId);
+      if (mapVisibilityFilter === "available_only") return availableIdSet!.has(userId);
+      return true;
+    }
+
     if (lat != null && lng != null) {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
@@ -158,19 +172,21 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         ))
         .orderBy(sqlTag`distance`);
       type UserDistanceRow = { user: { id: string; nickname: string; avatarUrl: string | null; userType: string }; distance: number | null; hideFromMap: boolean | null };
-      return res.json((rows as UserDistanceRow[]).map((r) => ({
-        id: r.user.id,
-        nickname: r.user.nickname,
-        avatarUrl: r.user.avatarUrl,
-        userType: r.user.userType,
-        // Privacy: do not leak derived distance for users who opted out of map visibility
-        distance: r.hideFromMap ? null : (typeof r.distance === "number" && Number.isFinite(r.distance) ? Math.round(r.distance * 10) / 10 : null),
-      })));
+      return res.json((rows as UserDistanceRow[])
+        .filter((r) => passesVisibilityFilter(r.user.id))
+        .map((r) => ({
+          id: r.user.id,
+          nickname: r.user.nickname,
+          avatarUrl: r.user.avatarUrl,
+          userType: r.user.userType,
+          // Privacy: do not leak derived distance for users who opted out of map visibility
+          distance: r.hideFromMap ? null : (typeof r.distance === "number" && Number.isFinite(r.distance) ? Math.round(r.distance * 10) / 10 : null),
+        })));
     }
 
     const allUsers = await storage.getAllUsers();
     const results = allUsers
-      .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId && !isSystemAccount(u))
+      .filter((u) => !blockedSet.has(u.id) && u.id !== requesterId && !isSystemAccount(u) && passesVisibilityFilter(u.id))
       .map((u) => ({
         id: u.id,
         nickname: u.nickname,
@@ -921,8 +937,19 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+
+    const mapFilterSetting = await storage.getAppSetting("map_visibility_filter");
+    const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
+    const onlineIdSet = mapVisibilityFilter === "online_only" ? new Set(onlineTracker.getOnlineUserIds()) : null;
+
     const allItems = await storage.getAvailableUsersList(lat, lng);
-    const results = allItems.filter((r: any) => !blockedIds.has(r.user.id));
+    const results = allItems.filter((r: any) => {
+      if (blockedIds.has(r.user.id)) return false;
+      if (mapVisibilityFilter === "online_only") return onlineIdSet!.has(r.user.id);
+      // available_only is intentionally a no-op here: this endpoint already
+      // returns only users with isAvailable=true, so the filter is already satisfied.
+      return true;
+    });
     const motorcyclesMap: Record<string, any[]> = {};
     for (const item of results) {
       if (!motorcyclesMap[item.user.id]) {
@@ -978,13 +1005,21 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+
+    const [offlineRandomSetting, mapFilterSetting] = await Promise.all([
+      storage.getAppSetting("offline_position_randomize_default"),
+      storage.getAppSetting("map_visibility_filter"),
+    ]);
+    const globalOfflineRandomize = offlineRandomSetting?.value !== "false";
+    const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
+
     const trackerBikerIds = onlineTracker.getAvailableBikerIds(countriesParam);
     const onlineResultsRaw = trackerBikerIds.length > 0
       ? await storage.getAvailableBikersList(lat, lng, countriesParam, trackerBikerIds)
       : [];
     const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
-    if (includeOffline) {
+    if (includeOffline && mapVisibilityFilter !== "online_only" && mapVisibilityFilter !== "available_only") {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
       const { eq, and, or, inArray: inArr } = await import("drizzle-orm");
@@ -1001,9 +1036,16 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
         .where(and(...bikerConds))
         .orderBy(sqlTag`distance`);
       // Defense-in-depth: strip stored coordinates and derived distance for users with hideFromMap=true.
-      const allBikers = allBikersRaw.map((r: any) => r.profile?.hideFromMap
-        ? { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null }
-        : r);
+      // For offline users, apply globalOfflineRandomize to serve fuzzed coords when enabled.
+      const allBikers = allBikersRaw.map((r: any) => {
+        if (r.profile?.hideFromMap) return { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null };
+        const useOfflineCoords = globalOfflineRandomize && r.profile?.offlinePositionRandomize !== false;
+        const hasFuzzedCoords = r.profile?.lastOfflineLat != null && r.profile?.lastOfflineLng != null;
+        if (useOfflineCoords && hasFuzzedCoords) {
+          return { ...r, profile: { ...r.profile, latitude: r.profile.lastOfflineLat, longitude: r.profile.lastOfflineLng }, distance: null };
+        }
+        return r;
+      });
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
       const offlineOnly = allBikers.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -1015,28 +1057,34 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
       }
     }
     const onlineAvailableIds = new Set(onlineResults.map((r: any) => r.user.id));
-    const mapped = allResults.map((item: any) => {
-      const motos = motorcyclesMap[item.user.id] || [];
-      const firstMoto = motos[0];
-      return {
-        id: item.user.id,
-        nickname: item.user.nickname,
-        userType: item.user.userType,
-        sex: item.user.sex,
-        region: item.user.region,
-        country: item.user.country,
-        birthYear: item.user.birthYear,
-        bio: item.profile?.bio || null,
-        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
-        ridingStyle: firstMoto?.ridingStyle || null,
-        distance: item.profile?.hideFromMap ? null : (lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null),
-        latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude ?? null),
-        longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude ?? null),
-        isAvailable: (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id),
-        isOnline: onlineAvailableIds.has(item.user.id),
-        lastLoginAt: item.user.lastLoginAt ?? null,
-      };
-    });
+    const mapped = allResults
+      .filter((item: any) => {
+        if (mapVisibilityFilter === "online_only") return onlineAvailableIds.has(item.user.id);
+        if (mapVisibilityFilter === "available_only") return (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id);
+        return true;
+      })
+      .map((item: any) => {
+        const motos = motorcyclesMap[item.user.id] || [];
+        const firstMoto = motos[0];
+        return {
+          id: item.user.id,
+          nickname: item.user.nickname,
+          userType: item.user.userType,
+          sex: item.user.sex,
+          region: item.user.region,
+          country: item.user.country,
+          birthYear: item.user.birthYear,
+          bio: item.profile?.bio || null,
+          moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+          ridingStyle: firstMoto?.ridingStyle || null,
+          distance: item.profile?.hideFromMap ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null),
+          latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude ?? null),
+          longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude ?? null),
+          isAvailable: (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id),
+          isOnline: onlineAvailableIds.has(item.user.id),
+          lastLoginAt: item.user.lastLoginAt ?? null,
+        };
+      });
     return res.json(mapped);
   } catch (error) {
     console.error("Biker available list error:", error);
@@ -1052,13 +1100,21 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
     const includeOffline = req.query.includeOffline === "true";
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
+
+    const [offlineRandomSetting, mapFilterSetting] = await Promise.all([
+      storage.getAppSetting("offline_position_randomize_default"),
+      storage.getAppSetting("map_visibility_filter"),
+    ]);
+    const globalOfflineRandomize = offlineRandomSetting?.value !== "false";
+    const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
+
     const trackerZavIds = onlineTracker.getAvailableZavorrinaIds(countriesParam);
     const onlineResultsRaw = trackerZavIds.length > 0
       ? await storage.getAvailableZavorrinaList(lat, lng, countriesParam, trackerZavIds)
       : [];
     const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
-    if (includeOffline) {
+    if (includeOffline && mapVisibilityFilter !== "online_only" && mapVisibilityFilter !== "available_only") {
       const { db } = await import("../db");
       const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
       const { eq, and, inArray: inArr } = await import("drizzle-orm");
@@ -1075,9 +1131,16 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
         .where(and(...zavConds))
         .orderBy(sqlTag`distance`);
       // Defense-in-depth: strip stored coordinates and derived distance for users with hideFromMap=true.
-      const allZav = allZavRaw.map((r: any) => r.profile?.hideFromMap
-        ? { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null }
-        : r);
+      // For offline users, apply globalOfflineRandomize to serve fuzzed coords when enabled.
+      const allZav = allZavRaw.map((r: any) => {
+        if (r.profile?.hideFromMap) return { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null };
+        const useOfflineCoords = globalOfflineRandomize && r.profile?.offlinePositionRandomize !== false;
+        const hasFuzzedCoords = r.profile?.lastOfflineLat != null && r.profile?.lastOfflineLng != null;
+        if (useOfflineCoords && hasFuzzedCoords) {
+          return { ...r, profile: { ...r.profile, latitude: r.profile.lastOfflineLat, longitude: r.profile.lastOfflineLng }, distance: null };
+        }
+        return r;
+      });
       const onlineIds = new Set(onlineResults.map((r: any) => r.user.id));
       const offlineOnly = allZav.filter((r: any) => !onlineIds.has(r.user.id) && !blockedIds.has(r.user.id));
       allResults = [...onlineResults, ...offlineOnly];
@@ -1089,28 +1152,34 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
       }
     }
     const onlineAvailableIds = new Set(onlineResults.map((r: any) => r.user.id));
-    const mapped = allResults.map((item: any) => {
-      const motos = motorcyclesMap[item.user.id] || [];
-      const firstMoto = motos[0];
-      return {
-        id: item.user.id,
-        nickname: item.user.nickname,
-        userType: item.user.userType,
-        sex: item.user.sex,
-        region: item.user.region,
-        country: item.user.country,
-        birthYear: item.user.birthYear,
-        bio: item.profile?.bio || null,
-        moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
-        ridingStyle: firstMoto?.ridingStyle || null,
-        distance: item.profile?.hideFromMap ? null : (lat != null && lng != null ? Math.round(item.distance * 10) / 10 : null),
-        latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude ?? null),
-        longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude ?? null),
-        isAvailable: (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id),
-        isOnline: onlineAvailableIds.has(item.user.id),
-        lastLoginAt: item.user.lastLoginAt ?? null,
-      };
-    });
+    const mapped = allResults
+      .filter((item: any) => {
+        if (mapVisibilityFilter === "online_only") return onlineAvailableIds.has(item.user.id);
+        if (mapVisibilityFilter === "available_only") return (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id);
+        return true;
+      })
+      .map((item: any) => {
+        const motos = motorcyclesMap[item.user.id] || [];
+        const firstMoto = motos[0];
+        return {
+          id: item.user.id,
+          nickname: item.user.nickname,
+          userType: item.user.userType,
+          sex: item.user.sex,
+          region: item.user.region,
+          country: item.user.country,
+          birthYear: item.user.birthYear,
+          bio: item.profile?.bio || null,
+          moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
+          ridingStyle: firstMoto?.ridingStyle || null,
+          distance: item.profile?.hideFromMap ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null),
+          latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude ?? null),
+          longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude ?? null),
+          isAvailable: (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id),
+          isOnline: onlineAvailableIds.has(item.user.id),
+          lastLoginAt: item.user.lastLoginAt ?? null,
+        };
+      });
     return res.json(mapped);
   } catch (error) {
     console.error("Zavorrine available list error:", error);
@@ -1130,6 +1199,13 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Parametri lat e lng richiesti" });
     }
 
+    const [offlineRandomSetting, mapFilterSetting] = await Promise.all([
+      storage.getAppSetting("offline_position_randomize_default"),
+      storage.getAppSetting("map_visibility_filter"),
+    ]);
+    const globalOfflineRandomize = offlineRandomSetting?.value !== "false";
+    const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
+
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
 
@@ -1139,8 +1215,8 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
       .filter((item) => !item.profile?.hideFromMap)
       .map((item) => {
         const isOnlineNearby = !item.user.ghostMode && item.user.lastLoginAt != null && new Date(item.user.lastLoginAt) >= fifteenMinutesAgoNearby;
-        // Offline users with randomize enabled: serve fuzzed coords to protect real position
-        const useOfflineCoords = !isOnlineNearby && item.profile?.offlinePositionRandomize !== false;
+        // Offline users with randomize enabled (respects global override): serve fuzzed coords to protect real position
+        const useOfflineCoords = !isOnlineNearby && globalOfflineRandomize && item.profile?.offlinePositionRandomize !== false;
         const hasFuzzedCoords = item.profile?.lastOfflineLat != null && item.profile?.lastOfflineLng != null;
         const servedLat = (useOfflineCoords && hasFuzzedCoords) ? item.profile!.lastOfflineLat : item.profile?.latitude;
         const servedLng = (useOfflineCoords && hasFuzzedCoords) ? item.profile!.lastOfflineLng : item.profile?.longitude;
@@ -1158,11 +1234,17 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
           latitude: servedLat,
           longitude: servedLng,
           isAvailable: (item.profile?.isAvailable || false) && isOnlineNearby,
+          isOnline: isOnlineNearby,
           bio: item.profile?.bio || null,
           distance: servedDistance,
         };
       })
-      .filter((item) => item.latitude != null && item.longitude != null && !isNaN(item.latitude as number) && !isNaN(item.longitude as number));
+      .filter((item) => item.latitude != null && item.longitude != null && !isNaN(item.latitude as number) && !isNaN(item.longitude as number))
+      .filter((item) => {
+        if (mapVisibilityFilter === "online_only") return item.isOnline;
+        if (mapVisibilityFilter === "available_only") return item.isAvailable;
+        return true;
+      });
 
     return res.json(results);
   } catch (error) {
