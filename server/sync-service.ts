@@ -6,7 +6,7 @@ import { db } from "./db";
 import { appSettings } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
-const INTERVAL_MS = 12 * 60 * 60 * 1000; // 12 ore
+const INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 ore
 
 let syncTimer: NodeJS.Timeout | null = null;
 let isSyncing = false;
@@ -217,7 +217,7 @@ export function startSyncScheduler() {
     }
   }, INTERVAL_MS);
 
-  console.log(`[sync-service] Scheduler avviato — prossimo sync tra 12h (${nextAt})`);
+  console.log(`[sync-service] Scheduler avviato — prossimo sync tra 6h (${nextAt})`);
 }
 
 export function stopSyncScheduler() {

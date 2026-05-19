@@ -6602,6 +6602,7 @@ router.post("/matches/recalculate-all", async (_req: Request, res: Response) => 
   }
 });
 
+<<<<<<< HEAD
 // ─────────────────────────────────────────────────────────────────────────────
 // Task #1355: Sistema OTA Modulare — endpoint admin per slot + heartbeat + revert
 // ─────────────────────────────────────────────────────────────────────────────
@@ -6954,6 +6955,33 @@ router.get("/ota/events", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[ADMIN ota/events] error:", err);
     return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// POST /api/admin/sync/trigger — trigger immediato sync prod→dev
+router.post("/sync/trigger", async (_req: Request, res: Response) => {
+  try {
+    const { isSyncAvailable, syncProdToDev } = await import("../sync-service");
+    if (!isSyncAvailable()) {
+      return res.status(400).json({ ok: false, error: "Sync non disponibile in questo ambiente" });
+    }
+    const result = await syncProdToDev();
+    return res.json(result);
+  } catch (err: any) {
+    console.error("[ADMIN sync/trigger] error:", err);
+    return res.status(500).json({ ok: false, error: err?.message ?? "Errore interno" });
+  }
+});
+
+// GET /api/admin/sync/status — stato sync prod→dev
+router.get("/sync/status", async (_req: Request, res: Response) => {
+  try {
+    const { getSyncStatus } = await import("../sync-service");
+    const status = await getSyncStatus();
+    return res.json(status);
+  } catch (err: any) {
+    console.error("[ADMIN sync/status] error:", err);
+    return res.status(500).json({ ok: false, error: err?.message ?? "Errore interno" });
   }
 });
 
