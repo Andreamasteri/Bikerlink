@@ -900,6 +900,14 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
     }
 
     const updated = await storage.updateProposal(proposalId, updateData as any);
+
+    // If the proposal was re-activated (status explicitly set to "active" from a
+    // non-active state), re-trigger zone matching + push notifications so that
+    // nearby users are notified just as they would be for a brand-new proposal.
+    if (updateData.status === "active" && proposal.status !== "active" && updated) {
+      triggerProposalCreatedMatching(updated);
+    }
+
     return res.json(updated);
   } catch (error) {
     console.error("Update proposal error:", error);
