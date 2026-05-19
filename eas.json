@@ -10,9 +10,6 @@
       "android": {
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease"
-      },
-      "env": {
-        "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app"
       }
     },
     "production": {
@@ -24,9 +21,6 @@
       },
       "ios": {
         "autoIncrement": false
-      },
-      "env": {
-        "EXPO_PUBLIC_DOMAIN": "biker-link.replit.app"
       }
     }
   }

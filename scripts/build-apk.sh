@@ -56,6 +56,20 @@ fi
 echo "  ✔  Autorizzazione trovata — file eliminato (token monouso)"
 rm -f "$AUTH_FILE"
 
+# ── 2a-pre. Verifica EXPO_PUBLIC_DOMAIN ─────────────────────────────────────
+if [ -z "${EXPO_PUBLIC_DOMAIN:-}" ]; then
+  echo ""
+  echo "  ✖  EXPO_PUBLIC_DOMAIN non è impostato nell'ambiente."
+  echo ""
+  echo "  Questa variabile è richiesta per il build. Impostarla nei segreti Replit"
+  echo "  o esportarla prima di avviare lo script:"
+  echo ""
+  echo "    export EXPO_PUBLIC_DOMAIN=your-project.replit.app"
+  echo ""
+  exit 1
+fi
+echo "  ✔  EXPO_PUBLIC_DOMAIN=${EXPO_PUBLIC_DOMAIN}"
+
 # ── 2a. Pre-build change detector ───────────────────────────────────────────
 echo "  Avvio controllo variazioni dall'ultima build riuscita..."
 if bash scripts/pre-build-check.sh; then
@@ -239,7 +253,7 @@ sleep 5
 set +e
 CI=1 \
 EAS_NO_VCS=1 \
-EXPO_PUBLIC_DOMAIN=biker-link.replit.app \
+EXPO_PUBLIC_DOMAIN="${EXPO_PUBLIC_DOMAIN}" \
 npx eas-cli@18 build \
   --platform android \
   --profile "$PROFILE" \
