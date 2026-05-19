@@ -12,8 +12,10 @@ import {
   TextInput,
   Image,
   KeyboardAvoidingView,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
@@ -70,6 +72,11 @@ export default function ReadyToRideScreen() {
     queryKey: ["/api/users/profile"],
   });
 
+  const { data: meData } = useQuery({
+    queryKey: ["/api/users/me"],
+    enabled: !!user,
+  });
+
   const { data: ghostSettingData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/ghost-mode-enabled"],
   });
@@ -77,6 +84,10 @@ export default function ReadyToRideScreen() {
 
   const isAvailable = (data as any)?.isAvailable || false;
   const isGhostMode = (data as any)?.ghostMode || false;
+
+  const meProfile = (meData as any)?.profile;
+  const hideFromMap = meProfile?.hideFromMap ?? false;
+  const offlineRandomize = meProfile?.offlinePositionRandomize !== false;
 
   const invalidateOnlineQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
@@ -118,16 +129,26 @@ export default function ReadyToRideScreen() {
     },
     onSuccess: (enabled: boolean) => {
       invalidateOnlineQueries();
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
       AsyncStorage.setItem("user_ghost_mode", enabled ? "true" : "false").catch(() => {});
+    },
+  });
+
+  const privacyMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      await apiRequest("PUT", "/api/users/me/privacy", payload);
+    },
+    onSuccess: () => {
+      invalidateOnlineQueries();
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+    onError: () => {
+      Alert.alert(t("common.error"), t("ready.toggleError"));
     },
   });
 
   const handleToggle = () => {
     toggleMutation.mutate(!isAvailable);
-  };
-
-  const handleGhostToggle = () => {
-    ghostMutation.mutate(!isGhostMode);
   };
 
   const mySosQuery = useQuery<any>({
@@ -231,38 +252,94 @@ export default function ReadyToRideScreen() {
           </View>
         )}
 
-        <Pressable
-          style={[styles.cronoBtn, { borderColor: Colors.accent + "60" }]}
-          onPress={() => router.push("/ride" as any)}
-        >
-          <Ionicons name="shield-outline" size={20} color={Colors.accent} />
-          <Text style={styles.cronoBtnText}>Privacy & GPS</Text>
-        </Pressable>
+        <View style={styles.privacyCard}>
+          <View style={styles.privacyHeader}>
+            <Ionicons name="shield-outline" size={18} color={Colors.accent} />
+            <Text style={styles.privacyTitle}>Privacy</Text>
+          </View>
 
-        {ghostModeFeatureEnabled && (
-          <View style={styles.ghostBlock}>
-            <Pressable
-              style={[
-                styles.ghostBtn,
-                isGhostMode && styles.ghostBtnActive,
-              ]}
-              onPress={handleGhostToggle}
-              disabled={ghostMutation.isPending || toggleMutation.isPending}
-            >
-              {ghostMutation.isPending ? (
-                <ActivityIndicator color="#fff" size="small" />
-              ) : (
+          {ghostModeFeatureEnabled && (
+            <>
+              <View style={styles.privacyRow}>
                 <Ionicons
                   name={isGhostMode ? "eye-off" : "eye"}
                   size={20}
-                  color="#fff"
+                  color={isGhostMode ? Colors.accent : Colors.textSecondary}
+                  style={styles.privacyRowIcon}
                 />
-              )}
-              <Text style={styles.ghostBtnText}>{t("ride.ghostMode")}</Text>
-            </Pressable>
-            <Text style={styles.ghostDesc}>{t("ride.ghostModeDesc")}</Text>
+                <View style={styles.privacyRowText}>
+                  <Text style={styles.privacyRowLabel}>{t("ride.ghostMode")}</Text>
+                  <Text style={styles.privacyRowDesc}>
+                    {isGhostMode ? t("ride.ghostModeDesc") : "Sei visibile sulla mappa"}
+                  </Text>
+                </View>
+                <Switch
+                  value={isGhostMode}
+                  onValueChange={(val) => ghostMutation.mutate(val)}
+                  disabled={ghostMutation.isPending}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor="#fff"
+                />
+              </View>
+              <View style={styles.privacyDivider} />
+            </>
+          )}
+
+          <View style={styles.privacyRow}>
+            <Ionicons
+              name="eye-off-outline"
+              size={20}
+              color={hideFromMap ? Colors.accent : Colors.textSecondary}
+              style={styles.privacyRowIcon}
+            />
+            <View style={styles.privacyRowText}>
+              <Text style={styles.privacyRowLabel}>Non visibile sulla mappa</Text>
+              <Text style={styles.privacyRowDesc}>
+                Il tuo marker non viene mostrato agli altri utenti.
+              </Text>
+            </View>
+            <Switch
+              value={hideFromMap}
+              onValueChange={(val) => privacyMutation.mutate({ hideFromMap: val })}
+              disabled={privacyMutation.isPending}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor="#fff"
+            />
           </View>
-        )}
+
+          <View style={styles.privacyDivider} />
+
+          <View style={styles.privacyRow}>
+            <Ionicons
+              name="shuffle-outline"
+              size={20}
+              color={offlineRandomize ? Colors.accent : Colors.textSecondary}
+              style={styles.privacyRowIcon}
+            />
+            <View style={styles.privacyRowText}>
+              <Text style={styles.privacyRowLabel}>Randomizza posizione offline</Text>
+              <Text style={styles.privacyRowDesc}>
+                Quando chiudi l'app, la posizione viene spostata di ±20 km.
+              </Text>
+            </View>
+            <Switch
+              value={offlineRandomize}
+              onValueChange={(val) => privacyMutation.mutate({ offlinePositionRandomize: val })}
+              disabled={privacyMutation.isPending}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor="#fff"
+            />
+          </View>
+
+          <Pressable
+            style={styles.privacyMoreBtn}
+            onPress={() => router.push("/ride" as any)}
+          >
+            <Ionicons name="settings-outline" size={16} color={Colors.accent} />
+            <Text style={styles.privacyMoreBtnText}>Altre opzioni privacy & GPS</Text>
+            <Ionicons name="chevron-forward" size={14} color={Colors.accent} />
+          </Pressable>
+        </View>
 
         {sosEnabled && (
           <View style={styles.sosRow}>
@@ -433,24 +510,73 @@ const styles = StyleSheet.create({
       web: { boxShadow: "0px 4px 8px rgba(0,0,0,0.3)" },
     }),
   },
-  ghostBlock: {
-    alignItems: "center",
-    marginTop: 18,
-    gap: 6,
+  privacyCard: {
+    width: "100%",
+    maxWidth: 420,
+    marginTop: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  ghostBtn: {
+  privacyHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#3A3A3A",
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    borderRadius: 24,
+    marginBottom: 10,
   },
-  ghostBtnActive: {
-    backgroundColor: "#222222",
-    borderWidth: 1.5,
-    borderColor: "#888",
+  privacyTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: Colors.textSecondary,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  privacyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  privacyRowIcon: {
+    marginRight: 10,
+  },
+  privacyRowText: {
+    flex: 1,
+    paddingRight: 8,
+  },
+  privacyRowLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  privacyRowDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  privacyDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    opacity: 0.6,
+  },
+  privacyMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent + "60",
+  },
+  privacyMoreBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
   },
   toastContainer: {
     marginTop: 16,
@@ -466,18 +592,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     textAlign: "center" as const,
-  },
-  ghostBtnText: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
-  },
-  ghostDesc: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.accentRed,
-    textAlign: "center",
-    maxWidth: 260,
   },
   sosRow: {
     flexDirection: "row",
