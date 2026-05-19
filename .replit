@@ -65,10 +65,6 @@ args = "injection-safety"
 task = "workflow.run"
 args = "admin-privacy-filter"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "apk-build-launcher"
-
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -184,17 +180,6 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx vitest run --config vitest.config.server.ts"
-
-[[workflows.workflow]]
-name = "apk-build-launcher"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "touch .local/apk-build-authorized && EXPO_PUBLIC_DOMAIN=biker-link.replit.app bash scripts/build-apk.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
