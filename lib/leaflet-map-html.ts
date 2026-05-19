@@ -10,6 +10,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 .leaflet-container { background: #1a1a1a !important; }
 .leaflet-control-zoom { display: none !important; }
 .leaflet-control-attribution { font-size: 8px !important; opacity: 0.4; }
+.labels-hidden .nick-label { display: none !important; }
 </style>
 </head>
 <body>
@@ -271,7 +272,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
           var rawNick2 = u.nickname || "";
           var truncNick2 = rawNick2.length > 10 ? rawNick2.substring(0, 10) + "\u2026" : rawNick2;
           var safeNick2 = escapeHtml(truncNick2);
-          var labelHtml2 = "<div style=\\"background:" + color + ";padding:2px 6px;border-radius:8px;" +
+          var labelHtml2 = "<div class=\\"nick-label\\" style=\\"background:" + color + ";padding:2px 6px;border-radius:8px;" +
             "font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;" +
             "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8);" +
             "white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;" +
@@ -292,7 +293,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
           var rawNick = u.nickname || "";
           var truncNick = rawNick.length > 10 ? rawNick.substring(0, 10) + "\u2026" : rawNick;
           var safeNick = escapeHtml(truncNick);
-          var labelHtml = "<div style=\\"background:" + color + ";padding:2px 6px;border-radius:8px;" +
+          var labelHtml = "<div class=\\"nick-label\\" style=\\"background:" + color + ";padding:2px 6px;border-radius:8px;" +
             "font-size:10px;font-weight:700;color:#fff;margin-bottom:2px;" +
             "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8);" +
             "white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;" +
@@ -373,6 +374,21 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       map.setView([lat, lng], z < 13 ? 13 : z, { animate: true });
     }
   };
+
+  /* Nascondi i fumetti nickname quando la mappa è troppo zoomata fuori (task #1432).
+     Soglia configurabile: zoom < NICK_ZOOM_THRESHOLD → solo badge circolare, senza etichetta. */
+  var NICK_ZOOM_THRESHOLD = 10;
+  function updateNickLabels() {
+    var mapEl = document.getElementById("map");
+    if (!mapEl) return;
+    if (map.getZoom() < NICK_ZOOM_THRESHOLD) {
+      mapEl.classList.add("labels-hidden");
+    } else {
+      mapEl.classList.remove("labels-hidden");
+    }
+  }
+  map.on("zoomend", updateNickLabels);
+  updateNickLabels();
 
   postMsg({ type: "mapReady" });
 })();
