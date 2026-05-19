@@ -45,6 +45,7 @@ import * as Location from "expo-location";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
+import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 
 
 interface ProfileData {
@@ -136,6 +137,56 @@ export default function ProfileScreen() {
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
   const [isExportingData, setIsExportingData] = useState(false);
   const [localFloatingWidget, setLocalFloatingWidget] = useState<boolean>(true);
+  const [pushNotificationsEnabled, setPushNotificationsEnabled] = useState<boolean>(true);
+  const [pushTogglePending, setPushTogglePending] = useState<boolean>(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(PUSH_NOTIFICATIONS_ENABLED_KEY).then((val) => {
+      setPushNotificationsEnabled(val === null ? true : val === "true");
+    }).catch(() => {});
+  }, []);
+
+  const togglePushNotifications = useCallback(async (next: boolean) => {
+    setPushTogglePending(true);
+    setPushNotificationsEnabled(next);
+    const getMessage = (e: unknown): string =>
+      e instanceof Error ? e.message : typeof e === "string" ? e : "Operazione non riuscita";
+    try {
+      await AsyncStorage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, next ? "true" : "false");
+      if (next) {
+        const Notifications = require("expo-notifications");
+        const { status: existing } = await Notifications.getPermissionsAsync();
+        let finalStatus = existing;
+        if (existing !== "granted") {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== "granted") {
+          Alert.alert(
+            "Permesso richiesto",
+            "Abilita le notifiche dalle impostazioni del telefono per ricevere gli avvisi di match.",
+          );
+          return;
+        }
+        const tokenData = await Notifications.getExpoPushTokenAsync();
+        const token = tokenData?.data;
+        if (!token) {
+          throw new Error("Impossibile ottenere il token di notifica");
+        }
+        await apiRequest("PUT", "/api/users/me/push-token", { token });
+      } else {
+        await apiRequest("PUT", "/api/users/me/push-token", { token: null });
+      }
+    } catch (e: unknown) {
+      Alert.alert("Errore", getMessage(e));
+      setPushNotificationsEnabled(!next);
+      try {
+        await AsyncStorage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, !next ? "true" : "false");
+      } catch {}
+    } finally {
+      setPushTogglePending(false);
+    }
+  }, []);
 
   const { data: allSettingsData } = useQuery<{ unitsPrefEnabled?: boolean }>({
     queryKey: ["/api/settings/all"],
@@ -1195,6 +1246,32 @@ export default function ProfileScreen() {
 
       <View style={styles.section}>
         <MenuItem icon="create" label={t("profile.editProfile")} onPress={() => router.push("/profile/edit" as any)} />
+      </View>
+
+      <View style={styles.section}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            paddingVertical: 10,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 12 }}>
+            <Ionicons name="notifications-outline" size={20} color={Colors.text} style={{ marginRight: 10 }} />
+            <Text style={{ flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text }}>
+              Notifiche Match
+            </Text>
+          </View>
+          <Switch
+            testID="push-notifications-toggle"
+            value={pushNotificationsEnabled}
+            onValueChange={togglePushNotifications}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor="#fff"
+            disabled={pushTogglePending}
+          />
+        </View>
       </View>
 
       <View style={styles.section}>

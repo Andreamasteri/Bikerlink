@@ -22,6 +22,7 @@ import * as Updates from "expo-updates";
 import Constants from "expo-constants";
 import { triggerOtaCheck } from "@/lib/ota-check";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
+import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
@@ -407,6 +408,14 @@ function PushTokenRegistrar() {
 
     (async () => {
       try {
+        const pref = await AsyncStorage.getItem(PUSH_NOTIFICATIONS_ENABLED_KEY);
+        if (pref === "false") {
+          try {
+            await apiRequest("PUT", "/api/users/me/push-token", { token: null });
+          } catch {}
+          return;
+        }
+
         if (Platform.OS === "android") {
           await Notifications.setNotificationChannelAsync("matches", {
             name: "Match notifications",
