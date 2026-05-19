@@ -37,9 +37,17 @@ import type { User } from "@shared/schema";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import FavoriteStar from "@/components/FavoriteStar";
 
+type MapFiltersPrefs = {
+  biker?: boolean;
+  zavorrina?: boolean;
+  clubs?: boolean;
+  events?: boolean;
+};
+
 type UserWithProfileCoords = Omit<User, "password"> & {
   profileLatitude?: number | null;
   profileLongitude?: number | null;
+  mapFilters?: MapFiltersPrefs | null;
 };
 
 function formatLastSeen(dateStr: string | null | undefined): string {
@@ -161,6 +169,23 @@ export default function MapScreen() {
     })();
   }, []);
 
+  // Server preferences override device defaults exactly once per session, the
+  // first time the authenticated user object becomes available. We never write
+  // to the server in a "background" effect — only explicit user toggles (see
+  // updateMapFilter below) sync upstream, so we cannot clobber cloud prefs
+  // with device defaults before they load.
+  const serverFiltersAppliedRef = useRef(false);
+  const lastAppliedUserIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Reset the "server prefs applied" flag whenever the authenticated user
+    // identity changes (e.g. account switch without remount), so the new
+    // user's cloud prefs are picked up instead of being short-circuited.
+    const currentId = user?.id ?? null;
+    if (lastAppliedUserIdRef.current !== currentId) {
+      lastAppliedUserIdRef.current = currentId;
+      serverFiltersAppliedRef.current = false;
+    }
+  }, [user?.id]);
   useEffect(() => {
     (async () => {
       try {
@@ -179,11 +204,75 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (!filtersLoaded) return;
-    AsyncStorage.setItem(
-      "map_filters",
-      JSON.stringify({ biker: filterBiker, zavorrina: filterZavorrina, clubs: filterClubs, events: filterEvents })
-    ).catch(() => {});
-  }, [filterBiker, filterZavorrina, filterClubs, filterEvents, filtersLoaded]);
+    if (serverFiltersAppliedRef.current) return;
+    if (!user) return;
+    const typed = user as UserWithProfileCoords;
+    // `mapFilters` is now always present in /api/auth/me and /api/auth/login
+    // responses — `null` means "user has no saved cloud prefs yet". Either way
+    // we mark the override as applied so subsequent user toggles can sync.
+    if (!("mapFilters" in typed)) return;
+    serverFiltersAppliedRef.current = true;
+    const serverFilters = typed.mapFilters;
+    if (serverFilters && typeof serverFilters === "object") {
+      const nextBiker = typeof serverFilters.biker === "boolean" ? serverFilters.biker : filterBiker;
+      const nextZav = typeof serverFilters.zavorrina === "boolean" ? serverFilters.zavorrina : filterZavorrina;
+      const nextClubs = typeof serverFilters.clubs === "boolean" ? serverFilters.clubs : filterClubs;
+      const nextEvents = typeof serverFilters.events === "boolean" ? serverFilters.events : filterEvents;
+      setFilterBiker(nextBiker);
+      setFilterZavorrina(nextZav);
+      setFilterClubs(nextClubs);
+      setFilterEvents(nextEvents);
+      AsyncStorage.setItem(
+        "map_filters",
+        JSON.stringify({ biker: nextBiker, zavorrina: nextZav, clubs: nextClubs, events: nextEvents })
+      ).catch(() => {});
+    }
+  }, [filtersLoaded, user]);
+
+  const persistMapFilters = useCallback(
+    (payload: { biker: boolean; zavorrina: boolean; clubs: boolean; events: boolean }) => {
+      // Local cache first — graceful fallback if the server is unreachable.
+      AsyncStorage.setItem("map_filters", JSON.stringify(payload)).catch(() => {});
+      // Mark server prefs as applied: any further server-side load attempts in
+      // this session must not overwrite what the user just chose.
+      serverFiltersAppliedRef.current = true;
+      if (!isAuthenticated) return;
+      apiRequest("PUT", "/api/users/me", { mapFilters: payload }).catch(() => {});
+    },
+    [isAuthenticated]
+  );
+
+  const toggleFilterBiker = useCallback(() => {
+    setFilterBiker((prev) => {
+      const next = !prev;
+      persistMapFilters({ biker: next, zavorrina: filterZavorrina, clubs: filterClubs, events: filterEvents });
+      return next;
+    });
+  }, [persistMapFilters, filterZavorrina, filterClubs, filterEvents]);
+
+  const toggleFilterZavorrina = useCallback(() => {
+    setFilterZavorrina((prev) => {
+      const next = !prev;
+      persistMapFilters({ biker: filterBiker, zavorrina: next, clubs: filterClubs, events: filterEvents });
+      return next;
+    });
+  }, [persistMapFilters, filterBiker, filterClubs, filterEvents]);
+
+  const toggleFilterClubs = useCallback(() => {
+    setFilterClubs((prev) => {
+      const next = !prev;
+      persistMapFilters({ biker: filterBiker, zavorrina: filterZavorrina, clubs: next, events: filterEvents });
+      return next;
+    });
+  }, [persistMapFilters, filterBiker, filterZavorrina, filterEvents]);
+
+  const toggleFilterEvents = useCallback(() => {
+    setFilterEvents((prev) => {
+      const next = !prev;
+      persistMapFilters({ biker: filterBiker, zavorrina: filterZavorrina, clubs: filterClubs, events: next });
+      return next;
+    });
+  }, [persistMapFilters, filterBiker, filterZavorrina, filterClubs]);
 
   const countriesQueryParam = useMemo(() => {
     if (!countriesLoaded || selectedCountries.length === 0) return "";
@@ -885,8 +974,8 @@ export default function MapScreen() {
             searchRadiusKm={mySearchRadius}
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
-            onToggleFilterBiker={() => setFilterBiker((p) => !p)}
-            onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
+            onToggleFilterBiker={toggleFilterBiker}
+            onToggleFilterZavorrina={toggleFilterZavorrina}
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
             onEventPress={(id) => router.push({ pathname: "/evento/[id]" as const, params: { id } })}
@@ -924,8 +1013,8 @@ export default function MapScreen() {
             filterBiker={filterBiker}
             filterZavorrina={filterZavorrina}
             filterBarTopOffset={insets.top}
-            onToggleFilterBiker={() => setFilterBiker((p) => !p)}
-            onToggleFilterZavorrina={() => setFilterZavorrina((p) => !p)}
+            onToggleFilterBiker={toggleFilterBiker}
+            onToggleFilterZavorrina={toggleFilterZavorrina}
             onUserPress={handleUserPress}
             onEasterEggPress={handleEasterEggPress}
             onEventPress={(id) => { setMapFullscreen(false); router.push({ pathname: "/evento/[id]" as const, params: { id } }); }}
@@ -934,9 +1023,9 @@ export default function MapScreen() {
             fakeMeMarker={fakeMeMarker}
             clubPins={clubPinsQuery.data ?? []}
             filterClubs={filterClubs}
-            onToggleFilterClubs={() => setFilterClubs((p) => !p)}
+            onToggleFilterClubs={toggleFilterClubs}
             filterEvents={filterEvents}
-            onToggleFilterEvents={() => setFilterEvents((p) => !p)}
+            onToggleFilterEvents={toggleFilterEvents}
             onClubPress={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
             onProposeClubLocation={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
             initialCenterOverride={lastSmallMapCenter}

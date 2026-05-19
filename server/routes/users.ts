@@ -265,6 +265,21 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
       }
       profileUpdate.unitsPreference = up;
     }
+    if (b.mapFilters !== undefined) {
+      const mf = b.mapFilters;
+      if (mf !== null && (typeof mf !== "object" || Array.isArray(mf))) {
+        return res.status(400).json({ message: "Valore mapFilters non valido" });
+      }
+      if (mf === null) {
+        profileUpdate.mapFilters = null;
+      } else {
+        const sanitized: Record<string, boolean> = {};
+        for (const key of ["biker", "zavorrina", "clubs", "events"] as const) {
+          if (typeof mf[key] === "boolean") sanitized[key] = mf[key];
+        }
+        profileUpdate.mapFilters = sanitized;
+      }
+    }
 
     if (Object.keys(profileUpdate).length > 0) {
       const existingProfileMe = await storage.getUserProfile(userId);

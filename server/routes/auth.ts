@@ -396,7 +396,13 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     });
 
     const { password: _, ...safeUser } = userRecord ?? user;
-    return res.json({ ...safeUser, sessionToken: buildSessionToken(req.sessionID) });
+    return res.json({
+      ...safeUser,
+      profileLatitude: userProfile?.latitude ?? null,
+      profileLongitude: userProfile?.longitude ?? null,
+      mapFilters: userProfile?.mapFilters ?? null,
+      sessionToken: buildSessionToken(req.sessionID),
+    });
   } catch (error) {
     console.error("Login error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -444,6 +450,7 @@ router.get("/me", async (req: Request, res: Response) => {
       ...safeUser,
       profileLatitude: profile?.latitude ?? null,
       profileLongitude: profile?.longitude ?? null,
+      mapFilters: profile?.mapFilters ?? null,
     });
   } catch (error) {
     console.error("Me error:", error);

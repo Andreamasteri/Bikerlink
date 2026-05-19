@@ -143,6 +143,7 @@ export const userProfiles = pgTable("user_profiles", {
   lastOfflineLng: doublePrecision("last_offline_lng"),
   gpsPrecision: varchar("gps_precision", { length: 30 }).notNull().default("balanced"),
   unitsPreference: jsonb("units_preference").$type<{ timeFormat: string; speedUnit: string; distanceUnit: string } | null>(),
+  mapFilters: jsonb("map_filters").$type<{ biker?: boolean; zavorrina?: boolean; clubs?: boolean; events?: boolean } | null>(),
   coordinatesUpdatedAt: timestamp("coordinates_updated_at"),
   adminOverrideUntil: timestamp("admin_override_until"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
