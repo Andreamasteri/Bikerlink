@@ -1,5 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
+import { db } from "../db";
+import { gpsRejectionStats } from "@shared/schema";
+import { sql as drizzleSql } from "drizzle-orm";
 
 const router = Router();
 
@@ -86,9 +89,37 @@ router.post("/:id/points", async (req: Request, res: Response) => {
         typeof p.longitude !== "number" || !isFinite(p.longitude)
     );
     if (invalidPoints.length > 0) {
+      const payload = JSON.stringify(invalidPoints);
       console.warn(
-        `[tracking] Coordinate non valide rifiutate — userId=${userId} routeId=${id} count=${invalidPoints.length} payload=${JSON.stringify(invalidPoints)}`
+        `[tracking] Coordinate non valide rifiutate — userId=${userId} routeId=${id} count=${invalidPoints.length} payload=${payload}`
       );
+      const rawDeviceId =
+        (req.headers["expo-device-id"] as string | undefined) ||
+        (req.headers["expo-installation-id"] as string | undefined) ||
+        "unknown";
+      const deviceId = rawDeviceId.substring(0, 128);
+      const platform = (req.headers["expo-platform"] as string | undefined)?.substring(0, 20) ?? null;
+      db.insert(gpsRejectionStats)
+        .values({
+          userId,
+          deviceId,
+          platform,
+          rejectionCount: 1,
+          lastRejectedPayload: payload.slice(0, 2000),
+          lastRejectedAt: new Date(),
+          lastSource: "tracking",
+        })
+        .onConflictDoUpdate({
+          target: [gpsRejectionStats.userId, gpsRejectionStats.deviceId],
+          set: {
+            rejectionCount: drizzleSql`${gpsRejectionStats.rejectionCount} + 1`,
+            platform,
+            lastRejectedPayload: payload.slice(0, 2000),
+            lastRejectedAt: new Date(),
+            lastSource: "tracking",
+          },
+        })
+        .catch((err: unknown) => console.error("[tracking] gps_rejection_stats upsert error:", err));
       return res.status(400).json({
         message: "Coordinate GPS non valide: latitudine e longitudine devono essere numeri finiti",
         invalidCount: invalidPoints.length,

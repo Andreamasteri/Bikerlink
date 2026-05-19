@@ -9,7 +9,7 @@ import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "
 import { storage } from "../storage";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats } from "@shared/schema";
 import { DEFAULT_PREFS } from "./match-preferences";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, notInArray, lte, isNull, or, ilike } from "drizzle-orm";
@@ -5832,6 +5832,35 @@ router.get("/settings/version-distribution", async (_req: Request, res: Response
   } catch (error) {
     console.error("version-distribution error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/gps-rejections", async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const minCount = Math.max(Number(req.query.min_count) || 1, 1);
+    const rows = await db
+      .select({
+        userId: gpsRejectionStats.userId,
+        deviceId: gpsRejectionStats.deviceId,
+        platform: gpsRejectionStats.platform,
+        nickname: users.nickname,
+        email: users.email,
+        lastOtaNumber: gpsRejectionStats.lastOtaNumber,
+        rejectionCount: gpsRejectionStats.rejectionCount,
+        lastRejectedPayload: gpsRejectionStats.lastRejectedPayload,
+        lastRejectedAt: gpsRejectionStats.lastRejectedAt,
+        lastSource: gpsRejectionStats.lastSource,
+      })
+      .from(gpsRejectionStats)
+      .leftJoin(users, eq(gpsRejectionStats.userId, users.id))
+      .where(sql`${gpsRejectionStats.rejectionCount} >= ${minCount}`)
+      .orderBy(desc(gpsRejectionStats.rejectionCount))
+      .limit(limit);
+    return res.json({ stats: rows, total: rows.length });
+  } catch (error) {
+    console.error("GPS rejections fetch error:", error);
+    return res.status(500).json({ message: "Errore interno" });
   }
 });
 

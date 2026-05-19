@@ -7,9 +7,9 @@ import { isProtectedUser } from "../constants";
 import { isSystemAccount, systemAccountConditions } from "../lib/system-account-filter";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
-import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos } from "@shared/schema";
+import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos, gpsRejectionStats } from "@shared/schema";
 import { db } from "../db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
 import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
 import { onlineTracker } from "../online-tracker";
 import { reportRateLimiter, getTrustedClientIp } from "../lib/abuse-rate-limit";
@@ -651,9 +651,37 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
       typeof latitude !== "number" || !isFinite(latitude) ||
       typeof longitude !== "number" || !isFinite(longitude)
     ) {
+      const payload = JSON.stringify({ latitude, longitude });
       console.warn(
-        `[users/location] Coordinate non valide rifiutate — userId=${userId} payload=${JSON.stringify({ latitude, longitude })}`
+        `[users/location] Coordinate non valide rifiutate — userId=${userId} payload=${payload}`
       );
+      const rawDeviceId =
+        (req.headers["expo-device-id"] as string | undefined) ||
+        (req.headers["expo-installation-id"] as string | undefined) ||
+        "unknown";
+      const deviceId = rawDeviceId.substring(0, 128);
+      const platform = (req.headers["expo-platform"] as string | undefined)?.substring(0, 20) ?? null;
+      db.insert(gpsRejectionStats)
+        .values({
+          userId,
+          deviceId,
+          platform,
+          rejectionCount: 1,
+          lastRejectedPayload: payload.slice(0, 2000),
+          lastRejectedAt: new Date(),
+          lastSource: "location",
+        })
+        .onConflictDoUpdate({
+          target: [gpsRejectionStats.userId, gpsRejectionStats.deviceId],
+          set: {
+            rejectionCount: drizzleSql`${gpsRejectionStats.rejectionCount} + 1`,
+            platform,
+            lastRejectedPayload: payload.slice(0, 2000),
+            lastRejectedAt: new Date(),
+            lastSource: "location",
+          },
+        })
+        .catch((err: unknown) => console.error("[users/location] gps_rejection_stats upsert error:", err));
       return res.status(400).json({ message: "Coordinate GPS non valide: latitudine e longitudine devono essere numeri finiti" });
     }
     const existingProfile = await storage.getUserProfile(userId);

@@ -35,6 +35,7 @@ export default function AdminLayout() {
       <Stack.Screen name="traduzioni" options={{ title: "Sistema Traduzioni" }} />
       <Stack.Screen name="tabella-lingue" options={{ title: "Tabella Lingue" }} />
       <Stack.Screen name="gps-errors" options={{ title: "GPS Error Log" }} />
+      <Stack.Screen name="gps-rejections" options={{ title: "GPS Rifiutati" }} />
       <Stack.Screen name="sensors" options={{ headerShown: false }} />
       <Stack.Screen name="moderator-logs" options={{ title: "Log Moderatori" }} />
       <Stack.Screen name="blocks" options={{ title: "Blocchi tra utenti" }} />

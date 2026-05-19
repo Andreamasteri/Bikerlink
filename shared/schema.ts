@@ -12,6 +12,7 @@ import {
   index,
   uniqueIndex,
   pgEnum,
+  primaryKey,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1648,3 +1649,23 @@ export const mediaLibrary = pgTable("media_library", {
 
 export type MediaLibrary = typeof mediaLibrary.$inferSelect;
 export type InsertMediaLibrary = typeof mediaLibrary.$inferInsert;
+
+export const gpsRejectionStats = pgTable("gps_rejection_stats", {
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  deviceId: varchar("device_id", { length: 128 }).notNull().default("unknown"),
+  platform: varchar("platform", { length: 20 }),
+  rejectionCount: integer("rejection_count").notNull().default(0),
+  lastOtaNumber: integer("last_ota_number"),
+  lastRejectedPayload: text("last_rejected_payload"),
+  lastRejectedAt: timestamp("last_rejected_at").notNull().defaultNow(),
+  lastSource: varchar("last_source", { length: 20 }),
+}, (table) => [
+  primaryKey({ name: "gps_rejection_stats_pk", columns: [table.userId, table.deviceId] }),
+  index("gps_rejection_stats_count_idx").on(table.rejectionCount),
+  index("gps_rejection_stats_at_idx").on(table.lastRejectedAt),
+]);
+
+export type GpsRejectionStat = typeof gpsRejectionStats.$inferSelect;
+export type InsertGpsRejectionStat = typeof gpsRejectionStats.$inferInsert;
