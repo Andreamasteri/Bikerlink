@@ -5706,5 +5706,83 @@ router.delete("/blocks/:id", async (req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/admin/newsletter/subscribers ─────────────────────────────────
+// Lista iscritti alla newsletter con paginazione. Admin-only.
+router.get("/newsletter/subscribers", async (req: Request, res: Response) => {
+  try {
+    const pageRaw = req.query.page ? parseInt(String(req.query.page), 10) : 1;
+    const limitRaw = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
+    const page = Math.max(1, isNaN(pageRaw) ? 1 : pageRaw);
+    const limit = Math.max(1, Math.min(isNaN(limitRaw) ? 50 : limitRaw, 200));
+    const offset = (page - 1) * limit;
+
+    const countResult = await db.execute(sql`SELECT COUNT(*) AS cnt FROM newsletter_subscribers`);
+    const total = Number((countResult.rows[0] as { cnt: string }).cnt);
+
+    interface SubscriberRow {
+      id: number;
+      email: string;
+      notify_rides: boolean;
+      created_at: string;
+    }
+
+    const rows = await db.execute(sql`
+      SELECT id, email, notify_rides, created_at
+      FROM newsletter_subscribers
+      ORDER BY created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    return res.json({
+      total,
+      page,
+      limit,
+      subscribers: (rows.rows as SubscriberRow[]).map((r) => ({
+        id: r.id,
+        email: r.email,
+        notifyRides: r.notify_rides,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error("[ADMIN NEWSLETTER] list error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── GET /api/admin/newsletter/subscribers/export ───────────────────────────
+// Esporta la lista iscritti come CSV. Admin-only.
+router.get("/newsletter/subscribers/export", async (req: Request, res: Response) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT email, notify_rides, created_at
+      FROM newsletter_subscribers
+      ORDER BY created_at DESC
+    `);
+
+    interface ExportRow {
+      email: string;
+      notify_rides: boolean;
+      created_at: string;
+    }
+
+    const lines: string[] = ["email,notify_rides,created_at"];
+    for (const r of rows.rows as ExportRow[]) {
+      const email = String(r.email).replace(/"/g, '""');
+      const notifyRides = r.notify_rides ? "true" : "false";
+      const createdAt = r.created_at ? new Date(r.created_at).toISOString() : "";
+      lines.push(`"${email}",${notifyRides},${createdAt}`);
+    }
+
+    const csv = lines.join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename="newsletter_subscribers_${new Date().toISOString().slice(0, 10)}.csv"`);
+    return res.send(csv);
+  } catch (err) {
+    console.error("[ADMIN NEWSLETTER] export error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 export default router;
 

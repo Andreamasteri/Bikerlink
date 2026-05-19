@@ -71,6 +71,14 @@ const adminGroups: AdminGroup[] = [
     ],
   },
   {
+    title: "Marketing",
+    headerIcon: "email-newsletter",
+    headerIconSet: "MaterialCommunityIcons",
+    items: [
+      { key: "newsletter", label: "Newsletter", icon: "email-newsletter", iconSet: "MaterialCommunityIcons", route: "/admin/newsletter", accentColor: "#2196F3" },
+    ],
+  },
+  {
     title: "Sistema",
     headerIcon: "settings",
     headerIconSet: "MaterialIcons",
