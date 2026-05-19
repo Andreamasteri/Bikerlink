@@ -321,6 +321,19 @@ function configureExpoAndLanding(app: express.Application) {
     });
   }
 
+  // ── Web Portal SPA routes ────────────────────────────────────────────────
+  // Serve the web portal HTML at specific SPA routes.
+  // The client-side JS handles routing internally.
+  const webPortalPath = path.resolve(process.cwd(), "server", "templates", "web-portal.html");
+  const webPortalRoutes = ["/registrati", "/accedi", "/area-utente", "/media", "/admin/media"];
+  for (const route of webPortalRoutes) {
+    app.get(route, (_req: Request, res: Response) => {
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.sendFile(webPortalPath);
+    });
+  }
+
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
 
   // SECURITY (Task #1080): le foto extra delle moto vengono scritte come
@@ -1203,6 +1216,26 @@ function setupErrorHandler(app: express.Application) {
           console.log("[MIGRATION] sprint_results table ensured");
         } catch (e) {
           console.warn("[MIGRATION] sprint_results table:", e);
+        }
+
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS media_library (
+              id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::varchar,
+              type VARCHAR(10) NOT NULL DEFAULT 'pdf',
+              title_it VARCHAR(300) NOT NULL,
+              title_en VARCHAR(300) NOT NULL,
+              url TEXT NOT NULL,
+              thumbnail_url TEXT,
+              sort_order INTEGER NOT NULL DEFAULT 0,
+              created_at TIMESTAMP NOT NULL DEFAULT NOW()
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS media_library_type_idx ON media_library(type)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS media_library_sort_idx ON media_library(sort_order)`);
+          console.log("[MIGRATION] media_library table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] media_library table:", e);
         }
 
         try {

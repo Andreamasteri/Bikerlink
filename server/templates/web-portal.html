@@ -1,0 +1,1559 @@
+<!doctype html>
+<html lang="it" id="html-root">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>BikerLink — Web Portal</title>
+  <meta name="description" content="BikerLink — Registrati, accedi, scopri le risorse e gestisci il tuo profilo biker."/>
+  <meta name="theme-color" content="#0D0D0D"/>
+  <link rel="icon" href="/assets/images/playstore-icon.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet"/>
+  <style>
+    /* ── DESIGN SYSTEM ─────────────────────────────────────────────────── */
+    :root {
+      --accent: #FF6600;
+      --accent-dim: rgba(255,102,0,0.12);
+      --accent-glow: rgba(255,102,0,0.30);
+      --bg: #0D0D0D;
+      --bg-alt: #111111;
+      --surface: #161616;
+      --surface2: #1E1E1E;
+      --border: rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --text: #F2F2F2;
+      --text2: #999999;
+      --text3: #555555;
+      --success: #22C55E;
+      --error: #EF4444;
+      --font-display: 'Bebas Neue', sans-serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --radius: 4px;
+      --max: 1100px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 9999; opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+      background-size: 128px 128px;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.82; }
+    img { display: block; max-width: 100%; }
+
+    /* ── NAVBAR ─────────────────────────────────────────────────────────── */
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      height: 64px; display: flex; align-items: center;
+      background: rgba(13,13,13,0.88);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .navbar-inner {
+      max-width: var(--max); margin: 0 auto; padding: 0 24px;
+      width: 100%; display: flex; align-items: center; gap: 24px;
+    }
+    .nav-logo {
+      font-family: var(--font-display);
+      font-size: 24px; letter-spacing: 2px; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+      white-space: nowrap; cursor: pointer;
+    }
+    .nav-logo .dot { color: var(--accent); }
+    .nav-links {
+      display: flex; align-items: center; gap: 24px; margin-left: auto;
+    }
+    .nav-links a, .nav-link-btn {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+      color: var(--text3); text-transform: uppercase;
+      transition: color 0.2s; cursor: pointer;
+      background: none; border: none; font-family: var(--font-body);
+    }
+    .nav-links a:hover, .nav-link-btn:hover { color: var(--text); opacity: 1; }
+    .lang-toggle {
+      display: flex; align-items: center;
+      background: var(--surface2); border: 1px solid var(--border-mid);
+      border-radius: 3px; overflow: hidden;
+    }
+    .lang-btn {
+      font-size: 11px; font-weight: 700; letter-spacing: 1px;
+      padding: 5px 10px; border: none; background: transparent;
+      color: var(--text3); cursor: pointer; transition: all 0.15s;
+      font-family: var(--font-body);
+    }
+    .lang-btn.active { background: var(--accent); color: #fff; }
+    .lang-btn:hover:not(.active) { color: var(--text); }
+    .nav-auth-btn {
+      font-size: 12px; font-weight: 700; letter-spacing: 1px;
+      padding: 8px 18px; border-radius: 2px; cursor: pointer;
+      transition: all 0.2s; text-transform: uppercase; border: none;
+      font-family: var(--font-body);
+    }
+    .btn-login { background: transparent; color: var(--text2); border: 1px solid var(--border-mid); }
+    .btn-login:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-area { background: var(--accent); color: #fff; }
+    .btn-area:hover { opacity: 0.88; transform: translateY(-1px); }
+    .hamburger { display: none; background: none; border: none; color: var(--text); font-size: 22px; cursor: pointer; padding: 4px; }
+
+    /* ── PAGE SHELL ─────────────────────────────────────────────────────── */
+    #app { padding-top: 64px; min-height: 100vh; }
+    .page { display: none; animation: fadeIn 0.3s ease; }
+    .page.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── BUTTONS ─────────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 13px 28px; font-size: 13px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; border: none;
+      border-radius: 2px; cursor: pointer; text-decoration: none;
+      transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+      white-space: nowrap; font-family: var(--font-body);
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { box-shadow: 0 6px 24px var(--accent-glow); }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border-mid); }
+    .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-ghost { background: var(--surface2); color: var(--text2); }
+    .btn-ghost:hover { color: var(--text); }
+    .btn-danger { background: var(--error); color: #fff; }
+    .btn-sm { padding: 8px 16px; font-size: 11px; }
+    .btn-full { width: 100%; justify-content: center; }
+
+    /* ── FORM STYLES ─────────────────────────────────────────────────────── */
+    .form-group { margin-bottom: 18px; }
+    .form-label {
+      display: block; font-size: 11px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; color: var(--text3);
+      margin-bottom: 8px;
+    }
+    .form-input, .form-select, .form-textarea {
+      width: 100%; padding: 12px 14px;
+      background: var(--surface); border: 1px solid var(--border-mid);
+      border-radius: var(--radius); color: var(--text);
+      font-family: var(--font-body); font-size: 14px;
+      transition: border-color 0.2s;
+      appearance: none; -webkit-appearance: none;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none; border-color: var(--accent);
+    }
+    .form-input::placeholder { color: var(--text3); }
+    .form-select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; }
+    .form-select option { background: var(--surface2); }
+    .form-textarea { resize: vertical; min-height: 80px; }
+    .form-error { font-size: 12px; color: var(--error); margin-top: 6px; }
+    .form-hint { font-size: 12px; color: var(--text3); margin-top: 6px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+    .form-check input[type="checkbox"] { width: 16px; height: 16px; margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+
+    /* ── AUTH PAGES ─────────────────────────────────────────────────────── */
+    .auth-page {
+      min-height: calc(100vh - 64px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 48px 24px;
+      background: radial-gradient(ellipse 60% 50% at 50% 0%, rgba(255,102,0,0.08) 0%, transparent 70%);
+    }
+    .auth-card {
+      width: 100%; max-width: 480px;
+      background: var(--surface); border: 1px solid var(--border-mid);
+      border-radius: 8px; padding: 40px;
+    }
+    .auth-header { margin-bottom: 32px; text-align: center; }
+    .auth-logo {
+      font-family: var(--font-display); font-size: 32px;
+      letter-spacing: 3px; color: var(--text); margin-bottom: 8px;
+    }
+    .auth-logo .dot { color: var(--accent); }
+    .auth-subtitle { font-size: 14px; color: var(--text2); }
+    .auth-title {
+      font-family: var(--font-display); font-size: 28px;
+      letter-spacing: 2px; color: var(--text); margin-bottom: 6px;
+    }
+    .auth-footer { margin-top: 24px; text-align: center; font-size: 13px; color: var(--text3); }
+    .auth-footer a, .auth-footer .link-btn {
+      color: var(--accent); cursor: pointer; background: none; border: none;
+      font-family: var(--font-body); font-size: 13px;
+    }
+    .auth-divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+    /* ── TYPE SELECTOR ───────────────────────────────────────────────────── */
+    .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 8px; }
+    .type-card {
+      padding: 16px 8px; border: 1px solid var(--border-mid);
+      border-radius: var(--radius); cursor: pointer; text-align: center;
+      transition: all 0.2s; background: var(--surface2);
+    }
+    .type-card:hover { border-color: var(--accent); }
+    .type-card.selected { border-color: var(--accent); background: var(--accent-dim); }
+    .type-card .type-icon { font-size: 24px; margin-bottom: 6px; }
+    .type-card .type-label { font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text2); }
+    .type-card.selected .type-label { color: var(--accent); }
+
+    /* ── ALERT ───────────────────────────────────────────────────────────── */
+    .alert {
+      padding: 12px 16px; border-radius: var(--radius);
+      font-size: 13px; margin-bottom: 16px; display: none;
+    }
+    .alert.show { display: block; }
+    .alert-error { background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+    .alert-success { background: rgba(34,197,94,0.12); border: 1px solid rgba(34,197,94,0.3); color: #86efac; }
+    .alert-info { background: var(--accent-dim); border: 1px solid rgba(255,102,0,0.25); color: #fdba74; }
+
+    /* ── USER AREA ───────────────────────────────────────────────────────── */
+    .area-page { max-width: var(--max); margin: 0 auto; padding: 48px 24px; }
+    .area-header {
+      display: flex; align-items: center; gap: 24px;
+      padding: 32px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 8px;
+      margin-bottom: 32px;
+    }
+    .area-avatar {
+      width: 72px; height: 72px; border-radius: 50%;
+      background: var(--accent-dim); border: 2px solid rgba(255,102,0,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-display); font-size: 28px; color: var(--accent);
+      flex-shrink: 0;
+    }
+    .area-user-info h2 {
+      font-family: var(--font-display); font-size: 28px; letter-spacing: 2px;
+      color: var(--text); margin-bottom: 4px;
+    }
+    .area-user-type {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      letter-spacing: 2px; text-transform: uppercase; color: var(--accent);
+      border: 1px solid rgba(255,102,0,0.3); padding: 3px 10px;
+      border-radius: 2px; background: var(--accent-dim);
+    }
+    .area-user-since { font-size: 12px; color: var(--text3); margin-top: 6px; }
+    .area-logout-btn { margin-left: auto; }
+    .area-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .area-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 24px;
+    }
+    .area-card-title {
+      font-family: var(--font-display); font-size: 20px; letter-spacing: 1px;
+      color: var(--text); margin-bottom: 16px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .area-card-title .card-icon { color: var(--accent); font-size: 18px; }
+    .moto-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .moto-item:last-child { border-bottom: none; }
+    .moto-badge {
+      width: 36px; height: 36px; border-radius: 4px;
+      background: var(--accent-dim); border: 1px solid rgba(255,102,0,0.2);
+      display: flex; align-items: center; justify-content: center; font-size: 16px;
+    }
+    .moto-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .moto-year { font-size: 12px; color: var(--text3); }
+    .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .stat-item { text-align: center; padding: 16px; background: var(--surface2); border-radius: 4px; }
+    .stat-value {
+      font-family: var(--font-display); font-size: 32px; letter-spacing: 2px;
+      color: var(--accent); line-height: 1;
+    }
+    .stat-label { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--text3); margin-top: 4px; }
+    .empty-state { text-align: center; padding: 32px; color: var(--text3); font-size: 14px; }
+
+    /* ── MEDIA PAGE ─────────────────────────────────────────────────────── */
+    .media-page { max-width: var(--max); margin: 0 auto; padding: 48px 24px; }
+    .media-hero { text-align: center; margin-bottom: 48px; }
+    .media-hero .sec-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 3px;
+      text-transform: uppercase; color: var(--accent); margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+    }
+    .media-hero .sec-label::before { content: ''; display: block; width: 32px; height: 1px; background: var(--accent); }
+    .media-hero h1 {
+      font-family: var(--font-display); font-size: clamp(40px, 8vw, 72px);
+      letter-spacing: 3px; color: var(--text); margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+    .media-hero p { font-size: 15px; color: var(--text2); max-width: 500px; margin: 0 auto; }
+    .media-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 40px; }
+    .media-tab {
+      padding: 14px 28px; font-size: 13px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+      background: none; border: none; color: var(--text3); font-family: var(--font-body);
+      border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s;
+    }
+    .media-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .media-tab:hover:not(.active) { color: var(--text2); }
+    .media-panel { display: none; }
+    .media-panel.active { display: block; animation: fadeIn 0.3s ease; }
+    .pdf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
+    .pdf-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 24px; transition: border-color 0.2s;
+      display: flex; flex-direction: column;
+    }
+    .pdf-card:hover { border-color: rgba(255,102,0,0.3); }
+    .pdf-icon {
+      width: 48px; height: 48px; border-radius: 4px;
+      background: var(--accent-dim); border: 1px solid rgba(255,102,0,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px; margin-bottom: 16px;
+    }
+    .pdf-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 8px; flex: 1; }
+    .pdf-actions { margin-top: 16px; }
+    .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; }
+    .video-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; overflow: hidden; transition: border-color 0.2s;
+    }
+    .video-card:hover { border-color: rgba(255,102,0,0.3); }
+    .video-thumb {
+      aspect-ratio: 16/9; background: var(--surface2);
+      position: relative; overflow: hidden; cursor: pointer;
+    }
+    .video-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .video-play-btn {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 52px; height: 52px; border-radius: 50%;
+      background: rgba(255,102,0,0.88); border: 2px solid rgba(255,255,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; color: #fff; transition: transform 0.2s;
+    }
+    .video-thumb:hover .video-play-btn { transform: translate(-50%, -50%) scale(1.1); }
+    .video-thumb-placeholder {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 50%, rgba(255,102,0,0.08) 0%, transparent 70%);
+      font-size: 48px; color: rgba(255,102,0,0.2);
+    }
+    .video-info { padding: 16px; }
+    .video-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+    .video-actions { display: flex; gap: 8px; }
+    .media-empty {
+      text-align: center; padding: 80px 24px; color: var(--text3);
+    }
+    .media-empty .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }
+    .media-empty p { font-size: 15px; }
+
+    /* ── ADMIN MEDIA ─────────────────────────────────────────────────────── */
+    .admin-page { max-width: var(--max); margin: 0 auto; padding: 48px 24px; }
+    .admin-header { margin-bottom: 32px; }
+    .admin-header h1 {
+      font-family: var(--font-display); font-size: 36px; letter-spacing: 2px; color: var(--text);
+    }
+    .admin-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .admin-table-wrap { overflow-x: auto; }
+    .admin-table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    .admin-table th {
+      font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--text3); padding: 12px 16px; text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .admin-table td {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      color: var(--text2); vertical-align: middle;
+    }
+    .admin-table tr:hover td { background: rgba(255,255,255,0.02); }
+    .type-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 2px;
+    }
+    .type-badge.pdf { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+    .type-badge.video { background: rgba(59,130,246,0.15); color: #93c5fd; border: 1px solid rgba(59,130,246,0.3); }
+    .action-row { display: flex; gap: 6px; }
+
+    /* ── MODAL ───────────────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 2000;
+      background: rgba(0,0,0,0.75); display: none;
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid var(--border-mid);
+      border-radius: 8px; width: 100%; max-width: 520px;
+      padding: 32px; position: relative; max-height: 90vh; overflow-y: auto;
+    }
+    .modal-title {
+      font-family: var(--font-display); font-size: 24px; letter-spacing: 1px;
+      color: var(--text); margin-bottom: 24px;
+    }
+    .modal-close {
+      position: absolute; top: 16px; right: 16px;
+      background: none; border: none; color: var(--text3); font-size: 20px;
+      cursor: pointer; padding: 4px; transition: color 0.2s;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+
+    /* ── VIDEO PLAYER ────────────────────────────────────────────────────── */
+    .video-modal-overlay {
+      position: fixed; inset: 0; z-index: 3000;
+      background: rgba(0,0,0,0.92); display: none;
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .video-modal-overlay.show { display: flex; }
+    .video-modal-inner { width: 100%; max-width: 900px; position: relative; }
+    .video-modal-close {
+      position: absolute; top: -40px; right: 0;
+      background: none; border: none; color: var(--text); font-size: 24px;
+      cursor: pointer;
+    }
+    .video-embed { aspect-ratio: 16/9; width: 100%; }
+    .video-embed iframe, .video-embed video { width: 100%; height: 100%; border: none; }
+
+    /* ── LOADER ──────────────────────────────────────────────────────────── */
+    .loader {
+      display: inline-block; width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.2); border-top-color: var(--accent);
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-page {
+      min-height: calc(100vh - 64px);
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── FOOTER ──────────────────────────────────────────────────────────── */
+    .web-footer {
+      border-top: 1px solid var(--border); padding: 32px 24px;
+      text-align: center; margin-top: 80px;
+    }
+    .web-footer-inner { max-width: var(--max); margin: 0 auto; }
+    .web-footer-logo {
+      font-family: var(--font-display); font-size: 20px; letter-spacing: 2px;
+      color: var(--text3); margin-bottom: 8px;
+    }
+    .web-footer-links { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; margin-bottom: 12px; }
+    .web-footer-links a { font-size: 12px; color: var(--text3); }
+    .web-footer-copy { font-size: 12px; color: var(--text3); }
+
+    /* ── UPLOAD PROGRESS ─────────────────────────────────────────────────── */
+    .upload-zone {
+      border: 2px dashed var(--border-mid); border-radius: var(--radius);
+      padding: 24px; text-align: center; cursor: pointer; transition: border-color 0.2s;
+    }
+    .upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: var(--accent-dim); }
+    .upload-zone p { font-size: 13px; color: var(--text3); margin-top: 8px; }
+    .upload-icon { font-size: 28px; }
+    .progress-bar-wrap { height: 4px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; display: none; }
+    .progress-bar { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s; }
+
+    /* ── RESPONSIVE ─────────────────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-links.mobile-open {
+        display: flex; flex-direction: column; position: fixed;
+        top: 64px; left: 0; right: 0; background: var(--bg-alt);
+        padding: 20px 24px; gap: 16px; border-bottom: 1px solid var(--border);
+        z-index: 999;
+      }
+      .hamburger { display: block; }
+      .auth-card { padding: 28px 20px; }
+      .form-row { grid-template-columns: 1fr; }
+      .area-grid { grid-template-columns: 1fr; }
+      .area-header { flex-direction: column; align-items: flex-start; }
+      .area-logout-btn { margin-left: 0; }
+      .pdf-grid { grid-template-columns: 1fr; }
+      .video-grid { grid-template-columns: 1fr; }
+      .type-grid { grid-template-columns: 1fr; gap: 8px; }
+      .stat-grid { grid-template-columns: 1fr 1fr; }
+      .admin-table { font-size: 12px; }
+      .admin-table th, .admin-table td { padding: 10px 12px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar" id="navbar">
+  <div class="navbar-inner">
+    <span class="nav-logo" onclick="navigate('/')">BIKER<span class="dot">.</span>LINK</span>
+    <button class="hamburger" id="hamburger" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
+    <div class="nav-links" id="nav-links">
+      <a href="/" onclick="navigate('/'); return false;" data-i18n="nav.home">Home</a>
+      <button class="nav-link-btn" onclick="navigate('/media')" data-i18n="nav.media">Risorse</button>
+      <div class="lang-toggle">
+        <button class="lang-btn" id="lang-it" onclick="setLang('it')">IT</button>
+        <button class="lang-btn" id="lang-en" onclick="setLang('en')">EN</button>
+      </div>
+      <span id="nav-auth-area"></span>
+    </div>
+  </div>
+</nav>
+
+<!-- APP ROOT -->
+<div id="app">
+  <!-- Pages rendered here by JS -->
+</div>
+
+<!-- VIDEO MODAL -->
+<div class="video-modal-overlay" id="video-modal" onclick="closeVideoModal(event)">
+  <div class="video-modal-inner">
+    <button class="video-modal-close" onclick="closeVideoModal()">✕</button>
+    <div class="video-embed" id="video-embed-content"></div>
+  </div>
+</div>
+
+<!-- MEDIA FORM MODAL -->
+<div class="modal-overlay" id="media-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeMediaModal()">✕</button>
+    <h2 class="modal-title" id="modal-title">Aggiungi Risorsa</h2>
+    <div id="modal-alert" class="alert"></div>
+    <form id="media-form" onsubmit="submitMediaForm(event)">
+      <input type="hidden" id="media-id"/>
+      <div class="form-group">
+        <label class="form-label" data-i18n="admin.type">Tipo</label>
+        <select class="form-select" id="media-type" required>
+          <option value="pdf">PDF</option>
+          <option value="video">Video</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Titolo (IT)</label>
+          <input class="form-input" id="media-title-it" type="text" required placeholder="Titolo italiano"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Titolo (EN)</label>
+          <input class="form-input" id="media-title-en" type="text" required placeholder="English title"/>
+        </div>
+      </div>
+      <div class="form-group" id="url-group">
+        <label class="form-label" data-i18n="admin.url">URL</label>
+        <input class="form-input" id="media-url" type="text" placeholder="https://... oppure carica un file sotto"/>
+      </div>
+      <div class="form-group" id="upload-group">
+        <label class="form-label" data-i18n="admin.uploadFile">Carica file</label>
+        <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+          <div class="upload-icon">📎</div>
+          <p id="upload-label">Clicca o trascina un file PDF</p>
+        </div>
+        <div class="progress-bar-wrap" id="progress-wrap"><div class="progress-bar" id="progress-bar"></div></div>
+        <input type="file" id="file-input" style="display:none" accept=".pdf,.mp4,.webm" onchange="handleFileSelect(event)"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n="admin.thumbnail">Thumbnail URL (opzionale)</label>
+        <input class="form-input" id="media-thumb" type="text" placeholder="https://..."/>
+      </div>
+      <div class="form-group">
+        <label class="form-label" data-i18n="admin.sortOrder">Ordine</label>
+        <input class="form-input" id="media-sort" type="number" value="0"/>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeMediaModal()" data-i18n="common.cancel">Annulla</button>
+        <button type="submit" class="btn btn-primary btn-sm" id="modal-submit">Salva</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- CONFIRM DELETE MODAL -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="max-width:380px">
+    <h2 class="modal-title" style="font-size:20px" data-i18n="admin.confirmDelete">Conferma eliminazione</h2>
+    <p style="color:var(--text2);font-size:14px" data-i18n="admin.confirmDeleteDesc">Sei sicuro di voler eliminare questa risorsa?</p>
+    <div class="modal-actions">
+      <button class="btn btn-outline btn-sm" onclick="closeConfirmModal()" data-i18n="common.cancel">Annulla</button>
+      <button class="btn btn-danger btn-sm" id="confirm-delete-btn" data-i18n="common.delete">Elimina</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── I18N ──────────────────────────────────────────────────────────────────
+const I18N = {
+  it: {
+    "nav.home": "Home",
+    "nav.media": "Risorse",
+    "nav.login": "Accedi",
+    "nav.area": "Area Utente",
+    "nav.logout": "Esci",
+    "nav.admin": "Admin Media",
+    "page.register": "Registrati",
+    "page.login": "Accedi",
+    "page.userArea": "Area Utente",
+    "page.media": "Risorse",
+    "page.adminMedia": "Admin Media",
+    "auth.email": "Email",
+    "auth.password": "Password",
+    "auth.nickname": "Nickname",
+    "auth.birthYear": "Anno di nascita",
+    "auth.emailOrNickname": "Email o Nickname",
+    "auth.forgotPassword": "Hai dimenticato la password?",
+    "auth.noAccount": "Non hai un account?",
+    "auth.hasAccount": "Hai già un account?",
+    "auth.register": "Registrati",
+    "auth.login": "Accedi",
+    "auth.type": "Tipo account",
+    "auth.biker": "Biker",
+    "auth.zavorrina": "Zavorrina",
+    "auth.coppia": "Coppia",
+    "auth.birthYearHint": "Devi avere almeno 18 anni",
+    "auth.privacyAgree": "Accetto la",
+    "auth.privacyLink": "Privacy Policy",
+    "auth.eulaAgree": "e i Termini di Servizio",
+    "auth.verifyEmail": "Verifica la tua email per accedere",
+    "auth.emailSent": "Email di verifica inviata. Controlla la casella di posta.",
+    "auth.forgotDesc": "Inserisci la tua email e riceverai un codice di recupero",
+    "auth.resetCode": "Codice di recupero",
+    "auth.newPassword": "Nuova password",
+    "auth.resetSent": "Se l'email è registrata, riceverai un codice",
+    "area.welcome": "Bentornato,",
+    "area.memberSince": "Membro dal",
+    "area.garage": "Il Mio Garage",
+    "area.stats": "Statistiche",
+    "area.noMoto": "Nessuna moto nel garage",
+    "area.addMoto": "Aggiungi moto nell'app BikerLink",
+    "area.totalKm": "Km Totali",
+    "area.totalRides": "Giri",
+    "area.logout": "Esci",
+    "area.loginRequired": "Devi effettuare il login per accedere a questa sezione",
+    "media.title": "Risorse",
+    "media.subtitle": "Guide, manuali e video per la community BikerLink",
+    "media.pdf": "Guide & Manuali",
+    "media.video": "Video",
+    "media.download": "Scarica",
+    "media.play": "Guarda",
+    "media.emptyPdf": "Nessuna guida disponibile al momento",
+    "media.emptyVideo": "Nessun video disponibile al momento",
+    "admin.title": "Gestione Media",
+    "admin.add": "Aggiungi Risorsa",
+    "admin.type": "Tipo",
+    "admin.titleIt": "Titolo IT",
+    "admin.titleEn": "Titolo EN",
+    "admin.url": "URL",
+    "admin.uploadFile": "Carica File",
+    "admin.thumbnail": "Thumbnail URL",
+    "admin.sortOrder": "Ordine",
+    "admin.edit": "Modifica",
+    "admin.delete": "Elimina",
+    "admin.confirmDelete": "Conferma eliminazione",
+    "admin.confirmDeleteDesc": "Sei sicuro di voler eliminare questa risorsa? L'azione è irreversibile.",
+    "admin.accessDenied": "Accesso riservato agli amministratori",
+    "admin.uploading": "Upload in corso...",
+    "common.save": "Salva",
+    "common.cancel": "Annulla",
+    "common.delete": "Elimina",
+    "common.loading": "Caricamento...",
+    "common.error": "Errore",
+    "common.success": "Salvato!",
+    "common.actions": "Azioni",
+    "common.open": "Apri",
+  },
+  en: {
+    "nav.home": "Home",
+    "nav.media": "Resources",
+    "nav.login": "Log In",
+    "nav.area": "My Area",
+    "nav.logout": "Log Out",
+    "nav.admin": "Admin Media",
+    "page.register": "Sign Up",
+    "page.login": "Log In",
+    "page.userArea": "My Area",
+    "page.media": "Resources",
+    "page.adminMedia": "Admin Media",
+    "auth.email": "Email",
+    "auth.password": "Password",
+    "auth.nickname": "Nickname",
+    "auth.birthYear": "Year of birth",
+    "auth.emailOrNickname": "Email or Nickname",
+    "auth.forgotPassword": "Forgot your password?",
+    "auth.noAccount": "Don't have an account?",
+    "auth.hasAccount": "Already have an account?",
+    "auth.register": "Sign Up",
+    "auth.login": "Log In",
+    "auth.type": "Account type",
+    "auth.biker": "Biker",
+    "auth.zavorrina": "Pillion",
+    "auth.coppia": "Couple",
+    "auth.birthYearHint": "You must be at least 18 years old",
+    "auth.privacyAgree": "I accept the",
+    "auth.privacyLink": "Privacy Policy",
+    "auth.eulaAgree": "and the Terms of Service",
+    "auth.verifyEmail": "Verify your email to log in",
+    "auth.emailSent": "Verification email sent. Check your inbox.",
+    "auth.forgotDesc": "Enter your email and you will receive a recovery code",
+    "auth.resetCode": "Recovery code",
+    "auth.newPassword": "New password",
+    "auth.resetSent": "If the email is registered, you will receive a code",
+    "area.welcome": "Welcome back,",
+    "area.memberSince": "Member since",
+    "area.garage": "My Garage",
+    "area.stats": "Statistics",
+    "area.noMoto": "No motorcycles in garage",
+    "area.addMoto": "Add motorcycles in the BikerLink app",
+    "area.totalKm": "Total km",
+    "area.totalRides": "Rides",
+    "area.logout": "Log Out",
+    "area.loginRequired": "You must log in to access this section",
+    "media.title": "Resources",
+    "media.subtitle": "Guides, manuals and videos for the BikerLink community",
+    "media.pdf": "Guides & Manuals",
+    "media.video": "Videos",
+    "media.download": "Download",
+    "media.play": "Watch",
+    "media.emptyPdf": "No guides available yet",
+    "media.emptyVideo": "No videos available yet",
+    "admin.title": "Media Management",
+    "admin.add": "Add Resource",
+    "admin.type": "Type",
+    "admin.titleIt": "Title IT",
+    "admin.titleEn": "Title EN",
+    "admin.url": "URL",
+    "admin.uploadFile": "Upload File",
+    "admin.thumbnail": "Thumbnail URL",
+    "admin.sortOrder": "Order",
+    "admin.edit": "Edit",
+    "admin.delete": "Delete",
+    "admin.confirmDelete": "Confirm deletion",
+    "admin.confirmDeleteDesc": "Are you sure you want to delete this resource? This action is irreversible.",
+    "admin.accessDenied": "Access restricted to administrators",
+    "admin.uploading": "Uploading...",
+    "common.save": "Save",
+    "common.cancel": "Cancel",
+    "common.delete": "Delete",
+    "common.loading": "Loading...",
+    "common.error": "Error",
+    "common.success": "Saved!",
+    "common.actions": "Actions",
+    "common.open": "Open",
+  }
+};
+
+let currentLang = localStorage.getItem('bl_lang') || 'it';
+let currentUser = null;
+let currentPath = '';
+let pendingDeleteId = null;
+let mediaItems = [];
+
+function t(key) {
+  return I18N[currentLang][key] || I18N['it'][key] || key;
+}
+
+function setLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('bl_lang', lang);
+  document.getElementById('html-root').lang = lang;
+  document.getElementById('lang-it').classList.toggle('active', lang === 'it');
+  document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+  applyI18n();
+  renderCurrentPage();
+}
+
+function applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    el.textContent = t(key);
+  });
+}
+
+// ── ROUTER ────────────────────────────────────────────────────────────────
+const ROUTES = {
+  '/registrati': renderRegister,
+  '/accedi': renderLogin,
+  '/area-utente': renderArea,
+  '/media': renderMedia,
+  '/admin/media': renderAdminMedia,
+};
+
+function navigate(path) {
+  if (path === '/') {
+    window.location.href = '/';
+    return;
+  }
+  history.pushState({}, '', path);
+  handleRoute(path);
+  closeMobileMenu();
+}
+
+function handleRoute(path) {
+  currentPath = path;
+  const handler = ROUTES[path];
+  if (handler) {
+    handler();
+  } else {
+    renderNotFound();
+  }
+}
+
+window.addEventListener('popstate', () => handleRoute(location.pathname));
+
+// ── AUTH STATE ────────────────────────────────────────────────────────────
+async function checkAuth() {
+  try {
+    const res = await fetch('/api/auth/me', { credentials: 'include' });
+    if (res.ok) {
+      currentUser = await res.json();
+    } else {
+      currentUser = null;
+    }
+  } catch {
+    currentUser = null;
+  }
+  renderNavAuth();
+}
+
+function renderNavAuth() {
+  const area = document.getElementById('nav-auth-area');
+  if (!area) return;
+  if (currentUser) {
+    area.innerHTML = `
+      <button class="nav-auth-btn btn-area" onclick="navigate('/area-utente')">${t('nav.area')}</button>
+      ${currentUser.role === 'admin' ? `<button class="nav-link-btn" onclick="navigate('/admin/media')">${t('nav.admin')}</button>` : ''}
+    `;
+  } else {
+    area.innerHTML = `
+      <button class="nav-auth-btn btn-login" onclick="navigate('/accedi')">${t('nav.login')}</button>
+    `;
+  }
+}
+
+async function logout() {
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+  currentUser = null;
+  renderNavAuth();
+  navigate('/accedi');
+}
+
+// ── MOBILE MENU ───────────────────────────────────────────────────────────
+function toggleMobileMenu() {
+  document.getElementById('nav-links').classList.toggle('mobile-open');
+}
+function closeMobileMenu() {
+  document.getElementById('nav-links').classList.remove('mobile-open');
+}
+
+// ── RENDER HELPERS ────────────────────────────────────────────────────────
+function setApp(html) {
+  document.getElementById('app').innerHTML = html;
+  applyI18n();
+}
+
+function renderCurrentPage() {
+  handleRoute(location.pathname);
+  renderNavAuth();
+}
+
+function showAlert(id, msg, type = 'error') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `alert show alert-${type}`;
+}
+function hideAlert(id) {
+  const el = document.getElementById(id);
+  if (el) el.className = 'alert';
+}
+
+// ── REGISTER PAGE ─────────────────────────────────────────────────────────
+function renderRegister() {
+  document.title = `BikerLink — ${t('page.register')}`;
+  setApp(`
+    <div class="auth-page">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="auth-logo">BIKER<span class="dot">.</span>LINK</div>
+          <div class="auth-title">${t('page.register')}</div>
+        </div>
+        <div id="reg-alert" class="alert"></div>
+        <form id="reg-form" onsubmit="submitRegister(event)" novalidate>
+          <div class="form-group">
+            <label class="form-label">${t('auth.type')}</label>
+            <div class="type-grid">
+              <div class="type-card selected" data-type="biker" onclick="selectType('biker')">
+                <div class="type-icon">🏍️</div>
+                <div class="type-label">${t('auth.biker')}</div>
+              </div>
+              <div class="type-card" data-type="zavorrina" onclick="selectType('zavorrina')">
+                <div class="type-icon">🧑‍🤝‍🧑</div>
+                <div class="type-label">${t('auth.zavorrina')}</div>
+              </div>
+              <div class="type-card" data-type="coppia" onclick="selectType('coppia')">
+                <div class="type-icon">💑</div>
+                <div class="type-label">${t('auth.coppia')}</div>
+              </div>
+            </div>
+            <input type="hidden" id="reg-type" value="biker"/>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">${t('auth.nickname')}</label>
+              <input class="form-input" id="reg-nick" type="text" placeholder="Il tuo nickname" required autocomplete="username"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">${t('auth.birthYear')}</label>
+              <input class="form-input" id="reg-year" type="number" placeholder="es. 1990" min="1900" max="${new Date().getFullYear() - 18}"/>
+              <div class="form-hint">${t('auth.birthYearHint')}</div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">${t('auth.email')}</label>
+            <input class="form-input" id="reg-email" type="email" placeholder="email@esempio.it" required autocomplete="email"/>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">${t('auth.password')}</label>
+              <input class="form-input" id="reg-pass" type="password" placeholder="Min. 8 car., A-Z, a-z, 0-9" required autocomplete="new-password"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Conferma</label>
+              <input class="form-input" id="reg-pass2" type="password" placeholder="Ripeti password" required autocomplete="new-password"/>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-check">
+              <input type="checkbox" id="reg-privacy" required/>
+              <span style="font-size:13px;color:var(--text2)">
+                ${t('auth.privacyAgree')} <a href="/privacy" target="_blank">${t('auth.privacyLink')}</a> ${t('auth.eulaAgree')}
+              </span>
+            </label>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" id="reg-btn">${t('auth.register')}</button>
+        </form>
+        <div class="auth-footer">
+          ${t('auth.hasAccount')} <button class="link-btn" onclick="navigate('/accedi')">${t('auth.login')}</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function selectType(type) {
+  document.querySelectorAll('.type-card').forEach(c => c.classList.toggle('selected', c.dataset.type === type));
+  document.getElementById('reg-type').value = type;
+}
+
+async function submitRegister(e) {
+  e.preventDefault();
+  const nick = document.getElementById('reg-nick').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
+  const type = document.getElementById('reg-type').value;
+  const year = document.getElementById('reg-year').value;
+  const privacy = document.getElementById('reg-privacy').checked;
+
+  hideAlert('reg-alert');
+  if (!nick || !email || !pass) return showAlert('reg-alert', 'Compila tutti i campi obbligatori');
+  if (pass !== pass2) return showAlert('reg-alert', 'Le password non coincidono');
+  if (pass.length < 8) return showAlert('reg-alert', 'La password deve avere almeno 8 caratteri');
+  if (!/[A-Z]/.test(pass)) return showAlert('reg-alert', 'La password deve contenere almeno una lettera maiuscola');
+  if (!/[a-z]/.test(pass)) return showAlert('reg-alert', 'La password deve contenere almeno una lettera minuscola');
+  if (!/[0-9]/.test(pass)) return showAlert('reg-alert', 'La password deve contenere almeno un numero');
+  if (!privacy) return showAlert('reg-alert', 'Devi accettare la Privacy Policy');
+
+  const btn = document.getElementById('reg-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+
+  try {
+    const body = { nickname: nick, email, password: pass, userType: type, eulaAccepted: true };
+    if (year) body.birthYear = parseInt(year);
+    const res = await fetch('/api/auth/register', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('reg-alert', data.message || 'Errore durante la registrazione');
+    } else if (data.requiresEmailVerification) {
+      showAlert('reg-alert', t('auth.emailSent'), 'success');
+    } else {
+      currentUser = data;
+      renderNavAuth();
+      navigate('/area-utente');
+    }
+  } catch {
+    showAlert('reg-alert', 'Errore di rete. Riprova.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('auth.register');
+  }
+}
+
+// ── LOGIN PAGE ────────────────────────────────────────────────────────────
+function renderLogin() {
+  document.title = `BikerLink — ${t('page.login')}`;
+  setApp(`
+    <div class="auth-page">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="auth-logo">BIKER<span class="dot">.</span>LINK</div>
+          <div class="auth-title">${t('page.login')}</div>
+        </div>
+        <div id="login-alert" class="alert"></div>
+        <form id="login-form" onsubmit="submitLogin(event)" novalidate>
+          <div class="form-group">
+            <label class="form-label">${t('auth.emailOrNickname')}</label>
+            <input class="form-input" id="login-id" type="text" placeholder="email o nickname" required autocomplete="username"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">${t('auth.password')}</label>
+            <input class="form-input" id="login-pass" type="password" placeholder="••••••••" required autocomplete="current-password"/>
+            <div style="margin-top:8px;text-align:right">
+              <button type="button" class="link-btn" style="font-size:12px;color:var(--text3)" onclick="showForgot()">${t('auth.forgotPassword')}</button>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary btn-full" id="login-btn">${t('auth.login')}</button>
+        </form>
+        <div class="auth-divider"></div>
+        <div id="forgot-section" style="display:none">
+          <p style="font-size:13px;color:var(--text2);margin-bottom:16px">${t('auth.forgotDesc')}</p>
+          <div id="forgot-alert" class="alert"></div>
+          <div class="form-group">
+            <label class="form-label">${t('auth.email')}</label>
+            <input class="form-input" id="forgot-email" type="email" placeholder="email@esempio.it"/>
+          </div>
+          <button class="btn btn-outline btn-full btn-sm" onclick="submitForgot()">${t('auth.forgotPassword')}</button>
+        </div>
+        <div class="auth-footer">
+          ${t('auth.noAccount')} <button class="link-btn" onclick="navigate('/registrati')">${t('auth.register')}</button>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+function showForgot() {
+  document.getElementById('forgot-section').style.display = 'block';
+}
+
+async function submitLogin(e) {
+  e.preventDefault();
+  const identifier = document.getElementById('login-id').value.trim();
+  const password = document.getElementById('login-pass').value;
+  hideAlert('login-alert');
+  if (!identifier || !password) return showAlert('login-alert', 'Compila tutti i campi');
+
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('login-alert', data.message || 'Credenziali non valide');
+    } else {
+      currentUser = data;
+      renderNavAuth();
+      navigate('/area-utente');
+    }
+  } catch {
+    showAlert('login-alert', 'Errore di rete. Riprova.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('auth.login');
+  }
+}
+
+async function submitForgot() {
+  const email = document.getElementById('forgot-email').value.trim();
+  hideAlert('forgot-alert');
+  if (!email) return showAlert('forgot-alert', 'Inserisci la tua email');
+  try {
+    await fetch('/api/auth/forgot-password', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    showAlert('forgot-alert', t('auth.resetSent'), 'success');
+  } catch {
+    showAlert('forgot-alert', 'Errore di rete');
+  }
+}
+
+// ── USER AREA ─────────────────────────────────────────────────────────────
+async function renderArea() {
+  document.title = `BikerLink — ${t('page.userArea')}`;
+  if (!currentUser) {
+    setApp(`
+      <div class="auth-page">
+        <div class="auth-card" style="text-align:center;max-width:400px">
+          <div class="auth-logo">BIKER<span class="dot">.</span>LINK</div>
+          <p style="color:var(--text2);margin:16px 0 24px">${t('area.loginRequired')}</p>
+          <button class="btn btn-primary btn-full" onclick="navigate('/accedi')">${t('auth.login')}</button>
+        </div>
+      </div>
+    `);
+    return;
+  }
+
+  setApp(`<div class="loading-page"><div class="loader"></div></div>`);
+
+  try {
+    const [profileRes, motorcyclesRes] = await Promise.all([
+      fetch('/api/auth/me', { credentials: 'include' }),
+      fetch('/api/motorcycles', { credentials: 'include' }),
+    ]);
+
+    const profile = profileRes.ok ? await profileRes.json() : currentUser;
+    const motorcycles = motorcyclesRes.ok ? await motorcyclesRes.json() : [];
+
+    const initials = (profile.nickname || '?').charAt(0).toUpperCase();
+    const memberDate = profile.createdAt
+      ? new Date(profile.createdAt).toLocaleDateString(currentLang === 'it' ? 'it-IT' : 'en-US', { year: 'numeric', month: 'long' })
+      : '';
+
+    const typeLabel = { biker: t('auth.biker'), zavorrina: t('auth.zavorrina'), coppia: t('auth.coppia') };
+    const userTypeLabel = typeLabel[profile.userType] || profile.userType || 'Biker';
+
+    const motoHtml = motorcycles.length === 0
+      ? `<div class="empty-state"><div style="font-size:32px;margin-bottom:8px">🏍️</div><p>${t('area.noMoto')}</p><p style="margin-top:6px;font-size:12px">${t('area.addMoto')}</p></div>`
+      : motorcycles.map(m => `
+          <div class="moto-item">
+            <div class="moto-badge">🏍️</div>
+            <div>
+              <div class="moto-name">${esc(m.brand)} ${esc(m.model)}</div>
+              ${m.year ? `<div class="moto-year">${m.year}</div>` : ''}
+            </div>
+            ${m.isDefault ? `<span class="type-badge" style="margin-left:auto;background:var(--accent-dim);color:var(--accent);border-color:rgba(255,102,0,0.3)">Default</span>` : ''}
+          </div>
+        `).join('');
+
+    const totalKm = profile.profileTotalKm ?? 0;
+    const totalRides = profile.profileTotalRides ?? 0;
+
+    setApp(`
+      <div class="area-page">
+        <div class="area-header">
+          <div class="area-avatar">${initials}</div>
+          <div class="area-user-info">
+            <h2>${esc(profile.nickname)}</h2>
+            <span class="area-user-type">${userTypeLabel}</span>
+            ${memberDate ? `<div class="area-user-since">${t('area.memberSince')} ${memberDate}</div>` : ''}
+          </div>
+          <button class="btn btn-outline btn-sm area-logout-btn" onclick="logout()">${t('area.logout')}</button>
+        </div>
+
+        <div class="area-grid">
+          <div class="area-card">
+            <div class="area-card-title"><span class="card-icon">🏍️</span> ${t('area.garage')}</div>
+            ${motoHtml}
+          </div>
+          <div class="area-card">
+            <div class="area-card-title"><span class="card-icon">📊</span> ${t('area.stats')}</div>
+            <div class="stat-grid">
+              <div class="stat-item">
+                <div class="stat-value">${Math.round(totalKm).toLocaleString()}</div>
+                <div class="stat-label">${t('area.totalKm')}</div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-value">${totalRides}</div>
+                <div class="stat-label">${t('area.totalRides')}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      ${renderFooter()}
+    `);
+
+  } catch (err) {
+    setApp(`<div class="auth-page"><div class="auth-card"><div class="auth-title">Errore</div><p style="color:var(--text2)">Impossibile caricare i dati. <button class="link-btn" onclick="renderArea()">Riprova</button></p></div></div>`);
+  }
+}
+
+// ── MEDIA PAGE ────────────────────────────────────────────────────────────
+async function renderMedia() {
+  document.title = `BikerLink — ${t('page.media')}`;
+  setApp(`<div class="loading-page"><div class="loader"></div></div>`);
+
+  try {
+    const res = await fetch('/api/media', { credentials: 'include' });
+    const items = res.ok ? await res.json() : [];
+    mediaItems = items;
+
+    const pdfs = items.filter(i => i.type === 'pdf');
+    const videos = items.filter(i => i.type === 'video');
+
+    const pdfCards = pdfs.length === 0
+      ? `<div class="media-empty"><div class="empty-icon">📄</div><p>${t('media.emptyPdf')}</p></div>`
+      : pdfs.map(pdf => `
+          <div class="pdf-card">
+            <div class="pdf-icon">📄</div>
+            <div class="pdf-title">${esc(currentLang === 'en' ? pdf.titleEn : pdf.titleIt)}</div>
+            <div class="pdf-actions">
+              <a href="${esc(pdf.url)}" target="_blank" rel="noopener" class="btn btn-outline btn-sm">⬇ ${t('media.download')}</a>
+            </div>
+          </div>
+        `).join('');
+
+    const videoCards = videos.length === 0
+      ? `<div class="media-empty"><div class="empty-icon">🎬</div><p>${t('media.emptyVideo')}</p></div>`
+      : videos.map(v => `
+          <div class="video-card">
+            <div class="video-thumb" onclick="openVideo('${esc(v.url)}')">
+              ${v.thumbnailUrl
+                ? `<img src="${esc(v.thumbnailUrl)}" alt="" loading="lazy"/>`
+                : `<div class="video-thumb-placeholder">▶</div>`}
+              <div class="video-play-btn">▶</div>
+            </div>
+            <div class="video-info">
+              <div class="video-title">${esc(currentLang === 'en' ? v.titleEn : v.titleIt)}</div>
+              <div class="video-actions">
+                <button class="btn btn-outline btn-sm" onclick="openVideo('${esc(v.url)}')">${t('media.play')}</button>
+                <a href="${esc(v.url)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">${t('common.open')}</a>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+    setApp(`
+      <div class="media-page">
+        <div class="media-hero">
+          <div class="sec-label">${t('media.title')}</div>
+          <h1>${t('media.title')}</h1>
+          <p>${t('media.subtitle')}</p>
+        </div>
+        <div class="media-tabs">
+          <button class="media-tab active" id="tab-pdf" onclick="switchMediaTab('pdf')">${t('media.pdf')}</button>
+          <button class="media-tab" id="tab-video" onclick="switchMediaTab('video')">${t('media.video')}</button>
+        </div>
+        <div class="media-panel active" id="panel-pdf">
+          <div class="pdf-grid">${pdfCards}</div>
+        </div>
+        <div class="media-panel" id="panel-video">
+          <div class="video-grid">${videoCards}</div>
+        </div>
+      </div>
+      ${renderFooter()}
+    `);
+  } catch {
+    setApp(`<div class="auth-page"><div class="auth-card"><div class="auth-title">Errore</div><p style="color:var(--text2)">Impossibile caricare le risorse.</p></div></div>`);
+  }
+}
+
+function switchMediaTab(type) {
+  document.getElementById('tab-pdf').classList.toggle('active', type === 'pdf');
+  document.getElementById('tab-video').classList.toggle('active', type === 'video');
+  document.getElementById('panel-pdf').classList.toggle('active', type === 'pdf');
+  document.getElementById('panel-video').classList.toggle('active', type === 'video');
+}
+
+function openVideo(url) {
+  const modal = document.getElementById('video-modal');
+  const embed = document.getElementById('video-embed-content');
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
+
+  if (ytMatch) {
+    embed.innerHTML = `<iframe src="https://www.youtube.com/embed/${ytMatch[1]}?autoplay=1" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+  } else if (vimeoMatch) {
+    embed.innerHTML = `<iframe src="https://player.vimeo.com/video/${vimeoMatch[1]}?autoplay=1" allow="autoplay; fullscreen" allowfullscreen></iframe>`;
+  } else {
+    embed.innerHTML = `<video src="${url}" controls autoplay style="width:100%;height:100%;background:#000"></video>`;
+  }
+}
+
+function closeVideoModal(e) {
+  if (e && e.target !== document.getElementById('video-modal')) return;
+  document.getElementById('video-modal').classList.remove('show');
+  document.getElementById('video-embed-content').innerHTML = '';
+  document.body.style.overflow = '';
+}
+
+// ── ADMIN MEDIA ───────────────────────────────────────────────────────────
+async function renderAdminMedia() {
+  document.title = `BikerLink — ${t('page.adminMedia')}`;
+
+  if (!currentUser || currentUser.role !== 'admin') {
+    setApp(`
+      <div class="auth-page">
+        <div class="auth-card" style="text-align:center;max-width:400px">
+          <div style="font-size:48px;margin-bottom:16px">🔒</div>
+          <div class="auth-title">${t('admin.accessDenied')}</div>
+          <p style="color:var(--text2);margin-top:12px;font-size:14px">${t('area.loginRequired')}</p>
+        </div>
+      </div>
+    `);
+    return;
+  }
+
+  setApp(`<div class="loading-page"><div class="loader"></div></div>`);
+
+  try {
+    const res = await fetch('/api/media', { credentials: 'include' });
+    mediaItems = res.ok ? await res.json() : [];
+    renderAdminTable();
+  } catch {
+    setApp(`<div class="auth-page"><div class="auth-card"><div class="auth-title">Errore caricamento</div></div></div>`);
+  }
+}
+
+function renderAdminTable() {
+  const rows = mediaItems.length === 0
+    ? `<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:32px">Nessuna risorsa</td></tr>`
+    : mediaItems.map(item => `
+        <tr>
+          <td><span class="type-badge ${item.type}">${item.type.toUpperCase()}</span></td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item.titleIt)}">${esc(item.titleIt)}</td>
+          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(item.titleEn)}">${esc(item.titleEn)}</td>
+          <td><a href="${esc(item.url)}" target="_blank" style="color:var(--accent);font-size:12px">🔗 Link</a></td>
+          <td>${item.sortOrder}</td>
+          <td>
+            <div class="action-row">
+              <button class="btn btn-ghost btn-sm" onclick="editMedia('${item.id}')">${t('admin.edit')}</button>
+              <button class="btn btn-danger btn-sm" onclick="confirmDelete('${item.id}')">${t('admin.delete')}</button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+
+  setApp(`
+    <div class="admin-page">
+      <div class="admin-header">
+        <h1>${t('admin.title')}</h1>
+      </div>
+      <div id="admin-alert" class="alert"></div>
+      <div class="admin-toolbar">
+        <span style="font-size:13px;color:var(--text3)">${mediaItems.length} risorse</span>
+        <button class="btn btn-primary btn-sm" onclick="openAddModal()">${t('admin.add')}</button>
+      </div>
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>${t('admin.type')}</th>
+              <th>${t('admin.titleIt')}</th>
+              <th>${t('admin.titleEn')}</th>
+              <th>URL</th>
+              <th>${t('admin.sortOrder')}</th>
+              <th>${t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+    ${renderFooter()}
+  `);
+}
+
+function openAddModal() {
+  document.getElementById('media-id').value = '';
+  document.getElementById('media-form').reset();
+  document.getElementById('modal-title').textContent = t('admin.add');
+  document.getElementById('modal-submit').textContent = t('common.save');
+  hideAlert('modal-alert');
+  document.getElementById('media-modal').classList.add('show');
+}
+
+function editMedia(id) {
+  const item = mediaItems.find(i => i.id === id);
+  if (!item) return;
+  document.getElementById('media-id').value = id;
+  document.getElementById('media-type').value = item.type;
+  document.getElementById('media-title-it').value = item.titleIt;
+  document.getElementById('media-title-en').value = item.titleEn;
+  document.getElementById('media-url').value = item.url;
+  document.getElementById('media-thumb').value = item.thumbnailUrl || '';
+  document.getElementById('media-sort').value = item.sortOrder;
+  document.getElementById('modal-title').textContent = t('admin.edit');
+  document.getElementById('modal-submit').textContent = t('common.save');
+  hideAlert('modal-alert');
+  document.getElementById('media-modal').classList.add('show');
+}
+
+function closeMediaModal() {
+  document.getElementById('media-modal').classList.remove('show');
+}
+
+async function submitMediaForm(e) {
+  e.preventDefault();
+  const id = document.getElementById('media-id').value;
+  const url = document.getElementById('media-url').value.trim();
+  if (!url) return showAlert('modal-alert', 'Inserisci un URL o carica un file');
+
+  const body = {
+    type: document.getElementById('media-type').value,
+    titleIt: document.getElementById('media-title-it').value.trim(),
+    titleEn: document.getElementById('media-title-en').value.trim(),
+    url,
+    thumbnailUrl: document.getElementById('media-thumb').value.trim() || null,
+    sortOrder: parseInt(document.getElementById('media-sort').value) || 0,
+  };
+
+  const btn = document.getElementById('modal-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+
+  try {
+    const res = await fetch(id ? `/api/admin/media/${id}` : '/api/admin/media', {
+      method: id ? 'PUT' : 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('modal-alert', data.message || 'Errore');
+    } else {
+      closeMediaModal();
+      await renderAdminMedia();
+      showAlert('admin-alert', t('common.success'), 'success');
+    }
+  } catch {
+    showAlert('modal-alert', 'Errore di rete');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('common.save');
+  }
+}
+
+async function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('upload-label').textContent = file.name;
+
+  const wrap = document.getElementById('progress-wrap');
+  const bar = document.getElementById('progress-bar');
+  wrap.style.display = 'block';
+  bar.style.width = '20%';
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    bar.style.width = '60%';
+    const res = await fetch('/api/admin/media/upload', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    bar.style.width = '100%';
+    const data = await res.json();
+    if (res.ok && data.url) {
+      document.getElementById('media-url').value = data.url;
+      showAlert('modal-alert', 'File caricato con successo', 'success');
+    } else {
+      showAlert('modal-alert', data.message || 'Errore upload');
+    }
+  } catch {
+    showAlert('modal-alert', 'Errore upload file');
+  } finally {
+    setTimeout(() => { wrap.style.display = 'none'; bar.style.width = '0%'; }, 1500);
+  }
+}
+
+function confirmDelete(id) {
+  pendingDeleteId = id;
+  document.getElementById('confirm-modal').classList.add('show');
+  document.getElementById('confirm-delete-btn').onclick = async () => {
+    closeConfirmModal();
+    try {
+      const res = await fetch(`/api/admin/media/${pendingDeleteId}`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      if (res.ok) {
+        await renderAdminMedia();
+        showAlert('admin-alert', 'Eliminato', 'success');
+      } else {
+        const data = await res.json();
+        showAlert('admin-alert', data.message || 'Errore eliminazione');
+      }
+    } catch {
+      showAlert('admin-alert', 'Errore di rete');
+    }
+  };
+}
+
+function closeConfirmModal() {
+  document.getElementById('confirm-modal').classList.remove('show');
+  pendingDeleteId = null;
+}
+
+// ── FOOTER ────────────────────────────────────────────────────────────────
+function renderFooter() {
+  return `
+    <footer class="web-footer">
+      <div class="web-footer-inner">
+        <div class="web-footer-logo">BIKER<span style="color:var(--accent)">.</span>LINK</div>
+        <div class="web-footer-links">
+          <a href="/">Home</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Termini</a>
+          <a href="/media">Risorse</a>
+        </div>
+        <div class="web-footer-copy">© ${new Date().getFullYear()} BikerLink — U'll Never Ride Alone</div>
+      </div>
+    </footer>
+  `;
+}
+
+// ── NOT FOUND ─────────────────────────────────────────────────────────────
+function renderNotFound() {
+  setApp(`
+    <div class="auth-page">
+      <div class="auth-card" style="text-align:center;max-width:400px">
+        <div style="font-family:var(--font-display);font-size:80px;color:var(--accent);line-height:1">404</div>
+        <div class="auth-title">Pagina non trovata</div>
+        <p style="color:var(--text2);margin:12px 0 24px;font-size:14px">La pagina che cerchi non esiste.</p>
+        <button class="btn btn-primary btn-full" onclick="navigate('/')">Torna alla Home</button>
+      </div>
+    </div>
+  `);
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+(async function init() {
+  document.getElementById('lang-it').classList.toggle('active', currentLang === 'it');
+  document.getElementById('lang-en').classList.toggle('active', currentLang === 'en');
+  await checkAuth();
+  handleRoute(location.pathname);
+  applyI18n();
+
+  // Close modals on overlay click
+  document.getElementById('confirm-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeConfirmModal();
+  });
+  document.getElementById('media-modal').addEventListener('click', function(e) {
+    if (e.target === this) closeMediaModal();
+  });
+
+  // Update lang on type change in media form
+  document.getElementById('media-type').addEventListener('change', function() {
+    const isPdf = this.value === 'pdf';
+    document.getElementById('upload-label').textContent = isPdf ? 'Clicca o trascina un file PDF' : 'Clicca o trascina un video MP4';
+    document.getElementById('file-input').accept = isPdf ? '.pdf' : '.mp4,.webm';
+  });
+})();
+</script>
+</body>
+</html>

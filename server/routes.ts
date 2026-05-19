@@ -47,6 +47,7 @@ import eventsRoutes from "./routes/events";
 import arcadeRoutes from "./routes/arcade";
 import errorsRoutes from "./routes/errors";
 import sprintsRoutes from "./routes/sprints";
+import { publicMediaRouter, adminMediaRouter } from "./routes/media-library";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
 import { users, userFavorites } from "@shared/schema";
@@ -220,6 +221,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/arcade", arcadeRoutes);
   app.use("/api/errors", errorsRoutes);
   app.use("/api/sprints", sprintsRoutes);
+  app.use("/api/media", publicMediaRouter);
+  app.use("/api/admin/media", adminMediaRouter);
 
   const { default: plannedRoutesRoutes } = await import("./routes/planned-routes");
   app.use("/api/planned-routes", plannedRoutesRoutes);

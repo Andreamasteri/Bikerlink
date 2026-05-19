@@ -1607,3 +1607,22 @@ export const matchPreferences = pgTable("match_preferences", {
 
 export type MatchPreferences = typeof matchPreferences.$inferSelect;
 export type InsertMatchPreferences = typeof matchPreferences.$inferInsert;
+
+export const mediaLibrary = pgTable("media_library", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  type: varchar("type", { length: 10 }).notNull().default("pdf"),
+  titleIt: varchar("title_it", { length: 300 }).notNull(),
+  titleEn: varchar("title_en", { length: 300 }).notNull(),
+  url: text("url").notNull(),
+  thumbnailUrl: text("thumbnail_url"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("media_library_type_idx").on(table.type),
+  index("media_library_sort_idx").on(table.sortOrder),
+]);
+
+export type MediaLibrary = typeof mediaLibrary.$inferSelect;
+export type InsertMediaLibrary = typeof mediaLibrary.$inferInsert;
