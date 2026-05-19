@@ -1,12 +1,37 @@
-import { Router, Request, Response } from "express";
+import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { userLastfmSessions, userMusicTracks } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import dnsPromises from "dns/promises";
 import net from "net";
 import { Agent } from "undici";
+import { getTrustedClientIp } from "../lib/abuse-rate-limit";
 
 const router = Router();
+
+// SECURITY (Task #1450): Rate limiter for the public preview-playlist
+// endpoint. One unauthenticated request can fan out into up to 20 outbound
+// iTunes fetches, making it a network-egress amplifier. A 30 req / 5 min
+// cap per IP keeps legitimate interactive use entirely unaffected while
+// making large-scale amplification attacks impractical.
+const previewPlaylistHitMap = new Map<string, { count: number; resetAt: number }>();
+const PREVIEW_RATE_LIMIT_MAX = 30;
+const PREVIEW_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
+
+function previewPlaylistRateLimiter(req: Request, res: Response, next: NextFunction) {
+  const ip = getTrustedClientIp(req) ?? "unknown";
+  const now = Date.now();
+  const entry = previewPlaylistHitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    previewPlaylistHitMap.set(ip, { count: 1, resetAt: now + PREVIEW_RATE_LIMIT_WINDOW_MS });
+    return next();
+  }
+  if (entry.count >= PREVIEW_RATE_LIMIT_MAX) {
+    return res.status(429).json({ error: "Troppe richieste" });
+  }
+  entry.count++;
+  return next();
+}
 
 function requireAuth(req: Request, res: Response, next: () => void) {
   if (!req.session.userId) {
@@ -316,7 +341,9 @@ interface PreviewResultItem {
   genre: string | null;
 }
 
-router.get("/preview-playlist", async (req: Request, res: Response) => {
+// SECURITY (Task #1450): previewPlaylistRateLimiter applied here to cap
+// outbound iTunes fanout from unauthenticated callers.
+router.get("/preview-playlist", previewPlaylistRateLimiter, async (req: Request, res: Response) => {
   const { tracks } = req.query;
 
   if (!tracks) {

@@ -65,16 +65,21 @@ function setupCors(app: express.Application) {
 }
 
 function setupBodyParsing(app: express.Application) {
-  // SECURITY (Task #1082, #1125): the global 10 MB JSON parser is bypassed
-  // on selected public/abuse-prone routes so the route can install a much
-  // smaller per-route parser and run its rate limiter before the body is
-  // ever parsed.
+  // SECURITY (Task #1082, #1125, #1450): the global 10 MB JSON parser is
+  // bypassed on selected public/abuse-prone routes so the route can install
+  // a much smaller per-route parser and run its rate limiter before the body
+  // is ever parsed.
   //   - /api/admin/startup-beacon (Task #1082) — public diagnostics.
   //   - /api/admin/ota-error      (Task #1125) — public OTA telemetry.
   //   - /api/admin/client-error   (Task #1125) — public client crash sink.
   //   - /api/feedback             (Task #1125) — authenticated but
   //                                              unthrottled and triggers
   //                                              an outbound email per call.
+  //   - /api/errors               (Task #1450) — public GPS error sink;
+  //                                              triggers outbound email and
+  //                                              a DB write per accepted
+  //                                              request. Needs the limiter
+  //                                              to run before body parsing.
   // Without this bypass an attacker pays the cost of a 10 MB JSON parse
   // (CPU, memory, log noise) before the route can decide to drop the
   // request, which is exactly the abuse vector the threat model calls out.
@@ -92,6 +97,7 @@ function setupBodyParsing(app: express.Application) {
     "/api/admin/ota-error",
     "/api/admin/client-error",
     "/api/feedback",
+    "/api/errors",
   ]);
   app.use((req, res, next) => {
     if (req.method === "POST") {

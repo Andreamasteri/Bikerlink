@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from "express";
+import express, { Router, type Request, type Response, type NextFunction } from "express";
 import { sendEmail } from "../email";
 import { storage } from "../storage";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
@@ -8,6 +8,13 @@ const router = Router();
 
 const MAX_STRING_LEN = 2000;
 const MAX_STACK_LEN = 5000;
+
+// SECURITY (Task #1450): Small per-route body parser replaces the global
+// 10 MB parser for this endpoint. errorMessage is truncated to 2 KB and
+// stackTrace to 5 KB downstream, so 16 KB gives comfortable headroom.
+// The global parser is bypassed for /api/errors in server/index.ts so this
+// parser is the only one that ever runs on these requests.
+const errorsJson = express.json({ limit: "16kb" });
 
 const ipHitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 10;
@@ -23,6 +30,17 @@ function isRateLimited(ip: string): boolean {
   if (entry.count >= RATE_LIMIT_MAX) return true;
   entry.count++;
   return false;
+}
+
+// SECURITY (Task #1450): Run the IP rate-limit check as middleware BEFORE
+// the body parser so an over-limit attacker receives a 429 in O(1) — no
+// multi-kilobyte JSON parse is triggered on their request.
+function errorsRateLimiter(req: Request, res: Response, next: NextFunction) {
+  const ip = getTrustedClientIp(req) ?? "unknown";
+  if (isRateLimited(ip)) {
+    return res.status(429).json({ message: "Troppe richieste" });
+  }
+  return next();
 }
 
 function truncate(s: unknown, max: number): string {
@@ -75,21 +93,10 @@ function buildErrorEmailHtml(payload: {
   `;
 }
 
-router.post("/", async (req: Request, res: Response) => {
+// SECURITY (Task #1450): errorsRateLimiter runs before errorsJson so that
+// over-limit requests are rejected before any body parsing occurs.
+router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Response) => {
   try {
-    // Task #1126 (Telemetry and Reporting Abuse): use the centralized
-    // `getTrustedClientIp` helper instead of inline `req.ip ?? remoteAddress`
-    // (or, far worse, raw `req.headers["x-forwarded-for"]` parsing). The
-    // helper documents the trust-proxy contract that makes this safe and is
-    // the single chokepoint that future code review must police.
-    // The literal "unknown" bucket ensures requests without an identifiable
-    // source still share a single per-IP limit instead of bypassing it.
-    const ip = getTrustedClientIp(req) ?? "unknown";
-
-    if (isRateLimited(ip)) {
-      return res.status(429).json({ message: "Troppe richieste" });
-    }
-
     const body = req.body ?? {};
     const errorMessage = truncate(body.errorMessage, MAX_STRING_LEN);
     const stackTrace = body.stackTrace ? truncate(body.stackTrace, MAX_STACK_LEN) : null;
