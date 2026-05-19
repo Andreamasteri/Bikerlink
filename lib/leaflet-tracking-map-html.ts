@@ -57,6 +57,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
         return !p || !isValidCoord(p.lat, p.lng);
       });
       if (__DEBUG__ && badPoints.length > 0) {
+        console.warn("[BikerLink] applyUpdate: skipping " + badPoints.length + " out-of-range point(s).", badPoints.slice(0, 3).map(function(p) { return p ? { lat: p.lat, lng: p.lng } : p; }));
         postMsg({ type: "trackingCoordError", source: "points", skipped: badPoints.length, samples: badPoints.slice(0, 3) });
       }
       trackPoints = data.points.filter(function(p) {
@@ -75,6 +76,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       var lng = data.current.lng;
       if (!isValidCoord(lat, lng)) {
         if (__DEBUG__) {
+          console.warn("[BikerLink] applyUpdate: out-of-range current coordinate rejected.", { lat: lat, lng: lng });
           postMsg({ type: "trackingCoordError", source: "current", payload: data.current });
         }
         return;
