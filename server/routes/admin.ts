@@ -6999,5 +6999,36 @@ router.get("/sync/status", async (_req: Request, res: Response) => {
   }
 });
 
+// ── GET /api/admin/settings/apk-url ───────────────────────────────────────
+// Restituisce l'URL APK corrente (DB ha priorità sull'env var).
+router.get("/settings/apk-url", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("apk_download_url");
+    const dbUrl = setting?.value?.trim() || null;
+    const envUrl = process.env.APK_DOWNLOAD_URL || null;
+    return res.json({
+      url: dbUrl || envUrl || null,
+      source: dbUrl ? "db" : envUrl ? "env" : "none",
+    });
+  } catch (err) {
+    console.error("[ADMIN apk-url] get error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── PUT /api/admin/settings/apk-url ───────────────────────────────────────
+// Aggiorna o svuota l'URL APK nel DB (non tocca l'env var).
+router.put("/settings/apk-url", async (req: Request, res: Response) => {
+  try {
+    const { url } = req.body as { url?: string };
+    const trimmed = typeof url === "string" ? url.trim() : "";
+    await storage.upsertAppSetting("apk_download_url", trimmed || "", undefined);
+    return res.json({ ok: true, url: trimmed || null });
+  } catch (err) {
+    console.error("[ADMIN apk-url] put error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 export default router;
 

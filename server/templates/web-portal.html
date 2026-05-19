@@ -771,6 +771,7 @@ const ROUTES = {
   '/area-utente': renderArea,
   '/media': renderMedia,
   '/admin/media': renderAdminMedia,
+  '/admin/settings': renderAdminSettings,
 };
 
 function navigate(path) {
@@ -817,6 +818,7 @@ function renderNavAuth() {
     area.innerHTML = `
       <button class="nav-auth-btn btn-area" onclick="navigate('/area-utente')">${t('nav.area')}</button>
       ${currentUser.role === 'admin' ? `<button class="nav-link-btn" onclick="navigate('/admin/media')">${t('nav.admin')}</button>` : ''}
+      ${currentUser.role === 'admin' ? `<button class="nav-link-btn" onclick="navigate('/admin/settings')" style="color:var(--accent)">⚙ Settings</button>` : ''}
     `;
   } else {
     area.innerHTML = `
@@ -1486,6 +1488,107 @@ function confirmDelete(id) {
 function closeConfirmModal() {
   document.getElementById('confirm-modal').classList.remove('show');
   pendingDeleteId = null;
+}
+
+// ── ADMIN SETTINGS PAGE ───────────────────────────────────────────────────
+async function renderAdminSettings() {
+  document.title = 'BikerLink — Admin Settings';
+  if (!currentUser || currentUser.role !== 'admin') {
+    setApp(`<div class="auth-page"><div class="auth-card"><div class="auth-title">${t('admin.accessDenied')}</div></div></div>`);
+    return;
+  }
+
+  setApp(`
+    <div class="admin-page" style="padding-top:88px;max-width:680px;margin:0 auto">
+      <div class="admin-header">
+        <h1>⚙ Impostazioni Admin</h1>
+      </div>
+      <div id="settings-alert" class="alert"></div>
+
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:28px;margin-top:24px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:20px">
+          Download APK
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-size:13px">APK Download URL</label>
+          <div style="font-size:12px;color:var(--text3);margin-bottom:8px">
+            URL pubblico dell'APK Android. Ha priorità sulla variabile d'ambiente <code style="background:var(--surface2);padding:1px 6px;border-radius:3px;font-size:11px">APK_DOWNLOAD_URL</code>. Lascia vuoto per usare l'env var.
+          </div>
+          <div style="display:flex;gap:8px;align-items:stretch">
+            <input class="form-input" id="apk-url-input" type="url"
+              placeholder="https://..." autocomplete="off"
+              style="flex:1;font-size:13px;font-family:monospace"/>
+            <button class="btn btn-primary btn-sm" id="apk-url-save-btn" onclick="saveApkUrl()" style="white-space:nowrap;padding:0 18px">
+              Salva
+            </button>
+          </div>
+          <div id="apk-url-source" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px">
+        <button class="btn btn-ghost btn-sm" onclick="navigate('/admin/media')">← Torna al pannello media</button>
+      </div>
+    </div>
+    ${renderFooter()}
+  `);
+
+  await loadApkUrlSetting();
+}
+
+async function loadApkUrlSetting() {
+  try {
+    const res = await fetch('/api/admin/settings/apk-url', { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const input = document.getElementById('apk-url-input');
+    const sourceEl = document.getElementById('apk-url-source');
+    if (input) input.value = data.url || '';
+    if (sourceEl) {
+      if (data.source === 'db') {
+        sourceEl.textContent = '✓ URL caricato dal database';
+        sourceEl.style.color = 'var(--success)';
+      } else if (data.source === 'env') {
+        sourceEl.textContent = 'ℹ URL caricato dalla variabile d\'ambiente (nessun valore nel DB)';
+        sourceEl.style.color = 'var(--text3)';
+      } else {
+        sourceEl.textContent = '⚠ Nessun URL configurato — /api/download/apk/latest risponde 404';
+        sourceEl.style.color = 'var(--error)';
+      }
+    }
+  } catch {
+    /* silent */
+  }
+}
+
+async function saveApkUrl() {
+  const input = document.getElementById('apk-url-input');
+  const btn = document.getElementById('apk-url-save-btn');
+  const url = input ? input.value.trim() : '';
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loader"></span>';
+
+  try {
+    const res = await fetch('/api/admin/settings/apk-url', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('settings-alert', data.message || 'Errore durante il salvataggio');
+    } else {
+      showAlert('settings-alert', 'URL APK salvato con successo', 'success');
+      await loadApkUrlSetting();
+    }
+  } catch {
+    showAlert('settings-alert', 'Errore di rete. Riprova.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Salva';
+  }
 }
 
 // ── FOOTER ────────────────────────────────────────────────────────────────
