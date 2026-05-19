@@ -1,8 +1,9 @@
 entrypoint = "README.md"
-modules = ["javascript", "nodejs-20", "node", "python-3.11", "postgresql-16"]
+modules = ["javascript", "nodejs-20", "node", "python-3.11", "postgresql-16", "python3"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
 [deployment]
 deploymentTarget = "autoscale"
