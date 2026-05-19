@@ -627,17 +627,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         if (slotResult.rows.length > 0) {
           release = slotResult.rows[0] as Record<string, unknown>;
-        } else if (assignedSlot !== "stable") {
-          // Assigned slot has no active OTA → fall back to stable (never to legacy)
-          await logEvent("fallback_to_stable", null, `slot=${assignedSlot} no active OTA, falling back to stable`);
+          // Telemetry: log if we served a broken OTA that is still routing (edge case)
+          if ((release.status as string) === "broken") {
+            await logEvent("serving_broken_ota", String(release.id), `slot=${assignedSlot} OTA is broken but still routing`);
+          }
+        } else {
+          // Assigned slot has no active OTA — fall back to stable (never to legacy)
+          const reason = `slot=${assignedSlot} no active OTA`;
+          await logEvent("fallback_to_stable", null, reason);
           const stableResult = await pool.query(
             "SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
             [effectiveRv]
           );
           if (stableResult.rows.length > 0) {
             release = stableResult.rows[0] as Record<string, unknown>;
+          } else {
+            // stable also empty → noUpdateAvailable; log explicitly
+            await logEvent("fallback_to_stable_empty", null, `${reason} and stable also empty`);
           }
-          // stable also empty → noUpdateAvailable (no further fallback)
         }
       } else {
         // Path B: no assignment — try stable slot first
@@ -656,7 +663,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
           if (legacyResult.rows.length > 0) {
             release = legacyResult.rows[0] as Record<string, unknown>;
+            await logEvent("legacy_fallback", String(legacyResult.rows[0].id), "stable slot empty, serving legacy pre-slot OTA");
           }
+          // If legacy also empty → noUpdateAvailable is logged below
         }
       }
 
@@ -773,6 +782,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Task #1355: heartbeat endpoint — l'app chiama questo endpoint dopo aver
   // caricato con successo un OTA. Registra in ota_events con phase=loaded e
   // incrementa il contatore success_count sulla release.
+  //
+  // Security hardening:
+  //   - releaseId must exist in ota_releases (otherwise 404 — no metric poisoning)
+  //   - Idempotency: a device+release combo is deduplicated within a 5-minute window
+  //     (prevents duplicate success_count inflation from retries)
+  //   - rate limit: max 10 heartbeats/minute per IP (in-memory counter)
+  const _heartbeatRateMap = new Map<string, { count: number; resetAt: number }>();
   app.post("/api/ota/heartbeat", async (req: Request, res: Response) => {
     try {
       const { deviceId, releaseId, runtimeVersion } = req.body ?? {};
@@ -782,6 +798,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safeDeviceId = deviceId ? String(deviceId).substring(0, 128) : null;
       const safeReleaseId = String(releaseId).substring(0, 64);
       const safeRv = runtimeVersion ? String(runtimeVersion).substring(0, 32) : null;
+      const clientIp = getTrustedClientIp(req) ?? "unknown";
+
+      // Rate limit: 10 heartbeats per minute per IP
+      const now = Date.now();
+      const rl = _heartbeatRateMap.get(clientIp);
+      if (!rl || rl.resetAt <= now) {
+        _heartbeatRateMap.set(clientIp, { count: 1, resetAt: now + 60_000 });
+      } else {
+        rl.count++;
+        if (rl.count > 10) {
+          return res.status(429).json({ message: "Too many heartbeats" });
+        }
+      }
+
+      // Validate releaseId exists (reject unknown IDs — prevents metric poisoning)
+      const exists = await pool.query(
+        "SELECT id FROM ota_releases WHERE id = $1 LIMIT 1",
+        [safeReleaseId]
+      );
+      if (!exists.rows.length) {
+        return res.status(404).json({ message: "Release non trovata" });
+      }
+
+      // Idempotency: skip duplicate success_count increment within 5-minute window
+      // Uses ota_events: if a 'loaded' event for this device+release exists recently, skip increment
+      let shouldIncrementCount = true;
+      if (safeDeviceId) {
+        const recent = await pool.query(
+          "SELECT 1 FROM ota_events WHERE phase='loaded' AND source=$1 AND release_id=$2 AND created_at > NOW() - INTERVAL '5 minutes' LIMIT 1",
+          [safeDeviceId, safeReleaseId]
+        );
+        if (recent.rows.length > 0) shouldIncrementCount = false;
+      }
 
       const { db } = await import("./db");
       const { otaEvents } = await import("@shared/schema");
@@ -794,15 +843,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         releaseId: safeReleaseId,
         currentUpdateId: safeReleaseId,
         failCount: 0,
-        ip: getTrustedClientIp(req),
+        ip: clientIp,
       });
 
-      await pool.query(
-        "UPDATE ota_releases SET success_count = success_count + 1, updated_at = NOW() WHERE id = $1",
-        [safeReleaseId]
-      );
+      if (shouldIncrementCount) {
+        await pool.query(
+          "UPDATE ota_releases SET success_count = success_count + 1, updated_at = NOW() WHERE id = $1",
+          [safeReleaseId]
+        );
+      }
 
-      return res.json({ ok: true });
+      return res.json({ ok: true, counted: shouldIncrementCount });
     } catch (error) {
       console.error("[ota/heartbeat] Error:", error);
       return res.status(500).json({ message: "Internal server error" });

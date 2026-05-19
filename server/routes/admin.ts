@@ -6756,17 +6756,23 @@ router.post("/ota/revert", async (req: Request, res: Response) => {
     }
     const prevRow = prevStableResult.rows[0] as { id: string; version: string };
 
-    // Transazione atomica
+    // Transazione atomica — SWAP: stable ↔ previous-stable
+    // Preserva il history chain: lo stable che viene spostato va a previous-stable,
+    // non viene archiviato, così può essere ri-ripristinato in futuro.
     await pool.query("BEGIN");
     try {
-      // Lo stable corrente → archived (non slot=NULL: riserviamo NULL ai record pre-slot-system)
+      // Passo 1: lo stable corrente → slot temporaneo per evitare conflitti di unique
       await pool.query(
-        "UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = 'stable'"
+        "UPDATE ota_releases SET slot = '_revert_tmp', updated_at = NOW() WHERE slot = 'stable'"
       );
-      // Il previous-stable → stable (resta active)
+      // Passo 2: il previous-stable → stable (resta active)
       await pool.query(
         "UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin-revert', updated_at = NOW() WHERE id = $1",
         [prevRow.id]
+      );
+      // Passo 3: il vecchio stable → previous-stable (ora può essere ri-ripristinato)
+      await pool.query(
+        "UPDATE ota_releases SET slot = 'previous-stable', updated_at = NOW() WHERE slot = '_revert_tmp'"
       );
       await pool.query("COMMIT");
     } catch (txErr) {
