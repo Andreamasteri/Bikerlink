@@ -698,7 +698,35 @@
     "apkVersionCode": 41,
     "apkVersionName": null,
     "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-01T07:22:54.194Z"
+  },
+  {
+    "updateNumber": 26,
+    "version": "1.26.0",
+    "cycle": "8.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-26 rv8.0.0: OTA-26: Match engine 18 tipi+toggle, Privacy & Ride ghost mode+fake zone, Giri moto AI+curvy, sensori DeviceMotion, fix chat duplicati, landing page redesign, sito BikerLink, pannello newsletter, profilo unificato, match inspector admin, health check matching, geolocalizza da profilo, gerarchia continenti",
+    "note": "CURRENT_OTA_NUMBER=26. Pubblicato da publish-ota.sh (un comando solo).",
+    "runtimeVersion": "8.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "62fd5d01-8ca9-452c-be61-362ad4d24fd5",
+    "bundleUrl": "private/ota/ota-1.26.0-1779155275157.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "78bfd683cb8c8f11fdaed5f75dd00c1cd37a2c1f",
+    "easDashboard": null,
+    "apkBuildId": "e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/e03f51d8-9f2b-496f-bba2-e0fe90b69fb7",
+    "apkVersionCode": 41,
+    "apkVersionName": null,
+    "apkUrl": "https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk",
+    "status": "published",
+    "publishedAt": "2026-05-19T01:48:01.089Z"
   }
 ]
