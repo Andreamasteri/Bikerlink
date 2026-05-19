@@ -59,6 +59,18 @@ export default function PublicProfileScreen() {
   });
   const marketplaceEnabled = marketplaceData?.enabled !== false;
 
+  const { data: sprintRankData } = useQuery<{ rank: number | null; sprint0to100Ms: number | null }>({
+    queryKey: ["/api/sprints/leaderboard/rank", id],
+    queryFn: async () => {
+      const res = await fetch(new URL(`/api/sprints/leaderboard/rank/${id}`, baseUrl).toString(), {
+        credentials: "include",
+      });
+      if (!res.ok) return { rank: null, sprint0to100Ms: null };
+      return res.json();
+    },
+    enabled: !!id,
+  });
+
   const { data: routesData } = useQuery<{ routes: { id: string }[] }>({
     queryKey: ["/api/users", id, "custom-routes"],
     queryFn: async () => {
@@ -363,6 +375,22 @@ export default function PublicProfileScreen() {
           )}
         </View>
 
+        {sprintRankData?.rank != null && (
+          <TouchableOpacity
+            style={styles.sprintRankBadge}
+            onPress={() => {
+              const href = `/sprint-history?tab=leaderboard&focusUserId=${encodeURIComponent(id ?? "")}`;
+              router.push(href as Parameters<typeof router.push>[0]);
+            }}
+            activeOpacity={0.8}
+            testID="sprint-rank-badge"
+          >
+            <Ionicons name="trophy-outline" size={16} color={Colors.accentRed} />
+            <Text style={styles.sprintRankText}>Sprint rank: #{sprintRankData.rank}</Text>
+            <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+
         {!!profile.bio && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Bio</Text>
@@ -662,6 +690,24 @@ const styles = StyleSheet.create({
   userType: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.textSecondary, marginTop: 4 },
   locationRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8 },
   locationText: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  sprintRankBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "center",
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.accentRed + "50",
+  },
+  sprintRankText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
   section: { paddingHorizontal: 20, marginTop: 16 },
   sectionTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.accent, marginBottom: 8 },
   bioText: { fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.text, lineHeight: 22 },

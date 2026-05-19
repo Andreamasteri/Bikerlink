@@ -72,7 +72,7 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
     if (!currentUserId) return;
 
     const limitRaw = parseInt(String(req.query.limit ?? "100"), 10);
-    const limit = Math.min(Math.max(isFinite(limitRaw) ? limitRaw : 100, 1), 200);
+    const limit = Math.min(Math.max(isFinite(limitRaw) ? limitRaw : 100, 1), 500);
 
     const motorcycleType = typeof req.query.motorcycleType === "string" && req.query.motorcycleType.length > 0
       ? req.query.motorcycleType
@@ -131,8 +131,13 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
       ? baseQuery.innerJoin(userMotorcycles, and(...motoConditions))
       : baseQuery.leftJoin(userMotorcycles, and(...motoConditions));
 
+    // Optional: always include a specific user's row even if outside top-N
+    const includeUserId = typeof req.query.includeUserId === "string" && req.query.includeUserId.length > 0
+      ? req.query.includeUserId
+      : null;
+
     const rows = await withMoto
-      .orderBy(asc(bestPerUser.sprint0to100Ms), asc(bestPerUser.createdAt))
+      .orderBy(asc(bestPerUser.sprint0to100Ms), asc(bestPerUser.createdAt), asc(bestPerUser.id))
       .limit(limit);
 
     const leaderboard = rows.map((r, idx) => ({
@@ -151,9 +156,123 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
       isCurrentUser: r.userId === currentUserId,
     }));
 
+    // If includeUserId is set and that user is not already in the results,
+    // fetch their row separately and append it with their actual rank.
+    if (includeUserId && !leaderboard.some((e) => e.userId === includeUserId)) {
+      const focusBaseQuery = db
+        .select({
+          userId: users.id,
+          nickname: users.nickname,
+          avatarUrl: users.avatarUrl,
+          sprint0to100Ms: bestPerUser.sprint0to100Ms,
+          maxAccelerationG: bestPerUser.maxAccelerationG,
+          maxTiltDeg: bestPerUser.maxTiltDeg,
+          createdAt: bestPerUser.createdAt,
+          id: bestPerUser.id,
+          motorcycleBrand: userMotorcycles.brand,
+          motorcycleModel: userMotorcycles.model,
+          motorcycleType: userMotorcycles.motorcycleType,
+          displacement: userMotorcycles.displacement,
+        })
+        .from(bestPerUser)
+        .innerJoin(users, eq(users.id, bestPerUser.userId))
+        .where(eq(bestPerUser.userId, includeUserId));
+
+      const focusRows = needsMotoFilter
+        ? await focusBaseQuery.innerJoin(userMotorcycles, and(...motoConditions))
+        : await focusBaseQuery.leftJoin(userMotorcycles, and(...motoConditions));
+
+      if (focusRows.length > 0) {
+        const fr = focusRows[0];
+        // Compute rank for this user
+        const [countRow] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(bestPerUser)
+          .where(
+            sql`${bestPerUser.sprint0to100Ms} < ${fr.sprint0to100Ms}
+              OR (${bestPerUser.sprint0to100Ms} = ${fr.sprint0to100Ms} AND ${bestPerUser.createdAt} < ${fr.createdAt})
+              OR (${bestPerUser.sprint0to100Ms} = ${fr.sprint0to100Ms} AND ${bestPerUser.createdAt} = ${fr.createdAt} AND ${bestPerUser.id} < ${fr.id})`
+          );
+        const focusRank = (countRow?.count ?? 0) + 1;
+        leaderboard.push({
+          rank: focusRank,
+          userId: fr.userId,
+          nickname: fr.nickname,
+          avatarUrl: fr.avatarUrl,
+          sprint0to100Ms: fr.sprint0to100Ms,
+          maxAccelerationG: fr.maxAccelerationG,
+          maxTiltDeg: fr.maxTiltDeg,
+          createdAt: fr.createdAt,
+          motorcycleBrand: fr.motorcycleBrand,
+          motorcycleModel: fr.motorcycleModel,
+          motorcycleType: fr.motorcycleType,
+          displacement: fr.displacement,
+          isCurrentUser: fr.userId === currentUserId,
+        });
+      }
+    }
+
+    // Keep response strictly rank-sorted (includeUserId may have appended an out-of-order row)
+    if (includeUserId) {
+      leaderboard.sort((a, b) => a.rank - b.rank || a.sprint0to100Ms - b.sprint0to100Ms);
+    }
+
     return res.json(leaderboard);
   } catch (error) {
     console.error("Get sprint leaderboard error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/leaderboard/rank/:userId", async (req: Request, res: Response) => {
+  try {
+    const requesterId = requireAuth(req, res);
+    if (!requesterId) return;
+
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ message: "userId richiesto" });
+
+    const bestPerUser = db
+      .selectDistinctOn([sprintResults.userId], {
+        userId: sprintResults.userId,
+        sprint0to100Ms: sprintResults.sprint0to100Ms,
+        createdAt: sprintResults.createdAt,
+        id: sprintResults.id,
+      })
+      .from(sprintResults)
+      .orderBy(
+        asc(sprintResults.userId),
+        asc(sprintResults.sprint0to100Ms),
+        asc(sprintResults.createdAt),
+        asc(sprintResults.id),
+      )
+      .as("best_per_user");
+
+    const targetRow = await db
+      .select({ sprint0to100Ms: bestPerUser.sprint0to100Ms, createdAt: bestPerUser.createdAt, id: bestPerUser.id })
+      .from(bestPerUser)
+      .where(eq(bestPerUser.userId, userId))
+      .limit(1);
+
+    if (targetRow.length === 0) {
+      return res.json({ rank: null, sprint0to100Ms: null });
+    }
+
+    const { sprint0to100Ms: targetMs, createdAt: targetCreatedAt, id: targetId } = targetRow[0];
+
+    const [countRow] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(bestPerUser)
+      .where(
+        sql`${bestPerUser.sprint0to100Ms} < ${targetMs}
+          OR (${bestPerUser.sprint0to100Ms} = ${targetMs} AND ${bestPerUser.createdAt} < ${targetCreatedAt})
+          OR (${bestPerUser.sprint0to100Ms} = ${targetMs} AND ${bestPerUser.createdAt} = ${targetCreatedAt} AND ${bestPerUser.id} < ${targetId})`
+      );
+
+    const rank = (countRow?.count ?? 0) + 1;
+    return res.json({ rank, sprint0to100Ms: targetMs });
+  } catch (error) {
+    console.error("Get sprint rank error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

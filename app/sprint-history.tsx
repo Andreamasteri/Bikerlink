@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState } from "react";
+import { useRef, useCallback, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import {
   Alert,
   Image,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
@@ -73,7 +73,9 @@ export default function SprintHistoryScreen() {
   const { speedUnit, timeFormat } = useUnits();
   const locale = getCurrentLocale();
   const listRef = useRef<FlatList>(null);
-  const [tab, setTab] = useState<Tab>("mine");
+  const params = useLocalSearchParams<{ tab?: string; focusUserId?: string }>();
+  const focusUserId = params.focusUserId ?? null;
+  const [tab, setTab] = useState<Tab>(params.tab === "leaderboard" ? "leaderboard" : "mine");
 
   const targetSpeed = speedUnit === "mph" ? 62 : 100;
   const targetLabel = speedUnit === "mph" ? "62 mph" : "100 km/h";
@@ -97,12 +99,33 @@ export default function SprintHistoryScreen() {
     refetch: refetchLeaderboard,
     isRefetching: isRefetchingLeaderboard,
   } = useQuery<LeaderboardEntry[]>({
-    queryKey: ["/api/sprints/leaderboard"],
-    queryFn: getQueryFn({ on401: "throw" }),
+    queryKey: ["/api/sprints/leaderboard", focusUserId ?? ""],
+    queryFn: async () => {
+      const { getApiUrl } = await import("@/lib/query-client");
+      const url = new URL("/api/sprints/leaderboard", getApiUrl());
+      if (focusUserId) url.searchParams.set("includeUserId", focusUserId);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("Errore leaderboard");
+      return res.json();
+    },
     staleTime: 60 * 1000,
     gcTime: 5 * 60 * 1000,
     enabled: tab === "leaderboard",
   });
+
+  const leaderboardListRef = useRef<FlatList>(null);
+  const focusIndexRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!focusUserId || !leaderboard || leaderboard.length === 0) return;
+    const idx = leaderboard.findIndex((e) => e.userId === focusUserId);
+    if (idx < 0) return;
+    focusIndexRef.current = idx;
+    const timer = setTimeout(() => {
+      leaderboardListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.4 });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [focusUserId, leaderboard]);
 
   const personalBest: SprintResult | null = sprints && sprints.length > 0 ? sprints[0] : null;
 
@@ -213,6 +236,7 @@ export default function SprintHistoryScreen() {
       const isRecord = index === 0;
       const medal = getMedalIcon(index);
       const motoLabel = [item.motorcycleBrand, item.motorcycleModel].filter(Boolean).join(" ");
+      const isFocused = focusUserId != null && item.userId === focusUserId && !item.isCurrentUser;
 
       return (
         <View
@@ -220,6 +244,7 @@ export default function SprintHistoryScreen() {
             styles.sprintItem,
             isRecord && styles.sprintItemRecord,
             item.isCurrentUser && styles.sprintItemMe,
+            isFocused && styles.sprintItemFocused,
           ]}
         >
           <View style={styles.sprintRank}>
@@ -279,7 +304,7 @@ export default function SprintHistoryScreen() {
         </View>
       );
     },
-    []
+    [focusUserId]
   );
 
   const topPadding = insets.top;
@@ -408,11 +433,28 @@ export default function SprintHistoryScreen() {
             </View>
           ) : (
             <FlatList
+              ref={leaderboardListRef}
               data={leaderboard}
               keyExtractor={(item) => item.userId}
               renderItem={renderLeaderboardItem}
               contentContainerStyle={{ paddingBottom: bottomPad + 16, paddingTop: 8 }}
               showsVerticalScrollIndicator={false}
+              onScrollToIndexFailed={(info) => {
+                // First scroll to the highest measured index to force more items to render
+                leaderboardListRef.current?.scrollToIndex({
+                  index: info.highestMeasuredFrameIndex,
+                  animated: false,
+                });
+                // Then retry scrolling to the original target index after a short delay
+                const targetIndex = focusIndexRef.current ?? info.index;
+                setTimeout(() => {
+                  leaderboardListRef.current?.scrollToIndex({
+                    index: targetIndex,
+                    animated: true,
+                    viewPosition: 0.4,
+                  });
+                }, 350);
+              }}
               refreshControl={
                 <RefreshControl
                   refreshing={isRefetchingLeaderboard}
@@ -651,6 +693,11 @@ const styles = StyleSheet.create({
   sprintItemMe: {
     borderWidth: 1,
     borderColor: Colors.accentRed + "80",
+  },
+  sprintItemFocused: {
+    borderWidth: 1.5,
+    borderColor: Colors.accent + "90",
+    backgroundColor: Colors.accent + "12",
   },
   sprintRank: {
     width: 28,
