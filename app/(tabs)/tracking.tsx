@@ -365,6 +365,7 @@ function SensorOverlayPanel({
   currentTiltDeg,
   maxAccelG,
   mountAxisCalib,
+  sensorsEnabled,
   colors,
   styles: s,
   t,
@@ -374,6 +375,7 @@ function SensorOverlayPanel({
   currentTiltDeg: number;
   maxAccelG: number;
   mountAxisCalib: MountAxisCalibration | null;
+  sensorsEnabled: boolean;
   colors: ReturnType<typeof useColors>["Colors"];
   styles: {
     sensorOverlayPanel: object;
@@ -2779,6 +2781,7 @@ function TrackingNativeScreen() {
                     currentTiltDeg={currentTiltDeg}
                     maxAccelG={maxAccelG}
                     mountAxisCalib={mountAxisCalib}
+                    sensorsEnabled={sensorsEnabled}
                     colors={Colors}
                     styles={styles}
                     t={t}
@@ -2911,6 +2914,7 @@ function TrackingNativeScreen() {
                         currentTiltDeg={currentTiltDeg}
                         maxAccelG={maxAccelG}
                         mountAxisCalib={mountAxisCalib}
+                        sensorsEnabled={sensorsEnabled}
                         colors={Colors}
                         styles={styles}
                         t={t}
