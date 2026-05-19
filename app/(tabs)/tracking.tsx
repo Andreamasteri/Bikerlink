@@ -1178,6 +1178,7 @@ export default function TrackingScreen() {
 
   // Battery drain stats (measured per-device, per-mode)
   const [batteryDrainStats, setBatteryDrainStats] = useState<BatteryDrainStats>({ easy: [], medium: [], race: [] });
+  const [showBatteryStats, setShowBatteryStats] = useState(false);
   const rideStartBatteryLevelRef = useRef<number | null>(null);
   const rideStartBatteryTimeRef = useRef<number>(0);
   const rideBatteryProfileRef = useRef<UpdateProfile>("medium");
@@ -3324,6 +3325,110 @@ export default function TrackingScreen() {
                 ? t("tracking.batteryMeasuredNote")
                 : t("tracking.batteryEstimateNote")}
             </Text>
+
+            {/* Battery drain stats expandable section */}
+            <TouchableOpacity
+              style={styles.batteryStatsToggle}
+              onPress={() => setShowBatteryStats((v) => !v)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="battery-charging-outline" size={13} color={Colors.textSecondary} />
+              <Text style={styles.batteryStatsToggleLabel}>{t("tracking.batteryStats.title")}</Text>
+              <Ionicons
+                name={showBatteryStats ? "chevron-up" : "chevron-down"}
+                size={13}
+                color={Colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {showBatteryStats && (
+              <View style={styles.batteryStatsPanel}>
+                {(["easy", "medium", "race"] as UpdateProfile[]).map((p) => {
+                  const samples = batteryDrainStats[p];
+                  const hasData = samples.length > 0;
+                  const avg = hasData ? samples.reduce((a, b) => a + b, 0) / samples.length : null;
+                  const minVal = hasData ? Math.min(...samples) : null;
+                  const maxVal = hasData ? Math.max(...samples) : null;
+                  const sparkMax = hasData ? Math.max(...samples, 0.1) : 1;
+                  const modeLabel = p === "easy" ? t("tracking.label.easy") : p === "medium" ? t("tracking.label.standard") : t("tracking.label.race");
+                  const modeColor = p === "easy" ? Colors.success : p === "medium" ? Colors.accent : Colors.error;
+                  return (
+                    <View key={p} style={styles.batteryStatsModeCard}>
+                      <View style={styles.batteryStatsModeHeader}>
+                        <View style={[styles.batteryStatsModeIndicator, { backgroundColor: modeColor }]} />
+                        <Text style={styles.batteryStatsModeLabel}>{modeLabel}</Text>
+                        <Text style={styles.batteryStatsSamplesCount}>
+                          {hasData ? `${samples.length} ${t("tracking.batteryStats.samples")}` : t("tracking.batteryStats.noData")}
+                        </Text>
+                      </View>
+                      {hasData ? (
+                        <>
+                          <View style={styles.batteryStatsRow}>
+                            <View style={styles.batteryStatsFigure}>
+                              <Text style={[styles.batteryStatsFigureValue, { color: modeColor }]}>{avg!.toFixed(1)}%/h</Text>
+                              <Text style={styles.batteryStatsFigureLabel}>{t("tracking.batteryStats.avg")}</Text>
+                            </View>
+                            <View style={styles.batteryStatsFigure}>
+                              <Text style={styles.batteryStatsFigureValue}>{minVal!.toFixed(1)}%/h</Text>
+                              <Text style={styles.batteryStatsFigureLabel}>{t("tracking.batteryStats.min")}</Text>
+                            </View>
+                            <View style={styles.batteryStatsFigure}>
+                              <Text style={styles.batteryStatsFigureValue}>{maxVal!.toFixed(1)}%/h</Text>
+                              <Text style={styles.batteryStatsFigureLabel}>{t("tracking.batteryStats.max")}</Text>
+                            </View>
+                          </View>
+                          <View style={styles.batteryStatsSparkline}>
+                            {samples.map((v, i) => {
+                              const barHeight = Math.max(4, Math.round((v / sparkMax) * 28));
+                              const isLast = i === samples.length - 1;
+                              return (
+                                <View key={i} style={styles.batteryStatsBarWrapper}>
+                                  <View
+                                    style={[
+                                      styles.batteryStatsBar,
+                                      {
+                                        height: barHeight,
+                                        backgroundColor: isLast ? modeColor : modeColor + "55",
+                                      },
+                                    ]}
+                                  />
+                                </View>
+                              );
+                            })}
+                          </View>
+                          <Text style={styles.batteryStatsSparklineLabel}>{t("tracking.batteryStats.lastSamples")}</Text>
+                        </>
+                      ) : null}
+                    </View>
+                  );
+                })}
+                <TouchableOpacity
+                  style={styles.batteryStatsResetBtn}
+                  onPress={() => {
+                    Alert.alert(
+                      t("tracking.batteryStats.resetConfirmTitle"),
+                      t("tracking.batteryStats.resetConfirmMsg"),
+                      [
+                        { text: t("common.cancel"), style: "cancel" },
+                        {
+                          text: t("tracking.batteryStats.resetConfirmBtn"),
+                          style: "destructive",
+                          onPress: async () => {
+                            await AsyncStorage.removeItem(BATTERY_DRAIN_STATS_KEY);
+                            setBatteryDrainStats({ easy: [], medium: [], race: [] });
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons name="trash-outline" size={13} color={Colors.error} />
+                  <Text style={styles.batteryStatsResetLabel}>{t("tracking.batteryStats.reset")}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <View style={styles.profileWarning}>
               <Ionicons name="warning-outline" size={14} color={Colors.warning} />
               <Text style={styles.profileWarningText}>
@@ -4955,5 +5060,117 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold" as const,
     fontSize: 13,
     color: Colors.text,
+  },
+
+  // Battery drain stats expandable section
+  batteryStatsToggle: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 5,
+    paddingVertical: 5,
+  },
+  batteryStatsToggleLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium" as const,
+    color: Colors.textSecondary,
+  },
+  batteryStatsPanel: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 8,
+    gap: 8,
+  },
+  batteryStatsModeCard: {
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 6,
+  },
+  batteryStatsModeHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+  },
+  batteryStatsModeIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  batteryStatsModeLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.text,
+    flex: 1,
+  },
+  batteryStatsSamplesCount: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary,
+    fontStyle: "italic" as const,
+  },
+  batteryStatsRow: {
+    flexDirection: "row" as const,
+    gap: 8,
+  },
+  batteryStatsFigure: {
+    flex: 1,
+    alignItems: "center" as const,
+    gap: 2,
+  },
+  batteryStatsFigureValue: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold" as const,
+    color: Colors.text,
+  },
+  batteryStatsFigureLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.5,
+  },
+  batteryStatsSparkline: {
+    flexDirection: "row" as const,
+    alignItems: "flex-end" as const,
+    gap: 3,
+    height: 32,
+    paddingTop: 4,
+  },
+  batteryStatsBarWrapper: {
+    flex: 1,
+    height: 28,
+    justifyContent: "flex-end" as const,
+    alignItems: "center" as const,
+  },
+  batteryStatsBar: {
+    width: "100%" as const,
+    borderRadius: 2,
+    minHeight: 4,
+  },
+  batteryStatsSparklineLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary + "88",
+    textAlign: "center" as const,
+    fontStyle: "italic" as const,
+  },
+  batteryStatsResetBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 5,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.error + "40",
+    backgroundColor: Colors.error + "0D",
+  },
+  batteryStatsResetLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium" as const,
+    color: Colors.error,
   },
 });
