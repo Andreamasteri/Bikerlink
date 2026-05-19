@@ -237,17 +237,40 @@ async function runTests() {
 
   // ── Test 5: heartbeat endpoint ──
   {
-    const hbRes = await fetch(`${BASE}/api/ota/heartbeat`, {
+    // Test 5a: heartbeat con releaseId SCONOSCIUTO deve restituire 404 (non 500)
+    const hbUnknownRes = await fetch(`${BASE}/api/ota/heartbeat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deviceId: "test-hb-device", releaseId: "00000000-test-0000-0000-000000000000", runtimeVersion: RUNTIME_VERSION }),
+      body: JSON.stringify({ deviceId: "test-hb-device", releaseId: "00000000-dead-beef-0000-000000000000", runtimeVersion: RUNTIME_VERSION }),
     });
-    // 200 = ok, 500 = release non trovata ma endpoint risponde
-    if (hbRes.status === 200 || hbRes.status === 500) {
-      pass(`Heartbeat endpoint risponde HTTP ${hbRes.status}`);
+    if (hbUnknownRes.status === 404) {
+      pass("Heartbeat releaseId sconosciuto → 404 (metric poisoning prevenuto)");
     } else {
-      fail(`Heartbeat endpoint HTTP ${hbRes.status}`, await hbRes.text());
+      fail(`Heartbeat releaseId sconosciuto atteso 404, ricevuto ${hbUnknownRes.status}`, await hbUnknownRes.text());
     }
+
+    // Test 5b: heartbeat con releaseId REALE deve restituire 200 + counted
+    const realRelease = stableRelease ?? test1Release ?? releases.find(r => r.status === "active") ?? null;
+    if (realRelease) {
+      const hbRealRes = await fetch(`${BASE}/api/ota/heartbeat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: "test-hb-device-real", releaseId: realRelease.id, runtimeVersion: RUNTIME_VERSION }),
+      });
+      if (hbRealRes.status === 200) {
+        const body = await hbRealRes.json() as { ok: boolean; counted: boolean };
+        if (body.ok) {
+          pass(`Heartbeat releaseId reale → 200 ok (counted=${body.counted})`, `releaseId=${realRelease.id.substring(0, 8)}…`);
+        } else {
+          fail("Heartbeat releaseId reale → 200 ma ok=false", JSON.stringify(body));
+        }
+      } else {
+        fail(`Heartbeat releaseId reale HTTP ${hbRealRes.status}`, await hbRealRes.text());
+      }
+    } else {
+      console.log("  ⚠️  Test 5b saltato: nessuna release attiva disponibile per heartbeat positivo");
+    }
+
     console.log();
   }
 

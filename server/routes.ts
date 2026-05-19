@@ -795,7 +795,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!releaseId || typeof releaseId !== "string") {
         return res.status(400).json({ message: "releaseId obbligatorio" });
       }
-      const safeDeviceId = deviceId ? String(deviceId).substring(0, 128) : null;
+      // ota_events.source is varchar(32) — truncate deviceId to match the column constraint.
+      // Expo installation IDs are UUIDs (36 chars) so we keep the first 32 chars which
+      // are unique enough for filtering and idempotency checks.
+      const safeDeviceId = deviceId ? String(deviceId).substring(0, 32) : null;
       const safeReleaseId = String(releaseId).substring(0, 64);
       const safeRv = runtimeVersion ? String(runtimeVersion).substring(0, 32) : null;
       const clientIp = getTrustedClientIp(req) ?? "unknown";
