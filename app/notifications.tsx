@@ -27,8 +27,26 @@ interface AppNotification {
   createdAt: string;
 }
 
+interface IncomingMatchRequest {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  status: string;
+  createdAt: string;
+  sender: {
+    id: string;
+    nickname: string;
+    avatarUrl: string | null;
+    userType: string;
+  } | null;
+}
+
 function getNotifIcon(type: string): { name: React.ComponentProps<typeof Ionicons>["name"]; color: string } {
   switch (type) {
+    case "direct_match_request":
+      return { name: "person-add", color: "#FF6600" };
+    case "direct_match_accepted":
+      return { name: "checkmark-circle", color: "#34C759" };
     case "match_request":
     case "match_accepted":
       return { name: "bicycle", color: "#FF6600" };
@@ -58,38 +76,145 @@ function timeAgo(dateStr: string): string {
 function getNotifRoute(item: AppNotification): string | null {
   const { notificationType: t, referenceId: rid } = item;
   switch (t) {
+    case "direct_match_accepted":
+      return rid ? `/profile/${rid}` : null;
     case "match":
     case "match_request":
     case "match_accepted":
-      // referenceId is the other user's ID; stay on list if absent
       return rid ? `/profile/${rid}` : null;
     case "motoclub":
     case "motoclub_invite":
     case "motoclub_join":
-      // referenceId is the club ID; stay on list if absent
       return rid ? `/motoclub/${rid}` : null;
     case "event_approved":
     case "event_rejected":
     case "event_invite":
-      // referenceId is the event ID; stay on list if absent
       return rid ? `/evento/${rid}` : null;
     case "proposal":
     case "proposal_joined":
-      // referenceId is the proposal ID; stay on list if absent
       return rid ? `/proposals/${rid}` : null;
     case "sos":
-      // SOS: always open the map — no specific referenceId needed
       return "/(tabs)/index";
     case "chat":
-      // referenceId is the conversation ID; stay on list if absent
       return rid ? `/chat/${rid}` : null;
     case "system":
-      // System notifications carry no deep-link target
       return null;
     default:
       return null;
   }
 }
+
+function MatchRequestCard({
+  request,
+  onAccept,
+  onReject,
+  isAccepting,
+  isRejecting,
+}: {
+  request: IncomingMatchRequest;
+  onAccept: () => void;
+  onReject: () => void;
+  isAccepting: boolean;
+  isRejecting: boolean;
+}) {
+  const colors = useColors();
+  const router = useRouter();
+
+  return (
+    <View style={[matchCardStyles.card, { backgroundColor: colors.surface, borderColor: colors.accent }]}>
+      <TouchableOpacity
+        style={matchCardStyles.senderRow}
+        onPress={() => request.sender && router.push(`/profile/${request.sender.id}` as any)}
+        activeOpacity={0.7}
+      >
+        <View style={[matchCardStyles.avatar, { backgroundColor: colors.accent + "22" }]}>
+          <Ionicons name="person-add" size={22} color={colors.accent} />
+        </View>
+        <View style={matchCardStyles.senderInfo}>
+          <Text style={[matchCardStyles.senderName, { color: colors.text }]} numberOfLines={1}>
+            {request.sender?.nickname ?? "Utente"}
+          </Text>
+          <Text style={[matchCardStyles.senderSub, { color: colors.textSecondary ?? colors.text }]}>
+            ti ha mandato una richiesta di match · {timeAgo(request.createdAt)}
+          </Text>
+        </View>
+      </TouchableOpacity>
+      <View style={matchCardStyles.actions}>
+        <TouchableOpacity
+          style={[matchCardStyles.rejectBtn, { borderColor: colors.border }]}
+          onPress={onReject}
+          disabled={isRejecting || isAccepting}
+          activeOpacity={0.7}
+        >
+          {isRejecting ? (
+            <ActivityIndicator size="small" color={colors.textSecondary ?? "#999"} />
+          ) : (
+            <Text style={[matchCardStyles.rejectText, { color: colors.textSecondary ?? "#999" }]}>Rifiuta</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[matchCardStyles.acceptBtn, { backgroundColor: colors.accent }]}
+          onPress={onAccept}
+          disabled={isAccepting || isRejecting}
+          activeOpacity={0.7}
+        >
+          {isAccepting ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={matchCardStyles.acceptText}>Accetta</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const matchCardStyles = StyleSheet.create({
+  card: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    padding: 14,
+    gap: 12,
+  },
+  senderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  avatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  senderInfo: { flex: 1 },
+  senderName: { fontSize: 15, fontWeight: "700" },
+  senderSub: { fontSize: 12, marginTop: 2 },
+  actions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  rejectBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  acceptBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  rejectText: { fontSize: 14, fontWeight: "600" },
+  acceptText: { fontSize: 14, fontWeight: "700", color: "#fff" },
+});
 
 export default function NotificationsScreen() {
   const t = useT();
@@ -100,6 +225,10 @@ export default function NotificationsScreen() {
 
   const { data: notifications = [], isLoading } = useQuery<AppNotification[]>({
     queryKey: ["/api/notifications"],
+  });
+
+  const { data: incomingRequests = [], isLoading: loadingRequests } = useQuery<IncomingMatchRequest[]>({
+    queryKey: ["/api/friends/requests/incoming"],
   });
 
   const markReadMutation = useMutation({
@@ -131,6 +260,28 @@ export default function NotificationsScreen() {
     },
   });
 
+  const acceptRequestMutation = useMutation({
+    mutationFn: (requestId: string) => apiRequest("POST", `/api/friends/request/${requestId}/accept`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/friends/requests/incoming"] });
+      qc.invalidateQueries({ queryKey: ["/api/friends"] });
+      qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    },
+    onError: (e: any) => {
+      Alert.alert("Errore", e.message || "Impossibile accettare la richiesta");
+    },
+  });
+
+  const rejectRequestMutation = useMutation({
+    mutationFn: (requestId: string) => apiRequest("POST", `/api/friends/request/${requestId}/reject`, {}),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/friends/requests/incoming"] });
+    },
+    onError: (e: any) => {
+      Alert.alert("Errore", e.message || "Impossibile rifiutare la richiesta");
+    },
+  });
+
   const handleDeleteAll = useCallback(() => {
     Alert.alert(
       "Cancella tutte le notifiche",
@@ -147,6 +298,9 @@ export default function NotificationsScreen() {
   }, [deleteAllMutation]);
 
   const handleItemPress = useCallback((item: AppNotification) => {
+    if (item.notificationType === "direct_match_request") {
+      return;
+    }
     if (!item.isRead) {
       markReadMutation.mutate(item.id);
     }
@@ -161,6 +315,8 @@ export default function NotificationsScreen() {
   }, [deleteOneMutation]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
+  const isLoadingAny = isLoading || loadingRequests;
+  const hasContent = notifications.length > 0 || incomingRequests.length > 0;
 
   const renderItem = ({ item }: { item: AppNotification }) => {
     const icon = getNotifIcon(item.notificationType);
@@ -217,7 +373,7 @@ export default function NotificationsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background ?? colors.surface }]}>
       <Stack.Screen
         options={{
-          headerRight: notifications.length > 0
+          headerRight: hasContent
             ? () => (
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
                   {unreadCount > 0 && (
@@ -225,26 +381,28 @@ export default function NotificationsScreen() {
                       <Ionicons name="checkmark-done-outline" size={22} color={colors.accent} />
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity
-                    onPress={handleDeleteAll}
-                    style={styles.headerBtn}
-                    disabled={deleteAllMutation.isPending}
-                  >
-                    <Ionicons
-                      name="trash-outline"
-                      size={20}
-                      color={deleteAllMutation.isPending ? (colors.textSecondary ?? "#999") : "#E63946"}
-                    />
-                  </TouchableOpacity>
+                  {notifications.length > 0 && (
+                    <TouchableOpacity
+                      onPress={handleDeleteAll}
+                      style={styles.headerBtn}
+                      disabled={deleteAllMutation.isPending}
+                    >
+                      <Ionicons
+                        name="trash-outline"
+                        size={20}
+                        color={deleteAllMutation.isPending ? (colors.textSecondary ?? "#999") : "#E63946"}
+                      />
+                    </TouchableOpacity>
+                  )}
                 </View>
               )
             : undefined,
         }}
       />
 
-      {isLoading ? (
+      {isLoadingAny ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
-      ) : notifications.length === 0 ? (
+      ) : !hasContent ? (
         <View style={styles.empty}>
           <Ionicons name="notifications-off-outline" size={56} color={colors.textSecondary ?? colors.text} />
           <Text style={[styles.emptyText, { color: colors.textSecondary ?? colors.text }]}>
@@ -256,6 +414,28 @@ export default function NotificationsScreen() {
           data={notifications}
           keyExtractor={(item) => item.id}
           renderItem={renderItem}
+          ListHeaderComponent={
+            incomingRequests.length > 0 ? (
+              <View style={{ paddingBottom: 8 }}>
+                <Text style={[styles.sectionLabel, { color: colors.accent }]}>
+                  Richieste di Match ({incomingRequests.length})
+                </Text>
+                {incomingRequests.map((req) => (
+                  <MatchRequestCard
+                    key={req.id}
+                    request={req}
+                    onAccept={() => acceptRequestMutation.mutate(req.id)}
+                    onReject={() => rejectRequestMutation.mutate(req.id)}
+                    isAccepting={acceptRequestMutation.isPending && acceptRequestMutation.variables === req.id}
+                    isRejecting={rejectRequestMutation.isPending && rejectRequestMutation.variables === req.id}
+                  />
+                ))}
+                {notifications.length > 0 && (
+                  <View style={[styles.sectionDivider, { borderColor: colors.border }]} />
+                )}
+              </View>
+            ) : null
+          }
           contentContainerStyle={{ paddingBottom: insets.bottom + 16 }}
           showsVerticalScrollIndicator={false}
         />
@@ -321,5 +501,19 @@ const styles = StyleSheet.create({
   headerBtn: {
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: "700",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  sectionDivider: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginHorizontal: 16,
+    marginTop: 16,
   },
 });

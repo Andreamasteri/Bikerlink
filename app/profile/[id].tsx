@@ -52,6 +52,7 @@ export default function PublicProfileScreen() {
   const { user } = useAuth();
   const baseUrl = getApiUrl();
   const loggedViewIds = React.useRef<Set<string>>(new Set());
+  const isSelf = user?.id === id;
 
   const { data: marketplaceData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/marketplace-enabled"],
@@ -108,6 +109,35 @@ export default function PublicProfileScreen() {
   const [blockedOverride, setBlockedOverride] = useState<boolean | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const isBlocked = blockedOverride !== null ? blockedOverride : (profile?.isBlockedByMe ?? false);
+
+  const { data: friendStatus, refetch: refetchFriendStatus } = useQuery<{
+    status: "none" | "pending_sent" | "pending_received" | "friends" | "self";
+    requestId?: string;
+  }>({
+    queryKey: ["/api/friends/status", id],
+    queryFn: async () => {
+      const res = await fetch(new URL(`/api/friends/status/${id}`, baseUrl).toString(), {
+        credentials: "include",
+      });
+      if (!res.ok) return { status: "none" };
+      return res.json();
+    },
+    enabled: !!id && !!user && !isSelf,
+  });
+
+  const sendMatchRequestMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/friends/request/${id}`, {});
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchFriendStatus();
+      queryClient.invalidateQueries({ queryKey: ["/api/friends/status", id] });
+    },
+    onError: (e: any) => {
+      Alert.alert("Errore", e.message || "Impossibile inviare la richiesta");
+    },
+  });
 
   const [menuVisible, setMenuVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
@@ -253,7 +283,6 @@ export default function PublicProfileScreen() {
   }
 
   const color = getUserColor(profile.userType);
-  const isSelf = user?.id === id;
 
   return (
     <>
@@ -401,6 +430,46 @@ export default function PublicProfileScreen() {
             <Ionicons name="chatbubbles" size={22} color={Colors.background} />
             <Text style={styles.chatButtonText}>Scrivi un messaggio</Text>
           </TouchableOpacity>
+        )}
+
+        {!isSelf && !isBlocked && friendStatus && friendStatus.status !== "self" && (
+          <>
+            {friendStatus.status === "friends" && (
+              <View style={styles.matchStatusButton}>
+                <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+                <Text style={[styles.matchStatusText, { color: Colors.success }]}>Siete Match ✓</Text>
+              </View>
+            )}
+            {friendStatus.status === "pending_sent" && (
+              <View style={[styles.matchStatusButton, { borderColor: Colors.textSecondary }]}>
+                <Ionicons name="time-outline" size={20} color={Colors.textSecondary} />
+                <Text style={[styles.matchStatusText, { color: Colors.textSecondary }]}>Richiesta inviata</Text>
+              </View>
+            )}
+            {friendStatus.status === "pending_received" && (
+              <View style={[styles.matchStatusButton, { borderColor: Colors.accent }]}>
+                <Ionicons name="person-add-outline" size={20} color={Colors.accent} />
+                <Text style={[styles.matchStatusText, { color: Colors.accent }]}>Richiesta ricevuta</Text>
+              </View>
+            )}
+            {friendStatus.status === "none" && (
+              <TouchableOpacity
+                style={[styles.matchRequestButton, sendMatchRequestMutation.isPending && { opacity: 0.5 }]}
+                onPress={() => sendMatchRequestMutation.mutate()}
+                disabled={sendMatchRequestMutation.isPending}
+                activeOpacity={0.8}
+              >
+                {sendMatchRequestMutation.isPending ? (
+                  <ActivityIndicator size="small" color={Colors.background} />
+                ) : (
+                  <>
+                    <Ionicons name="person-add" size={20} color={Colors.background} />
+                    <Text style={styles.matchRequestText}>Richiedi Match</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </>
         )}
         {!isSelf && isBlocked && (
           <TouchableOpacity
@@ -724,4 +793,30 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   reportCloseBtnText: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.text },
+  matchRequestButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.accent,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    marginTop: 12,
+  },
+  matchRequestText: { fontSize: 15, fontWeight: "600" as const, color: Colors.background },
+  matchStatusButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: Colors.success,
+  },
+  matchStatusText: { fontSize: 15, fontWeight: "600" as const },
 });

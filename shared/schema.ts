@@ -1488,3 +1488,24 @@ export const proposalZoneNotifications = pgTable("proposal_zone_notifications", 
 
 export type ProposalZoneNotification = typeof proposalZoneNotifications.$inferSelect;
 export type InsertProposalZoneNotification = typeof proposalZoneNotifications.$inferInsert;
+
+export const directMatchRequests = pgTable("direct_match_requests", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  senderId: varchar("sender_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  receiverId: varchar("receiver_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("direct_match_requests_unique_idx").on(table.senderId, table.receiverId),
+  index("direct_match_requests_receiver_idx").on(table.receiverId),
+  index("direct_match_requests_sender_idx").on(table.senderId),
+]);
+
+export type DirectMatchRequest = typeof directMatchRequests.$inferSelect;
+export type InsertDirectMatchRequest = typeof directMatchRequests.$inferInsert;
