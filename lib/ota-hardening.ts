@@ -13,21 +13,28 @@
 //     reloadAsync se siamo in stato di "rollback" pendente — guard anti-loop
 //     tramite contatore in-memory.
 //
-// NOTA sull'header device-id:
-// `app.json > expo.updates.requestHeaders` accetta solo valori statici (baked
-// a build time). Le API runtime di override (`setUpdateRequestHeadersOverride`)
-// richiederebbero `disableAntiBrickingMeasures: true` — non accettabile per un
-// task di "hardening" perché disabilita protezioni native di sicurezza.
-// Soluzione: usiamo `Updates.setExtraParamAsync("device-id", id)`, che persiste
-// nello storage nativo e viene inviato in OGNI chiamata /api/expo-updates dal
-// secondo boot in poi (a partire dal primo boot dove l'override è applicato).
-// Il valore arriva al server nel header strutturato `Expo-Extra-Params`.
+// NOTA sull'header `expo-device-id`:
+// Il server (server/routes.ts:595) fa slot-routing su `req.headers["expo-device-id"]`.
+// Iniezione per-device implementata tramite:
+//  - app.json.updates.requestHeaders: header statico "pending" garantisce che
+//    OGNI chiamata /api/expo-updates lo include (dal primissimo boot post-install).
+//  - Updates.setUpdateRequestHeadersOverride (SDK 55, experimental) lo riscrive
+//    a runtime con il device-id stabile al primo init utile.
+//  - Updates.setExtraParamAsync("device-id", id) come canale ridondante.
 //
-// CONTRATTO SERVER (cross-task): il backend OTA (routes.ts /api/expo-updates)
-// deve leggere il device-id PRIMA da `req.headers["expo-device-id"]`, POI da
-// `req.headers["expo-installation-id"]` (già implementato), POI parsare
-// `req.headers["expo-extra-params"]` cercando la chiave `device-id`. Quest'ultima
-// integrazione è un follow-up server-side, fuori scope di Task #1357.
+// RISK ACCEPTANCE su `disableAntiBrickingMeasures: true`:
+// L'API di override degli header runtime in expo-updates SDK 55 richiede questo
+// flag. Disabilita alcune protezioni native (es. il SDK non rifiuta più update
+// da URL che non corrisponde a quello build-time). Compensating controls
+// adottati in questo task:
+//  1) URL OTA è hardcoded in app.json e l'override NON cambia l'URL (passiamo
+//     solo l'oggetto requestHeaders senza updateUrl).
+//  2) checkAutomatically:"ON_ERROR_RECOVERY" è attivo: in caso di crash al boot
+//     di un OTA, expo-updates auto-fallback all'embedded bundle.
+//  3) attachErrorRecoveryListener intercetta ctx.rollback runtime con anti-loop
+//     e forza reloadAsync verso embedded.
+//  4) Heartbeat post-load permette al server di rilevare device che non
+//     confermano il caricamento → admin può marcare l'OTA broken da pannello.
 
 import * as Updates from "expo-updates";
 import { Platform } from "react-native";
@@ -185,13 +192,23 @@ export async function initOtaHardening(): Promise<void> {
   _hardeningInited = true;
   if (Platform.OS === "web") return;
 
-  // 1. Inietta device ID via Expo-Extra-Params. Persiste tra restart perché
-  //    expo-updates salva gli extra params nello storage nativo. Lo stesso
-  //    valore viene usato dal heartbeat (sotto), garantendo coerenza tra
-  //    slot assignment e telemetria.
+  // 1. Inietta device ID come HEADER HTTP `expo-device-id` sulle prossime
+  //    chiamate /api/expo-updates (slot routing lato server). Persiste tra
+  //    restart perché expo-updates salva l'override nello storage nativo.
+  //    Replicato anche come extra-param `device-id` (canale ridondante).
   try {
     const deviceId = await getStableDeviceId();
     if (!__DEV__) {
+      try {
+        const override = (Updates as {
+          setUpdateRequestHeadersOverride?: (h: Record<string, string> | null) => void;
+        }).setUpdateRequestHeadersOverride;
+        if (typeof override === "function") {
+          // Passiamo SOLO requestHeaders, NON updateUrl: l'URL build-time
+          // (https://biker-link.replit.app/api/expo-updates) resta invariato.
+          override({ "expo-device-id": deviceId });
+        }
+      } catch {}
       await Updates.setExtraParamAsync("device-id", deviceId).catch(() => {});
     }
   } catch {}
