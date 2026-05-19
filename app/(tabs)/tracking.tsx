@@ -686,8 +686,11 @@ export default function TrackingScreen() {
   const currentTiltDegRef = useRef(0);
   const sprintStartTimeRef = useRef<number | null>(null);
   const sprintPhaseRef = useRef<"waiting" | "measuring" | "done">("waiting");
+  const sprintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const handsOffAnim = useRef(new Animated.Value(1)).current;
   const sprint0to100MsRef = useRef<number | null>(null);
+  const countdownTickRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownGoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const emaSpeedRef = useRef<number>(0);
   const gpsOfflineBufferRef = useRef<GpsPoint[]>([]);
   const gpsOfflineWriteCountRef = useRef(0);
@@ -771,11 +774,10 @@ export default function TrackingScreen() {
 
   // ── 0-100 sprint nav-lock broadcast ──────────────────────────────────────
   useEffect(() => {
-    const locked =
-      sprintPhase === "measuring" ||
-      (is0100Enabled && (phase === "countdown" || phase === "active"));
+    // Only lock navigation when actually measuring (not during countdown)
+    const locked = sprintPhase === "measuring";
     setSprintMeasuringBroadcast(locked);
-  }, [sprintPhase, is0100Enabled, phase]);
+  }, [sprintPhase]);
 
   // ── Hands-off blink + haptic + global broadcast ───────────────────────────
   useEffect(() => {
@@ -1226,6 +1228,8 @@ export default function TrackingScreen() {
   const flushPoints = useCallback(async () => {
     const rId = routeIdRef.current;
     if (!rId || pointsBufferRef.current.length === 0) return;
+    // During active sprint: keep points buffered locally; send only after completion
+    if (is0100EnabledRef.current && sprintPhaseRef.current !== "done") return;
     const toSend = [...pointsBufferRef.current];
     pointsBufferRef.current = [];
     setPointsBuffered(0);
@@ -1271,9 +1275,10 @@ export default function TrackingScreen() {
         isIdleRef.current = false;
       }
 
-      // Distance
+      // Distance — only accumulate with valid GPS samples (accuracy <= 30m or unknown)
       const alt = altitude ?? 0;
-      if (lastPosRef.current) {
+      const coordAccuracyOk = accuracy === null || accuracy === undefined || accuracy <= 30;
+      if (coordAccuracyOk && lastPosRef.current) {
         const dist = haversineKm(
           lastPosRef.current.lat,
           lastPosRef.current.lng,
@@ -1285,7 +1290,9 @@ export default function TrackingScreen() {
           setTotalKm(totalKmRef.current);
         }
       }
-      lastPosRef.current = { lat: latitude, lng: longitude, time: now };
+      if (coordAccuracyOk) {
+        lastPosRef.current = { lat: latitude, lng: longitude, time: now };
+      }
 
       // Throttle avg speed display — update only every 6 minutes
       const _avgNow = Date.now();
@@ -1298,7 +1305,8 @@ export default function TrackingScreen() {
         lastAvgSpeedUpdateRef.current = _avgNow;
       }
 
-      if (speedKmh <= 300 && speedKmh > maxSpeedRef.current) {
+      // Max speed — only update with valid GPS samples (accuracy <= 30m or unknown)
+      if (coordAccuracyOk && speedKmh <= 300 && speedKmh > maxSpeedRef.current) {
         maxSpeedRef.current = speedKmh;
         setMaxSpeed(speedKmh);
       }
@@ -1316,41 +1324,50 @@ export default function TrackingScreen() {
 
       // Sprint 0-100
       if (is0100EnabledRef.current) {
-        if (sprintPhaseRef.current === "waiting" && speedKmh > 1) {
-          sprintPhaseRef.current = "measuring";
-          sprintStartTimeRef.current = now;
-          setSprintPhase("measuring");
-        }
-        // Detection always uses km/h internally (100 km/h ≈ 62.1 mph), matching the
-        // UI label which converts 100 km/h to the user's preferred unit via convertSpeed().
-        if (sprintPhaseRef.current === "measuring" && speedKmh >= 100) {
-          const elapsed = now - (sprintStartTimeRef.current ?? now);
-          sprint0to100MsRef.current = elapsed;
-          setSprint0to100Ms(elapsed);
-          sprintPhaseRef.current = "done";
-          setSprintPhase("done");
-          // Persist sprint result to dedicated sprint_results table
-          apiRequest("POST", "/api/sprints", {
-            sprint0to100Ms: elapsed,
-            maxAccelerationG: maxAccelGRef.current,
-            maxDecelerationG: maxDecelGRef.current,
-            maxTiltDeg: maxTiltDegRef.current,
-            routeId: routeIdRef.current,
-          })
-            .then(() => queryClient.invalidateQueries({ queryKey: ["/api/sprints"] }))
-            .catch((err) => console.warn("[Sprint] save failed:", err));
-          // Check if this is a new personal best
-          const prevBest = personalBestMsRef.current;
-          if (prevBest === null || elapsed < prevBest) {
-            setIsNewRecord(true);
-            Animated.sequence([
-              Animated.spring(recordAnim, { toValue: 1, useNativeDriver: true }),
-              Animated.delay(3000),
-              Animated.timing(recordAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
-            ]).start();
+        // Only use GPS samples with reasonable accuracy for sprint detection
+        const accuracyOk = accuracy === null || accuracy === undefined || accuracy <= 25;
+        if (accuracyOk) {
+          if (sprintPhaseRef.current === "waiting" && speedKmh > 1) {
+            sprintPhaseRef.current = "measuring";
+            sprintStartTimeRef.current = now;
+            setSprintPhase("measuring");
           }
-          stopTrackingInternal();
-          return;
+          // Detection always uses km/h internally (100 km/h ≈ 62.1 mph), matching the
+          // UI label which converts 100 km/h to the user's preferred unit via convertSpeed().
+          if (sprintPhaseRef.current === "measuring" && speedKmh >= 100) {
+            // Sprint completed — cancel the 30s timeout
+            if (sprintTimeoutRef.current) {
+              clearTimeout(sprintTimeoutRef.current);
+              sprintTimeoutRef.current = null;
+            }
+            const elapsed = now - (sprintStartTimeRef.current ?? now);
+            sprint0to100MsRef.current = elapsed;
+            setSprint0to100Ms(elapsed);
+            sprintPhaseRef.current = "done";
+            setSprintPhase("done");
+            // Persist sprint result to dedicated sprint_results table
+            apiRequest("POST", "/api/sprints", {
+              sprint0to100Ms: elapsed,
+              maxAccelerationG: maxAccelGRef.current,
+              maxDecelerationG: maxDecelGRef.current,
+              maxTiltDeg: maxTiltDegRef.current,
+              routeId: routeIdRef.current,
+            })
+              .then(() => queryClient.invalidateQueries({ queryKey: ["/api/sprints"] }))
+              .catch((err) => console.warn("[Sprint] save failed:", err));
+            // Check if this is a new personal best
+            const prevBest = personalBestMsRef.current;
+            if (prevBest === null || elapsed < prevBest) {
+              setIsNewRecord(true);
+              Animated.sequence([
+                Animated.spring(recordAnim, { toValue: 1, useNativeDriver: true }),
+                Animated.delay(3000),
+                Animated.timing(recordAnim, { toValue: 0, duration: 600, useNativeDriver: true }),
+              ]).start();
+            }
+            stopTrackingInternal();
+            return;
+          }
         }
       }
 
@@ -1412,6 +1429,52 @@ export default function TrackingScreen() {
     pendingBgToastCountRef.current = 0;
   }, []);
 
+  // ── Discard sprint attempt (no save) — called on 30s timeout or manual cancel ──
+  const discardSprintAttempt = useCallback(() => {
+    // Cancel all pending timers (countdown interval + GO! delay + 30s timeout)
+    if (countdownTickRef.current) {
+      clearInterval(countdownTickRef.current);
+      countdownTickRef.current = null;
+    }
+    if (countdownGoTimeoutRef.current) {
+      clearTimeout(countdownGoTimeoutRef.current);
+      countdownGoTimeoutRef.current = null;
+    }
+    if (sprintTimeoutRef.current) {
+      clearTimeout(sprintTimeoutRef.current);
+      sprintTimeoutRef.current = null;
+    }
+    cleanupTracking();
+    const failedId = routeIdRef.current;
+    routeIdRef.current = null;
+    phaseRef.current = "idle";
+    setPhase("idle");
+    setSprintMeasuringBroadcast(false);
+    // Clear all in-memory point buffers (no trace locally)
+    pointsBufferRef.current = [];
+    setPointsBuffered(0);
+    gpsOfflineBufferRef.current = [];
+    gpsOfflineWriteCountRef.current = 0;
+    // Delete the route that was created (no trace on server)
+    if (failedId) {
+      apiRequest("DELETE", `/api/routes/${failedId}`).catch(() => {});
+    }
+    // Clear GPS offline segments from AsyncStorage (fire-and-forget)
+    AsyncStorage.getItem(GPS_BUFFER_SEGCOUNT_KEY).then((rawN) => {
+      const n = rawN ? parseInt(rawN, 10) : 0;
+      const keys = [
+        GPS_BUFFER_SEGCOUNT_KEY,
+        ...Array.from({ length: n }, (_, i) => GPS_BUFFER_SEG_KEY(i)),
+      ];
+      return AsyncStorage.multiRemove(keys);
+    }).catch(() => {});
+    sprintPhaseRef.current = "waiting";
+    sprint0to100MsRef.current = null;
+    sprintStartTimeRef.current = null;
+    setSprintPhase("waiting");
+    setSprint0to100Ms(null);
+  }, [cleanupTracking]);
+
   // ── Reset tracking state ───────────────────────────────────────────────────
   const resetTrackingState = useCallback(() => {
     setCurrentSpeed(0);
@@ -1471,6 +1534,18 @@ export default function TrackingScreen() {
     totalGpsPointsRef.current = 0;
     bgStartPointsRef.current = 0;
     bgPointsCountRef.current = 0;
+    if (sprintTimeoutRef.current) {
+      clearTimeout(sprintTimeoutRef.current);
+      sprintTimeoutRef.current = null;
+    }
+    if (countdownTickRef.current) {
+      clearInterval(countdownTickRef.current);
+      countdownTickRef.current = null;
+    }
+    if (countdownGoTimeoutRef.current) {
+      clearTimeout(countdownGoTimeoutRef.current);
+      countdownGoTimeoutRef.current = null;
+    }
   }, []);
 
   // ── Recalibrate G on-demand ────────────────────────────────────────────────
@@ -1664,7 +1739,7 @@ export default function TrackingScreen() {
         startAccelerometer();
 
         let remaining = effectiveCountdownSecs;
-        const tick = setInterval(() => {
+        countdownTickRef.current = setInterval(() => {
           remaining -= 1;
           setCountdownValue(remaining);
 
@@ -1681,12 +1756,30 @@ export default function TrackingScreen() {
           ]).start();
 
           if (remaining <= 0) {
-            clearInterval(tick);
-            // Pause 800ms on "GO" before starting active tracking
-            setTimeout(() => {
-              beginActiveTracking().catch((e) => {
-                logGpsError(e, "beginActiveTracking-from-countdown");
-              });
+            if (countdownTickRef.current) {
+              clearInterval(countdownTickRef.current);
+              countdownTickRef.current = null;
+            }
+            // Pause 800ms on "GO!" before starting active tracking
+            countdownGoTimeoutRef.current = setTimeout(() => {
+              countdownGoTimeoutRef.current = null;
+              beginActiveTracking()
+                .then(() => {
+                  // Start the 30s sprint timeout after GO! fires
+                  if (is0100EnabledRef.current) {
+                    if (sprintTimeoutRef.current) clearTimeout(sprintTimeoutRef.current);
+                    sprintTimeoutRef.current = setTimeout(() => {
+                      sprintTimeoutRef.current = null;
+                      // 30s elapsed and speed never hit 100 — discard silently
+                      if (sprintPhaseRef.current !== "done") {
+                        discardSprintAttempt();
+                      }
+                    }, 30000);
+                  }
+                })
+                .catch((e) => {
+                  logGpsError(e, "beginActiveTracking-from-countdown");
+                });
             }, 800);
           }
         }, 1000);
@@ -1710,6 +1803,7 @@ export default function TrackingScreen() {
     beginActiveTracking,
     startAccelerometer,
     countdownAnim,
+    discardSprintAttempt,
   ]);
 
   // ── Handle PAUSE / RESUME ──────────────────────────────────────────────────
@@ -1843,15 +1937,13 @@ export default function TrackingScreen() {
 
   // ── Countdown colors ───────────────────────────────────────────────────────
   const countdownColor =
-    countdownValue > 10
+    countdownValue > 3
       ? "#ffffff"
-      : countdownValue >= 6
-      ? "#ef4444"
       : countdownValue >= 1
-      ? "#eab308"
-      : "#22c55e";
+      ? "#FFD700"
+      : "#00E676";
 
-  const countdownFontSize = countdownValue === 0 ? 120 : 96;
+  const countdownFontSize = countdownValue === 0 ? 144 : 96;
 
   // ────────────────────────────────────────────────────────────────────────────
   // RENDER
@@ -1906,9 +1998,20 @@ export default function TrackingScreen() {
               },
             ]}
           >
-            {countdownValue === 0 ? "GO" : countdownValue.toString()}
+            {countdownValue === 0 ? "GO!" : countdownValue.toString()}
           </Animated.Text>
-          <Text style={styles.countdownSub}>Preparati...</Text>
+          {countdownValue > 0 && (
+            <Text style={styles.countdownSub}>Preparati...</Text>
+          )}
+          {is0100Enabled && (
+            <TouchableOpacity
+              style={styles.countdownCancelBtn}
+              onPress={discardSprintAttempt}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.countdownCancelText}>Annulla</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
@@ -2150,6 +2253,18 @@ export default function TrackingScreen() {
                       : t("tracking.sprintCompleted")}
                   </Text>
                 </View>
+
+                {/* Annulla button when waiting for rider to start moving */}
+                {sprintPhase === "waiting" && (
+                  <TouchableOpacity
+                    style={styles.sprintCancelBtn}
+                    onPress={discardSprintAttempt}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons name="close-circle-outline" size={18} color={Colors.accentRed} />
+                    <Text style={styles.sprintCancelText}>Annulla</Text>
+                  </TouchableOpacity>
+                )}
 
                 {sprint0to100Ms !== null && (
                   <Text style={styles.sprint0100Time}>
@@ -2930,6 +3045,21 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 16,
   },
+  countdownCancelBtn: {
+    marginTop: 40,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: Colors.accentRed + "80",
+    backgroundColor: Colors.accentRed + "15",
+  },
+  countdownCancelText: {
+    fontFamily: "Inter_600SemiBold" as const,
+    fontSize: 15,
+    color: Colors.accentRed,
+    textAlign: "center" as const,
+  },
 
   // Active header
   activeHeader: {
@@ -3139,6 +3269,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold" as const,
     color: Colors.accent,
+  },
+  sprintCancelBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
+    marginTop: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.accentRed + "70",
+    backgroundColor: Colors.accentRed + "12",
+    alignSelf: "center" as const,
+  },
+  sprintCancelText: {
+    fontFamily: "Inter_600SemiBold" as const,
+    fontSize: 13,
+    color: Colors.accentRed,
   },
   newRecordBadge: {
     flexDirection: "row" as const,
