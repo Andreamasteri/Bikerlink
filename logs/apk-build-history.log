@@ -74,3 +74,5 @@
 2026-05-19T02:11:17Z  APK BUILD COMPLETATA (FINISHED) — buildId=91cfde53-66e7-45fc-83f0-d7f72a98fcde versionCode=45 versionName=3.4.0 APK=https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk task=#1346
 2026-05-19T15:58:46Z  APK BUILD AVVIATA — profilo=release-apk commit=e9531d01 utente=runner versionName=3.4.0 versionCode=45 committed=no
 2026-05-19T15:58:46Z  APK BUILD INVIATA (--no-wait) — profilo=release-apk commit=e9531d01 utente=runner versionName=3.4.0 versionCode=45 committed=no
+2026-05-19T21:29:10Z  APK BUILD AVVIATA — profilo=release-apk commit=c14e2e63 utente=runner versionName=3.4.0 versionCode=45 committed=no
+2026-05-19T21:29:10Z  APK BUILD INVIATA (--no-wait) — profilo=release-apk commit=c14e2e63 utente=runner versionName=3.4.0 versionCode=45 committed=no

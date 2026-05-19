@@ -196,6 +196,7 @@ NODE_ENV = "production"
 [userenv.shared]
 BIKERLINK_ADMIN_EMAIL = "admin@bikerlink.it"
 BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
+EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
 
 [userenv.development]
 
