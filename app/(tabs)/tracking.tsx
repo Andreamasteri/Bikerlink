@@ -1031,68 +1031,82 @@ export default function TrackingScreen() {
 
       // Returning to foreground: nextState active, previous was non-active
       if (nextState === "active" && prevState !== "active") {
-        if (phaseRef.current === "active" || phaseRef.current === "paused") {
-          const acquired = totalGpsPointsRef.current - bgStartPointsRef.current;
-          bgPointsCountRef.current = acquired;
-          if (acquired > 0) {
-            if (isTabFocusedRef.current) {
-              // Tab is visible — show the toast immediately
-              showBgPointsToast(acquired);
-            } else {
-              // Tab is hidden (user is on another tab) — accumulate and defer until tab gains focus
-              pendingBgToastCountRef.current += acquired;
-            }
-          }
-        }
-        bgStartPointsRef.current = 0;
-
         // Invalidate any in-flight background-start async (cancellation token)
         bgStartGenRef.current += 1;
 
-        // Stop background task and resume foreground watch (Android only)
-        if (bgTrackingActiveRef.current && phaseRef.current === "active") {
-          bgTrackingActiveRef.current = false;
-          void (async () => {
-            // 1. Stop background location task
+        const wasBgActive = bgTrackingActiveRef.current && phaseRef.current === "active";
+        if (wasBgActive) bgTrackingActiveRef.current = false;
+
+        // Defer the bg-task teardown, point merge, and toast to an async IIFE so
+        // the merge happens BEFORE we compute the toast count — otherwise
+        // totalGpsPointsRef hasn't been incremented yet and the toast would
+        // always show 0 on Android (the bg task writes only to AsyncStorage).
+        void (async () => {
+          // 1. If background task was running, stop it and resume foreground watch
+          if (wasBgActive) {
             const hasTask = await Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => false);
             if (hasTask) {
               await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => {});
             }
-            // 2. Resume foreground watch with the current profile config
             const fgConfig = getModeConfig(profileRef.current);
             const fgSub = await Location.watchPositionAsync(
               { accuracy: fgConfig.accuracy, timeInterval: fgConfig.timeInterval, distanceInterval: fgConfig.distanceInterval },
               onNativeLocationRef.current,
             ).catch(() => null);
             if (fgSub) watchSubRef.current = fgSub;
+          }
 
-            // 3. Process accumulated background points through the full ride pipeline
-            //    (distance, map coords, offline buffer, server upload)
-            try {
-              const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
-              const bgPoints: { latitude: number; longitude: number; altitude: number; speedKmh: number; timestamp: string }[] =
-                raw ? JSON.parse(raw) : [];
-              for (const pt of bgPoints) {
-                // Reconstruct a LocationObject so onNativeLocation processes it identically
-                // to foreground points: haversine distance, mapCoords, buffer, flush
-                const fakeLoc: Location.LocationObject = {
-                  coords: {
-                    latitude: pt.latitude,
-                    longitude: pt.longitude,
-                    altitude: pt.altitude,
-                    speed: pt.speedKmh / 3.6,
-                    accuracy: null,
-                    altitudeAccuracy: null,
-                    heading: null,
-                  },
-                  timestamp: new Date(pt.timestamp).getTime(),
-                };
-                onNativeLocationRef.current(fakeLoc);
+          // 2. Drain accumulated background points and merge them through
+          //    onNativeLocation so they contribute to distance, route map
+          //    coords, offline GPS buffer, and eventual server upload — exactly
+          //    like foreground points. Done unconditionally so points written
+          //    by the bg task aren't lost when wasBgActive is false (e.g. the
+          //    bg task fired right before we got the foreground event).
+          //    onNativeLocation internally drops the sample unless
+          //    phaseRef.current === "active" and the ride isn't paused, so
+          //    it's safe to call in any phase (paused / countdown / idle
+          //    samples are no-ops and just get cleared from the key).
+          try {
+            const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
+            const bgPoints: { latitude: number; longitude: number; altitude: number; speedKmh: number; timestamp: string }[] =
+              raw ? JSON.parse(raw) : [];
+            for (const pt of bgPoints) {
+              // Reconstruct a LocationObject so onNativeLocation processes it
+              // identically to a foreground sample: haversine distance,
+              // mapCoords, batch buffer, offline append, flush.
+              const fakeLoc: Location.LocationObject = {
+                coords: {
+                  latitude: pt.latitude,
+                  longitude: pt.longitude,
+                  altitude: pt.altitude,
+                  speed: pt.speedKmh / 3.6,
+                  accuracy: null,
+                  altitudeAccuracy: null,
+                  heading: null,
+                },
+                timestamp: new Date(pt.timestamp).getTime(),
+              };
+              onNativeLocationRef.current(fakeLoc);
+            }
+            await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
+          } catch {}
+
+          // 3. Toast count — computed AFTER the merge so the delta reflects
+          //    the points that were just merged in (totalGpsPointsRef is
+          //    incremented inside onNativeLocation).
+          if (phaseRef.current === "active" || phaseRef.current === "paused") {
+            const acquired = totalGpsPointsRef.current - bgStartPointsRef.current;
+            bgPointsCountRef.current = acquired;
+            if (acquired > 0) {
+              if (isTabFocusedRef.current) {
+                showBgPointsToast(acquired);
+              } else {
+                pendingBgToastCountRef.current += acquired;
               }
-              await AsyncStorage.setItem(BG_POINTS_KEY, "[]").catch(() => {});
-            } catch {}
-          })();
-        }
+            }
+          }
+          bgStartPointsRef.current = 0;
+        })();
       }
     };
     const sub = AppState.addEventListener("change", handleAppStateChange);
