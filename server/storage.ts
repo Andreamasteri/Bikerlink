@@ -135,6 +135,12 @@ import {
   gpsErrors,
   type GpsError,
   type InsertGpsError,
+  plannedRoutes,
+  routeWeatherCache,
+  type PlannedRoute,
+  type InsertPlannedRoute,
+  type RouteWeatherCache,
+  type InsertRouteWeatherCache,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -412,6 +418,16 @@ export interface IStorage {
   }>;
   deleteBlockById(id: string): Promise<boolean>;
   deleteBikerBikerMatchesBetween(userId1: string, userId2: string): Promise<number>;
+
+  // Planned Routes
+  createPlannedRoute(data: InsertPlannedRoute): Promise<PlannedRoute>;
+  getPlannedRoute(id: string): Promise<PlannedRoute | undefined>;
+  getPlannedRoutes(userId: string): Promise<PlannedRoute[]>;
+  getPublicPlannedRoutes(limit?: number): Promise<PlannedRoute[]>;
+  updatePlannedRoute(id: string, data: Partial<InsertPlannedRoute>): Promise<PlannedRoute | undefined>;
+  deletePlannedRoute(id: string): Promise<void>;
+  upsertRouteWeatherCache(data: InsertRouteWeatherCache): Promise<RouteWeatherCache>;
+  getRouteWeatherCache(routeId: string): Promise<RouteWeatherCache | undefined>;
 }
 
 /**
@@ -2430,6 +2446,63 @@ export class DatabaseStorage implements IStorage {
       console.error("[CoordinateHistory] cleanup error:", err);
       return 0;
     }
+  }
+
+  // ── Planned Routes ──────────────────────────────────────────────────────────
+
+  async createPlannedRoute(data: InsertPlannedRoute): Promise<PlannedRoute> {
+    const [route] = await db.insert(plannedRoutes).values(data).returning();
+    return route;
+  }
+
+  async getPlannedRoute(id: string): Promise<PlannedRoute | undefined> {
+    const [route] = await db.select().from(plannedRoutes).where(eq(plannedRoutes.id, id)).limit(1);
+    return route;
+  }
+
+  async getPlannedRoutes(userId: string): Promise<PlannedRoute[]> {
+    return db.select().from(plannedRoutes)
+      .where(eq(plannedRoutes.userId, userId))
+      .orderBy(desc(plannedRoutes.createdAt));
+  }
+
+  async getPublicPlannedRoutes(limit = 50): Promise<PlannedRoute[]> {
+    return db.select().from(plannedRoutes)
+      .where(eq(plannedRoutes.visibility, "public"))
+      .orderBy(desc(plannedRoutes.createdAt))
+      .limit(limit);
+  }
+
+  async updatePlannedRoute(id: string, data: Partial<InsertPlannedRoute>): Promise<PlannedRoute | undefined> {
+    const [route] = await db.update(plannedRoutes)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(plannedRoutes.id, id))
+      .returning();
+    return route;
+  }
+
+  async deletePlannedRoute(id: string): Promise<void> {
+    await db.delete(plannedRoutes).where(eq(plannedRoutes.id, id));
+  }
+
+  async upsertRouteWeatherCache(data: InsertRouteWeatherCache): Promise<RouteWeatherCache> {
+    const existing = await this.getRouteWeatherCache(data.routeId);
+    if (existing) {
+      const [updated] = await db.update(routeWeatherCache)
+        .set({ weatherData: data.weatherData, departureTime: data.departureTime })
+        .where(eq(routeWeatherCache.routeId, data.routeId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(routeWeatherCache).values(data).returning();
+    return created;
+  }
+
+  async getRouteWeatherCache(routeId: string): Promise<RouteWeatherCache | undefined> {
+    const [cache] = await db.select().from(routeWeatherCache)
+      .where(eq(routeWeatherCache.routeId, routeId))
+      .limit(1);
+    return cache;
   }
 }
 

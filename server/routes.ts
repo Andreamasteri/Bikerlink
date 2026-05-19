@@ -219,6 +219,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/errors", errorsRoutes);
   app.use("/api/sprints", sprintsRoutes);
 
+  const { default: plannedRoutesRoutes } = await import("./routes/planned-routes");
+  app.use("/api/planned-routes", plannedRoutesRoutes);
+
   app.get("/api/media/promo-video", async (_req: Request, res: Response) => {
     try {
       const { downloadBuffer } = await import("./objectStorage");

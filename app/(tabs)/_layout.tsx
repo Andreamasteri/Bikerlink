@@ -195,7 +195,7 @@ export default function TabLayout() {
 
   const HIDDEN_TAB_NAMES = new Set(["tracking", "garage"]);
   if (isGpsGateActive) {
-    ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi", "arcade"].forEach(
+    ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi", "arcade", "giri"].forEach(
       (n) => HIDDEN_TAB_NAMES.add(n)
     );
   }
@@ -436,6 +436,17 @@ export default function TabLayout() {
             tabBarIcon: () => null,
             headerTitle: "Privacy & GPS",
             href: null,
+          }}
+        />
+        <Tabs.Screen
+          name="giri"
+          options={{
+            title: "Giri",
+            tabBarIcon: ({ color, size }) => (
+              <MaterialCommunityIcons name="map-marker-path" size={size} color={color} />
+            ),
+            headerShown: false,
+            href: gpsTabHref,
           }}
         />
         <Tabs.Screen

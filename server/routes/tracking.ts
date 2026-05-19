@@ -214,6 +214,73 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       } as any);
     }
 
+    // Async post-ride map-matching: compute real curvature score from GPS points
+    // and update any matching planned route for this user (non-blocking, fire-and-forget)
+    setImmediate(async () => {
+      try {
+        const allPoints = await storage.getRoutePoints(id);
+        if (allPoints.length < 3) return;
+
+        // Compute real curvature score from actual GPS track
+        let totalAngle = 0;
+        for (let i = 1; i < allPoints.length - 1; i++) {
+          const v1 = [
+            allPoints[i].latitude - allPoints[i - 1].latitude,
+            allPoints[i].longitude - allPoints[i - 1].longitude,
+          ];
+          const v2 = [
+            allPoints[i + 1].latitude - allPoints[i].latitude,
+            allPoints[i + 1].longitude - allPoints[i].longitude,
+          ];
+          const dot = v1[0] * v2[0] + v1[1] * v2[1];
+          const mag1 = Math.sqrt(v1[0] ** 2 + v1[1] ** 2);
+          const mag2 = Math.sqrt(v2[0] ** 2 + v2[1] ** 2);
+          if (mag1 > 0 && mag2 > 0) {
+            const cosA = Math.min(1, Math.max(-1, dot / (mag1 * mag2)));
+            totalAngle += Math.acos(cosA);
+          }
+        }
+        const realCurvatureScore = Math.round(Math.min(1, totalAngle / (allPoints.length * 0.3)) * 100) / 100;
+
+        // Find planned routes by this user whose start point is within 5km of ride start
+        const rideStart = allPoints[0];
+        const userPlannedRoutes = await storage.getPlannedRoutes(userId);
+        for (const pr of userPlannedRoutes) {
+          const wps = (pr.waypoints as Array<{ lat: number; lng: number }>) ?? [];
+          if (!wps.length) continue;
+          const startWp = wps[0];
+          if (!startWp?.lat || !startWp?.lng) continue;
+          // Haversine distance: planned route start vs actual ride start
+          const R = 6371;
+          const dLat = (startWp.lat - rideStart.latitude) * Math.PI / 180;
+          const dLng = (startWp.lng - rideStart.longitude) * Math.PI / 180;
+          const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(rideStart.latitude * Math.PI / 180) * Math.cos(startWp.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+          const distKm = 2 * R * Math.asin(Math.sqrt(a));
+
+          if (distKm < 5) {
+            // Match found — store real GPS-derived curvature score both in dedicated
+            // column and in metadata for historical audit.
+            // IMPORTANT: do NOT overwrite bikerScore (planned curvature estimate);
+            // realCurvatureScore is the post-ride validation measurement.
+            await storage.updatePlannedRoute(pr.id, {
+              realCurvatureScore,
+              metadata: {
+                ...(pr.metadata as object ?? {}),
+                realCurvatureScore,
+                matchedRideId: id,
+                matchedAt: new Date().toISOString(),
+              } as any,
+            });
+            console.log(`[post-ride] Updated planned route ${pr.id} metadata.realCurvatureScore=${realCurvatureScore} from ride ${id}`);
+            break;
+          }
+        }
+      } catch (e) {
+        console.warn("[post-ride map-matching] error:", e);
+      }
+    });
+
     return res.json(updated);
   } catch (error) {
     console.error("Stop route error:", error);

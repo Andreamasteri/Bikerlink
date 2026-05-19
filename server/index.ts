@@ -1266,6 +1266,44 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] proposal_zone_notifications:", e);
         }
 
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS planned_routes (
+              id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+              user_id VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              title VARCHAR(200) NOT NULL,
+              description TEXT,
+              waypoints JSONB DEFAULT '[]'::jsonb,
+              polyline TEXT,
+              distance_km DOUBLE PRECISION DEFAULT 0,
+              duration_minutes INTEGER DEFAULT 0,
+              biker_score DOUBLE PRECISION DEFAULT 0,
+              style VARCHAR(20) NOT NULL DEFAULT 'curvy',
+              visibility VARCHAR(20) NOT NULL DEFAULT 'public',
+              is_multi_day BOOLEAN NOT NULL DEFAULT false,
+              metadata JSONB DEFAULT '{}'::jsonb,
+              created_at TIMESTAMP NOT NULL DEFAULT now(),
+              updated_at TIMESTAMP NOT NULL DEFAULT now()
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS planned_routes_user_id_idx ON planned_routes (user_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS planned_routes_visibility_idx ON planned_routes (visibility)`);
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS route_weather_cache (
+              id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
+              route_id VARCHAR(36) NOT NULL REFERENCES planned_routes(id) ON DELETE CASCADE,
+              departure_time TIMESTAMP NOT NULL,
+              weather_data JSONB DEFAULT '{}'::jsonb,
+              created_at TIMESTAMP NOT NULL DEFAULT now()
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS route_weather_cache_route_id_idx ON route_weather_cache (route_id)`);
+          await db.execute(sql`ALTER TABLE planned_routes ADD COLUMN IF NOT EXISTS real_curvature_score DOUBLE PRECISION`);
+          console.log("[MIGRATION] planned_routes + route_weather_cache tables ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] planned_routes/route_weather_cache:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 

@@ -15,6 +15,13 @@
       "when": 1747612800000,
       "tag": "0001_direct_match_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1747785600000,
+      "tag": "0002_planned_routes",
+      "breakpoints": true
     }
   ]
 }
