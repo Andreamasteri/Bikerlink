@@ -6602,7 +6602,6 @@ router.post("/matches/recalculate-all", async (_req: Request, res: Response) => 
   }
 });
 
-<<<<<<< HEAD
 // ─────────────────────────────────────────────────────────────────────────────
 // Task #1355: Sistema OTA Modulare — endpoint admin per slot + heartbeat + revert
 // ─────────────────────────────────────────────────────────────────────────────
