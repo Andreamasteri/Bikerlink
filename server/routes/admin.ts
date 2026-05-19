@@ -38,6 +38,15 @@ import { allSettledLimited } from "../lib/concurrency";
 
 const router = Router();
 
+/**
+ * Narrows an Express route/query param to a plain string.
+ * Returns null when the value is an array or missing so the caller can
+ * respond with 400 instead of silently coercing bad input.
+ */
+function paramStr(v: string | string[] | undefined): string | null {
+  return typeof v === "string" ? v : null;
+}
+
 interface OtaProbeRecord {
   status?: number;
   contentType?: string;
@@ -2284,7 +2293,8 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
 
 router.put("/advertisements/:id", adUpload.single("image"), async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     const updates: any = {};
     if (req.body.name !== undefined) updates.name = req.body.name;
     if (req.body.sponsor !== undefined) updates.sponsor = req.body.sponsor;
@@ -2426,7 +2436,8 @@ router.put("/advertisements/group/:groupId", async (req: Request, res: Response)
 
 router.delete("/advertisements/:id", async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     const campaign = await storage.getAdCampaign(id);
     await storage.deleteCampaign(id);
     if (campaign?.imageUrl) {
@@ -2985,7 +2996,9 @@ router.post("/stregatti", async (req: Request, res: Response) => {
 router.get("/users/:id/stats", async (req: Request, res: Response) => {
   try {
     // Strip null bytes — PostgreSQL rejects them even in parameterised queries.
-    const userId = req.params.id.replace(/\x00/g, "");
+    const rawId = paramStr(req.params.id);
+    if (rawId === null) return res.status(400).json({ message: "ID utente non valido" });
+    const userId = rawId.replace(/\x00/g, "");
     if (!userId) {
       return res.status(400).json({ message: "ID utente non valido" });
     }
@@ -3343,7 +3356,8 @@ router.delete("/stregatti", async (req: Request, res: Response) => {
 
 router.delete("/stregatti/:id", async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     await storage.deleteFakeUser(id);
     return res.json({ message: "Stregatto eliminato" });
   } catch (error) {
@@ -3354,7 +3368,8 @@ router.delete("/stregatti/:id", async (req: Request, res: Response) => {
 
 router.put("/stregatti/:id/toggle-available", async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     const profile = await storage.getUserProfile(id);
     if (!profile) {
       return res.status(404).json({ message: "Profilo non trovato" });
@@ -3373,7 +3388,8 @@ router.put("/stregatti/:id/toggle-available", async (req: Request, res: Response
 
 router.put("/stregatti/:id/toggle-online", async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     const user = await storage.getUser(id);
     if (!user || !user.isFake) {
       return res.status(404).json({ message: "Stregatto non trovato" });
@@ -3393,7 +3409,8 @@ router.put("/stregatti/:id/toggle-online", async (req: Request, res: Response) =
 
 router.get("/stregatti/:id/conversations", async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     const convs = await storage.getFakeUserConversations(id);
     return res.json(convs);
   } catch (error) {
@@ -3431,7 +3448,8 @@ router.delete("/stregatti/all-conversations", async (req: Request, res: Response
 
 router.delete("/stregatti/:id/conversations", async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     const user = await storage.getUser(id);
     if (!user || !user.isFake) {
       return res.status(404).json({ message: "Stregatto non trovato" });
@@ -3458,7 +3476,8 @@ router.delete("/stregatti/:id/conversations", async (req: Request, res: Response
 
 router.get("/stregatti/conversations/:convId/messages", async (req: Request, res: Response) => {
   try {
-    const convId = req.params.convId;
+    const convId = paramStr(req.params.convId);
+    if (convId === null) return res.status(400).json({ message: "ID conversazione non valido" });
     const msgs = await storage.getMessages(convId, 200, 0);
     const result = await Promise.all(
       msgs.map(async (msg) => {
@@ -3932,7 +3951,8 @@ router.post("/invitation-codes", async (req: Request, res: Response) => {
 
 router.put("/invitation-codes/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     const { label, giftMessage, maxUses, isActive, expiresAt } = req.body;
     const existing = await storage.getInvitationCodeById(id);
     if (!existing) return res.status(404).json({ message: "Codice non trovato" });
@@ -3953,7 +3973,8 @@ router.put("/invitation-codes/:id", async (req: Request, res: Response) => {
 
 router.delete("/invitation-codes/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     const existing = await storage.getInvitationCodeById(id);
     if (!existing) return res.status(404).json({ message: "Codice non trovato" });
     await storage.deleteInvitationCode(id);
@@ -3966,7 +3987,8 @@ router.delete("/invitation-codes/:id", async (req: Request, res: Response) => {
 
 router.post("/invitation-codes/:id/image", inviteCodeUpload.single("image"), async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID non valido" });
     const existing = await storage.getInvitationCodeById(id);
     if (!existing) return res.status(404).json({ message: "Codice non trovato" });
     if (!req.file) return res.status(400).json({ message: "Nessuna immagine caricata" });
@@ -5813,8 +5835,8 @@ router.get("/blocks", async (req: Request, res: Response) => {
 // Rimuove un blocco specifico per ID.
 router.delete("/blocks/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    if (!id) return res.status(400).json({ message: "ID blocco mancante" });
+    const id = paramStr(req.params.id);
+    if (id === null) return res.status(400).json({ message: "ID blocco mancante" });
     const deleted = await storage.deleteBlockById(id);
     if (!deleted) return res.status(404).json({ message: "Blocco non trovato" });
     return res.json({ deleted: true });
@@ -5837,13 +5859,6 @@ router.get("/newsletter/subscribers", async (req: Request, res: Response) => {
     const countResult = await db.execute(sql`SELECT COUNT(*) AS cnt FROM newsletter_subscribers`);
     const total = Number((countResult.rows[0] as { cnt: string }).cnt);
 
-    interface SubscriberRow {
-      id: number;
-      email: string;
-      notify_rides: boolean;
-      created_at: string;
-    }
-
     const rows = await db.execute(sql`
       SELECT id, email, notify_rides, created_at
       FROM newsletter_subscribers
@@ -5855,11 +5870,11 @@ router.get("/newsletter/subscribers", async (req: Request, res: Response) => {
       total,
       page,
       limit,
-      subscribers: (rows.rows as SubscriberRow[]).map((r) => ({
-        id: r.id,
-        email: r.email,
-        notifyRides: r.notify_rides,
-        createdAt: r.created_at,
+      subscribers: rows.rows.map((r) => ({
+        id: r.id as number,
+        email: r.email as string,
+        notifyRides: r.notify_rides as boolean,
+        createdAt: r.created_at as string,
       })),
     });
   } catch (err) {
@@ -5878,17 +5893,11 @@ router.get("/newsletter/subscribers/export", async (req: Request, res: Response)
       ORDER BY created_at DESC
     `);
 
-    interface ExportRow {
-      email: string;
-      notify_rides: boolean;
-      created_at: string;
-    }
-
     const lines: string[] = ["email,notify_rides,created_at"];
-    for (const r of rows.rows as ExportRow[]) {
-      const email = String(r.email).replace(/"/g, '""');
+    for (const r of rows.rows) {
+      const email = String(r.email ?? "").replace(/"/g, '""');
       const notifyRides = r.notify_rides ? "true" : "false";
-      const createdAt = r.created_at ? new Date(r.created_at).toISOString() : "";
+      const createdAt = r.created_at ? new Date(String(r.created_at)).toISOString() : "";
       lines.push(`"${email}",${notifyRides},${createdAt}`);
     }
 
@@ -6318,25 +6327,20 @@ async function handleMatchInspectorUsers(req: Request, res: Response): Promise<v
       LIMIT ${limit} OFFSET ${offset}
     `);
 
-    interface UserRow {
-      id: string; nickname: string; avatar_url: string | null;
-      user_type: string; role: string; status: string;
-      bb_count: string; bz_count: string;
-      bb_counts: Record<string, number> | null;
-    }
-
     const n = (v: number | string | undefined | null) => typeof v === "number" ? v : parseInt(String(v ?? "0"), 10);
-    const users2 = (rows.rows as UserRow[]).map((r) => {
-      const bb = r.bb_counts ?? {};
+    const users2 = rows.rows.map((r) => {
+      const bb = (r.bb_counts as Record<string, number> | null) ?? {};
+      const bbCount = r.bb_count as string | number | null;
+      const bzCount = r.bz_count as string | number | null;
       return {
-        id: r.id, nickname: r.nickname, avatarUrl: r.avatar_url,
-        userType: r.user_type, role: r.role, status: r.status,
-        totalMatches: n(r.bb_count) + n(r.bz_count),
-        bbMatches: n(r.bb_count),
-        bzMatches: n(r.bz_count),
+        id: r.id as string, nickname: r.nickname as string, avatarUrl: r.avatar_url as string | null,
+        userType: r.user_type as string, role: r.role as string, status: r.status as string,
+        totalMatches: n(bbCount) + n(bzCount),
+        bbMatches: n(bbCount),
+        bzMatches: n(bzCount),
         matchCounts: {
           bikerBikerBrand: n(bb.bbBrand),
-          bikerZavorrinaBrand: n(r.bz_count),
+          bikerZavorrinaBrand: n(bzCount),
           bikerClubBrand: n(bb.bikerClub),
           zavarrinaClubBrand: n(bb.zavClub),
           bikerBikerTypeStyle: n(bb.bbType),
@@ -6367,7 +6371,8 @@ async function handleMatchInspectorUsers(req: Request, res: Response): Promise<v
 // Detailed match inspection for a single user, grouped by all 17 match types
 async function handleMatchInspectorUserDetail(req: Request, res: Response): Promise<void> {
   try {
-    const { userId } = req.params;
+    const userId = paramStr(req.params.userId);
+    if (userId === null) { res.status(400).json({ message: "ID utente non valido" }); return; }
     const user = await storage.getUser(userId);
     if (!user) { res.status(404).json({ message: "Utente non trovato" }); return; }
 
@@ -6401,18 +6406,6 @@ async function handleMatchInspectorUserDetail(req: Request, res: Response): Prom
       ORDER BY bzm.created_at DESC
     `);
 
-    interface BBRow {
-      id: string; motorcycle_brand: string; motorcycle_model: string; status: string;
-      is_supermatch: boolean; created_at: string;
-      other_id: string; other_nickname: string; other_avatar: string | null;
-      other_lat: number | null; other_lng: number | null;
-    }
-    interface BZRow {
-      id: string; status: string; is_supermatch: boolean; created_at: string;
-      other_id: string; other_nickname: string; other_avatar: string | null;
-      other_lat: number | null; other_lng: number | null;
-    }
-
     const userLat = profile?.latitude ?? null;
     const userLng = profile?.longitude ?? null;
 
@@ -6425,27 +6418,30 @@ async function handleMatchInspectorUserDetail(req: Request, res: Response): Prom
 
     const typeGroups: Record<string, ReturnType<typeof toMatchItem>[]> = {};
 
-    for (const row of bbRows.rows as BBRow[]) {
-      const typeKey = classifyBBBrand(row.motorcycle_brand);
+    for (const _row of bbRows.rows) {
+      const row = _row as Record<string, unknown>;
+      const brand = row.motorcycle_brand as string;
+      const typeKey = classifyBBBrand(brand);
       if (!typeGroups[typeKey]) typeGroups[typeKey] = [];
-      typeGroups[typeKey].push(toMatchItem(row.other_id, row.other_nickname, row.other_avatar, row.other_lat, row.other_lng, row.id, row.status, row.is_supermatch, row.created_at));
+      typeGroups[typeKey].push(toMatchItem(row.other_id as string, row.other_nickname as string, row.other_avatar as string | null, row.other_lat as number | null, row.other_lng as number | null, row.id as string, row.status as string, row.is_supermatch as boolean, row.created_at as string));
       if (typeKey === "bikerBikerAvgSpeed") {
         if (!typeGroups["bikerBikerAvgDuration"]) typeGroups["bikerBikerAvgDuration"] = [];
-        typeGroups["bikerBikerAvgDuration"].push(toMatchItem(row.other_id, row.other_nickname, row.other_avatar, row.other_lat, row.other_lng, row.id, row.status, row.is_supermatch, row.created_at));
+        typeGroups["bikerBikerAvgDuration"].push(toMatchItem(row.other_id as string, row.other_nickname as string, row.other_avatar as string | null, row.other_lat as number | null, row.other_lng as number | null, row.id as string, row.status as string, row.is_supermatch as boolean, row.created_at as string));
       }
-      if (row.motorcycle_brand === "gps_full") {
+      if (brand === "gps_full") {
         for (const extra of ["bikerBikerLeanAngle", "bikerBikerDayTime"] as const) {
           if (typeKey !== extra) {
             if (!typeGroups[extra]) typeGroups[extra] = [];
-            typeGroups[extra].push(toMatchItem(row.other_id, row.other_nickname, row.other_avatar, row.other_lat, row.other_lng, row.id, row.status, row.is_supermatch, row.created_at));
+            typeGroups[extra].push(toMatchItem(row.other_id as string, row.other_nickname as string, row.other_avatar as string | null, row.other_lat as number | null, row.other_lng as number | null, row.id as string, row.status as string, row.is_supermatch as boolean, row.created_at as string));
           }
         }
       }
     }
 
-    for (const row of bzRows.rows as BZRow[]) {
+    for (const _row of bzRows.rows) {
+      const row = _row as Record<string, unknown>;
       if (!typeGroups["bikerZavorrinaBrand"]) typeGroups["bikerZavorrinaBrand"] = [];
-      typeGroups["bikerZavorrinaBrand"].push(toMatchItem(row.other_id, row.other_nickname, row.other_avatar, row.other_lat, row.other_lng, row.id, row.status, row.is_supermatch, row.created_at));
+      typeGroups["bikerZavorrinaBrand"].push(toMatchItem(row.other_id as string, row.other_nickname as string, row.other_avatar as string | null, row.other_lat as number | null, row.other_lng as number | null, row.id as string, row.status as string, row.is_supermatch as boolean, row.created_at as string));
     }
 
     const matchesByType = MI_ALL_TYPE_KEYS.map((typeKey) => {
@@ -6470,7 +6466,8 @@ async function handleMatchInspectorUserDetail(req: Request, res: Response): Prom
 // Handler: POST /api/admin/users/:userId/matches/recalculate  (also: /api/admin/match-inspector/users/:userId/recalculate)
 async function handleMatchInspectorRecalculate(req: Request, res: Response): Promise<void> {
   try {
-    const { userId } = req.params;
+    const userId = paramStr(req.params.userId);
+    if (userId === null) { res.status(400).json({ message: "ID utente non valido" }); return; }
     const user = await storage.getUser(userId);
     if (!user) { res.status(404).json({ message: "Utente non trovato" }); return; }
     const result = await runMatchingForUser(userId);
