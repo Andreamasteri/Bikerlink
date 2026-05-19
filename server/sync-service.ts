@@ -90,8 +90,22 @@ export function isSyncAvailable(): boolean {
  * Esegue un child process con argomenti separati (nessuna interpolazione di stringa)
  * e restituisce stdout/stderr completi. Rigetta la promise se il processo esce con
  * codice != 0.
+ *
+ * SECURITY: `bin` è sempre un valore letterale hardcoded nei call site di questa
+ * funzione ("pg_dump" o "psql") — non deriva mai da input utente, richieste HTTP,
+ * o valori del database. La funzione non è esposta pubblicamente. Come misura di
+ * difesa in profondità viene applicato un allowlist esplicito che rigetta qualsiasi
+ * eseguibile non previsto, rendendo impossibile l'injection anche in caso di futura
+ * modifica accidentale dei call site.
+ *
+ * nosec: child_process.spawn — bin è verificato contro allowlist server-side
  */
+const ALLOWED_BINS = new Set(["pg_dump", "psql"]);
+
 function runProcess(bin: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+  if (!ALLOWED_BINS.has(bin)) {
+    return Promise.reject(new Error(`runProcess: eseguibile non consentito: "${bin}"`));
+  }
   return new Promise((resolve, reject) => {
     const proc = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
