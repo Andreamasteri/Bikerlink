@@ -1426,10 +1426,127 @@
         .motoclub-inner { gap: 48px; }
         .sos-inner { gap: 48px; }
       }
+      /* ── HAMBURGER BUTTON ────────────────────────────────────────────────── */
+      .nav-hamburger {
+        display: none;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        background: transparent;
+        border: 1px solid var(--border-mid);
+        border-radius: var(--radius);
+        cursor: pointer;
+        margin-left: auto;
+        flex-shrink: 0;
+        transition: border-color 0.2s;
+      }
+      .nav-hamburger:hover { border-color: var(--accent); }
+      .nav-hamburger .ham-bar {
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: var(--text);
+        border-radius: 1px;
+        transition: transform 0.25s, opacity 0.2s;
+        position: absolute;
+      }
+      .nav-hamburger .ham-bar:nth-child(1) { transform: translateY(-5px); }
+      .nav-hamburger .ham-bar:nth-child(3) { transform: translateY(5px); }
+      .nav-hamburger.open .ham-bar:nth-child(1) { transform: translateY(0) rotate(45deg); }
+      .nav-hamburger.open .ham-bar:nth-child(2) { opacity: 0; }
+      .nav-hamburger.open .ham-bar:nth-child(3) { transform: translateY(0) rotate(-45deg); }
+
+      /* ── MOBILE MENU ─────────────────────────────────────────────────────── */
+      .mobile-menu {
+        display: none;
+        position: fixed;
+        top: 64px;
+        left: 0;
+        right: 0;
+        z-index: 999;
+        background: rgba(13,13,13,0.97);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-bottom: 1px solid var(--border);
+        padding: 0 20px;
+        overflow: hidden;
+        max-height: 0;
+        transition: max-height 0.32s cubic-bezier(0.22,1,0.36,1), padding 0.25s;
+      }
+      .mobile-menu.open {
+        max-height: 480px;
+        padding: 16px 20px 24px;
+      }
+      .mobile-menu-links {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        margin-bottom: 16px;
+      }
+      .mobile-menu-links a {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--text2);
+        padding: 12px 4px;
+        border-bottom: 1px solid var(--border);
+        transition: color 0.2s;
+      }
+      .mobile-menu-links a:hover { color: var(--text); opacity: 1; }
+      .mobile-menu-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 8px;
+      }
+      .mobile-menu-actions a {
+        flex: 1;
+        text-align: center;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        padding: 10px 16px;
+        border-radius: var(--radius);
+        transition: all 0.2s;
+      }
+      .mobile-menu-actions .mob-login {
+        border: 1px solid var(--border-mid);
+        color: var(--text2);
+        background: transparent;
+      }
+      .mobile-menu-actions .mob-login:hover { border-color: var(--text2); color: var(--text); opacity: 1; }
+      .mobile-menu-actions .mob-register {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+      }
+      .mobile-menu-actions .mob-register:hover { background: var(--accent-hover); opacity: 1; }
+      .mobile-menu-lang {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+      }
+      .mobile-menu-lang .lang-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: var(--text3);
+        margin-right: 4px;
+      }
+
       @media (max-width: 768px) {
         :root { --section-pad: 80px 24px; }
         .navbar-inner { padding: 0 20px; }
         .nav-links a:not(.lang-toggle):not(.nav-btn-login):not(.nav-btn-register) { display: none; }
+        .nav-hamburger { display: inline-flex; }
+        .mobile-menu { display: block; }
         .feature-section-inner,
         .community-inner,
         .motoclub-inner,
@@ -1475,8 +1592,34 @@
           <a href="/accedi" class="nav-btn-login" data-i18n="nav.login">Accedi</a>
           <a href="/registrati" class="nav-btn-register" data-i18n="nav.register">Registrati</a>
         </div>
+        <button class="nav-hamburger" id="nav-hamburger" aria-label="Apri menu" aria-expanded="false" aria-controls="mobile-menu">
+          <span class="ham-bar"></span>
+          <span class="ham-bar"></span>
+          <span class="ham-bar"></span>
+        </button>
       </div>
     </nav>
+
+    <!-- ── MOBILE MENU ─────────────────────────────────────────────────────── -->
+    <div class="mobile-menu" id="mobile-menu" role="dialog" aria-label="Menu mobile">
+      <div class="mobile-menu-links">
+        <a href="#features" data-i18n="nav.features">Features</a>
+        <a href="#community" data-i18n="nav.community">Community</a>
+        <a href="/investors" data-i18n="nav.investors">Investitori</a>
+        <a href="/privacy" data-i18n="nav.privacy">Privacy</a>
+      </div>
+      <div class="mobile-menu-actions">
+        <a href="/accedi" class="mob-login" data-i18n="nav.login">Accedi</a>
+        <a href="/registrati" class="mob-register" data-i18n="nav.register">Registrati</a>
+      </div>
+      <div class="mobile-menu-lang">
+        <span class="lang-label">Lingua</span>
+        <div class="lang-toggle">
+          <button class="lang-btn active" id="mob-btn-it" onclick="setLang('it')">IT</button>
+          <button class="lang-btn" id="mob-btn-en" onclick="setLang('en')">EN</button>
+        </div>
+      </div>
+    </div>
 
     <!-- ── HERO ───────────────────────────────────────────────────────────── -->
     <section class="hero" id="hero">
@@ -2215,6 +2358,8 @@
       document.documentElement.lang = lang;
       document.getElementById('btn-it').classList.toggle('active', lang === 'it');
       document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+      document.getElementById('mob-btn-it').classList.toggle('active', lang === 'it');
+      document.getElementById('mob-btn-en').classList.toggle('active', lang === 'en');
       const dict = I18N[lang];
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
@@ -2227,6 +2372,28 @@
     window.addEventListener('scroll', () => {
       navbar.classList.toggle('scrolled', window.scrollY > 40);
     }, { passive: true });
+
+    // ── HAMBURGER MENU ────────────────────────────────────────────────────────
+    const hamburger = document.getElementById('nav-hamburger');
+    const mobileMenu = document.getElementById('mobile-menu');
+    function closeMobileMenu() {
+      hamburger.classList.remove('open');
+      mobileMenu.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', 'false');
+    }
+    hamburger.addEventListener('click', () => {
+      const isOpen = mobileMenu.classList.toggle('open');
+      hamburger.classList.toggle('open', isOpen);
+      hamburger.setAttribute('aria-expanded', String(isOpen));
+    });
+    mobileMenu.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', closeMobileMenu);
+    });
+    document.addEventListener('click', e => {
+      if (!navbar.contains(e.target) && !mobileMenu.contains(e.target)) {
+        closeMobileMenu();
+      }
+    });
 
     // ── HERO PARALLAX ─────────────────────────────────────────────────────────
     const heroMesh = document.getElementById('hero-mesh');
