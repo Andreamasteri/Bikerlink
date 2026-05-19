@@ -196,7 +196,7 @@ export default function TabLayout() {
 
   const HIDDEN_TAB_NAMES = isWeb
     ? new Set<string>([])
-    : new Set(["tracking", "garage"]);
+    : new Set(["tracking", "garage", "giri"]);
   if (isGpsGateActive && !isWeb) {
     ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi", "arcade", "giri"].forEach(
       (n) => HIDDEN_TAB_NAMES.add(n)
@@ -449,7 +449,7 @@ export default function TabLayout() {
               <MaterialCommunityIcons name="map-marker-path" size={size} color={color} />
             ),
             headerShown: false,
-            href: gpsTabHref,
+            href: null,
           }}
         />
         <Tabs.Screen

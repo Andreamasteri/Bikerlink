@@ -293,5 +293,6 @@ const staticStyles = StyleSheet.create({
   communityItemLabel: {
     fontSize: 16,
     fontFamily: "Inter_500Medium",
+    flex: 1,
   },
 });

@@ -20,6 +20,7 @@ import { useT, useLocale } from "@/lib/language-context";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import TrackingScreen from "@/app/(tabs)/tracking";
 import RoutesScreen from "@/app/routes/index";
+import GiriScreen from "@/app/(tabs)/giri";
 
 interface ProposalItem {
   id: string;
@@ -184,6 +185,7 @@ const HUB_SECTIONS = [
   { key: "proposte", i18nKey: "proposals.hub.proposalsRequests" },
   { key: "giri", i18nKey: "proposals.hub.ridesPerformance" },
   { key: "percorsi", i18nKey: "proposals.hub.myRoutes" },
+  { key: "pianificati", i18nKey: "proposals.hub.myRides" },
 ] as const;
 
 export default function ProposalsScreen() {
@@ -193,7 +195,7 @@ export default function ProposalsScreen() {
   const t = useT();
   const locale = useLocale();
   const [activeFilter, setActiveFilter] = useState("all");
-  const [activeHub, setActiveHub] = useState<"proposte" | "giri" | "percorsi">("proposte");
+  const [activeHub, setActiveHub] = useState<"proposte" | "giri" | "percorsi" | "pianificati">("proposte");
 
   const queryKey =
     activeFilter === "all"
@@ -223,7 +225,7 @@ export default function ProposalsScreen() {
   allData.push({ type: "proposalHeader", key: "ph" });
   (proposals || []).forEach((p) => allData.push({ type: "proposal", key: `p-${p.id}`, data: p }));
 
-  const handleHubPress = (key: "proposte" | "giri" | "percorsi") => {
+  const handleHubPress = (key: "proposte" | "giri" | "percorsi" | "pianificati") => {
     setActiveHub(key);
   };
 
@@ -254,6 +256,10 @@ export default function ProposalsScreen() {
       ) : activeHub === "percorsi" ? (
         <View style={{ flex: 1 }}>
           <RoutesScreen />
+        </View>
+      ) : activeHub === "pianificati" ? (
+        <View style={{ flex: 1 }}>
+          <GiriScreen />
         </View>
       ) : (
         <>

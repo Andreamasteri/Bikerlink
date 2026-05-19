@@ -961,16 +961,6 @@ export default function ProfileScreen() {
         </Pressable>
       </View>
 
-      <Pressable style={[styles.section, styles.accordionHeader]} onPress={() => router.push("/ride" as any)}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Ionicons name="shield-outline" size={20} color={Colors.accent} />
-          <Text style={[styles.sectionTitle, { marginBottom: 0, color: Colors.text }]}>Privacy & GPS</Text>
-        </View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-          <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>Impostazioni</Text>
-          <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
-        </View>
-      </Pressable>
 
       {currentUserType === "biker" && showSearchPref && (
         <View style={styles.section}>
@@ -1021,6 +1011,32 @@ export default function ProfileScreen() {
         </Pressable>
         {notifPrefsExpanded && (
           <View style={{ paddingTop: 8, gap: 2 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingVertical: 10,
+                borderBottomWidth: 1.5,
+                borderBottomColor: Colors.accent + "40",
+                marginBottom: 6,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 12 }}>
+                <Ionicons name="notifications" size={18} color={Colors.accent} style={{ marginRight: 8 }} />
+                <Text style={{ flex: 1, fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
+                  Abilita notifiche push
+                </Text>
+              </View>
+              <Switch
+                testID="push-notifications-toggle"
+                value={pushNotificationsEnabled}
+                onValueChange={togglePushNotifications}
+                trackColor={{ false: Colors.border, true: Colors.accent }}
+                thumbColor="#fff"
+                disabled={pushTogglePending}
+              />
+            </View>
             <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular", marginBottom: 8 }}>
               Scegli quali notifiche push vuoi ricevere. Le notifiche disattivate non ti arriveranno sul telefono.
             </Text>
@@ -1276,77 +1292,6 @@ export default function ProfileScreen() {
       </View>
       )}
 
-      {/* ─── Sensori & Calibrazione ──────────────────────────────────────── */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { marginBottom: 12 }]}>{t("profile.sensorsCalib")}</Text>
-
-        {/* Status row */}
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12, padding: 12, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border }}>
-          <Ionicons
-            name="compass-outline"
-            size={20}
-            color={mountCalib ? Colors.success : colors.textSecondary}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontFamily: "Inter_500Medium" as const, fontSize: 14, color: Colors.text }}>
-              {mountCalib ? t("tracking.mountCalib.calibratedBadge") : t("tracking.mountCalib.notCalibrated")}
-            </Text>
-            {mountCalib && (
-              <Text style={{ fontFamily: "Inter_400Regular" as const, fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                {t("tracking.mountCalib.longAxisLabel")}: {mountCalib.longAxis.toUpperCase()} · {t("tracking.mountCalib.latAxisLabel")}: {mountCalib.latAxis.toUpperCase()} · {t("tracking.mountCalib.vertAxisLabel")}: {mountCalib.vertAxis.toUpperCase()}
-              </Text>
-            )}
-            {mountCalib && (
-              <Text style={{ fontFamily: "Inter_400Regular" as const, fontSize: 11, color: colors.textSecondary, marginTop: 2 }}>
-                {t("profile.sensorsCalib.calibratedOn")} {new Date(mountCalib.timestamp).toLocaleDateString("it-IT")}
-              </Text>
-            )}
-          </View>
-        </View>
-
-        {/* Recalibrate button */}
-        <Pressable
-          testID="recalibrate-btn"
-          style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: Colors.accent + "14", borderRadius: 12, marginBottom: 8 }}
-          onPress={() => setShowMountCalibWizard(true)}
-        >
-          <Ionicons name="refresh-circle-outline" size={20} color={Colors.accent} />
-          <Text style={{ fontFamily: "Inter_600SemiBold" as const, fontSize: 14, color: Colors.accent, flex: 1 }}>
-            {t("profile.sensorsCalib.recalibrate")}
-          </Text>
-          <Ionicons name="chevron-forward" size={16} color={Colors.accent} />
-        </Pressable>
-
-        {/* Reset button */}
-        {mountCalib && (
-          <Pressable
-            testID="reset-calib-btn"
-            style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border }}
-            onPress={() => {
-              Alert.alert(
-                t("profile.sensorsCalib.resetConfirmTitle"),
-                t("profile.sensorsCalib.resetConfirmMsg"),
-                [
-                  { text: t("profile.sensorsCalib.resetConfirmCancel"), style: "cancel" },
-                  {
-                    text: t("profile.sensorsCalib.resetConfirmOk"),
-                    style: "destructive",
-                    onPress: () => {
-                      clearMountCalibration().catch(() => {});
-                      setMountCalib(null);
-                    },
-                  },
-                ]
-              );
-            }}
-          >
-            <Ionicons name="trash-outline" size={20} color={colors.textSecondary} />
-            <Text style={{ fontFamily: "Inter_500Medium" as const, fontSize: 14, color: colors.textSecondary, flex: 1 }}>
-              {t("profile.sensorsCalib.reset")}
-            </Text>
-          </Pressable>
-        )}
-      </View>
 
       <View style={styles.section}>
         <Pressable style={styles.accordionHeader} onPress={() => setDocsExpanded(v => !v)}>
@@ -1387,31 +1332,6 @@ export default function ProfileScreen() {
         <MenuItem icon="create" label={t("profile.editProfile")} onPress={() => router.push("/profile/edit" as any)} />
       </View>
 
-      <View style={styles.section}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingVertical: 10,
-          }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 12 }}>
-            <Ionicons name="notifications-outline" size={20} color={Colors.text} style={{ marginRight: 10 }} />
-            <Text style={{ flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text }}>
-              Notifiche Match
-            </Text>
-          </View>
-          <Switch
-            testID="push-notifications-toggle"
-            value={pushNotificationsEnabled}
-            onValueChange={togglePushNotifications}
-            trackColor={{ false: Colors.border, true: Colors.accent }}
-            thumbColor="#fff"
-            disabled={pushTogglePending}
-          />
-        </View>
-      </View>
 
       <View style={styles.section}>
         <View style={taskbarStyles.inlineRow}>

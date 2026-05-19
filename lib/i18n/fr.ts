@@ -54,6 +54,7 @@ const fr: Record<string, string> = {
   "proposals.hub.proposalsRequests": "Propositions &\nDemandes",
   "proposals.hub.ridesPerformance": "Sorties &\nPerformance",
   "proposals.hub.myRoutes": "Mes\nItinéraires",
+  "proposals.hub.myRides": "Trajets\nPlanifiés",
 
   "proposals.title": "Propositions",
   "proposals.create": "Créer une proposition",
