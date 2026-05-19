@@ -62,6 +62,24 @@ export default function AdminMatchPreferencesEditScreen() {
     [saveMutation],
   );
 
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      const base = getApiUrl();
+      const url = new URL(`/api/admin/users/${userId}/match-preferences`, base);
+      const res = await fetch(url.toString(), {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Errore reset preferenze");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users", userId, "matches"] });
+    },
+    onError: () => Alert.alert("Errore", "Impossibile resettare le preferenze"),
+  });
+
   const resetAll = useCallback(() => {
     Alert.alert(
       "Ripristina tutto",
@@ -71,11 +89,11 @@ export default function AdminMatchPreferencesEditScreen() {
         {
           text: "Ripristina",
           style: "destructive",
-          onPress: () => saveMutation.mutate({ ...DEFAULT_MATCH_PREFS }),
+          onPress: () => resetMutation.mutate(),
         },
       ],
     );
-  }, [saveMutation]);
+  }, [resetMutation]);
 
   if (isLoading) {
     return (
@@ -108,7 +126,7 @@ export default function AdminMatchPreferencesEditScreen() {
           <TouchableOpacity
             style={styles.resetBtn}
             onPress={resetAll}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || resetMutation.isPending}
             testID="reset-all-btn"
           >
             <Text style={styles.resetBtnText}>Reset</Text>

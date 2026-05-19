@@ -6569,6 +6569,21 @@ router.put("/users/:userId/match-preferences", async (req: Request, res: Respons
   }
 });
 
+// DELETE /api/admin/users/:userId/match-preferences
+// Cancella la riga match_preferences per un singolo utente, ripristinando i valori di default.
+router.delete("/users/:userId/match-preferences", async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    await db
+      .delete(matchPreferences)
+      .where(eq(matchPreferences.userId, userId));
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[ADMIN match-preferences DELETE] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 // Route registrations — legacy alias paths (backward compat)
 router.get("/match-inspector/users", handleMatchInspectorUsers);
 router.get("/match-inspector/users/:userId", handleMatchInspectorUserDetail);
