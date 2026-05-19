@@ -2967,7 +2967,8 @@ router.post("/stregatti", async (req: Request, res: Response) => {
 
 router.get("/users/:id/stats", async (req: Request, res: Response) => {
   try {
-    const userId = req.params.id;
+    // Strip null bytes — PostgreSQL rejects them even in parameterised queries.
+    const userId = req.params.id.replace(/\x00/g, "");
     const userResult = await db.execute(sql`
       SELECT u.id, u.nickname, u.email, u.user_type as "userType", u.role, u.status,
              u.created_at as "createdAt", u.last_login_at as "lastLoginAt",

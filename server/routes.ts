@@ -785,9 +785,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ota_events.source is varchar(32) — truncate deviceId to match the column constraint.
       // Expo installation IDs are UUIDs (36 chars) so we keep the first 32 chars which
       // are unique enough for filtering and idempotency checks.
-      const safeDeviceId = deviceId ? String(deviceId).substring(0, 32) : null;
-      const safeReleaseId = String(releaseId).substring(0, 64);
-      const safeRv = runtimeVersion ? String(runtimeVersion).substring(0, 32) : null;
+      // Strip null bytes — PostgreSQL rejects them even in parameterised queries.
+      const stripNull = (s: string) => s.replace(/\x00/g, "");
+      const safeDeviceId = deviceId ? stripNull(String(deviceId)).substring(0, 32) : null;
+      const safeReleaseId = stripNull(String(releaseId)).substring(0, 64);
+      const safeRv = runtimeVersion ? stripNull(String(runtimeVersion)).substring(0, 32) : null;
       const clientIp = getTrustedClientIp(req) ?? "unknown";
 
       // Rate limit: 10 heartbeats per minute per IP

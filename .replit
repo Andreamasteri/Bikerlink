@@ -57,6 +57,10 @@ args = "ota-guard"
 task = "workflow.run"
 args = "admin-map-exclusion"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "injection-safety"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -150,6 +154,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx tsx scripts/check-admin-map-exclusion.ts"
+
+[[workflows.workflow]]
+name = "injection-safety"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/test-injection-safety.ts"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
