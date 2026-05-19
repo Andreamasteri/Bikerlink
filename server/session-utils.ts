@@ -1,4 +1,5 @@
-import { pool } from "./db";
+import { db } from "./db";
+import { sql } from "drizzle-orm";
 
 // Cancella tutte le sessioni server-side per l'utente. La tabella `session`
 // (connect-pg-simple) memorizza il payload come JSON nel campo `sess`.
@@ -8,12 +9,8 @@ export async function revokeAllUserSessions(
   options?: { excludeSid?: string },
 ): Promise<number> {
   if (!userId) return 0;
-  const params: unknown[] = [userId];
-  let where = "sess->>'userId' = $1";
-  if (options?.excludeSid) {
-    params.push(options.excludeSid);
-    where += " AND sid <> $2";
-  }
-  const r = await pool.query(`DELETE FROM session WHERE ${where}`, params);
-  return r.rowCount ?? 0;
+  const r = options?.excludeSid
+    ? await db.execute(sql`DELETE FROM session WHERE sess->>'userId' = ${userId} AND sid <> ${options.excludeSid}`)
+    : await db.execute(sql`DELETE FROM session WHERE sess->>'userId' = ${userId}`);
+  return (r.rowCount as number) ?? 0;
 }

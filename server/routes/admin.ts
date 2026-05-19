@@ -7,7 +7,7 @@ import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, Sha
 import bcrypt from "bcryptjs";
 import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "../objectStorage";
 import { storage } from "../storage";
-import { db, pool } from "../db";
+import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
 import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences } from "@shared/schema";
 import { DEFAULT_PREFS } from "./match-preferences";
@@ -1287,9 +1287,8 @@ router.get("/analytics", async (_req: Request, res: Response) => {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const { pool } = await import("../db");
-    const totalUsersResult = await pool.query("SELECT count(*)::int as count FROM users WHERE is_fake = false");
-    const totalUsers = totalUsersResult.rows[0]?.count ?? 0;
+    const totalUsersResult = await db.execute(sql`SELECT count(*)::int as count FROM users WHERE is_fake = false`);
+    const totalUsers = (totalUsersResult.rows[0] as { count: number } | undefined)?.count ?? 0;
 
     const fifteenMinutesAgo = new Date(now.getTime() - 15 * 60 * 1000);
 
@@ -1354,10 +1353,7 @@ router.get("/analytics/export-csv", async (_req: Request, res: Response) => {
 
 router.get("/analytics/users-list", async (_req: Request, res: Response) => {
   try {
-    const { pool } = await import("../db");
-    const result = await pool.query(
-      "SELECT id, nickname, user_type as \"userType\", sex, region, created_at as \"createdAt\" FROM users WHERE is_fake = false ORDER BY created_at DESC"
-    );
+    const result = await db.execute(sql`SELECT id, nickname, user_type as "userType", sex, region, created_at as "createdAt" FROM users WHERE is_fake = false ORDER BY created_at DESC`);
     return res.json(result.rows);
   } catch (error) {
     console.error("Admin analytics users-list error:", error);
@@ -1369,11 +1365,7 @@ router.get("/analytics/active-users", async (req: Request, res: Response) => {
   try {
     const period = parseInt(req.query.period as string) || 30;
     const since = new Date(Date.now() - period * 24 * 60 * 60 * 1000);
-    const { pool } = await import("../db");
-    const result = await pool.query(
-      "SELECT id, nickname, user_type as \"userType\", last_login_at as \"lastLoginAt\" FROM users WHERE is_fake = false AND status = 'active' AND last_login_at >= $1 ORDER BY last_login_at DESC",
-      [since]
-    );
+    const result = await db.execute(sql`SELECT id, nickname, user_type as "userType", last_login_at as "lastLoginAt" FROM users WHERE is_fake = false AND status = 'active' AND last_login_at >= ${since} ORDER BY last_login_at DESC`);
     return res.json(result.rows);
   } catch (error) {
     console.error("Admin analytics active-users error:", error);
@@ -1384,11 +1376,7 @@ router.get("/analytics/active-users", async (req: Request, res: Response) => {
 router.get("/analytics/online-now", async (_req: Request, res: Response) => {
   try {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const { pool } = await import("../db");
-    const result = await pool.query(
-      "SELECT id, nickname, user_type as \"userType\", last_login_at as \"lastLoginAt\" FROM users WHERE is_fake = false AND status = 'active' AND last_login_at >= $1 ORDER BY last_login_at DESC",
-      [fifteenMinutesAgo]
-    );
+    const result = await db.execute(sql`SELECT id, nickname, user_type as "userType", last_login_at as "lastLoginAt" FROM users WHERE is_fake = false AND status = 'active' AND last_login_at >= ${fifteenMinutesAgo} ORDER BY last_login_at DESC`);
     return res.json(result.rows);
   } catch (error) {
     console.error("Admin analytics online-now error:", error);
@@ -1398,15 +1386,14 @@ router.get("/analytics/online-now", async (_req: Request, res: Response) => {
 
 router.get("/analytics/ad-clicks", async (_req: Request, res: Response) => {
   try {
-    const { pool } = await import("../db");
-    const result = await pool.query(
-      `SELECT ac.id, ac.user_id as "userId", u.nickname, u.user_type as "userType", 
-              camp.name as "adTitle", ac.created_at as "clickedAt"
-       FROM ad_clicks ac
-       LEFT JOIN users u ON ac.user_id = u.id
-       LEFT JOIN ad_campaigns camp ON ac.campaign_id = camp.id
-       ORDER BY ac.created_at DESC`
-    );
+    const result = await db.execute(sql`
+      SELECT ac.id, ac.user_id as "userId", u.nickname, u.user_type as "userType",
+             camp.name as "adTitle", ac.created_at as "clickedAt"
+      FROM ad_clicks ac
+      LEFT JOIN users u ON ac.user_id = u.id
+      LEFT JOIN ad_campaigns camp ON ac.campaign_id = camp.id
+      ORDER BY ac.created_at DESC
+    `);
     return res.json(result.rows);
   } catch (error) {
     console.error("Admin analytics ad-clicks error:", error);
@@ -1416,15 +1403,14 @@ router.get("/analytics/ad-clicks", async (_req: Request, res: Response) => {
 
 router.get("/analytics/pending-reports", async (_req: Request, res: Response) => {
   try {
-    const { pool } = await import("../db");
-    const result = await pool.query(
-      `SELECT ft.id, ft.ticket_type as "type", ft.subject as "title", ft.message as "description",
-              u.nickname as "submittedBy", ft.created_at as "createdAt"
-       FROM feedback_tickets ft
-       LEFT JOIN users u ON ft.user_id = u.id
-       WHERE ft.status = 'open'
-       ORDER BY ft.created_at DESC`
-    );
+    const result = await db.execute(sql`
+      SELECT ft.id, ft.ticket_type as "type", ft.subject as "title", ft.message as "description",
+             u.nickname as "submittedBy", ft.created_at as "createdAt"
+      FROM feedback_tickets ft
+      LEFT JOIN users u ON ft.user_id = u.id
+      WHERE ft.status = 'open'
+      ORDER BY ft.created_at DESC
+    `);
     return res.json(result.rows);
   } catch (error) {
     console.error("Admin analytics pending-reports error:", error);
@@ -2982,22 +2968,19 @@ router.post("/stregatti", async (req: Request, res: Response) => {
 router.get("/users/:id/stats", async (req: Request, res: Response) => {
   try {
     const userId = req.params.id;
-    const { pool } = await import("../db");
-
-    const userResult = await pool.query(
-      `SELECT u.id, u.nickname, u.email, u.user_type as "userType", u.role, u.status,
-              u.created_at as "createdAt", u.last_login_at as "lastLoginAt",
-              u.last_logout_at as "lastLogoutAt", u.last_app_close_at as "lastAppCloseAt",
-              u.ghost_mode as "ghostMode",
-              u.is_fake as "isFake", u.is_primal as "isPrimal",
-              up.total_km as "totalKm", up.total_rides as "totalRides",
-              up.is_available as "isAvailable", up.bio,
-              up.latitude, up.longitude
-       FROM users u
-       LEFT JOIN user_profiles up ON up.user_id = u.id
-       WHERE u.id = $1`,
-      [userId]
-    );
+    const userResult = await db.execute(sql`
+      SELECT u.id, u.nickname, u.email, u.user_type as "userType", u.role, u.status,
+             u.created_at as "createdAt", u.last_login_at as "lastLoginAt",
+             u.last_logout_at as "lastLogoutAt", u.last_app_close_at as "lastAppCloseAt",
+             u.ghost_mode as "ghostMode",
+             u.is_fake as "isFake", u.is_primal as "isPrimal",
+             up.total_km as "totalKm", up.total_rides as "totalRides",
+             up.is_available as "isAvailable", up.bio,
+             up.latitude, up.longitude
+      FROM users u
+      LEFT JOIN user_profiles up ON up.user_id = u.id
+      WHERE u.id = ${userId}
+    `);
 
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: "Utente non trovato" });
@@ -3006,49 +2989,36 @@ router.get("/users/:id/stats", async (req: Request, res: Response) => {
     const user = userResult.rows[0];
 
     const [proposalsResult, conversationsResult, messagesResult, adClicksResult, reportsResult, motorcyclesResult] = await Promise.all([
-      pool.query(
-        `SELECT COUNT(*)::int as count FROM proposals WHERE user_id = $1`,
-        [userId]
-      ),
-      pool.query(
-        `SELECT COUNT(*)::int as count FROM conversation_participants WHERE user_id = $1`,
-        [userId]
-      ),
-      pool.query(
-        `SELECT COUNT(*)::int as count FROM messages WHERE sender_id = $1`,
-        [userId]
-      ),
-      pool.query(
-        `SELECT ac.id, camp.name as "adTitle", ac.created_at as "clickedAt"
-         FROM ad_clicks ac
-         LEFT JOIN ad_campaigns camp ON ac.campaign_id = camp.id
-         WHERE ac.user_id = $1
-         ORDER BY ac.created_at DESC
-         LIMIT 20`,
-        [userId]
-      ),
-      pool.query(
-        `SELECT COUNT(*)::int as "filed", 
-                (SELECT COUNT(*)::int FROM reports WHERE reported_user_id = $1) as "received"
-         FROM reports WHERE reporter_id = $1`,
-        [userId]
-      ),
-      pool.query(
-        `SELECT brand, model, year, displacement, motorcycle_type as "motorcycleType", riding_style as "ridingStyle"
-         FROM user_motorcycles WHERE user_id = $1`,
-        [userId]
-      ),
+      db.execute(sql`SELECT COUNT(*)::int as count FROM proposals WHERE user_id = ${userId}`),
+      db.execute(sql`SELECT COUNT(*)::int as count FROM conversation_participants WHERE user_id = ${userId}`),
+      db.execute(sql`SELECT COUNT(*)::int as count FROM messages WHERE sender_id = ${userId}`),
+      db.execute(sql`
+        SELECT ac.id, camp.name as "adTitle", ac.created_at as "clickedAt"
+        FROM ad_clicks ac
+        LEFT JOIN ad_campaigns camp ON ac.campaign_id = camp.id
+        WHERE ac.user_id = ${userId}
+        ORDER BY ac.created_at DESC
+        LIMIT 20
+      `),
+      db.execute(sql`
+        SELECT COUNT(*)::int as "filed",
+               (SELECT COUNT(*)::int FROM reports WHERE reported_user_id = ${userId}) as "received"
+        FROM reports WHERE reporter_id = ${userId}
+      `),
+      db.execute(sql`
+        SELECT brand, model, year, displacement, motorcycle_type as "motorcycleType", riding_style as "ridingStyle"
+        FROM user_motorcycles WHERE user_id = ${userId}
+      `),
     ]);
 
-    const loginHistory = await pool.query(
-      `SELECT ml.action, ml.created_at as "createdAt", m.nickname as "moderatorNickname"
-       FROM moderator_logs ml
-       LEFT JOIN users m ON ml.moderator_id = m.id
-       WHERE ml.target_id = $1
-       ORDER BY ml.created_at DESC
-       LIMIT 20`,
-      [userId]
-    );
+    const loginHistory = await db.execute(sql`
+      SELECT ml.action, ml.created_at as "createdAt", m.nickname as "moderatorNickname"
+      FROM moderator_logs ml
+      LEFT JOIN users m ON ml.moderator_id = m.id
+      WHERE ml.target_id = ${userId}
+      ORDER BY ml.created_at DESC
+      LIMIT 20
+    `);
 
     const { onlineTracker } = await import("../online-tracker");
     return res.json({
@@ -4704,35 +4674,22 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
     // they must call /api/admin/ota/assign-slot afterwards (or use assignSlot body param).
     const { assignSlot } = req.body ?? {};
 
-    await pool.query("BEGIN");
-    let result: { rows: unknown[] };
+    if (assignSlot && !/^(stable|previous-stable|test-\d+)$/.test(assignSlot)) {
+      return res.status(400).json({ message: "assignSlot non valido. Formati ammessi: stable, test-1, test-2, ..." });
+    }
+
+    let result: { rows: unknown[] } = { rows: [] };
     try {
-      if (assignSlot) {
-        // Validate slot if provided
-        if (!/^(stable|previous-stable|test-\d+)$/.test(assignSlot)) {
-          await pool.query("ROLLBACK");
-          return res.status(400).json({ message: "assignSlot non valido. Formati ammessi: stable, test-1, test-2, ..." });
+      result = await db.transaction(async (tx) => {
+        if (assignSlot) {
+          // Clear previous occupant of the target slot (set to archived)
+          await tx.execute(sql`UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = ${assignSlot} AND id != ${id}`);
+          return tx.execute(sql`UPDATE ota_releases SET status = 'active', slot = ${assignSlot}, published_at = NOW(), updated_at = NOW() WHERE id = ${id} RETURNING *`);
+        } else {
+          return tx.execute(sql`UPDATE ota_releases SET status = 'active', published_at = NOW(), updated_at = NOW() WHERE id = ${id} RETURNING *`);
         }
-        // Clear previous occupant of the target slot (set to archived)
-        await pool.query(
-          "UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = $1 AND id != $2",
-          [assignSlot, id]
-        );
-        const r = await pool.query(
-          "UPDATE ota_releases SET status = 'active', slot = $1, published_at = NOW(), updated_at = NOW() WHERE id = $2 RETURNING *",
-          [assignSlot, id]
-        );
-        result = r;
-      } else {
-        const r = await pool.query(
-          "UPDATE ota_releases SET status = 'active', published_at = NOW(), updated_at = NOW() WHERE id = $1 RETURNING *",
-          [id]
-        );
-        result = r;
-      }
-      await pool.query("COMMIT");
+      });
     } catch (txErr) {
-      await pool.query("ROLLBACK");
       throw txErr;
     }
 
@@ -6686,27 +6643,24 @@ router.post("/ota/assign-slot", async (req: Request, res: Response) => {
     }
 
     // Transazione: garantisce un solo occupante per slot
-    await pool.query("BEGIN");
     let assignedRow: Record<string, unknown> | null = null;
     try {
-      // Evict previous occupant of this slot → archived (not slot=NULL, to keep legacy fallback clean)
-      await pool.query(
-        "UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = $1 AND id != $2",
-        [slot, releaseId]
-      );
-      // Assign the new occupant and activate it so it can be served
-      const result = await pool.query(
-        "UPDATE ota_releases SET slot = $1, status = 'active', published_at = COALESCE(published_at, NOW()), updated_at = NOW() WHERE id = $2 RETURNING id, version, slot, status",
-        [slot, releaseId]
-      );
-      if (!result.rows.length) {
-        await pool.query("ROLLBACK");
+      assignedRow = await db.transaction(async (tx) => {
+        // Evict previous occupant of this slot → archived (not slot=NULL, to keep legacy fallback clean)
+        await tx.execute(sql`UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = ${slot} AND id != ${releaseId}`);
+        // Assign the new occupant and activate it so it can be served
+        const result = await tx.execute(sql`UPDATE ota_releases SET slot = ${slot}, status = 'active', published_at = COALESCE(published_at, NOW()), updated_at = NOW() WHERE id = ${releaseId} RETURNING id, version, slot, status`);
+        if (!result.rows.length) {
+          const err = new Error("Release non trovata");
+          (err as NodeJS.ErrnoException).code = "NOT_FOUND";
+          throw err;
+        }
+        return result.rows[0] as Record<string, unknown>;
+      });
+    } catch (txErr: unknown) {
+      if (txErr instanceof Error && (txErr as NodeJS.ErrnoException).code === "NOT_FOUND") {
         return res.status(404).json({ message: "Release non trovata" });
       }
-      assignedRow = result.rows[0] as Record<string, unknown>;
-      await pool.query("COMMIT");
-    } catch (txErr) {
-      await pool.query("ROLLBACK");
       throw txErr;
     }
 
@@ -6817,36 +6771,21 @@ router.post("/ota/promote", async (req: Request, res: Response) => {
     }
 
     // Leggi candidato prima di aprire la transazione (read-only)
-    const testOta = await pool.query(
-      "SELECT id, version FROM ota_releases WHERE slot = $1 AND status = 'active' ORDER BY published_at DESC LIMIT 1",
-      [fromSlot]
-    );
+    const testOta = await db.execute(sql`SELECT id, version FROM ota_releases WHERE slot = ${fromSlot} AND status = 'active' ORDER BY published_at DESC LIMIT 1`);
     if (!testOta.rows.length) {
       return res.status(400).json({ message: `Nessun OTA attivo nello slot ${fromSlot}` });
     }
     const testRow = testOta.rows[0] as { id: string; version: string };
 
     // Transazione atomica
-    await pool.query("BEGIN");
-    try {
+    await db.transaction(async (tx) => {
       // Il previous-stable corrente → archived (non slot=NULL: riserviamo NULL ai record pre-slot-system)
-      await pool.query(
-        "UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = 'previous-stable'"
-      );
+      await tx.execute(sql`UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = 'previous-stable'`);
       // Lo stable corrente → previous-stable (resta active: è il candidato al revert)
-      await pool.query(
-        "UPDATE ota_releases SET slot = 'previous-stable', updated_at = NOW() WHERE slot = 'stable'"
-      );
+      await tx.execute(sql`UPDATE ota_releases SET slot = 'previous-stable', updated_at = NOW() WHERE slot = 'stable'`);
       // Il candidato → stable
-      await pool.query(
-        "UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin', updated_at = NOW() WHERE id = $1",
-        [testRow.id]
-      );
-      await pool.query("COMMIT");
-    } catch (txErr) {
-      await pool.query("ROLLBACK");
-      throw txErr;
-    }
+      await tx.execute(sql`UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin', updated_at = NOW() WHERE id = ${testRow.id}`);
+    });
 
     // Log evento (best-effort, fuori dalla transazione)
     try {
@@ -6879,9 +6818,7 @@ router.post("/ota/promote", async (req: Request, res: Response) => {
 router.post("/ota/revert", async (req: Request, res: Response) => {
   try {
     // Trova il previous-stable deterministicamente (il più recentemente promosso lì)
-    const prevStableResult = await pool.query(
-      "SELECT id, version FROM ota_releases WHERE slot = 'previous-stable' AND status = 'active' ORDER BY updated_at DESC LIMIT 1"
-    );
+    const prevStableResult = await db.execute(sql`SELECT id, version FROM ota_releases WHERE slot = 'previous-stable' AND status = 'active' ORDER BY updated_at DESC LIMIT 1`);
     if (!prevStableResult.rows.length) {
       return res.status(400).json({ message: "Nessun previous-stable disponibile per il revert" });
     }
@@ -6890,26 +6827,14 @@ router.post("/ota/revert", async (req: Request, res: Response) => {
     // Transazione atomica — SWAP: stable ↔ previous-stable
     // Preserva il history chain: lo stable che viene spostato va a previous-stable,
     // non viene archiviato, così può essere ri-ripristinato in futuro.
-    await pool.query("BEGIN");
-    try {
+    await db.transaction(async (tx) => {
       // Passo 1: lo stable corrente → slot temporaneo per evitare conflitti di unique
-      await pool.query(
-        "UPDATE ota_releases SET slot = '_revert_tmp', updated_at = NOW() WHERE slot = 'stable'"
-      );
+      await tx.execute(sql`UPDATE ota_releases SET slot = '_revert_tmp', updated_at = NOW() WHERE slot = 'stable'`);
       // Passo 2: il previous-stable → stable (resta active)
-      await pool.query(
-        "UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin-revert', updated_at = NOW() WHERE id = $1",
-        [prevRow.id]
-      );
+      await tx.execute(sql`UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin-revert', updated_at = NOW() WHERE id = ${prevRow.id}`);
       // Passo 3: il vecchio stable → previous-stable (ora può essere ri-ripristinato)
-      await pool.query(
-        "UPDATE ota_releases SET slot = 'previous-stable', updated_at = NOW() WHERE slot = '_revert_tmp'"
-      );
-      await pool.query("COMMIT");
-    } catch (txErr) {
-      await pool.query("ROLLBACK");
-      throw txErr;
-    }
+      await tx.execute(sql`UPDATE ota_releases SET slot = 'previous-stable', updated_at = NOW() WHERE slot = '_revert_tmp'`);
+    });
 
     // Log evento (best-effort)
     try {
@@ -6981,18 +6906,17 @@ router.get("/ota/events", async (req: Request, res: Response) => {
     const limitRaw = parseInt(String(req.query.limit ?? "50"), 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 && limitRaw <= 200 ? limitRaw : 50;
 
-    // Build dynamic WHERE clause with AND conditions
-    const conditions: string[] = [];
-    const params: (string | number)[] = [];
-    if (releaseId) { conditions.push(`release_id = $${params.length + 1}`); params.push(releaseId); }
-    if (phase)     { conditions.push(`phase = $${params.length + 1}`); params.push(phase); }
-    if (deviceId)  { conditions.push(`source = $${params.length + 1}`); params.push(deviceId); }
+    // Build dynamic WHERE clause using Drizzle sql template fragments
+    const conditions: ReturnType<typeof sql>[] = [];
+    if (releaseId) conditions.push(sql`release_id = ${releaseId}`);
+    if (phase)     conditions.push(sql`phase = ${phase}`);
+    if (deviceId)  conditions.push(sql`source = ${deviceId}`);
 
-    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-    const query = `SELECT * FROM ota_events ${where} ORDER BY created_at DESC LIMIT $${params.length + 1}`;
-    params.push(limit);
+    const whereClause = conditions.length > 0
+      ? sql`WHERE ${sql.join(conditions, sql` AND `)}`
+      : sql``;
 
-    const result = await pool.query(query, params);
+    const result = await db.execute(sql`SELECT * FROM ota_events ${whereClause} ORDER BY created_at DESC LIMIT ${limit}`);
     return res.json(result.rows);
   } catch (err) {
     console.error("[ADMIN ota/events] error:", err);

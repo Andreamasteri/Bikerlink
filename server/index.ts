@@ -871,17 +871,12 @@ function setupErrorHandler(app: express.Application) {
               // Execute batch UPDATE per cycle (one round-trip per runtimeVersion)
               let totalUpdated = 0;
               for (const [rv, ids] of assignMap) {
-                const result = await pool.query(
-                  `UPDATE ota_releases SET runtime_version = $1, updated_at = NOW() WHERE id = ANY($2::text[])`,
-                  [rv, ids]
-                );
+                const result = await db.execute(sql`UPDATE ota_releases SET runtime_version = ${rv}, updated_at = NOW() WHERE id = ANY(${ids}::text[])`);
                 totalUpdated += (result.rowCount ?? 0);
               }
 
               // Post-backfill verification
-              const nullCheck = await pool.query(
-                `SELECT COUNT(*)::int AS remaining FROM ota_releases WHERE runtime_version IS NULL`
-              );
+              const nullCheck = await db.execute(sql`SELECT COUNT(*)::int AS remaining FROM ota_releases WHERE runtime_version IS NULL`);
               const remaining = (nullCheck.rows[0] as { remaining: number }).remaining ?? 0;
               if (remaining === 0) {
                 console.log(`[MIGRATION] ota_releases: runtime_version backfill complete — ${totalUpdated} row(s) updated, all rows non-NULL`);
@@ -893,9 +888,7 @@ function setupErrorHandler(app: express.Application) {
             console.warn("[MIGRATION] ota_releases backfill runtime_version:", backfillErr);
             // Operational alert: check for remaining NULL rows even after failure
             try {
-              const alertCheck = await pool.query(
-                `SELECT COUNT(*)::int AS remaining FROM ota_releases WHERE runtime_version IS NULL`
-              );
+              const alertCheck = await db.execute(sql`SELECT COUNT(*)::int AS remaining FROM ota_releases WHERE runtime_version IS NULL`);
               const alertRemaining = (alertCheck.rows[0] as { remaining: number }).remaining ?? 0;
               if (alertRemaining > 0) {
                 console.error(`[MIGRATION] ota_releases: ALERT — ${alertRemaining} row(s) have NULL runtime_version due to backfill error. Strict OTA filtering is active; these rows will not be served.`);
@@ -944,13 +937,12 @@ function setupErrorHandler(app: express.Application) {
         // + delete corresponding bundles from object storage (best-effort)
         try {
           const retentionDays = await getOtaRetentionDays();
-          const cleanupResult = await pool.query(
-            `DELETE FROM ota_releases
-             WHERE status IN ('superseded', 'draft')
-               AND published_at < NOW() - ($1 || ' days')::INTERVAL
-             RETURNING id, version, status, published_at, bundle_path`,
-            [String(retentionDays)]
-          );
+          const cleanupResult = await db.execute(sql`
+            DELETE FROM ota_releases
+            WHERE status IN ('superseded', 'draft')
+              AND published_at < NOW() - (${String(retentionDays)} || ' days')::INTERVAL
+            RETURNING id, version, status, published_at, bundle_path
+          `);
           const deletedRows = cleanupResult.rows as Array<{ id: string; version: string; status: string; published_at: string; bundle_path: string | null }>;
           if (deletedRows.length > 0) {
             console.log(`[OTA-CLEANUP] Removed ${deletedRows.length} stale OTA release(s) older than ${retentionDays} days:`);
@@ -1666,13 +1658,12 @@ function setupErrorHandler(app: express.Application) {
 
             // Returns true only when EVERY new country has at least minPerZone users per zone.
             const checkCoverage = async (minPerZone: number): Promise<boolean> => {
-              const rows = await pool.query<{ country: string; cnt: number }>(
-                `SELECT country, COUNT(*)::int AS cnt FROM users
-                 WHERE invitation_code = 'mass_seed_5k_v1' AND country = ANY($1::text[])
-                 GROUP BY country`,
-                [Array.from(NEW_ZONE_COUNTRIES)]
-              );
-              const countByCountry = new Map(rows.rows.map(r => [r.country, r.cnt]));
+              const rows = await db.execute(sql`
+                SELECT country, COUNT(*)::int AS cnt FROM users
+                WHERE invitation_code = 'mass_seed_5k_v1' AND country = ANY(${Array.from(NEW_ZONE_COUNTRIES)}::text[])
+                GROUP BY country
+              `);
+              const countByCountry = new Map((rows.rows as Array<{ country: string; cnt: number }>).map(r => [r.country, r.cnt]));
               for (const [country, zoneCount] of zonesPerCountry) {
                 const have = countByCountry.get(country) ?? 0;
                 if (have < zoneCount * minPerZone) return false;
@@ -1907,13 +1898,12 @@ function setupErrorHandler(app: express.Application) {
           const runOtaCleanup = async () => {
             try {
               const retentionDays = await getOtaRetentionDays();
-              const result = await pool.query(
-                `DELETE FROM ota_releases
-                 WHERE status IN ('superseded', 'draft')
-                   AND published_at < NOW() - ($1 || ' days')::INTERVAL
-                 RETURNING id, version, status, published_at`,
-                [String(retentionDays)]
-              );
+              const result = await db.execute(sql`
+                DELETE FROM ota_releases
+                WHERE status IN ('superseded', 'draft')
+                  AND published_at < NOW() - (${String(retentionDays)} || ' days')::INTERVAL
+                RETURNING id, version, status, published_at
+              `);
               const rows = result.rows as Array<{ id: string; version: string; status: string; published_at: string }>;
               if (rows.length > 0) {
                 console.log(`[OTA-CLEANUP] Periodic: removed ${rows.length} stale OTA release(s) older than ${retentionDays} days:`);
@@ -1951,16 +1941,15 @@ function setupErrorHandler(app: express.Application) {
           const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
           const runOtaEventsCleanup = async () => {
             try {
-              const result = await pool.query(
-                `DELETE FROM ota_events
-                 WHERE id IN (
-                   SELECT id FROM ota_events
-                   ORDER BY created_at DESC
-                   OFFSET $1
-                 ) OR created_at < NOW() - INTERVAL '30 days'
-                 RETURNING id`,
-                [OTA_EVENTS_RETENTION]
-              );
+              const result = await db.execute(sql`
+                DELETE FROM ota_events
+                WHERE id IN (
+                  SELECT id FROM ota_events
+                  ORDER BY created_at DESC
+                  OFFSET ${OTA_EVENTS_RETENTION}
+                ) OR created_at < NOW() - INTERVAL '30 days'
+                RETURNING id
+              `);
               const count = result.rowCount ?? 0;
               if (count > 0) {
                 console.log(`[OTA-EVENTS-CLEANUP] Removed ${count} old ota_events record(s) (retention=${OTA_EVENTS_RETENTION}).`);

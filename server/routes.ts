@@ -371,13 +371,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/updates/check", async (_req: Request, res: Response) => {
     try {
-      const result = await pool.query(
-        "SELECT * FROM ota_releases WHERE status = 'active' ORDER BY published_at DESC LIMIT 1"
-      );
+      const result = await db.execute(sql`SELECT * FROM ota_releases WHERE status = 'active' ORDER BY published_at DESC LIMIT 1`);
       if (!result.rows.length) {
         return res.json({ hasUpdate: false, version: null, releaseNotes: null, bundlePath: null, publishedAt: null });
       }
-      const release = result.rows[0];
+      const release = result.rows[0] as Record<string, unknown>;
       return res.json({
         hasUpdate: true,
         version: release.version,
@@ -600,10 +598,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let hasSlotAssignment = false;
       if (deviceId) {
         try {
-          const assignResult = await pool.query(
-            "SELECT slot, expires_at FROM device_ota_assignments WHERE device_id = $1",
-            [deviceId]
-          );
+          const assignResult = await db.execute(sql`SELECT slot, expires_at FROM device_ota_assignments WHERE device_id = ${deviceId}`);
           if (assignResult.rows.length > 0) {
             const asgn = assignResult.rows[0];
             const expired = asgn.expires_at && new Date(asgn.expires_at) <= new Date();
@@ -621,10 +616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (hasSlotAssignment && assignedSlot) {
         // Path A: strict slot routing — no legacy fallback
-        const slotResult = await pool.query(
-          "SELECT * FROM ota_releases WHERE slot = $1 AND status = 'active' AND runtime_version = $2 ORDER BY published_at DESC LIMIT 1",
-          [assignedSlot, effectiveRv]
-        );
+        const slotResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = ${assignedSlot} AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
         if (slotResult.rows.length > 0) {
           release = slotResult.rows[0] as Record<string, unknown>;
           // Note: `serving_broken_ota` telemetry is intentionally omitted here because
@@ -636,10 +628,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // → fall back to stable (never to legacy)
           const reason = `slot=${assignedSlot} no active OTA`;
           await logEvent("fallback_to_stable", null, reason);
-          const stableResult = await pool.query(
-            "SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
-            [effectiveRv]
-          );
+          const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
           if (stableResult.rows.length > 0) {
             release = stableResult.rows[0] as Record<string, unknown>;
           } else {
@@ -649,19 +638,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else {
         // Path B: no assignment — try stable slot first
-        const stableResult = await pool.query(
-          "SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
-          [effectiveRv]
-        );
+        const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
         if (stableResult.rows.length > 0) {
           release = stableResult.rows[0] as Record<string, unknown>;
         } else {
           // Legacy fallback: only for pre-slot OTA records (slot IS NULL).
           // This handles devices calling before any admin has assigned the stable slot.
-          const legacyResult = await pool.query(
-            "SELECT * FROM ota_releases WHERE slot IS NULL AND status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
-            [effectiveRv]
-          );
+          const legacyResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot IS NULL AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
           if (legacyResult.rows.length > 0) {
             release = legacyResult.rows[0] as Record<string, unknown>;
             await logEvent("legacy_fallback", String(legacyResult.rows[0].id), "stable slot empty, serving legacy pre-slot OTA");
@@ -761,14 +744,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // — draft/inactive/revoked releases must not leak — and (b) re-validate
       // the bundle_path against the OTA prefix allowlist as defense-in-depth
       // in case any legacy or out-of-band INSERT bypassed the admin gate.
-      const result = await pool.query(
-        "SELECT bundle_path FROM ota_releases WHERE id = $1 AND status = 'active'",
-        [releaseId]
-      );
-      if (!result.rows.length || !result.rows[0].bundle_path) {
+      const result = await db.execute(sql`SELECT bundle_path FROM ota_releases WHERE id = ${releaseId} AND status = 'active'`);
+      if (!result.rows.length || !(result.rows[0] as Record<string, unknown>).bundle_path) {
         return res.status(404).end();
       }
-      const bundlePath = result.rows[0].bundle_path as string;
+      const bundlePath = (result.rows[0] as Record<string, unknown>).bundle_path as string;
       const { downloadBuffer, isValidOtaBundlePath } = await import("./objectStorage");
       if (!isValidOtaBundlePath(bundlePath)) {
         console.error(
@@ -823,10 +803,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Validate releaseId exists (reject unknown IDs — prevents metric poisoning)
-      const exists = await pool.query(
-        "SELECT id FROM ota_releases WHERE id = $1 LIMIT 1",
-        [safeReleaseId]
-      );
+      const exists = await db.execute(sql`SELECT id FROM ota_releases WHERE id = ${safeReleaseId} LIMIT 1`);
       if (!exists.rows.length) {
         return res.status(404).json({ message: "Release non trovata" });
       }
@@ -835,14 +812,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Uses ota_events: if a 'loaded' event for this device+release exists recently, skip increment
       let shouldIncrementCount = true;
       if (safeDeviceId) {
-        const recent = await pool.query(
-          "SELECT 1 FROM ota_events WHERE phase='loaded' AND source=$1 AND release_id=$2 AND created_at > NOW() - INTERVAL '5 minutes' LIMIT 1",
-          [safeDeviceId, safeReleaseId]
-        );
+        const recent = await db.execute(sql`SELECT 1 FROM ota_events WHERE phase='loaded' AND source=${safeDeviceId} AND release_id=${safeReleaseId} AND created_at > NOW() - INTERVAL '5 minutes' LIMIT 1`);
         if (recent.rows.length > 0) shouldIncrementCount = false;
       }
 
-      const { db } = await import("./db");
       const { otaEvents } = await import("@shared/schema");
 
       await db.insert(otaEvents).values({
@@ -857,10 +830,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       if (shouldIncrementCount) {
-        await pool.query(
-          "UPDATE ota_releases SET success_count = success_count + 1, updated_at = NOW() WHERE id = $1",
-          [safeReleaseId]
-        );
+        await db.execute(sql`UPDATE ota_releases SET success_count = success_count + 1, updated_at = NOW() WHERE id = ${safeReleaseId}`);
       }
 
       return res.json({ ok: true, counted: shouldIncrementCount });
@@ -1787,39 +1757,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const [photos, gpsRoutes, sentMessagesResult, contestResult] = await Promise.all([
       storage.getUserPhotos(userId),
       storage.getRoutes(userId),
-      pool.query<{
-        message_id: string;
-        conversation_id: string;
-        message_type: string;
-        content: string | null;
-        image_url: string | null;
-        latitude: number | null;
-        longitude: number | null;
-        created_at: Date;
-      }>(
-        `SELECT m.id AS message_id, m.conversation_id, m.message_type, m.content,
-                m.image_url, m.latitude, m.longitude, m.created_at
-         FROM messages m
-         WHERE m.sender_id = $1
-         ORDER BY m.created_at DESC`,
-        [userId]
-      ),
-      pool.query<{
-        id: string;
-        photo_url: string | null;
-        caption: string | null;
-        week_number: number;
-        year: number;
-        votes_count: number;
-        is_approved: boolean;
-        created_at: Date;
-      }>(
-        `SELECT id, photo_url, caption, week_number, year, votes_count, is_approved, created_at
-         FROM photo_contest_entries
-         WHERE user_id = $1
-         ORDER BY created_at DESC`,
-        [userId]
-      ),
+      db.execute(sql`
+        SELECT m.id AS message_id, m.conversation_id, m.message_type, m.content,
+               m.image_url, m.latitude, m.longitude, m.created_at
+        FROM messages m
+        WHERE m.sender_id = ${userId}
+        ORDER BY m.created_at DESC
+      `),
+      db.execute(sql`
+        SELECT id, photo_url, caption, week_number, year, votes_count, is_approved, created_at
+        FROM photo_contest_entries
+        WHERE user_id = ${userId}
+        ORDER BY created_at DESC
+      `),
     ]);
 
     const exportData = {
