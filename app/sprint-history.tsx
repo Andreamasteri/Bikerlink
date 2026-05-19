@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,14 +7,17 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-
+  Modal,
+  Pressable,
+  TextInput,
+  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getQueryFn } from "@/lib/query-client";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { getQueryFn, apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { useUnits } from "@/lib/units-context";
 import { formatDateTime } from "@/lib/units";
@@ -69,6 +72,36 @@ export default function SprintHistoryScreen() {
 
   const personalBest: SprintResult | null = sprints && sprints.length > 0 ? sprints[0] : null;
 
+  const [publishSprint, setPublishSprint] = useState<SprintResult | null>(null);
+  const [publishCaption, setPublishCaption] = useState("");
+
+  const publishMutation = useMutation({
+    mutationFn: async (data: { performanceData: string; caption: string }) => {
+      await apiRequest("POST", "/api/contest/entries", data);
+    },
+    onSuccess: () => {
+      setPublishSprint(null);
+      setPublishCaption("");
+      queryClient.invalidateQueries({ queryKey: ["/api/contest/entries"] });
+      Alert.alert(t("tracking.published"), t("tracking.publishedMsg"));
+    },
+    onError: () => Alert.alert(t("common.error"), t("tracking.publishError")),
+  });
+
+  const handlePublish = useCallback(() => {
+    if (!publishSprint) return;
+    const perfData = JSON.stringify({
+      type: "sprint",
+      sprint0to100Ms: publishSprint.sprint0to100Ms ?? 0,
+      targetSpeedKmh: 100,
+      maxAccelerationG: publishSprint.maxAccelerationG ?? 0,
+      maxDecelerationG: publishSprint.maxDecelerationG ?? 0,
+      maxTiltDeg: publishSprint.maxTiltDeg ?? 0,
+      date: publishSprint.createdAt,
+    });
+    publishMutation.mutate({ performanceData: perfData, caption: publishCaption });
+  }, [publishSprint, publishCaption, publishMutation]);
+
   const renderItem = useCallback(
     ({ item, index }: { item: SprintResult; index: number }) => {
       const isRecord = index === 0;
@@ -122,6 +155,19 @@ export default function SprintHistoryScreen() {
               {formatDateTime(item.createdAt, locale, timeFormat)}
             </Text>
           </View>
+
+          <TouchableOpacity
+            style={styles.publishBtn}
+            onPress={() => {
+              setPublishCaption("");
+              setPublishSprint(item);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+            testID={`publish-sprint-${item.id}`}
+          >
+            <Ionicons name="share-outline" size={18} color={Colors.accent} />
+          </TouchableOpacity>
         </View>
       );
     },
@@ -201,6 +247,86 @@ export default function SprintHistoryScreen() {
           }
         />
       )}
+
+      {/* ── PUBLISH MODAL ────────────────────────────────────────────────── */}
+      <Modal
+        visible={!!publishSprint}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPublishSprint(null)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setPublishSprint(null)}>
+          <Pressable style={styles.publishModal} onPress={() => {}}>
+            <Text style={styles.publishTitle}>{t("tracking.publish")}</Text>
+            <Text style={styles.publishSubtitle}>{t("tracking.publishDesc")}</Text>
+
+            {publishSprint && (
+              <View style={styles.publishSummary}>
+                <View style={styles.publishSummaryRow}>
+                  <Ionicons name="speedometer-outline" size={16} color={Colors.accentRed} />
+                  <Text style={styles.publishSummaryText}>
+                    0→{targetLabel}: {formatSprintTime(publishSprint.sprint0to100Ms ?? 0)}
+                  </Text>
+                </View>
+                {(publishSprint.maxAccelerationG ?? 0) > 0 && (
+                  <View style={styles.publishSummaryRow}>
+                    <Ionicons name="pulse-outline" size={16} color={Colors.accentRed} />
+                    <Text style={styles.publishSummaryText}>
+                      {(publishSprint.maxAccelerationG ?? 0).toFixed(2)}G
+                    </Text>
+                  </View>
+                )}
+                {(publishSprint.maxTiltDeg ?? 0) > 0 && (
+                  <View style={styles.publishSummaryRow}>
+                    <Ionicons name="compass-outline" size={16} color={Colors.accent} />
+                    <Text style={styles.publishSummaryText}>
+                      {(publishSprint.maxTiltDeg ?? 0).toFixed(1)}°
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <TextInput
+              style={styles.publishInput}
+              placeholder={t("tracking.publishPlaceholder")}
+              placeholderTextColor={Colors.textSecondary}
+              value={publishCaption}
+              onChangeText={setPublishCaption}
+              maxLength={200}
+              multiline
+            />
+            <View style={styles.publishActions}>
+              <TouchableOpacity
+                style={styles.publishCancelBtn}
+                onPress={() => setPublishSprint(null)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.publishCancelText}>{t("common.cancel")}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.publishConfirmBtn,
+                  publishMutation.isPending && { opacity: 0.5 },
+                ]}
+                onPress={handlePublish}
+                disabled={publishMutation.isPending}
+                activeOpacity={0.7}
+                testID="publish-sprint-confirm"
+              >
+                {publishMutation.isPending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="share-outline" size={16} color="#fff" />
+                    <Text style={styles.publishConfirmText}>{t("tracking.publishBtn")}</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -354,5 +480,97 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "right",
     lineHeight: 15,
+  },
+  publishBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.accent + "40",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 20,
+  },
+  publishModal: {
+    width: "100%",
+    maxWidth: 400,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    gap: 12,
+  },
+  publishTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: Colors.text,
+  },
+  publishSubtitle: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  publishSummary: {
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    padding: 12,
+    gap: 8,
+  },
+  publishSummaryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  publishSummaryText: {
+    fontSize: 14,
+    color: Colors.text,
+    fontWeight: "600",
+  },
+  publishInput: {
+    backgroundColor: Colors.background,
+    borderRadius: 10,
+    padding: 12,
+    color: Colors.text,
+    fontSize: 14,
+    minHeight: 80,
+    textAlignVertical: "top",
+  },
+  publishActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 4,
+  },
+  publishCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.background,
+  },
+  publishCancelText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.textSecondary,
+  },
+  publishConfirmBtn: {
+    flex: 1,
+    flexDirection: "row",
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.accent,
+    gap: 6,
+  },
+  publishConfirmText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
   },
 });
