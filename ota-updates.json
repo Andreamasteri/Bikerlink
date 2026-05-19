@@ -903,25 +903,26 @@
     "cycle": "9.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-2 rv9.0.0: Ciclo 9.x: schema versione 46.29.9 + rv 9.0.0 (#1525), fix brace-expansion build (#1526)",
+    "message": "OTA-2 rv9.0.0: Ciclo 9.x: pulizia automatica cache Metro + watchdog (#1527, #1528, #1529)",
     "note": "CURRENT_OTA_NUMBER=2. Pubblicato da publish-ota.sh (2-stage).",
     "runtimeVersion": "9.0.0",
     "jsEngine": "hermes",
     "platforms": [
       "android"
     ],
-    "releaseId": null,
-    "bundleUrl": null,
+    "releaseId": "bfc95949-c835-4035-8186-0c611f47535b",
+    "bundleUrl": "private/ota/ota-46.2.9-1779229855092.js",
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
-    "commitBase": "95e2c776e70c5c64893642b4136843e00dfe89ba",
+    "commitBase": "1d7e910e2809ebd9ec9ae24fe7d2fa44ddfee6fa",
     "easDashboard": null,
     "apkBuildId": null,
     "apkBuildDashboard": null,
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "pending"
+    "status": "published",
+    "publishedAt": "2026-05-19T22:31:01.196Z"
   }
 ]
