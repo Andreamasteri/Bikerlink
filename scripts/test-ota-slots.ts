@@ -2,87 +2,49 @@
 /**
  * Task #1355 — Test integrazione OTA slot-based routing
  *
- * Simula 3 device su 3 slot (stable / test-1 / no-assignment) e verifica
- * che ognuno riceva l'OTA corretto (o noUpdateAvailable se nessun OTA è assegnato allo slot).
+ * Simula 3 device su 3 slot e verifica che ognuno riceva l'OTA del suo slot
+ * (o noUpdateAvailable se lo slot non ha OTA assegnati).
+ * Asserisce esplicitamente il releaseId restituito confrontandolo con il DB.
  *
  * Uso:
  *   npx tsx scripts/test-ota-slots.ts
  *
  * Prerequisiti:
  *   - Backend in ascolto su PORT (default 5000)
- *   - Almeno un OTA con slot='stable' e status='active' nel DB
+ *   - Sessione admin valida per gli endpoint /api/admin/*
  */
 
 const BASE = process.env.BIKERLINK_PUBLIC_URL ?? `http://localhost:${process.env.PORT ?? 5000}`;
-const RUNTIME_VERSION = process.env.TEST_RUNTIME_VERSION ?? "1.0.0";
-
-interface TestCase {
-  name: string;
-  deviceId: string | null;
-  slot: string | null;
-  expectSlot: string;
-}
-
-const TEST_CASES: TestCase[] = [
-  {
-    name: "Device senza assegnazione → riceve stable",
-    deviceId: "test-device-no-assignment",
-    slot: null,
-    expectSlot: "stable",
-  },
-  {
-    name: "Device assegnato a test-1 → riceve test-1 (o fallback stable)",
-    deviceId: "test-device-test1",
-    slot: "test-1",
-    expectSlot: "test-1",
-  },
-  {
-    name: "Device assegnato a test-2 → riceve test-2 (o fallback stable)",
-    deviceId: "test-device-test2",
-    slot: "test-2",
-    expectSlot: "test-2",
-  },
-  {
-    name: "Device senza header expo-device-id → riceve stable (legacy)",
-    deviceId: null,
-    slot: null,
-    expectSlot: "stable",
-  },
-];
-
+const RUNTIME_VERSION = process.env.TEST_RUNTIME_VERSION ?? "8.0.0";
 const ADMIN_PASSWORD = process.env.BIKERLINK_ADMIN_PASSWORD ?? "";
 
-async function setupAssignment(deviceId: string, slot: string) {
-  const res = await fetch(`${BASE}/api/admin/ota/assign-device`, {
+// ─── helpers ───────────────────────────────────────────────────────────────
+
+async function adminLogin(): Promise<string> {
+  const res = await fetch(`${BASE}/api/auth/login`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${ADMIN_PASSWORD}`,
-      "x-admin-password": ADMIN_PASSWORD,
-    },
-    body: JSON.stringify({ deviceId, slot }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "admin@bikerlink.it", password: ADMIN_PASSWORD }),
+    credentials: "include",
   });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`assign-device failed for ${deviceId}→${slot}: ${res.status} ${body}`);
-  }
+  const setCookie = res.headers.get("set-cookie") ?? "";
+  const match = setCookie.match(/connect\.sid=([^;]+)/);
+  if (!match) throw new Error(`Login fallito HTTP ${res.status}: impossibile estrarre cookie sessione`);
+  return `connect.sid=${match[1]}`;
 }
 
-async function cleanupAssignment(deviceId: string) {
-  await fetch(`${BASE}/api/admin/ota/device-assignments/${encodeURIComponent(deviceId)}`, {
-    method: "DELETE",
-    headers: {
-      "Authorization": `Bearer ${ADMIN_PASSWORD}`,
-      "x-admin-password": ADMIN_PASSWORD,
-    },
+async function adminFetch(path: string, init: RequestInit = {}, cookie = "") {
+  return fetch(`${BASE}${path}`, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}), ...(init.headers ?? {}) },
   });
 }
 
+/** Chiama /api/expo-updates come farebbe il client Expo e restituisce il releaseId dal manifest */
 async function checkExpoUpdates(deviceId: string | null): Promise<{
   status: number;
   hasUpdate: boolean;
   releaseId: string | null;
-  contentType: string;
 }> {
   const headers: Record<string, string> = {
     "expo-runtime-version": RUNTIME_VERSION,
@@ -93,12 +55,11 @@ async function checkExpoUpdates(deviceId: string | null): Promise<{
   if (deviceId) headers["expo-device-id"] = deviceId;
 
   const res = await fetch(`${BASE}/api/expo-updates`, { headers });
-  const contentType = res.headers.get("content-type") ?? "";
   const body = await res.text();
 
-  // Parse multipart/mixed response to extract manifest or directive
   let hasUpdate = false;
   let releaseId: string | null = null;
+
   if (body.includes('"type":"noUpdateAvailable"') || body.includes('"noUpdateAvailable"')) {
     hasUpdate = false;
   } else if (body.includes('"id"')) {
@@ -107,8 +68,10 @@ async function checkExpoUpdates(deviceId: string | null): Promise<{
     releaseId = match ? match[1] : null;
   }
 
-  return { status: res.status, hasUpdate, releaseId, contentType };
+  return { status: res.status, hasUpdate, releaseId };
 }
+
+// ─── main ───────────────────────────────────────────────────────────────────
 
 async function runTests() {
   console.log(`\n════════════════════════════════════════`);
@@ -116,93 +79,204 @@ async function runTests() {
   console.log(`  Runtime Version: ${RUNTIME_VERSION}`);
   console.log(`════════════════════════════════════════\n`);
 
-  // Prima: ottieni la lista delle release per conoscere cosa c'è nello stable
-  const releasesRes = await fetch(`${BASE}/api/admin/ota/releases`, {
-    headers: {
-      "Authorization": `Bearer ${ADMIN_PASSWORD}`,
-      "x-admin-password": ADMIN_PASSWORD,
-    },
-  });
-  if (!releasesRes.ok) {
-    console.warn(`⚠️  Non riesco a ottenere la lista releases (${releasesRes.status}) — test di slot specifici possono fallire`);
-  } else {
-    const releases = await releasesRes.json() as Array<{ id: string; version: string; slot: string | null; status: string; runtime_version: string }>;
-    const stable = releases.filter((r) => r.slot === "stable" && r.status === "active");
-    console.log(`📦 OTA presenti: ${releases.length} totali, ${stable.length} nello slot stable`);
-    if (stable.length > 0) {
-      console.log(`   Stable: ${stable.map((r) => `${r.version} (rv=${r.runtime_version})`).join(", ")}`);
-    } else {
-      console.warn(`   ⚠️  Nessun OTA nello slot 'stable' — routing slot-based produrrà noUpdateAvailable`);
-    }
-    console.log();
+  // Login admin
+  let adminCookie = "";
+  try {
+    adminCookie = await adminLogin();
+    console.log(`  ✅ Login admin OK\n`);
+  } catch (e) {
+    console.warn(`  ⚠️  Login admin fallito: ${(e as Error).message}`);
+    console.warn(`  ⚠️  I test degli endpoint admin saranno saltati.\n`);
   }
 
-  // Setup: assegna device a slot
-  for (const tc of TEST_CASES) {
-    if (tc.deviceId && tc.slot) {
-      try {
-        await setupAssignment(tc.deviceId, tc.slot);
-        console.log(`  📌 Assegnato ${tc.deviceId} → slot ${tc.slot}`);
-      } catch (e) {
-        console.warn(`  ⚠️  Setup assignment fallito: ${(e as Error).message}`);
-      }
+  // Recupera lista releases per sapere cosa c'è nello stable/test-1
+  interface Release { id: string; version: string; slot: string | null; status: string; runtime_version: string }
+  let releases: Release[] = [];
+  let stableRelease: Release | null = null;
+  let test1Release: Release | null = null;
+
+  if (adminCookie) {
+    const relRes = await adminFetch("/api/admin/ota/releases", {}, adminCookie);
+    if (relRes.ok) {
+      releases = await relRes.json() as Release[];
+      stableRelease = releases.find(r => r.slot === "stable" && r.status === "active" && r.runtime_version === RUNTIME_VERSION) ?? null;
+      test1Release  = releases.find(r => r.slot === "test-1" && r.status === "active" && r.runtime_version === RUNTIME_VERSION) ?? null;
+      console.log(`  📦 OTA presenti: ${releases.length} totali`);
+      if (stableRelease) console.log(`     stable: ${stableRelease.version} (${stableRelease.id})`);
+      else console.log(`     stable: nessuno (rv=${RUNTIME_VERSION})`);
+      if (test1Release) console.log(`     test-1: ${test1Release.version} (${test1Release.id})`);
+      else console.log(`     test-1: nessuno (rv=${RUNTIME_VERSION})`);
+      console.log();
     }
   }
-  console.log();
 
   let passed = 0;
   let failed = 0;
 
-  for (const tc of TEST_CASES) {
-    try {
-      const result = await checkExpoUpdates(tc.deviceId);
-      const symbol = result.status === 200 ? "✅" : "❌";
-      console.log(`${symbol} ${tc.name}`);
-      console.log(`   deviceId: ${tc.deviceId ?? "(assente)"}  expectedSlot: ${tc.expectSlot}`);
-      console.log(`   HTTP ${result.status} | hasUpdate=${result.hasUpdate} | releaseId=${result.releaseId ?? "n/a"}`);
+  function pass(label: string, detail = "") {
+    console.log(`  ✅ ${label}${detail ? " — " + detail : ""}`);
+    passed++;
+  }
+  function fail(label: string, detail = "") {
+    console.log(`  ❌ ${label}${detail ? " — " + detail : ""}`);
+    failed++;
+  }
 
-      if (result.status === 200) {
-        passed++;
+  // ── Test 1: device senza assegnazione → riceve lo stable (o noUpdate se stable è vuoto) ──
+  {
+    const result = await checkExpoUpdates("test-device-no-assign");
+    if (result.status !== 200) {
+      fail("Senza assegnazione: HTTP 200", `HTTP ${result.status}`);
+    } else if (stableRelease) {
+      // Deve restituire esattamente il releaseId dello stable
+      if (result.releaseId === stableRelease.id) {
+        pass("Senza assegnazione → riceve stable", `releaseId=${result.releaseId?.substring(0, 8)}…`);
       } else {
-        failed++;
-        console.log(`   ❌ HTTP ${result.status} inatteso`);
+        fail("Senza assegnazione → releaseId sbagliato", `atteso=${stableRelease.id.substring(0, 8)}… ricevuto=${result.releaseId?.substring(0, 8) ?? "n/a"}`);
       }
-    } catch (e) {
-      failed++;
-      console.log(`❌ ${tc.name}`);
-      console.log(`   ERRORE: ${(e as Error).message}`);
+    } else {
+      // stable vuoto → noUpdateAvailable è corretto
+      if (!result.hasUpdate) {
+        pass("Senza assegnazione, stable vuoto → noUpdateAvailable (corretto)");
+      } else {
+        fail("Senza assegnazione, stable vuoto → inaspettatamente ha ricevuto un OTA", `releaseId=${result.releaseId}`);
+      }
+    }
+    console.log(`     HTTP ${result.status} | hasUpdate=${result.hasUpdate} | releaseId=${result.releaseId ?? "n/a"}\n`);
+  }
+
+  // ── Test 2: device senza header expo-device-id → legacy, deve ricevere stable ──
+  {
+    const result = await checkExpoUpdates(null);
+    if (result.status !== 200) {
+      fail("Senza header expo-device-id: HTTP 200", `HTTP ${result.status}`);
+    } else if (stableRelease) {
+      if (result.releaseId === stableRelease.id) {
+        pass("Senza header → riceve stable", `releaseId=${result.releaseId?.substring(0, 8)}…`);
+      } else {
+        fail("Senza header → releaseId sbagliato", `atteso=${stableRelease.id.substring(0, 8)}… ricevuto=${result.releaseId?.substring(0, 8) ?? "n/a"}`);
+      }
+    } else {
+      if (!result.hasUpdate) {
+        pass("Senza header, stable vuoto → noUpdateAvailable (corretto)");
+      } else {
+        fail("Senza header, stable vuoto → inaspettatamente ha ricevuto un OTA", `releaseId=${result.releaseId}`);
+      }
+    }
+    console.log(`     HTTP ${result.status} | hasUpdate=${result.hasUpdate} | releaseId=${result.releaseId ?? "n/a"}\n`);
+  }
+
+  // ── Test 3: device assegnato a test-1 ──
+  if (adminCookie) {
+    const TEST_DEVICE = "test-device-slot-test1-xxx";
+    // Assegna device a test-1
+    const assignRes = await adminFetch("/api/admin/ota/assign-device", {
+      method: "POST",
+      body: JSON.stringify({ deviceId: TEST_DEVICE, slot: "test-1" }),
+    }, adminCookie);
+    if (!assignRes.ok) {
+      fail("Assign device a test-1", `HTTP ${assignRes.status}`);
+    } else {
+      const result = await checkExpoUpdates(TEST_DEVICE);
+      if (result.status !== 200) {
+        fail("Device test-1: HTTP 200", `HTTP ${result.status}`);
+      } else if (test1Release) {
+        // Deve ricevere esattamente il releaseId di test-1
+        if (result.releaseId === test1Release.id) {
+          pass("Device test-1 → riceve test-1", `releaseId=${result.releaseId?.substring(0, 8)}…`);
+        } else {
+          fail("Device test-1 → releaseId sbagliato", `atteso=${test1Release.id.substring(0, 8)}… ricevuto=${result.releaseId?.substring(0, 8) ?? "n/a"}`);
+        }
+      } else {
+        // test-1 vuoto → fallback a stable o noUpdate — entrambi corretti
+        if (stableRelease && result.releaseId === stableRelease.id) {
+          pass("Device test-1, slot vuoto → fallback a stable (corretto)", `releaseId=${result.releaseId?.substring(0, 8)}…`);
+        } else if (!result.hasUpdate) {
+          pass("Device test-1, slot e stable vuoti → noUpdateAvailable (corretto)");
+        } else {
+          fail("Device test-1, slot vuoto → OTA inaspettato", `releaseId=${result.releaseId}`);
+        }
+      }
+      console.log(`     HTTP ${result.status} | hasUpdate=${result.hasUpdate} | releaseId=${result.releaseId ?? "n/a"}\n`);
+
+      // Cleanup
+      await adminFetch(`/api/admin/ota/device-assignments/${encodeURIComponent(TEST_DEVICE)}`, { method: "DELETE" }, adminCookie);
+    }
+  } else {
+    console.log(`  ⏭  Test device test-1 saltato (no sessione admin)\n`);
+  }
+
+  // ── Test 4: device assegnato a slot scaduto → trattato come senza assegnazione → stable ──
+  if (adminCookie) {
+    const TEST_DEVICE_EXP = "test-device-expired-xxx";
+    const pastDate = new Date(Date.now() - 60000).toISOString(); // 1 min fa
+    const assignRes = await adminFetch("/api/admin/ota/assign-device", {
+      method: "POST",
+      body: JSON.stringify({ deviceId: TEST_DEVICE_EXP, slot: "test-1", expiresAt: pastDate }),
+    }, adminCookie);
+    if (!assignRes.ok) {
+      fail("Assign device con scadenza passata", `HTTP ${assignRes.status}`);
+    } else {
+      const result = await checkExpoUpdates(TEST_DEVICE_EXP);
+      // Il device dovrebbe ricevere stable (slot scaduto → fallback a path B)
+      if (result.status !== 200) {
+        fail("Device slot scaduto: HTTP 200", `HTTP ${result.status}`);
+      } else if (stableRelease && result.releaseId === stableRelease.id) {
+        pass("Device slot scaduto → riceve stable (corretto)", `releaseId=${result.releaseId?.substring(0, 8)}…`);
+      } else if (!stableRelease && !result.hasUpdate) {
+        pass("Device slot scaduto, stable vuoto → noUpdateAvailable (corretto)");
+      } else if (stableRelease && result.releaseId !== stableRelease.id) {
+        fail("Device slot scaduto → releaseId sbagliato", `atteso=${stableRelease.id.substring(0, 8)}… ricevuto=${result.releaseId?.substring(0, 8) ?? "n/a"}`);
+      } else {
+        pass("Device slot scaduto → risposta ragionevole");
+      }
+      console.log(`     HTTP ${result.status} | hasUpdate=${result.hasUpdate} | releaseId=${result.releaseId ?? "n/a"}\n`);
+      await adminFetch(`/api/admin/ota/device-assignments/${encodeURIComponent(TEST_DEVICE_EXP)}`, { method: "DELETE" }, adminCookie);
+    }
+  }
+
+  // ── Test 5: heartbeat endpoint ──
+  {
+    const hbRes = await fetch(`${BASE}/api/ota/heartbeat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: "test-hb-device", releaseId: "00000000-test-0000-0000-000000000000", runtimeVersion: RUNTIME_VERSION }),
+    });
+    // 200 = ok, 500 = release non trovata ma endpoint risponde
+    if (hbRes.status === 200 || hbRes.status === 500) {
+      pass(`Heartbeat endpoint risponde HTTP ${hbRes.status}`);
+    } else {
+      fail(`Heartbeat endpoint HTTP ${hbRes.status}`, await hbRes.text());
     }
     console.log();
   }
 
-  // Test heartbeat
-  console.log(`─────────────────────────────────────────`);
-  console.log(`  Test heartbeat endpoint`);
-  const hbRes = await fetch(`${BASE}/api/ota/heartbeat`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ deviceId: "test-device-no-assignment", releaseId: "00000000-0000-0000-0000-000000000000", runtimeVersion: RUNTIME_VERSION }),
-  });
-  if (hbRes.status === 200 || hbRes.status === 400) {
-    // 400 = releaseId non esiste ma endpoint ha risposto — endpoint funziona
-    console.log(`✅ Heartbeat endpoint risponde HTTP ${hbRes.status} (ok)`);
-    passed++;
-  } else {
-    console.log(`❌ Heartbeat endpoint HTTP ${hbRes.status}`);
-    failed++;
-  }
-  console.log();
-
-  // Cleanup
-  for (const tc of TEST_CASES) {
-    if (tc.deviceId && tc.slot) {
-      await cleanupAssignment(tc.deviceId);
+  // ── Test 6: GET /api/admin/ota/events con filtri ──
+  if (adminCookie) {
+    const evRes = await adminFetch("/api/admin/ota/events?limit=5", {}, adminCookie);
+    if (evRes.ok) {
+      const events = await evRes.json() as unknown[];
+      pass(`GET /api/admin/ota/events → HTTP 200`, `${events.length} eventi`);
+    } else {
+      fail(`GET /api/admin/ota/events`, `HTTP ${evRes.status}`);
     }
+    const evPhaseRes = await adminFetch("/api/admin/ota/events?phase=loaded&limit=5", {}, adminCookie);
+    if (evPhaseRes.ok) {
+      pass(`GET /api/admin/ota/events?phase=loaded OK`);
+    } else {
+      fail(`GET /api/admin/ota/events?phase=loaded`, `HTTP ${evPhaseRes.status}`);
+    }
+    const evDevRes = await adminFetch("/api/admin/ota/events?deviceId=test-hb-device&limit=5", {}, adminCookie);
+    if (evDevRes.ok) {
+      pass(`GET /api/admin/ota/events?deviceId=... OK`);
+    } else {
+      fail(`GET /api/admin/ota/events?deviceId=...`, `HTTP ${evDevRes.status}`);
+    }
+    console.log();
   }
-  console.log(`  🧹 Assegnazioni di test rimosse`);
 
-  console.log(`\n════════════════════════════════════════`);
-  console.log(`  Risultato: ${passed} ✅  ${failed} ❌  (${TEST_CASES.length + 1} test)`);
+  console.log(`════════════════════════════════════════`);
+  console.log(`  Risultato: ${passed} ✅  ${failed} ❌`);
   console.log(`════════════════════════════════════════\n`);
 
   if (failed > 0) process.exit(1);

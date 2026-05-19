@@ -582,9 +582,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Task #1355: slot-based routing — read device ID from expo-device-id header,
       // look up assignment in device_ota_assignments, then serve the OTA for that slot.
-      // Legacy fallback: devices without assignment or without header get 'stable'.
+      //
+      // Two strictly separate paths:
+      //   A) Device HAS an explicit slot assignment → strict slot routing.
+      //      - If the assigned slot has no active OTA AND slot != stable → fall back to stable.
+      //      - If stable also empty → noUpdateAvailable. NEVER falls back to legacy query.
+      //   B) Device has NO assignment (or no header) → serve stable slot.
+      //      - If stable slot is empty → legacy fallback (slot IS NULL, status='active'),
+      //        to support pre-slot OTA records that pre-date the new slot system.
       const deviceId = (req.headers["expo-device-id"] as string | undefined)?.substring(0, 128) || null;
-      let targetSlot = "stable";
+      let assignedSlot: string | null = null;
+      let hasSlotAssignment = false;
       if (deviceId) {
         try {
           const assignResult = await pool.query(
@@ -594,25 +602,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (assignResult.rows.length > 0) {
             const asgn = assignResult.rows[0];
             const expired = asgn.expires_at && new Date(asgn.expires_at) <= new Date();
-            if (!expired) targetSlot = asgn.slot as string;
+            if (!expired) {
+              assignedSlot = asgn.slot as string;
+              hasSlotAssignment = true;
+            }
           }
         } catch (e) {
           console.error("[expo-updates] assignment lookup failed:", e);
         }
       }
 
-      // Try slot-based query first; fall back to legacy active-only query for backward compat.
       let release: Record<string, unknown> | null = null;
-      try {
+
+      if (hasSlotAssignment && assignedSlot) {
+        // Path A: strict slot routing — no legacy fallback
         const slotResult = await pool.query(
           "SELECT * FROM ota_releases WHERE slot = $1 AND status = 'active' AND runtime_version = $2 ORDER BY published_at DESC LIMIT 1",
-          [targetSlot, effectiveRv]
+          [assignedSlot, effectiveRv]
         );
         if (slotResult.rows.length > 0) {
           release = slotResult.rows[0] as Record<string, unknown>;
-        } else if (targetSlot !== "stable") {
-          // Slot requested but no OTA assigned to it — fall back to stable
-          await logEvent("fallback_to_stable", null, `slot=${targetSlot} no active OTA, falling back to stable`);
+        } else if (assignedSlot !== "stable") {
+          // Assigned slot has no active OTA → fall back to stable (never to legacy)
+          await logEvent("fallback_to_stable", null, `slot=${assignedSlot} no active OTA, falling back to stable`);
           const stableResult = await pool.query(
             "SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
             [effectiveRv]
@@ -620,20 +632,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (stableResult.rows.length > 0) {
             release = stableResult.rows[0] as Record<string, unknown>;
           }
+          // stable also empty → noUpdateAvailable (no further fallback)
         }
-      } catch (e) {
-        console.error("[expo-updates] slot query failed:", e);
-      }
-
-      // Legacy fallback: no slot-based release found → use old status='active' query
-      // (supports pre-slot OTA records that have slot=NULL)
-      if (!release) {
-        const legacyResult = await pool.query(
-          "SELECT * FROM ota_releases WHERE status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
+      } else {
+        // Path B: no assignment — try stable slot first
+        const stableResult = await pool.query(
+          "SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
           [effectiveRv]
         );
-        if (legacyResult.rows.length > 0) {
-          release = legacyResult.rows[0] as Record<string, unknown>;
+        if (stableResult.rows.length > 0) {
+          release = stableResult.rows[0] as Record<string, unknown>;
+        } else {
+          // Legacy fallback: only for pre-slot OTA records (slot IS NULL).
+          // This handles devices calling before any admin has assigned the stable slot.
+          const legacyResult = await pool.query(
+            "SELECT * FROM ota_releases WHERE slot IS NULL AND status = 'active' AND runtime_version = $1 ORDER BY published_at DESC LIMIT 1",
+            [effectiveRv]
+          );
+          if (legacyResult.rows.length > 0) {
+            release = legacyResult.rows[0] as Record<string, unknown>;
+          }
         }
       }
 

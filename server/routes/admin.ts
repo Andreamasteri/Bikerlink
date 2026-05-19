@@ -6511,7 +6511,8 @@ router.get("/ota/releases", async (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/ota/assign-slot — assegna un OTA a uno slot
+// POST /api/admin/ota/assign-slot — assegna un OTA a uno slot (un solo occupante per slot)
+// Transazione: rimuove l'occupante precedente dello slot, poi assegna il nuovo.
 // body: { releaseId: string, slot: string }
 router.post("/ota/assign-slot", async (req: Request, res: Response) => {
   try {
@@ -6521,13 +6522,33 @@ router.post("/ota/assign-slot", async (req: Request, res: Response) => {
     if (!VALID_SLOTS.includes(slot)) {
       return res.status(400).json({ message: `slot non valido. Valori ammessi: ${VALID_SLOTS.join(", ")}` });
     }
-    const result = await db.execute(sql`
-      UPDATE ota_releases SET slot = ${slot}, updated_at = NOW()
-      WHERE id = ${releaseId}
-      RETURNING id, version, slot, status
-    `);
-    if (!result.rows.length) return res.status(404).json({ message: "Release non trovata" });
-    // Log evento
+
+    // Transazione: garantisce un solo occupante per slot
+    await pool.query("BEGIN");
+    let assignedRow: Record<string, unknown> | null = null;
+    try {
+      // Rimuovi qualsiasi altra release che occupa già questo slot
+      await pool.query(
+        "UPDATE ota_releases SET slot = NULL, updated_at = NOW() WHERE slot = $1 AND id != $2",
+        [slot, releaseId]
+      );
+      // Assegna il nuovo occupante
+      const result = await pool.query(
+        "UPDATE ota_releases SET slot = $1, updated_at = NOW() WHERE id = $2 RETURNING id, version, slot, status",
+        [slot, releaseId]
+      );
+      if (!result.rows.length) {
+        await pool.query("ROLLBACK");
+        return res.status(404).json({ message: "Release non trovata" });
+      }
+      assignedRow = result.rows[0] as Record<string, unknown>;
+      await pool.query("COMMIT");
+    } catch (txErr) {
+      await pool.query("ROLLBACK");
+      throw txErr;
+    }
+
+    // Log evento (best-effort, fuori dalla transazione)
     try {
       await db.insert(otaEvents).values({
         phase: "admin-assign-slot",
@@ -6543,7 +6564,7 @@ router.post("/ota/assign-slot", async (req: Request, res: Response) => {
       const inv = req.app.locals.invalidateExpoUpdateHash;
       if (typeof inv === "function") inv();
     } catch { /* best-effort */ }
-    return res.json({ ok: true, release: result.rows[0] });
+    return res.json({ ok: true, release: assignedRow });
   } catch (err) {
     console.error("[ADMIN ota/assign-slot] error:", err);
     return res.status(500).json({ message: "Errore interno" });
@@ -6618,7 +6639,12 @@ router.delete("/ota/device-assignments/:deviceId", async (req: Request, res: Res
 });
 
 // POST /api/admin/ota/promote — promuove OTA di uno slot test a STABLE
-// Lo stable corrente diventa previous-stable. body: { fromSlot: string }
+// Transazione atomica:
+//   1. Trova il candidato nel fromSlot (ORDER BY published_at DESC — deterministico)
+//   2. Sposta il previous-stable corrente a slot=NULL (storico)
+//   3. Sposta lo stable corrente a previous-stable
+//   4. Sposta il candidato a stable
+// body: { fromSlot: string }
 router.post("/ota/promote", async (req: Request, res: Response) => {
   try {
     const { fromSlot } = req.body ?? {};
@@ -6628,29 +6654,39 @@ router.post("/ota/promote", async (req: Request, res: Response) => {
       return res.status(400).json({ message: `fromSlot deve essere uno di: ${VALID_TEST_SLOTS.join(", ")}` });
     }
 
-    // Verifica che ci sia un OTA attivo nel fromSlot
-    const testOta = await db.execute(sql`
-      SELECT id, version FROM ota_releases WHERE slot = ${fromSlot} AND status = 'active' LIMIT 1
-    `);
+    // Leggi candidato prima di aprire la transazione (read-only)
+    const testOta = await pool.query(
+      "SELECT id, version FROM ota_releases WHERE slot = $1 AND status = 'active' ORDER BY published_at DESC LIMIT 1",
+      [fromSlot]
+    );
     if (!testOta.rows.length) {
       return res.status(400).json({ message: `Nessun OTA attivo nello slot ${fromSlot}` });
     }
     const testRow = testOta.rows[0] as { id: string; version: string };
 
-    // Lo stable corrente → previous-stable (sovrascrive il precedente previous-stable)
-    await db.execute(sql`
-      UPDATE ota_releases SET slot = 'previous-stable', updated_at = NOW()
-      WHERE slot = 'stable'
-    `);
+    // Transazione atomica
+    await pool.query("BEGIN");
+    try {
+      // Il previous-stable corrente → storico (slot=NULL)
+      await pool.query(
+        "UPDATE ota_releases SET slot = NULL, updated_at = NOW() WHERE slot = 'previous-stable'"
+      );
+      // Lo stable corrente → previous-stable
+      await pool.query(
+        "UPDATE ota_releases SET slot = 'previous-stable', updated_at = NOW() WHERE slot = 'stable'"
+      );
+      // Il candidato → stable
+      await pool.query(
+        "UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin', updated_at = NOW() WHERE id = $1",
+        [testRow.id]
+      );
+      await pool.query("COMMIT");
+    } catch (txErr) {
+      await pool.query("ROLLBACK");
+      throw txErr;
+    }
 
-    // Il test slot → stable con timestamp promozione
-    await db.execute(sql`
-      UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin', updated_at = NOW()
-      WHERE id = ${testRow.id}
-    `);
-
-    // Il test slot ora è vuoto — OK (nessuna release lo occupa)
-    // Log evento
+    // Log evento (best-effort, fuori dalla transazione)
     try {
       await db.insert(otaEvents).values({
         phase: "admin-promote",
@@ -6674,29 +6710,40 @@ router.post("/ota/promote", async (req: Request, res: Response) => {
 });
 
 // POST /api/admin/ota/revert — annulla l'ultima promozione: previous-stable → stable
-router.post("/ota/revert", async (_req: Request, res: Response) => {
+// Transazione atomica:
+//   1. Trova il previous-stable (ORDER BY updated_at DESC — il più recentemente mosso lì)
+//   2. Sposta lo stable corrente a slot=NULL
+//   3. Sposta il previous-stable a stable
+router.post("/ota/revert", async (req: Request, res: Response) => {
   try {
-    const prevStable = await db.execute(sql`
-      SELECT id, version FROM ota_releases WHERE slot = 'previous-stable' AND status = 'active' LIMIT 1
-    `);
-    if (!prevStable.rows.length) {
+    // Trova il previous-stable deterministicamente (il più recentemente promosso lì)
+    const prevStableResult = await pool.query(
+      "SELECT id, version FROM ota_releases WHERE slot = 'previous-stable' AND status = 'active' ORDER BY updated_at DESC LIMIT 1"
+    );
+    if (!prevStableResult.rows.length) {
       return res.status(400).json({ message: "Nessun previous-stable disponibile per il revert" });
     }
-    const prevRow = prevStable.rows[0] as { id: string; version: string };
+    const prevRow = prevStableResult.rows[0] as { id: string; version: string };
 
-    // Lo stable corrente → nessuno slot (released / no più in routing)
-    await db.execute(sql`
-      UPDATE ota_releases SET slot = NULL, updated_at = NOW()
-      WHERE slot = 'stable'
-    `);
+    // Transazione atomica
+    await pool.query("BEGIN");
+    try {
+      // Lo stable corrente → storico (slot=NULL, non più in routing)
+      await pool.query(
+        "UPDATE ota_releases SET slot = NULL, updated_at = NOW() WHERE slot = 'stable'"
+      );
+      // Il previous-stable → stable
+      await pool.query(
+        "UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin-revert', updated_at = NOW() WHERE id = $1",
+        [prevRow.id]
+      );
+      await pool.query("COMMIT");
+    } catch (txErr) {
+      await pool.query("ROLLBACK");
+      throw txErr;
+    }
 
-    // Il previous-stable → stable
-    await db.execute(sql`
-      UPDATE ota_releases SET slot = 'stable', promoted_at = NOW(), promoted_by = 'admin-revert', updated_at = NOW()
-      WHERE id = ${prevRow.id}
-    `);
-
-    // Log evento
+    // Log evento (best-effort)
     try {
       await db.insert(otaEvents).values({
         phase: "admin-revert",
@@ -6709,8 +6756,8 @@ router.post("/ota/revert", async (_req: Request, res: Response) => {
     } catch { /* best-effort */ }
     // Invalida cache hash manifest
     try {
-      const inv = (_req as Request & { app: { locals: { invalidateExpoUpdateHash?: unknown } } }).app.locals.invalidateExpoUpdateHash;
-      if (typeof inv === "function") (inv as () => void)();
+      const inv = req.app.locals.invalidateExpoUpdateHash;
+      if (typeof inv === "function") inv();
     } catch { /* best-effort */ }
     return res.json({ ok: true, revertedToReleaseId: prevRow.id, revertedToVersion: prevRow.version });
   } catch (err) {
@@ -6755,30 +6802,28 @@ router.post("/ota/mark-broken", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/ota/events — ultimi N eventi ota_events filtrabili per releaseId/phase
-// query: ?releaseId=&phase=&limit=50
+// GET /api/admin/ota/events — ultimi N eventi ota_events filtrabili per releaseId/phase/deviceId
+// query: ?releaseId=&phase=&deviceId=&limit=50
+// deviceId filtra per source (dove è salvato l'ID del device negli eventi heartbeat)
 router.get("/ota/events", async (req: Request, res: Response) => {
   try {
     const releaseId = req.query.releaseId ? String(req.query.releaseId) : null;
     const phase = req.query.phase ? String(req.query.phase) : null;
+    const deviceId = req.query.deviceId ? String(req.query.deviceId).substring(0, 128) : null;
     const limitRaw = parseInt(String(req.query.limit ?? "50"), 10);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 && limitRaw <= 200 ? limitRaw : 50;
 
-    let query: string;
-    const params: (string | number | null)[] = [];
-    if (releaseId && phase) {
-      query = "SELECT * FROM ota_events WHERE release_id = $1 AND phase = $2 ORDER BY created_at DESC LIMIT $3";
-      params.push(releaseId, phase, limit);
-    } else if (releaseId) {
-      query = "SELECT * FROM ota_events WHERE release_id = $1 ORDER BY created_at DESC LIMIT $2";
-      params.push(releaseId, limit);
-    } else if (phase) {
-      query = "SELECT * FROM ota_events WHERE phase = $1 ORDER BY created_at DESC LIMIT $2";
-      params.push(phase, limit);
-    } else {
-      query = "SELECT * FROM ota_events ORDER BY created_at DESC LIMIT $1";
-      params.push(limit);
-    }
+    // Build dynamic WHERE clause with AND conditions
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+    if (releaseId) { conditions.push(`release_id = $${params.length + 1}`); params.push(releaseId); }
+    if (phase)     { conditions.push(`phase = $${params.length + 1}`); params.push(phase); }
+    if (deviceId)  { conditions.push(`source = $${params.length + 1}`); params.push(deviceId); }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const query = `SELECT * FROM ota_events ${where} ORDER BY created_at DESC LIMIT $${params.length + 1}`;
+    params.push(limit);
+
     const result = await pool.query(query, params);
     return res.json(result.rows);
   } catch (err) {
