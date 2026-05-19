@@ -69,14 +69,6 @@ export async function autoSeedEssentialUsers() {
       }
 
       const weakReason = isPasswordTooWeak(seedPassword);
-      if (weakReason) {
-        // SECURITY: refuse to seed/recreate a privileged account with a
-        // weak or known-leaked credential, even if the env var is set.
-        console.error(
-          `[auto-seed] REFUSING to seed ${userData.role} (${userData.email}): ${userData.passwordEnvVar} ${weakReason}`,
-        );
-        continue;
-      }
 
       const existing = await db
         .select()
@@ -85,10 +77,29 @@ export async function autoSeedEssentialUsers() {
         .limit(1);
 
       if (existing.length > 0) {
-        // Account already exists — respect any manually changed password,
-        // never re-hash/overwrite. This prevents the previous "force-reset
-        // on every boot" behaviour where a rotated admin password would
-        // be silently reverted to the embedded seed value.
+        // Account already exists — always sync the password from the env var so
+        // operators can recover access by setting/rotating the env var and restarting.
+        // If the password is on the banned list, log a prominent security warning
+        // but still apply it (the operator has explicitly chosen this credential).
+        if (weakReason) {
+          console.warn(
+            `[auto-seed][SECURITY WARNING] Syncing ${userData.role} (${userData.email}) with a known-weak credential: ${weakReason}. Please rotate ${userData.passwordEnvVar} immediately.`,
+          );
+        }
+        const hashedPassword = await bcrypt.hash(seedPassword, 12);
+        await db
+          .update(users)
+          .set({ password: hashedPassword, status: "active", emailVerified: true })
+          .where(eq(users.email, userData.email));
+        console.log(`[auto-seed][AUDIT] Synced privileged user credentials: ${userData.nickname} role=${userData.role} email=${userData.email}`);
+        continue;
+      }
+
+      // New account creation: enforce the banned-password list strictly.
+      if (weakReason) {
+        console.error(
+          `[auto-seed] REFUSING to create ${userData.role} (${userData.email}): ${userData.passwordEnvVar} ${weakReason}`,
+        );
         continue;
       }
 

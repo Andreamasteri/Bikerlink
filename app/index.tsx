@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet, Platform } from "react-native";
 import { Redirect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ONBOARDING_STORAGE_KEY } from "@/constants/onboarding";
 import Colors from "@/constants/colors";
+import { useAuth } from "@/lib/auth-context";
 
 export default function Index() {
   const [checked, setChecked] = useState(false);
   const [onboardingDone, setOnboardingDone] = useState(false);
+  const { isLoading: authIsLoading, isAuthenticated } = useAuth();
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_STORAGE_KEY)
@@ -21,12 +23,16 @@ export default function Index() {
       });
   }, []);
 
-  if (!checked) {
+  if (!checked || authIsLoading) {
     return (
       <View style={styles.loader}>
         <ActivityIndicator size="large" color={Colors.accent} />
       </View>
     );
+  }
+
+  if (isAuthenticated) {
+    return <Redirect href="/(tabs)" />;
   }
 
   if (onboardingDone) {
