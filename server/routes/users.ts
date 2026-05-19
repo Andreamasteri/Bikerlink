@@ -370,11 +370,13 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     }
     if (typeof emailChatNotifications === "boolean") updateData.emailChatNotifications = emailChatNotifications;
     if (notificationPreferences && typeof notificationPreferences === "object") {
-      const current = (existingProfile?.notificationPreferences ?? { matches: true, zoneProposals: true, chat: true }) as { matches: boolean; zoneProposals: boolean; chat: boolean };
+      const current = (existingProfile?.notificationPreferences ?? { matches: true, zoneProposals: true, chat: true, motoclub: true, eventi: true }) as { matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean };
       const merged = { ...current };
       if (typeof notificationPreferences.matches === "boolean") merged.matches = notificationPreferences.matches;
       if (typeof notificationPreferences.zoneProposals === "boolean") merged.zoneProposals = notificationPreferences.zoneProposals;
       if (typeof notificationPreferences.chat === "boolean") merged.chat = notificationPreferences.chat;
+      if (typeof notificationPreferences.motoclub === "boolean") merged.motoclub = notificationPreferences.motoclub;
+      if (typeof notificationPreferences.eventi === "boolean") merged.eventi = notificationPreferences.eventi;
       updateData.notificationPreferences = merged;
     }
 

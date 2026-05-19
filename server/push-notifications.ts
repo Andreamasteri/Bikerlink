@@ -3,7 +3,7 @@ import { users, userProfiles } from "@shared/schema";
 import { inArray, eq } from "drizzle-orm";
 import it from "../lib/i18n/it";
 
-type NotificationPrefKey = "matches" | "zoneProposals" | "chat";
+type NotificationPrefKey = "matches" | "zoneProposals" | "chat" | "motoclub" | "eventi";
 
 async function filterUserIdsByPreference(
   userIds: string[],
@@ -21,8 +21,8 @@ async function filterUserIdsByPreference(
 
     // Only opt-out is honored. Users without a profile row (legacy/edge cases)
     // or with no stored prefs default to allowed, matching the column default
-    // {matches:true, zoneProposals:true, chat:true}. Only explicit `false`
-    // skips the push.
+    // {matches:true, zoneProposals:true, chat:true, motoclub:true, eventi:true}.
+    // Only explicit `false` skips the push.
     const prefByUser = new Map<string, typeof rows[number]["prefs"]>();
     for (const r of rows) {
       prefByUser.set(r.userId, r.prefs);
@@ -210,5 +210,79 @@ export async function sendZoneProposalPushNotifications(userIds: string[]): Prom
     await sendExpoMessages(messages, userIdByToken);
   } catch (err) {
     console.warn("[Push] sendZoneProposalPushNotifications error (non-fatal):", err);
+  }
+}
+
+export async function sendMotoclubPushNotifications(
+  userIds: string[],
+  opts: { title: string; body: string; clubId?: string },
+): Promise<void> {
+  if (!userIds.length) return;
+  try {
+    const filteredIds = await filterUserIdsByPreference(userIds, "motoclub");
+    if (!filteredIds.length) return;
+    const rows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(inArray(users.id, filteredIds));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+
+    for (const row of rows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: opts.title,
+          body: opts.body,
+          sound: "default" as const,
+          data: { type: "motoclub", clubId: opts.clubId },
+          channelId: "motoclub",
+        });
+      }
+    }
+
+    if (messages.length === 0) return;
+    await sendExpoMessages(messages, userIdByToken);
+  } catch (err) {
+    console.warn("[Push] sendMotoclubPushNotifications error (non-fatal):", err);
+  }
+}
+
+export async function sendEventiPushNotifications(
+  userIds: string[],
+  opts: { title: string; body: string; eventId?: string },
+): Promise<void> {
+  if (!userIds.length) return;
+  try {
+    const filteredIds = await filterUserIdsByPreference(userIds, "eventi");
+    if (!filteredIds.length) return;
+    const rows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(inArray(users.id, filteredIds));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+
+    for (const row of rows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: opts.title,
+          body: opts.body,
+          sound: "default" as const,
+          data: { type: "evento", eventId: opts.eventId },
+          channelId: "eventi",
+        });
+      }
+    }
+
+    if (messages.length === 0) return;
+    await sendExpoMessages(messages, userIdByToken);
+  } catch (err) {
+    console.warn("[Push] sendEventiPushNotifications error (non-fatal):", err);
   }
 }

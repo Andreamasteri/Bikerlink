@@ -88,6 +88,8 @@ interface ProfileData {
       matches?: boolean;
       zoneProposals?: boolean;
       chat?: boolean;
+      motoclub?: boolean;
+      eventi?: boolean;
     } | null;
   };
   photos?: Array<{
@@ -342,10 +344,12 @@ export default function ProfileScreen() {
     matches: profile?.profile?.notificationPreferences?.matches ?? true,
     zoneProposals: profile?.profile?.notificationPreferences?.zoneProposals ?? true,
     chat: profile?.profile?.notificationPreferences?.chat ?? true,
+    motoclub: profile?.profile?.notificationPreferences?.motoclub ?? true,
+    eventi: profile?.profile?.notificationPreferences?.eventi ?? true,
   };
 
   const notifPrefsMutation = useMutation({
-    mutationFn: async (updates: Partial<{ matches: boolean; zoneProposals: boolean; chat: boolean }>) => {
+    mutationFn: async (updates: Partial<{ matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean }>) => {
       await apiRequest("PUT", "/api/users/profile/dynamic", { notificationPreferences: updates });
     },
     onSuccess: () => {
@@ -356,7 +360,7 @@ export default function ProfileScreen() {
     },
   });
 
-  const toggleNotifPref = (key: "matches" | "zoneProposals" | "chat", value: boolean) => {
+  const toggleNotifPref = (key: "matches" | "zoneProposals" | "chat" | "motoclub" | "eventi", value: boolean) => {
     notifPrefsMutation.mutate({ [key]: value });
   };
 
@@ -976,6 +980,8 @@ export default function ProfileScreen() {
               { key: "matches" as const, label: "Match (nuovi abbinamenti)" },
               { key: "zoneProposals" as const, label: "Proposte nella tua zona" },
               { key: "chat" as const, label: "Messaggi in chat" },
+              { key: "motoclub" as const, label: "MotoClub (inviti e aggiornamenti)" },
+              { key: "eventi" as const, label: "Eventi in programma" },
             ]).map((item) => (
               <View
                 key={item.key}

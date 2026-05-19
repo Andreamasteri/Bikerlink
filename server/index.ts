@@ -1268,7 +1268,8 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
-          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS notification_preferences JSONB NOT NULL DEFAULT '{"matches":true,"zoneProposals":true,"chat":true}'::jsonb`);
+          await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS notification_preferences JSONB NOT NULL DEFAULT '{"matches":true,"zoneProposals":true,"chat":true,"motoclub":true,"eventi":true}'::jsonb`);
+          await db.execute(sql`ALTER TABLE user_profiles ALTER COLUMN notification_preferences SET DEFAULT '{"matches":true,"zoneProposals":true,"chat":true,"motoclub":true,"eventi":true}'::jsonb`);
           console.log("[MIGRATION] user_profiles.notification_preferences ensured");
         } catch (e) {
           console.warn("[MIGRATION] user_profiles.notification_preferences:", e);

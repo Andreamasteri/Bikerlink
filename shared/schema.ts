@@ -118,9 +118,9 @@ export const userProfiles = pgTable("user_profiles", {
   preferredMapStyle: varchar("preferred_map_style", { length: 20 }),
   emailChatNotifications: boolean("email_chat_notifications").notNull().default(false),
   notificationPreferences: jsonb("notification_preferences")
-    .$type<{ matches: boolean; zoneProposals: boolean; chat: boolean }>()
+    .$type<{ matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean }>()
     .notNull()
-    .default(sql`'{"matches":true,"zoneProposals":true,"chat":true}'::jsonb`),
+    .default(sql`'{"matches":true,"zoneProposals":true,"chat":true,"motoclub":true,"eventi":true}'::jsonb`),
   hideFromMap: boolean("hide_from_map").notNull().default(false),
   positionFuzz: boolean("position_fuzz").notNull().default(false),
   positionFuzzKm: integer("position_fuzz_km").notNull().default(1),
