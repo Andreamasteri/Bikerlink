@@ -128,10 +128,3 @@ export function diffSchemas(previous: SchemaSnapshot, current: SchemaSnapshot): 
 
   return { addedTables, removedTables, modifiedTables };
 }
-
-if (require.main === module) {
-  saveSchemaSnapshot().then(() => process.exit(0)).catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
-}

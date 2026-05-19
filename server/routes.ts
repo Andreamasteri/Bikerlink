@@ -1796,7 +1796,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           COUNT(*) FILTER (WHERE user_type = 'biker') AS bikers,
           COUNT(*) FILTER (WHERE user_type = 'zavorrina') AS zavorrine
         FROM users
-        WHERE is_deleted IS NOT TRUE
+        WHERE role != 'admin'
       `);
       const row = result.rows[0] as { total: string; bikers: string; zavorrine: string } | undefined;
       res.json({
