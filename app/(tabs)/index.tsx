@@ -17,7 +17,7 @@ import {
   FlatList,
   SectionList,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getApiUrl } from "@/lib/query-client";
@@ -56,6 +56,7 @@ function formatLastSeen(dateStr: string | null | undefined): string {
 
 export default function MapScreen() {
   const router = useRouter();
+  const { focusLat: focusLatParam, focusLng: focusLngParam } = useLocalSearchParams<{ focusLat?: string; focusLng?: string }>();
   const colors = useColors();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const t = useT();
@@ -104,6 +105,7 @@ export default function MapScreen() {
   const [showInviteEventModal, setShowInviteEventModal] = useState(false);
   const [inviteSending, setInviteSending] = useState(false);
   const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
+  const lastFocusParamRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -116,6 +118,19 @@ export default function MapScreen() {
     const t = setTimeout(() => setMapReady(true), 5000);
     return () => clearTimeout(t);
   }, [mapReady]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    if (!focusLatParam || !focusLngParam) return;
+    const key = `${focusLatParam},${focusLngParam}`;
+    if (lastFocusParamRef.current === key) return;
+    lastFocusParamRef.current = key;
+    const lat = parseFloat(focusLatParam);
+    const lng = parseFloat(focusLngParam);
+    if (isNaN(lat) || isNaN(lng)) return;
+    const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
+    activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng });
+  }, [mapReady, focusLatParam, focusLngParam, mapFullscreen]);
 
   useEffect(() => {
     if (mapFullscreen) {

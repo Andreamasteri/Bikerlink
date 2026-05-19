@@ -635,6 +635,8 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       topArtistName: topTrack?.artistName ?? null,
       primaryClubName,
       primaryClubId,
+      latitude: (!profile?.hideFromMap && !targetUser.ghostMode) ? (profile?.latitude ?? null) : null,
+      longitude: (!profile?.hideFromMap && !targetUser.ghostMode) ? (profile?.longitude ?? null) : null,
     });
   } catch (error) {
     console.error("Get public user profile error:", error);

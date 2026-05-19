@@ -425,6 +425,23 @@ export default function PublicProfileScreen() {
           </TouchableOpacity>
         )}
 
+        {!isSelf && profile.latitude != null && profile.longitude != null && (
+          <TouchableOpacity
+            style={styles.geoButton}
+            onPress={() => router.push({
+              pathname: "/(tabs)/index",
+              params: {
+                focusLat: String(profile.latitude),
+                focusLng: String(profile.longitude),
+              },
+            })}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="navigate" size={20} color="#4CAF50" />
+            <Text style={styles.geoButtonText}>Geolocalizza sulla mappa</Text>
+          </TouchableOpacity>
+        )}
+
         {!isSelf && !isBlocked && (
           <TouchableOpacity style={styles.chatButton} onPress={handleStartChat} activeOpacity={0.8}>
             <Ionicons name="chatbubbles" size={22} color={Colors.background} />
@@ -819,4 +836,18 @@ const styles = StyleSheet.create({
     borderColor: Colors.success,
   },
   matchStatusText: { fontSize: 15, fontWeight: "600" as const },
+  geoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginHorizontal: 20,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  geoButtonText: { fontSize: 15, fontWeight: "600" as const, color: "#4CAF50" },
 });
