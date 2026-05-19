@@ -1098,6 +1098,9 @@ const tr: Record<string, string> = {
   "ready.privacy.offlineRandomizeLabel": "Çevrimdışı konumu rastgele kaydır",
   "ready.privacy.offlineRandomizeDesc": "Uygulamayı kapattığında konumun ±20 km kaydırılır.",
   "ready.privacy.moreOptions": "Daha fazla gizlilik & GPS seçeneği",
+
+  "gps_error_title": "GPS Hatası",
+  "gps_error_body": "GPS noktaları kaydedilemedi. Geçersiz koordinatlar tespit edildi.",
 };
 
 export default tr;

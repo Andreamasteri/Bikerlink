@@ -80,6 +80,21 @@ router.post("/:id/points", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Nessun punto GPS fornito" });
     }
 
+    const invalidPoints = points.filter(
+      (p: any) =>
+        typeof p.latitude !== "number" || !isFinite(p.latitude) ||
+        typeof p.longitude !== "number" || !isFinite(p.longitude)
+    );
+    if (invalidPoints.length > 0) {
+      console.warn(
+        `[tracking] Coordinate non valide rifiutate — userId=${userId} routeId=${id} count=${invalidPoints.length} payload=${JSON.stringify(invalidPoints)}`
+      );
+      return res.status(400).json({
+        message: "Coordinate GPS non valide: latitudine e longitudine devono essere numeri finiti",
+        invalidCount: invalidPoints.length,
+      });
+    }
+
     const routePoints = points.map((p: any) => ({
       routeId: id as string,
       latitude: p.latitude,

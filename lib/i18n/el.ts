@@ -1098,6 +1098,9 @@ const el: Record<string, string> = {
   "ready.privacy.offlineRandomizeLabel": "Τυχαιοποίηση θέσης εκτός σύνδεσης",
   "ready.privacy.offlineRandomizeDesc": "Όταν κλείνεις την εφαρμογή, η θέση σου μετατοπίζεται κατά ±20 χλμ.",
   "ready.privacy.moreOptions": "Περισσότερες επιλογές απορρήτου & GPS",
+
+  "gps_error_title": "Σφάλμα GPS",
+  "gps_error_body": "Δεν ήταν δυνατή η αποθήκευση σημείων GPS. Εντοπίστηκαν μη έγκυρες συντεταγμένες.",
 };
 
 export default el;

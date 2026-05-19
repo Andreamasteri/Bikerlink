@@ -1146,6 +1146,9 @@ const en: Record<string, string> = {
   "ready.privacy.offlineRandomizeLabel": "Randomize offline position",
   "ready.privacy.offlineRandomizeDesc": "When you close the app, your position is shifted by ±20 km.",
   "ready.privacy.moreOptions": "More privacy & GPS options",
+
+  "gps_error_title": "GPS Error",
+  "gps_error_body": "Could not save GPS points. Invalid coordinates detected.",
 };
 
 export default en;

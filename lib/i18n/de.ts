@@ -1098,6 +1098,9 @@ const de: Record<string, string> = {
   "ready.privacy.offlineRandomizeLabel": "Offline-Position zufällig verschieben",
   "ready.privacy.offlineRandomizeDesc": "Wenn du die App schließt, wird dein Standort um ±20 km verschoben.",
   "ready.privacy.moreOptions": "Weitere Datenschutz- & GPS-Optionen",
+
+  "gps_error_title": "GPS-Fehler",
+  "gps_error_body": "GPS-Punkte konnten nicht gespeichert werden. Ungültige Koordinaten erkannt.",
 };
 
 export default de;

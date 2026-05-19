@@ -1098,6 +1098,9 @@ const fr: Record<string, string> = {
   "ready.privacy.offlineRandomizeLabel": "Randomiser la position hors ligne",
   "ready.privacy.offlineRandomizeDesc": "Quand tu fermes l'appli, ta position est décalée de ±20 km.",
   "ready.privacy.moreOptions": "Plus d'options confidentialité & GPS",
+
+  "gps_error_title": "Erreur GPS",
+  "gps_error_body": "Impossible d'enregistrer les points GPS. Coordonnées invalides détectées.",
 };
 
 export default fr;

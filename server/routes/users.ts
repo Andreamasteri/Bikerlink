@@ -647,6 +647,15 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
     if (latitude === undefined || longitude === undefined) {
       return res.status(400).json({ message: "Latitudine e longitudine richieste" });
     }
+    if (
+      typeof latitude !== "number" || !isFinite(latitude) ||
+      typeof longitude !== "number" || !isFinite(longitude)
+    ) {
+      console.warn(
+        `[users/location] Coordinate non valide rifiutate — userId=${userId} payload=${JSON.stringify({ latitude, longitude })}`
+      );
+      return res.status(400).json({ message: "Coordinate GPS non valide: latitudine e longitudine devono essere numeri finiti" });
+    }
     const existingProfile = await storage.getUserProfile(userId);
     const fakeResult = applyFakeZones(latitude, longitude, existingProfile);
     if (fakeResult.applied) {
