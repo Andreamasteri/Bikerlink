@@ -100,7 +100,8 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     if (e.origin !== window.location.origin) { return; }
     try {
       var msg = JSON.parse(e.data);
-      if (msg.type === "updateLocation" && msg.json) {
+      if (msg.type === "updateLocation" &&
+          typeof msg.json === "string" && msg.json.length > 0) {
         window.trackingBridge.updateLocation(msg.json);
       }
     } catch(err) {}
