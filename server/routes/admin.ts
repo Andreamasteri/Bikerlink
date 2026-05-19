@@ -470,6 +470,10 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
 
     // Account riservati (Apple/Google reviewer) — protetti dalla purga
     const protectedEmails = PROTECTED_EMAILS.map((e) => e.toLowerCase());
+    const protectedEmailsClause = sql.join(
+      protectedEmails.map((e) => sql`${e}`),
+      sql`, `
+    );
 
     const { deletedCount } = await db.transaction(async (tx) => {
       // Step 1: null events.approved_by per utenti non-admin (esclude account protetti)
@@ -478,7 +482,7 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
         WHERE approved_by IN (
           SELECT id FROM users
           WHERE role != 'admin'
-            AND LOWER(email) NOT IN ${sql.raw(`(${protectedEmails.map((e) => `'${e.replace(/'/g, "''")}'`).join(",")})`)}
+            AND LOWER(email) NOT IN (${protectedEmailsClause})
         )
       `);
 
@@ -486,7 +490,7 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
       const countResult = await tx.execute(sql`
         SELECT COUNT(*) AS cnt FROM users
         WHERE role != 'admin'
-          AND LOWER(email) NOT IN ${sql.raw(`(${protectedEmails.map((e) => `'${e.replace(/'/g, "''")}'`).join(",")})`)}
+          AND LOWER(email) NOT IN (${protectedEmailsClause})
       `);
       const deletedCount = Number((countResult.rows[0] as { cnt: string }).cnt);
 
@@ -494,7 +498,7 @@ router.delete("/purge-non-admin-users", async (req: Request, res: Response) => {
       await tx.execute(sql`
         DELETE FROM users
         WHERE role != 'admin'
-          AND LOWER(email) NOT IN ${sql.raw(`(${protectedEmails.map((e) => `'${e.replace(/'/g, "''")}'`).join(",")})`)}
+          AND LOWER(email) NOT IN (${protectedEmailsClause})
       `);
 
       // Step 4: elimina conversazioni orfane (senza partecipanti)
