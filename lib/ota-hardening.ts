@@ -13,13 +13,21 @@
 //     reloadAsync se siamo in stato di "rollback" pendente — guard anti-loop
 //     tramite contatore in-memory.
 //
-// NOTA sull'header `expo-device-id`:
-// Il server (server/routes.ts /api/expo-updates) legge `req.headers["expo-device-id"]`
-// per fare slot-routing. Per iniettare un valore dinamico per-device usiamo
-// `Updates.setUpdateRequestHeadersOverride` (SDK 55, experimental), che richiede
-// `disableAntiBrickingMeasures: true` in app.json.updates. In app.json mettiamo
-// un placeholder statico ("pending") che viene sovrascritto al primo avvio
-// utile dall'override runtime.
+// NOTA sull'header device-id:
+// `app.json > expo.updates.requestHeaders` accetta solo valori statici (baked
+// a build time). Le API runtime di override (`setUpdateRequestHeadersOverride`)
+// richiederebbero `disableAntiBrickingMeasures: true` — non accettabile per un
+// task di "hardening" perché disabilita protezioni native di sicurezza.
+// Soluzione: usiamo `Updates.setExtraParamAsync("device-id", id)`, che persiste
+// nello storage nativo e viene inviato in OGNI chiamata /api/expo-updates dal
+// secondo boot in poi (a partire dal primo boot dove l'override è applicato).
+// Il valore arriva al server nel header strutturato `Expo-Extra-Params`.
+//
+// CONTRATTO SERVER (cross-task): il backend OTA (routes.ts /api/expo-updates)
+// deve leggere il device-id PRIMA da `req.headers["expo-device-id"]`, POI da
+// `req.headers["expo-installation-id"]` (già implementato), POI parsare
+// `req.headers["expo-extra-params"]` cercando la chiave `device-id`. Quest'ultima
+// integrazione è un follow-up server-side, fuori scope di Task #1357.
 
 import * as Updates from "expo-updates";
 import { Platform } from "react-native";
@@ -177,22 +185,13 @@ export async function initOtaHardening(): Promise<void> {
   _hardeningInited = true;
   if (Platform.OS === "web") return;
 
-  // 1. Inietta device ID come HEADER `expo-device-id` sulle prossime chiamate
-  //    /api/expo-updates (slot routing lato server). Persiste tra restart
-  //    perché expo-updates salva l'override nello storage nativo.
-  //    Inoltre lo replichiamo come extra-param `device-id` per compatibilità
-  //    con eventuali consumer che leggono da Expo-Extra-Params.
+  // 1. Inietta device ID via Expo-Extra-Params. Persiste tra restart perché
+  //    expo-updates salva gli extra params nello storage nativo. Lo stesso
+  //    valore viene usato dal heartbeat (sotto), garantendo coerenza tra
+  //    slot assignment e telemetria.
   try {
     const deviceId = await getStableDeviceId();
     if (!__DEV__) {
-      try {
-        const override = (Updates as {
-          setUpdateRequestHeadersOverride?: (h: Record<string, string> | null) => void;
-        }).setUpdateRequestHeadersOverride;
-        if (typeof override === "function") {
-          override({ "expo-device-id": deviceId });
-        }
-      } catch {}
       await Updates.setExtraParamAsync("device-id", deviceId).catch(() => {});
     }
   } catch {}

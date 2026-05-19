@@ -136,11 +136,7 @@
       "url": "https://biker-link.replit.app/api/expo-updates",
       "enabled": true,
       "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "ON_ERROR_RECOVERY",
-      "disableAntiBrickingMeasures": true,
-      "requestHeaders": {
-        "expo-device-id": "pending"
-      }
+      "checkAutomatically": "ON_ERROR_RECOVERY"
     },
     "runtimeVersion": "8.0.0",
     "extra": {
