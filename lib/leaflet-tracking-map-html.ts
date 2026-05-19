@@ -45,9 +45,15 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       "border:3px solid #fff;box-shadow:0 0 0 0 rgba(33,150,243,0.7);\\"></div>";
   }
 
+  function isFiniteCoord(v) {
+    return typeof v === "number" && isFinite(v);
+  }
+
   function applyUpdate(data) {
-    if (data.points) {
-      trackPoints = data.points;
+    if (Array.isArray(data.points)) {
+      trackPoints = data.points.filter(function(p) {
+        return p && isFiniteCoord(p.lat) && isFiniteCoord(p.lng);
+      });
       if (trackPolyline) { map.removeLayer(trackPolyline); }
       if (trackPoints.length > 1) {
         trackPolyline = L.polyline(trackPoints.map(function(p) { return [p.lat, p.lng]; }), {
@@ -59,6 +65,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     if (data.current) {
       var lat = data.current.lat;
       var lng = data.current.lng;
+      if (!isFiniteCoord(lat) || !isFiniteCoord(lng)) { return; }
       if (currentMarker) { map.removeLayer(currentMarker); }
       currentMarker = L.marker([lat, lng], {
         icon: L.divIcon({ html: currentDotHtml(), className: "", iconSize: [18, 18], iconAnchor: [9, 9] }),
