@@ -426,16 +426,24 @@ async function notifyTopMembersOfNewJoin(clubId: string, newUserId: string, club
       .limit(3);
 
     const newUser = await storage.getUser(newUserId);
+    const nickname = newUser?.nickname ?? "Un nuovo utente";
     for (const row of topSenders) {
       await storage.createNotification({
         userId: row.senderId,
         title: `Nuovo membro in ${clubName}!`,
-        body: `${newUser?.nickname ?? "Un nuovo utente"} è entrato nel tuo club`,
+        body: `${nickname} è entrato nel tuo club`,
         notificationType: "motoclub_join",
         referenceType: "motoclub",
         referenceId: clubId,
       });
     }
+
+    const topSenderIds = topSenders.map(r => r.senderId);
+    sendMotoclubPushNotifications(topSenderIds, {
+      title: `Nuovo membro in ${clubName}!`,
+      body: `${nickname} è entrato nel tuo club`,
+      clubId,
+    }).catch(() => {});
   } catch (e) {
     console.error("[notifyTopMembers error]", e);
   }
