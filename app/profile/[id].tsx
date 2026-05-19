@@ -247,7 +247,7 @@ export default function PublicProfileScreen() {
   const handleStartChat = async () => {
     try {
       const res = await apiRequest("POST", "/api/chat/conversations", {
-        conversationType: "direct",
+        conversationType: "private",
         participantIds: [id],
       });
       const conv = await res.json();

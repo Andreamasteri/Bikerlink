@@ -640,7 +640,7 @@ router.post("/conversations", async (req: Request, res: Response) => {
       const otherUserId = participantIds[0];
       const existingConvs = await storage.getConversations(userId);
       for (const conv of existingConvs) {
-        if (conv.conversationType !== "private") continue;
+        if (conv.conversationType !== "private" && conv.conversationType !== "direct") continue;
         const parts = await storage.getConversationParticipants(conv.id);
         if (parts.length === 2) {
           const ids = parts.map((p) => p.userId);

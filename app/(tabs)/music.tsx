@@ -2232,7 +2232,7 @@ function MatchCard({ match }: { match: MusicMatch }) {
   const openChat = useCallback(async () => {
     setChatLoading(true);
     try {
-      const res = await apiRequest("POST", "/api/chat/conversations", { participantId: match.user.id });
+      const res = await apiRequest("POST", "/api/chat/conversations", { conversationType: "private", participantIds: [match.user.id] });
       const data = await res.json();
       localQueryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
       router.push(`/chat/${data.id}` as any);
