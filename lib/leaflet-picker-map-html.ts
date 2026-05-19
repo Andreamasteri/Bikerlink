@@ -113,6 +113,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   };
 
   window.addEventListener("message", function(e) {
+    if (e.origin !== window.location.origin) { return; }
     try {
       var msg = JSON.parse(e.data);
       if (msg.type === "setCoord" && msg.lat != null && msg.lng != null) {
