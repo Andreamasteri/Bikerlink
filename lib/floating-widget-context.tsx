@@ -44,6 +44,20 @@ async function dismissBackgroundNotif() {
   } catch {}
 }
 
+async function setAppBadge(count: number) {
+  if (!Notifications || Platform.OS !== "ios") return;
+  try {
+    await Notifications.setBadgeCountAsync(count);
+  } catch {}
+}
+
+async function clearAppBadge() {
+  if (!Notifications || Platform.OS !== "ios") return;
+  try {
+    await Notifications.setBadgeCountAsync(0);
+  } catch {}
+}
+
 interface FloatingWidgetContextType {
   isVisible: boolean;
   unreadChat: number;
@@ -134,15 +148,18 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
       if (prev === "active" && (nextState === "background" || nextState === "inactive")) {
         if (permissionGranted) {
           await scheduleBackgroundNotif(unreadChatRef.current, unreadNotifRef.current);
+          await setAppBadge(unreadChatRef.current + unreadNotifRef.current);
         }
       } else if (nextState === "active" && prev !== "active") {
         await dismissBackgroundNotif();
+        await clearAppBadge();
       }
     });
 
     return () => {
       sub.remove();
       dismissBackgroundNotif();
+      clearAppBadge();
     };
   }, [isLoggedIn]);
 
@@ -151,6 +168,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
     (async () => {
       if (AppState.currentState !== "active") {
         await scheduleBackgroundNotif(unreadChatRef.current, unreadNotifRef.current);
+        await setAppBadge(unreadChatRef.current + unreadNotifRef.current);
       }
     })();
   }, [unreadChat, unreadNotifications]);
