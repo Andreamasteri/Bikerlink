@@ -1533,6 +1533,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const COMPETITOR_PDF_PATH = path.resolve(process.cwd(), "server/public/assets/competitor-analysis.pdf");
   const COMPETITOR_PNG_PATH = path.resolve(process.cwd(), "server/public/assets/competitor-analysis.png");
+  const MATCHING_PDF_PATH = path.resolve(process.cwd(), "server/public/matching-system.pdf");
+
+  app.get("/matching-system.pdf", (_req, res) => {
+    if (!fs.existsSync(MATCHING_PDF_PATH)) {
+      return res.status(404).json({ message: "File non disponibile" });
+    }
+    res.setHeader("Content-Disposition", 'inline; filename="BikerLink-MatchingSystem.pdf"');
+    res.setHeader("Content-Type", "application/pdf");
+    fs.createReadStream(MATCHING_PDF_PATH).pipe(res);
+  });
 
   app.get("/assets/competitor-analysis.pdf", (_req, res) => {
     if (!fs.existsSync(COMPETITOR_PDF_PATH)) {

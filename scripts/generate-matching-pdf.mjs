@@ -12,6 +12,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
 const MD_PATH = path.join(ROOT, 'docs', 'matching-system.md');
 const OUT_PATH = path.join(ROOT, 'docs', 'matching-system.pdf');
+const PUBLIC_COPY_PATH = path.join(ROOT, 'server', 'public', 'matching-system.pdf');
 
 const ORANGE = '#E85D04';
 const DARK   = '#1A1A2E';
@@ -495,6 +496,9 @@ async function main() {
   const size = (fs.statSync(OUT_PATH).size / 1024).toFixed(1);
   console.log(`PDF generato da: ${MD_PATH}`);
   console.log(`Output: ${OUT_PATH} (${size} KB)`);
+
+  fs.copyFileSync(OUT_PATH, PUBLIC_COPY_PATH);
+  console.log(`Copia pubblica: ${PUBLIC_COPY_PATH}`);
 }
 
 main().catch(err => { console.error('Errore:', err); process.exit(1); });
