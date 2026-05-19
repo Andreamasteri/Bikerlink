@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { AppState, AppStateStatus } from "react-native";
+import { AppState, AppStateStatus, Platform } from "react-native";
 import * as Location from "expo-location";
 import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
@@ -49,6 +49,18 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const gpsRequired = gpsData?.required !== false;
 
   const checkPermission = useCallback(async () => {
+    if (Platform.OS === "web") {
+      if (typeof navigator !== "undefined" && navigator.geolocation) {
+        navigator.permissions?.query({ name: "geolocation" as PermissionName }).then((result) => {
+          setHasPermission(result.state === "granted" || result.state === "prompt");
+        }).catch(() => {
+          setHasPermission(true);
+        });
+      } else {
+        setHasPermission(true);
+      }
+      return;
+    }
     try {
       const { status } = await Location.getForegroundPermissionsAsync();
       setHasPermission(status === "granted");
@@ -58,6 +70,11 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const checkBackgroundPermission = useCallback(async () => {
+    if (Platform.OS === "web") {
+      setHasBackgroundPermission(false);
+      setBackgroundPermissionChecked(true);
+      return;
+    }
     try {
       const { status } = await Location.getBackgroundPermissionsAsync();
       const granted = status === "granted";
@@ -77,6 +94,19 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS === "web") {
+      return new Promise((resolve) => {
+        if (typeof navigator === "undefined" || !navigator.geolocation) {
+          setHasPermission(true);
+          resolve(true);
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          () => { setHasPermission(true); resolve(true); },
+          () => { setHasPermission(false); resolve(false); }
+        );
+      });
+    }
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       const granted = status === "granted";
@@ -89,6 +119,9 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const requestBackgroundPermission = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS === "web") {
+      return false;
+    }
     try {
       const { status } = await Location.requestBackgroundPermissionsAsync();
       const granted = status === "granted";

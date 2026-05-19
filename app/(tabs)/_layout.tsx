@@ -195,7 +195,7 @@ export default function TabLayout() {
   const gpsTabHref = (isGpsGateActive && !isWeb) ? null : undefined;
 
   const HIDDEN_TAB_NAMES = isWeb
-    ? new Set(["tracking"])
+    ? new Set<string>([])
     : new Set(["tracking", "garage"]);
   if (isGpsGateActive && !isWeb) {
     ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi", "arcade", "giri"].forEach(
@@ -460,7 +460,7 @@ export default function TabLayout() {
               <Ionicons name="navigate" size={size} color={color} />
             ),
             headerTitle: t("tracking.recordRide"),
-            href: null,
+            href: isWeb ? undefined : null,
             headerLeft: () => (
               <Pressable onPress={() => router.back()} style={{ marginLeft: 8 }}>
                 <Ionicons name="arrow-back" size={24} color={colors.text} />
