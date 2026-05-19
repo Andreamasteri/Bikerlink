@@ -846,6 +846,9 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
         message: "Errore temporaneo nella revoca delle sessioni. Riprova tra qualche istante.",
       });
     }
+    // Terminate any open SSE chat stream so that a stolen session cannot
+    // continue to receive private messages after password-reset revocation.
+    closeSseClient(id);
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await storage.updateUser(id, { password: hashedPassword });
     if (!user) {

@@ -9,6 +9,7 @@ import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetConfirm
 import { createClubInvitesForMoto, createRegionalClubInvite } from "./motoclubs";
 import { onlineTracker } from "../online-tracker";
 import { revokeAllUserSessions } from "../session-utils";
+import { closeSseClient } from "../chat-sse";
 
 /**
  * Calcola il token Bearer da restituire al client mobile.
@@ -543,6 +544,9 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
         message: "Errore temporaneo nella revoca delle sessioni. Riprova tra qualche istante.",
       });
     }
+    // Terminate any open SSE chat stream for this user so that a stolen session
+    // cannot continue to receive private messages after password-reset revocation.
+    closeSseClient(user.id);
     if (revoked > 0) {
       console.log(`[PASSWORD RESET] Revoked ${revoked} session(s) for user ${user.id}`);
     }
