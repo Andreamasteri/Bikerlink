@@ -425,22 +425,46 @@ export default function PublicProfileScreen() {
           </TouchableOpacity>
         )}
 
-        {!isSelf && profile.latitude != null && profile.longitude != null && (
-          <TouchableOpacity
-            style={styles.geoButton}
-            onPress={() => router.push({
-              pathname: "/(tabs)/index",
-              params: {
-                focusLat: String(profile.latitude),
-                focusLng: String(profile.longitude),
-              },
-            })}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="navigate" size={20} color="#4CAF50" />
-            <Text style={styles.geoButtonText}>Geolocalizza sulla mappa</Text>
-          </TouchableOpacity>
-        )}
+        {!isSelf && profile.latitude != null && profile.longitude != null && (() => {
+          let ageLabel: string | null = null;
+          if (profile.coordinatesUpdatedAt) {
+            const updatedAt = new Date(profile.coordinatesUpdatedAt).getTime();
+            const diffMs = Date.now() - updatedAt;
+            const diffMin = Math.floor(diffMs / 60000);
+            if (diffMin >= 30) {
+              if (diffMin < 60) {
+                ageLabel = `posizione di ${diffMin}min fa`;
+              } else {
+                const diffH = Math.floor(diffMin / 60);
+                if (diffH < 24) {
+                  ageLabel = `posizione di ${diffH}h fa`;
+                } else {
+                  const diffD = Math.floor(diffH / 24);
+                  ageLabel = `posizione di ${diffD}g fa`;
+                }
+              }
+            }
+          }
+          return (
+            <TouchableOpacity
+              style={styles.geoButton}
+              onPress={() => router.push({
+                pathname: "/(tabs)/index",
+                params: {
+                  focusLat: String(profile.latitude),
+                  focusLng: String(profile.longitude),
+                },
+              })}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="navigate" size={20} color="#4CAF50" />
+              <View style={{ alignItems: "center" }}>
+                <Text style={styles.geoButtonText}>Geolocalizza sulla mappa</Text>
+                {ageLabel && <Text style={styles.geoButtonSubtext}>{ageLabel}</Text>}
+              </View>
+            </TouchableOpacity>
+          );
+        })()}
 
         {!isSelf && !isBlocked && (
           <TouchableOpacity style={styles.chatButton} onPress={handleStartChat} activeOpacity={0.8}>
@@ -850,4 +874,5 @@ const styles = StyleSheet.create({
     borderColor: "#4CAF50",
   },
   geoButtonText: { fontSize: 15, fontWeight: "600" as const, color: "#4CAF50" },
+  geoButtonSubtext: { fontSize: 12, fontWeight: "400" as const, color: Colors.textSecondary, marginTop: 2 },
 });

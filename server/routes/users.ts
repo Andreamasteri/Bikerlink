@@ -758,6 +758,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       primaryClubId,
       latitude: (!profile?.hideFromMap && !targetUser.ghostMode) ? (profile?.latitude ?? null) : null,
       longitude: (!profile?.hideFromMap && !targetUser.ghostMode) ? (profile?.longitude ?? null) : null,
+      coordinatesUpdatedAt: (!profile?.hideFromMap && !targetUser.ghostMode) ? (profile?.coordinatesUpdatedAt ?? null) : null,
     });
   } catch (error) {
     console.error("Get public user profile error:", error);
