@@ -1,4 +1,4 @@
-export function buildLeafletTrackingMapHtml(tileUrl: string, tileMaxZoom: number, accentColor: string = "#FF6600"): string {
+export function buildLeafletTrackingMapHtml(tileUrl: string, tileMaxZoom: number, accentColor: string = "#FF6600", debug: boolean = false): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -24,6 +24,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function() {
+  var __DEBUG__ = ${debug ? 'true' : 'false'};
   var accentColor = ${JSON.stringify(accentColor)};
 
   var map = L.map("map", {
@@ -52,6 +53,12 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 
   function applyUpdate(data) {
     if (Array.isArray(data.points)) {
+      var badPoints = data.points.filter(function(p) {
+        return !p || !isValidCoord(p.lat, p.lng);
+      });
+      if (__DEBUG__ && badPoints.length > 0) {
+        postMsg({ type: "trackingCoordError", source: "points", skipped: badPoints.length, samples: badPoints.slice(0, 3) });
+      }
       trackPoints = data.points.filter(function(p) {
         return p && isValidCoord(p.lat, p.lng);
       });
@@ -66,7 +73,12 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     if (data.current) {
       var lat = data.current.lat;
       var lng = data.current.lng;
-      if (!isValidCoord(lat, lng)) { return; }
+      if (!isValidCoord(lat, lng)) {
+        if (__DEBUG__) {
+          postMsg({ type: "trackingCoordError", source: "current", payload: data.current });
+        }
+        return;
+      }
       if (currentMarker) { map.removeLayer(currentMarker); }
       currentMarker = L.marker([lat, lng], {
         icon: L.divIcon({ html: currentDotHtml(), className: "", iconSize: [18, 18], iconAnchor: [9, 9] }),

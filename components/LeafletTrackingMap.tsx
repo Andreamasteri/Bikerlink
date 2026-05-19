@@ -20,7 +20,7 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
   const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
 
   const html = useMemo(
-    () => buildLeafletTrackingMapHtml(tileConfig.urlTemplate, tileConfig.maximumZ, Colors.accent),
+    () => buildLeafletTrackingMapHtml(tileConfig.urlTemplate, tileConfig.maximumZ, Colors.accent, __DEV__),
     [tileConfig.urlTemplate, tileConfig.maximumZ]
   );
 
@@ -53,13 +53,15 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     try {
-      const msg = JSON.parse(event.nativeEvent.data) as { type: string };
+      const msg = JSON.parse(event.nativeEvent.data) as { type: string; [key: string]: unknown };
       if (msg.type === "trackingReady") {
         setBridgeReady(true);
         if (pendingRef.current) {
           pushUpdate(pendingRef.current.points, pendingRef.current.currentLocation);
           pendingRef.current = null;
         }
+      } else if (__DEV__ && msg.type === "trackingCoordError") {
+        console.warn("[LeafletTrackingMap] malformed location payload:", JSON.stringify(msg));
       }
     } catch {}
   }, [pushUpdate]);
