@@ -5839,25 +5839,29 @@ router.get("/gps-rejections", async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const minCount = Math.max(Number(req.query.min_count) || 1, 1);
-    const rows = await db
-      .select({
-        userId: gpsRejectionStats.userId,
-        deviceId: gpsRejectionStats.deviceId,
-        platform: gpsRejectionStats.platform,
-        nickname: users.nickname,
-        email: users.email,
-        lastOtaNumber: gpsRejectionStats.lastOtaNumber,
-        rejectionCount: gpsRejectionStats.rejectionCount,
-        lastRejectedPayload: gpsRejectionStats.lastRejectedPayload,
-        lastRejectedAt: gpsRejectionStats.lastRejectedAt,
-        lastSource: gpsRejectionStats.lastSource,
-      })
-      .from(gpsRejectionStats)
-      .leftJoin(users, eq(gpsRejectionStats.userId, users.id))
-      .where(sql`${gpsRejectionStats.rejectionCount} >= ${minCount}`)
-      .orderBy(desc(gpsRejectionStats.rejectionCount))
-      .limit(limit);
-    return res.json({ stats: rows, total: rows.length });
+    const [rows, thresholdSetting] = await Promise.all([
+      db
+        .select({
+          userId: gpsRejectionStats.userId,
+          deviceId: gpsRejectionStats.deviceId,
+          platform: gpsRejectionStats.platform,
+          nickname: users.nickname,
+          email: users.email,
+          lastOtaNumber: gpsRejectionStats.lastOtaNumber,
+          rejectionCount: gpsRejectionStats.rejectionCount,
+          lastRejectedPayload: gpsRejectionStats.lastRejectedPayload,
+          lastRejectedAt: gpsRejectionStats.lastRejectedAt,
+          lastSource: gpsRejectionStats.lastSource,
+        })
+        .from(gpsRejectionStats)
+        .leftJoin(users, eq(gpsRejectionStats.userId, users.id))
+        .where(sql`${gpsRejectionStats.rejectionCount} >= ${minCount}`)
+        .orderBy(desc(gpsRejectionStats.rejectionCount))
+        .limit(limit),
+      storage.getAppSetting("gps_rejection_alert_threshold"),
+    ]);
+    const alertThreshold = thresholdSetting?.value ? Number(thresholdSetting.value) : 100;
+    return res.json({ stats: rows, total: rows.length, alertThreshold: Number.isNaN(alertThreshold) ? 100 : alertThreshold });
   } catch (error) {
     console.error("GPS rejections fetch error:", error);
     return res.status(500).json({ message: "Errore interno" });

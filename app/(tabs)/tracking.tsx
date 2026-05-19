@@ -364,6 +364,7 @@ function SensorOverlayPanel({
   currentLateralG,
   currentTiltDeg,
   maxAccelG,
+  mountAxisCalib,
   colors,
   styles: s,
   t,
@@ -372,6 +373,7 @@ function SensorOverlayPanel({
   currentLateralG: number;
   currentTiltDeg: number;
   maxAccelG: number;
+  mountAxisCalib: MountAxisCalibration | null;
   colors: ReturnType<typeof useColors>["Colors"];
   styles: {
     sensorOverlayPanel: object;
@@ -382,34 +384,60 @@ function SensorOverlayPanel({
   };
   t: (key: string) => string;
 }) {
+  const isCalibrated = mountAxisCalib !== null;
   return (
-    <View style={s.sensorOverlayPanel}>
-      <View style={s.sensorOverlayItem}>
-        <Text style={[s.sensorOverlayValue, currentG > 0.05 ? { color: colors.success } : currentG < -0.05 ? { color: colors.accentRed } : {}]}>
-          {currentG >= 0 ? "+" : ""}{currentG.toFixed(2)}
-        </Text>
-        <Text style={s.sensorOverlayLabel}>{t("tracking.gLong")}</Text>
+    <View style={[s.sensorOverlayPanel, { flexDirection: "column" as const, alignItems: "stretch" as const }]}>
+      <View style={{ flexDirection: "row" as const, alignItems: "center" as const, justifyContent: "space-around" as const }}>
+        <View style={s.sensorOverlayItem}>
+          <Text style={[s.sensorOverlayValue, currentG > 0.05 ? { color: colors.success } : currentG < -0.05 ? { color: colors.accentRed } : {}]}>
+            {currentG >= 0 ? "+" : ""}{currentG.toFixed(2)}
+          </Text>
+          <Text style={s.sensorOverlayLabel}>{t("tracking.gLong")}</Text>
+        </View>
+        <View style={s.sensorOverlaySep} />
+        <View style={s.sensorOverlayItem}>
+          <Text style={s.sensorOverlayValue}>
+            {currentLateralG.toFixed(2)}
+          </Text>
+          <Text style={s.sensorOverlayLabel}>{t("tracking.gLateral")}</Text>
+        </View>
+        <View style={s.sensorOverlaySep} />
+        <View style={s.sensorOverlayItem}>
+          <Text style={[s.sensorOverlayValue, { color: colors.accent }]}>
+            {currentTiltDeg.toFixed(1)}°
+          </Text>
+          <Text style={s.sensorOverlayLabel}>{t("tracking.tiltLive")}</Text>
+        </View>
+        <View style={s.sensorOverlaySep} />
+        <View style={s.sensorOverlayItem}>
+          <Text style={[s.sensorOverlayValue, { color: colors.accentRed }]}>
+            {maxAccelG.toFixed(2)}
+          </Text>
+          <Text style={s.sensorOverlayLabel}>{t("tracking.gMaxAccel")}</Text>
+        </View>
       </View>
-      <View style={s.sensorOverlaySep} />
-      <View style={s.sensorOverlayItem}>
-        <Text style={s.sensorOverlayValue}>
-          {currentLateralG.toFixed(2)}
-        </Text>
-        <Text style={s.sensorOverlayLabel}>{t("tracking.gLateral")}</Text>
-      </View>
-      <View style={s.sensorOverlaySep} />
-      <View style={s.sensorOverlayItem}>
-        <Text style={[s.sensorOverlayValue, { color: colors.accent }]}>
-          {currentTiltDeg.toFixed(1)}°
-        </Text>
-        <Text style={s.sensorOverlayLabel}>{t("tracking.tiltLive")}</Text>
-      </View>
-      <View style={s.sensorOverlaySep} />
-      <View style={s.sensorOverlayItem}>
-        <Text style={[s.sensorOverlayValue, { color: colors.accentRed }]}>
-          {maxAccelG.toFixed(2)}
-        </Text>
-        <Text style={s.sensorOverlayLabel}>{t("tracking.gMaxAccel")}</Text>
+      <View style={{ alignItems: "center" as const, marginTop: 7 }}>
+        <View style={{
+          flexDirection: "row" as const,
+          alignItems: "center" as const,
+          backgroundColor: isCalibrated ? colors.success + "22" : colors.warning + "22",
+          borderRadius: 20,
+          paddingHorizontal: 10,
+          paddingVertical: 3,
+          borderWidth: 1,
+          borderColor: isCalibrated ? colors.success + "60" : colors.warning + "55",
+        }}>
+          <Text style={{
+            fontSize: 10,
+            fontFamily: "Inter_500Medium" as const,
+            color: isCalibrated ? colors.success : colors.warning,
+            letterSpacing: 0.2,
+          }}>
+            {isCalibrated
+              ? `${t("tracking.mountCalib.calibratedBadge")} · ${mountAxisCalib.longAxis.toUpperCase()}/${mountAxisCalib.latAxis.toUpperCase()}`
+              : t("tracking.mountCalib.chipDefault")}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -2750,6 +2778,7 @@ function TrackingNativeScreen() {
                     currentLateralG={currentLateralG}
                     currentTiltDeg={currentTiltDeg}
                     maxAccelG={maxAccelG}
+                    mountAxisCalib={mountAxisCalib}
                     colors={Colors}
                     styles={styles}
                     t={t}
@@ -2881,6 +2910,7 @@ function TrackingNativeScreen() {
                         currentLateralG={currentLateralG}
                         currentTiltDeg={currentTiltDeg}
                         maxAccelG={maxAccelG}
+                        mountAxisCalib={mountAxisCalib}
                         colors={Colors}
                         styles={styles}
                         t={t}

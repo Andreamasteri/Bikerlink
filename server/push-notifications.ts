@@ -325,3 +325,40 @@ export async function sendEventiPushNotifications(
     console.warn("[Push] sendEventiPushNotifications error (non-fatal):", err);
   }
 }
+
+export async function sendAdminGpsAlertPush(opts: {
+  userId: string;
+  nickname: string | null;
+  deviceId: string;
+  rejectionCount: number;
+}): Promise<void> {
+  try {
+    const adminRows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(eq(users.role, "admin"));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+    const display = opts.nickname ?? opts.userId.slice(0, 8) + "…";
+
+    for (const row of adminRows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: "⚠️ GPS Anomalie",
+          body: `${display} ha raggiunto ${opts.rejectionCount} rifiuti GPS`,
+          sound: "default" as const,
+          data: { type: "gps_alert", targetUserId: opts.userId },
+          channelId: "matches",
+        });
+      }
+    }
+
+    if (messages.length === 0) return;
+    await sendExpoMessages(messages, userIdByToken);
+  } catch (err) {
+    console.warn("[Push] sendAdminGpsAlertPush error (non-fatal):", err);
+  }
+}

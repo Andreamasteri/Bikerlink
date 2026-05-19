@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { gpsRejectionStats } from "@shared/schema";
 import { sql as drizzleSql } from "drizzle-orm";
+import { sendAdminGpsAlertPush } from "../push-notifications";
 
 const router = Router();
 
@@ -99,27 +100,47 @@ router.post("/:id/points", async (req: Request, res: Response) => {
         "unknown";
       const deviceId = rawDeviceId.substring(0, 128);
       const platform = (req.headers["expo-platform"] as string | undefined)?.substring(0, 20) ?? null;
-      db.insert(gpsRejectionStats)
-        .values({
-          userId,
-          deviceId,
-          platform,
-          rejectionCount: 1,
-          lastRejectedPayload: payload.slice(0, 2000),
-          lastRejectedAt: new Date(),
-          lastSource: "tracking",
-        })
-        .onConflictDoUpdate({
-          target: [gpsRejectionStats.userId, gpsRejectionStats.deviceId],
-          set: {
-            rejectionCount: drizzleSql`${gpsRejectionStats.rejectionCount} + 1`,
-            platform,
-            lastRejectedPayload: payload.slice(0, 2000),
-            lastRejectedAt: new Date(),
-            lastSource: "tracking",
-          },
-        })
-        .catch((err: unknown) => console.error("[tracking] gps_rejection_stats upsert error:", err));
+      (async () => {
+        try {
+          const returned = await db.insert(gpsRejectionStats)
+            .values({
+              userId,
+              deviceId,
+              platform,
+              rejectionCount: 1,
+              lastRejectedPayload: payload.slice(0, 2000),
+              lastRejectedAt: new Date(),
+              lastSource: "tracking",
+            })
+            .onConflictDoUpdate({
+              target: [gpsRejectionStats.userId, gpsRejectionStats.deviceId],
+              set: {
+                rejectionCount: drizzleSql`${gpsRejectionStats.rejectionCount} + 1`,
+                platform,
+                lastRejectedPayload: payload.slice(0, 2000),
+                lastRejectedAt: new Date(),
+                lastSource: "tracking",
+              },
+            })
+            .returning({ rejectionCount: gpsRejectionStats.rejectionCount });
+          const newCount = returned[0]?.rejectionCount ?? 0;
+          if (newCount > 0) {
+            const thresholdSetting = await storage.getAppSetting("gps_rejection_alert_threshold");
+            const threshold = thresholdSetting?.value ? Number(thresholdSetting.value) : 100;
+            if (!Number.isNaN(threshold) && newCount - 1 < threshold && newCount >= threshold) {
+              const user = await storage.getUser(userId);
+              sendAdminGpsAlertPush({
+                userId,
+                nickname: user?.nickname ?? null,
+                deviceId,
+                rejectionCount: newCount,
+              }).catch(() => {});
+            }
+          }
+        } catch (err) {
+          console.error("[tracking] gps_rejection_stats upsert error:", err);
+        }
+      })();
       return res.status(400).json({
         message: "Coordinate GPS non valide: latitudine e longitudine devono essere numeri finiti",
         invalidCount: invalidPoints.length,

@@ -40,11 +40,12 @@ function formatDate(iso: string): string {
   }
 }
 
-function RejectionCard({ item }: { item: GpsRejectionStat }) {
+function RejectionCard({ item, alertThreshold }: { item: GpsRejectionStat; alertThreshold: number }) {
   const [expanded, setExpanded] = useState(false);
   const colors = useColors();
 
   const severity = item.rejectionCount >= 50 ? "#FF3B30" : item.rejectionCount >= 10 ? "#FF9500" : "#34C759";
+  const isOverThreshold = item.rejectionCount >= alertThreshold;
 
   return (
     <TouchableOpacity
@@ -58,9 +59,16 @@ function RejectionCard({ item }: { item: GpsRejectionStat }) {
             <Text style={styles.countText}>{item.rejectionCount}</Text>
           </View>
           <View>
-            <Text style={[styles.nickname, { color: colors.text }]}>
-              {item.nickname ?? item.userId.slice(0, 8) + "…"}
-            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={[styles.nickname, { color: colors.text }]}>
+                {item.nickname ?? item.userId.slice(0, 8) + "…"}
+              </Text>
+              {isOverThreshold && (
+                <View style={{ backgroundColor: "#FF3B3022", borderRadius: 10, paddingHorizontal: 6, paddingVertical: 2, borderWidth: 1, borderColor: "#FF3B3066" }}>
+                  <Text style={{ fontSize: 9, fontFamily: "Inter_700Bold", color: "#FF3B30", letterSpacing: 0.3 }}>⚠ ALERT</Text>
+                </View>
+              )}
+            </View>
             {item.email && (
               <Text style={[styles.email, { color: colors.textSecondary }]}>
                 {item.email}
@@ -114,11 +122,12 @@ export default function GpsRejectionsScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
-  const { data, isLoading, refetch, isRefetching } = useQuery<{ stats: GpsRejectionStat[]; total: number }>({
+  const { data, isLoading, refetch, isRefetching } = useQuery<{ stats: GpsRejectionStat[]; total: number; alertThreshold: number }>({
     queryKey: ["/api/admin/gps-rejections"],
   });
 
   const stats = data?.stats ?? [];
+  const alertThreshold = data?.alertThreshold ?? 100;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -134,7 +143,7 @@ export default function GpsRejectionsScreen() {
       <FlatList
         data={stats}
         keyExtractor={(item) => item.userId + "_" + item.deviceId}
-        renderItem={({ item }) => <RejectionCard item={item} />}
+        renderItem={({ item }) => <RejectionCard item={item} alertThreshold={alertThreshold} />}
         contentContainerStyle={[
           styles.list,
           { paddingBottom: insets.bottom + 16 },
