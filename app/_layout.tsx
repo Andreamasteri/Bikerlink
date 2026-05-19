@@ -22,6 +22,7 @@ import * as Updates from "expo-updates";
 import Constants from "expo-constants";
 import { triggerOtaCheck } from "@/lib/ota-check";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
+import { initOtaHardening } from "@/lib/ota-hardening";
 import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 
 let Notifications: typeof import("expo-notifications") | null = null;
@@ -286,6 +287,11 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 
 function OtaStartupChecker() {
   useEffect(() => {
+    // Task #1357 — hardening OTA: device-id, heartbeat, error-recovery listener.
+    // Eseguito una sola volta al primo mount del root layout (dopo fonts ready).
+    // Fire-and-forget: nessun await, nessun blocco UI.
+    initOtaHardening().catch(() => {});
+
     const timer = setTimeout(() => {
       triggerOtaCheck("startup");
     }, 3000);
