@@ -14,6 +14,7 @@ import {
   StyleSheet,
   Platform,
   KeyboardAvoidingView,
+  Linking,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -204,6 +205,7 @@ function SensorBody({ def }: { def: SensorDefinition }) {
   const [isStarting, setIsStarting] = useState(false);
   const [liveData, setLiveData] = useState<string | null>(null);
   const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [showOpenSettings, setShowOpenSettings] = useState(false);
   const subRef = useRef<Subscription | null>(null);
   const notesDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -278,7 +280,9 @@ function SensorBody({ def }: { def: SensorDefinition }) {
       }
       if (!perm.granted) {
         const canAsk = perm.canAskAgain !== false;
-        const settingsMsg = "Vai in Impostazioni → Privacy → Movimento e fitness e abilita BikerLink.";
+        const settingsMsg = canAsk
+          ? "Vai in Impostazioni → Privacy → Movimento e fitness e abilita BikerLink."
+          : "Apri Impostazioni → Privacy e sicurezza → Movimento e fitness → BikerLink e attiva l'interruttore.";
         addLog(
           "error",
           def.key === "pedometer"
@@ -287,12 +291,14 @@ function SensorBody({ def }: { def: SensorDefinition }) {
               : `${t("sensors.permPreviouslyDeniedShort")} ${settingsMsg}`
             : t("admin.sensorPermissionDenied")
         );
-        if (!canAsk) {
-          addLog("info", "Premi 'Apri Impostazioni' per abilitare il permesso manualmente.");
+        if (def.key === "pedometer" && !canAsk) {
+          addLog("info", "Premi 'Apri Impostazioni' qui sotto per abilitare il permesso manualmente.");
+          setShowOpenSettings(true);
         }
         setIsStarting(false);
         return;
       }
+      setShowOpenSettings(false);
       if (perm.required) {
         addLog("success", "Permesso concesso");
       }
@@ -397,6 +403,20 @@ function SensorBody({ def }: { def: SensorDefinition }) {
             <Text style={ss.clearText}>Svuota</Text>
           </TouchableOpacity>
         </View>
+        {showOpenSettings && (
+          <TouchableOpacity
+            onPress={() => {
+              Linking.openSettings().catch((err) => {
+                addLog("error", `Impossibile aprire Impostazioni: ${err instanceof Error ? err.message : String(err)}`);
+              });
+            }}
+            style={ss.openSettingsBtn}
+            testID="open-settings-btn"
+          >
+            <Ionicons name="settings-outline" size={16} color="#fff" />
+            <Text style={ss.openSettingsText}>Apri Impostazioni</Text>
+          </TouchableOpacity>
+        )}
         {logs.length === 0 ? (
           <Text style={ss.logEmpty}>Nessun evento — premi Avvia per iniziare</Text>
         ) : (
@@ -659,6 +679,22 @@ const ss = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+  },
+  openSettingsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.accent,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  openSettingsText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
   },
   logEmpty: {
     fontSize: 12,
