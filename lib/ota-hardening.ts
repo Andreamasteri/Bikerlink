@@ -13,11 +13,13 @@
 //     reloadAsync se siamo in stato di "rollback" pendente — guard anti-loop
 //     tramite contatore in-memory.
 //
-// NOTA sull'header `expo-device-id` richiesto dal task:
-// `app.json > expo.updates.requestHeaders` accetta solo valori statici (baked
-// al build time). Per un valore per-device dinamico l'API supportata da
-// expo-updates SDK 55 è `setExtraParamAsync`, che invia i parametri nel
-// header strutturato `Expo-Extra-Params`. Il server legge `device-id` da lì.
+// NOTA sull'header `expo-device-id`:
+// Il server (server/routes.ts /api/expo-updates) legge `req.headers["expo-device-id"]`
+// per fare slot-routing. Per iniettare un valore dinamico per-device usiamo
+// `Updates.setUpdateRequestHeadersOverride` (SDK 55, experimental), che richiede
+// `disableAntiBrickingMeasures: true` in app.json.updates. In app.json mettiamo
+// un placeholder statico ("pending") che viene sovrascritto al primo avvio
+// utile dall'override runtime.
 
 import * as Updates from "expo-updates";
 import { Platform } from "react-native";
@@ -32,6 +34,8 @@ let _heartbeatSent = false;
 let _hardeningInited = false;
 let _errorReloadCount = 0;
 let _stateListenerSub: { remove: () => void } | null = null;
+let _seenCheckErrorSeq = -1;
+let _seenDownloadErrorSeq = -1;
 
 /**
  * Heartbeat fire-and-forget verso /api/ota/heartbeat.
@@ -98,18 +102,33 @@ function attachErrorRecoveryListener() {
         const ctx = event?.context;
         if (!ctx) return;
 
-        // Caso 1: il server ha emesso una directive di rollback → applichiamo.
+        // Caso 1: il server ha emesso una directive di rollback (o expo-updates
+        // ha detectato che il bundle attivo non è più valido) → forziamo reload.
+        // Se l'app sta girando da un OTA non-stable e quel bundle è marcato
+        // come da rollbackare, expo-updates ha già scartato il manifest:
+        // reloadAsync riparte sull'embedded bundle (il fallback nativo).
         if (ctx.rollback && _errorReloadCount < ERROR_RECOVERY_MAX_RELOADS) {
           _errorReloadCount += 1;
-          // reloadAsync ricarica al bundle embedded perché expo-updates ha
-          // già scartato il bundle marcato come rollback.
           Updates.reloadAsync().catch(() => {});
           return;
         }
 
-        // Caso 2: errore di download di un nuovo OTA. Non facciamo reload qui
-        // (l'OTA non è ancora attivo, quindi non c'è nulla da cui rollbackare).
-        // Il prossimo check riproverà.
+        // Caso 2: errore al check del manifest. Notifichiamo il server
+        // (telemetria) ma non facciamo reload: il bundle attivo è ancora sano.
+        // Usiamo sequenceNumber per non riportare lo stesso errore due volte.
+        if (ctx.checkError && ctx.sequenceNumber > _seenCheckErrorSeq) {
+          _seenCheckErrorSeq = ctx.sequenceNumber;
+          reportOtaListenerError("check", ctx.checkError, Updates.updateId);
+          return;
+        }
+
+        // Caso 3: errore al download di un nuovo OTA. Idem: nessun reload,
+        // il bundle attivo è valido. Telemetria una sola volta per evento.
+        if (ctx.downloadError && ctx.sequenceNumber > _seenDownloadErrorSeq) {
+          _seenDownloadErrorSeq = ctx.sequenceNumber;
+          reportOtaListenerError("download", ctx.downloadError, Updates.updateId);
+          return;
+        }
       } catch {
         // listener non deve mai propagare eccezioni
       }
@@ -117,6 +136,34 @@ function attachErrorRecoveryListener() {
   } catch {
     // API non disponibile / runtime non supportato: degrade silenzioso
   }
+}
+
+function reportOtaListenerError(
+  phase: "check" | "download",
+  err: Error,
+  currentUpdateId: string | null,
+): void {
+  try {
+    const msg = String(err?.message ?? err).substring(0, 500);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    fetch(new URL("/api/admin/ota-error", getApiUrl()).toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        error: `[listener/${phase}] ${msg}`,
+        failCount: 0,
+        updateId: currentUpdateId ?? "embedded",
+        runtimeVersion: Updates.runtimeVersion ?? "unknown",
+        phase,
+        source: "listener",
+        platform: Platform.OS,
+      }),
+    })
+      .catch(() => {})
+      .finally(() => clearTimeout(timeout));
+  } catch {}
 }
 
 /**
@@ -130,16 +177,27 @@ export async function initOtaHardening(): Promise<void> {
   _hardeningInited = true;
   if (Platform.OS === "web") return;
 
-  // 1. Inietta device ID nelle prossime chiamate /api/expo-updates.
-  //    Persiste tra restart (expo-updates lo salva nello storage nativo).
+  // 1. Inietta device ID come HEADER `expo-device-id` sulle prossime chiamate
+  //    /api/expo-updates (slot routing lato server). Persiste tra restart
+  //    perché expo-updates salva l'override nello storage nativo.
+  //    Inoltre lo replichiamo come extra-param `device-id` per compatibilità
+  //    con eventuali consumer che leggono da Expo-Extra-Params.
   try {
     const deviceId = await getStableDeviceId();
     if (!__DEV__) {
+      try {
+        const override = (Updates as {
+          setUpdateRequestHeadersOverride?: (h: Record<string, string> | null) => void;
+        }).setUpdateRequestHeadersOverride;
+        if (typeof override === "function") {
+          override({ "expo-device-id": deviceId });
+        }
+      } catch {}
       await Updates.setExtraParamAsync("device-id", deviceId).catch(() => {});
     }
   } catch {}
 
-  // 2. Listener per rollback runtime.
+  // 2. Listener per rollback runtime + errori di check/download.
   attachErrorRecoveryListener();
 
   // 3. Heartbeat (se siamo su un OTA scaricato).
