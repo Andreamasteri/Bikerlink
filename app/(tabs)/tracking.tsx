@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   AppState,
   AppStateStatus,
+  DimensionValue,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -3402,6 +3403,135 @@ export default function TrackingScreen() {
 
             {showBatteryStats && (
               <View style={styles.batteryStatsPanel}>
+                {/* ── Combined chart ── */}
+                {(() => {
+                  const modes = ["easy", "medium", "race"] as UpdateProfile[];
+                  const modeColors: Record<UpdateProfile, string> = {
+                    easy: Colors.success,
+                    medium: Colors.accent,
+                    race: Colors.error,
+                  };
+                  const modeLabels: Record<UpdateProfile, string> = {
+                    easy: t("tracking.label.easy"),
+                    medium: t("tracking.label.standard"),
+                    race: t("tracking.label.race"),
+                  };
+                  const avgs = modes.map((p) => {
+                    const s = batteryDrainStats[p];
+                    return s.length > 0 ? s.reduce((a, b) => a + b, 0) / s.length : null;
+                  });
+                  const anyData = avgs.some((v) => v !== null);
+
+                  // Overlaid sparkline: last 10 samples per mode on same scale
+                  const SPARK_SAMPLES = 10;
+                  const allSamples = modes.flatMap((p) => batteryDrainStats[p]);
+                  const sparkGlobalMax = allSamples.length > 0 ? Math.max(...allSamples, 0.1) : 1;
+                  const maxGroupLen = Math.max(...modes.map((p) => Math.min(batteryDrainStats[p].length, SPARK_SAMPLES)));
+
+                  // Grouped bar chart scale
+                  const validAvgs = avgs.filter((v) => v !== null) as number[];
+                  const barMax = validAvgs.length > 0 ? Math.max(...validAvgs, 0.1) : 1;
+
+                  return (
+                    <View style={styles.batteryStatsCombinedCard}>
+                      {/* Header */}
+                      <View style={styles.batteryStatsCombinedHeader}>
+                        <Ionicons name="stats-chart" size={12} color={Colors.textSecondary} />
+                        <Text style={styles.batteryStatsCombinedTitle}>{t("tracking.batteryStats.combinedTitle")}</Text>
+                      </View>
+
+                      {/* Legend */}
+                      <View style={styles.batteryStatsCombinedLegend}>
+                        {modes.map((p) => (
+                          <View key={p} style={styles.batteryStatsCombinedLegendItem}>
+                            <View style={[styles.batteryStatsCombinedLegendDot, { backgroundColor: modeColors[p] }]} />
+                            <Text style={styles.batteryStatsCombinedLegendLabel}>{modeLabels[p]}</Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      {anyData ? (
+                        <>
+                          {/* Horizontal grouped bar chart — avg drain per mode */}
+                          <View style={styles.batteryStatsCombinedBars}>
+                            {modes.map((p, i) => {
+                              const avg = avgs[i];
+                              const barW = avg !== null ? Math.max(6, Math.round((avg / barMax) * 100)) : 0;
+                              return (
+                                <View key={p} style={styles.batteryStatsCombinedBarRow}>
+                                  <View style={styles.batteryStatsCombinedBarTrack}>
+                                    <View
+                                      style={[
+                                        styles.batteryStatsCombinedBarFill,
+                                        {
+                                          width: `${barW}%` as DimensionValue,
+                                          backgroundColor: modeColors[p],
+                                        },
+                                      ]}
+                                    />
+                                  </View>
+                                  <Text style={[styles.batteryStatsCombinedBarValue, { color: modeColors[p] }]}>
+                                    {avg !== null ? `${avg.toFixed(1)}%/h` : "—"}
+                                  </Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                          <Text style={styles.batteryStatsCombinedBarAxisLabel}>{t("tracking.batteryStats.avgDrainRate")}</Text>
+
+                          {/* Overlaid sparkline — all modes on same Y axis */}
+                          {maxGroupLen > 0 && (
+                            <>
+                              <View style={styles.batteryStatsCombinedSparkContainer}>
+                                {/* Y grid lines */}
+                                {[0.25, 0.5, 0.75, 1].map((frac) => (
+                                  <View
+                                    key={frac}
+                                    style={[
+                                      styles.batteryStatsCombinedGridLine,
+                                      { bottom: `${frac * 100}%` as DimensionValue },
+                                    ]}
+                                  />
+                                ))}
+                                {/* Bars for each column slot */}
+                                {Array.from({ length: maxGroupLen }).map((_, colIdx) => (
+                                  <View key={colIdx} style={styles.batteryStatsCombinedSparkCol}>
+                                    {modes.map((p) => {
+                                      const samples = batteryDrainStats[p];
+                                      const sliceStart = Math.max(0, samples.length - SPARK_SAMPLES);
+                                      const slice = samples.slice(sliceStart);
+                                      const offsetIdx = maxGroupLen - slice.length;
+                                      const dataIdx = colIdx - offsetIdx;
+                                      const val = dataIdx >= 0 && dataIdx < slice.length ? slice[dataIdx] : null;
+                                      const barH = val !== null ? Math.max(3, Math.round((val / sparkGlobalMax) * 44)) : 0;
+                                      return (
+                                        <View
+                                          key={p}
+                                          style={[
+                                            styles.batteryStatsCombinedSparkBar,
+                                            {
+                                              height: barH,
+                                              backgroundColor: val !== null ? modeColors[p] + "CC" : "transparent",
+                                            },
+                                          ]}
+                                        />
+                                      );
+                                    })}
+                                  </View>
+                                ))}
+                              </View>
+                              <Text style={styles.batteryStatsSparklineLabel}>{t("tracking.batteryStats.lastSamples")}</Text>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <Text style={styles.batteryStatsCombinedNoData}>{t("tracking.batteryStats.noDataYet")}</Text>
+                      )}
+                    </View>
+                  );
+                })()}
+
+                {/* ── Per-mode cards ── */}
                 {(["easy", "medium", "race"] as UpdateProfile[]).map((p) => {
                   const samples = batteryDrainStats[p];
                   const hasData = samples.length > 0;
@@ -5119,6 +5249,119 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold" as const,
     fontSize: 13,
     color: Colors.text,
+  },
+
+  // Combined cross-mode battery chart
+  batteryStatsCombinedCard: {
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 6,
+  },
+  batteryStatsCombinedHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 5,
+  },
+  batteryStatsCombinedTitle: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.textSecondary,
+    textTransform: "uppercase" as const,
+    letterSpacing: 0.6,
+    flex: 1,
+  },
+  batteryStatsCombinedLegend: {
+    flexDirection: "row" as const,
+    gap: 10,
+    paddingBottom: 2,
+  },
+  batteryStatsCombinedLegendItem: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+  },
+  batteryStatsCombinedLegendDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+  },
+  batteryStatsCombinedLegendLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium" as const,
+    color: Colors.textSecondary,
+  },
+  batteryStatsCombinedBars: {
+    gap: 5,
+    paddingTop: 2,
+  },
+  batteryStatsCombinedBarRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+  },
+  batteryStatsCombinedBarTrack: {
+    flex: 1,
+    height: 10,
+    backgroundColor: Colors.border,
+    borderRadius: 5,
+    overflow: "hidden" as const,
+  },
+  batteryStatsCombinedBarFill: {
+    height: "100%" as const,
+    borderRadius: 5,
+  },
+  batteryStatsCombinedBarValue: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold" as const,
+    width: 52,
+    textAlign: "right" as const,
+  },
+  batteryStatsCombinedBarAxisLabel: {
+    fontSize: 9,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary + "88",
+    textAlign: "center" as const,
+    fontStyle: "italic" as const,
+    marginTop: -2,
+  },
+  batteryStatsCombinedSparkContainer: {
+    flexDirection: "row" as const,
+    alignItems: "flex-end" as const,
+    gap: 3,
+    height: 52,
+    paddingTop: 4,
+    position: "relative" as const,
+  },
+  batteryStatsCombinedGridLine: {
+    position: "absolute" as const,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: Colors.border + "60",
+  },
+  batteryStatsCombinedSparkCol: {
+    flex: 1,
+    height: 48,
+    flexDirection: "row" as const,
+    alignItems: "flex-end" as const,
+    justifyContent: "center" as const,
+    gap: 1,
+  },
+  batteryStatsCombinedSparkBar: {
+    flex: 1,
+    borderRadius: 2,
+    minHeight: 0,
+  },
+  batteryStatsCombinedNoData: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+    fontStyle: "italic" as const,
+    paddingVertical: 6,
   },
 
   // Battery drain stats expandable section
