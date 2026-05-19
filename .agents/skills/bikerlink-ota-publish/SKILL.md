@@ -56,10 +56,10 @@ bash scripts/build-apk.sh production   # AAB Play Store
 
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
-- **Runtime Version**: `8.0.0` (ciclo corrente, APK v45) ← CICLO V3
-- **APK corrente**: versionCode **45**, versionName **3.4.0** (buildId: `91cfde53-66e7-45fc-83f0-d7f72a98fcde`, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk — STABILE)
-- **APK precedente (STABILE distribuita)**: versionCode 44, versionName 3.3.0 (buildId: `b148edc3-de25-4f55-b5c4-c4466b4ccc0b`, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk)
-- **OTA corrente**: OTA-29 (releaseId: `c24193bb-167f-4740-a7f8-4dcbb3880aa1`)
+- **Runtime Version**: `9.0.0` (ciclo corrente, APK v46) ← CICLO 9.x
+- **APK corrente**: versionCode **46**, versionName **46.29.9**
+- **APK precedente (STABILE distribuita)**: versionCode 45, versionName 3.4.0 (buildId: `91cfde53-66e7-45fc-83f0-d7f72a98fcde`, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk)
+- **OTA corrente**: OTA-29 (ultimo del ciclo 8.x — il ciclo 9.x inizia dalla prossima pubblicazione)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -139,8 +139,11 @@ che la release è già live in produzione: in quel caso lo script avvisa di aggi
 manualmente `ota-updates.json` e NON ripristina (la release è già attiva).
 
 ### Versioning automatico
-Lo script calcola la versione come `1.<updateNumber>.0` (es. OTA-19 → `1.19.0`).
-Non è necessario specificare la versione manualmente.
+Lo script calcola la versione come `<build>.<updateNumber>.<ciclo_ota>` (es. Ciclo 9.x, OTA-30 → `46.30.9`).
+- **46** = versionCode APK corrente
+- **updateNumber** = numero progressivo OTA nel ciclo (calcolato automaticamente)
+- **9** = ciclo runtimeVersion corrente (9.0.0)
+Non è necessario specificare la versione manualmente. Leggere `.agents/skills/bikerlink-versioning/SKILL.md` per la convenzione completa.
 
 ---
 
@@ -275,10 +278,13 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
 - Ciclo 5.x: OTA 41 (rv 5.0.0) — DEPRECATO
 - Ciclo 6.x: OTA 42–43 (rv 6.0.0) — OBSOLETO
 - Ciclo 7.x: OTA 44–156 (rv 7.0.0) — CHIUSO
-- **Ciclo 8.x: OTA 1–25 (rv 8.0.0) ← CORRENTE (V3)**
+- **Ciclo 8.x: OTA 1–29 (rv 8.0.0) — CHIUSO a OTA-29**
   - APK v41: STABILE — buildId: e03f51d8, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk
   - APK v43 (3.2.0): STABILE — buildId: 38cb1b32-4316-4f63-9799-1b9ab36888e8, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk
   - APK v44 (3.3.0): STABILE — buildId: b148edc3-de25-4f55-b5c4-c4466b4ccc0b, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk (baseline pulita per device piantati su OTA-19 — Task #1151)
+  - APK v45 (3.4.0): STABILE — buildId: 91cfde53-66e7-45fc-83f0-d7f72a98fcde, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk
+- **Ciclo 9.x: OTA 30+ (rv 9.0.0) ← CORRENTE**
+  - APK v46 (46.29.9): versionCode 46, runtimeVersion 9.0.0
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:

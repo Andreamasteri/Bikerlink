@@ -178,7 +178,9 @@ do_export() {
   APK_URL=$(echo "$NEXT_OTA_INFO" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const j=JSON.parse(d); console.log(j.apkUrl ?? ''); })")
   APK_BUILD_DASHBOARD=$(echo "$NEXT_OTA_INFO" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ const j=JSON.parse(d); console.log(j.apkBuildDashboard ?? ''); })")
 
-  local VERSION="1.${NEXT_OTA}.0"
+  # Formato versione OTA: <build>.<updateNumber>.<ciclo_ota>
+  # 46 = versionCode APK corrente, NEXT_OTA = numero progressivo OTA nel ciclo, 9 = ciclo runtimeVersion (9.0.0)
+  local VERSION="46.${NEXT_OTA}.9"
   local GIT_COMMIT_HASH GIT_COMMIT_SHORT
   GIT_COMMIT_HASH=$(git rev-parse HEAD 2>/dev/null || echo "N/A")
   GIT_COMMIT_SHORT="${GIT_COMMIT_HASH:0:12}"
@@ -274,7 +276,7 @@ do_export() {
     const newEntry = {
       updateNumber: nextNum,
       version: process.env.OTA_VERSION,
-      cycle: '8.x',
+      cycle: '9.x',
       channel: 'preview',
       platform: 'android',
       message: JSON.stringify('OTA-' + nextNum + ' rv' + rv + ': ' + releaseMsg).slice(1, -1),
