@@ -454,6 +454,7 @@ const fr: Record<string, string> = {
   "tracking.stopConfirmBtn": "Terminer",
   "tracking.loadError": "Impossible de charger le parcours.",
   "tracking.precisionNote": "Plus de précision = Plus de consommation de batterie",
+  "tracking.batteryEstimateNote": "Consommation de batterie estimée par heure (approximative)",
   "tracking.countdown": "Compte à rebours",
   "tracking.handsOff": "Hands Off",
   "tracking.handsOffDesc": "pour éviter les touchers accidentels à grande vitesse",

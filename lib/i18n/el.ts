@@ -454,6 +454,7 @@ const el: Record<string, string> = {
   "tracking.stopConfirmBtn": "Τερματισμός",
   "tracking.loadError": "Αδύνατη φόρτωση διαδρομής.",
   "tracking.precisionNote": "Περισσότερη ακρίβεια = Μεγαλύτερη κατανάλωση μπαταρίας",
+  "tracking.batteryEstimateNote": "Εκτιμώμενη κατανάλωση μπαταρίας ανά ώρα (κατά προσέγγιση)",
   "tracking.countdown": "Αντίστροφη μέτρηση",
   "tracking.handsOff": "Hands Off",
   "tracking.handsOffDesc": "για αποφυγή τυχαίων αφών σε υψηλή ταχύτητα",

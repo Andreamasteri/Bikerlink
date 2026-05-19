@@ -497,6 +497,7 @@ const it: Record<string, string> = {
   "tracking.stopConfirmBtn": "Termina",
   "tracking.loadError": "Impossibile caricare il percorso.",
   "tracking.precisionNote": "Più precisione = Maggior consumo di batteria",
+  "tracking.batteryEstimateNote": "Consumo batteria stimato per ora (approssimativo)",
   "tracking.countdown": "Countdown",
   "tracking.handsOff": "Hands Off",
   "tracking.handsOffDesc": "per evitare tocchi ad alta velocità",

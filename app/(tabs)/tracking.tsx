@@ -209,6 +209,15 @@ function getModeConfigBackground(profile: UpdateProfile): {
   return { accuracy: Location.Accuracy.High, timeInterval: 8000, distanceInterval: 15 };
 }
 
+// Stima statica del consumo batteria per ora in tracking in background.
+// Valori approssimativi basati su intervallo di campionamento e accuracy GPS
+// di getModeConfigBackground(). Non sono misure reali.
+function getEstimatedBatteryDrainPerHour(profile: UpdateProfile): string {
+  if (profile === "race") return "~9%/h";
+  if (profile === "easy") return "~3%/h";
+  return "~5%/h";
+}
+
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
 
@@ -2705,9 +2714,27 @@ export default function TrackingScreen() {
                   >
                     {p === "easy" ? t("tracking.profile.easy") : p === "medium" ? t("tracking.profile.medium") : t("tracking.profile.race")}
                   </Text>
+                  <View style={styles.profileBtnBatteryRow}>
+                    <Ionicons
+                      name="battery-half-outline"
+                      size={10}
+                      color={profile === p ? Colors.accent : Colors.textSecondary + "AA"}
+                    />
+                    <Text
+                      style={[
+                        styles.profileBtnBattery,
+                        profile === p && styles.profileBtnBatteryActive,
+                      ]}
+                    >
+                      {getEstimatedBatteryDrainPerHour(p)}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
             </View>
+            <Text style={styles.profileBatteryNote}>
+              {t("tracking.batteryEstimateNote")}
+            </Text>
             <View style={styles.profileWarning}>
               <Ionicons name="warning-outline" size={14} color={Colors.warning} />
               <Text style={styles.profileWarningText}>
@@ -3705,6 +3732,29 @@ const styles = StyleSheet.create({
   },
   profileBtnDescActive: {
     color: Colors.accent + "CC",
+  },
+  profileBtnBatteryRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 3,
+    marginTop: 4,
+  },
+  profileBtnBattery: {
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold" as const,
+    color: Colors.textSecondary + "AA",
+  },
+  profileBtnBatteryActive: {
+    color: Colors.accent,
+  },
+  profileBatteryNote: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular" as const,
+    color: Colors.textSecondary + "99",
+    textAlign: "center" as const,
+    marginTop: 6,
+    marginBottom: 4,
+    fontStyle: "italic" as const,
   },
   profileWarning: {
     flexDirection: "row" as const,

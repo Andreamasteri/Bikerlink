@@ -497,6 +497,7 @@ const en: Record<string, string> = {
   "tracking.stopConfirmBtn": "End",
   "tracking.loadError": "Unable to load the route.",
   "tracking.precisionNote": "More precision = Higher battery consumption",
+  "tracking.batteryEstimateNote": "Estimated battery drain per hour (approximate)",
   "tracking.countdown": "Countdown",
   "tracking.handsOff": "Hands Off",
   "tracking.handsOffDesc": "to avoid taps at high speed",

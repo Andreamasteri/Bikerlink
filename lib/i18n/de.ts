@@ -454,6 +454,7 @@ const de: Record<string, string> = {
   "tracking.stopConfirmBtn": "Beenden",
   "tracking.loadError": "Strecke konnte nicht geladen werden.",
   "tracking.precisionNote": "Mehr Präzision = Mehr Akkuverbrauch",
+  "tracking.batteryEstimateNote": "Geschätzter Akkuverbrauch pro Stunde (ungefähr)",
   "tracking.countdown": "Countdown",
   "tracking.handsOff": "Hands Off",
   "tracking.handsOffDesc": "um unbeabsichtigte Berührungen bei hoher Geschwindigkeit zu vermeiden",

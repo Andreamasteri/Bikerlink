@@ -454,6 +454,7 @@ const tr: Record<string, string> = {
   "tracking.stopConfirmBtn": "Bitir",
   "tracking.loadError": "Rota yüklenemedi.",
   "tracking.precisionNote": "Daha fazla hassasiyet = Daha fazla pil tüketimi",
+  "tracking.batteryEstimateNote": "Saatlik tahmini pil tüketimi (yaklaşık)",
   "tracking.countdown": "Geri sayım",
   "tracking.handsOff": "Hands Off",
   "tracking.handsOffDesc": "yüksek hızda kazara dokunuşları önlemek için",
