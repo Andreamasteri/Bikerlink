@@ -24,7 +24,7 @@ import type { AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
 
-import { EUROPEAN_COUNTRIES, getRegionsForCountry } from "@/lib/countries-regions";
+import { EUROPEAN_COUNTRIES, getRegionsForCountry, CONTINENT_MAP, getCountriesForContinent } from "@/lib/countries-regions";
 
 const PHONE_PREFIXES = [
   { code: "+39", country: "Italia" },
@@ -341,6 +341,11 @@ export default function RegisterScreen() {
   const [eulaAccepted, setEulaAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [privacyModalSeen, setPrivacyModalSeen] = useState(false);
+  const [showEmailConfirm, setShowEmailConfirm] = useState(false);
+  const [emailConfirmed, setEmailConfirmed] = useState(false);
+
   const [inviteCode, setInviteCode] = useState(params.inviteCode ?? "");
   const [invitePreview, setInvitePreview] = useState<{ code: string; label: string | null; giftMessage: string | null } | null>(null);
   const [invitePreviewLoading, setInvitePreviewLoading] = useState(false);
@@ -350,6 +355,13 @@ export default function RegisterScreen() {
   const [pendingNavigation, setPendingNavigation] = useState<"tabs" | "verify" | null>(null);
   const [verifyEmail, setVerifyEmail] = useState("");
   const inviteDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (step === 3 && !privacyModalSeen) {
+      setShowPrivacyModal(true);
+      setPrivacyModalSeen(true);
+    }
+  }, [step]);
 
   useEffect(() => {
     if (inviteDebounceRef.current) clearTimeout(inviteDebounceRef.current);
@@ -417,6 +429,7 @@ export default function RegisterScreen() {
       if (!/[a-z]/.test(password)) { setError(t("validation.passwordLower")); return false; }
       if (!/[0-9]/.test(password)) { setError(t("validation.passwordNumber")); return false; }
       if (password !== confirmPassword) { setError("Le password non coincidono"); return false; }
+      if (!country) { setError("Seleziona il tuo paese"); return false; }
     } else if (step === 4) {
       if (!eulaAccepted) {
         setError("Devi accettare i termini e le condizioni");
@@ -646,11 +659,6 @@ export default function RegisterScreen() {
     <View style={styles.stepContent}>
       <Text style={styles.stepTitle}>{t("register.step3.title")}</Text>
 
-      <View style={styles.privacyNoticeCard}>
-        <Ionicons name="information-circle-outline" size={20} color={Colors.accent} style={{ marginTop: 2 }} />
-        <Text style={styles.privacyNoticeText}>{t("register.privacyNotice")}</Text>
-      </View>
-
       <View style={styles.inputWrapper}>
         <Ionicons name="at" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
         <TextInput
@@ -672,7 +680,12 @@ export default function RegisterScreen() {
           placeholder={t("auth.email")}
           placeholderTextColor={Colors.textSecondary}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(v) => { setEmail(v); setEmailConfirmed(false); }}
+          onBlur={() => {
+            if (email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+              setShowEmailConfirm(true);
+            }
+          }}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="email-address"
@@ -680,16 +693,22 @@ export default function RegisterScreen() {
         />
         {emailVerifEnabled && (
           <TouchableOpacity
-            onPress={() => Alert.alert(
-              t("auth.emailVerifyTitle"),
-              t("auth.emailVerifyInfo")
-            )}
+            onPress={() => Alert.alert(t("auth.emailVerifyTitle"), t("auth.emailVerifyInfo"))}
             style={{ paddingHorizontal: 8 }}
           >
             <Ionicons name="information-circle-outline" size={20} color={Colors.accent} />
           </TouchableOpacity>
         )}
       </View>
+      {email.includes("@") && !email.includes("@gmail.") && !email.split("@")[1]?.includes(".") && (
+        <TouchableOpacity
+          style={styles.emailSuggestion}
+          onPress={() => { setEmail(email.split("@")[0] + "@gmail.com"); setEmailConfirmed(false); }}
+        >
+          <Ionicons name="mail" size={16} color={Colors.accent} />
+          <Text style={styles.emailSuggestionText}>{email.split("@")[0]}@gmail.com</Text>
+        </TouchableOpacity>
+      )}
 
       {phoneFieldEnabled && (
         <View style={styles.phoneRow}>
@@ -714,6 +733,11 @@ export default function RegisterScreen() {
           </View>
         </View>
       )}
+
+      <Text style={styles.passwordHint}>
+        <Text style={styles.passwordHintItalic}>8 caratteri, con almeno una minuscola e </Text>
+        <Text style={[styles.passwordHintItalic, styles.passwordHintUpper]}>UNA MAIUSCOLA</Text>
+      </Text>
 
       <View style={styles.inputWrapper}>
         <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
@@ -784,13 +808,15 @@ export default function RegisterScreen() {
       </View>
 
       <TouchableOpacity
-        style={styles.inputWrapper}
+        style={[styles.inputWrapper, !country && styles.inputWrapperRequired]}
         onPress={() => { setShowCountries(!showCountries); setShowRegions(false); }}
         testID="reg-country-toggle"
       >
-        <Ionicons name="globe-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
+        <Ionicons name="globe-outline" size={20} color={country ? Colors.accent : Colors.textSecondary} style={styles.inputIcon} />
         <Text style={[styles.input, { lineHeight: 52 }, !country && { color: Colors.textSecondary }]}>
-          {country ? `${EUROPEAN_COUNTRIES.find(c => c.code === country)?.flag} ${EUROPEAN_COUNTRIES.find(c => c.code === country)?.name}` : "Paese (opzionale)"}
+          {country
+            ? `${EUROPEAN_COUNTRIES.find(c => c.code === country)?.flag} ${EUROPEAN_COUNTRIES.find(c => c.code === country)?.name}`
+            : "Paese *"}
         </Text>
         <Ionicons name={showCountries ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
       </TouchableOpacity>
@@ -798,15 +824,34 @@ export default function RegisterScreen() {
       {showCountries && (
         <View style={styles.regionList}>
           <ScrollView style={styles.regionScroll} nestedScrollEnabled>
-            {[...EUROPEAN_COUNTRIES].sort((a, b) => a.name.localeCompare(b.name)).map((c) => (
-              <TouchableOpacity
-                key={c.code}
-                style={[styles.regionItem, country === c.code && styles.regionItemSelected]}
-                onPress={() => { setCountry(c.code); setRegion(""); setShowCountries(false); }}
-              >
-                <Text style={[styles.regionText, country === c.code && styles.regionTextSelected]}>{c.flag} {c.name}</Text>
-              </TouchableOpacity>
-            ))}
+            {[
+              { key: "EU", label: "🌍 Europa" },
+              { key: "NA", label: "🌎 Nord America" },
+              { key: "SA", label: "🌎 Sud America" },
+              { key: "AF", label: "🌍 Africa" },
+              { key: "AS", label: "🌏 Asia" },
+              { key: "OC", label: "🌏 Oceania" },
+            ].map(({ key, label }) => {
+              const continentCountries = getCountriesForContinent(key)
+                .sort((a, b) => a.name.localeCompare(b.name));
+              if (continentCountries.length === 0) return null;
+              return (
+                <View key={key}>
+                  <View style={styles.continentHeader}>
+                    <Text style={styles.continentLabel}>{label}</Text>
+                  </View>
+                  {continentCountries.map((c) => (
+                    <TouchableOpacity
+                      key={c.code}
+                      style={[styles.regionItem, styles.regionItemIndented, country === c.code && styles.regionItemSelected]}
+                      onPress={() => { setCountry(c.code); setRegion(""); setShowCountries(false); }}
+                    >
+                      <Text style={[styles.regionText, country === c.code && styles.regionTextSelected]}>{c.flag} {c.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              );
+            })}
           </ScrollView>
         </View>
       )}
@@ -820,7 +865,7 @@ export default function RegisterScreen() {
           >
             <Ionicons name="location-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
             <Text style={[styles.input, { lineHeight: 52 }, !region && { color: Colors.textSecondary }]}>
-              {region || `${t("auth.region")} (opzionale)`}
+              {region || `${t("auth.region")} (preferibile inserirla)`}
             </Text>
             <Ionicons name={showRegions ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
           </TouchableOpacity>
@@ -1033,6 +1078,56 @@ export default function RegisterScreen() {
         )}
       </ScrollView>
 
+      {/* Privacy Modal — appare automaticamente al primo step 3 */}
+      <Modal
+        visible={showPrivacyModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPrivacyModal(false)}
+      >
+        <View style={styles.privacyModalOverlay}>
+          <View style={styles.privacyModalCard}>
+            <Ionicons name="shield-checkmark" size={48} color={Colors.accent} style={{ marginBottom: 16 }} />
+            <Text style={styles.privacyModalTitle}>BikerLink</Text>
+            <Text style={styles.privacyModalBody}>{t("register.privacyNotice")}</Text>
+            <Text style={styles.privacyModalHighlight}>
+              <Text style={styles.privacyModalHighlightText}>App discreta. Privacy al primo posto.</Text>
+            </Text>
+            <TouchableOpacity style={styles.privacyModalButton} onPress={() => setShowPrivacyModal(false)}>
+              <Text style={styles.privacyModalButtonText}>Ho capito, prosegui</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Email Confirm Modal */}
+      <Modal
+        visible={showEmailConfirm}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEmailConfirm(false)}
+      >
+        <View style={styles.privacyModalOverlay}>
+          <View style={styles.emailConfirmCard}>
+            <Ionicons name="mail" size={40} color={Colors.accent} style={{ marginBottom: 12 }} />
+            <Text style={styles.emailConfirmTitle}>Sei sicuro sia corretto?</Text>
+            <Text style={styles.emailConfirmEmail}>{email.trim()}</Text>
+            <TouchableOpacity
+              style={styles.privacyModalButton}
+              onPress={() => { setEmailConfirmed(true); setShowEmailConfirm(false); }}
+            >
+              <Text style={styles.privacyModalButtonText}>Sì, è questo ✓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.emailConfirmEditBtn}
+              onPress={() => setShowEmailConfirm(false)}
+            >
+              <Text style={styles.emailConfirmEditText}>Correggi</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       <Modal
         visible={showGiftModal}
         transparent
@@ -1189,7 +1284,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     color: Colors.text,
-    fontSize: 17,
+    fontSize: 19,
     fontFamily: "Inter_400Regular",
     height: "100%",
   },
@@ -1558,5 +1653,140 @@ const styles = StyleSheet.create({
     color: Colors.background,
     fontSize: 17,
     fontFamily: "Inter_600SemiBold",
+  },
+  passwordHint: {
+    paddingHorizontal: 4,
+    marginBottom: -4,
+  },
+  passwordHintItalic: {
+    color: Colors.accent,
+    fontSize: 14,
+    fontStyle: "italic" as const,
+    fontFamily: "Inter_400Regular",
+  },
+  passwordHintUpper: {
+    fontFamily: "Inter_700Bold",
+  },
+  emailSuggestion: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent + "55",
+    marginTop: -8,
+  },
+  emailSuggestionText: {
+    color: Colors.accent,
+    fontSize: 15,
+    fontFamily: "Inter_500Medium",
+  },
+  inputWrapperRequired: {
+    borderColor: Colors.accent + "88",
+  },
+  continentHeader: {
+    backgroundColor: Colors.background,
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+  },
+  continentLabel: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    textTransform: "uppercase" as const,
+    letterSpacing: 1,
+  },
+  regionItemIndented: {
+    paddingLeft: 24,
+  },
+  privacyModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    justifyContent: "center" as const,
+    alignItems: "center" as const,
+    padding: 24,
+  },
+  privacyModalCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    padding: 32,
+    alignItems: "center" as const,
+    width: "100%",
+    maxWidth: 360,
+  },
+  privacyModalTitle: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    marginBottom: 16,
+    textAlign: "center" as const,
+  },
+  privacyModalBody: {
+    fontSize: 16,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center" as const,
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  privacyModalHighlight: {
+    marginBottom: 28,
+  },
+  privacyModalHighlightText: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
+    fontStyle: "italic" as const,
+    textDecorationLine: "underline" as const,
+    textAlign: "center" as const,
+  },
+  privacyModalButton: {
+    backgroundColor: Colors.accent,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    width: "100%",
+    alignItems: "center" as const,
+  },
+  privacyModalButtonText: {
+    color: Colors.background,
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+  },
+  emailConfirmCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 24,
+    padding: 32,
+    alignItems: "center" as const,
+    width: "100%",
+    maxWidth: 360,
+  },
+  emailConfirmTitle: {
+    fontSize: 24,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    textAlign: "center" as const,
+    marginBottom: 14,
+  },
+  emailConfirmEmail: {
+    fontSize: 18,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.accent,
+    textAlign: "center" as const,
+    marginBottom: 28,
+    paddingHorizontal: 8,
+  },
+  emailConfirmEditBtn: {
+    marginTop: 14,
+    paddingVertical: 10,
+  },
+  emailConfirmEditText: {
+    color: Colors.textSecondary,
+    fontSize: 16,
+    fontFamily: "Inter_500Medium",
+    textDecorationLine: "underline" as const,
   },
 });
