@@ -196,7 +196,7 @@ export default function TabLayout() {
 
   const HIDDEN_TAB_NAMES = isWeb
     ? new Set<string>([])
-    : new Set(["tracking", "garage", "giri"]);
+    : new Set(["tracking", "garage", "giri", "ride"]);
   if (isGpsGateActive && !isWeb) {
     ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi", "arcade", "giri"].forEach(
       (n) => HIDDEN_TAB_NAMES.add(n)
