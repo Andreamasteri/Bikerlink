@@ -1315,12 +1315,11 @@ export default function AdminSettings() {
     },
   });
 
-  const { data: mapsData } = useQuery<{ enabled: boolean; provider: string; userChoiceEnabled: boolean }>({
+  const { data: mapsData } = useQuery<{ enabled: boolean; provider: string }>({
     queryKey: ["/api/settings/maps"],
   });
   const mapsEnabled = mapsData?.enabled !== false;
   const mapsProvider = (mapsData?.provider || "carto_light") as "carto_light" | "carto_dark" | "esri_gray";
-  const mapsUserChoiceEnabled = mapsData?.userChoiceEnabled !== false;
   const mapsEnabledMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const baseUrl = getApiUrl();
@@ -1363,26 +1362,6 @@ export default function AdminSettings() {
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
-  const mapsUserChoiceMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/maps_user_choice_enabled", baseUrl);
-      const res = await globalThis.fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: enabled ? "true" : "false" }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/maps"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-    },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
-  });
 
   const [isUploadingEula, setIsUploadingEula] = useState(false);
 
@@ -2757,24 +2736,6 @@ export default function AdminSettings() {
             })()}
           </View>
         )}
-        <View style={[styles.synecoHeader, { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.border }]}>
-          <View style={styles.synecoInfo}>
-            <Ionicons name="person-circle-outline" size={18} color={Colors.textSecondary} />
-            <Text style={[styles.synecoDesc, { marginBottom: 0 }]}>Scelta stile utente</Text>
-          </View>
-          <Switch
-            value={mapsUserChoiceEnabled}
-            onValueChange={(val) => mapsUserChoiceMutation.mutate(val)}
-            trackColor={{ false: Colors.border, true: Colors.accent }}
-            thumbColor={mapsUserChoiceEnabled ? Colors.text : Colors.textSecondary}
-            disabled={mapsUserChoiceMutation.isPending}
-          />
-        </View>
-        <Text style={styles.synecoDesc}>
-          {mapsUserChoiceEnabled
-            ? "Attivo — gli utenti vedono la sezione «Stile Mappa» nel profilo e possono scegliere il proprio stile"
-            : "Disattivato (default) — la sezione «Stile Mappa» è nascosta nel profilo utente; viene usato lo stile impostato qui sopra"}
-        </Text>
           </View>
         )}
       </View>

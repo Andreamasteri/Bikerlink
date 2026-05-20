@@ -9,14 +9,12 @@ interface MapConfig {
   enabled: boolean;
   adminProvider: MapProvider;
   resolvedProvider: MapProvider;
-  userChoiceEnabled: boolean;
   isLoading: boolean;
 }
 
 interface MapsApiResponse {
   enabled: boolean;
   provider: string;
-  userChoiceEnabled: boolean;
 }
 
 interface UserProfileResponse {
@@ -29,7 +27,6 @@ const defaultConfig: MapConfig = {
   enabled: true,
   adminProvider: "carto_light",
   resolvedProvider: "carto_light",
-  userChoiceEnabled: false,
   isLoading: false,
 };
 
@@ -58,7 +55,6 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
       ? rawAdminProvider
       : "carto_light";
 
-  const userChoiceEnabled = mapsData?.userChoiceEnabled === true;
   const mapsEnabled = mapsData?.enabled !== false;
 
   const rawUserPref = profileData?.profile?.preferredMapStyle as MapProvider | undefined;
@@ -68,7 +64,7 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
   let resolvedProvider: MapProvider;
   if (!mapsEnabled) {
     resolvedProvider = adminProvider;
-  } else if (userChoiceEnabled && userPref) {
+  } else if ((adminProvider === "carto_light" || adminProvider === "carto_dark") && userPref) {
     resolvedProvider = userPref;
   } else {
     resolvedProvider = adminProvider;
@@ -78,7 +74,6 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
     enabled: mapsEnabled,
     adminProvider,
     resolvedProvider,
-    userChoiceEnabled,
     isLoading: mapsLoading || profileLoading,
   };
 

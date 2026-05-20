@@ -136,7 +136,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const t = useT();
   const locale = useLocale();
-  const { enabled: mapsEnabled, userChoiceEnabled } = useMapConfig();
+  const { enabled: mapsEnabled } = useMapConfig();
   const { currentTheme, setTheme, userSwitchingEnabled } = useTheme();
   const { taskbarStyle, setTaskbarStyle } = useTaskbarStyle();
   const { timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit, applyCountryDefault } = useUnits();
@@ -1154,7 +1154,7 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {mapsEnabled && userChoiceEnabled && (
+      {mapsEnabled && (
         <View style={styles.section}>
           <Pressable style={styles.accordionHeader} onPress={() => setMapStyleExpanded(v => !v)}>
             <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Stile Mappa</Text>

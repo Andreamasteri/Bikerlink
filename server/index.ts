@@ -1641,11 +1641,6 @@ function setupErrorHandler(app: express.Application) {
           if (!motoclubZavSetting) await storage.upsertAppSetting("motoclub_include_zav", "true");
           const showSearchPrefSetting = await storage.getAppSetting("show_search_preference");
           if (!showSearchPrefSetting) await storage.upsertAppSetting("show_search_preference", "false");
-          const mapsUserChoiceMigrated = await storage.getAppSetting("maps_user_choice_migrated_v1");
-          if (!mapsUserChoiceMigrated) {
-            await storage.upsertAppSetting("maps_user_choice_enabled", "false");
-            await storage.upsertAppSetting("maps_user_choice_migrated_v1", "done");
-          }
           const unitsPrefSetting = await storage.getAppSetting("units_preference_enabled");
           if (!unitsPrefSetting) await storage.upsertAppSetting("units_preference_enabled", "false");
           const musicProviderSetting = await storage.getAppSetting("music_provider");

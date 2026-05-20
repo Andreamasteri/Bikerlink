@@ -151,7 +151,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   onRegionChangeComplete,
   gpsFollowupEnabled = false,
 }: InteractiveMapProps, ref) {
-  const { enabled: mapsEnabled, resolvedProvider, userChoiceEnabled } = useMapConfig();
+  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
