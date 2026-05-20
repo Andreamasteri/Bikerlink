@@ -34,7 +34,6 @@ import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useMapConfig } from "@/lib/map-context";
-import { MAP_PROVIDER_LABELS, MAP_PROVIDER_DESCRIPTIONS, type MapProvider } from "@/lib/map-tiles";
 import { useTaskbarStyle, type TaskbarStyle } from "@/lib/taskbar-style-context";
 import { useUnits, type TimeFormat, type SpeedUnit, type DistanceUnit } from "@/lib/units-context";
 import { convertDistance } from "@/lib/units";
@@ -428,15 +427,6 @@ export default function ProfileScreen() {
     },
   });
 
-  const mapStyleMutation = useMutation({
-    mutationFn: async (value: MapProvider) => {
-      await apiRequest("PUT", "/api/users/profile/dynamic", { preferredMapStyle: value });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-    },
-  });
-
   const cancelDeletionMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/users/me/cancel-deletion");
@@ -458,7 +448,6 @@ export default function ProfileScreen() {
   const [gpsPrecision, setGpsPrecision] = useState("balanced");
   const [gpsPrecisionExpanded, setGpsPrecisionExpanded] = useState(false);
   const [privacyExpanded, setPrivacyExpanded] = useState(false);
-  const [mapStyleExpanded, setMapStyleExpanded] = useState(false);
   const [themeExpanded, setThemeExpanded] = useState(false);
   const [offlineMapsExpanded, setOfflineMapsExpanded] = useState(false);
   const [offlineMapsIndex, setOfflineMapsIndex] = useState<OfflineTilesIndex>({});
@@ -832,6 +821,11 @@ export default function ProfileScreen() {
             </Text>
           </View>
         )}
+        {!!profile?.profile?.bio && (
+          <Text style={{ fontSize: 13, color: Colors.textSecondary, fontFamily: "Inter_400Regular", textAlign: "center", marginTop: 4, marginBottom: 4, paddingHorizontal: 16 }}>
+            {profile.profile.bio}
+          </Text>
+        )}
       </View>
 
       <View style={styles.section}>
@@ -905,14 +899,6 @@ export default function ProfileScreen() {
           </Pressable>
         </View>
       )}
-
-      {profile?.profile?.bio ? (
-        <View style={styles.section}>
-          <View style={styles.bioCard}>
-            <Text style={styles.bioText}>{profile.profile.bio}</Text>
-          </View>
-        </View>
-      ) : null}
 
       <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -1162,48 +1148,6 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {mapsEnabled && (
-        <View style={styles.section}>
-          <Pressable style={styles.accordionHeader} onPress={() => setMapStyleExpanded(v => !v)}>
-            <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Stile Mappa</Text>
-            <Ionicons name={mapStyleExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
-          </Pressable>
-          {mapStyleExpanded && (
-            <View style={styles.mapStyleCard}>
-              {(["esri_gray", "carto_light"] as MapProvider[]).map((p) => {
-                const rawStyle = profile?.profile?.preferredMapStyle as MapProvider | null | undefined;
-                const currentStyle: MapProvider = (!rawStyle || rawStyle === "carto_dark") ? "carto_light" : rawStyle;
-                const isSelected = currentStyle === p;
-                return (
-                  <Pressable
-                    key={p}
-                    style={[styles.mapStyleOption, isSelected && styles.mapStyleOptionActive]}
-                    onPress={() => mapStyleMutation.mutate(p)}
-                    disabled={mapStyleMutation.isPending}
-                  >
-                    <Ionicons
-                      name={p === "carto_dark" ? "moon" : p === "esri_gray" ? "map-outline" : "sunny"}
-                      size={20}
-                      color={isSelected ? Colors.accent : Colors.textSecondary}
-                    />
-                    <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={[styles.mapStyleName, isSelected && { color: Colors.accent }]}>
-                        {MAP_PROVIDER_LABELS[p]}
-                      </Text>
-                      <Text style={styles.mapStyleDesc} numberOfLines={2}>
-                        {MAP_PROVIDER_DESCRIPTIONS[p]}
-                      </Text>
-                    </View>
-                    {isSelected && (
-                      <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        </View>
-      )}
 
       <View style={styles.section}>
         <Pressable
