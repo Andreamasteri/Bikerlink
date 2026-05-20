@@ -153,6 +153,8 @@ export async function downloadTilesForRoute(
   const tiles = enumerateTiles(bbox);
   const total = tiles.length;
   let downloaded = 0;
+  // Tracks only tiles that were not already cached and had to be fetched.
+  let newlyDownloaded = 0;
 
   await ensureDir(tilesBaseDir());
 
@@ -167,10 +169,15 @@ export async function downloadTilesForRoute(
           const info = await FileSystem.getInfoAsync(dest);
           if (!info.exists) {
             await FileSystem.downloadAsync(tileUrl(z, x, y), dest);
+            // Only count tiles we actually fetched from the network.
+            newlyDownloaded++;
           }
+          // Cached tiles fall through here without incrementing newlyDownloaded,
+          // but they still advance the progress bar below so they feel instant.
         } catch {
           // Skip failed tiles silently — partial offline cache is still useful
         } finally {
+          // All tiles (cached or freshly downloaded) advance the progress bar.
           downloaded++;
           onProgress(downloaded, total);
         }
@@ -191,7 +198,9 @@ export async function downloadTilesForRoute(
       bbox,
       tileCount: total,
       downloadedAt: new Date().toISOString(),
-      bytesEstimated: total * ESTIMATED_TILE_BYTES,
+      // Use only newly downloaded tiles so storage estimates across overlapping
+      // routes are not double-counted.
+      bytesEstimated: newlyDownloaded * ESTIMATED_TILE_BYTES,
     };
     await saveIndex(index);
   }
