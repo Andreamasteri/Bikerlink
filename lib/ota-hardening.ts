@@ -40,6 +40,7 @@ import { Platform } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
 import { getStableDeviceId } from "@/lib/device-id";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
+import { incrementRollbackCount, resetStuckCounters } from "@/lib/ota-stuck";
 
 const HEARTBEAT_TIMEOUT_MS = 3000;
 const ERROR_RECOVERY_MAX_RELOADS = 1; // anti-loop: max 1 reload-to-embedded per session
@@ -75,7 +76,7 @@ export async function sendOtaHeartbeatOnce(): Promise<void> {
     const timeout = setTimeout(() => controller.abort(), HEARTBEAT_TIMEOUT_MS);
 
     try {
-      await fetch(new URL("/api/ota/heartbeat", getApiUrl()).toString(), {
+      const res = await fetch(new URL("/api/ota/heartbeat", getApiUrl()).toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
@@ -85,7 +86,11 @@ export async function sendOtaHeartbeatOnce(): Promise<void> {
           runtimeVersion,
           otaNumber: CURRENT_OTA_NUMBER,
         }),
-      }).catch(() => {});
+      });
+      // Task #1587: heartbeat success → bundle is healthy, reset stuck counters.
+      if (res.ok) {
+        resetStuckCounters().catch(() => {});
+      }
     } finally {
       clearTimeout(timeout);
     }
@@ -123,6 +128,8 @@ function attachErrorRecoveryListener() {
         // reloadAsync riparte sull'embedded bundle (il fallback nativo).
         if (ctx.rollback && _errorReloadCount < ERROR_RECOVERY_MAX_RELOADS) {
           _errorReloadCount += 1;
+          // Task #1587: persist rollback event so stuck-gate can fire after ≥3 rollbacks.
+          incrementRollbackCount().catch(() => {});
           Updates.reloadAsync().catch(() => {});
           return;
         }

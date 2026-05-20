@@ -23,6 +23,8 @@ import Constants from "expo-constants";
 import { triggerOtaCheck } from "@/lib/ota-check";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { initOtaHardening } from "@/lib/ota-hardening";
+import { isOtaStuck } from "@/lib/ota-stuck";
+import OtaStuckScreen from "@/components/OtaStuckScreen";
 import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 
 let Notifications: typeof import("expo-notifications") | null = null;
@@ -565,6 +567,7 @@ export default function RootLayout() {
     { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold }
   );
   const [ready, setReady] = useState(false);
+  const [otaStuck, setOtaStuck] = useState<boolean | null>(null); // null = not checked yet
 
   useEffect(() => {
     (async () => {
@@ -574,7 +577,19 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    const forceReady = () => {
+    const forceReady = async () => {
+      // Task #1587: check stuck state before revealing the app.
+      // Only on native — expo-updates is a no-op in dev/web.
+      if (Platform.OS !== "web" && !__DEV__) {
+        try {
+          const stuck = await isOtaStuck();
+          setOtaStuck(stuck);
+        } catch {
+          setOtaStuck(false);
+        }
+      } else {
+        setOtaStuck(false);
+      }
       setReady(true);
       SplashScreen.hideAsync().catch(() => {});
     };
@@ -625,6 +640,10 @@ export default function RootLayout() {
       <ThemeProvider>
       <LanguageProvider>
         <QueryClientProvider client={queryClient}>
+          {/* Task #1587: render stuck screen before any auth/navigation layers */}
+          {ready && otaStuck === true ? (
+            <OtaStuckScreen onCleared={() => setOtaStuck(false)} />
+          ) : (
           <AuthProvider>
             <ChatSseGate>
             <MapSettingsProvider>
@@ -658,6 +677,7 @@ export default function RootLayout() {
             </MapSettingsProvider>
             </ChatSseGate>
           </AuthProvider>
+          )}
         </QueryClientProvider>
       </LanguageProvider>
       </ThemeProvider>

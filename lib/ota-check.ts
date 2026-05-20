@@ -1,6 +1,7 @@
 import * as Updates from "expo-updates";
 import { AppState, Platform } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
+import { incrementStuckSessions, getLastFetchedId, setLastFetchedId } from "@/lib/ota-stuck";
 
 export type OtaTriggerSource = "startup" | "appstate" | "login" | "register" | "manual";
 export type OtaPhase = "check" | "fetch" | "reload" | "no-update" | "fetch-not-new" | "fetched" | "skipped";
@@ -271,6 +272,22 @@ export async function triggerOtaCheck(
       probePromise.catch(() => {});
       networkInfoPromise.catch(() => {});
       return r;
+    }
+
+    // Task #1587: stale-session detection.
+    // If an update is available but we're still running the same bundle ID we
+    // had last time we tried to fetch, the previous fetch+reload didn't advance
+    // the bundle → potential stuck state. Increment the stuck-sessions counter.
+    // Skip in __DEV__ (expo-updates is a no-op anyway) and on web.
+    if (!__DEV__ && Platform.OS !== "web") {
+      try {
+        const lastFetchedId = await getLastFetchedId();
+        if (lastFetchedId && lastFetchedId === currentUpdateId) {
+          incrementStuckSessions().catch(() => {});
+        }
+        // Record the ID we're running right now before we try to fetch.
+        await setLastFetchedId(currentUpdateId);
+      } catch {}
     }
 
     phase = "fetch";
