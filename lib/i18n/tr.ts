@@ -263,6 +263,7 @@ const tr: Record<string, string> = {
   "home.locationNudge": "Coğrafi konum etkin olmadığından harita varsayılan bir konumu gösteriyor.",
   "home.locationNudgeHow": "Nasıl etkinleştirilir",
   "home.locationNudgeDismiss": "Kapat",
+  "home.centerOnMobilePosition": "Mobil konum",
   "home.available": "Müsait",
   "home.users": "Kullanıcılar",
   "home.alsoOffline": "Çevrimdışı da dahil",

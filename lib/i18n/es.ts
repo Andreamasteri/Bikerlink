@@ -263,6 +263,7 @@ const es: Record<string, string> = {
   "home.locationNudge": "El mapa muestra una ubicación predeterminada porque la geolocalización no está activada.",
   "home.locationNudgeHow": "Cómo activarla",
   "home.locationNudgeDismiss": "Cerrar",
+  "home.centerOnMobilePosition": "Posición móvil",
   "home.available": "Disponibles",
   "home.users": "Usuarios",
   "home.alsoOffline": "También offline",

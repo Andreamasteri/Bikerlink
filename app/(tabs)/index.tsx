@@ -73,7 +73,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const baseUrl = getApiUrl();
   const synecoVisible = useSynecoVisible();
-  const { positionReady: contextPositionReady, requestPermission } = useLocationGate();
+  const { positionReady: contextPositionReady, requestPermission, webResolvedPosition } = useLocationGate();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapFullscreen, setMapFullscreen] = useState(false);
@@ -117,6 +117,7 @@ export default function MapScreen() {
   const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const lastFocusParamRef = useRef<string | null>(null);
   const [showLocationNudge, setShowLocationNudge] = useState(false);
+  const [webMobilePosition, setWebMobilePosition] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -411,24 +412,50 @@ export default function MapScreen() {
           }
         }
 
+        // On web, fetch saved mobile position BEFORE calling fetchGPSLocation
+        // (fetchGPSLocation does PUT /api/users/location which would mark browser
+        // GPS as "live", making a subsequent check indistinguishable from mobile GPS).
+        if (Platform.OS === "web") {
+          let savedMobilePos: { latitude: number; longitude: number; source: string | null } | null = null;
+          try {
+            const res = await apiRequest("GET", "/api/user/position");
+            const data = await res.json();
+            if (data?.latitude != null && data?.longitude != null) {
+              savedMobilePos = { latitude: data.latitude, longitude: data.longitude, source: data.source ?? null };
+              if (!cancelled) setWebMobilePosition({ latitude: data.latitude, longitude: data.longitude });
+            }
+          } catch {}
+
+          if (savedMobilePos?.source === "live") {
+            // Mobile position is fresh — use it as the primary map center
+            if (!cancelled) {
+              setLocation({ latitude: savedMobilePos.latitude, longitude: savedMobilePos.longitude });
+              setLocationLoading(false);
+            }
+            return;
+          }
+
+          // Mobile position is stale or absent — fall through to browser GPS
+          const gps = await fetchGPSLocation();
+          if (cancelled) return;
+          if (gps) {
+            setLocation(gps);
+          } else if (savedMobilePos) {
+            setLocation((prev) => prev ?? { latitude: savedMobilePos!.latitude, longitude: savedMobilePos!.longitude });
+          }
+          setLocationLoading(false);
+          return;
+        }
+
         const gps = await fetchGPSLocation();
         if (cancelled) return;
         if (gps) {
           setLocation(gps);
           setLocationLoading(false);
-        } else if (Platform.OS !== "web") {
+        } else {
           const fallback = getRegionFallback();
           if (fallback) setLocation((prev) => prev ?? fallback);
           setLocationLoading(false);
-        } else {
-          try {
-            const res = await apiRequest("GET", "/api/user/position");
-            const data = await res.json();
-            if (!cancelled && data?.latitude != null && data?.longitude != null) {
-              setLocation((prev) => prev ?? { latitude: data.latitude, longitude: data.longitude });
-            }
-          } catch {}
-          if (!cancelled) setLocationLoading(false);
         }
       } catch (err) {
         console.warn("[index] initMapLocation fallita:", err);
@@ -1065,6 +1092,19 @@ export default function MapScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      )}
+
+      {Platform.OS === "web" && webMobilePosition != null && (
+        <TouchableOpacity
+          style={styles.webMobilePositionBtn}
+          onPress={() => {
+            setLocation(webMobilePosition);
+            mapRef.current?.focusOnCoordinate(webMobilePosition);
+          }}
+        >
+          <MaterialCommunityIcons name="motorbike" size={14} color={Colors.accent} />
+          <Text style={styles.webMobilePositionBtnText}>{t("home.centerOnMobilePosition")}</Text>
+        </TouchableOpacity>
       )}
 
       <Modal visible={mapFullscreen} animationType="fade" onRequestClose={() => setMapFullscreen(false)}>
@@ -2767,5 +2807,24 @@ const styles = StyleSheet.create({
   },
   locationNudgeDismissBtn: {
     padding: 4,
+  },
+  webMobilePositionBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    alignSelf: "flex-start" as const,
+  },
+  webMobilePositionBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
   },
 });

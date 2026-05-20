@@ -293,6 +293,7 @@ const it: Record<string, string> = {
   "home.locationNudge": "La mappa mostra una posizione predefinita perché la geolocalizzazione non è abilitata.",
   "home.locationNudgeHow": "Come abilitarla",
   "home.locationNudgeDismiss": "Chiudi",
+  "home.centerOnMobilePosition": "Posizione mobile",
   "home.available": "Disponibili",
   "home.users": "Utenti",
   "home.alsoOffline": "Anche offline",

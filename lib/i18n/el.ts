@@ -263,6 +263,7 @@ const el: Record<string, string> = {
   "home.locationNudge": "Ο χάρτης εμφανίζει μια προεπιλεγμένη τοποθεσία επειδή η γεωεντοπισμός δεν είναι ενεργοποιημένος.",
   "home.locationNudgeHow": "Πώς να το ενεργοποιήσετε",
   "home.locationNudgeDismiss": "Κλείσιμο",
+  "home.centerOnMobilePosition": "Θέση κινητού",
   "home.available": "Διαθέσιμοι",
   "home.users": "Χρήστες",
   "home.alsoOffline": "Και εκτός σύνδεσης",

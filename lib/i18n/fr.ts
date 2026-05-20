@@ -263,6 +263,7 @@ const fr: Record<string, string> = {
   "home.locationNudge": "La carte affiche un emplacement par défaut car la géolocalisation n'est pas activée.",
   "home.locationNudgeHow": "Comment l'activer",
   "home.locationNudgeDismiss": "Fermer",
+  "home.centerOnMobilePosition": "Position mobile",
   "home.available": "Disponibles",
   "home.users": "Utilisateurs",
   "home.alsoOffline": "Aussi hors ligne",

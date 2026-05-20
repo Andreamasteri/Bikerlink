@@ -263,6 +263,7 @@ const de: Record<string, string> = {
   "home.locationNudge": "Die Karte zeigt einen Standardort, da die Geolokalisierung nicht aktiviert ist.",
   "home.locationNudgeHow": "Wie aktivieren",
   "home.locationNudgeDismiss": "Schließen",
+  "home.centerOnMobilePosition": "Mobiler Standort",
   "home.available": "Verfügbar",
   "home.users": "Benutzer",
   "home.alsoOffline": "Auch offline",

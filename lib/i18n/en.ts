@@ -293,6 +293,7 @@ const en: Record<string, string> = {
   "home.locationNudge": "The map is showing a default location because geolocation is not enabled.",
   "home.locationNudgeHow": "How to enable it",
   "home.locationNudgeDismiss": "Dismiss",
+  "home.centerOnMobilePosition": "Mobile position",
   "home.available": "Available",
   "home.users": "Users",
   "home.alsoOffline": "Also offline",

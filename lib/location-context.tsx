@@ -102,18 +102,15 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const tryResolveWebPositionFromDb = useCallback(async (): Promise<boolean> => {
+  const tryResolveWebPositionFromDb = useCallback(async (): Promise<{ latitude: number; longitude: number; source: string | null } | null> => {
     try {
       const res = await apiRequest("GET", "/api/user/position");
       const data = await res.json();
       if (data?.latitude != null && data?.longitude != null) {
-        setWebResolvedPosition({ latitude: data.latitude, longitude: data.longitude });
-        setPositionReady(true);
-        webPositionFoundRef.current = true;
-        return true;
+        return { latitude: data.latitude, longitude: data.longitude, source: data.source ?? null };
       }
     } catch {}
-    return false;
+    return null;
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
@@ -125,9 +122,12 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         navigator.geolocation.getCurrentPosition(
-          (pos) => {
+          async (pos) => {
             setHasPermission(true);
-            setWebResolvedPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+            const browserPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+            const mobile = await tryResolveWebPositionFromDb();
+            const best = mobile?.source === "live" ? { latitude: mobile.latitude, longitude: mobile.longitude } : browserPos;
+            setWebResolvedPosition(best);
             setPositionReady(true);
             webPositionFoundRef.current = true;
             resolve(true);
@@ -180,18 +180,32 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
     webGpsDoneRef.current = true;
 
     if (typeof navigator === "undefined" || !navigator.geolocation) {
-      tryResolveWebPositionFromDb();
+      tryResolveWebPositionFromDb().then((mobile) => {
+        if (mobile) {
+          setWebResolvedPosition({ latitude: mobile.latitude, longitude: mobile.longitude });
+          setPositionReady(true);
+          webPositionFoundRef.current = true;
+        }
+      });
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setWebResolvedPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+      async (pos) => {
+        const browserPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+        const mobile = await tryResolveWebPositionFromDb();
+        const best = mobile?.source === "live" ? { latitude: mobile.latitude, longitude: mobile.longitude } : browserPos;
+        setWebResolvedPosition(best);
         setPositionReady(true);
         webPositionFoundRef.current = true;
       },
-      () => {
-        tryResolveWebPositionFromDb();
+      async () => {
+        const mobile = await tryResolveWebPositionFromDb();
+        if (mobile) {
+          setWebResolvedPosition({ latitude: mobile.latitude, longitude: mobile.longitude });
+          setPositionReady(true);
+          webPositionFoundRef.current = true;
+        }
       },
       { timeout: 8000, maximumAge: 60000 }
     );
@@ -207,24 +221,47 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         navigator.permissions?.query({ name: "geolocation" as PermissionName }).then(async (result) => {
           if (result.state === "granted") {
             navigator.geolocation.getCurrentPosition(
-              (pos) => {
-                setWebResolvedPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+              async (pos) => {
+                const browserPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+                const mobile = await tryResolveWebPositionFromDb();
+                const best = mobile?.source === "live" ? { latitude: mobile.latitude, longitude: mobile.longitude } : browserPos;
+                setWebResolvedPosition(best);
                 setPositionReady(true);
                 webPositionFoundRef.current = true;
               },
-              () => {
-                tryResolveWebPositionFromDb();
+              async () => {
+                const mobile = await tryResolveWebPositionFromDb();
+                if (mobile) {
+                  setWebResolvedPosition({ latitude: mobile.latitude, longitude: mobile.longitude });
+                  setPositionReady(true);
+                  webPositionFoundRef.current = true;
+                }
               },
               { timeout: 5000, maximumAge: 30000 }
             );
           } else {
-            await tryResolveWebPositionFromDb();
+            const mobile = await tryResolveWebPositionFromDb();
+            if (mobile) {
+              setWebResolvedPosition({ latitude: mobile.latitude, longitude: mobile.longitude });
+              setPositionReady(true);
+              webPositionFoundRef.current = true;
+            }
           }
         }).catch(async () => {
-          await tryResolveWebPositionFromDb();
+          const mobile = await tryResolveWebPositionFromDb();
+          if (mobile) {
+            setWebResolvedPosition({ latitude: mobile.latitude, longitude: mobile.longitude });
+            setPositionReady(true);
+            webPositionFoundRef.current = true;
+          }
         });
       } else {
-        await tryResolveWebPositionFromDb();
+        const mobile = await tryResolveWebPositionFromDb();
+        if (mobile) {
+          setWebResolvedPosition({ latitude: mobile.latitude, longitude: mobile.longitude });
+          setPositionReady(true);
+          webPositionFoundRef.current = true;
+        }
       }
     }, WEB_POSITION_POLL_INTERVAL);
 
