@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import Svg, { Path, Defs, LinearGradient, Stop, Polygon } from "react-native-svg";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
@@ -24,6 +25,15 @@ import { getTileConfig } from "@/lib/map-tiles";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ElevationProfile {
+  elevations: number[];
+  distanceKm: number[];
+  minEle: number;
+  maxEle: number;
+  totalGain: number;
+  totalLoss: number;
+}
 
 interface Waypoint { lat: number; lng: number; name?: string; }
 
@@ -114,6 +124,48 @@ function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
 
 const TILE_CONFIG = getTileConfig("carto_dark");
 
+// ─── Elevation Chart Component ────────────────────────────────────────────────
+
+function ElevationChart({ profile, colors }: { profile: ElevationProfile; colors: ReturnType<typeof useColors> }) {
+  const W = 320;
+  const H = 100;
+  const PAD_X = 2;
+  const PAD_Y = 4;
+
+  const { elevations, minEle, maxEle } = profile;
+  if (elevations.length < 2) return null;
+
+  const eleRange = maxEle - minEle || 1;
+  const pts = elevations.map((e, i) => {
+    const x = PAD_X + (i / (elevations.length - 1)) * (W - PAD_X * 2);
+    const y = H - PAD_Y - ((e - minEle) / eleRange) * (H - PAD_Y * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  const polyPoints = [
+    `${PAD_X},${H}`,
+    ...pts,
+    `${W - PAD_X},${H}`,
+  ].join(" ");
+
+  const pathD = pts.reduce((acc, pt, i) => {
+    return acc + (i === 0 ? `M${pt}` : ` L${pt}`);
+  }, "");
+
+  return (
+    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      <Defs>
+        <LinearGradient id="eleGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor={colors.accent} stopOpacity="0.5" />
+          <Stop offset="100%" stopColor={colors.accent} stopOpacity="0.04" />
+        </LinearGradient>
+      </Defs>
+      <Polygon points={polyPoints} fill="url(#eleGrad)" />
+      <Path d={pathD} stroke={colors.accent} strokeWidth="1.8" fill="none" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GiriDetailScreen() {
@@ -136,6 +188,9 @@ export default function GiriDetailScreen() {
   const [hotels, setHotels] = useState<any[] | null>(null);
   const [hotelsLoading, setHotelsLoading] = useState(false);
   const [matchBannerDismissed, setMatchBannerDismissed] = useState(false);
+  const [elevation, setElevation] = useState<ElevationProfile | null>(null);
+  const [elevationLoading, setElevationLoading] = useState(false);
+  const [elevationError, setElevationError] = useState(false);
 
   const { data: route, isLoading } = useQuery<PlannedRoute>({
     queryKey: ["/api/planned-routes", id],
@@ -160,6 +215,14 @@ export default function GiriDetailScreen() {
     route?.title ?? "",
     routePoints
   );
+
+  // Auto-load elevation profile when route loads
+  React.useEffect(() => {
+    if (route && !elevation && !elevationLoading && !elevationError) {
+      handleLoadElevation();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route?.id]);
 
   // Auto-load compatible bikers when route loads (proactive matching)
   React.useEffect(() => {
@@ -318,6 +381,23 @@ export default function GiriDetailScreen() {
     } finally { setHotelsLoading(false); }
   };
 
+  const handleLoadElevation = async () => {
+    if (!id) return;
+    setElevationLoading(true);
+    setElevationError(false);
+    try {
+      const url = new URL(`/api/planned-routes/${id}/elevation`, getApiUrl());
+      const resp = await fetch(url.toString(), { credentials: "include" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      setElevation(data);
+    } catch {
+      setElevationError(true);
+    } finally {
+      setElevationLoading(false);
+    }
+  };
+
   const handleExportGPX = () => {
     const url = new URL(`/api/planned-routes/${id}/export.gpx`, getApiUrl());
     Linking.openURL(url.toString());
@@ -469,6 +549,59 @@ export default function GiriDetailScreen() {
             </View>
           </View>
         </View>
+
+        {/* Elevation profile */}
+        {(elevationLoading || elevation || elevationError) && (
+          <View style={s.eleCard}>
+            <View style={s.eleTitleRow}>
+              <MaterialCommunityIcons name="terrain" size={16} color={colors.accent} />
+              <Text style={s.eleTitle}>Profilo Altimetrico</Text>
+              {elevationLoading && <ActivityIndicator size="small" color={colors.accent} style={{ marginLeft: 8 }} />}
+            </View>
+
+            {elevationError && !elevationLoading && (
+              <Pressable style={s.eleRetryRow} onPress={handleLoadElevation}>
+                <Ionicons name="refresh-outline" size={14} color={colors.textSecondary} />
+                <Text style={s.eleRetryText}>Dati non disponibili — tocca per riprovare</Text>
+              </Pressable>
+            )}
+
+            {elevation && !elevationLoading && (
+              <>
+                <View style={s.eleChartWrap}>
+                  <ElevationChart profile={elevation} colors={colors} />
+                  <View style={s.eleAxisRow}>
+                    <Text style={s.eleAxisLabel}>{elevation.distanceKm[0]} km</Text>
+                    <Text style={s.eleAxisLabel}>{elevation.distanceKm[Math.floor(elevation.distanceKm.length / 2)]} km</Text>
+                    <Text style={s.eleAxisLabel}>{elevation.distanceKm[elevation.distanceKm.length - 1]} km</Text>
+                  </View>
+                </View>
+
+                <View style={s.eleStatsRow}>
+                  <View style={s.eleStat}>
+                    <Text style={s.eleStatValue}>{elevation.minEle} m</Text>
+                    <Text style={s.eleStatLabel}>Min</Text>
+                  </View>
+                  <View style={s.eleStatDivider} />
+                  <View style={s.eleStat}>
+                    <Text style={s.eleStatValue}>{elevation.maxEle} m</Text>
+                    <Text style={s.eleStatLabel}>Max</Text>
+                  </View>
+                  <View style={s.eleStatDivider} />
+                  <View style={s.eleStat}>
+                    <Text style={[s.eleStatValue, { color: "#22c55e" }]}>+{elevation.totalGain} m</Text>
+                    <Text style={s.eleStatLabel}>Salita</Text>
+                  </View>
+                  <View style={s.eleStatDivider} />
+                  <View style={s.eleStat}>
+                    <Text style={[s.eleStatValue, { color: colors.accentRed }]}>-{elevation.totalLoss} m</Text>
+                    <Text style={s.eleStatLabel}>Discesa</Text>
+                  </View>
+                </View>
+              </>
+            )}
+          </View>
+        )}
 
         {/* Biker matching banner — proactive, auto-loaded */}
         {matchBikers && matchBikers.length > 0 && !matchBannerDismissed && (
@@ -946,4 +1079,17 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   offlineBtnCancel: { backgroundColor: colors.accentRed + "18" },
   offlineBtnDelete: { backgroundColor: colors.accentRed + "18" },
   offlineBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
+  eleCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 14, marginBottom: 16, gap: 10 },
+  eleTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  eleTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: colors.text },
+  eleChartWrap: { borderRadius: 10, overflow: "hidden", gap: 4 },
+  eleAxisRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 2 },
+  eleAxisLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: colors.textSecondary },
+  eleStatsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: colors.background, borderRadius: 10, padding: 10 },
+  eleStat: { alignItems: "center", flex: 1 },
+  eleStatValue: { fontFamily: "Inter_700Bold", fontSize: 14, color: colors.text },
+  eleStatLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: colors.textSecondary, marginTop: 2 },
+  eleStatDivider: { width: 1, height: 32, backgroundColor: colors.border },
+  eleRetryRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8 },
+  eleRetryText: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, flex: 1 },
 });

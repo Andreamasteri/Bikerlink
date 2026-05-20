@@ -933,6 +933,103 @@ router.delete("/:id", async (req: Request, res: Response) => {
   }
 });
 
+// ─── Elevation profile ────────────────────────────────────────────────────────
+
+router.get("/:id/elevation", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+  const id = req.params["id"] as string;
+
+  try {
+    const route = await storage.getPlannedRoute(id);
+    if (!route) return res.status(404).json({ message: "Percorso non trovato" });
+    if (route.userId !== userId && route.visibility !== "public") {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+
+    // Build sample points from polyline or waypoints
+    let rawPoints: [number, number][] = [];
+    if (route.polyline) {
+      rawPoints = decodePolyline(route.polyline);
+    } else {
+      const wps = (route.waypoints as Array<{ lat: number; lng: number }>) ?? [];
+      rawPoints = wps.filter((wp) => wp.lat !== 0 || wp.lng !== 0).map((wp) => [wp.lat, wp.lng]);
+    }
+
+    if (rawPoints.length === 0) {
+      return res.status(422).json({ message: "Nessun punto disponibile per il profilo altimetrico" });
+    }
+
+    // Downsample to max 100 points (OpenTopoData limit per request)
+    const MAX_SAMPLES = 100;
+    const step = Math.max(1, Math.ceil(rawPoints.length / MAX_SAMPLES));
+    const sampled: [number, number][] = [];
+    for (let i = 0; i < rawPoints.length; i += step) {
+      sampled.push(rawPoints[i]);
+    }
+    // Always include the last point (without exceeding MAX_SAMPLES)
+    const last = rawPoints[rawPoints.length - 1];
+    if (sampled[sampled.length - 1] !== last && sampled.length < MAX_SAMPLES) {
+      sampled.push(last);
+    }
+    // Hard cap — guarantee we never exceed OpenTopoData limit
+    if (sampled.length > MAX_SAMPLES) sampled.length = MAX_SAMPLES;
+
+    // Compute cumulative distance (km) for each sampled point
+    const distKm: number[] = [0];
+    for (let i = 1; i < sampled.length; i++) {
+      distKm.push(distKm[i - 1] + haversineKm(sampled[i-1][0], sampled[i-1][1], sampled[i][0], sampled[i][1]));
+    }
+
+    // Call OpenTopoData SRTM90m (free, no key required)
+    const locationsStr = sampled.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join("|");
+    const topoUrl = `https://api.opentopodata.org/v1/srtm90m?locations=${locationsStr}`;
+
+    let elevations: number[];
+    try {
+      const topoResp = await fetch(topoUrl, {
+        headers: { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" },
+      });
+      if (!topoResp.ok) throw new Error(`OpenTopoData ${topoResp.status}`);
+      const topoData = await topoResp.json() as any;
+      if (topoData.status !== "OK") throw new Error("OpenTopoData status: " + topoData.status);
+      elevations = (topoData.results as any[]).map((r: any) => Math.round(r.elevation ?? 0));
+    } catch (err) {
+      console.error("[elevation] OpenTopoData error:", err);
+      // Fallback: return empty to let client show unavailable
+      return res.status(502).json({ message: "Dati altimetrici non disponibili al momento" });
+    }
+
+    // Compute stats
+    const validEle = elevations.filter((e) => e != null && !isNaN(e));
+    if (validEle.length === 0) {
+      return res.status(502).json({ message: "Dati altimetrici non disponibili al momento" });
+    }
+    const minEle = Math.min(...validEle);
+    const maxEle = Math.max(...validEle);
+    let totalGain = 0;
+    let totalLoss = 0;
+    for (let i = 1; i < elevations.length; i++) {
+      const diff = elevations[i] - elevations[i - 1];
+      if (diff > 0) totalGain += diff;
+      else totalLoss += Math.abs(diff);
+    }
+
+    return res.json({
+      elevations,
+      distanceKm: distKm.map((d) => Math.round(d * 10) / 10),
+      minEle: Math.round(minEle),
+      maxEle: Math.round(maxEle),
+      totalGain: Math.round(totalGain),
+      totalLoss: Math.round(totalLoss),
+      points: sampled.length,
+    });
+  } catch (err) {
+    console.error("[elevation] error:", err);
+    return res.status(500).json({ message: "Errore profilo altimetrico" });
+  }
+});
+
 // ─── GPX export ───────────────────────────────────────────────────────────────
 
 router.get("/:id/export.gpx", async (req: Request, res: Response) => {
