@@ -78,6 +78,13 @@
       "when": 1748131200000,
       "tag": "0009_drop_motorcycle_model_column",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1748217600000,
+      "tag": "0010_navigation_steps",
+      "breakpoints": true
     }
   ]
 }

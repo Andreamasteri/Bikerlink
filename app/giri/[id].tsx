@@ -403,6 +403,34 @@ export default function GiriDetailScreen() {
     Linking.openURL(url.toString());
   };
 
+  const handleOpenInGoogleMaps = () => {
+    if (!route?.waypoints?.length) return;
+    const wps = route.waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+    if (!wps.length) return;
+    const origin = `${wps[0].lat},${wps[0].lng}`;
+    const dest = `${wps[wps.length - 1].lat},${wps[wps.length - 1].lng}`;
+    const mid = wps.slice(1, -1).map((wp) => `${wp.lat},${wp.lng}`).join("|");
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+    if (mid) url += `&waypoints=${mid}`;
+    Linking.openURL(url);
+  };
+
+  const handleOpenInWaze = () => {
+    if (!route?.waypoints?.length) return;
+    const wps = route.waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+    if (!wps.length) return;
+    const dest = wps[wps.length - 1];
+    Linking.openURL(`https://waze.com/ul?ll=${dest.lat},${dest.lng}&navigate=yes`);
+  };
+
+  const handleOpenInAppleMaps = () => {
+    if (!route?.waypoints?.length) return;
+    const wps = route.waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+    if (!wps.length) return;
+    const dest = wps[wps.length - 1];
+    Linking.openURL(`maps://maps.apple.com/?daddr=${dest.lat},${dest.lng}&dirflg=d`);
+  };
+
   const handleDelete = () => {
     Alert.alert("Elimina giro", "Vuoi davvero eliminare questo giro pianificato?", [
       { text: "Annulla", style: "cancel" },
@@ -662,6 +690,33 @@ export default function GiriDetailScreen() {
             ))}
           </View>
         )}
+
+        {/* Navigate button */}
+        <Pressable
+          style={s.navigateBtn}
+          onPress={() => router.push(`/navigate/${id}` as any)}
+        >
+          <MaterialCommunityIcons name="navigation" size={20} color="#fff" />
+          <Text style={s.navigateBtnText}>Naviga</Text>
+        </Pressable>
+
+        {/* Open in external apps */}
+        <View style={s.externalAppsRow}>
+          <Pressable style={s.externalAppBtn} onPress={handleOpenInGoogleMaps}>
+            <MaterialCommunityIcons name="google-maps" size={16} color={colors.textSecondary} />
+            <Text style={s.externalAppLabel}>Google Maps</Text>
+          </Pressable>
+          <Pressable style={s.externalAppBtn} onPress={handleOpenInWaze}>
+            <MaterialCommunityIcons name="waze" size={16} color={colors.textSecondary} />
+            <Text style={s.externalAppLabel}>Waze</Text>
+          </Pressable>
+          {Platform.OS === "ios" && (
+            <Pressable style={s.externalAppBtn} onPress={handleOpenInAppleMaps}>
+              <Ionicons name="map-outline" size={16} color={colors.textSecondary} />
+              <Text style={s.externalAppLabel}>Apple Maps</Text>
+            </Pressable>
+          )}
+        </View>
 
         {/* Action grid */}
         <View style={s.actionsGrid}>
@@ -1006,6 +1061,30 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   wpDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
   wpLine: { position: "absolute", left: 5, top: 16, width: 2, height: 20, backgroundColor: colors.border },
   wpText: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.text, flex: 1 },
+  navigateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.accent,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginBottom: 12,
+  },
+  navigateBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
+  externalAppsRow: { flexDirection: "row", gap: 8, marginBottom: 20 },
+  externalAppBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+  },
+  externalAppLabel: { fontFamily: "Inter_500Medium", fontSize: 11, color: colors.textSecondary },
   actionsGrid: { flexDirection: "row", gap: 10, marginBottom: 20 },
   actionCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 12, paddingVertical: 14, alignItems: "center", gap: 6 },
   actionLabel: { fontFamily: "Inter_500Medium", fontSize: 12, color: colors.text },

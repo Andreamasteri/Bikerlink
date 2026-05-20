@@ -1510,6 +1510,15 @@ export type InsertAppCrashLog = typeof appCrashLogs.$inferInsert;
 
 // ── PLANNED ROUTES (Giri pianificati) ────────────────────────────────────────
 
+export interface NavigationStep {
+  sign: number;
+  text: string;
+  distance: number;
+  time: number;
+  interval: [number, number];
+  streetName?: string;
+}
+
 export const plannedRoutes = pgTable("planned_routes", {
   id: varchar("id", { length: 36 })
     .primaryKey()
@@ -1521,6 +1530,7 @@ export const plannedRoutes = pgTable("planned_routes", {
   description: text("description"),
   waypoints: jsonb("waypoints").$type<Array<{ lat: number; lng: number; name?: string }>>().default([]),
   polyline: text("polyline"),
+  navigationSteps: jsonb("navigation_steps").$type<NavigationStep[]>(),
   distanceKm: doublePrecision("distance_km").default(0),
   durationMinutes: integer("duration_minutes").default(0),
   bikerScore: doublePrecision("biker_score").default(0),

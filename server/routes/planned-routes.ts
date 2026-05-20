@@ -286,7 +286,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     const body: any = {
       points: waypoints.map((wp) => [wp.lng, wp.lat]),
       profile: "motorcycle",
-      instructions: false,
+      instructions: true,
       calc_points: true,
       points_encoded: true,
       optimize: false,
@@ -354,6 +354,16 @@ router.post("/calculate", async (req: Request, res: Response) => {
     const distanceKm = Math.round((path.distance ?? 0) / 100) / 10;
     const durationMinutes = Math.round((path.time ?? 0) / 60000);
 
+    // Extract navigation steps from GraphHopper instructions
+    const navigationSteps = (path.instructions ?? []).map((instr: any) => ({
+      sign: instr.sign ?? 0,
+      text: instr.text ?? "",
+      distance: Math.round(instr.distance ?? 0),
+      time: Math.round((instr.time ?? 0) / 1000),
+      interval: instr.interval ?? [0, 0],
+      streetName: instr.street_name ?? "",
+    }));
+
     // Compute target duration warning for round-trip
     const targetMinutes = roundTripHours ? roundTripHours * 60 : null;
     const durationDeviation = targetMinutes
@@ -362,6 +372,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
 
     return res.json({
       encoded, rawPoints: null, distanceKm, durationMinutes, bikerScore,
+      navigationSteps,
       targetDurationMinutes: targetMinutes,
       durationDeviationPct: durationDeviation !== null ? Math.round(durationDeviation * 100) : null,
     });
@@ -835,7 +846,7 @@ router.post("/", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const body = req.body as Partial<InsertPlannedRoute> & { title: string };
+  const body = req.body as Partial<InsertPlannedRoute> & { title: string; navigationSteps?: any[] };
   if (!body.title) return res.status(400).json({ message: "Titolo richiesto" });
 
   try {
@@ -845,6 +856,7 @@ router.post("/", async (req: Request, res: Response) => {
       description: body.description ?? null,
       waypoints: (body.waypoints as any) ?? [],
       polyline: body.polyline ?? null,
+      navigationSteps: (body.navigationSteps as any) ?? null,
       distanceKm: body.distanceKm ?? 0,
       durationMinutes: body.durationMinutes ?? 0,
       bikerScore: body.bikerScore ?? 0,

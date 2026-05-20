@@ -36,6 +36,7 @@ interface RouteResult {
   durationMinutes: number;
   bikerScore: number;
   approximate?: boolean;
+  navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
 }
 interface UserMotorcycle { id: string; brand: string; model: string; year?: number | null; ridingStyle?: string | null; }
 
@@ -538,6 +539,7 @@ export default function GiriCreateScreen() {
       distanceKm: routeResult?.distanceKm ?? 0,
       durationMinutes: routeResult?.durationMinutes ?? 0,
       bikerScore: routeResult?.bikerScore ?? 0,
+      navigationSteps: routeResult?.navigationSteps ?? null,
       style, visibility, isMultiDay,
       metadata: {
         avoidHighways, avoidTolls, daysCount, maxHoursPerDay,
