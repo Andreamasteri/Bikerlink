@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-
   Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -15,12 +14,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import RouteDetailMap from "@/components/RouteDetailMap";
-import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
 import { getCurrentLocale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
+import ElevationProfile from "@/components/ElevationProfile";
 
 interface Waypoint {
   id: string;
@@ -93,6 +93,9 @@ export default function CustomRouteDetailScreen() {
   });
 
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+  const [elevation, setElevation] = useState<any | null>(null);
+  const [elevationLoading, setElevationLoading] = useState(false);
+  const [elevationError, setElevationError] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: async () => {
@@ -129,6 +132,23 @@ export default function CustomRouteDetailScreen() {
         onPress: () => deleteMutation.mutate(),
       },
     ]);
+  };
+
+  const handleLoadElevation = async () => {
+    if (!id) return;
+    setElevationLoading(true);
+    setElevationError(false);
+    try {
+      const url = new URL(`/api/custom-routes/${id}/elevation`, getApiUrl());
+      const resp = await fetch(url.toString(), { credentials: "include" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      setElevation(data);
+    } catch {
+      setElevationError(true);
+    } finally {
+      setElevationLoading(false);
+    }
   };
 
   if (isLoading) {
@@ -302,6 +322,59 @@ export default function CustomRouteDetailScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Elevation profile */}
+      <View style={styles.elevationSection}>
+        <View style={styles.elevationHeader}>
+          <MaterialCommunityIcons name="elevation-rise" size={18} color={Colors.accent} />
+          <Text style={styles.sectionTitle}>Profilo altimetrico</Text>
+        </View>
+
+        {!elevation && !elevationLoading && !elevationError && (
+          <TouchableOpacity
+            style={styles.elevationButton}
+            onPress={handleLoadElevation}
+            activeOpacity={0.7}
+          >
+            <MaterialCommunityIcons name="chart-bell-curve" size={18} color={Colors.accent} />
+            <Text style={styles.elevationButtonText}>Mostra profilo altimetrico</Text>
+          </TouchableOpacity>
+        )}
+
+        {elevationLoading && (
+          <View style={styles.elevationLoading}>
+            <ActivityIndicator color={Colors.accent} size="small" />
+            <Text style={styles.elevationLoadingText}>Caricamento dati altimetrici…</Text>
+          </View>
+        )}
+
+        {elevationError && !elevationLoading && (
+          <View style={styles.elevationError}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={Colors.textSecondary} />
+            <Text style={styles.elevationErrorText}>Dati non disponibili al momento</Text>
+            <TouchableOpacity onPress={handleLoadElevation} activeOpacity={0.7}>
+              <Text style={styles.elevationRetry}>Riprova</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {elevation && !elevationLoading && (() => {
+          const profile = (elevation.elevations as number[]).map((alt: number, i: number) => ({
+            distanceKm: elevation.distanceKm[i] ?? 0,
+            altitudeM: alt,
+          }));
+          return (
+            <ElevationProfile
+              profile={profile}
+              gainM={elevation.totalGain}
+              lossM={elevation.totalLoss}
+              minM={elevation.minEle}
+              maxM={elevation.maxEle}
+              height={140}
+            />
+          );
+        })()}
+      </View>
 
       <View style={styles.waypointsSection}>
         <Text style={styles.sectionTitle}>
@@ -538,6 +611,61 @@ const styles = StyleSheet.create({
   },
   visibilityPrivateText: {
     color: Colors.textSecondary,
+  },
+  elevationSection: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  elevationHeader: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    marginBottom: 12,
+  },
+  elevationButton: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+  },
+  elevationButtonText: {
+    color: Colors.accent,
+    fontSize: 14,
+    fontWeight: "600" as const,
+  },
+  elevationLoading: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 10,
+    paddingVertical: 12,
+  },
+  elevationLoadingText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+  },
+  elevationError: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 8,
+    paddingVertical: 8,
+    flexWrap: "wrap" as const,
+  },
+  elevationErrorText: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    flex: 1,
+  },
+  elevationRetry: {
+    color: Colors.accent,
+    fontSize: 13,
+    fontWeight: "600" as const,
   },
   waypointsSection: {
     padding: 20,

@@ -393,6 +393,125 @@ router.post("/api/custom-routes/import-gpx", async (req, res) => {
   }
 });
 
+// ─── GET /api/custom-routes/:id/elevation ────────────────────────────────────
+
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+router.get("/api/custom-routes/:id/elevation", async (req, res) => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+
+    const route = await storage.getCustomRoute(req.params.id);
+    if (!route) return res.status(404).json({ message: "Percorso non trovato" });
+
+    const rawVis: unknown = (route as Record<string, unknown>).visibility;
+    const routeVisibility = isValidVisibility(rawVis)
+      ? rawVis
+      : route.isPublic
+      ? "public"
+      : "private";
+
+    if (route.userId !== userId) {
+      if (routeVisibility === "private") {
+        return res.status(403).json({ message: "Non autorizzato" });
+      }
+      if (routeVisibility === "friends") {
+        const isFriend = await storage.isUserFriendOf(userId, route.userId);
+        if (!isFriend) return res.status(403).json({ message: "Non autorizzato" });
+      }
+    }
+
+    const waypoints = await storage.getCustomRouteWaypoints(route.id);
+    const validWps = waypoints
+      .sort((a, b) => a.orderIndex - b.orderIndex)
+      .filter((wp) => wp.latitude !== 0 || wp.longitude !== 0);
+
+    if (validWps.length < 2) {
+      return res.status(422).json({ message: "Nessun punto disponibile per il profilo altimetrico" });
+    }
+
+    const rawPoints: [number, number][] = validWps.map((wp) => [wp.latitude, wp.longitude]);
+
+    const MAX_SAMPLES = 100;
+    const step = Math.max(1, Math.ceil(rawPoints.length / MAX_SAMPLES));
+    const sampled: [number, number][] = [];
+    for (let i = 0; i < rawPoints.length; i += step) {
+      sampled.push(rawPoints[i]);
+    }
+    const last = rawPoints[rawPoints.length - 1];
+    if (sampled[sampled.length - 1] !== last && sampled.length < MAX_SAMPLES) {
+      sampled.push(last);
+    }
+    if (sampled.length > MAX_SAMPLES) sampled.length = MAX_SAMPLES;
+
+    const distKm: number[] = [0];
+    for (let i = 1; i < sampled.length; i++) {
+      distKm.push(
+        distKm[i - 1] +
+          haversineKm(sampled[i - 1][0], sampled[i - 1][1], sampled[i][0], sampled[i][1])
+      );
+    }
+
+    const locationsStr = sampled
+      .map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`)
+      .join("|");
+    const topoUrl = `https://api.opentopodata.org/v1/srtm90m?locations=${locationsStr}`;
+
+    let elevations: number[];
+    try {
+      const topoResp = await fetch(topoUrl, {
+        headers: { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" },
+      });
+      if (!topoResp.ok) throw new Error(`OpenTopoData ${topoResp.status}`);
+      const topoData = (await topoResp.json()) as any;
+      if (topoData.status !== "OK") throw new Error("OpenTopoData status: " + topoData.status);
+      elevations = (topoData.results as any[]).map((r: any) => Math.round(r.elevation ?? 0));
+    } catch (err) {
+      console.error("[custom-routes elevation] OpenTopoData error:", err);
+      return res.status(502).json({ message: "Dati altimetrici non disponibili al momento" });
+    }
+
+    const validEle = elevations.filter((e) => e != null && !isNaN(e));
+    if (validEle.length === 0) {
+      return res.status(502).json({ message: "Dati altimetrici non disponibili al momento" });
+    }
+
+    const minEle = Math.min(...validEle);
+    const maxEle = Math.max(...validEle);
+    let totalGain = 0;
+    let totalLoss = 0;
+    for (let i = 1; i < elevations.length; i++) {
+      const diff = elevations[i] - elevations[i - 1];
+      if (diff > 0) totalGain += diff;
+      else totalLoss += Math.abs(diff);
+    }
+
+    return res.json({
+      elevations,
+      distanceKm: distKm.map((d) => Math.round(d * 10) / 10),
+      minEle: Math.round(minEle),
+      maxEle: Math.round(maxEle),
+      totalGain: Math.round(totalGain),
+      totalLoss: Math.round(totalLoss),
+      points: sampled.length,
+    });
+  } catch (err: any) {
+    console.error("[custom-routes elevation] error:", err);
+    return res.status(500).json({ message: "Errore profilo altimetrico" });
+  }
+});
+
 // ─── GET /api/users/:userId/custom-routes ─────────────────────────────────────
 router.get("/api/users/:userId/custom-routes", async (req, res) => {
   try {

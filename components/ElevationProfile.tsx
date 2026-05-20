@@ -11,12 +11,13 @@ interface ElevationPoint {
 interface ElevationProfileProps {
   profile: ElevationPoint[];
   gainM?: number | null;
+  lossM?: number | null;
   minM?: number | null;
   maxM?: number | null;
   height?: number;
 }
 
-export default function ElevationProfile({ profile, gainM, minM, maxM, height = 100 }: ElevationProfileProps) {
+export default function ElevationProfile({ profile, gainM, lossM, minM, maxM, height = 100 }: ElevationProfileProps) {
   const colors = useColors();
   const s = styles(colors);
 
@@ -91,7 +92,13 @@ export default function ElevationProfile({ profile, gainM, minM, maxM, height = 
         {gainM !== null && gainM !== undefined && (
           <View style={s.labelItem}>
             <Text style={[s.labelValue, { color: "#22c55e" }]}>+{gainM} m</Text>
-            <Text style={s.labelKey}>Dislivello</Text>
+            <Text style={s.labelKey}>Salita</Text>
+          </View>
+        )}
+        {lossM !== null && lossM !== undefined && (
+          <View style={s.labelItem}>
+            <Text style={[s.labelValue, { color: "#f87171" }]}>−{lossM} m</Text>
+            <Text style={s.labelKey}>Discesa</Text>
           </View>
         )}
         <View style={s.labelItem}>
