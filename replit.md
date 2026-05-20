@@ -18,6 +18,20 @@ La pubblicazione OTA è un'operazione separata e dedicata, eseguita **solo su is
 
 3. **"Fatto" ≠ "credo di aver fatto"**: per task di rimozione/pulizia, "fatto" significa che esiste una prova oggettiva nell'output finale (binario, log, response API). Se la prova non c'è, dichiarare esplicitamente "applicato ma non verificato sul binario" — non "fatto".
 
+## Image Assets — Varianti Responsive
+
+Ogni immagine WebP in `assets/images/` deve avere una variante `*-sm.webp` al 50% di larghezza, usata dai `srcset` del sito web (`server/site/pages.ts`).
+
+**Aggiungere una nuova immagine:**
+1. Aggiungi il file `*.webp` in `assets/images/`
+2. Esegui: `bash scripts/gen-responsive-images.sh`
+   - Genera automaticamente il `*-sm.webp` corrispondente se mancante
+   - Usa `--force` per rigenerare tutti i file `-sm` esistenti
+
+Il comando è idempotente: salta i file `-sm.webp` già presenti. Non richiede dipendenze extra — usa ImageMagick già disponibile nell'ambiente.
+
+---
+
 ## Overview
 BikerLink is a React Native (Expo SDK 55) mobile application designed to connect motorcyclists ("biker") and passengers ("zavorrine") across Italy, with a vision to expand Pan-European. The application aims to foster a community for motorcycle enthusiasts, enabling them to find riding partners, organize group rides, and share experiences. The tagline, "U'll never ride alone," encapsulates its core mission. Sponsored by Syneco Lubrificanti, BikerLink also integrates advertising and services relevant to its user base, such as Syneco workshops. The project seeks to create a dynamic platform for the motorcycle community, offering interactive maps, social features, and essential tools for riders.
 
