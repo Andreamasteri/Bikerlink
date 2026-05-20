@@ -259,7 +259,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
   const body = `
 <!-- ── HERO ── -->
 <section class="home-hero" aria-label="Hero BikerLink">
-  <img class="home-hero-bg" src="/assets/images/hero-handlebar.jpg" alt="Motociclista in sella — visuale dal manubrio sulla strada" width="1600" height="900" fetchpriority="high" />
+  <img class="home-hero-bg" src="/assets/images/hero-handlebar.webp" alt="Motociclista in sella — visuale dal manubrio sulla strada" width="1600" height="900" fetchpriority="high" />
   <div class="home-hero-overlay" aria-hidden="true"></div>
   <div class="home-hero-inner">
     <div class="home-hero-eyebrow">La community italiana dei biker</div>
