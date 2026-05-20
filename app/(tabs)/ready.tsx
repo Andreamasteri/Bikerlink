@@ -27,8 +27,17 @@ import { useSetting } from "@/lib/settings-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useT } from "@/lib/language-context";
 import * as Location from "expo-location";
+import LeafletPickerMap from "@/components/LeafletPickerMap";
 
 const sosLaunchIcon = require("@/assets/images/sos-launch-icon.png");
+
+type MapTarget =
+  | "homeReal"
+  | "homeFake"
+  | "workReal"
+  | "workFake"
+  | "whateverReal"
+  | "whateverFake";
 
 type VisibilitySummaryProps = {
   isAvailable: boolean;
@@ -112,6 +121,90 @@ const visStyles = StyleSheet.create({
   },
 });
 
+function FakeZoneCoordPanel({
+  realLabel,
+  fakeLabel,
+  realLat,
+  realLng,
+  fakeLat,
+  fakeLng,
+  realTarget,
+  fakeTarget,
+  colors,
+  onPickGPS,
+  onOpenMap,
+}: {
+  realLabel: string;
+  fakeLabel: string;
+  realLat: number | null;
+  realLng: number | null;
+  fakeLat: number | null;
+  fakeLng: number | null;
+  realTarget: MapTarget;
+  fakeTarget: MapTarget;
+  colors: ReturnType<typeof useColors>;
+  onPickGPS: (target: MapTarget) => void;
+  onOpenMap: (target: MapTarget, lat?: number | null, lng?: number | null) => void;
+}) {
+  return (
+    <View style={{ marginTop: 8, borderRadius: 10, borderWidth: 1, borderColor: colors.border, overflow: "hidden" }}>
+      <View style={{ padding: 10, backgroundColor: colors.background }}>
+        <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.textSecondary, marginBottom: 4 }}>
+          {realLabel}
+        </Text>
+        <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.text, marginBottom: 6 }}>
+          {realLat != null && realLng != null
+            ? `${realLat.toFixed(5)}, ${realLng.toFixed(5)}`
+            : "Non impostata"}
+        </Text>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable
+            style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}
+            onPress={() => onPickGPS(realTarget)}
+          >
+            <Ionicons name="locate" size={13} color={colors.text} />
+            <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.text }}>GPS</Text>
+          </Pressable>
+          <Pressable
+            style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}
+            onPress={() => onOpenMap(realTarget, realLat, realLng)}
+          >
+            <Ionicons name="map-outline" size={13} color={colors.text} />
+            <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.text }}>Mappa</Text>
+          </Pressable>
+        </View>
+      </View>
+      <View style={{ height: 1, backgroundColor: colors.border }} />
+      <View style={{ padding: 10, backgroundColor: colors.background }}>
+        <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.textSecondary, marginBottom: 4 }}>
+          {fakeLabel}
+        </Text>
+        <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: colors.text, marginBottom: 6 }}>
+          {fakeLat != null && fakeLng != null
+            ? `${fakeLat.toFixed(5)}, ${fakeLng.toFixed(5)}`
+            : "Non impostata"}
+        </Text>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable
+            style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}
+            onPress={() => onPickGPS(fakeTarget)}
+          >
+            <Ionicons name="locate" size={13} color={colors.text} />
+            <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.text }}>GPS</Text>
+          </Pressable>
+          <Pressable
+            style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}
+            onPress={() => onOpenMap(fakeTarget, fakeLat, fakeLng)}
+          >
+            <Ionicons name="map-outline" size={13} color={colors.text} />
+            <Text style={{ fontSize: 12, fontFamily: "Inter_500Medium", color: colors.text }}>Mappa</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function ReadyToRideScreen() {
   const colors = useColors();
   const { user } = useAuth();
@@ -126,6 +219,35 @@ export default function ReadyToRideScreen() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [privacyExpanded, setPrivacyExpanded] = useState(false);
+  const [gpsPrecisionExpanded, setGpsPrecisionExpanded] = useState(false);
+
+  const [positionFuzz, setPositionFuzz] = useState(false);
+  const [positionFuzzKm, setPositionFuzzKm] = useState(1);
+  const [fakeHomeEnabled, setFakeHomeEnabled] = useState(false);
+  const [homeLatitude, setHomeLatitude] = useState<number | null>(null);
+  const [homeLongitude, setHomeLongitude] = useState<number | null>(null);
+  const [fakeHomeLatitude, setFakeHomeLatitude] = useState<number | null>(null);
+  const [fakeHomeLongitude, setFakeHomeLongitude] = useState<number | null>(null);
+  const [fakeHomeRadius, setFakeHomeRadius] = useState(2);
+  const [fakeWorkEnabled, setFakeWorkEnabled] = useState(false);
+  const [workLatitude, setWorkLatitude] = useState<number | null>(null);
+  const [workLongitude, setWorkLongitude] = useState<number | null>(null);
+  const [fakeWorkLatitude, setFakeWorkLatitude] = useState<number | null>(null);
+  const [fakeWorkLongitude, setFakeWorkLongitude] = useState<number | null>(null);
+  const [fakeWorkRadius, setFakeWorkRadius] = useState(2);
+  const [fakeWhateverEnabled, setFakeWhateverEnabled] = useState(false);
+  const [whateverLatitude, setWhateverLatitude] = useState<number | null>(null);
+  const [whateverLongitude, setWhateverLongitude] = useState<number | null>(null);
+  const [fakeWhateverLatitude, setFakeWhateverLatitude] = useState<number | null>(null);
+  const [fakeWhateverLongitude, setFakeWhateverLongitude] = useState<number | null>(null);
+  const [fakeWhateverRadius, setFakeWhateverRadius] = useState(2);
+  const [gpsPrecision, setGpsPrecision] = useState("balanced");
+
+  const [mapPickerVisible, setMapPickerVisible] = useState(false);
+  const [mapPickerTarget, setMapPickerTarget] = useState<MapTarget>("homeReal");
+  const [mapPickerCoord, setMapPickerCoord] = useState({ latitude: 41.9, longitude: 12.5 });
 
   useEffect(() => {
     return () => {
@@ -170,6 +292,32 @@ export default function ReadyToRideScreen() {
   const meProfile = (meData as any)?.profile;
   const hideFromMap = meProfile?.hideFromMap ?? false;
   const offlineRandomize = meProfile?.offlinePositionRandomize !== false;
+
+  useEffect(() => {
+    const p = (meData as any)?.profile;
+    if (!p) return;
+    setPositionFuzz(p.positionFuzz ?? false);
+    setPositionFuzzKm(p.positionFuzzKm ?? 1);
+    setFakeHomeEnabled(p.fakeHomeEnabled ?? false);
+    setHomeLatitude(p.homeLatitude ?? null);
+    setHomeLongitude(p.homeLongitude ?? null);
+    setFakeHomeLatitude(p.fakeHomeLatitude ?? null);
+    setFakeHomeLongitude(p.fakeHomeLongitude ?? null);
+    setFakeHomeRadius(p.fakeHomeRadius ?? 2);
+    setFakeWorkEnabled(p.fakeWorkEnabled ?? false);
+    setWorkLatitude(p.workLatitude ?? null);
+    setWorkLongitude(p.workLongitude ?? null);
+    setFakeWorkLatitude(p.fakeWorkLatitude ?? null);
+    setFakeWorkLongitude(p.fakeWorkLongitude ?? null);
+    setFakeWorkRadius(p.fakeWorkRadius ?? 2);
+    setFakeWhateverEnabled(p.fakeWhateverEnabled ?? false);
+    setWhateverLatitude(p.whateverLatitude ?? null);
+    setWhateverLongitude(p.whateverLongitude ?? null);
+    setFakeWhateverLatitude(p.fakeWhateverLatitude ?? null);
+    setFakeWhateverLongitude(p.fakeWhateverLongitude ?? null);
+    setFakeWhateverRadius(p.fakeWhateverRadius ?? 2);
+    setGpsPrecision(p.gpsPrecision ?? "balanced");
+  }, [(meData as any)?.profile]);
 
   const invalidateOnlineQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });
@@ -216,21 +364,92 @@ export default function ReadyToRideScreen() {
     },
   });
 
+  const repushLocation = useCallback(async () => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") return;
+      const loc =
+        (await Location.getLastKnownPositionAsync()) ??
+        (await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }));
+      if (loc) {
+        await apiRequest("PUT", "/api/users/location", {
+          latitude: loc.coords.latitude,
+          longitude: loc.coords.longitude,
+        });
+      }
+    } catch {}
+  }, []);
+
   const privacyMutation = useMutation({
     mutationFn: async (payload: Record<string, unknown>) => {
       await apiRequest("PUT", "/api/users/me/privacy", payload);
     },
-    onSuccess: () => {
+    onSuccess: (_: unknown, variables: Record<string, unknown>) => {
       invalidateOnlineQueries();
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      if (
+        variables.positionFuzz === true ||
+        variables.fakeHomeEnabled === true ||
+        variables.fakeWorkEnabled === true ||
+        variables.fakeWhateverEnabled === true
+      ) {
+        repushLocation();
+      }
     },
-    onError: () => {
+    onError: (_err: Error, variables: Record<string, unknown>) => {
+      if (variables.positionFuzz !== undefined) setPositionFuzz(!variables.positionFuzz);
+      if (variables.fakeHomeEnabled !== undefined) setFakeHomeEnabled(!variables.fakeHomeEnabled);
+      if (variables.fakeWorkEnabled !== undefined) setFakeWorkEnabled(!variables.fakeWorkEnabled);
+      if (variables.fakeWhateverEnabled !== undefined) setFakeWhateverEnabled(!variables.fakeWhateverEnabled);
       Alert.alert(t("common.error"), t("ready.toggleError"));
     },
   });
 
   const handleToggle = () => {
     toggleMutation.mutate(!isAvailable);
+  };
+
+  const openMapPicker = (target: MapTarget, lat?: number | null, lng?: number | null) => {
+    setMapPickerTarget(target);
+    setMapPickerCoord({ latitude: lat ?? 41.9, longitude: lng ?? 12.5 });
+    setMapPickerVisible(true);
+  };
+
+  const confirmMapPicker = () => {
+    const lat = mapPickerCoord.latitude;
+    const lng = mapPickerCoord.longitude;
+    const updates: Record<string, number> = {};
+    if (mapPickerTarget === "homeReal") { setHomeLatitude(lat); setHomeLongitude(lng); updates.homeLatitude = lat; updates.homeLongitude = lng; }
+    else if (mapPickerTarget === "homeFake") { setFakeHomeLatitude(lat); setFakeHomeLongitude(lng); updates.fakeHomeLatitude = lat; updates.fakeHomeLongitude = lng; }
+    else if (mapPickerTarget === "workReal") { setWorkLatitude(lat); setWorkLongitude(lng); updates.workLatitude = lat; updates.workLongitude = lng; }
+    else if (mapPickerTarget === "workFake") { setFakeWorkLatitude(lat); setFakeWorkLongitude(lng); updates.fakeWorkLatitude = lat; updates.fakeWorkLongitude = lng; }
+    else if (mapPickerTarget === "whateverReal") { setWhateverLatitude(lat); setWhateverLongitude(lng); updates.whateverLatitude = lat; updates.whateverLongitude = lng; }
+    else if (mapPickerTarget === "whateverFake") { setFakeWhateverLatitude(lat); setFakeWhateverLongitude(lng); updates.fakeWhateverLatitude = lat; updates.fakeWhateverLongitude = lng; }
+    privacyMutation.mutate(updates);
+    setMapPickerVisible(false);
+  };
+
+  const pickFromGPS = async (target: MapTarget) => {
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permesso negato", "Concedi l'accesso alla posizione nelle impostazioni.");
+        return;
+      }
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      const lat = loc.coords.latitude;
+      const lng = loc.coords.longitude;
+      const updates: Record<string, number> = {};
+      if (target === "homeReal") { setHomeLatitude(lat); setHomeLongitude(lng); updates.homeLatitude = lat; updates.homeLongitude = lng; }
+      else if (target === "homeFake") { setFakeHomeLatitude(lat); setFakeHomeLongitude(lng); updates.fakeHomeLatitude = lat; updates.fakeHomeLongitude = lng; }
+      else if (target === "workReal") { setWorkLatitude(lat); setWorkLongitude(lng); updates.workLatitude = lat; updates.workLongitude = lng; }
+      else if (target === "workFake") { setFakeWorkLatitude(lat); setFakeWorkLongitude(lng); updates.fakeWorkLatitude = lat; updates.fakeWorkLongitude = lng; }
+      else if (target === "whateverReal") { setWhateverLatitude(lat); setWhateverLongitude(lng); updates.whateverLatitude = lat; updates.whateverLongitude = lng; }
+      else if (target === "whateverFake") { setFakeWhateverLatitude(lat); setFakeWhateverLongitude(lng); updates.fakeWhateverLatitude = lat; updates.fakeWhateverLongitude = lng; }
+      privacyMutation.mutate(updates);
+    } catch {
+      Alert.alert("Errore GPS", "Impossibile ottenere la posizione.");
+    }
   };
 
   const mySosQuery = useQuery<any>({
@@ -272,6 +491,13 @@ export default function ReadyToRideScreen() {
     },
   });
 
+  const gpsOptions = [
+    { key: "lowest", label: t("profile.gpsLowestLabel"), desc: t("profile.gpsLowestDesc"), icon: "battery-half-outline" },
+    { key: "balanced", label: t("profile.gpsBalancedLabel"), desc: t("profile.gpsBalancedDesc"), icon: "compass-outline" },
+    { key: "high", label: t("profile.gpsHighLabel"), desc: t("profile.gpsHighDesc"), icon: "locate-outline" },
+    { key: "highest", label: t("profile.gpsHighestLabel"), desc: t("profile.gpsHighestDesc"), icon: "navigate-outline" },
+    { key: "bestForNavigation", label: t("profile.gpsBestForNavLabel"), desc: t("profile.gpsBestForNavDesc"), icon: "map-outline" },
+  ] as { key: string; label: string; desc: string; icon: string }[];
 
   if (isLoading) {
     return (
@@ -284,6 +510,43 @@ export default function ReadyToRideScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: insets.top }}>
       <InlineMiniPlayer />
+
+      <Modal visible={mapPickerVisible} transparent={false} animationType="slide" onRequestClose={() => setMapPickerVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: Colors.background }}>
+          <View style={{ flexDirection: "row", alignItems: "center", padding: 16, paddingTop: insets.top + 8, backgroundColor: Colors.card, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+            <Pressable onPress={() => setMapPickerVisible(false)} style={{ marginRight: 12 }}>
+              <Ionicons name="close" size={24} color={Colors.text} />
+            </Pressable>
+            <Text style={{ flex: 1, fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
+              Seleziona posizione
+            </Text>
+            <Pressable
+              onPress={confirmMapPicker}
+              style={{ backgroundColor: Colors.accent, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 }}
+            >
+              <Text style={{ color: "#fff", fontFamily: "Inter_700Bold" }}>Conferma</Text>
+            </Pressable>
+          </View>
+          <LeafletPickerMap
+            initialLat={mapPickerCoord.latitude}
+            initialLng={mapPickerCoord.longitude}
+            initialZoom={12}
+            selectedCoord={{ lat: mapPickerCoord.latitude, lng: mapPickerCoord.longitude }}
+            onCoordPicked={(coord: { lat: number; lng: number }) =>
+              setMapPickerCoord({ latitude: coord.lat, longitude: coord.lng })
+            }
+          />
+          <View style={{ padding: 12, paddingBottom: insets.bottom + 8, backgroundColor: Colors.card }}>
+            <Text style={{ textAlign: "center", fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontSize: 13 }}>
+              Tocca la mappa per spostare il pin
+            </Text>
+            <Text style={{ textAlign: "center", fontFamily: "Inter_500Medium", color: Colors.text, fontSize: 13, marginTop: 4 }}>
+              {`${mapPickerCoord.latitude.toFixed(5)}, ${mapPickerCoord.longitude.toFixed(5)}`}
+            </Text>
+          </View>
+        </View>
+      </Modal>
+
       <ScrollView
         style={[styles.container, { backgroundColor: colors.background }]}
         contentContainerStyle={[
@@ -342,11 +605,6 @@ export default function ReadyToRideScreen() {
         />
 
         <View style={styles.privacyCard}>
-          <View style={styles.privacyHeader}>
-            <Ionicons name="shield-outline" size={18} color={Colors.accent} />
-            <Text style={styles.privacyTitle}>{t("ready.privacy.title")}</Text>
-          </View>
-
           {ghostModeFeatureEnabled && (
             <>
               <View style={styles.privacyRow}>
@@ -420,14 +678,252 @@ export default function ReadyToRideScreen() {
             />
           </View>
 
-          <Pressable
-            style={styles.privacyMoreBtn}
-            onPress={() => router.push("/ride" as any)}
-          >
-            <Ionicons name="settings-outline" size={16} color={Colors.accent} />
-            <Text style={styles.privacyMoreBtnText}>{t("ready.privacy.moreOptions")}</Text>
-            <Ionicons name="chevron-forward" size={14} color={Colors.accent} />
+          <View style={styles.privacyDivider} />
+
+          <Pressable style={styles.accordionHeader} onPress={() => setPrivacyExpanded((v) => !v)}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="shield-outline" size={18} color={Colors.accent} />
+              <Text style={styles.accordionTitle}>Privacy & Posizione</Text>
+            </View>
+            <Ionicons name={privacyExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
           </Pressable>
+
+          {privacyExpanded && (
+            <View style={styles.accordionContent}>
+              <View style={styles.privacyRow}>
+                <Ionicons name="locate-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
+                <View style={styles.privacyRowText}>
+                  <Text style={styles.privacyRowLabel}>Altera Posizione</Text>
+                  {positionFuzz ? (
+                    <Text style={styles.privacyWarning}>Disattivala prima di un giro in compagnia!</Text>
+                  ) : (
+                    <Text style={styles.privacyRowDesc}>Sposta randomicamente la posizione visibile.</Text>
+                  )}
+                </View>
+                <Switch
+                  value={positionFuzz}
+                  onValueChange={(val) => { setPositionFuzz(val); privacyMutation.mutate({ positionFuzz: val }); }}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {positionFuzz && (
+                <View style={styles.kmRow}>
+                  <Ionicons name="resize-outline" size={15} color={Colors.textSecondary} />
+                  <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio:</Text>
+                  <TextInput
+                    style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
+                    keyboardType="number-pad"
+                    value={String(positionFuzzKm)}
+                    onChangeText={(v) => {
+                      const n = parseInt(v, 10);
+                      if (!isNaN(n) && n >= 1 && n <= 50) {
+                        setPositionFuzzKm(n);
+                        privacyMutation.mutate({ positionFuzzKm: n });
+                      }
+                    }}
+                    maxLength={2}
+                    selectTextOnFocus
+                  />
+                  <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km (max 50)</Text>
+                </View>
+              )}
+
+              <View style={styles.privacyDivider} />
+
+              <View style={styles.privacyRow}>
+                <Ionicons name="home-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
+                <View style={styles.privacyRowText}>
+                  <Text style={styles.privacyRowLabel}>Fake Home</Text>
+                  <Text style={styles.privacyRowDesc}>Vicino a casa, la posizione viene sostituita.</Text>
+                </View>
+                <Switch
+                  value={fakeHomeEnabled}
+                  onValueChange={(val) => { setFakeHomeEnabled(val); privacyMutation.mutate({ fakeHomeEnabled: val }); }}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {fakeHomeEnabled && (
+                <>
+                  <FakeZoneCoordPanel
+                    realLabel="Posizione Casa (reale)"
+                    fakeLabel="Posizione Fittizia"
+                    realLat={homeLatitude}
+                    realLng={homeLongitude}
+                    fakeLat={fakeHomeLatitude}
+                    fakeLng={fakeHomeLongitude}
+                    realTarget="homeReal"
+                    fakeTarget="homeFake"
+                    colors={colors}
+                    onPickGPS={pickFromGPS}
+                    onOpenMap={openMapPicker}
+                  />
+                  <View style={styles.kmRow}>
+                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio attivazione:</Text>
+                    <TextInput
+                      style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
+                      keyboardType="number-pad"
+                      value={String(fakeHomeRadius)}
+                      onChangeText={(v) => {
+                        const n = parseInt(v, 10);
+                        if (!isNaN(n) && n >= 1 && n <= 100) {
+                          setFakeHomeRadius(n);
+                          privacyMutation.mutate({ fakeHomeRadius: n });
+                        }
+                      }}
+                      maxLength={3}
+                      selectTextOnFocus
+                    />
+                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km</Text>
+                  </View>
+                </>
+              )}
+
+              <View style={styles.privacyDivider} />
+
+              <View style={styles.privacyRow}>
+                <Ionicons name="business-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
+                <View style={styles.privacyRowText}>
+                  <Text style={styles.privacyRowLabel}>Fake Work</Text>
+                  <Text style={styles.privacyRowDesc}>Vicino al lavoro, la posizione viene sostituita.</Text>
+                </View>
+                <Switch
+                  value={fakeWorkEnabled}
+                  onValueChange={(val) => { setFakeWorkEnabled(val); privacyMutation.mutate({ fakeWorkEnabled: val }); }}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {fakeWorkEnabled && (
+                <>
+                  <FakeZoneCoordPanel
+                    realLabel="Posizione Lavoro (reale)"
+                    fakeLabel="Posizione Fittizia"
+                    realLat={workLatitude}
+                    realLng={workLongitude}
+                    fakeLat={fakeWorkLatitude}
+                    fakeLng={fakeWorkLongitude}
+                    realTarget="workReal"
+                    fakeTarget="workFake"
+                    colors={colors}
+                    onPickGPS={pickFromGPS}
+                    onOpenMap={openMapPicker}
+                  />
+                  <View style={styles.kmRow}>
+                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio attivazione:</Text>
+                    <TextInput
+                      style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
+                      keyboardType="number-pad"
+                      value={String(fakeWorkRadius)}
+                      onChangeText={(v) => {
+                        const n = parseInt(v, 10);
+                        if (!isNaN(n) && n >= 1 && n <= 100) {
+                          setFakeWorkRadius(n);
+                          privacyMutation.mutate({ fakeWorkRadius: n });
+                        }
+                      }}
+                      maxLength={3}
+                      selectTextOnFocus
+                    />
+                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km</Text>
+                  </View>
+                </>
+              )}
+
+              <View style={styles.privacyDivider} />
+
+              <View style={styles.privacyRow}>
+                <Ionicons name="location-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
+                <View style={styles.privacyRowText}>
+                  <Text style={styles.privacyRowLabel}>Fake Whatever</Text>
+                  <Text style={styles.privacyRowDesc}>Per qualsiasi altro luogo, sostituisci la posizione.</Text>
+                </View>
+                <Switch
+                  value={fakeWhateverEnabled}
+                  onValueChange={(val) => { setFakeWhateverEnabled(val); privacyMutation.mutate({ fakeWhateverEnabled: val }); }}
+                  trackColor={{ false: Colors.border, true: Colors.accent }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {fakeWhateverEnabled && (
+                <>
+                  <FakeZoneCoordPanel
+                    realLabel="Posizione (reale)"
+                    fakeLabel="Posizione Fittizia"
+                    realLat={whateverLatitude}
+                    realLng={whateverLongitude}
+                    fakeLat={fakeWhateverLatitude}
+                    fakeLng={fakeWhateverLongitude}
+                    realTarget="whateverReal"
+                    fakeTarget="whateverFake"
+                    colors={colors}
+                    onPickGPS={pickFromGPS}
+                    onOpenMap={openMapPicker}
+                  />
+                  <View style={styles.kmRow}>
+                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio attivazione:</Text>
+                    <TextInput
+                      style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
+                      keyboardType="number-pad"
+                      value={String(fakeWhateverRadius)}
+                      onChangeText={(v) => {
+                        const n = parseInt(v, 10);
+                        if (!isNaN(n) && n >= 1 && n <= 100) {
+                          setFakeWhateverRadius(n);
+                          privacyMutation.mutate({ fakeWhateverRadius: n });
+                        }
+                      }}
+                      maxLength={3}
+                      selectTextOnFocus
+                    />
+                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km</Text>
+                  </View>
+                </>
+              )}
+            </View>
+          )}
+
+          <View style={styles.privacyDivider} />
+
+          <Pressable style={styles.accordionHeader} onPress={() => setGpsPrecisionExpanded((v) => !v)}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="navigate-outline" size={18} color={Colors.accent} />
+              <Text style={styles.accordionTitle}>Precisione GPS Tracking</Text>
+            </View>
+            <Ionicons name={gpsPrecisionExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
+          </Pressable>
+
+          {gpsPrecisionExpanded && (
+            <View style={styles.accordionContent}>
+              {gpsOptions.map((opt) => {
+                const isSelected = gpsPrecision === opt.key;
+                return (
+                  <Pressable
+                    key={opt.key}
+                    style={[
+                      styles.gpsOption,
+                      { borderColor: isSelected ? Colors.accent : Colors.border, backgroundColor: isSelected ? Colors.accent + "15" : Colors.background },
+                    ]}
+                    onPress={() => { setGpsPrecision(opt.key); privacyMutation.mutate({ gpsPrecision: opt.key }); }}
+                  >
+                    <Ionicons name={opt.icon as any} size={20} color={isSelected ? Colors.accent : Colors.textSecondary} />
+                    <View style={{ flex: 1, marginLeft: 10 }}>
+                      <Text style={[styles.gpsOptionLabel, { color: isSelected ? Colors.accent : Colors.text }]}>{opt.label}</Text>
+                      <Text style={[styles.gpsOptionDesc, { color: Colors.textSecondary }]}>{opt.desc}</Text>
+                    </View>
+                    {isSelected && <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />}
+                  </Pressable>
+                );
+              })}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.accent + "10", borderRadius: 8, padding: 8, marginTop: 4 }}>
+                <Ionicons name="information-circle-outline" size={14} color={Colors.accent} />
+                <Text style={{ flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>
+                  {t("profile.unitsModeOverride")}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {sosEnabled && (
@@ -605,23 +1101,8 @@ const styles = StyleSheet.create({
     marginTop: 20,
     backgroundColor: Colors.surface,
     borderRadius: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
     paddingHorizontal: 14,
     paddingVertical: 12,
-  },
-  privacyHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 10,
-  },
-  privacyTitle: {
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-    color: Colors.textSecondary,
-    letterSpacing: 1,
-    textTransform: "uppercase",
   },
   privacyRow: {
     flexDirection: "row",
@@ -646,26 +1127,70 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginTop: 2,
   },
+  privacyWarning: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#E8821C",
+    marginTop: 2,
+  },
   privacyDivider: {
     height: 1,
     backgroundColor: Colors.border,
     opacity: 0.6,
+    marginVertical: 2,
   },
-  privacyMoreBtn: {
+  accordionHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginTop: 10,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.accent + "60",
+    justifyContent: "space-between",
+    paddingVertical: 8,
   },
-  privacyMoreBtnText: {
+  accordionTitle: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.accent,
+    color: Colors.text,
+  },
+  accordionContent: {
+    marginTop: 4,
+    gap: 8,
+    paddingBottom: 4,
+  },
+  kmRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  kmLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+  },
+  kmInput: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    width: 48,
+    textAlign: "center",
+  },
+  gpsOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+  },
+  gpsOptionLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    marginBottom: 2,
+  },
+  gpsOptionDesc: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 16,
   },
   toastContainer: {
     marginTop: 16,
