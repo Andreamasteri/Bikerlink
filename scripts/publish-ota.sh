@@ -110,11 +110,12 @@ do_admin_login() {
     read -rs password
     echo >&2
   fi
-  local RAW_LOGIN LOGIN_BODY SESSION_COOKIE
+  local RAW_LOGIN LOGIN_BODY SESSION_COOKIE JSON_BODY
+  JSON_BODY=$(node -e "process.stdout.write(JSON.stringify({identifier:process.argv[1],password:process.argv[2]}))" -- "$email" "$password")
   RAW_LOGIN=$(curl -s -D - -X POST "$BACKEND_URL/api/auth/login" \
     -H "Content-Type: application/json" \
     -H "X-Forwarded-Proto: https" \
-    -d "{\"identifier\":\"$email\",\"password\":\"$password\"}")
+    -d "$JSON_BODY")
   LOGIN_BODY=$(echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
   if ! echo "$LOGIN_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { const j=JSON.parse(d); process.exit(j.id ? 0 : 1); } catch { process.exit(1); } })" 2>/dev/null; then
     echo "ERRORE login: $LOGIN_BODY" >&2
