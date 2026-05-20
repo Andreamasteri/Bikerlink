@@ -173,25 +173,26 @@
     "cycle": "9.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-7 rv9.0.0: Ciclo 9.x: schema versione 46.29.9 + rv 9.0.0 (#1525), fix brace-expansion build (#1526)",
+    "message": "OTA-7 rv9.0.0: Fix pipeline OTA: rimosso workflow ota-export-stage1 automatico che pubblicava messaggi stale identici a OTA-6 (task #1580)",
     "note": "CURRENT_OTA_NUMBER=7. Pubblicato da publish-ota.sh (2-stage).",
     "runtimeVersion": "9.0.0",
     "jsEngine": "hermes",
     "platforms": [
       "android"
     ],
-    "releaseId": null,
-    "bundleUrl": null,
+    "releaseId": "1e18c34f-17c2-45a8-8a89-2a8b979c8f66",
+    "bundleUrl": "private/ota/ota-47.7.9-1779249822508.js",
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
-    "commitBase": "2b52f27d4b1de3571f3d861db184204c0b451e1b",
+    "commitBase": "95630d25ef266f2ce25fc8a4ebd78b79079aa32c",
     "easDashboard": null,
     "apkBuildId": null,
     "apkBuildDashboard": null,
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "pending"
+    "status": "published",
+    "publishedAt": "2026-05-20T04:03:47.496Z"
   }
 ]
