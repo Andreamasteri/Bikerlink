@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -16,6 +15,7 @@ import TrackingMap from "@/components/TrackingMap";
 import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
+import { useTelemetry } from "@/hooks/useTelemetry";
 
 interface GpsPoint {
   latitude: number;
@@ -60,6 +60,10 @@ export default function TrackingScreen() {
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const pendingPointsRef = useRef<GpsPoint[]>([]);
   const lastSendRef = useRef<number>(0);
+
+  // Telemetry: collects GPS + accelerometer at 1 Hz and flushes batches to
+  // /api/telemetry/batch. Starts/stops automatically with isTracking.
+  useTelemetry(isTracking);
 
   const startMutation = useMutation({
     mutationFn: async (freq: number) => {
