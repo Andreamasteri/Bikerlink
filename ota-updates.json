@@ -1106,18 +1106,19 @@
     "platforms": [
       "android"
     ],
-    "releaseId": null,
-    "bundleUrl": null,
+    "releaseId": "dddb488c-7d84-40a4-afde-438f7da94c93",
+    "bundleUrl": "private/ota/ota-47.9.9-1779314406658.js",
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
-    "commitBase": "26e2e07236df0a7f722b56f5e1ea567c85922b56",
+    "commitBase": "ba877df241d2600be56eeff7bb1d5c1133e71b46",
     "easDashboard": null,
     "apkBuildId": null,
     "apkBuildDashboard": null,
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "pending"
+    "status": "published",
+    "publishedAt": "2026-05-20T22:00:10.911Z"
   }
 ]

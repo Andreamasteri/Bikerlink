@@ -5028,7 +5028,7 @@ router.post("/ota", async (req: Request, res: Response) => {
     }
     const result = await db.execute(sql`
       INSERT INTO ota_releases (version, runtime_version, bundle_path, release_notes, status, created_by)
-      VALUES (${version}, ${runtimeVersion}, ${bundlePath}, ${releaseNotes || null}, 'draft', ${req.session.userId!})
+      VALUES (${version}, ${runtimeVersion}, ${bundlePath}, ${releaseNotes || null}, 'draft', ${req.session.userId ?? null})
       RETURNING *
     `);
     return res.json(result.rows[0]);

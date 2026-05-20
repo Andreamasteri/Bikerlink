@@ -175,12 +175,12 @@ outputType = "console"
 name = "Publish OTA"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/publish-ota.sh setup-token && bash scripts/publish-ota.sh publish"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
