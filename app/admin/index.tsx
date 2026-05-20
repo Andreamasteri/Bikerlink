@@ -1,10 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
+import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -30,6 +32,65 @@ type AdminGroup = AdminGroupHeader & {
   title: string;
   items: AdminItem[];
 };
+
+interface TelemetryStats {
+  totalSamples: number;
+  activeUsers: number;
+  kmCollected: number;
+  latestSample: string | null;
+}
+
+function TelemetryCard() {
+  const { data, isLoading, error } = useQuery<TelemetryStats>({
+    queryKey: ["/api/admin/telemetry/stats"],
+    queryFn: async () => {
+      const res = await fetch(new URL("/api/admin/telemetry/stats", getApiUrl()).toString(), {
+        headers: { ...(await authFetchHeaders()) },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  function formatDate(iso: string | null): string {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+
+  return (
+    <View style={telStyles.card}>
+      <View style={telStyles.cardHeader}>
+        <MaterialCommunityIcons name="chart-line" size={18} color="#22c55e" />
+        <Text style={telStyles.cardTitle}>Telemetria</Text>
+        {isLoading && <ActivityIndicator size="small" color="#22c55e" style={{ marginLeft: "auto" }} />}
+        {error && !isLoading && <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" style={{ marginLeft: "auto" }} />}
+      </View>
+      <View style={telStyles.statsRow}>
+        <View style={telStyles.stat}>
+          <Text style={telStyles.statValue}>{data ? data.totalSamples.toLocaleString("it-IT") : "—"}</Text>
+          <Text style={telStyles.statLabel}>Campioni</Text>
+        </View>
+        <View style={telStyles.divider} />
+        <View style={telStyles.stat}>
+          <Text style={telStyles.statValue}>{data ? String(data.activeUsers) : "—"}</Text>
+          <Text style={telStyles.statLabel}>Utenti attivi</Text>
+        </View>
+        <View style={telStyles.divider} />
+        <View style={telStyles.stat}>
+          <Text style={[telStyles.statValue, { color: "#22c55e" }]}>{data ? `${data.kmCollected.toLocaleString("it-IT")} km` : "—"}</Text>
+          <Text style={telStyles.statLabel}>Km stimati</Text>
+        </View>
+      </View>
+      <View style={telStyles.lastSample}>
+        <MaterialCommunityIcons name="clock-outline" size={12} color={Colors.textSecondary} />
+        <Text style={telStyles.lastSampleText}>Ultimo campione: {data ? formatDate(data.latestSample) : "—"}</Text>
+      </View>
+    </View>
+  );
+}
 
 const adminGroups: AdminGroup[] = [
   {
@@ -165,6 +226,8 @@ export default function AdminDashboard() {
     >
       <Text style={styles.subtitle}>Gestisci tutti gli aspetti dell'app</Text>
 
+      <TelemetryCard />
+
       {adminGroups.map((group) => (
         <React.Fragment key={group.title}>
           <View style={styles.groupContainer}>
@@ -257,5 +320,62 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
     textAlign: "center",
+  },
+});
+
+const telStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+  cardTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: Colors.text,
+  },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  stat: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    color: Colors.text,
+  },
+  statLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  divider: {
+    width: 1,
+    height: 36,
+    backgroundColor: Colors.border,
+  },
+  lastSample: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  lastSampleText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
 });
