@@ -98,7 +98,48 @@ export default function GiriScreen() {
   }, [refetch]);
 
   const [isImporting, setIsImporting] = useState(false);
+
+  const handleImportGpxWeb = useCallback(() => {
+    return new Promise<void>((resolve) => {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".gpx,application/gpx+xml,application/octet-stream";
+      input.onchange = async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) { resolve(); return; }
+        setIsImporting(true);
+        try {
+          const gpxContent = await new Promise<string>((res, rej) => {
+            const reader = new FileReader();
+            reader.onload = () => res(reader.result as string);
+            reader.onerror = () => rej(new Error("Impossibile leggere il file."));
+            reader.readAsText(file);
+          });
+          const guessedTitle = file.name.replace(/\.gpx$/i, "").replace(/[_-]+/g, " ").trim();
+          const response = await apiRequest("POST", "/api/planned-routes/import-gpx", {
+            gpxContent,
+            title: guessedTitle || undefined,
+            visibility: "private",
+          });
+          const route = await response.json() as { id: string };
+          qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
+          router.push(`/giri/${route.id}` as any);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : "Impossibile leggere il file GPX.";
+          Alert.alert("Errore", msg);
+        } finally {
+          setIsImporting(false);
+          resolve();
+        }
+      };
+      input.click();
+    });
+  }, [qc, router]);
+
   const handleImportGpx = useCallback(async () => {
+    if (Platform.OS === "web") {
+      return handleImportGpxWeb();
+    }
     try {
       setIsImporting(true);
       const result = await DocumentPicker.getDocumentAsync({
@@ -127,7 +168,7 @@ export default function GiriScreen() {
     } finally {
       setIsImporting(false);
     }
-  }, [qc, router]);
+  }, [qc, router, handleImportGpxWeb]);
 
   const s = styles(colors);
 
