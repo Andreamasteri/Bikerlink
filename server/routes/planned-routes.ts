@@ -162,6 +162,7 @@ function buildFallbackRoute(waypoints: Array<{ lat: number; lng: number }>) {
     distanceKm: Math.round(totalDist * 10) / 10,
     durationMinutes: Math.round(totalDist / 70 * 60),
     bikerScore: 0.5,
+    approximate: true,
   };
 }
 
@@ -276,7 +277,10 @@ router.post("/calculate", async (req: Request, res: Response) => {
   }
 
   const apiKey = process.env.GRAPHHOPPER_API_KEY;
-  if (!apiKey) return res.status(503).json({ message: "Servizio di routing non disponibile: chiave GRAPHHOPPER_API_KEY mancante" });
+  if (!apiKey) {
+    console.warn("[GraphHopper] GRAPHHOPPER_API_KEY non configurata, uso percorso approssimativo");
+    return res.json(buildFallbackRoute(waypoints));
+  }
 
   try {
     const body: any = {
@@ -335,12 +339,15 @@ router.post("/calculate", async (req: Request, res: Response) => {
     if (!resp.ok) {
       const errText = await resp.text();
       console.error("[GraphHopper] error:", errText);
-      return res.status(503).json({ message: "Servizio di routing non disponibile: errore GraphHopper" });
+      return res.json(buildFallbackRoute(waypoints));
     }
 
     const data = await resp.json() as any;
     const path = data.paths?.[0];
-    if (!path) return res.status(503).json({ message: "Servizio di routing non disponibile: nessun percorso trovato" });
+    if (!path) {
+      console.warn("[GraphHopper] nessun percorso trovato, uso fallback approssimativo");
+      return res.json(buildFallbackRoute(waypoints));
+    }
 
     const encoded = path.points as string;
     const bikerScore = style === "curvy" ? computeBikerScore(encoded) : style === "fast" ? 0.1 : 0.5;
@@ -360,7 +367,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[GraphHopper] fetch error:", err);
-    return res.status(503).json({ message: "Servizio di routing non disponibile: errore di rete" });
+    return res.json(buildFallbackRoute(waypoints));
   }
 });
 

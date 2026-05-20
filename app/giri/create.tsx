@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useCallback } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -35,6 +35,7 @@ interface RouteResult {
   distanceKm: number;
   durationMinutes: number;
   bikerScore: number;
+  approximate?: boolean;
 }
 interface UserMotorcycle { id: string; brand: string; model: string; year?: number | null; ridingStyle?: string | null; }
 
@@ -56,6 +57,21 @@ interface AiPreviewState {
   daysEstimate: number;
   avoidHighways: boolean;
   items: AiPreviewItem[];
+}
+
+function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
+  const points: Array<{ lat: number; lng: number }> = [];
+  let index = 0, lat = 0, lng = 0;
+  while (index < encoded.length) {
+    let shift = 0, result = 0, b: number;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = 0; result = 0;
+    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    points.push({ lat: lat / 1e5, lng: lng / 1e5 });
+  }
+  return points;
 }
 
 async function geocode(q: string): Promise<GeoResult[]> {
@@ -153,23 +169,29 @@ export default function GiriCreateScreen() {
   const [calculating, setCalculating] = useState(false);
 
   const suggestionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoCalcTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webviewRef = useRef<WebView | null>(null);
 
   const TILE = getTileConfig("carto_dark");
 
+  const isApproxRoute = !!routeResult && (!!routeResult.approximate || !routeResult.encoded);
+
   const plannerMapHtml = useMemo(() => {
-    const resolvedPts = routeResult?.rawPoints
-      ? routeResult.rawPoints.map(([lat, lng]) => ({ lat, lng }))
-      : null;
+    let resolvedPts: Array<{ lat: number; lng: number }> | undefined;
+    if (routeResult?.encoded) {
+      resolvedPts = decodePolyline(routeResult.encoded);
+    } else if (routeResult?.rawPoints) {
+      resolvedPts = routeResult.rawPoints.map(([lat, lng]) => ({ lat, lng }));
+    }
     return buildPlannerMapHtml(
       TILE.urlTemplate,
       TILE.maximumZ,
       colors.accent,
       waypoints,
-      resolvedPts ?? undefined
+      resolvedPts
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, colors.accent, routeResult?.encoded]);
+  }, [waypoints, colors.accent, routeResult?.encoded, routeResult?.rawPoints]);
 
   const handleMapTap = async (lat: number, lng: number) => {
     try {
@@ -408,6 +430,7 @@ export default function GiriCreateScreen() {
   const handleWpInput = (text: string, index: number) => {
     const newInputs = [...wpInputs]; newInputs[index] = text; setWpInputs(newInputs);
     const newWps = [...waypoints]; newWps[index] = { ...newWps[index], name: text, lat: 0, lng: 0 }; setWaypoints(newWps);
+    setRouteResult(null);
     if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
     if (text.length >= 3) {
       suggestionTimeout.current = setTimeout(async () => {
@@ -425,19 +448,44 @@ export default function GiriCreateScreen() {
     const newWps = [...waypoints]; newWps[index] = { lat: geo.lat, lng: geo.lng, name: geo.name.split(",")[0] }; setWaypoints(newWps);
     const newInputs = [...wpInputs]; newInputs[index] = geo.name.split(",")[0]; setWpInputs(newInputs);
     setWpSuggestions(null);
+    setRouteResult(null);
   };
 
   const addWaypoint = () => {
     const insertAt = waypoints.length - 1;
     const newWps = [...waypoints]; newWps.splice(insertAt, 0, { lat: 0, lng: 0, name: "" }); setWaypoints(newWps);
     const newInputs = [...wpInputs]; newInputs.splice(insertAt, 0, ""); setWpInputs(newInputs);
+    setRouteResult(null);
   };
 
   const removeWaypoint = (index: number) => {
     if (waypoints.length <= 2) return;
     setWaypoints(waypoints.filter((_, i) => i !== index));
     setWpInputs(wpInputs.filter((_, i) => i !== index));
+    setRouteResult(null);
   };
+
+  // ── Debounced auto-recalculate when resolved waypoints change ─────────────
+  useEffect(() => {
+    if (mode !== "manual") return;
+    const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+    if (resolved.length < 2) return;
+    if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current);
+    autoCalcTimeout.current = setTimeout(async () => {
+      const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
+      setCalculating(true);
+      try {
+        const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip);
+        setRouteResult(result);
+      } catch {
+        // silent — user can still trigger manually
+      } finally {
+        setCalculating(false);
+      }
+    }, 1500);
+    return () => { if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waypoints, style, avoidHighways, avoidTolls, isRoundTrip, roundTripHours, mode]);
 
   const handleCalculate = async () => {
     const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
@@ -748,6 +796,12 @@ export default function GiriCreateScreen() {
                   <Ionicons name="location-outline" size={12} color="#fff" />
                   <Text style={s.mapHintText}>Tocca per aggiungere tappe</Text>
                 </View>
+                {isApproxRoute && (
+                  <View style={s.approxBanner}>
+                    <Ionicons name="warning-outline" size={13} color="#f97316" />
+                    <Text style={s.approxBannerText}>percorso approssimativo</Text>
+                  </View>
+                )}
               </View>
             </View>
 
@@ -1100,4 +1154,6 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   plannerMap: { flex: 1 },
   mapHintBadge: { position: "absolute", bottom: 10, left: "50%" as any, transform: [{ translateX: -80 }], flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.7)", borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5 },
   mapHintText: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#ccc" },
+  approxBanner: { position: "absolute", top: 10, left: "50%" as any, transform: [{ translateX: -90 }], flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.75)", borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#f9731650" },
+  approxBannerText: { fontFamily: "Inter_500Medium", fontSize: 11, color: "#f97316" },
 });
