@@ -11,6 +11,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 .leaflet-control-zoom { display: none !important; }
 .leaflet-control-attribution { font-size: 8px !important; opacity: 0.4; }
 .labels-hidden .nick-label { display: none !important; }
+.spiderified .nick-label { display: none !important; }
 </style>
 </head>
 <body>
@@ -72,6 +73,16 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       oms.addListener("click", function(marker) {
         var d = marker.bikerlinkData;
         if (d) postMsg({ type: "markerPress", markerType: d.type, id: d.id });
+      });
+      oms.addListener("spiderfy", function(markers) {
+        markers.forEach(function(marker) {
+          if (marker._icon) marker._icon.classList.add("spiderified");
+        });
+      });
+      oms.addListener("unspiderfy", function(markers) {
+        markers.forEach(function(marker) {
+          if (marker._icon) marker._icon.classList.remove("spiderified");
+        });
       });
     } catch(e) {
       oms = null;
@@ -170,6 +181,14 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     var m = L.marker([lat, lng], {
       icon: L.divIcon({ html: html, className: "", iconSize: size, iconAnchor: anchor })
     }).addTo(markersLayer);
+    if (omsData && omsData.nickname) {
+      m.bindTooltip(escapeHtml(omsData.nickname), {
+        permanent: false,
+        direction: "top",
+        offset: [0, -18],
+        className: "nick-tooltip"
+      });
+    }
     if (omsData && oms) {
       m.bikerlinkData = omsData;
       try {
@@ -258,7 +277,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       (m.users || []).forEach(function(u) {
         var color = getUserColor(u.userType, u.sex);
         var svg = getUserSvg(u.userType, u.sex);
-        var omsData = { type: "user", id: u.id };
+        var omsData = { type: "user", id: u.id, nickname: u.nickname || "" };
         var globalChip = getGlobalCountryChip(u.country);
         var html;
         if (u.isCurrentUser) {
