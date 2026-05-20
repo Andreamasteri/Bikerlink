@@ -7,6 +7,8 @@ import { apiRequest } from "@/lib/query-client";
 
 interface LocationContextType {
   hasLocationPermission: boolean;
+  locationPermissionDenied: boolean;
+  locationPermissionPrompt: boolean;
   hasBackgroundPermission: boolean;
   backgroundPermissionChecked: boolean;
   backgroundPermissionRevoked: boolean;
@@ -20,6 +22,8 @@ interface LocationContextType {
 
 const LocationContext = createContext<LocationContextType>({
   hasLocationPermission: true,
+  locationPermissionDenied: false,
+  locationPermissionPrompt: false,
   hasBackgroundPermission: false,
   backgroundPermissionChecked: false,
   backgroundPermissionRevoked: false,
@@ -41,6 +45,8 @@ const WEB_POSITION_POLL_INTERVAL = 30000;
 
 export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [hasPermission, setHasPermission] = useState(true);
+  const [permissionDenied, setPermissionDenied] = useState(false);
+  const [permissionPrompt, setPermissionPrompt] = useState(false);
   const [hasBackgroundPermission, setHasBackgroundPermission] = useState(false);
   const [backgroundPermissionChecked, setBackgroundPermissionChecked] = useState(false);
   const [backgroundPermissionRevoked, setBackgroundPermissionRevoked] = useState(false);
@@ -60,21 +66,39 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const checkPermission = useCallback(async () => {
     if (Platform.OS === "web") {
       if (typeof navigator !== "undefined" && navigator.geolocation) {
-        navigator.permissions?.query({ name: "geolocation" as PermissionName }).then((result) => {
-          setHasPermission(result.state === "granted" || result.state === "prompt");
-        }).catch(() => {
+        if (navigator.permissions) {
+          navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
+            const denied = result.state === "denied";
+            const prompt = result.state === "prompt";
+            setHasPermission(!denied);
+            setPermissionDenied(denied);
+            setPermissionPrompt(prompt);
+          }).catch(() => {
+            setHasPermission(true);
+            setPermissionDenied(false);
+            setPermissionPrompt(true);
+          });
+        } else {
           setHasPermission(true);
-        });
+          setPermissionDenied(false);
+          setPermissionPrompt(true);
+        }
       } else {
         setHasPermission(true);
+        setPermissionDenied(false);
+        setPermissionPrompt(true);
       }
       return;
     }
     try {
       const { status } = await Location.getForegroundPermissionsAsync();
       setHasPermission(status === "granted");
+      setPermissionDenied(status === "denied");
+      setPermissionPrompt(status === "undetermined");
     } catch {
       setHasPermission(true);
+      setPermissionDenied(false);
+      setPermissionPrompt(false);
     }
   }, []);
 
@@ -124,6 +148,8 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
             setHasPermission(true);
+            setPermissionDenied(false);
+            setPermissionPrompt(false);
             const browserPos = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
             const mobile = await tryResolveWebPositionFromDb();
             const best = mobile?.source === "live" ? { latitude: mobile.latitude, longitude: mobile.longitude } : browserPos;
@@ -132,7 +158,23 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
             webPositionFoundRef.current = true;
             resolve(true);
           },
-          () => { setHasPermission(false); resolve(false); }
+          () => {
+            setHasPermission(false);
+            if (navigator.permissions) {
+              navigator.permissions.query({ name: "geolocation" as PermissionName }).then((result) => {
+                const denied = result.state === "denied";
+                setPermissionDenied(denied);
+                setPermissionPrompt(!denied);
+              }).catch(() => {
+                setPermissionDenied(false);
+                setPermissionPrompt(true);
+              });
+            } else {
+              setPermissionDenied(false);
+              setPermissionPrompt(true);
+            }
+            resolve(false);
+          }
         );
       });
     }
@@ -140,9 +182,13 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       const { status } = await Location.requestForegroundPermissionsAsync();
       const granted = status === "granted";
       setHasPermission(granted);
+      setPermissionDenied(status === "denied");
+      setPermissionPrompt(status === "undetermined");
       return granted;
     } catch {
       setHasPermission(true);
+      setPermissionDenied(false);
+      setPermissionPrompt(false);
       return true;
     }
   }, []);
@@ -296,6 +342,8 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   return (
     <LocationContext.Provider value={{
       hasLocationPermission: hasPermission,
+      locationPermissionDenied: permissionDenied,
+      locationPermissionPrompt: permissionPrompt,
       hasBackgroundPermission,
       backgroundPermissionChecked,
       backgroundPermissionRevoked,

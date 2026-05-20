@@ -244,6 +244,9 @@ const en: Record<string, string> = {
   "map.waitingLocationTitle": "Waiting for your location",
   "map.waitingLocationDesc": "GPS is not available or no position has been saved from your mobile device yet. Allow location access to load the map.",
   "map.allowLocation": "Allow location",
+  "map.locationDeniedTitle": "Location access blocked",
+  "map.locationDeniedDesc": "You have permanently blocked location access. To use the map, open your browser or device settings and allow location for this site.",
+  "map.openSettings": "Open settings",
   "map.searchPlaceholder": "Search by nickname...",
 
   "profile.bikerType": "Biker",

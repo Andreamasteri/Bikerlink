@@ -244,6 +244,9 @@ const it: Record<string, string> = {
   "map.waitingLocationTitle": "In attesa della tua posizione",
   "map.waitingLocationDesc": "Il GPS non è disponibile o non è ancora stata salvata una posizione dal tuo dispositivo mobile. Consenti l'accesso alla posizione per caricare la mappa.",
   "map.allowLocation": "Consenti posizione",
+  "map.locationDeniedTitle": "Accesso alla posizione bloccato",
+  "map.locationDeniedDesc": "Hai bloccato definitivamente l'accesso alla posizione. Per usare la mappa, apri le impostazioni del browser o del dispositivo e consenti la posizione per questo sito.",
+  "map.openSettings": "Apri impostazioni",
   "map.searchPlaceholder": "Cerca per nickname...",
 
   "profile.bikerType": "Biker",
