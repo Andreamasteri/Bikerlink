@@ -4,14 +4,11 @@ import { pool } from "../db";
  * One-time deduplication script for the biker_biker_matches table.
  *
  * Before the unique index `biker_biker_symmetric_idx` was added, the same
- * biker pair + brand could appear multiple times with different
- * motorcycle_model values (including empty strings). This script:
+ * biker pair + brand could appear multiple times. This script:
  *
  *  1. Keeps the oldest row per (LEAST(biker1_id,biker2_id),
  *     GREATEST(biker1_id,biker2_id), motorcycle_brand).
  *  2. Deletes every other row for that group.
- *  3. Resets motorcycle_model = '' on all surviving rows for consistency,
- *     since the column is no longer used as a matching dimension.
  */
 async function dedup() {
   const client = await pool.connect();
@@ -59,12 +56,6 @@ async function dedup() {
       )
     `);
     console.log(`[dedup] Deleted ${deleteRes.rowCount} duplicate rows`);
-
-    // Step 2 — reset motorcycle_model to '' on all surviving rows
-    const updateRes = await client.query(
-      "UPDATE biker_biker_matches SET motorcycle_model = ''"
-    );
-    console.log(`[dedup] Reset motorcycle_model on ${updateRes.rowCount} surviving rows`);
 
     await client.query("COMMIT");
 
