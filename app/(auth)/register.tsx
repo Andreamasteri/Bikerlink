@@ -341,10 +341,14 @@ export default function RegisterScreen() {
   const [eulaAccepted, setEulaAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
+  const [passwordMismatch, setPasswordMismatch] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [privacyModalSeen, setPrivacyModalSeen] = useState(false);
   const [showEmailConfirm, setShowEmailConfirm] = useState(false);
   const [emailConfirmed, setEmailConfirmed] = useState(false);
+  const [expandedContinents, setExpandedContinents] = useState<Set<string>>(() => {
+    return new Set<string>();
+  });
 
   const [inviteCode, setInviteCode] = useState(params.inviteCode ?? "");
   const [invitePreview, setInvitePreview] = useState<{ code: string; label: string | null; giftMessage: string | null } | null>(null);
@@ -657,7 +661,6 @@ export default function RegisterScreen() {
 
   const renderStep3 = () => (
     <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>{t("register.step3.title")}</Text>
 
       <View style={styles.inputWrapper}>
         <Ionicons name="at" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
@@ -777,7 +780,14 @@ export default function RegisterScreen() {
           placeholder={t("auth.confirmPassword")}
           placeholderTextColor={Colors.textSecondary}
           value={confirmPassword}
-          onChangeText={setConfirmPassword}
+          onChangeText={(v) => {
+            setConfirmPassword(v);
+            if (passwordMismatch && v === password) setPasswordMismatch(false);
+          }}
+          onBlur={() => {
+            if (confirmPassword && confirmPassword !== password) setPasswordMismatch(true);
+            else setPasswordMismatch(false);
+          }}
           secureTextEntry={!showConfirmPassword}
           autoCapitalize="none"
           textContentType="newPassword"
@@ -792,6 +802,9 @@ export default function RegisterScreen() {
           />
         </TouchableOpacity>
       </View>
+      {passwordMismatch && (
+        <Text style={styles.inlineError}>{t("validation.passwordMismatch")}</Text>
+      )}
 
       <View style={styles.inputWrapper}>
         <Ionicons name="calendar-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
@@ -809,7 +822,15 @@ export default function RegisterScreen() {
 
       <TouchableOpacity
         style={[styles.inputWrapper, !country && styles.inputWrapperRequired]}
-        onPress={() => { setShowCountries(!showCountries); setShowRegions(false); }}
+        onPress={() => {
+          const opening = !showCountries;
+          setShowCountries(opening);
+          setShowRegions(false);
+          if (opening && country) {
+            const continentEntry = CONTINENT_MAP.find(c => c.countryCodes.includes(country));
+            if (continentEntry) setExpandedContinents(new Set([continentEntry.key]));
+          }
+        }}
         testID="reg-country-toggle"
       >
         <Ionicons name="globe-outline" size={20} color={country ? Colors.accent : Colors.textSecondary} style={styles.inputIcon} />
@@ -835,12 +856,27 @@ export default function RegisterScreen() {
               const continentCountries = getCountriesForContinent(key)
                 .sort((a, b) => a.name.localeCompare(b.name));
               if (continentCountries.length === 0) return null;
+              const isExpanded = expandedContinents.has(key);
               return (
                 <View key={key}>
-                  <View style={styles.continentHeader}>
+                  <TouchableOpacity
+                    style={styles.continentHeader}
+                    onPress={() => {
+                      setExpandedContinents(prev => {
+                        const next = new Set(prev);
+                        if (next.has(key)) next.delete(key); else next.add(key);
+                        return next;
+                      });
+                    }}
+                  >
                     <Text style={styles.continentLabel}>{label}</Text>
-                  </View>
-                  {continentCountries.map((c) => (
+                    <Ionicons
+                      name={isExpanded ? "chevron-up" : "chevron-down"}
+                      size={14}
+                      color={Colors.textSecondary}
+                    />
+                  </TouchableOpacity>
+                  {isExpanded && continentCountries.map((c) => (
                     <TouchableOpacity
                       key={c.code}
                       style={[styles.regionItem, styles.regionItemIndented, country === c.code && styles.regionItemSelected]}
@@ -1689,8 +1725,11 @@ const styles = StyleSheet.create({
   },
   continentHeader: {
     backgroundColor: Colors.background,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 16,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "space-between" as const,
   },
   continentLabel: {
     color: Colors.textSecondary,
@@ -1698,6 +1737,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     textTransform: "uppercase" as const,
     letterSpacing: 1,
+  },
+  inlineError: {
+    color: Colors.error,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    marginTop: -8,
+    marginLeft: 4,
   },
   regionItemIndented: {
     paddingLeft: 24,
@@ -1712,24 +1758,24 @@ const styles = StyleSheet.create({
   privacyModalCard: {
     backgroundColor: Colors.surface,
     borderRadius: 24,
-    padding: 32,
+    padding: 36,
     alignItems: "center" as const,
     width: "100%",
-    maxWidth: 360,
+    maxWidth: 400,
   },
   privacyModalTitle: {
-    fontSize: 28,
+    fontSize: 34,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     marginBottom: 16,
     textAlign: "center" as const,
   },
   privacyModalBody: {
-    fontSize: 16,
+    fontSize: 18,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     textAlign: "center" as const,
-    lineHeight: 24,
+    lineHeight: 28,
     marginBottom: 20,
   },
   privacyModalHighlight: {
@@ -1772,12 +1818,19 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   emailConfirmEmail: {
-    fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
     color: Colors.accent,
     textAlign: "center" as const,
     marginBottom: 28,
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.background,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.accent,
+    width: "100%",
+    overflow: "hidden" as const,
   },
   emailConfirmEditBtn: {
     marginTop: 14,
