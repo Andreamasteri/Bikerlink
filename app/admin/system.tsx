@@ -75,19 +75,10 @@ interface SystemEvent {
   type: string;
 }
 
-interface OtaErrorEntry {
-  error: string;
-  failCount: number;
-  updateId: string;
-  runtimeVersion: string;
-  timestamp: string;
-}
-
 interface SystemHealth {
   backendStartedAt: number;
   backendUptimeSec: number;
   events: SystemEvent[];
-  otaErrors?: OtaErrorEntry[];
 }
 
 interface ServerRestart {
