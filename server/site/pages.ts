@@ -50,6 +50,29 @@ const HOME_CSS = `<style>
 .home-hero-scroll{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:8px;color:rgba(255,255,255,.35);font-size:10px;font-weight:700;letter-spacing:3px;text-transform:uppercase}
 .home-hero-scroll span{width:1px;height:48px;background:linear-gradient(to bottom,rgba(255,255,255,.3),transparent);display:block}
 
+/* ── COMPETITOR TABLE ────────────────────────────────────── */
+.comp-section{padding:80px 24px}
+.comp-section .section-inner{max-width:var(--max);margin:0 auto}
+.comp-highlights{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:40px 0}
+@media(max-width:640px){.comp-highlights{grid-template-columns:1fr}}
+.comp-highlight{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 20px;display:flex;flex-direction:column;gap:10px}
+.comp-highlight-icon{font-size:24px;line-height:1}
+.comp-highlight-title{font-size:14px;font-weight:700;letter-spacing:.5px;color:var(--text)}
+.comp-highlight-desc{font-size:13px;color:var(--text3);line-height:1.6}
+.comp-highlight-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,59,48,.12);color:var(--accent);font-size:11px;font-weight:700;letter-spacing:1px;padding:3px 10px;border-radius:20px;margin-top:auto;align-self:flex-start}
+.comp-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:12px;margin-top:12px}
+.comp-table{width:100%;border-collapse:collapse;min-width:560px}
+.comp-table th,.comp-table td{padding:12px 14px;text-align:center;font-size:13px;border-bottom:1px solid var(--border)}
+.comp-table td:first-child,.comp-table th:first-child{text-align:left;font-weight:600;color:var(--text);white-space:nowrap}
+.comp-table thead th{background:var(--surface);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);position:sticky;top:0;z-index:1}
+.comp-table thead th.col-bl{background:var(--accent);color:#fff;letter-spacing:1px}
+.comp-table tbody tr:last-child td{border-bottom:none}
+.comp-table tbody tr:hover td{background:rgba(255,255,255,.03)}
+.comp-table tbody td.col-bl{background:rgba(255,59,48,.07);font-weight:700;color:var(--text)}
+.comp-cell-check{color:#30d158;font-size:15px}
+.comp-cell-cross{color:var(--text3);opacity:.5;font-size:15px}
+.comp-cell-partial{color:#ffd60a;font-size:15px}
+
 /* ── STATS BAR ───────────────────────────────────────────── */
 .home-stats{background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:0}
 .home-stats-inner{max-width:var(--max);margin:0 auto;display:flex;flex-wrap:wrap}
@@ -383,6 +406,65 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
       <article class="card"><div class="icon">${icon.lock}</div><h3>Privacy reale</h3><p>Ghost Mode, fuzzing GPS, Fake Home. Scegli tu cosa rendere visibile.</p><div class="meta">GDPR · Italian-made</div></article>
       <article class="card"><div class="icon">${icon.zap}</div><h3>Veloce e leggera</h3><p>App nativa, caricamento progressivo, mappa ottimizzata anche con connessione lenta.</p><div class="meta">Android · iOS in arrivo</div></article>
       <article class="card"><div class="icon">${icon.shield}</div><h3>Community moderata</h3><p>Sistema di segnalazioni, moderazione automatica, EULA chiaro. Zero tolleranza per spam e abusi.</p><div class="meta">24/7</div></article>
+    </div>
+  </div>
+</section>
+
+<!-- ── COMPETITOR TABLE ── -->
+<section class="comp-section" aria-labelledby="comp-heading">
+  <div class="section-inner">
+    <span class="section-eyebrow">Confronto funzionalità</span>
+    <h2 class="section-title" id="comp-heading">Dove siamo <span class="accent">unici.</span></h2>
+    <p class="section-lead">Tre funzionalità che nessun altro ha. Non aggiunte, non partial — solo BikerLink.</p>
+    <div class="comp-highlights">
+      <div class="comp-highlight">
+        <div class="comp-highlight-icon">🤖</div>
+        <div class="comp-highlight-title">AI linguaggio naturale</div>
+        <div class="comp-highlight-desc">Pianifica un percorso scrivendo "strade curve in Toscana, 3 ore, evita autostrade" — l'AI capisce e costruisce il giro.</div>
+        <div class="comp-highlight-badge">Solo BikerLink</div>
+      </div>
+      <div class="comp-highlight">
+        <div class="comp-highlight-icon">🏆</div>
+        <div class="comp-highlight-title">BikerScore — Indice fun factor</div>
+        <div class="comp-highlight-desc">Ogni percorso ha un punteggio numerico basato su curvosità, dislivello, fondo e traffico. Scegli il giro più divertente, non solo il più veloce.</div>
+        <div class="comp-highlight-badge">Solo BikerLink</div>
+      </div>
+      <div class="comp-highlight">
+        <div class="comp-highlight-icon">🤝</div>
+        <div class="comp-highlight-title">Matching engine biker</div>
+        <div class="comp-highlight-desc">Algoritmo di compatibilità che abbina moto, stile di guida e disponibilità. Trova il compagno di viaggio giusto, non solo il più vicino.</div>
+        <div class="comp-highlight-badge">Solo BikerLink</div>
+      </div>
+    </div>
+    <div class="comp-table-wrap" role="region" aria-label="Tabella comparativa funzionalità">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th scope="col">Funzionalità</th>
+            <th scope="col">Kurviger</th>
+            <th scope="col">Calimoto</th>
+            <th scope="col">MotoPlanner</th>
+            <th scope="col">Rever</th>
+            <th scope="col">Scenic</th>
+            <th scope="col" class="col-bl">BikerLink</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Routing curvy</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>AI linguaggio naturale</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>Indice "fun factor"</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>Round trip</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>Multi-day</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>Meteo sul percorso</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>POI integrati</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>Matching biker</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>Social community</td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>GPX import</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-check">✅</span></td></tr>
+          <tr><td>Mappe offline</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-partial">⚠️</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-cross">❌</span></td></tr>
+          <tr><td>Navigazione voce</td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-cross">❌</span></td></tr>
+          <tr><td>CarPlay</td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-cross">❌</span></td><td><span class="comp-cell-check">✅</span></td><td class="col-bl"><span class="comp-cell-cross">❌</span></td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </section>
