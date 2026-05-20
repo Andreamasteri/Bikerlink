@@ -1093,7 +1093,7 @@ async function submitLogin(e) {
     const res = await fetch('/api/auth/login', {
       method: 'POST', credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier, password }),
+      body: JSON.stringify({ identifier, password, platform: 'web' }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -1226,7 +1226,13 @@ async function renderArea() {
             <span class="area-user-type">${userTypeLabel}</span>
             ${memberDate ? `<div class="area-user-since">${t('area.memberSince')} ${memberDate}</div>` : ''}
           </div>
-          <button class="btn btn-outline btn-sm area-logout-btn" onclick="logout()">${t('area.logout')}</button>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-left:auto;align-items:flex-end">
+            <a id="open-webapp-btn" href="#" target="_blank" class="btn btn-primary btn-sm" style="display:flex;align-items:center;gap:6px">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              Web App
+            </a>
+            <button class="btn btn-outline btn-sm area-logout-btn" onclick="logout()">${t('area.logout')}</button>
+          </div>
         </div>
 
         <div class="area-grid">
@@ -1263,9 +1269,23 @@ async function renderArea() {
       ${renderFooter()}
     `);
 
+  const webAppBtn = document.getElementById('open-webapp-btn');
+  if (webAppBtn) webAppBtn.href = getWebAppUrl();
+
   } catch (err) {
     setApp(`<div class="auth-page"><div class="auth-card"><div class="auth-title">Errore</div><p style="color:var(--text2)">Impossibile caricare i dati. <button class="link-btn" onclick="renderArea()">Riprova</button></p></div></div>`);
   }
+}
+
+function getWebAppUrl() {
+  const proto = window.location.protocol;
+  const host = window.location.hostname;
+  const port = window.location.port;
+  if (port && port !== '80' && port !== '443') {
+    const p = parseInt(port, 10);
+    return `${proto}//${host}:${p > 4000 ? 8081 : p}`;
+  }
+  return `${proto}//${host}:8081`;
 }
 
 async function deleteRoute(id) {

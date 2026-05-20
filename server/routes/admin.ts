@@ -7891,4 +7891,39 @@ router.put("/telemetry-target-km", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/users/:userId/sessions", async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    if (!userId) return res.status(400).json({ message: "userId richiesto" });
+    const rows = await db.execute(
+      sql`SELECT sid, sess->>'sessionType' AS session_type, expire FROM session WHERE sess->>'userId' = ${userId}`
+    );
+    const sessions = (rows.rows as any[]).map((r) => ({
+      sid: r.sid ? `…${String(r.sid).slice(-8)}` : "?",
+      sessionType: r.session_type ?? "unknown",
+      expiry: r.expire ? new Date(r.expire).toISOString() : null,
+    }));
+    const webCount = sessions.filter((s) => s.sessionType === "web").length;
+    const mobileCount = sessions.filter((s) => s.sessionType === "mobile").length;
+    return res.json({ sessions, webCount, mobileCount, total: sessions.length });
+  } catch (error) {
+    console.error("Admin user sessions error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/users/:userId/sessions/:sid", async (req: Request, res: Response) => {
+  try {
+    const { userId, sid } = req.params;
+    if (!userId || !sid) return res.status(400).json({ message: "Parametri mancanti" });
+    await db.execute(
+      sql`DELETE FROM session WHERE sess->>'userId' = ${userId} AND sid LIKE ${'%' + sid}`
+    );
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Admin revoke session error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 export default router;

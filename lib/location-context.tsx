@@ -18,6 +18,7 @@ interface LocationContextType {
   requestBackgroundPermission: () => Promise<boolean>;
   positionReady: boolean;
   webResolvedPosition: { latitude: number; longitude: number } | null;
+  webPhonePositionAvailable: boolean | null;
 }
 
 const LocationContext = createContext<LocationContextType>({
@@ -33,6 +34,7 @@ const LocationContext = createContext<LocationContextType>({
   requestBackgroundPermission: async () => false,
   positionReady: false,
   webResolvedPosition: null,
+  webPhonePositionAvailable: null,
 });
 
 export function useLocationGate() {
@@ -52,6 +54,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const [backgroundPermissionRevoked, setBackgroundPermissionRevoked] = useState(false);
   const [positionReady, setPositionReady] = useState(Platform.OS !== "web");
   const [webResolvedPosition, setWebResolvedPosition] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [webPhonePositionAvailable, setWebPhonePositionAvailable] = useState<boolean | null>(null);
   const appState = useRef(AppState.currentState);
   const hadBackgroundPermissionRef = useRef(false);
   const webGpsDoneRef = useRef(false);
@@ -346,6 +349,24 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   }, [tryResolveWebPositionFromDb]);
 
   useEffect(() => {
+    if (Platform.OS !== "web") return;
+
+    const checkPhonePosition = async () => {
+      try {
+        const res = await apiRequest("GET", "/api/users/my-last-position");
+        const data = await res.json();
+        setWebPhonePositionAvailable(!!data?.available);
+      } catch {
+        setWebPhonePositionAvailable(null);
+      }
+    };
+
+    checkPhonePosition();
+    const interval = setInterval(checkPhonePosition, WEB_POSITION_POLL_INTERVAL);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (!gpsRequired) return;
 
     const interval = setInterval(checkPermission, GPS_CHECK_INTERVAL);
@@ -384,6 +405,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       requestBackgroundPermission,
       positionReady,
       webResolvedPosition,
+      webPhonePositionAvailable,
     }}>
       {children}
     </LocationContext.Provider>

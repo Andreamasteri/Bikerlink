@@ -1008,6 +1008,7 @@ export const loginSchema = z.object({
   password: z.string().min(1, "Inserisci la password"),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  platform: z.string().optional(),
 });
 
 export type User = typeof users.$inferSelect;

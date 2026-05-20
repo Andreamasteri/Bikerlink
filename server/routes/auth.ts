@@ -8,7 +8,7 @@ import { storage } from "../storage";
 import { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetConfirmationEmail, sendInvitationGiftEmail, sendNewUserNotificationEmail } from "../email";
 import { createClubInvitesForMoto, createRegionalClubInvite } from "./motoclubs";
 import { onlineTracker } from "../online-tracker";
-import { revokeAllUserSessions } from "../session-utils";
+import { revokeAllUserSessions, revokeSessionsByType } from "../session-utils";
 import { closeSseClient } from "../chat-sse";
 import { parseVisitorCookie, recordVisit } from "../lib/visitor-tracking";
 
@@ -28,6 +28,7 @@ function buildSessionToken(sessionID: string): string {
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    sessionType?: "mobile" | "web";
   }
 }
 
@@ -329,7 +330,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return res.status(400).json({ message: parsed.error.errors[0].message });
     }
 
-    const { identifier: rawIdentifier, password, latitude: loginLat, longitude: loginLng } = parsed.data;
+    const { identifier: rawIdentifier, password, latitude: loginLat, longitude: loginLng, platform: loginPlatform } = parsed.data;
     const identifier = rawIdentifier.trim();
 
     let user = await storage.getUserByEmail(identifier);
@@ -384,7 +385,15 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       storage.upsertUserProfile(user.id, { latitude: loginLat, longitude: loginLng, coordinatesUpdatedAt: new Date() } as any).catch(() => {});
     }
 
+    const sessionType: "mobile" | "web" =
+      loginPlatform === "android" || loginPlatform === "ios" ? "mobile" : "web";
+
+    await revokeSessionsByType(user.id, sessionType).catch((e) => {
+      console.warn(`[login] revokeSessionsByType failed (non-blocking): ${e?.message}`);
+    });
+
     req.session.userId = user.id;
+    req.session.sessionType = sessionType;
     await new Promise<void>((resolve, reject) => {
       req.session.save((err) => { if (err) reject(err); else resolve(); });
     });
@@ -415,6 +424,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       profileLongitude: userProfile?.longitude ?? null,
       mapFilters: userProfile?.mapFilters ?? null,
       sessionToken: buildSessionToken(req.sessionID),
+      sessionType,
     });
   } catch (error) {
     console.error("Login error:", error);

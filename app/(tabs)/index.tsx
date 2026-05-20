@@ -118,6 +118,7 @@ export default function MapScreen() {
   const lastFocusParamRef = useRef<string | null>(null);
   const [showLocationNudge, setShowLocationNudge] = useState(false);
   const [webMobilePosition, setWebMobilePosition] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [webPhonePositionStatus, setWebPhonePositionStatus] = useState<"live" | "stale" | null>(null);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -423,6 +424,14 @@ export default function MapScreen() {
             if (data?.latitude != null && data?.longitude != null) {
               savedMobilePos = { latitude: data.latitude, longitude: data.longitude, source: data.source ?? null };
               if (!cancelled) setWebMobilePosition({ latitude: data.latitude, longitude: data.longitude });
+            }
+          } catch {}
+
+          try {
+            const lastPosRes = await apiRequest("GET", "/api/users/my-last-position");
+            const lastPosData = await lastPosRes.json();
+            if (!cancelled) {
+              setWebPhonePositionStatus(lastPosData?.available ? "live" : "stale");
             }
           } catch {}
 
@@ -1128,7 +1137,7 @@ export default function MapScreen() {
         </View>
       )}
 
-      {Platform.OS === "web" && webMobilePosition != null && (
+      {Platform.OS === "web" && webMobilePosition != null && webPhonePositionStatus === "live" && (
         <TouchableOpacity
           style={styles.webMobilePositionBtn}
           onPress={() => {
@@ -1136,9 +1145,13 @@ export default function MapScreen() {
             mapRef.current?.focusOnCoordinate(webMobilePosition);
           }}
         >
-          <MaterialCommunityIcons name="motorbike" size={14} color={Colors.accent} />
-          <Text style={styles.webMobilePositionBtnText}>{t("home.centerOnMobilePosition")}</Text>
+          <Text style={styles.webMobilePositionBtnText}>📍 Dal telefono</Text>
         </TouchableOpacity>
+      )}
+      {Platform.OS === "web" && webPhonePositionStatus === "stale" && (
+        <View style={[styles.webMobilePositionBtn, { borderColor: "#F59E0B" }]}>
+          <Text style={[styles.webMobilePositionBtnText, { color: "#F59E0B" }]}>⚠ Posizione non disponibile — apri l'app sul telefono</Text>
+        </View>
       )}
 
       <Modal visible={mapFullscreen} animationType="fade" onRequestClose={() => setMapFullscreen(false)}>

@@ -35,8 +35,8 @@ interface AuthContextValue {
 
 function useLoginMutation() {
   return useMutation({
-    mutationFn: async (data: { identifier: string; password: string; latitude?: number; longitude?: number }) => {
-      const res = await apiRequest("POST", "/api/auth/login", data);
+    mutationFn: async (data: { identifier: string; password: string; latitude?: number; longitude?: number; platform?: string }) => {
+      const res = await apiRequest("POST", "/api/auth/login", { ...data, platform: Platform.OS });
       return await res.json();
     },
     onSuccess: async (response: SafeUser & { sessionToken?: string }) => {
