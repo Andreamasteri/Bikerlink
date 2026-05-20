@@ -19,6 +19,7 @@ import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { haversineM } from "@/lib/geo";
 import { buildNavigationMapHtml } from "@/lib/leaflet-navigation-html";
 import { getTileConfig } from "@/lib/map-tiles";
 import { useLocale, useT } from "@/lib/language-context";
@@ -71,13 +72,6 @@ interface PlannedRoute {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 
-function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371000;
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
 
 function closestPointIndexOnPolyline(lat: number, lng: number, polyline: Array<[number, number]>): number {
   let minDist = Infinity;
