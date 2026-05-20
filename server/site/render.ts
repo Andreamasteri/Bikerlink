@@ -207,6 +207,12 @@ main{padding-top:64px;min-height:60vh}
 /* Focus visibility */
 a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:2px}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* LANG TOGGLE */
+.lang-toggle{display:flex;align-items:center;background:var(--surface2);border:1px solid var(--border-mid);border-radius:3px;overflow:hidden;margin-left:10px;flex-shrink:0}
+.lang-btn{font-size:11px;font-weight:700;letter-spacing:1px;padding:5px 9px;border:none;background:transparent;color:var(--text3);cursor:pointer;transition:all .15s;font-family:var(--font-body);line-height:1}
+.lang-btn.active{background:var(--accent);color:#fff}
+.lang-btn:hover:not(.active){color:var(--text)}
 `;
 
 // Minify the inline stylesheet: strip CSS comments, collapse newlines and
@@ -230,9 +236,9 @@ function jsonldScript(jsonld?: object | object[]): string {
 }
 
 function navbar(currentPath: string): string {
-  const link = (href: string, label: string) => {
+  const link = (href: string, label: string, key: string) => {
     const active = href === currentPath ? ' aria-current="page"' : "";
-    return `<a href="${href}"${active}>${label}</a>`;
+    return `<a href="${href}"${active} data-i18n="${key}">${label}</a>`;
   };
   return `
 <header class="navbar" role="banner">
@@ -240,24 +246,89 @@ function navbar(currentPath: string): string {
     <a href="/" class="nav-logo" aria-label="BIKER·LINK home">BIKER<span class="dot">·</span>LINK</a>
     <button class="nav-burger" id="navBurger" aria-label="Menu" aria-controls="navLinks" aria-expanded="false"><span aria-hidden="true">☰</span><span class="sr-only">Menu</span></button>
     <nav id="navLinks" class="nav-links" aria-label="Navigazione principale">
-      ${link("/features", "Funzionalità")}
-      ${link("/sos", "SOS")}
-      ${link("/motoclub", "MotoClub")}
-      ${link("/community", "Community")}
-      ${link("/about", "About")}
-      ${link("/faq", "FAQ")}
-      <a href="/download" class="nav-cta" aria-label="Scarica app">Scarica app</a>
+      ${link("/features", "Funzionalità", "nav.features")}
+      ${link("/sos", "SOS", "nav.sos")}
+      ${link("/motoclub", "MotoClub", "nav.motoclub")}
+      ${link("/community", "Community", "nav.community")}
+      ${link("/about", "About", "nav.about")}
+      ${link("/faq", "FAQ", "nav.faq")}
+      <a href="/download" class="nav-cta" aria-label="Scarica app" data-i18n="nav.download">Scarica app</a>
     </nav>
+    <div class="lang-toggle" role="group" aria-label="Seleziona lingua">
+      <button class="lang-btn" id="langIT" aria-pressed="true" onclick="setLang('it')">IT</button>
+      <button class="lang-btn" id="langEN" aria-pressed="false" onclick="setLang('en')">EN</button>
+    </div>
   </div>
 </header>
 <script>
 (function(){
   var b=document.getElementById('navBurger'),n=document.getElementById('navLinks');
-  if(!b||!n)return;
-  b.addEventListener('click',function(){
-    var o=n.classList.toggle('open');
-    b.setAttribute('aria-expanded',o?'true':'false');
-  });
+  if(b&&n){
+    b.addEventListener('click',function(){
+      var o=n.classList.toggle('open');
+      b.setAttribute('aria-expanded',o?'true':'false');
+    });
+  }
+
+  var T={
+    it:{
+      'nav.features':'Funzionalità','nav.sos':'SOS','nav.motoclub':'MotoClub',
+      'nav.community':'Community','nav.about':'About','nav.faq':'FAQ',
+      'nav.download':'Scarica app',
+      'footer.product':'Prodotto','footer.company':'Azienda','footer.legal':'Legale',
+      'footer.features':'Funzionalità','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
+      'footer.community':'Community','footer.dl':'Scarica l\'app',
+      'footer.about':'Chi siamo','footer.faq':'Domande frequenti',
+      'footer.contact':'Contatti','footer.investors':'Investitori',
+      'footer.privacy':'Privacy Policy','footer.terms':'Termini di Servizio',
+      'footer.delete':'Elimina account',
+      'footer.tag':'La prima piattaforma verticale per motociclisti. Community, GPS live, MotoClub, SOS — gratis per sempre.',
+      'footer.dl-btn':'Scarica l\'app',
+      'footer.rights':'Tutti i diritti riservati.',
+      'footer.tagline':'Made for riders, by riders.'
+    },
+    en:{
+      'nav.features':'Features','nav.sos':'SOS','nav.motoclub':'MotoClub',
+      'nav.community':'Community','nav.about':'About','nav.faq':'FAQ',
+      'nav.download':'Download app',
+      'footer.product':'Product','footer.company':'Company','footer.legal':'Legal',
+      'footer.features':'Features','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
+      'footer.community':'Community','footer.dl':'Download app',
+      'footer.about':'About us','footer.faq':'FAQ',
+      'footer.contact':'Contact','footer.investors':'Investors',
+      'footer.privacy':'Privacy Policy','footer.terms':'Terms of Service',
+      'footer.delete':'Delete account',
+      'footer.tag':'The first vertical platform for motorcyclists. Community, live GPS, MotoClub, SOS — free forever.',
+      'footer.dl-btn':'Download app',
+      'footer.rights':'All rights reserved.',
+      'footer.tagline':'Made for riders, by riders.'
+    }
+  };
+
+  function applyLang(lang){
+    var d=T[lang]||T.it;
+    document.querySelectorAll('[data-i18n]').forEach(function(el){
+      var k=el.getAttribute('data-i18n');
+      if(d[k]!==undefined) el.textContent=d[k];
+    });
+    var btnIT=document.getElementById('langIT'),btnEN=document.getElementById('langEN');
+    if(btnIT&&btnEN){
+      btnIT.classList.toggle('active',lang==='it');
+      btnEN.classList.toggle('active',lang==='en');
+      btnIT.setAttribute('aria-pressed',lang==='it'?'true':'false');
+      btnEN.setAttribute('aria-pressed',lang==='en'?'true':'false');
+    }
+    document.documentElement.lang=lang==='en'?'en':'it';
+  }
+
+  window.setLang=function(lang){
+    try{localStorage.setItem('bl_lang',lang);}catch(e){}
+    applyLang(lang);
+  };
+
+  var saved;
+  try{saved=localStorage.getItem('bl_lang');}catch(e){}
+  applyLang(saved==='en'?'en':'it');
 })();
 </script>`;
 }
@@ -269,9 +340,9 @@ function footer(): string {
   <div class="footer-inner">
     <div>
       <div class="footer-brand">BIKER<span class="dot">·</span>LINK</div>
-      <p class="footer-tag">La prima piattaforma verticale per motociclisti. Community, GPS live, MotoClub, SOS — gratis per sempre.</p>
+      <p class="footer-tag" data-i18n="footer.tag">La prima piattaforma verticale per motociclisti. Community, GPS live, MotoClub, SOS — gratis per sempre.</p>
       <div class="btn-row" style="margin-top:8px">
-        <a class="btn btn-primary" href="/download">Scarica l'app</a>
+        <a class="btn btn-primary" href="/download" data-i18n="footer.dl-btn">Scarica l'app</a>
       </div>
       <div style="margin-top:14px;display:flex;align-items:center;gap:16px">
         <a href="https://www.youtube.com/@Bikerlink-f4k" target="_blank" rel="noopener" aria-label="Canale YouTube BikerLink" style="display:inline-flex;align-items:center;color:var(--text3);text-decoration:none;transition:color .2s" onmouseover="this.style.color='#FF0000'" onmouseout="this.style.color='var(--text3)'">
@@ -295,36 +366,36 @@ function footer(): string {
       </div>
     </div>
     <div>
-      <h2 style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px">Prodotto</h2>
+      <h2 style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.product">Prodotto</h2>
       <ul>
-        <li><a href="/features">Funzionalità</a></li>
-        <li><a href="/sos">SOS Biker</a></li>
-        <li><a href="/motoclub">MotoClub</a></li>
-        <li><a href="/community">Community</a></li>
-        <li><a href="/download">Scarica l'app</a></li>
+        <li><a href="/features" data-i18n="footer.features">Funzionalità</a></li>
+        <li><a href="/sos" data-i18n="footer.sos">SOS Biker</a></li>
+        <li><a href="/motoclub" data-i18n="footer.motoclub">MotoClub</a></li>
+        <li><a href="/community" data-i18n="footer.community">Community</a></li>
+        <li><a href="/download" data-i18n="footer.dl">Scarica l'app</a></li>
       </ul>
     </div>
     <div>
-      <h2 style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px">Azienda</h2>
+      <h2 style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.company">Azienda</h2>
       <ul>
-        <li><a href="/about">Chi siamo</a></li>
-        <li><a href="/faq">Domande frequenti</a></li>
-        <li><a href="/contact">Contatti</a></li>
-        <li><a href="/investors">Investitori</a></li>
+        <li><a href="/about" data-i18n="footer.about">Chi siamo</a></li>
+        <li><a href="/faq" data-i18n="footer.faq">Domande frequenti</a></li>
+        <li><a href="/contact" data-i18n="footer.contact">Contatti</a></li>
+        <li><a href="/investors" data-i18n="footer.investors">Investitori</a></li>
       </ul>
     </div>
     <div>
-      <h2 style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px">Legale</h2>
+      <h2 style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.legal">Legale</h2>
       <ul>
-        <li><a href="/privacy">Privacy Policy</a></li>
-        <li><a href="/terms">Termini di Servizio</a></li>
-        <li><a href="/delete-account">Elimina account</a></li>
+        <li><a href="/privacy" data-i18n="footer.privacy">Privacy Policy</a></li>
+        <li><a href="/terms" data-i18n="footer.terms">Termini di Servizio</a></li>
+        <li><a href="/delete-account" data-i18n="footer.delete">Elimina account</a></li>
       </ul>
     </div>
   </div>
   <div class="footer-bottom">
-    <span>© ${year} BikerLink. Tutti i diritti riservati.</span>
-    <span>Made for riders, by riders.</span>
+    <span>© ${year} BikerLink. <span data-i18n="footer.rights">Tutti i diritti riservati.</span></span>
+    <span data-i18n="footer.tagline">Made for riders, by riders.</span>
   </div>
 </footer>`;
 }
