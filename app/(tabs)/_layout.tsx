@@ -183,10 +183,8 @@ export default function TabLayout() {
     }
   }, [meData, user]);
 
-  // ── Stato visibilità mappa (per icona cromatica "Status") ────────────────
-  const ghostMode = profileData?.ghostMode || false;
-  const hideFromMap = profileData?.hideFromMap || false;
-  const isVisibleOnMap = !ghostMode && !hideFromMap;
+  // ── Stato disponibilità (per icona cromatica "Status") ──────────────────
+  const statusIsAvailable = profileData?.isAvailable || false;
 
   const tabBarHeight = 60 + insets.bottom;
   const tabBarPaddingBottom = insets.bottom;
@@ -330,7 +328,7 @@ export default function TabLayout() {
               <Ionicons
                 name="location"
                 size={22}
-                color={isVisibleOnMap ? colors.success : colors.accentRed}
+                color={statusIsAvailable ? colors.success : colors.accentRed}
               />
             ),
             headerShown: false,

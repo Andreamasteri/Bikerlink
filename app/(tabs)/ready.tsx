@@ -56,18 +56,18 @@ function getVisibilitySummary(props: VisibilitySummaryProps): {
 
   if (!isAvailable) {
     return {
-      label: "Non visibile",
+      label: "Non disponibile · Non visibile",
       icon: "eye-off",
       color: "#fff",
-      bg: Colors.textSecondary,
+      bg: Colors.accentRed,
     };
   }
   if (isGhostMode) {
     return {
-      label: "Ghost mode attivo",
+      label: "Ghost mode · Invisibile sulla mappa",
       icon: "eye-off",
       color: "#fff",
-      bg: "#555",
+      bg: Colors.accentRed,
     };
   }
   if (hideFromMap) {
@@ -80,14 +80,14 @@ function getVisibilitySummary(props: VisibilitySummaryProps): {
   }
   if (offlineRandomize) {
     return {
-      label: "Posizione offuscata",
+      label: "Visibile · Posizione offuscata",
       icon: "shuffle-outline",
       color: "#fff",
       bg: "#E07B00",
     };
   }
   return {
-    label: "Visibile a tutti",
+    label: "Visibile a tutti · Posizione reale",
     icon: "eye",
     color: "#fff",
     bg: Colors.success,
@@ -743,12 +743,6 @@ export default function ReadyToRideScreen() {
         ]}
       >
       <View style={styles.content}>
-        <Ionicons
-          name="bicycle"
-          size={64}
-          color={isAvailable ? Colors.success : Colors.accentRed}
-        />
-
         <Text style={styles.statusText}>
           {isAvailable ? t("ready.statusAvailable") : t("map.unavailable")}
         </Text>
