@@ -321,6 +321,11 @@ export default function ProfileScreen() {
   });
   const showSearchPref = showSearchPrefData?.enabled === true;
 
+  const { data: searchPrefLockedData } = useQuery<{ locked: boolean }>({
+    queryKey: ["/api/settings/search-preference-locked"],
+  });
+  const searchPrefLocked = searchPrefLockedData?.locked === true;
+
   const { data: matchPrefGateData, refetch: refetchMatchPrefGate } = useQuery<{ visible: boolean }>({
     queryKey: ["/api/match-preferences/gate"],
     staleTime: 120_000,
@@ -1011,15 +1016,18 @@ export default function ProfileScreen() {
               { value: "zavorrine" as const, label: "Solo Zavorrine", icon: "person" as keyof typeof Ionicons.glyphMap },
               { value: "both" as const, label: "Entrambi", icon: "people" as keyof typeof Ionicons.glyphMap },
             ]).map((opt) => {
-              const isSelected = searchPreference === opt.value;
+              const effectivePreference = searchPrefLocked ? "both" : searchPreference;
+              const isSelected = effectivePreference === opt.value;
               return (
                 <Pressable
                   key={opt.value}
                   style={[
                     styles.searchPrefBtn,
                     isSelected && styles.searchPrefBtnActive,
+                    searchPrefLocked && { opacity: opt.value === "both" ? 1 : 0.4 },
                   ]}
-                  onPress={() => searchPreferenceMutation.mutate(opt.value)}
+                  onPress={() => !searchPrefLocked && searchPreferenceMutation.mutate(opt.value)}
+                  disabled={searchPrefLocked}
                 >
                   <Ionicons
                     name={opt.icon}
@@ -1447,42 +1455,13 @@ export default function ProfileScreen() {
 
 
       <View style={styles.section}>
-        <Pressable style={styles.accordionHeader} onPress={() => setDocsExpanded(v => !v)}>
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t("profile.documentation")}</Text>
-          <Ionicons name={docsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        <Pressable
+          style={[styles.menuItem, { justifyContent: "space-between" }]}
+          onPress={() => router.push("/profile/edit" as any)}
+        >
+          <Text style={[styles.menuLabel, { fontSize: 20 }]}>{t("profile.editProfile")}</Text>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
         </Pressable>
-        {docsExpanded && (
-          <>
-            <MenuItem
-              icon="document-text"
-              label={isDownloadingManual ? t("profile.downloading") : t("profile.downloadManual")}
-              onPress={handleDownloadManual}
-              color={Colors.accent}
-            />
-            <MenuItem
-              icon="shield-checkmark-outline"
-              label={isDownloadingEula ? t("profile.downloading") : t("profile.downloadEula")}
-              onPress={handleDownloadEula}
-              color={Colors.accent}
-            />
-            <MenuItem
-              icon="document-text-outline"
-              label={isDownloadingPrivacy ? t("profile.downloading") : t("profile.downloadPrivacyPolicy")}
-              onPress={handleDownloadPrivacyPolicy}
-              color={Colors.accent}
-            />
-            <MenuItem
-              icon="cloud-download-outline"
-              label={isExportingData ? t("profile.downloading") : t("profile.exportUserData")}
-              onPress={handleExportUserData}
-              color={Colors.accent}
-            />
-          </>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <MenuItem icon="create" label={t("profile.editProfile")} onPress={() => router.push("/profile/edit" as any)} />
       </View>
 
 
@@ -1548,6 +1527,41 @@ export default function ProfileScreen() {
           <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as any)} color={Colors.warning} />
         )}
 
+      </View>
+
+      <View style={styles.section}>
+        <Pressable style={styles.accordionHeader} onPress={() => setDocsExpanded(v => !v)}>
+          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>{t("profile.documentation")}</Text>
+          <Ionicons name={docsExpanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </Pressable>
+        {docsExpanded && (
+          <>
+            <MenuItem
+              icon="document-text"
+              label={isDownloadingManual ? t("profile.downloading") : t("profile.downloadManual")}
+              onPress={handleDownloadManual}
+              color={Colors.accent}
+            />
+            <MenuItem
+              icon="shield-checkmark-outline"
+              label={isDownloadingEula ? t("profile.downloading") : t("profile.downloadEula")}
+              onPress={handleDownloadEula}
+              color={Colors.accent}
+            />
+            <MenuItem
+              icon="document-text-outline"
+              label={isDownloadingPrivacy ? t("profile.downloading") : t("profile.downloadPrivacyPolicy")}
+              onPress={handleDownloadPrivacyPolicy}
+              color={Colors.accent}
+            />
+            <MenuItem
+              icon="cloud-download-outline"
+              label={isExportingData ? t("profile.downloading") : t("profile.exportUserData")}
+              onPress={handleExportUserData}
+              color={Colors.accent}
+            />
+          </>
+        )}
       </View>
 
       <View style={[styles.section, { marginTop: 32, gap: 10 }]}>

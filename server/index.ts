@@ -1652,6 +1652,10 @@ function setupErrorHandler(app: express.Application) {
           if (!motoclubZavSetting) await storage.upsertAppSetting("motoclub_include_zav", "true");
           const showSearchPrefSetting = await storage.getAppSetting("show_search_preference");
           if (!showSearchPrefSetting) await storage.upsertAppSetting("show_search_preference", "false");
+          const matchPrefVisibleSetting = await storage.getAppSetting("match_preferences_visible");
+          if (!matchPrefVisibleSetting) await storage.upsertAppSetting("match_preferences_visible", "false");
+          const searchPrefLockedSetting = await storage.getAppSetting("search_preference_locked");
+          if (!searchPrefLockedSetting) await storage.upsertAppSetting("search_preference_locked", "false");
           const unitsPrefSetting = await storage.getAppSetting("units_preference_enabled");
           if (!unitsPrefSetting) await storage.upsertAppSetting("units_preference_enabled", "false");
           const musicProviderSetting = await storage.getAppSetting("music_provider");

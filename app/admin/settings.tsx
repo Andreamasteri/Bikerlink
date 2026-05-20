@@ -747,6 +747,16 @@ export default function AdminSettings() {
   });
   const showSearchPrefEnabled = showSearchPrefData?.enabled === true;
 
+  const { data: matchPrefVisibleData } = useQuery<{ visible: boolean }>({
+    queryKey: ["/api/match-preferences/gate"],
+  });
+  const matchPrefVisibleEnabled = matchPrefVisibleData?.visible === true;
+
+  const { data: searchPrefLockedData } = useQuery<{ locked: boolean }>({
+    queryKey: ["/api/settings/search-preference-locked"],
+  });
+  const searchPrefLockedEnabled = searchPrefLockedData?.locked === true;
+
   const { data: themeServerData } = useQuery<{ userSwitchingEnabled: boolean; defaultTheme: string }>({
     queryKey: ["/api/settings/theme"],
   });
@@ -1174,6 +1184,46 @@ export default function AdminSettings() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/show-search-preference"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
+
+  const matchPrefVisibleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/match_preferences_visible", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/match-preferences/gate"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
+
+  const searchPrefLockedMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/search_preference_locked", baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/search-preference-locked"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
     onError: (e: Error) => Alert.alert("Errore", e.message),
@@ -1904,6 +1954,44 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {showSearchPrefEnabled ? t("admin.searchMatchVisible") : t("admin.searchMatchHidden")}
+        </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="options" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Preferenze Matching visibili</Text>
+          </View>
+          <Switch
+            value={matchPrefVisibleEnabled}
+            onValueChange={(val) => matchPrefVisibleMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.warning }}
+            thumbColor={matchPrefVisibleEnabled ? Colors.text : Colors.textSecondary}
+            disabled={matchPrefVisibleMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {matchPrefVisibleEnabled ? "Sezione Preferenze Matching visibile nel profilo utente" : "Sezione Preferenze Matching nascosta nel profilo utente"}
+        </Text>
+      </View>
+
+      <View style={styles.paidCard}>
+        <View style={styles.synecoHeader}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="lock-closed" size={20} color={Colors.warning} />
+            <Text style={styles.synecoLabel}>Blocca scelta ricerca match</Text>
+          </View>
+          <Switch
+            value={searchPrefLockedEnabled}
+            onValueChange={(val) => searchPrefLockedMutation.mutate(val)}
+            trackColor={{ false: Colors.border, true: Colors.warning }}
+            thumbColor={searchPrefLockedEnabled ? Colors.text : Colors.textSecondary}
+            disabled={searchPrefLockedMutation.isPending}
+          />
+        </View>
+        <Text style={styles.synecoDesc}>
+          {searchPrefLockedEnabled ? 'Utenti bloccati su "Entrambi", non possono cambiare scelta' : "Utenti liberi di scegliere la propria preferenza di ricerca"}
         </Text>
       </View>
 

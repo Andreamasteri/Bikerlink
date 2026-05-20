@@ -1221,6 +1221,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/settings/search-preference-locked", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("search_preference_locked");
+      res.json({ locked: setting?.value === "true" });
+    } catch {
+      res.json({ locked: false });
+    }
+  });
+
   app.get("/api/settings/coordinate-history", async (_req, res) => {
     try {
       const [enabled, interval, maxRecords, mode, selectedUsers] = await Promise.all([
