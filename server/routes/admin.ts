@@ -3431,25 +3431,45 @@ router.get("/stregatti/:id/conversations", async (req: Request, res: Response) =
 
 router.delete("/stregatti/all-conversations", async (req: Request, res: Response) => {
   try {
-    const fakeUsers = await db.select({ id: users.id, nickname: users.nickname })
+    const fakeUsersResult = await db.select({ id: users.id })
       .from(users)
       .where(and(eq(users.isFake, true), ne(users.nickname, "BikerLink_Official")));
+    const fakeUserCount = fakeUsersResult.length;
+
     let deleted = 0;
-    for (const u of fakeUsers) {
-      const convs = await storage.getFakeUserConversations(u.id);
-      for (const conv of convs) {
-        await storage.deleteConversation(String(conv.id));
-        deleted++;
+    if (fakeUserCount > 0) {
+      const fakeUserIds = fakeUsersResult.map(u => u.id);
+
+      const PARAM_CHUNK = 500;
+      const allConvIds = new Set<string>();
+      for (let i = 0; i < fakeUserIds.length; i += PARAM_CHUNK) {
+        const chunk = fakeUserIds.slice(i, i + PARAM_CHUNK);
+        const rows = await db.selectDistinct({ convId: conversationParticipants.conversationId })
+          .from(conversationParticipants)
+          .where(inArray(conversationParticipants.userId, chunk));
+        for (const r of rows) allConvIds.add(r.convId);
+      }
+
+      const convIds = [...allConvIds];
+      deleted = convIds.length;
+
+      const CHUNK = 500;
+      for (let i = 0; i < convIds.length; i += CHUNK) {
+        const chunk = convIds.slice(i, i + CHUNK);
+        await db.delete(messages).where(inArray(messages.conversationId, chunk));
+        await db.delete(conversationParticipants).where(inArray(conversationParticipants.conversationId, chunk));
+        await db.delete(conversations).where(inArray(conversations.id, chunk));
       }
     }
+
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "delete_all_fake_chats",
       targetType: "system",
       targetId: "all",
-      details: `Eliminate globalmente ${deleted} conversazioni di ${fakeUsers.length} utenti fake`,
+      details: `Eliminate globalmente ${deleted} conversazioni di ${fakeUserCount} utenti fake`,
     });
-    return res.json({ deleted, users: fakeUsers.length, message: `${deleted} conversazioni eliminate` });
+    return res.json({ deleted, users: fakeUserCount, message: `${deleted} conversazioni eliminate` });
   } catch (error) {
     console.error("Admin delete all fake conversations error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -4486,34 +4506,53 @@ router.post("/reconcile-fake-moto", async (req: Request, res: Response) => {
       );
 
     let clubJoins = 0;
-    const brandClubsCache = new Map<string, { id: string; name: string }[]>();
 
-    for (let i = 0; i < allFakeBikers.length; i += BATCH_SIZE) {
-      const batch = allFakeBikers.slice(i, i + BATCH_SIZE);
-      for (const u of batch) {
-        const userMotos = await db.select().from(userMotorcycles).where(eq(userMotorcycles.userId, u.id));
+    if (allFakeBikers.length > 0) {
+      // Fetch all motorcycles for all fake bikers in one query (JOIN avoids large IN list)
+      const allFakeBikerMotos = await db.select({ userId: userMotorcycles.userId, brand: userMotorcycles.brand })
+        .from(userMotorcycles)
+        .innerJoin(users, and(eq(userMotorcycles.userId, users.id), eq(users.isFake, true), sql`${users.userType} IN ('biker', 'coppia')`));
+
+      // Group brands by userId
+      const brandsByUser = new Map<string, string[]>();
+      for (const row of allFakeBikerMotos) {
+        if (!brandsByUser.has(row.userId)) brandsByUser.set(row.userId, []);
+        brandsByUser.get(row.userId)!.push(row.brand);
+      }
+
+      // Resolve brand clubs (one query per distinct brand, cached)
+      const brandClubsCache = new Map<string, { id: string }[]>();
+      const distinctBrands = [...new Set(allFakeBikerMotos.map(r => r.brand.toLowerCase()))];
+      for (const brandKey of distinctBrands) {
+        const clubs = await db.select({ id: motoClubs.id })
+          .from(motoClubs)
+          .where(and(eq(motoClubs.isApproved, true), eq(motoClubs.clubType, "brand"), ilike(motoClubs.brandName!, brandKey)));
+        brandClubsCache.set(brandKey, clubs);
+      }
+
+      // Build all club-join rows without any per-user DB calls
+      const clubJoinRows: { clubId: string; userId: string; role: string; status: string }[] = [];
+      for (const u of allFakeBikers) {
+        const brands = brandsByUser.get(u.id) || [];
         const seenClubIds = new Set<string>();
-        for (const moto of userMotos) {
-          const brandKey = moto.brand.toLowerCase();
-          if (!brandClubsCache.has(brandKey)) {
-            const clubs = await db.select({ id: motoClubs.id, name: motoClubs.name })
-              .from(motoClubs)
-              .where(and(eq(motoClubs.isApproved, true), eq(motoClubs.clubType, "brand"), ilike(motoClubs.brandName!, moto.brand)));
-            brandClubsCache.set(brandKey, clubs);
-          }
-          const clubs = brandClubsCache.get(brandKey) || [];
+        for (const brand of brands) {
+          const clubs = brandClubsCache.get(brand.toLowerCase()) || [];
           for (const club of clubs) {
             if (seenClubIds.has(club.id)) continue;
             seenClubIds.add(club.id);
-            const result = await db.insert(motoClubMembers).values({
-              clubId: club.id,
-              userId: u.id,
-              role: "member",
-              status: "active",
-            }).onConflictDoNothing().returning({ id: motoClubMembers.id });
-            if (result.length > 0) clubJoins++;
+            clubJoinRows.push({ clubId: club.id, userId: u.id, role: "member", status: "active" });
           }
         }
+      }
+
+      // Bulk insert in chunks
+      const CLUB_CHUNK = 500;
+      for (let i = 0; i < clubJoinRows.length; i += CLUB_CHUNK) {
+        const result = await db.insert(motoClubMembers)
+          .values(clubJoinRows.slice(i, i + CLUB_CHUNK))
+          .onConflictDoNothing()
+          .returning({ id: motoClubMembers.id });
+        clubJoins += result.length;
       }
     }
 
