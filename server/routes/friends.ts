@@ -340,6 +340,51 @@ router.post("/request/:userId", requireAuth, async (req: Request, res: Response)
   }
 });
 
+router.delete("/request/:userId", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const currentUserId = req.session.userId!;
+    const targetUserId = req.params.userId;
+
+    const existing = await db
+      .select()
+      .from(directMatchRequests)
+      .where(
+        and(
+          eq(directMatchRequests.senderId, currentUserId),
+          eq(directMatchRequests.receiverId, targetUserId),
+          eq(directMatchRequests.status, "pending")
+        )
+      )
+      .limit(1);
+
+    if (existing.length === 0) {
+      return res.status(404).json({ message: "Nessuna richiesta pendente trovata" });
+    }
+
+    const requestId = existing[0].id;
+
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(notifications)
+        .where(
+          and(
+            eq(notifications.referenceType, "direct_match_request"),
+            eq(notifications.referenceId, requestId)
+          )
+        );
+
+      await tx
+        .delete(directMatchRequests)
+        .where(eq(directMatchRequests.id, requestId));
+    });
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Cancel match request error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.post("/request/:requestId/accept", requireAuth, async (req: Request, res: Response) => {
   try {
     const currentUserId = req.session.userId!;

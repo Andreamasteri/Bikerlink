@@ -151,6 +151,35 @@ export default function PublicProfileScreen() {
     },
   });
 
+  const cancelMatchRequestMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", `/api/friends/request/${id}`, undefined);
+      return res.json();
+    },
+    onSuccess: () => {
+      refetchFriendStatus();
+      queryClient.invalidateQueries({ queryKey: ["/api/friends/status", id] });
+    },
+    onError: (e: any) => {
+      Alert.alert("Errore", e.message || "Impossibile annullare la richiesta");
+    },
+  });
+
+  const handleCancelMatchRequest = () => {
+    Alert.alert(
+      "Annulla richiesta",
+      "Vuoi annullare la richiesta di match inviata?",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Annulla richiesta",
+          style: "destructive",
+          onPress: () => cancelMatchRequestMutation.mutate(),
+        },
+      ]
+    );
+  };
+
   const [menuVisible, setMenuVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [selectedReason, setSelectedReason] = useState<string>("");
@@ -510,10 +539,14 @@ export default function PublicProfileScreen() {
               </View>
             )}
             {friendStatus.status === "pending_sent" && (
-              <View style={[styles.matchStatusButton, { borderColor: Colors.textSecondary }]}>
+              <TouchableOpacity
+                style={[styles.matchStatusButton, { borderColor: Colors.textSecondary }]}
+                onPress={handleCancelMatchRequest}
+                disabled={cancelMatchRequestMutation.isPending}
+              >
                 <Ionicons name="time-outline" size={20} color={Colors.textSecondary} />
                 <Text style={[styles.matchStatusText, { color: Colors.textSecondary }]}>Richiesta inviata</Text>
-              </View>
+              </TouchableOpacity>
             )}
             {friendStatus.status === "pending_received" && (
               <View style={[styles.matchStatusButton, { borderColor: Colors.accent }]}>
