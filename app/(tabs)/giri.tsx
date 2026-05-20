@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest } from "@/lib/query-client";
+import { loadIndex } from "@/lib/offline-tiles";
 
 interface TelemetryStats {
   km_collected: number;
@@ -200,12 +201,40 @@ export default function GiriScreen() {
     return colors.textSecondary;
   };
 
+  const [offlineRouteIds, setOfflineRouteIds] = useState<Set<string>>(new Set());
+  const offlineCheckScheduled = useRef(false);
+
+  const refreshOfflineIndex = useCallback(async () => {
+    try {
+      const index = await loadIndex();
+      setOfflineRouteIds(new Set(Object.keys(index)));
+    } catch {
+      // silently ignore — offline index is best-effort
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshOfflineIndex();
+  }, [refreshOfflineIndex]);
+
+  // Re-check after routes load so new route IDs are evaluated
+  useEffect(() => {
+    if (!routes.length) return;
+    if (offlineCheckScheduled.current) return;
+    offlineCheckScheduled.current = true;
+    const timer = setTimeout(() => {
+      offlineCheckScheduled.current = false;
+      refreshOfflineIndex();
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [routes, refreshOfflineIndex]);
+
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetch(), refreshOfflineIndex()]);
     setRefreshing(false);
-  }, [refetch]);
+  }, [refetch, refreshOfflineIndex]);
 
   const [isImporting, setIsImporting] = useState(false);
 
@@ -341,15 +370,25 @@ export default function GiriScreen() {
                     </View>
                   )}
                 </View>
-                {filter === "mine" && (
-                  <Pressable
-                    onPress={() => deleteMutation.mutate(route.id)}
-                    hitSlop={12}
-                    style={{ padding: 4 }}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={colors.accentRed} />
-                  </Pressable>
-                )}
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                  {offlineRouteIds.has(route.id) && (
+                    <MaterialCommunityIcons
+                      name="cloud-check-outline"
+                      size={18}
+                      color="#22c55e"
+                      testID={`offline-badge-${route.id}`}
+                    />
+                  )}
+                  {filter === "mine" && (
+                    <Pressable
+                      onPress={() => deleteMutation.mutate(route.id)}
+                      hitSlop={12}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons name="trash-outline" size={18} color={colors.accentRed} />
+                    </Pressable>
+                  )}
+                </View>
               </View>
 
               <View style={s.statsRow}>
