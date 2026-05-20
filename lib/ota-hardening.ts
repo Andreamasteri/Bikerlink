@@ -38,7 +38,7 @@
 import * as Updates from "expo-updates";
 import { Platform } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
-import { getStableDeviceId } from "@/lib/device-id";
+import { getStableDeviceId, getCachedDeviceId } from "@/lib/device-id";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { incrementRollbackCount, resetStuckCounters } from "@/lib/ota-stuck";
 
@@ -178,6 +178,8 @@ function reportOtaListenerError(
         phase,
         source: "listener",
         platform: Platform.OS,
+        // Task #1625: stable device fingerprint (cached sync value).
+        deviceId: getCachedDeviceId(),
       }),
     })
       .catch(() => {})

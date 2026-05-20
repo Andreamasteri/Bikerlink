@@ -862,13 +862,13 @@ function OtaDeviceHistoryCard({
       </View>
 
       <Text style={styles.hintText}>
-        Cerca per Device ID (indirizzo IP) per vedere la timeline OTA completa del dispositivo.
+        Cerca per Device ID per vedere la timeline OTA completa del dispositivo.
       </Text>
 
       <View style={[styles.filterRow, { marginTop: 10 }]}>
         <TextInput
           style={[styles.filterInput, { flex: 1 }]}
-          placeholder="Device ID / IP…"
+          placeholder="Device ID…"
           placeholderTextColor={Colors.textMuted ?? "#888"}
           value={searchInput}
           onChangeText={onSearchInputChange}

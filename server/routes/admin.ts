@@ -318,6 +318,8 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
     }
     const {
       error, failCount, updateId, runtimeVersion, phase, source, platform,
+      // Task #1625: stable device fingerprint (replaces IP-based tracking).
+      deviceId,
       // Task #1148: nuovi campi diagnostici opzionali (tutti troncati sotto).
       errorCode, errorCause, errorUserInfo, nativeStack, updateUrl, channel, networkInfo, probe,
     } = req.body as {
@@ -328,6 +330,7 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
       phase?: string;
       source?: string;
       platform?: string;
+      deviceId?: string;
       errorCode?: string;
       errorCause?: string;
       errorUserInfo?: string;
@@ -396,6 +399,7 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
         error: entry.error,
         failCount: entry.failCount,
         ip: clientIp(req),
+        deviceId: typeof deviceId === "string" ? deviceId.substring(0, 64) : undefined,
         diagnostics: hasDiagnostics ? sanitizedDiag : undefined,
       });
       // Nota: il cleanup della tabella ota_events è gestito dal job schedulato
@@ -580,7 +584,7 @@ router.get("/ota-events", async (req: Request, res: Response) => {
 });
 
 // GET /api/admin/ota-device-history?deviceId=X&limit=50
-// Returns the full OTA timeline for a specific device (identified by ip/token).
+// Returns the full OTA timeline for a specific device (identified by device_id fingerprint).
 // The most-recent event is used to derive the device's current update state.
 router.get("/ota-device-history", async (req: Request, res: Response) => {
   try {
@@ -589,7 +593,7 @@ router.get("/ota-device-history", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "deviceId è obbligatorio" });
     }
     // Default: exact match. Pass fuzzy=true for contains-search (useful when
-    // admins only have a partial IP or token fragment).
+    // admins only have a partial device ID fragment).
     const fuzzy = req.query.fuzzy === "true";
     const pageRaw = parseInt(String(req.query.page ?? "1"), 10);
     const page = Math.max(isNaN(pageRaw) ? 1 : pageRaw, 1);
@@ -598,8 +602,8 @@ router.get("/ota-device-history", async (req: Request, res: Response) => {
     const offset = (page - 1) * pageSize;
 
     const matchSql = fuzzy
-      ? sql`ip ILIKE ${"%" + rawDeviceId + "%"}`
-      : sql`ip = ${rawDeviceId}`;
+      ? sql`device_id ILIKE ${"%" + rawDeviceId + "%"}`
+      : sql`device_id = ${rawDeviceId}`;
 
     // Total count for pagination
     const countResult = await db.execute(sql`
@@ -608,7 +612,7 @@ router.get("/ota-device-history", async (req: Request, res: Response) => {
     const totalCount = (countResult.rows[0] as { total: number }).total ?? 0;
 
     const result = await db.execute(sql`
-      SELECT id, created_at, phase, source, platform, runtime_version, current_update_id, release_id, error, fail_count, ip, diagnostics
+      SELECT id, created_at, phase, source, platform, runtime_version, current_update_id, release_id, error, fail_count, ip, device_id, diagnostics
       FROM ota_events
       WHERE ${matchSql}
       ORDER BY created_at DESC

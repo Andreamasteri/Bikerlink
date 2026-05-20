@@ -2,6 +2,7 @@ import * as Updates from "expo-updates";
 import { AppState, Platform } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
 import { incrementStuckSessions, getLastFetchedId, setLastFetchedId } from "@/lib/ota-stuck";
+import { getCachedDeviceId } from "@/lib/device-id";
 
 export type OtaTriggerSource = "startup" | "appstate" | "login" | "register" | "manual";
 export type OtaPhase = "check" | "fetch" | "reload" | "no-update" | "fetch-not-new" | "fetched" | "skipped";
@@ -203,6 +204,8 @@ function reportOtaEvent(payload: ReportPayload) {
         phase: payload.phase,
         source: payload.source,
         platform: Platform.OS,
+        // Task #1625: stable device fingerprint (cached sync value, loaded at init).
+        deviceId: getCachedDeviceId(),
         // Task #1148: nuovi campi diagnostici (tutti opzionali, troncati lato server).
         errorCode: payload.errorCode,
         errorCause: payload.errorCause,

@@ -85,6 +85,13 @@
       "when": 1748217600000,
       "tag": "0010_navigation_steps",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1748304000000,
+      "tag": "0011_ota_events_device_id",
+      "breakpoints": true
     }
   ]
 }
