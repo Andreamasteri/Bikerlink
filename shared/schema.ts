@@ -1770,6 +1770,7 @@ export const segmentTelemetry = pgTable("segment_telemetry", {
   maxLeanAngle: doublePrecision("max_lean_angle"),
   avgGforce: doublePrecision("avg_gforce"),
   sampleCount: integer("sample_count").notNull().default(0),
+  curvyScore: doublePrecision("curvy_score"),
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),
 });
 

@@ -1569,6 +1569,17 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] segment_telemetry:", e);
         }
 
+        // Fase 3 — Curvy Score: aggiungi colonna curvy_score a segment_telemetry
+        try {
+          await db.execute(sql`
+            ALTER TABLE segment_telemetry
+            ADD COLUMN IF NOT EXISTS curvy_score DOUBLE PRECISION
+          `);
+          console.log("[MIGRATION] segment_telemetry.curvy_score column ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] segment_telemetry.curvy_score:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
@@ -2234,6 +2245,17 @@ function setupErrorHandler(app: express.Application) {
           console.log("[INIT] Phase 14 map matching nightly scheduler registered (02:00 Europe/Rome)");
         } catch (e) {
           console.warn("[INIT] Phase 14 map matching scheduler failed (non-fatal):", e);
+        }
+
+        // Phase 15 — Curvy Score weekly scheduler (domenica 03:00 Europe/Rome)
+        // Calcola il curvy_score reale per ogni segmento OSM da segment_telemetry.
+        // Usato dal profilo di routing "Curvy Reale" in planned-routes.
+        try {
+          const { scheduleWeeklyCurvyScoreUpdate } = await import("./curvy-score-job");
+          scheduleWeeklyCurvyScoreUpdate();
+          console.log("[INIT] Phase 15 curvy score weekly scheduler registered (domenica 03:00 Europe/Rome)");
+        } catch (e) {
+          console.warn("[INIT] Phase 15 curvy score scheduler failed (non-fatal):", e);
         }
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);

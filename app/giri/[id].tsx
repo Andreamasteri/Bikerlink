@@ -236,8 +236,6 @@ function POIPhotoGallery({ poiId, colors }: { poiId: string; colors: any }) {
     </View>
   );
 }
-  );
-}
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 

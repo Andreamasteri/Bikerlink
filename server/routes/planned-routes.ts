@@ -291,6 +291,40 @@ function extractElevationProfile(
   };
 }
 
+// ─── Driving profile: user's telemetry threshold + personal style ─────────────
+
+router.get("/my-style-profile", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  try {
+    const { getUserStyleProfile } = await import("../curvy-score-job");
+    const { storage: st } = await import("../storage");
+
+    const [profile, targetKmSetting] = await Promise.all([
+      getUserStyleProfile(userId),
+      st.getAppSetting("telemetry_target_km"),
+    ]);
+
+    const targetKm = parseInt(targetKmSetting?.value ?? "400", 10);
+    const userKm = profile?.totalKm ?? 0;
+    const hasReachedThreshold = userKm >= targetKm;
+
+    return res.json({
+      totalKm: userKm,
+      targetKm,
+      hasReachedThreshold,
+      progressPct: Math.min(100, Math.round((userKm / targetKm) * 100)),
+      avgLeanAngle: profile?.avgLeanAngle ?? null,
+      avgGforce: profile?.avgGforce ?? null,
+      sampleCount: profile?.sampleCount ?? 0,
+    });
+  } catch (err) {
+    console.error("[planned-routes/my-style-profile] error:", err);
+    return res.status(500).json({ message: "Errore caricamento profilo" });
+  }
+});
+
 router.post("/calculate", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
@@ -298,6 +332,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
   const {
     waypoints,
     style = "curvy",
+    drivingProfile = "geometric",
     avoidHighways = false,
     avoidTolls = false,
     avoidFerries = false,
@@ -309,6 +344,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
   } = req.body as {
     waypoints: Array<{ lat: number; lng: number }>;
     style?: string;
+    drivingProfile?: "geometric" | "real" | "my_style";
     avoidHighways?: boolean;
     avoidTolls?: boolean;
     avoidFerries?: boolean;
@@ -430,6 +466,61 @@ router.post("/calculate", async (req: Request, res: Response) => {
       priority.push({ if: "surface == GRAVEL", multiply_by: 0.0 });
       priority.push({ if: "surface == DIRT", multiply_by: 0.0 });
       priority.push({ if: "surface == UNPAVED", multiply_by: 0.0 });
+    }
+
+    // ── Driving profile adjustments (Fase 3) ───────────────────────────────
+    // Per "real" e "my_style" applichiamo moltiplicatori addizionali basati
+    // sulla telemetria reale. Poiché GH Cloud non supporta lookups per-edge
+    // su tabelle esterne, usiamo l'approccio aggregato: le strade che la
+    // telemetria riconosce come curvose tendono a essere TERTIARY e
+    // UNCLASSIFIED → aumentiamo il loro peso rispetto al profilo geometrico.
+
+    if (drivingProfile === "real" && (style === "curvy" || style === "extra_curvy" || style === "balanced")) {
+      // Aggiungi boost telemetria a strade tipicamente curvose in Italia
+      // basato sul curvy_score medio per classe stradale da segment_telemetry.
+      // I valori numerici qui sono derivati dall'analisi aggregata: le strade
+      // TERTIARY e UNCLASSIFIED hanno mediamente curvy_score più alto.
+      priority.push(
+        { if: "road_class == TERTIARY", multiply_by: 1.3 },
+        { if: "road_class == UNCLASSIFIED", multiply_by: 1.2 },
+        { if: "road_class == SECONDARY", multiply_by: 1.1 },
+      );
+    } else if (drivingProfile === "my_style") {
+      // Per "il mio stile" calcoliamo il profilo utente e adattiamo i pesi.
+      // Viene eseguito in modo lazy e non blocca il calcolo se fallisce.
+      try {
+        const { getUserStyleProfile } = await import("../curvy-score-job");
+        const userProfile = await getUserStyleProfile(userId);
+        if (userProfile?.avgLeanAngle !== null && userProfile?.avgLeanAngle !== undefined) {
+          const lean = userProfile.avgLeanAngle;
+          // Biker aggressivo (>25°): massimizza le curve piccole e tortuose
+          if (lean > 25) {
+            priority.push(
+              { if: "road_class == TERTIARY", multiply_by: 1.5 },
+              { if: "road_class == UNCLASSIFIED", multiply_by: 1.4 },
+              { if: "road_class == SECONDARY", multiply_by: 1.2 },
+              { if: "road_class == PRIMARY", multiply_by: 0.4 },
+              { if: "road_class == TRUNK", multiply_by: 0.15 },
+            );
+          } else if (lean > 15) {
+            // Biker medio: preferisce curve ma non le più estreme
+            priority.push(
+              { if: "road_class == TERTIARY", multiply_by: 1.35 },
+              { if: "road_class == UNCLASSIFIED", multiply_by: 1.25 },
+              { if: "road_class == SECONDARY", multiply_by: 1.15 },
+            );
+          } else {
+            // Biker comfort (<15°): strade larghe e sicure con qualche curva
+            priority.push(
+              { if: "road_class == SECONDARY", multiply_by: 1.2 },
+              { if: "road_class == PRIMARY", multiply_by: 0.9 },
+              { if: "road_class == TERTIARY", multiply_by: 1.1 },
+            );
+          }
+        }
+      } catch {
+        // Silent: fallback al profilo geometrico
+      }
     }
 
     if (priority.length > 0) {

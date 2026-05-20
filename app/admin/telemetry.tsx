@@ -33,6 +33,16 @@ interface MapMatchingStats {
   ghConfigured: boolean;
 }
 
+interface CurvyScoreStats {
+  totalSegments: number;
+  withScore: number;
+  withoutScore: number;
+  coveragePct: number;
+  avgScore: number | null;
+  lastRun: string | null;
+  isRunning: boolean;
+}
+
 async function adminFetch(path: string): Promise<Response> {
   const res = await fetch(new URL(path, getApiUrl()).toString(), {
     headers: { ...(await authFetchHeaders()) },
@@ -71,6 +81,7 @@ export default function AdminTelemetryScreen() {
   const [targetInput, setTargetInput] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [runningJob, setRunningJob] = useState(false);
+  const [runningCurvyJob, setRunningCurvyJob] = useState(false);
 
   const { data: stats, isLoading, error, refetch } = useQuery<TelemetryAdminStats>({
     queryKey: ["/api/admin/telemetry-stats"],
@@ -86,6 +97,13 @@ export default function AdminTelemetryScreen() {
     queryFn: () => adminFetch("/api/admin/map-matching-stats").then((r) => r.json()),
     staleTime: 15_000,
     refetchInterval: (data) => (data?.isRunning ? 5_000 : 30_000),
+  });
+
+  const { data: curvyStats, refetch: refetchCurvy } = useQuery<CurvyScoreStats>({
+    queryKey: ["/api/admin/curvy-score-stats"],
+    queryFn: () => adminFetch("/api/admin/curvy-score-stats").then((r) => r.json()),
+    staleTime: 30_000,
+    refetchInterval: (data) => (data?.isRunning ? 5_000 : 60_000),
   });
 
   const handleSaveTarget = async () => {
@@ -116,6 +134,32 @@ export default function AdminTelemetryScreen() {
       Alert.alert("Errore", "Impossibile aggiornare l'obiettivo.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRunCurvyJob = async () => {
+    if (runningCurvyJob || curvyStats?.isRunning) return;
+    setRunningCurvyJob(true);
+    try {
+      const res = await fetch(
+        new URL("/api/admin/curvy-score/run", getApiUrl()).toString(),
+        {
+          method: "POST",
+          headers: { ...(await authFetchHeaders()) },
+          credentials: "include",
+        }
+      );
+      if (res.status === 409) {
+        Alert.alert("Info", "Job curvy score già in esecuzione.");
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      Alert.alert("Avviato", "Calcolo curvy score avviato in background. Aggiorna tra qualche minuto.");
+      setTimeout(() => refetchCurvy(), 3_000);
+    } catch {
+      Alert.alert("Errore", "Impossibile avviare il job curvy score.");
+    } finally {
+      setRunningCurvyJob(false);
     }
   };
 
@@ -360,9 +404,101 @@ export default function AdminTelemetryScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* ── Curvy Score section ── */}
+      <View style={styles.section}>
+        <View style={styles.mmHeader}>
+          <MaterialCommunityIcons name="sine-wave" size={18} color="#8b5cf6" />
+          <Text style={styles.sectionTitle}>Curvy Score (Fase 3)</Text>
+        </View>
+        <Text style={styles.settingDesc}>
+          Job settimanale (domenica 03:00) che calcola il curvy_score di ogni segmento OSM
+          dalla telemetria di piega e G-force dei biker.
+        </Text>
+
+        {curvyStats && (
+          <>
+            <View style={styles.statsGrid}>
+              <StatCard
+                label="Segmenti con score"
+                value={curvyStats.withScore.toLocaleString("it-IT")}
+                icon="check-circle"
+                color="#22c55e"
+              />
+              <StatCard
+                label="Segmenti senza score"
+                value={curvyStats.withoutScore.toLocaleString("it-IT")}
+                icon="timer-sand"
+                color="#f59e0b"
+              />
+              <StatCard
+                label="Copertura"
+                value={`${curvyStats.coveragePct.toFixed(1)}%`}
+                icon="chart-pie"
+                color="#8b5cf6"
+              />
+              {curvyStats.avgScore !== null && (
+                <StatCard
+                  label="Score medio"
+                  value={curvyStats.avgScore.toFixed(2)}
+                  icon="sine-wave"
+                  color="#06b6d4"
+                />
+              )}
+            </View>
+
+            <View style={[styles.progressBg, { marginTop: 12 }]}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${Math.min(curvyStats.coveragePct, 100)}%` as `${number}%`,
+                    backgroundColor: curvyStats.coveragePct >= 80 ? "#22c55e" : "#8b5cf6",
+                  },
+                ]}
+              />
+            </View>
+          </>
+        )}
+
+        <View style={styles.mmMeta}>
+          <View style={styles.mmMetaRow}>
+            <MaterialCommunityIcons name="clock-outline" size={14} color={Colors.textSecondary} />
+            <Text style={styles.mmMetaText}>
+              Ultima esecuzione: {formatLastRun(curvyStats?.lastRun)}
+            </Text>
+          </View>
+          {curvyStats?.isRunning && (
+            <View style={styles.mmMetaRow}>
+              <ActivityIndicator size="small" color="#8b5cf6" />
+              <Text style={[styles.mmMetaText, { color: "#8b5cf6" }]}>
+                Job in esecuzione…
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.runJobBtn,
+            { backgroundColor: "#8b5cf6" },
+            (runningCurvyJob || curvyStats?.isRunning) && { opacity: 0.5 },
+          ]}
+          onPress={handleRunCurvyJob}
+          disabled={runningCurvyJob || curvyStats?.isRunning}
+          activeOpacity={0.8}
+        >
+          {runningCurvyJob ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <MaterialCommunityIcons name="play-circle" size={18} color="#fff" />
+          )}
+          <Text style={[styles.runJobBtnText, { color: "#fff" }]}>Esegui ora</Text>
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity
         style={styles.refreshBtn}
-        onPress={() => { refetch(); refetchMm(); }}
+        onPress={() => { refetch(); refetchMm(); refetchCurvy(); }}
         activeOpacity={0.8}
       >
         <Ionicons name="refresh" size={16} color={Colors.accent} />

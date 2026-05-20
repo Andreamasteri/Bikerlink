@@ -7659,6 +7659,72 @@ router.post("/map-matching/run", async (req: Request, res: Response) => {
   }
 });
 
+// ─── Curvy Score Fase 3 ────────────────────────────────────────────────────────
+
+router.get("/curvy-score-stats", async (_req: Request, res: Response) => {
+  try {
+    const { getCurvyScoreStats } = await import("../curvy-score-job");
+    const stats = await getCurvyScoreStats();
+    return res.json(stats);
+  } catch (err) {
+    console.error("[admin/curvy-score-stats] error:", err);
+    return res.status(500).json({ message: "Errore caricamento stats curvy score" });
+  }
+});
+
+router.post("/curvy-score/run", async (req: Request, res: Response) => {
+  try {
+    const { runCurvyScoreJob, isCurvyScoreJobRunning } = await import("../curvy-score-job");
+    if (isCurvyScoreJobRunning()) {
+      return res.status(409).json({ message: "Job già in esecuzione" });
+    }
+    runCurvyScoreJob()
+      .then((result) => {
+        console.log("[CURVY-SCORE] Esecuzione manuale completata:", result);
+      })
+      .catch((err) => {
+        console.error("[CURVY-SCORE] Errore esecuzione manuale:", err);
+      });
+    return res.json({ message: "Job avviato", started: true });
+  } catch (err) {
+    console.error("[admin/curvy-score/run] error:", err);
+    return res.status(500).json({ message: "Errore avvio job" });
+  }
+});
+
+router.put("/curvy-score/weights", async (req: Request, res: Response) => {
+  try {
+    const { weight_lean, weight_gforce, min_samples } = req.body as {
+      weight_lean?: number;
+      weight_gforce?: number;
+      min_samples?: number;
+    };
+    if (weight_lean !== undefined) {
+      if (typeof weight_lean !== "number" || weight_lean <= 0 || weight_lean > 1) {
+        return res.status(400).json({ message: "weight_lean deve essere tra 0 e 1" });
+      }
+      process.env.CURVY_SCORE_WEIGHT_LEAN = String(weight_lean);
+    }
+    if (weight_gforce !== undefined) {
+      if (typeof weight_gforce !== "number" || weight_gforce <= 0 || weight_gforce > 1) {
+        return res.status(400).json({ message: "weight_gforce deve essere tra 0 e 1" });
+      }
+      process.env.CURVY_SCORE_WEIGHT_GFORCE = String(weight_gforce);
+    }
+    if (min_samples !== undefined) {
+      if (typeof min_samples !== "number" || min_samples < 1) {
+        return res.status(400).json({ message: "min_samples deve essere >= 1" });
+      }
+      process.env.CURVY_SCORE_MIN_SAMPLES = String(Math.round(min_samples));
+    }
+    const { getCurvyScoreWeights } = await import("../curvy-score-job");
+    return res.json({ message: "Pesi aggiornati", weights: getCurvyScoreWeights() });
+  } catch (err) {
+    console.error("[admin/curvy-score/weights] error:", err);
+    return res.status(500).json({ message: "Errore aggiornamento pesi" });
+  }
+});
+
 router.put("/telemetry-target-km", async (req: Request, res: Response) => {
   try {
     const { target_km } = req.body;

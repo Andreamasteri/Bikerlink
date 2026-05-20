@@ -28,6 +28,7 @@ import { decodePolyline } from "@/lib/polyline";
 import { useLanguage } from "@/lib/language-context";
 
 type Style = "direct" | "fast" | "balanced" | "curvy" | "extra_curvy";
+type DrivingProfile = "geometric" | "real" | "my_style";
 type Mode = "ai" | "ai-preview" | "manual";
 type CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
 
@@ -107,6 +108,7 @@ async function geocode(q: string): Promise<GeoResult[]> {
 async function calcRoute(
   waypoints: Waypoint[],
   style: Style,
+  drivingProfile: DrivingProfile,
   avoidHighways: boolean,
   avoidTolls: boolean,
   avoidFerries: boolean,
@@ -121,7 +123,7 @@ async function calcRoute(
     method: "POST", credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      waypoints, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved,
+      waypoints, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved,
       roundTripHours, isRoundTrip, language,
       ...(headingDeg !== null && headingDeg !== undefined ? { headingDeg } : {}),
     }),
@@ -131,6 +133,16 @@ async function calcRoute(
     throw new Error(body.message ?? "Calcolo percorso fallito");
   }
   return resp.json();
+}
+
+interface MyStyleProfile {
+  totalKm: number;
+  targetKm: number;
+  hasReachedThreshold: boolean;
+  progressPct: number;
+  avgLeanAngle: number | null;
+  avgGforce: number | null;
+  sampleCount: number;
 }
 
 async function parseAI(prompt: string): Promise<any> {
@@ -202,6 +214,7 @@ export default function GiriCreateScreen() {
 
   const [title, setTitle] = useState("Giro in moto");
   const [style, setStyle] = useState<Style>("curvy");
+  const [drivingProfile, setDrivingProfile] = useState<DrivingProfile>("geometric");
   const [isRoundTrip, setIsRoundTrip] = useState(false);
   const [roundTripHours, setRoundTripHours] = useState(3);
   const [headingDeg, setHeadingDeg] = useState<number | null>(null);
@@ -292,6 +305,11 @@ export default function GiriCreateScreen() {
 
   const { data: motorcycles = [] } = useQuery<UserMotorcycle[]>({
     queryKey: ["/api/motorcycles"],
+  });
+
+  const { data: myStyleProfile } = useQuery<MyStyleProfile>({
+    queryKey: ["/api/planned-routes/my-style-profile"],
+    staleTime: 5 * 60 * 1000,
   });
 
   const saveMutation = useMutation({
@@ -439,7 +457,7 @@ export default function GiriCreateScreen() {
         "/api/planned-routes/calculate", "POST",
         () => {
           const url = new URL("/api/planned-routes/calculate", getApiUrl());
-          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language }) });
+          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, drivingProfile, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language }) });
         },
         async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
       );
@@ -547,7 +565,7 @@ export default function GiriCreateScreen() {
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
       setCalculating(true);
       try {
-        const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
+        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
         setRouteResult(result);
       } catch {
         // silent — user can still trigger manually
@@ -557,7 +575,7 @@ export default function GiriCreateScreen() {
     }, 500);
     return () => { if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, style, avoidHighways, avoidTolls, isRoundTrip, roundTripHours, headingDeg, mode]);
+  }, [waypoints, style, drivingProfile, avoidHighways, avoidTolls, isRoundTrip, roundTripHours, headingDeg, mode]);
 
   const handleCalculate = async () => {
     const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
@@ -568,7 +586,7 @@ export default function GiriCreateScreen() {
     setCalculating(true);
     setWeatherPreview(null);
     try {
-      const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
+      const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
       setRouteResult(result);
       if (result.durationMinutes > 480 && !isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
@@ -847,6 +865,62 @@ export default function GiriCreateScreen() {
                 {style === "curvy" && "Strade curve e panoramiche — ideale per i bikers"}
                 {style === "extra_curvy" && "Massimizza le curve: strade secondarie e tortuose"}
               </Text>
+            </View>
+
+            {/* Profilo di guida — Fase 3 */}
+            <View style={s.section}>
+              <Text style={s.sectionLabel}>Profilo di guida</Text>
+              {(["geometric", "real", "my_style"] as DrivingProfile[]).map((prof) => {
+                const isMyStyle = prof === "my_style";
+                const locked = isMyStyle && !(myStyleProfile?.hasReachedThreshold);
+                const isActive = drivingProfile === prof && !locked;
+                const labels: Record<DrivingProfile, string> = {
+                  geometric: "Curvy geometrico",
+                  real: "Curvy reale",
+                  my_style: "Il mio stile",
+                };
+                const descs: Record<DrivingProfile, string> = {
+                  geometric: "Basato sulla forma geometrica delle strade",
+                  real: "Basato su dati reali di piega e G-force dei biker",
+                  my_style: "Personalizzato sulla tua telemetria storica",
+                };
+                const icons: Record<DrivingProfile, keyof typeof Ionicons.glyphMap> = {
+                  geometric: "compass-outline",
+                  real: "people-outline",
+                  my_style: "person-outline",
+                };
+                return (
+                  <Pressable
+                    key={prof}
+                    style={[s.profileCard, isActive && { borderColor: colors.accent, borderWidth: 2 }]}
+                    onPress={() => {
+                      if (locked) return;
+                      setDrivingProfile(prof);
+                    }}
+                    disabled={locked}
+                  >
+                    <View style={s.profileCardLeft}>
+                      <Ionicons name={icons[prof]} size={22} color={isActive ? colors.accent : colors.textSecondary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.profileCardTitle, isActive && { color: colors.accent }]}>{labels[prof]}</Text>
+                      <Text style={s.profileCardDesc}>{descs[prof]}</Text>
+                      {locked && (
+                        <View style={s.profileLockRow}>
+                          <Ionicons name="lock-closed-outline" size={12} color={colors.textSecondary} />
+                          <Text style={s.profileLockText}>
+                            Disponibile dopo {myStyleProfile?.targetKm ?? 400} km registrati
+                            {myStyleProfile && myStyleProfile.totalKm > 0
+                              ? ` (${Math.round(myStyleProfile.totalKm)} km registrati)`
+                              : ""}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    {isActive && <Ionicons name="checkmark-circle" size={20} color={colors.accent} />}
+                  </Pressable>
+                );
+              })}
             </View>
 
             {/* Planner map */}
@@ -1256,6 +1330,12 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   curvinessBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   curvinessBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: colors.textSecondary },
   curvinessDesc: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, textAlign: "center" },
+  profileCard: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginBottom: 8 },
+  profileCardLeft: { width: 32, alignItems: "center" },
+  profileCardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text, marginBottom: 2 },
+  profileCardDesc: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
+  profileLockRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  profileLockText: { fontFamily: "Inter_400Regular", fontSize: 11, color: colors.textSecondary },
   plannerMapContainer: { height: 220, borderRadius: 14, overflow: "hidden", position: "relative", borderWidth: 1, borderColor: colors.border },
   plannerMap: { flex: 1 },
   mapHintBadge: { position: "absolute", bottom: 8, left: "50%", transform: [{ translateX: -70 }], backgroundColor: "rgba(0,0,0,0.7)", borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5 },
