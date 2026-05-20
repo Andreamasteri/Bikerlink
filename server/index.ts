@@ -1592,6 +1592,27 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] segment_telemetry.curvy_score:", e);
         }
 
+        // Task #1770 — OTA Publish Tokens: tabella per autenticazione script publish-ota.sh
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS ota_publish_tokens (
+              id          SERIAL      PRIMARY KEY,
+              token_hash  TEXT        NOT NULL UNIQUE,
+              label       VARCHAR(100) NOT NULL DEFAULT 'default',
+              created_at  TIMESTAMP   NOT NULL DEFAULT NOW(),
+              expires_at  TIMESTAMP,
+              last_used_at TIMESTAMP,
+              revoked     BOOLEAN     NOT NULL DEFAULT FALSE
+            )
+          `);
+          await db.execute(sql`
+            CREATE INDEX IF NOT EXISTS ota_publish_tokens_hash_idx ON ota_publish_tokens (token_hash)
+          `);
+          console.log("[MIGRATION] ota_publish_tokens table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] ota_publish_tokens:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 

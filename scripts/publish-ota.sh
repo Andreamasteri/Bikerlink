@@ -37,6 +37,8 @@ STATE_OTA_UPDATES_BAK="$STATE_DIR/ota-state.ota-updates.json.bak"
 ADMIN_EMAIL="${BIKERLINK_ADMIN_EMAIL:-}"
 ADMIN_PASSWORD="${BIKERLINK_ADMIN_PASSWORD:-}"
 
+OTA_TOKEN_FILE="$STATE_DIR/ota-token"
+
 # ─── Stato di esecuzione (locale al processo) ─────────────
 ROLLBACK_NEEDED=0
 COOKIE_JAR=""
@@ -50,8 +52,15 @@ Uso:
   $0 export "messaggio"      # stage 1: bump + Metro export + verifica (~80s)
   $0 publish                 # stage 2: upload + create + publish + slot stable + verify + finalize (~30s)
   $0 rollback                # ripristina lib/ota.ts e ota-updates.json dal backup
+  $0 setup-token             # genera token OTA e lo salva in .local/ota-token (una tantum)
+  $0 revoke-token            # revoca il token in .local/ota-token e lo elimina
 
-Variabili d'ambiente richieste (per export legacy e publish):
+Flusso raccomandato (senza password nell'environment):
+  1. bash $0 setup-token     # una tantum: richiede email/password admin, salva token
+  2. bash $0 export "msg"    # esporta bundle
+  3. bash $0 publish         # pubblica — usa il token se .local/ota-token esiste
+
+Variabili d'ambiente richieste (solo se .local/ota-token non esiste):
   BIKERLINK_ADMIN_EMAIL      — email account admin
   BIKERLINK_ADMIN_PASSWORD   — password account admin
 
@@ -80,6 +89,153 @@ state_get() {
     if (v === undefined || v === null) process.exit(1);
     process.stdout.write(String(v));
   " 2>/dev/null
+}
+
+# ─── Login admin (usato da setup-token e revoke-token) ───────
+# Restituisce il session cookie in stdout; esce con 1 in caso di errore.
+do_admin_login() {
+  local email="${1:-$ADMIN_EMAIL}"
+  local password="${2:-$ADMIN_PASSWORD}"
+  if [ -z "$email" ]; then
+    printf "Email admin: " >&2
+    read -r email
+  fi
+  if [ -z "$password" ]; then
+    printf "Password admin: " >&2
+    read -rs password
+    echo >&2
+  fi
+  local RAW_LOGIN LOGIN_BODY SESSION_COOKIE
+  RAW_LOGIN=$(curl -s -D - -X POST "$BACKEND_URL/api/auth/login" \
+    -H "Content-Type: application/json" \
+    -H "X-Forwarded-Proto: https" \
+    -d "{\"identifier\":\"$email\",\"password\":\"$password\"}")
+  LOGIN_BODY=$(echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
+  if ! echo "$LOGIN_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { const j=JSON.parse(d); process.exit(j.id ? 0 : 1); } catch { process.exit(1); } })" 2>/dev/null; then
+    echo "ERRORE login: $LOGIN_BODY" >&2
+    exit 1
+  fi
+  SESSION_COOKIE=$(echo "$RAW_LOGIN" | grep -i "^set-cookie:" | grep "connect.sid" | head -1 | sed 's/.*connect\.sid=\([^;]*\).*/connect.sid=\1/' | tr -d '\r')
+  if [ -z "$SESSION_COOKIE" ]; then
+    echo "ERRORE: nessun session cookie ricevuto" >&2
+    exit 1
+  fi
+  echo "$SESSION_COOKIE"
+}
+
+# ─── setup-token: genera token OTA e lo salva in .local/ota-token ─
+do_setup_token() {
+  mkdir -p "$STATE_DIR"
+  echo ""
+  echo "╔══════════════════════════════════════════════════╗"
+  echo "║  BikerLink OTA — Setup Token                     ║"
+  echo "╚══════════════════════════════════════════════════╝"
+  echo ""
+  echo "  Backend: $BACKEND_URL"
+  echo ""
+  echo "  Login admin necessario per generare il token."
+  echo "  Le credenziali non vengono salvate."
+  echo ""
+
+  local SESSION_COOKIE
+  SESSION_COOKIE=$(do_admin_login) || exit 1
+  echo "  ✔ Autenticato"
+
+  local TOKEN_RESPONSE TOKEN_PLAIN TOKEN_ID
+  TOKEN_RESPONSE=$(curl -s -X POST "$BACKEND_URL/api/admin/ota/token" \
+    -H "Cookie: $SESSION_COOKIE" \
+    -H "Content-Type: application/json" \
+    -H "X-Forwarded-Proto: https" \
+    -d "{\"label\":\"publish-ota-script\",\"expiresInDays\":365}")
+  TOKEN_PLAIN=$(echo "$TOKEN_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).token ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
+  TOKEN_ID=$(echo "$TOKEN_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).id ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
+  if [ -z "$TOKEN_PLAIN" ]; then
+    echo "  ERRORE generazione token: $TOKEN_RESPONSE"
+    exit 1
+  fi
+
+  echo "$TOKEN_PLAIN" > "$OTA_TOKEN_FILE"
+  chmod 600 "$OTA_TOKEN_FILE"
+  echo "  ✔ Token ID $TOKEN_ID salvato in $OTA_TOKEN_FILE (chmod 600)"
+  echo "  ✔ Scadenza: 365 giorni da oggi"
+  echo ""
+  echo "  Prossimi step:"
+  echo "    bash $0 export \"messaggio\"  # esporta bundle"
+  echo "    bash $0 publish              # pubblica (usa il token automaticamente)"
+  echo ""
+  echo "  Per revocare il token in futuro:"
+  echo "    bash $0 revoke-token"
+  echo ""
+}
+
+# ─── revoke-token: revoca il token in .local/ota-token ────────────
+do_revoke_token() {
+  if [ ! -f "$OTA_TOKEN_FILE" ]; then
+    echo "Errore: $OTA_TOKEN_FILE non trovato. Nulla da revocare."
+    exit 1
+  fi
+
+  local RAW_TOKEN
+  RAW_TOKEN=$(cat "$OTA_TOKEN_FILE")
+  if [ -z "$RAW_TOKEN" ]; then
+    echo "Errore: file $OTA_TOKEN_FILE vuoto."
+    exit 1
+  fi
+
+  echo ""
+  echo "╔══════════════════════════════════════════════════╗"
+  echo "║  BikerLink OTA — Revoca Token                    ║"
+  echo "╚══════════════════════════════════════════════════╝"
+  echo ""
+  echo "  Backend: $BACKEND_URL"
+  echo ""
+
+  # Prima prova a ottenere la lista token con il token stesso (se non ancora scaduto).
+  # Fallback: login admin.
+  local SESSION_COOKIE
+  SESSION_COOKIE=$(do_admin_login) || exit 1
+  echo "  ✔ Autenticato"
+
+  local TOKENS_RESPONSE TOKEN_ID
+  TOKENS_RESPONSE=$(curl -s "$BACKEND_URL/api/admin/ota/tokens" \
+    -H "Cookie: $SESSION_COOKIE" \
+    -H "X-Forwarded-Proto: https")
+  TOKEN_ID=$(echo "$TOKENS_RESPONSE" | node -e "
+    const rawToken = process.argv[1];
+    const crypto = require('crypto');
+    // Non possiamo calcolare l'hash lato client qui facilmente.
+    // Identifichiamo il token per label 'publish-ota-script' non ancora revocato.
+    let d=''; process.stdin.on('data',c=>d+=c).on('end',()=>{
+      try {
+        const tokens = JSON.parse(d);
+        const t = tokens.find(x => x.label === 'publish-ota-script' && !x.revoked);
+        console.log(t ? t.id : '');
+      } catch { console.log(''); }
+    });
+  " 2>/dev/null || true)
+
+  if [ -z "$TOKEN_ID" ]; then
+    echo "  ⚠ Token non trovato nel DB (forse già revocato o label diversa)."
+    echo "  Rimuovo solo il file locale."
+    rm -f "$OTA_TOKEN_FILE"
+    echo "  ✔ $OTA_TOKEN_FILE rimosso"
+    exit 0
+  fi
+
+  local REVOKE_RESPONSE REVOKE_OK
+  REVOKE_RESPONSE=$(curl -s -X DELETE "$BACKEND_URL/api/admin/ota/token/$TOKEN_ID" \
+    -H "Cookie: $SESSION_COOKIE" \
+    -H "X-Forwarded-Proto: https")
+  REVOKE_OK=$(echo "$REVOKE_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { const j=JSON.parse(d); process.stdout.write(j.ok ? '1' : ''); } catch { process.stdout.write(''); } })" 2>/dev/null || true)
+  if [ "$REVOKE_OK" != "1" ]; then
+    echo "  ERRORE revoca token ID $TOKEN_ID: $REVOKE_RESPONSE"
+    exit 1
+  fi
+
+  rm -f "$OTA_TOKEN_FILE"
+  echo "  ✔ Token ID $TOKEN_ID revocato nel DB"
+  echo "  ✔ $OTA_TOKEN_FILE rimosso"
+  echo ""
 }
 
 # ─── Restore from backup files (used by rollback + cleanup) ──
@@ -581,32 +737,38 @@ do_publish() {
     fs.writeFileSync(process.env.STATE_FILE_PATH, JSON.stringify(s, null, 2) + '\n');
   "
 
-  # ─── Step G: Login admin ──────────────────────────────────
-  echo "[G] Login admin su $BACKEND_URL..."
-  COOKIE_JAR="/tmp/ota-publish-cookies-$$.txt"
-  local RAW_LOGIN LOGIN_BODY SESSION_COOKIE
-  RAW_LOGIN=$(curl -s -D - -X POST "$BACKEND_URL/api/auth/login" \
-    -H "Content-Type: application/json" \
-    -H "X-Forwarded-Proto: https" \
-    -d "{\"identifier\":\"$ADMIN_EMAIL\",\"password\":\"$ADMIN_PASSWORD\"}")
-  LOGIN_BODY=$(echo "$RAW_LOGIN" | awk 'BEGIN{body=0} /^\r$/{body=1; next} body{print}')
-  if ! echo "$LOGIN_BODY" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { const j=JSON.parse(d); process.exit(j.id ? 0 : 1); } catch { process.exit(1); } })" 2>/dev/null; then
-    echo "   ERRORE login: $LOGIN_BODY"
-    exit 1
+  # ─── Step G: Autenticazione (token o login) ───────────────
+  # Se esiste .local/ota-token, usa quello al posto del login email/password.
+  local OTA_TOKEN="" SESSION_COOKIE="" AUTH_HEADER=""
+  if [ -f "$OTA_TOKEN_FILE" ]; then
+    OTA_TOKEN=$(cat "$OTA_TOKEN_FILE")
+    if [ -n "$OTA_TOKEN" ]; then
+      echo "[G] Token OTA trovato in $OTA_TOKEN_FILE — skip login."
+      AUTH_HEADER="Authorization: Bearer $OTA_TOKEN"
+    fi
   fi
-  SESSION_COOKIE=$(echo "$RAW_LOGIN" | grep -i "^set-cookie:" | grep "connect.sid" | head -1 | sed 's/.*connect\.sid=\([^;]*\).*/connect.sid=\1/' | tr -d '\r')
-  if [ -z "$SESSION_COOKIE" ]; then
-    echo "   ERRORE: nessun session cookie ricevuto"
-    exit 1
+  if [ -z "$OTA_TOKEN" ]; then
+    echo "[G] Login admin su $BACKEND_URL..."
+    require_admin_creds
+    SESSION_COOKIE=$(do_admin_login "$ADMIN_EMAIL" "$ADMIN_PASSWORD") || exit 1
+    echo "   ✔ Autenticato"
   fi
-  echo "   ✔ Autenticato"
+
+  # Helper: aggiunge auth header corretto alla chiamata curl
+  auth_curl() {
+    if [ -n "$OTA_TOKEN" ]; then
+      curl -s -H "$AUTH_HEADER" -H "X-Forwarded-Proto: https" "$@"
+    else
+      curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" "$@"
+    fi
+  }
 
   # ─── Step H: Creazione release draft ──────────────────────
   echo "[H] Creazione release OTA (draft)..."
   local NOTES_JSON RV_JSON CREATE_RESPONSE RELEASE_ID
   NOTES_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "OTA-$NEXT_OTA rv$RUNTIME_VERSION: $RELEASE_MESSAGE")
   RV_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "$RUNTIME_VERSION")
-  CREATE_RESPONSE=$(curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" -X POST "$BACKEND_URL/api/admin/ota" \
+  CREATE_RESPONSE=$(auth_curl -X POST "$BACKEND_URL/api/admin/ota" \
     -H "Content-Type: application/json" \
     -d "{\"version\":\"$VERSION\",\"runtimeVersion\":$RV_JSON,\"bundlePath\":\"$BUNDLE_URL\",\"releaseNotes\":$NOTES_JSON}")
   RELEASE_ID=$(echo "$CREATE_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).id ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
@@ -627,7 +789,7 @@ do_publish() {
   # ─── Step I: Pubblicazione release ────────────────────────
   echo "[I] Pubblicazione release..."
   local PUBLISH_RESPONSE PUBLISH_STATUS
-  PUBLISH_RESPONSE=$(curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" -X POST "$BACKEND_URL/api/admin/ota/$RELEASE_ID/publish")
+  PUBLISH_RESPONSE=$(auth_curl -X POST "$BACKEND_URL/api/admin/ota/$RELEASE_ID/publish")
   PUBLISH_STATUS=$(echo "$PUBLISH_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).status ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
   if [ "$PUBLISH_STATUS" != "active" ]; then
     echo "   ERRORE pubblicazione: $PUBLISH_RESPONSE"
@@ -640,7 +802,7 @@ do_publish() {
   # la release resta archived e nessun dispositivo la riceve.
   echo "[I+] Promozione slot=stable..."
   local SLOT_RESPONSE SLOT_OK
-  SLOT_RESPONSE=$(curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" -X POST "$BACKEND_URL/api/admin/ota/assign-slot" \
+  SLOT_RESPONSE=$(auth_curl -X POST "$BACKEND_URL/api/admin/ota/assign-slot" \
     -H "Content-Type: application/json" \
     -d "{\"releaseId\":\"$RELEASE_ID\",\"slot\":\"stable\"}")
   SLOT_OK=$(echo "$SLOT_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { const j=JSON.parse(d); process.stdout.write(j.ok ? '1' : ''); } catch { process.stdout.write(''); } })" 2>/dev/null || true)
@@ -800,14 +962,21 @@ case "$COMMAND" in
   rollback)
     do_rollback_cmd
     ;;
+  setup-token)
+    do_setup_token
+    ;;
+  revoke-token)
+    do_revoke_token
+    ;;
   -h|--help|help)
     usage
     ;;
   *)
     # Modalità legacy: $1 è il messaggio di release → esegui entrambi gli stage.
-    # Valida le credenziali admin PRIMA di toccare qualsiasi file, per preservare
-    # l'atomicità del single-shot (originale: nessuna mutazione se mancano creds).
-    require_admin_creds
+    # Non richiede credenziali admin se esiste .local/ota-token.
+    if [ ! -f "$OTA_TOKEN_FILE" ]; then
+      require_admin_creds
+    fi
     do_export "$COMMAND"
     do_publish
     ;;

@@ -1776,3 +1776,22 @@ export const segmentTelemetry = pgTable("segment_telemetry", {
 
 export type SegmentTelemetry = typeof segmentTelemetry.$inferSelect;
 export type InsertSegmentTelemetry = typeof segmentTelemetry.$inferInsert;
+
+// ── OTA PUBLISH TOKENS (Task #1770) ─────────────────────────────────────────
+// Token dedicati per l'autenticazione dello script publish-ota.sh.
+// Il token grezzo non viene mai salvato: solo il suo sha256 è in DB.
+// Il token viene generato una volta sola e salvato in .local/ota-token (chmod 600).
+export const otaPublishTokens = pgTable("ota_publish_tokens", {
+  id: serial("id").primaryKey(),
+  tokenHash: text("token_hash").notNull().unique(),
+  label: varchar("label", { length: 100 }).notNull().default("default"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at"),
+  lastUsedAt: timestamp("last_used_at"),
+  revoked: boolean("revoked").notNull().default(false),
+}, (table) => [
+  index("ota_publish_tokens_hash_idx").on(table.tokenHash),
+]);
+
+export type OtaPublishToken = typeof otaPublishTokens.$inferSelect;
+export type InsertOtaPublishToken = typeof otaPublishTokens.$inferInsert;

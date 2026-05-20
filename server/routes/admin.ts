@@ -1,6 +1,7 @@
 import express, { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
 import multer from "multer";
+import crypto from "crypto";
 import { haversineKm } from "../geo";
 import fs from "fs";
 import path from "path";
@@ -10,7 +11,7 @@ import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "
 import { storage } from "../storage";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats, siteVisits, rideTelemetry, routes } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats, siteVisits, rideTelemetry, routes, otaPublishTokens } from "@shared/schema";
 import { DEFAULT_PREFS } from "./match-preferences";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, notInArray, lte, isNull, or, ilike } from "drizzle-orm";
@@ -229,6 +230,12 @@ async function assignFakeUserToClubs(userId: string): Promise<ClubAssignStats> {
 }
 
 function requireAdmin(req: Request, res: Response, next: Function) {
+  // Task #1770: se la richiesta è già stata autenticata via OTA token
+  // (per i tre endpoint di publish), bypassa il controllo sessione.
+  if ((req as any).otaTokenAuthenticated === true) {
+    return next();
+  }
+
   const path = req.originalUrl || req.url;
   // Ultimi 6 char del sessionId per la diagnostica (no PII, no leak completo).
   const sid = req.sessionID ? `…${req.sessionID.slice(-6)}` : "none";
@@ -259,6 +266,67 @@ function requireAdmin(req: Request, res: Response, next: Function) {
     return res.status(500).json({ message: "Errore autenticazione admin", reason: "db-error" });
   });
 }
+
+// Task #1770 — OTA token middleware: valida Bearer token per i 3 endpoint di publish.
+// Viene applicato PRIMA di router.use(requireAdmin) per i soli path OTA di scrittura.
+// Se il token è valido, imposta req.otaTokenAuthenticated = true; requireAdmin lo rispetta.
+const OTA_PUBLISH_PATHS: Array<RegExp | string> = [
+  // POST /ota  (create release)
+  /^\/ota\/?$/,
+  // POST /ota/:id/publish
+  /^\/ota\/[^/]+\/publish\/?$/,
+  // POST /ota/assign-slot
+  /^\/ota\/assign-slot\/?$/,
+];
+
+function matchOtaPublishPath(method: string, url: string): boolean {
+  if (method !== "POST") return false;
+  const pathname = url.split("?")[0];
+  return OTA_PUBLISH_PATHS.some((p) =>
+    typeof p === "string" ? pathname === p : p.test(pathname)
+  );
+}
+
+async function checkOtaTokenMiddleware(req: Request, _res: Response, next: Function) {
+  try {
+    if (!matchOtaPublishPath(req.method, req.url)) return next();
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) return next();
+    const rawToken = authHeader.substring(7).trim();
+    if (!rawToken) return next();
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const now = new Date();
+    const rows = await db
+      .select({ id: otaPublishTokens.id })
+      .from(otaPublishTokens)
+      .where(
+        and(
+          eq(otaPublishTokens.tokenHash, tokenHash),
+          eq(otaPublishTokens.revoked, false),
+          or(
+            isNull(otaPublishTokens.expiresAt),
+            sql`${otaPublishTokens.expiresAt} > ${now}`
+          )
+        )
+      )
+      .limit(1);
+    if (rows.length > 0) {
+      (req as any).otaTokenAuthenticated = true;
+      (req as any).otaTokenId = rows[0].id;
+      // Aggiorna last_used_at in background (best-effort)
+      db.update(otaPublishTokens)
+        .set({ lastUsedAt: now })
+        .where(eq(otaPublishTokens.id, rows[0].id))
+        .catch((e: unknown) => console.warn("[OTA-TOKEN] last_used_at update failed:", e));
+    }
+  } catch (e) {
+    console.error("[OTA-TOKEN] checkOtaTokenMiddleware error:", e);
+  }
+  next();
+}
+
+// Registra il middleware OTA token PRIMA del gate requireAdmin globale
+router.use(checkOtaTokenMiddleware as any);
 
 // Retention massima righe ota_events — usato come limite per la query admin
 // di visualizzazione. Il cleanup hard è gestito da Phase 12.5 in server/index.ts
@@ -5040,6 +5108,74 @@ router.get("/ota", async (_req: Request, res: Response) => {
   }
 });
 
+// ── OTA Publish Token management (Task #1770) ──────────────────────────────
+// Tutti e tre gli endpoint richiedono sessione admin (requireAdmin globale).
+// Il token generato viene restituito in plaintext UNA SOLA VOLTA.
+
+// POST /api/admin/ota/token — genera un nuovo token OTA
+router.post("/ota/token", async (req: Request, res: Response) => {
+  try {
+    const label = typeof req.body?.label === "string" ? req.body.label.substring(0, 100) : "default";
+    const expiresInDays = typeof req.body?.expiresInDays === "number" ? req.body.expiresInDays : 365;
+    const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const [row] = await db.insert(otaPublishTokens).values({
+      tokenHash,
+      label,
+      expiresAt,
+    }).returning({
+      id: otaPublishTokens.id,
+      label: otaPublishTokens.label,
+      createdAt: otaPublishTokens.createdAt,
+      expiresAt: otaPublishTokens.expiresAt,
+    });
+    // Restituisce il token in chiaro UNA SOLA VOLTA — non viene mai risalvato
+    return res.status(201).json({ ...row, token: rawToken });
+  } catch (err) {
+    console.error("[OTA-TOKEN] generate error:", err);
+    return res.status(500).json({ message: "Errore generazione token" });
+  }
+});
+
+// GET /api/admin/ota/tokens — lista token (senza hash, senza plaintext)
+router.get("/ota/tokens", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        id: otaPublishTokens.id,
+        label: otaPublishTokens.label,
+        createdAt: otaPublishTokens.createdAt,
+        expiresAt: otaPublishTokens.expiresAt,
+        lastUsedAt: otaPublishTokens.lastUsedAt,
+        revoked: otaPublishTokens.revoked,
+      })
+      .from(otaPublishTokens)
+      .orderBy(desc(otaPublishTokens.createdAt));
+    return res.json(rows);
+  } catch (err) {
+    console.error("[OTA-TOKEN] list error:", err);
+    return res.status(500).json({ message: "Errore lista token" });
+  }
+});
+
+// DELETE /api/admin/ota/token/:id — revoca token
+router.delete("/ota/token/:id", async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: "id non valido" });
+    const [updated] = await db
+      .update(otaPublishTokens)
+      .set({ revoked: true })
+      .where(eq(otaPublishTokens.id, id))
+      .returning({ id: otaPublishTokens.id });
+    if (!updated) return res.status(404).json({ message: "Token non trovato" });
+    return res.json({ ok: true, id: updated.id });
+  } catch (err) {
+    console.error("[OTA-TOKEN] revoke error:", err);
+    return res.status(500).json({ message: "Errore revoca token" });
+  }
+});
 
 const TRANSLATIONS_STAGING: {
   keyMap: Record<string, { position: string; it: string }>;
