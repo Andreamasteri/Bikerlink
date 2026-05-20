@@ -55,6 +55,9 @@ static-build/
 # OTA build artifacts (rimossi da cleanup trap in publish-ota.sh)
 dist-ota/
 
+# OTA publish token (generato da 'bash scripts/publish-ota.sh setup-token', mai committare)
+.local/ota-token
+
 # Compiled server
 server_dist/
 server_dist/index.js
