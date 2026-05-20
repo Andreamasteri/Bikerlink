@@ -47,12 +47,6 @@ import LeafletPickerMap from "@/components/LeafletPickerMap";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 import { MATCH_PREF_ITEMS, DEFAULT_MATCH_PREFS, type MatchPrefsPayload } from "@/lib/match-pref-items";
-import {
-  MountAxisCalibration,
-  MountCalibWizard,
-  loadMountCalibration,
-  clearMountCalibration,
-} from "@/components/MountCalibWizard";
 
 
 interface ProfileData {
@@ -147,8 +141,6 @@ export default function ProfileScreen() {
   const { timeFormat, speedUnit, distanceUnit, setTimeFormat, setSpeedUnit, setDistanceUnit, applyCountryDefault } = useUnits();
   const [unitsExpanded, setUnitsExpanded] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [mountCalib, setMountCalib] = useState<MountAxisCalibration | null>(null);
-  const [showMountCalibWizard, setShowMountCalibWizard] = useState(false);
   const [isDownloadingManual, setIsDownloadingManual] = useState(false);
   const [isDownloadingEula, setIsDownloadingEula] = useState(false);
   const [isDownloadingPrivacy, setIsDownloadingPrivacy] = useState(false);
@@ -163,10 +155,6 @@ export default function ProfileScreen() {
     AsyncStorage.getItem(PUSH_NOTIFICATIONS_ENABLED_KEY).then((val) => {
       setPushNotificationsEnabled(val === null ? true : val === "true");
     }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    loadMountCalibration().then(setMountCalib).catch(() => {});
   }, []);
 
   const togglePushNotifications = useCallback(async (next: boolean) => {
@@ -1486,15 +1474,6 @@ export default function ProfileScreen() {
       <View style={{ height: 40 }} />
     </ScrollView>
 
-    {showMountCalibWizard && (
-      <MountCalibWizard
-        onComplete={(calib) => {
-          setMountCalib(calib);
-          setShowMountCalibWizard(false);
-        }}
-        onDismiss={() => setShowMountCalibWizard(false)}
-      />
-    )}
     </View>
   );
 }
