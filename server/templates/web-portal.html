@@ -1334,6 +1334,7 @@ async function renderArea() {
 }
 
 function getWebAppUrl() {
+  if (window.EXPO_WEB_URL) return window.EXPO_WEB_URL;
   const proto = window.location.protocol;
   const host = window.location.hostname;
   const port = window.location.port;

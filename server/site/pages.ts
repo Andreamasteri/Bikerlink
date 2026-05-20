@@ -273,7 +273,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
         Scarica l'app
       </a>
       <a class="btn-ghost" href="/features">Scopri le funzionalità</a>
-      <a class="btn-ghost" href="/accedi">
+      <a class="btn-ghost" href="${process.env.EXPO_WEB_URL || '/accedi'}">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
         Apri Web App
       </a>

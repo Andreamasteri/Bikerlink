@@ -331,13 +331,24 @@ function configureExpoAndLanding(app: express.Application) {
   // ── Web Portal SPA routes ────────────────────────────────────────────────
   // Serve the web portal HTML at specific SPA routes.
   // The client-side JS handles routing internally.
+  // We inject window.EXPO_WEB_URL so the portal can build the correct Expo
+  // web app link in both dev (port heuristic) and production (subdomain URL).
   const webPortalPath = path.resolve(process.cwd(), "server", "templates", "web-portal.html");
+  let webPortalHtml: string | null = null;
+  function getWebPortalHtml(): string {
+    if (!webPortalHtml) {
+      webPortalHtml = require("fs").readFileSync(webPortalPath, "utf8");
+    }
+    const expoWebUrl = process.env.EXPO_WEB_URL || "";
+    const injection = `<script>window.EXPO_WEB_URL=${JSON.stringify(expoWebUrl)};</script>`;
+    return webPortalHtml.replace("</head>", `${injection}\n</head>`);
+  }
   const webPortalRoutes = ["/registrati", "/accedi", "/area-utente", "/media", "/admin/media", "/admin/settings"];
   for (const route of webPortalRoutes) {
     app.get(route, (_req: Request, res: Response) => {
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("Cache-Control", "no-store");
-      res.sendFile(webPortalPath);
+      res.send(getWebPortalHtml());
     });
   }
 
