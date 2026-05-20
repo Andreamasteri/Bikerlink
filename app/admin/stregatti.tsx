@@ -195,17 +195,29 @@ export default function FakeUsersAdmin() {
     mutationFn: async ({ enabled, adminPassword }: { enabled: boolean; adminPassword: string }) => {
       const baseUrl = getApiUrl();
       const url = new URL("/api/admin/stregatti/toggle-all", baseUrl);
-      const res = await fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled, adminPassword }),
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
-        throw new Error(err.message);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      try {
+        const res = await fetch(url.toString(), {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled, adminPassword }),
+          credentials: "include",
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ message: "Errore" }));
+          throw new Error(err.message);
+        }
+        return res.json();
+      } catch (err: any) {
+        if (err.name === "AbortError") {
+          throw new Error("La richiesta ha impiegato troppo tempo. Riprova.");
+        }
+        throw err;
+      } finally {
+        clearTimeout(timeoutId);
       }
-      return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });

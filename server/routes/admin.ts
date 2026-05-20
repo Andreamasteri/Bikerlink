@@ -3317,17 +3317,27 @@ router.put("/stregatti/toggle-all", async (req: Request, res: Response) => {
     }
     const { db } = await import("../db");
     const { users: usersTable, userProfiles } = await import("../../shared/schema");
-    const { eq } = await import("drizzle-orm");
+    const { eq, and, isNull, sql } = await import("drizzle-orm");
     await storage.upsertAppSetting("fake_users_enabled", enabled ? "true" : "false");
-    const fakeUsers = await db.select().from(usersTable).where(eq(usersTable.isFake, true));
     const newLoginAt = enabled ? new Date() : new Date("2020-01-01");
-    for (const fakeUser of fakeUsers) {
-      await db.update(userProfiles).set({ isAvailable: enabled }).where(eq(userProfiles.userId, fakeUser.id));
-      const userUpdate: Record<string, unknown> = { lastLoginAt: newLoginAt };
-      if (enabled && !fakeUser.country) userUpdate.country = "IT";
-      await db.update(usersTable).set(userUpdate as any).where(eq(usersTable.id, fakeUser.id));
+    await db.update(userProfiles)
+      .set({ isAvailable: enabled })
+      .where(
+        sql`${userProfiles.userId} IN (SELECT id FROM users WHERE is_fake = true)`
+      );
+    await db.update(usersTable)
+      .set({ lastLoginAt: newLoginAt })
+      .where(eq(usersTable.isFake, true));
+    if (enabled) {
+      await db.update(usersTable)
+        .set({ country: "IT" })
+        .where(and(eq(usersTable.isFake, true), isNull(usersTable.country)));
     }
-    return res.json({ message: `Tutti gli stregatti sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: fakeUsers.length });
+    const [{ count }] = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(usersTable)
+      .where(eq(usersTable.isFake, true));
+    return res.json({ message: `Tutti gli stregatti sono stati ${enabled ? "abilitati" : "disabilitati"}`, count: Number(count) });
   } catch (error) {
     console.error("Admin toggle all stregatti error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
