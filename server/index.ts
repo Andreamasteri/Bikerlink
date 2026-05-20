@@ -263,7 +263,7 @@ function configureExpoAndLanding(app: express.Application) {
 
     // Task #1520: when no expo-platform header is present, fall through to
     // registerSiteRoutes() which serves the new multi-page marketing site.
-    // The old monolithic landing-page.html is no longer used as the home.
+    // Home page is served by server/site/pages.ts :: buildHome().
     next();
   });
 

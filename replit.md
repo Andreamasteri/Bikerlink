@@ -57,6 +57,7 @@ BikerLink utilizes a modern full-stack architecture.
 
 **Backend:**
 - Built with Express 5 and TypeScript, running on port 5000.
+- **Home page source of truth**: `server/site/pages.ts :: buildHome()` (registered via `server/site/routes.ts`). The old `server/templates/landing-page.html` has been deleted (Task #1537).
 - PostgreSQL is used as the database, managed with Drizzle ORM.
 - Replit Object Storage is utilized for user photos and backup services.
 - The API provides endpoints for authentication, user management, motorcycle CRUD, ride proposals, chat, emergency SOS, GPS tracking, photo contests, Syneco workshops, advertising, notifications, reports, and administrative functions.
