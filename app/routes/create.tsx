@@ -286,22 +286,35 @@ export default function CreateRouteScreen() {
 
   // Curvature map
   const tileConfig = useMemo(() => getTileConfig(), []);
-  const curvatureMapHtml = useMemo(() => buildPlannerMapHtml(
-    tileConfig.url,
-    tileConfig.maxZoom,
-    Colors.accent,
-    waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })),
-    waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })),
-    null,
-  ), []);
+  const [curvatureMapHtml, setCurvatureMapHtml] = useState<string>("");
+  const curvatureMapMountedRef = useRef(false);
 
   useEffect(() => {
-    if (!webviewRef.current || waypoints.length < 2) return;
-    const pts = JSON.stringify(waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })));
-    const wps = JSON.stringify(waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })));
-    const js = `(function(){ if(typeof window.updateRouteWithCurvature==='function'){ window.updateRouteWithCurvature(${pts}, true); } if(typeof window.setWaypoints==='function'){ window.setWaypoints(${wps}); } })(); true;`;
-    webviewRef.current.injectJavaScript(js);
-  }, [waypoints]);
+    if (waypoints.length < 2) {
+      curvatureMapMountedRef.current = false;
+      return;
+    }
+
+    if (!curvatureMapMountedRef.current) {
+      // First time the map becomes visible: bake current waypoints into the HTML
+      curvatureMapMountedRef.current = true;
+      setCurvatureMapHtml(buildPlannerMapHtml(
+        tileConfig.url,
+        tileConfig.maxZoom,
+        Colors.accent,
+        waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })),
+        waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })),
+        null,
+      ));
+    } else {
+      // Already mounted: update markers and polyline via JS injection (no reload/flicker)
+      if (!webviewRef.current) return;
+      const pts = JSON.stringify(waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })));
+      const wps = JSON.stringify(waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })));
+      const js = `(function(){ if(typeof window.updateWaypoints==='function'){ window.updateWaypoints(${wps}, ${pts}); } })(); true;`;
+      webviewRef.current.injectJavaScript(js);
+    }
+  }, [waypoints, tileConfig]);
 
   return (
     <View style={[styles.container]}>
@@ -344,7 +357,7 @@ export default function CreateRouteScreen() {
 
 
         {/* Curvature map — shown when there are at least 2 waypoints */}
-        {waypoints.length >= 2 && (
+        {waypoints.length >= 2 && curvatureMapHtml !== "" && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Anteprima percorso (curvatura)</Text>
             <View style={{ height: 200, borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: Colors.border }}>
