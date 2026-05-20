@@ -2044,25 +2044,50 @@ export default function AdminSettings() {
             const selectedCount = continent.countries.filter((c) => matchingCountries.includes(c.code)).length;
             return (
               <View key={continent.key} style={styles.continentBlock}>
-                <TouchableOpacity
-                  style={styles.continentHeader}
-                  onPress={() => toggleContinent(continent.key)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.continentLabel}>{continent.label}</Text>
-                  <View style={styles.continentHeaderRight}>
-                    {selectedCount > 0 && (
-                      <View style={styles.continentBadge}>
-                        <Text style={styles.continentBadgeText}>{selectedCount}</Text>
-                      </View>
-                    )}
-                    <Ionicons
-                      name={isExpanded ? "chevron-up" : "chevron-down"}
-                      size={16}
-                      color={Colors.textSecondary}
-                    />
-                  </View>
-                </TouchableOpacity>
+                <View style={styles.continentHeader}>
+                  <TouchableOpacity
+                    style={styles.continentHeaderLeft}
+                    onPress={() => toggleContinent(continent.key)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.continentLabel}>{continent.label}</Text>
+                    <View style={styles.continentHeaderRight}>
+                      {selectedCount > 0 && (
+                        <View style={styles.continentBadge}>
+                          <Text style={styles.continentBadgeText}>{selectedCount}</Text>
+                        </View>
+                      )}
+                      <Ionicons
+                        name={isExpanded ? "chevron-up" : "chevron-down"}
+                        size={16}
+                        color={Colors.textSecondary}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.continentSelectAllBtn}
+                    onPress={() => {
+                      const allCodes = continent.countries.map((c) => c.code);
+                      const allSelected = allCodes.every((code) => matchingCountries.includes(code));
+                      if (allSelected) {
+                        setMatchingCountries((prev) => prev.filter((code) => !allCodes.includes(code)));
+                      } else {
+                        setMatchingCountries((prev) => {
+                          const existing = new Set(prev);
+                          allCodes.forEach((code) => existing.add(code));
+                          return Array.from(existing);
+                        });
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.continentSelectAllText}>
+                      {continent.countries.every((c) => matchingCountries.includes(c.code))
+                        ? "Deseleziona tutti"
+                        : "Seleziona tutti"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 {isExpanded && (
                   <View style={styles.continentCountries}>
                     {continent.countries.map((c) => {
@@ -3927,10 +3952,29 @@ const styles = StyleSheet.create({
   continentHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 12,
     paddingVertical: 10,
     backgroundColor: Colors.card,
+    gap: 8,
+  },
+  continentHeaderLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  continentSelectAllBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.accent + "66",
+    backgroundColor: Colors.accent + "14",
+  },
+  continentSelectAllText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: Colors.accent,
   },
   continentLabel: {
     fontFamily: "Inter_600SemiBold",
