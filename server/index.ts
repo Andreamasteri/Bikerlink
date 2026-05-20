@@ -1993,6 +1993,47 @@ function setupErrorHandler(app: express.Application) {
           console.log(`[INIT] Phase 12.5 ota_events cleanup scheduled (1min delay, then every 6h, retention=${OTA_EVENTS_RETENTION})`);
         }
 
+        // Phase 12.6 — ota_stuck_events periodic cleanup every 6h
+        // Hard retention: keeps at most OTA_STUCK_EVENTS_RETENTION rows (env var, default 500).
+        // Also removes records older than 90 days regardless of row count.
+        // Runs once at startup (1-min delay) then every 6h.
+        {
+          const _rawStuckRetention = parseInt(process.env.OTA_STUCK_EVENTS_RETENTION ?? "500", 10);
+          const OTA_STUCK_EVENTS_RETENTION = Number.isFinite(_rawStuckRetention) && _rawStuckRetention >= 1
+            ? _rawStuckRetention
+            : 500;
+          if (_rawStuckRetention !== OTA_STUCK_EVENTS_RETENTION) {
+            console.warn(`[OTA-STUCK-CLEANUP] OTA_STUCK_EVENTS_RETENTION env var is invalid ("${process.env.OTA_STUCK_EVENTS_RETENTION}") — falling back to 500.`);
+          }
+          const SIX_HOURS_MS_STUCK = 6 * 60 * 60 * 1000;
+          const runOtaStuckEventsCleanup = async () => {
+            try {
+              const result = await db.execute(sql`
+                DELETE FROM ota_stuck_events
+                WHERE id IN (
+                  SELECT id FROM ota_stuck_events
+                  ORDER BY created_at DESC
+                  OFFSET ${OTA_STUCK_EVENTS_RETENTION}
+                ) OR created_at < NOW() - INTERVAL '90 days'
+                RETURNING id
+              `);
+              const count = result.rowCount ?? 0;
+              if (count > 0) {
+                console.log(`[OTA-STUCK-CLEANUP] Removed ${count} old ota_stuck_events record(s) (retention=${OTA_STUCK_EVENTS_RETENTION}).`);
+              } else {
+                console.log(`[OTA-STUCK-CLEANUP] No old ota_stuck_events to remove (retention=${OTA_STUCK_EVENTS_RETENTION}).`);
+              }
+            } catch (err) {
+              console.warn("[OTA-STUCK-CLEANUP] Periodic cleanup error:", err);
+            }
+          };
+          setTimeout(() => {
+            runOtaStuckEventsCleanup();
+            setInterval(runOtaStuckEventsCleanup, SIX_HOURS_MS_STUCK);
+          }, 60 * 1000);
+          console.log(`[INIT] Phase 12.6 ota_stuck_events cleanup scheduled (1min delay, then every 6h, retention=${OTA_STUCK_EVENTS_RETENTION})`);
+        }
+
         // Phase 13 — schema snapshot (non-blocking, fire-and-forget)
         // Captures a fresh snapshot of the DB schema after all migrations have run.
         // Used by the match-health skill to detect structural changes between deploys.
