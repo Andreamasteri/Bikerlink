@@ -360,6 +360,17 @@
           <p>La mappa si caricherà dopo la geocodifica dei waypoint</p>
         </div>
         <div id="route-map" style="display:none"></div>
+        <div id="route-stats" style="display:none;padding:10px 14px;background:var(--surface2);border-top:1px solid var(--border);gap:24px;align-items:center;flex-wrap:wrap;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3)">Distanza</span>
+            <span id="stat-distance" style="font-size:14px;font-weight:700;color:var(--accent)">—</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3)">Durata</span>
+            <span id="stat-duration" style="font-size:14px;font-weight:700;color:var(--text)">—</span>
+          </div>
+          <span id="stat-note" style="font-size:11px;color:var(--text3);margin-left:auto"></span>
+        </div>
       </div>
     </div>
 
@@ -627,7 +638,53 @@ async function geocodeAndDrawMap(parsed) {
   }
 
   initMap();
-  drawMapPoints(coords);
+
+  // Try to get the real road route from GraphHopper
+  let routePoints = null;
+  let distanceKm = null;
+  let durationMinutes = null;
+
+  if (coords.length >= 2) {
+    setBadge('map-badge', 'Calcolo percorso...', true);
+    try {
+      const calcRes = await fetch('/api/planned-routes/calculate', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          waypoints: coords.map(c => ({ lat: c.lat, lng: c.lng })),
+          style: parsed.style || 'curvy',
+          avoidHighways: !!parsed.avoidHighways,
+          isRoundTrip: !!parsed.isRoundTrip,
+        }),
+      });
+      if (calcRes.ok) {
+        const calcData = await calcRes.json();
+        if (calcData.rawPoints && calcData.rawPoints.length > 1) {
+          routePoints = calcData.rawPoints;
+          distanceKm = calcData.distanceKm;
+          durationMinutes = calcData.durationMinutes;
+        }
+      }
+    } catch { /* fall through to straight-line */ }
+  }
+
+  drawMapPoints(coords, routePoints);
+
+  // Show stats if we got real route data
+  const statsEl = document.getElementById('route-stats');
+  if (distanceKm !== null && durationMinutes !== null) {
+    const hours = Math.floor(durationMinutes / 60);
+    const mins = durationMinutes % 60;
+    const durationStr = hours > 0 ? `${hours}h ${mins}min` : `${mins} min`;
+    document.getElementById('stat-distance').textContent = distanceKm + ' km';
+    document.getElementById('stat-duration').textContent = durationStr;
+    document.getElementById('stat-note').textContent = 'Percorso su strade reali';
+    statsEl.style.display = 'flex';
+  } else {
+    statsEl.style.display = 'none';
+  }
+
   setBadge('map-badge', coords.length + ' tappe', false);
 }
 
@@ -649,7 +706,7 @@ function initMap() {
   }
 }
 
-function drawMapPoints(coords) {
+function drawMapPoints(coords, routePoints) {
   if (!leafletMap || coords.length === 0) return;
 
   const group = L.layerGroup();
@@ -670,9 +727,17 @@ function drawMapPoints(coords) {
   });
 
   if (coords.length > 1) {
-    const latlngs = coords.map(c => [c.lat, c.lng]);
-    const polyline = L.polyline(latlngs, { color: '#FF6600', weight: 3, opacity: 0.8, dashArray: '8 6' });
-    group.addLayer(polyline);
+    if (routePoints && routePoints.length > 1) {
+      // Draw real road route from GraphHopper
+      const latlngs = routePoints.map(p => [p.lat, p.lng]);
+      const polyline = L.polyline(latlngs, { color: '#FF6600', weight: 4, opacity: 0.9 });
+      group.addLayer(polyline);
+    } else {
+      // Fallback: straight-line dashed polyline between waypoints
+      const latlngs = coords.map(c => [c.lat, c.lng]);
+      const polyline = L.polyline(latlngs, { color: '#FF6600', weight: 3, opacity: 0.6, dashArray: '8 6' });
+      group.addLayer(polyline);
+    }
   }
 
   markerLayer = group.addTo(leafletMap);
@@ -757,6 +822,7 @@ function resetPlanner() {
   if (leafletMap && routeLayer) { leafletMap.removeLayer(routeLayer); routeLayer = null; }
   document.getElementById('route-map').style.display = 'none';
   document.getElementById('map-placeholder').style.display = 'flex';
+  document.getElementById('route-stats').style.display = 'none';
 }
 
 function resetPanels() {
@@ -767,6 +833,7 @@ function resetPanels() {
   if (leafletMap && markerLayer) { leafletMap.removeLayer(markerLayer); markerLayer = null; }
   document.getElementById('route-map').style.display = 'none';
   document.getElementById('map-placeholder').style.display = 'flex';
+  document.getElementById('route-stats').style.display = 'none';
 }
 
 function setBadge(id, text, pulse) {
