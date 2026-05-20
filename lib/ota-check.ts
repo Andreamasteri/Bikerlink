@@ -296,12 +296,25 @@ export async function triggerOtaCheck(
     phase = "fetch";
     const fetched = await Updates.fetchUpdateAsync();
     if (!fetched.isNew) {
+      // L'update era già stato scaricato in una sessione precedente ma reloadAsync
+      // non è mai stato chiamato (es. app chiusa di forza prima del backgrounding).
+      // Il bundle è pronto: lo applichiamo adesso con la stessa logica del ramo normale.
       consecutiveFailures = 0;
-      reportOtaEvent({ phase: "fetch-not-new", source, currentUpdateId, runtimeVersion });
-      const r: OtaManualResult = { ok: true, phase: "fetch-not-new" };
-      _emitOtaResult(r);
       probePromise.catch(() => {});
       networkInfoPromise.catch(() => {});
+      reportOtaEvent({ phase: "fetch-not-new", source, currentUpdateId, runtimeVersion });
+      const appIsActive = AppState.currentState === "active";
+      if (options?.immediateReload || !appIsActive) {
+        phase = "reload";
+        await Updates.reloadAsync();
+        const r: OtaManualResult = { ok: true, phase: "reload" };
+        _emitOtaResult(r);
+        return r;
+      }
+      _pendingReload = true;
+      _scheduleReloadOnBackground();
+      const r: OtaManualResult = { ok: true, phase: "fetch-not-new" };
+      _emitOtaResult(r);
       return r;
     }
 
