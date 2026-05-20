@@ -26,6 +26,7 @@ import { rideTelemetry, segmentTelemetry } from "@shared/schema";
 import { eq, sql, and } from "drizzle-orm";
 import { mapMatch, isSelfHosted, GHPoint } from "./graphhopper-client";
 import { storage } from "./storage";
+import { haversineKm } from "./geo";
 
 const LAST_RUN_KEY = "map_matching_last_run";
 const JOB_RUNNING_KEY = "map_matching_job_running";
@@ -34,20 +35,6 @@ let isRunning = false;
 
 export function isMapMatchingRunning(): boolean {
   return isRunning;
-}
-
-// ─── Haversine distance helper ─────────────────────────────────────────────────
-
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
 }
 
 // ─── Core job logic ────────────────────────────────────────────────────────────

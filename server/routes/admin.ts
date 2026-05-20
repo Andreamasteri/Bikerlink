@@ -1,6 +1,7 @@
 import express, { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
 import multer from "multer";
+import { haversineKm } from "../geo";
 import fs from "fs";
 import path from "path";
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, ShadingType, AlignmentType, TextRun, HeightRule } from "docx";
@@ -6455,17 +6456,9 @@ router.get("/match-health", requireAdmin, async (req: Request, res: Response) =>
         LIMIT 5
       `);
 
-      const haversine = (lat1: number, lng1: number, lat2: number, lng2: number) => {
-        const R = 6371;
-        const dLat = ((lat2 - lat1) * Math.PI) / 180;
-        const dLng = ((lng2 - lng1) * Math.PI) / 180;
-        const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      };
-
       const distances = sampleRes.rows
         .filter(r => r.b1lat != null && r.b1lng != null && r.b2lat != null && r.b2lng != null)
-        .map(r => Math.round(haversine(r.b1lat!, r.b1lng!, r.b2lat!, r.b2lng!)));
+        .map(r => Math.round(haversineKm(r.b1lat!, r.b1lng!, r.b2lat!, r.b2lng!)));
 
       const distanceCheck = {
         status: sampleRes.rows.length === 0 ? "WARN" : distances.every(d => d > 0) ? "OK" : "WARN",
@@ -6552,14 +6545,6 @@ router.put("/match-settings", async (req: Request, res: Response) => {
 });
 
 // ── MATCH INSPECTOR ───────────────────────────────────────────────────────────
-
-function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 function classifyBBBrand(brand: string): string {
   if (brand.startsWith("tipo_zav:")) return "bikerZavarrinaTypeStyle";
