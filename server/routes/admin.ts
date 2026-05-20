@@ -6567,15 +6567,6 @@ router.get("/match-health", requireAdmin, async (req: Request, res: Response) =>
   }
 });
 
-// PUT /api/admin/match-settings — DEPRECATO
-// Usare PUT /api/admin/settings/match_preferences_visible (con log moderatore)
-router.put("/match-settings", (_req: Request, res: Response) => {
-  return res.status(410).json({
-    message:
-      "Endpoint deprecato. Usare PUT /api/admin/settings/match_preferences_visible",
-  });
-});
-
 // ── MATCH INSPECTOR ───────────────────────────────────────────────────────────
 
 function classifyBBBrand(brand: string): string {
