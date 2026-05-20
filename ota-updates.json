@@ -1146,7 +1146,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-20T22:36:52.213Z"
+  },
+  {
+    "updateNumber": 11,
+    "version": "47.11.9",
+    "cycle": "9.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-11 rv9.0.0: OTA-11: telemetria 1000km + giri ideali collassabili + rimosso testo debug dal profilo",
+    "note": "CURRENT_OTA_NUMBER=11. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "9.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "ff9b0c47-ab10-4fbf-9da3-f433b8992c6b",
+    "bundleUrl": "private/ota/ota-47.11.9-1779319761251.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "c301d0289ed7508d43426958cb37dd5ee73945e9",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-20T23:29:25.685Z"
   }
 ]

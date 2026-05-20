@@ -59,7 +59,7 @@ bash scripts/build-apk.sh production   # AAB Play Store
 - **Runtime Version**: `9.0.0` (ciclo corrente, APK v46) ← CICLO 9.x
 - **APK corrente**: versionCode **46**, versionName **46.29.9**
 - **APK precedente (STABILE distribuita)**: versionCode 45, versionName 3.4.0 (buildId: `91cfde53-66e7-45fc-83f0-d7f72a98fcde`, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk)
-- **OTA corrente**: OTA-10 (ciclo 9.x attivo, rv 9.0.0, v47.10.9, releaseId: `aa1ba7bb-88ae-40d0-91ff-c7106d8a9de7`, slot: stable)
+- **OTA corrente**: OTA-11 (ciclo 9.x attivo, rv 9.0.0, v47.11.9, releaseId: `ff9b0c47-ab10-4fbf-9da3-f433b8992c6b`, slot: stable)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -298,7 +298,8 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
 - **Ciclo 9.x: OTA 1+ (rv 9.0.0) ← CORRENTE**
   - APK v46 (46.29.9): versionCode 46, runtimeVersion 9.0.0
   - OTA-9 (v47.9.9): fix token auth backend (`req.session.userId ?? null`), releaseId: `dddb488c`
-  - OTA-10 (v47.10.9): fix aggiornamento automatico — ramo `fetch-not-new` ora chiama `reloadAsync()`, releaseId: `aa1ba7bb` ← **CORRENTE**
+  - OTA-10 (v47.10.9): fix aggiornamento automatico — ramo `fetch-not-new` ora chiama `reloadAsync()`, releaseId: `aa1ba7bb`
+  - OTA-11 (v47.11.9): telemetria target 1000km + giri ideali collassabili + rimosso testo debug profilo, releaseId: `ff9b0c47` ← **CORRENTE**
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
