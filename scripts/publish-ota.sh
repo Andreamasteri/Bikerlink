@@ -74,8 +74,13 @@ EOF
 }
 
 require_admin_creds() {
+  # Se esiste un token OTA valido, le credenziali non sono necessarie
+  if [ -f "$OTA_TOKEN_FILE" ] && [ -s "$OTA_TOKEN_FILE" ]; then
+    return 0
+  fi
   if [ -z "$ADMIN_EMAIL" ] || [ -z "$ADMIN_PASSWORD" ]; then
     echo "Errore: imposta BIKERLINK_ADMIN_EMAIL e BIKERLINK_ADMIN_PASSWORD"
+    echo "  oppure genera un token con: bash $0 setup-token"
     exit 1
   fi
 }
