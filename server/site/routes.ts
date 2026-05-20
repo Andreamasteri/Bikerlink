@@ -86,6 +86,7 @@ const COUNTRY_GEO: Record<string, { name: string; lat: number; lon: number }> = 
   BR: { name: "Brasile", lat: -14.2, lon: -51.9 },
   AU: { name: "Australia", lat: -25.3, lon: 133.8 },
   JP: { name: "Giappone", lat: 36.2, lon: 138.3 },
+  EC: { name: "Ecuador", lat: -1.8, lon: -78.2 },
 };
 
 // Cache for community stats (recomputed every 5 min).
