@@ -409,6 +409,15 @@ function SensorOverlayPanel({
             {currentTiltDeg.toFixed(1)}°
           </Text>
           <Text style={s.sensorOverlayLabel}>{t("tracking.tiltLive")}</Text>
+          {/* Tilt arc gauge — mirrors the same ±2° dead-band as the text color */}
+          <View style={{ width: 44, height: 4, backgroundColor: colors.border, borderRadius: 2, marginTop: 4, overflow: "hidden" as const }}>
+            <View style={{
+              width: Math.min(Math.abs(currentTiltDeg) / 60, 1) * 44,
+              height: 4,
+              backgroundColor: currentTiltDeg < -2 ? colors.accentRed : currentTiltDeg > 2 ? colors.success : colors.accent,
+              borderRadius: 2,
+            }} />
+          </View>
         </View>
         <View style={s.sensorOverlaySep} />
         <View style={s.sensorOverlayItem}>
