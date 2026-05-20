@@ -243,6 +243,11 @@ export default function GiriCreateScreen() {
 
   const isApproxRoute = !!routeResult && (!!routeResult.approximate || !routeResult.encoded);
 
+  const compassDirLabel: string | null =
+    mode === "ai"
+      ? (aiPreview?.roundTripDirection ?? null)
+      : (COMPASS_DIRECTIONS.find((d) => d.deg === headingDeg)?.label ?? null);
+
   const plannerMapHtml = useMemo(() => {
     let resolvedPts: Array<{ lat: number; lng: number }> | undefined;
     if (routeResult?.encoded) {
@@ -255,10 +260,16 @@ export default function GiriCreateScreen() {
       TILE.maximumZ,
       colors.accent,
       waypoints,
-      resolvedPts
+      resolvedPts,
+      compassDirLabel
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waypoints, colors.accent, routeResult?.encoded, routeResult?.rawPoints]);
+
+  useEffect(() => {
+    const js = `(function(){ if(typeof window.updateCompassDirection==='function'){ window.updateCompassDirection(${JSON.stringify(compassDirLabel)}); } })(); true;`;
+    webviewRef.current?.injectJavaScript(js);
+  }, [compassDirLabel]);
 
   const handleMapTap = async (lat: number, lng: number) => {
     try {

@@ -11,10 +11,13 @@ export function buildPlannerMapHtml(
   tileMaxZoom: number,
   accentColor: string,
   waypoints: PlannerWaypoint[],
-  routePolylinePts?: Array<{ lat: number; lng: number }>
+  routePolylinePts?: Array<{ lat: number; lng: number }>,
+  compassDirection?: string | null
 ): string {
   const wpsJson = JSON.stringify(waypoints.filter((w) => w.lat !== 0 || w.lng !== 0));
   const polyJson = JSON.stringify(routePolylinePts ?? []);
+  const initialDir = compassDirection ?? null;
+  const initialDirJs = JSON.stringify(initialDir);
 
   return `<!DOCTYPE html>
 <html>
@@ -34,6 +37,13 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   padding: 5px 10px; border-radius: 20px; z-index: 2000;
   pointer-events: none; white-space: nowrap;
   font-family: -apple-system, sans-serif;
+}
+@keyframes dir-flow {
+  from { stroke-dashoffset: 24; }
+  to   { stroke-dashoffset: 0; }
+}
+.dir-arrow-path {
+  animation: dir-flow 0.7s linear infinite;
 }
 </style>
 </head>
@@ -101,6 +111,61 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     map.setView([45.5, 10.5], 6, { animate: false });
   }
 
+  // ── Compass direction arrow ───────────────────────────────────────────────
+  var COMPASS_BEARING = { N:0, NE:45, E:90, SE:135, S:180, SO:225, O:270, NO:315 };
+  var dirArrowLine = null;
+  var dirArrowHead = null;
+  var currentDir = ${initialDirJs};
+
+  function destPoint(lat, lng, bearingDeg, distKm) {
+    var R = 6371;
+    var d = distKm / R;
+    var brng = bearingDeg * Math.PI / 180;
+    var lat1 = lat * Math.PI / 180;
+    var lng1 = lng * Math.PI / 180;
+    var lat2 = Math.asin(Math.sin(lat1)*Math.cos(d) + Math.cos(lat1)*Math.sin(d)*Math.cos(brng));
+    var lng2 = lng1 + Math.atan2(Math.sin(brng)*Math.sin(d)*Math.cos(lat1), Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));
+    return [lat2 * 180/Math.PI, lng2 * 180/Math.PI];
+  }
+
+  function renderDirectionArrow(dir) {
+    if (dirArrowLine) { map.removeLayer(dirArrowLine); dirArrowLine = null; }
+    if (dirArrowHead) { map.removeLayer(dirArrowHead); dirArrowHead = null; }
+    if (!dir || waypoints.length === 0) return;
+    var bearing = COMPASS_BEARING[dir];
+    if (bearing === undefined) return;
+    var origin = waypoints[0];
+    var midPt  = destPoint(origin.lat, origin.lng, bearing, 40);
+    var tipPt  = destPoint(origin.lat, origin.lng, bearing, 70);
+
+    dirArrowLine = L.polyline(
+      [[origin.lat, origin.lng], midPt, tipPt],
+      { color: "#facc15", weight: 3, dashArray: "10 8", opacity: 0.9, interactive: false }
+    ).addTo(map);
+
+    // Apply CSS animation to the SVG path element
+    var pathEl = dirArrowLine.getElement();
+    if (pathEl) { pathEl.classList.add("dir-arrow-path"); }
+
+    // Arrowhead (rotated triangle)
+    var rot = bearing;
+    var arrowHtml = "<div style=\\"width:0;height:0;" +
+      "border-left:8px solid transparent;border-right:8px solid transparent;" +
+      "border-bottom:18px solid #facc15;" +
+      "transform:rotate(" + rot + "deg);opacity:0.95;filter:drop-shadow(0 0 4px rgba(250,204,21,0.6));\\"></div>";
+    dirArrowHead = L.marker(tipPt, {
+      icon: L.divIcon({ html: arrowHtml, className: "", iconSize: [16, 18], iconAnchor: [8, 9] }),
+      interactive: false
+    }).addTo(map);
+  }
+
+  renderDirectionArrow(currentDir);
+
+  window.updateCompassDirection = function(dir) {
+    currentDir = dir;
+    renderDirectionArrow(dir);
+  };
+
   // Tap handler
   map.on("click", function(e) {
     var msg = JSON.stringify({ type: "tap", lat: e.latlng.lat, lng: e.latlng.lng });
@@ -117,6 +182,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     if (newRoutePts) routePts = newRoutePts;
     renderWaypoints();
     renderRoute();
+    renderDirectionArrow(currentDir);
     var pts = newRoutePts && newRoutePts.length > 1 ? newRoutePts : waypoints;
     if (pts.length > 1) {
       var lats = pts.map(function(p) { return p.lat; });
