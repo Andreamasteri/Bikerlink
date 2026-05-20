@@ -120,19 +120,65 @@ do_export() {
     usage
   fi
 
-  # State file pre-esistente → chiedi conferma prima di sovrascrivere
+  # ─── Guard: stage file esistente → Stage 2 ancora pendente ──
+  # Non richiedere stdin: questo script può essere eseguito da workflow
+  # non interattivi e una read() vuota causerebbe exit silenzioso.
   if [ -f "$STATE_FILE" ]; then
-    echo "⚠ State file esistente: $STATE_FILE"
-    echo "  Una OTA è già stata esportata ma non pubblicata. Opzioni:"
-    echo "  • bash $0 publish    — pubblica l'export esistente"
-    echo "  • bash $0 rollback   — annulla l'export esistente"
     echo ""
-    echo "  Sovrascrivo ora con un nuovo export? [y/N]"
-    read -r CONFIRM
-    if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
-      exit 1
-    fi
-    do_restore
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║  🔒 EXPORT BLOCCATO — Stage 2 ancora pendente           ║"
+    echo "╠══════════════════════════════════════════════════════════╣"
+    echo "║  State file trovato: $STATE_FILE"
+    echo "║  Una OTA è stata esportata ma non ancora pubblicata.    ║"
+    echo "║                                                          ║"
+    echo "║  Opzioni:                                                ║"
+    echo "║    bash $0 publish    — esegui Stage 2 (pubblica)  ║"
+    echo "║    bash $0 rollback   — annulla l'export esistente  ║"
+    echo "╚══════════════════════════════════════════════════════════╝"
+    exit 1
+  fi
+
+  # ─── Guard: entry pending in ota-updates.json ─────────────────
+  # Anche se il state file non esiste (es. rimosso manualmente),
+  # ota-updates.json potrebbe avere un'entry con status='pending'
+  # il che indica che Stage 2 non è ancora stato eseguito.
+  local PENDING_GUARD
+  PENDING_GUARD=$(OTA_UPDATES_FILE_PATH="$OTA_UPDATES_FILE" node -e "
+    const fs = require('fs');
+    try {
+      const appJson = JSON.parse(fs.readFileSync('app.json','utf8'));
+      const rv = appJson?.expo?.runtimeVersion ?? null;
+      const data = JSON.parse(fs.readFileSync(process.env.OTA_UPDATES_FILE_PATH,'utf8'));
+      const cycle = data.filter(e => typeof e.updateNumber === 'number' && e.runtimeVersion === rv);
+      const pending = cycle.filter(e => e.status === 'pending');
+      if (pending.length > 0) {
+        const nums = pending.map(e => 'OTA-' + e.updateNumber).join(', ');
+        console.log('BLOCKED:' + nums);
+      } else {
+        console.log('OK');
+      }
+    } catch(e) {
+      console.log('READ_ERROR:' + e.message.replace(/\n/g,' '));
+    }
+  " 2>/dev/null || echo "READ_ERROR:node_failed")
+
+  if [[ "$PENDING_GUARD" == BLOCKED:* ]]; then
+    local BLOCKED_ENTRIES="${PENDING_GUARD#BLOCKED:}"
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║  🔒 EXPORT BLOCCATO — Stage 2 ancora pendente           ║"
+    echo "╠══════════════════════════════════════════════════════════╣"
+    echo "║  ota-updates.json ha entry con status='pending':        ║"
+    echo "║    $BLOCKED_ENTRIES"
+    echo "║                                                          ║"
+    echo "║  Pubblicare prima lo Stage 2 pendente:                  ║"
+    echo "║    bash $0 publish    — esegui Stage 2 (pubblica)  ║"
+    echo "║    bash $0 rollback   — annulla l'export esistente  ║"
+    echo "╚══════════════════════════════════════════════════════════╝"
+    exit 1
+  elif [[ "$PENDING_GUARD" == READ_ERROR:* ]]; then
+    echo "   ⚠ Impossibile verificare entry pending in $OTA_UPDATES_FILE: ${PENDING_GUARD#READ_ERROR:}"
+    echo "   Procedendo con cautela..."
   fi
 
   mkdir -p "$STATE_DIR"

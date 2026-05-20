@@ -67,10 +67,6 @@ args = "admin-privacy-filter"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "ota-export-stage1"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Clean Metro"
 
 [[workflows.workflow]]
@@ -188,17 +184,6 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx vitest run --config vitest.config.server.ts"
-
-[[workflows.workflow]]
-name = "ota-export-stage1"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "rm -rf /tmp/metro-* /tmp/haste-map-* && BIKERLINK_ADMIN_EMAIL=admin@bikerlink.it bash scripts/publish-ota.sh export \"Ciclo 9.x: schema versione 46.29.9 + rv 9.0.0 (#1525), fix brace-expansion build (#1526)\""
 
 [[workflows.workflow]]
 name = "Clean Metro"
