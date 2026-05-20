@@ -96,6 +96,20 @@ function applyPositionFuzz(lat: number, lng: number, radiusKm: number): { lat: n
   return { lat: lat + dlat * Math.sin(theta), lng: lng + dlng * Math.cos(theta) };
 }
 
+function fuzzedCoordsForViewer(
+  lat: number | null | undefined,
+  lng: number | null | undefined,
+  profile: any,
+  isOwner: boolean
+): { latitude: number | null; longitude: number | null } {
+  if (lat == null || lng == null) return { latitude: null, longitude: null };
+  if (!isOwner && profile?.positionFuzz && (profile.positionFuzzKm ?? 0) > 0) {
+    const fuzzed = applyPositionFuzz(lat, lng, profile.positionFuzzKm ?? 1);
+    return { latitude: fuzzed.lat, longitude: fuzzed.lng };
+  }
+  return { latitude: lat, longitude: lng };
+}
+
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
@@ -889,11 +903,8 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
           return { latitude: null, longitude: null, coordinatesUpdatedAt: null };
         }
         const isOwner = requesterId === userId;
-        if (!isOwner && profile.positionFuzz && (profile.positionFuzzKm ?? 0) > 0) {
-          const fuzzed = applyPositionFuzz(profile.latitude, profile.longitude, profile.positionFuzzKm ?? 1);
-          return { latitude: fuzzed.lat, longitude: fuzzed.lng, coordinatesUpdatedAt: profile.coordinatesUpdatedAt ?? null };
-        }
-        return { latitude: profile.latitude, longitude: profile.longitude, coordinatesUpdatedAt: profile.coordinatesUpdatedAt ?? null };
+        const fc = fuzzedCoordsForViewer(profile.latitude, profile.longitude, profile, isOwner);
+        return { latitude: fc.latitude, longitude: fc.longitude, coordinatesUpdatedAt: profile.coordinatesUpdatedAt ?? null };
       })(),
     });
   } catch (error) {
@@ -1001,8 +1012,11 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
           distance: (!showDistanceInCounter || item.profile?.hideFromMap) ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance)) ? Math.round(item.distance * 10) / 10 : null,
-          latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude ?? null),
-          longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude ?? null),
+          ...(() => {
+            if (item.profile?.hideFromMap) return { latitude: null, longitude: null };
+            const fc = fuzzedCoordsForViewer(item.profile?.latitude, item.profile?.longitude, item.profile, item.user.id === requesterId);
+            return { latitude: fc.latitude, longitude: fc.longitude };
+          })(),
           isAvailable: mapVisibilityFilter === "available_only"
             ? (item.profile?.isAvailable || false)
             : (item.profile?.isAvailable || false) && onlineIdSet.has(item.user.id),
@@ -1169,8 +1183,11 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
           distance: item.profile?.hideFromMap ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null),
-          latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude ?? null),
-          longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude ?? null),
+          ...(() => {
+            if (item.profile?.hideFromMap) return { latitude: null, longitude: null };
+            const fc = fuzzedCoordsForViewer(item.profile?.latitude, item.profile?.longitude, item.profile, item.user.id === requesterId);
+            return { latitude: fc.latitude, longitude: fc.longitude };
+          })(),
           isAvailable: (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id),
           isOnline: onlineAvailableIds.has(item.user.id),
           lastLoginAt: item.user.lastLoginAt ?? null,
@@ -1264,8 +1281,11 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
           distance: item.profile?.hideFromMap ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null),
-          latitude: item.profile?.hideFromMap ? null : (item.profile?.latitude ?? null),
-          longitude: item.profile?.hideFromMap ? null : (item.profile?.longitude ?? null),
+          ...(() => {
+            if (item.profile?.hideFromMap) return { latitude: null, longitude: null };
+            const fc = fuzzedCoordsForViewer(item.profile?.latitude, item.profile?.longitude, item.profile, item.user.id === requesterId);
+            return { latitude: fc.latitude, longitude: fc.longitude };
+          })(),
           isAvailable: (item.profile?.isAvailable || false) && onlineAvailableIds.has(item.user.id),
           isOnline: onlineAvailableIds.has(item.user.id),
           lastLoginAt: item.user.lastLoginAt ?? null,
@@ -1322,8 +1342,10 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
           region: item.user.region,
           country: item.user.country,
           avatarUrl: item.user.avatarUrl,
-          latitude: servedLat,
-          longitude: servedLng,
+          ...(() => {
+            const fc = fuzzedCoordsForViewer(servedLat, servedLng, item.profile, item.user.id === requesterId);
+            return { latitude: fc.latitude, longitude: fc.longitude };
+          })(),
           isAvailable: (item.profile?.isAvailable || false) && isOnlineNearby,
           isOnline: isOnlineNearby,
           bio: item.profile?.bio || null,
@@ -1383,8 +1405,11 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
           region: item.user.region,
           country: item.user.country,
           avatarUrl: item.user.avatarUrl,
-          latitude: (item.profile?.hideFromMap || item.user.ghostMode) ? null : (item.profile?.latitude || null),
-          longitude: (item.profile?.hideFromMap || item.user.ghostMode) ? null : (item.profile?.longitude || null),
+          ...(() => {
+            if (item.profile?.hideFromMap || item.user.ghostMode) return { latitude: null, longitude: null };
+            const fc = fuzzedCoordsForViewer(item.profile?.latitude, item.profile?.longitude, item.profile, item.user.id === requesterId);
+            return { latitude: fc.latitude, longitude: fc.longitude };
+          })(),
           isAvailable: (item.profile?.isAvailable || false) && isOnlineSearch,
           bio: item.profile?.bio || null,
         };
