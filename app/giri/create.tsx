@@ -26,6 +26,7 @@ import DebugPanel from "@/components/DebugPanel";
 
 type Style = "curvy" | "balanced" | "fast";
 type Mode = "ai" | "ai-preview" | "manual";
+type CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
 
 interface Waypoint { lat: number; lng: number; name: string; }
 interface GeoResult { name: string; lat: number; lng: number; }
@@ -90,12 +91,13 @@ async function calcRoute(
   avoidTolls: boolean,
   roundTripHours?: number,
   isRoundTrip?: boolean,
+  roundTripDirection?: CompassDir | null,
 ): Promise<RouteResult> {
   const url = new URL("/api/planned-routes/calculate", getApiUrl());
   const resp = await fetch(url.toString(), {
     method: "POST", credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ waypoints, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip }),
+    body: JSON.stringify({ waypoints, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip, roundTripDirection }),
   });
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}));
@@ -116,6 +118,77 @@ async function parseAI(prompt: string): Promise<any> {
     throw new Error(body.message ?? "Servizio AI non disponibile");
   }
   return resp.json();
+}
+
+const COMPASS_LAYOUT: (CompassDir | null)[][] = [
+  ["NO", "N", "NE"],
+  ["O",  null, "E"],
+  ["SO", "S", "SE"],
+];
+
+const COMPASS_LABEL: Record<CompassDir, string> = {
+  N: "N", NE: "NE", E: "E", SE: "SE", S: "S", SO: "SO", O: "O", NO: "NO",
+};
+
+function CompassSelector({
+  value,
+  onChange,
+  colors,
+}: {
+  value: CompassDir | null;
+  onChange: (d: CompassDir | null) => void;
+  colors: ReturnType<typeof useColors>;
+}) {
+  return (
+    <View style={{ marginTop: 14, gap: 4 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary }}>
+          Direzione preferita
+        </Text>
+        {value && (
+          <Pressable onPress={() => onChange(null)}>
+            <Text style={{ fontFamily: "Inter_500Medium", fontSize: 12, color: colors.accent }}>Rimuovi</Text>
+          </Pressable>
+        )}
+      </View>
+      <View style={{ alignSelf: "center", gap: 4 }}>
+        {COMPASS_LAYOUT.map((row, ri) => (
+          <View key={ri} style={{ flexDirection: "row", gap: 4 }}>
+            {row.map((dir, ci) =>
+              dir === null ? (
+                <View key={ci} style={{ width: 52, height: 52, justifyContent: "center", alignItems: "center" }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: value ? colors.accent : colors.border }} />
+                </View>
+              ) : (
+                <Pressable
+                  key={dir}
+                  onPress={() => onChange(value === dir ? null : dir)}
+                  style={{
+                    width: 52, height: 52, borderRadius: 10, justifyContent: "center", alignItems: "center",
+                    backgroundColor: value === dir ? colors.accent + "22" : colors.surface,
+                    borderWidth: 1.5,
+                    borderColor: value === dir ? colors.accent : colors.border,
+                  }}
+                >
+                  <Text style={{
+                    fontFamily: "Inter_700Bold", fontSize: 14,
+                    color: value === dir ? colors.accent : colors.text,
+                  }}>
+                    {COMPASS_LABEL[dir]}
+                  </Text>
+                </Pressable>
+              )
+            )}
+          </View>
+        ))}
+      </View>
+      {value && (
+        <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, textAlign: "center", marginTop: 4 }}>
+          Il percorso partirà verso {value}
+        </Text>
+      )}
+    </View>
+  );
 }
 
 export default function GiriCreateScreen() {
@@ -153,6 +226,7 @@ export default function GiriCreateScreen() {
   const [style, setStyle] = useState<Style>("curvy");
   const [isRoundTrip, setIsRoundTrip] = useState(false);
   const [roundTripHours, setRoundTripHours] = useState(3);
+  const [roundTripDirection, setRoundTripDirection] = useState<CompassDir | null>(null);
   const [isMultiDay, setIsMultiDay] = useState(false);
   const [daysCount, setDaysCount] = useState(2);
   const [maxHoursPerDay, setMaxHoursPerDay] = useState(6);
@@ -476,7 +550,7 @@ export default function GiriCreateScreen() {
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
       setCalculating(true);
       try {
-        const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip);
+        const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip, roundTripDirection);
         setRouteResult(result);
       } catch {
         // silent — user can still trigger manually
@@ -486,7 +560,7 @@ export default function GiriCreateScreen() {
     }, 1500);
     return () => { if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, style, avoidHighways, avoidTolls, isRoundTrip, roundTripHours, mode]);
+  }, [waypoints, style, avoidHighways, avoidTolls, isRoundTrip, roundTripHours, roundTripDirection, mode]);
 
   const handleCalculate = async () => {
     const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
@@ -500,7 +574,7 @@ export default function GiriCreateScreen() {
         "/api/planned-routes/calculate", "POST",
         () => {
           const url = new URL("/api/planned-routes/calculate", getApiUrl());
-          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip }) });
+          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip, roundTripDirection }) });
         },
         async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
       );
@@ -543,7 +617,7 @@ export default function GiriCreateScreen() {
       style, visibility, isMultiDay,
       metadata: {
         avoidHighways, avoidTolls, daysCount, maxHoursPerDay,
-        isRoundTrip, roundTripHours, motorcycleId: selectedMotoId,
+        isRoundTrip, roundTripHours, roundTripDirection, motorcycleId: selectedMotoId,
         fuelStopsNeeded,
       },
     });
@@ -878,6 +952,7 @@ export default function GiriCreateScreen() {
                   <View style={s.sliderTicks}>
                     {[1, 3, 6, 9, 12].map((h) => <Text key={h} style={s.sliderTick}>{h}h</Text>)}
                   </View>
+                  <CompassSelector value={roundTripDirection} onChange={setRoundTripDirection} colors={colors} />
                 </View>
               )}
 

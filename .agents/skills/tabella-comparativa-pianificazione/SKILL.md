@@ -31,7 +31,7 @@ Richiama questa skill ogni volta che devi:
 | Routing curvy | ✅ slider | ✅ | ⚠️ | ❌ | ⚠️ | ✅ 3 mode |
 | Slider curviness granulare (5 livelli) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌→implementare |
 | Evita sterrato / traghetti | ✅ | ⚠️ | ❌ | ❌ | ✅ | ❌→implementare |
-| Round trip + direzione bussola | ✅ | ✅ | ❌ | ❌ | ✅ | ⚠️ solo durata→implementare |
+| Round trip + direzione bussola | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
 | Multi-day / split tappe | ❌ | ❌ | ✅ | ❌ | ✅ | ✅ |
 | Street View sul percorso | ❌ | ❌ | ❌ | ❌ | ✅ | ❌→implementare |
 | Meteo durante pianificazione | ❌ | ⚠️ | ❌ | ❌ | ✅ | ❌→implementare (post-save già fatto) |
@@ -49,8 +49,8 @@ Richiama questa skill ogni volta che devi:
 
 Basandosi sulla tabella, le funzioni con maggiore impatto competitivo ancora mancanti in BikerLink:
 
-1. **Slider curviness granulare (5 livelli)** — punto di forza distintivo di Kurviger, assente in tutti gli altri
-2. **Round trip + direzione bussola** — presente in Kurviger, Calimoto e MyRouteApp; BikerLink ha solo la durata
+1. **Profilo altimetrico** — presente in Kurviger, Calimoto e MyRouteApp (i 3 concorrenti principali)
+2. **Slider curviness granulare (5 livelli)** — punto di forza distintivo di Kurviger, assente in tutti gli altri
 3. **Evita sterrato / traghetti** — presente in Kurviger e MyRouteApp
 4. **Meteo durante pianificazione** — parziale in Calimoto, completo in MyRouteApp; BikerLink ha solo post-save
 5. **POI foto community** — presente in Kurviger e MyRouteApp

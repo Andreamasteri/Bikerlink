@@ -263,6 +263,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     avoidTolls = false,
     roundTripHours,
     isRoundTrip,
+    roundTripDirection,
   } = req.body as {
     waypoints: Array<{ lat: number; lng: number }>;
     style?: string;
@@ -270,21 +271,49 @@ router.post("/calculate", async (req: Request, res: Response) => {
     avoidTolls?: boolean;
     roundTripHours?: number;
     isRoundTrip?: boolean;
+    roundTripDirection?: string;
   };
 
   if (!waypoints || waypoints.length < 2) {
     return res.status(400).json({ message: "Almeno 2 waypoint richiesti" });
   }
 
+  // ── Compass direction: insert intermediate waypoint in given bearing ────────
+  const DIRECTION_DEGREES: Record<string, number> = {
+    N: 0, NE: 45, E: 90, SE: 135, S: 180, SO: 225, O: 270, NO: 315,
+  };
+
+  let effectiveWaypoints = waypoints;
+  if (isRoundTrip && roundTripDirection && DIRECTION_DEGREES[roundTripDirection] !== undefined) {
+    const headingDeg = DIRECTION_DEGREES[roundTripDirection];
+    const headingRad = headingDeg * Math.PI / 180;
+    const start = waypoints[0];
+    const styleAvgSpeed: Record<string, number> = { curvy: 55, balanced: 65, fast: 85 };
+    const avgKmh = styleAvgSpeed[style] ?? 65;
+    const offsetKm = (roundTripHours ?? 2) * avgKmh * 0.4;
+    const deltaLat = offsetKm / 111.32;
+    const deltaLng = offsetKm / (111.32 * Math.cos(start.lat * Math.PI / 180));
+    const midLat = start.lat + deltaLat * Math.cos(headingRad);
+    const midLng = start.lng + deltaLng * Math.sin(headingRad);
+    const last = waypoints[waypoints.length - 1];
+    const otherWps = waypoints.slice(1, -1);
+    effectiveWaypoints = [
+      start,
+      { lat: midLat, lng: midLng },
+      ...otherWps,
+      last,
+    ];
+  }
+
   const apiKey = process.env.GRAPHHOPPER_API_KEY;
   if (!apiKey) {
     console.warn("[GraphHopper] GRAPHHOPPER_API_KEY non configurata, uso percorso approssimativo");
-    return res.json(buildFallbackRoute(waypoints));
+    return res.json(buildFallbackRoute(effectiveWaypoints));
   }
 
   try {
     const body: any = {
-      points: waypoints.map((wp) => [wp.lng, wp.lat]),
+      points: effectiveWaypoints.map((wp) => [wp.lng, wp.lat]),
       profile: "motorcycle",
       instructions: true,
       calc_points: true,
