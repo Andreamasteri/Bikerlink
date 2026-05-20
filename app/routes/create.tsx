@@ -289,6 +289,24 @@ export default function CreateRouteScreen() {
   const [curvatureMapHtml, setCurvatureMapHtml] = useState<string>("");
   const curvatureMapMountedRef = useRef(false);
 
+  // Always-current ref so onLoadEnd can read the latest waypoints without stale closures
+  const waypointsRef = useRef<LocalWaypoint[]>(waypoints);
+  waypointsRef.current = waypoints;
+
+  const injectWaypoints = useCallback((wps: LocalWaypoint[]) => {
+    if (!webviewRef.current || wps.length < 2) return;
+    const pts = JSON.stringify(wps.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })));
+    const wpsJson = JSON.stringify(wps.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })));
+    const js = `(function(){ if(typeof window.updateWaypoints==='function'){ window.updateWaypoints(${wpsJson}, ${pts}); } })(); true;`;
+    webviewRef.current.injectJavaScript(js);
+  }, []);
+
+  // When the WebView finishes loading (initial load or any reload), sync current
+  // waypoints so fitBounds is always called with up-to-date coordinates.
+  const handleMapLoaded = useCallback(() => {
+    injectWaypoints(waypointsRef.current);
+  }, [injectWaypoints]);
+
   useEffect(() => {
     if (waypoints.length < 2) {
       curvatureMapMountedRef.current = false;
@@ -296,7 +314,9 @@ export default function CreateRouteScreen() {
     }
 
     if (!curvatureMapMountedRef.current) {
-      // First time the map becomes visible: bake current waypoints into the HTML
+      // First time the map becomes visible: bake current waypoints into the HTML.
+      // handleMapLoaded will fire once the WebView finishes loading and will
+      // call updateWaypoints (+ fitBounds) with the then-current waypoints.
       curvatureMapMountedRef.current = true;
       setCurvatureMapHtml(buildPlannerMapHtml(
         tileConfig.url,
@@ -307,14 +327,11 @@ export default function CreateRouteScreen() {
         null,
       ));
     } else {
-      // Already mounted: update markers and polyline via JS injection (no reload/flicker)
-      if (!webviewRef.current) return;
-      const pts = JSON.stringify(waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })));
-      const wps = JSON.stringify(waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })));
-      const js = `(function(){ if(typeof window.updateWaypoints==='function'){ window.updateWaypoints(${wps}, ${pts}); } })(); true;`;
-      webviewRef.current.injectJavaScript(js);
+      // Already mounted: update markers, polyline and re-fit via JS injection
+      // (no reload/flicker). Covers add, remove AND reorder.
+      injectWaypoints(waypoints);
     }
-  }, [waypoints, tileConfig]);
+  }, [waypoints, tileConfig, injectWaypoints]);
 
   return (
     <View style={[styles.container]}>
@@ -368,6 +385,7 @@ export default function CreateRouteScreen() {
                 scrollEnabled={false}
                 javaScriptEnabled
                 originWhitelist={["*"]}
+                onLoadEnd={handleMapLoaded}
               />
             </View>
           </View>
