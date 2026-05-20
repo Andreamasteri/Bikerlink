@@ -21,6 +21,8 @@ import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
 import { getTileConfig } from "@/lib/map-tiles";
+import { useApiDebugLog } from "@/hooks/useApiDebugLog";
+import DebugPanel from "@/components/DebugPanel";
 
 type Style = "curvy" | "balanced" | "fast";
 type Mode = "ai" | "ai-preview" | "manual";
@@ -105,6 +107,22 @@ export default function GiriCreateScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
+
+  const { logs: debugLogs, clearLogs: clearDebugLogs, logFetch } = useApiDebugLog();
+  const [debugVisible, setDebugVisible] = useState(__DEV__);
+  const titleTapCount = useRef(0);
+  const titleTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTitleTap = useCallback(() => {
+    titleTapCount.current += 1;
+    if (titleTapTimer.current) clearTimeout(titleTapTimer.current);
+    if (titleTapCount.current >= 5) {
+      titleTapCount.current = 0;
+      setDebugVisible((v) => !v);
+      return;
+    }
+    titleTapTimer.current = setTimeout(() => { titleTapCount.current = 0; }, 1500);
+  }, []);
 
   const [mode, setMode] = useState<Mode>("ai");
   const [aiPrompt, setAiPrompt] = useState("");
@@ -202,7 +220,14 @@ export default function GiriCreateScreen() {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
     try {
-      const result = await parseAI(aiPrompt);
+      const result = await logFetch<any>(
+        "/api/planned-routes/ai-parse", "POST",
+        () => {
+          const url = new URL("/api/planned-routes/ai-parse", getApiUrl());
+          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: aiPrompt }) });
+        },
+        async (resp) => { if (!resp.ok) throw new Error("AI non disponibile"); return resp.json(); }
+      );
 
       // Build initial preview items (unresolved)
       const rawLocations: Array<{ role: AiPreviewItem["role"]; name: string }> = [];
@@ -242,7 +267,11 @@ export default function GiriCreateScreen() {
       // Auto-geocode each location in parallel
       initialItems.forEach((item, idx) => {
         if (!item.name) return;
-        geocode(item.name).then((results) => {
+        logFetch<GeoResult[]>(
+          "/api/planned-routes/geocode", "GET",
+          () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", item.name); return fetch(url.toString(), { credentials: "include" }); },
+          async (resp) => { if (!resp.ok) return []; return resp.json(); }
+        ).then((results) => {
           const best = results[0];
           setAiPreview((prev) => {
             if (!prev) return prev;
@@ -294,7 +323,11 @@ export default function GiriCreateScreen() {
       items[idx] = { ...items[idx], geocoding: true };
       return { ...prev, items };
     });
-    geocode(name).then((results) => {
+    logFetch<GeoResult[]>(
+      "/api/planned-routes/geocode", "GET",
+      () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", name); return fetch(url.toString(), { credentials: "include" }); },
+      async (resp) => { if (!resp.ok) return []; return resp.json(); }
+    ).then((results) => {
       const best = results[0];
       setAiPreview((prev) => {
         if (!prev) return prev;
@@ -343,7 +376,14 @@ export default function GiriCreateScreen() {
     setCalculating(true);
     setRouteResult(null);
     try {
-      const result = await calcRoute(toCalc, aiPreview.style, aiPreview.avoidHighways, false);
+      const result = await logFetch<RouteResult>(
+        "/api/planned-routes/calculate", "POST",
+        () => {
+          const url = new URL("/api/planned-routes/calculate", getApiUrl());
+          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, avoidHighways: aiPreview.avoidHighways, avoidTolls: false }) });
+        },
+        async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
+      );
       setRouteResult(result);
       if (result.durationMinutes > 480 && !aiPreview.isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
@@ -371,7 +411,11 @@ export default function GiriCreateScreen() {
     if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
     if (text.length >= 3) {
       suggestionTimeout.current = setTimeout(async () => {
-        const results = await geocode(text);
+        const results = await logFetch<GeoResult[]>(
+          "/api/planned-routes/geocode", "GET",
+          () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", text); return fetch(url.toString(), { credentials: "include" }); },
+          async (resp) => { if (!resp.ok) return []; return resp.json(); }
+        );
         setWpSuggestions({ index, results });
       }, 600);
     } else { setWpSuggestions(null); }
@@ -403,7 +447,14 @@ export default function GiriCreateScreen() {
     const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
     setCalculating(true);
     try {
-      const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip);
+      const result = await logFetch<RouteResult>(
+        "/api/planned-routes/calculate", "POST",
+        () => {
+          const url = new URL("/api/planned-routes/calculate", getApiUrl());
+          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip }) });
+        },
+        async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
+      );
       setRouteResult(result);
       if (result.durationMinutes > 480 && !isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
@@ -473,7 +524,9 @@ export default function GiriCreateScreen() {
         <Pressable onPress={() => router.back()} style={s.backBtn} hitSlop={12}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
         </Pressable>
-        <Text style={s.navTitle}>Pianifica Giro</Text>
+        <Pressable onPress={handleTitleTap} hitSlop={8}>
+          <Text style={s.navTitle}>Pianifica Giro</Text>
+        </Pressable>
         <View style={{ width: 40 }} />
       </View>
 
@@ -950,6 +1003,10 @@ export default function GiriCreateScreen() {
               </Pressable>
             )}
           </>
+        )}
+
+        {debugVisible && (
+          <DebugPanel logs={debugLogs} onClear={clearDebugLogs} />
         )}
       </ScrollView>
     </View>
