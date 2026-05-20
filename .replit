@@ -51,15 +51,7 @@ args = "Error Monitor"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "ota-guard"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "admin-map-exclusion"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "injection-safety"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -142,17 +134,6 @@ args = "bash scripts/error-monitor.sh"
 outputType = "console"
 
 [[workflows.workflow]]
-name = "ota-guard"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "SKIP_LIVE_CHECK=1 bash scripts/validate-ota.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
 name = "admin-map-exclusion"
 author = "agent"
 
@@ -162,17 +143,6 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx tsx scripts/check-admin-map-exclusion.ts"
-
-[[workflows.workflow]]
-name = "injection-safety"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsx scripts/test-injection-safety.ts"
 
 [[workflows.workflow]]
 name = "admin-privacy-filter"

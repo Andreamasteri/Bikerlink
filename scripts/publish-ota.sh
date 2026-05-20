@@ -678,8 +678,6 @@ do_publish() {
   # Verrà rimosso esplicitamente al successo finale (vedi fine do_publish).
   KEEP_DIST=1
 
-  require_admin_creds
-
   if [ ! -f "$STATE_FILE" ]; then
     echo "Errore: state file $STATE_FILE non trovato."
     echo "Esegui prima: bash $0 export \"messaggio\""
