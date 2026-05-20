@@ -19,7 +19,7 @@ import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
-import { haversineM } from "@/lib/geo";
+import { haversineM, closestPointIndexOnPolyline } from "@/lib/geo";
 import { buildNavigationMapHtml } from "@/lib/leaflet-navigation-html";
 import { getTileConfig } from "@/lib/map-tiles";
 import { useLocale, useT } from "@/lib/language-context";
@@ -70,18 +70,6 @@ interface PlannedRoute {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-
-
-function closestPointIndexOnPolyline(lat: number, lng: number, polyline: Array<[number, number]>): number {
-  let minDist = Infinity;
-  let closestIdx = 0;
-  for (let i = 0; i < polyline.length; i++) {
-    const d = haversineM(lat, lng, polyline[i][0], polyline[i][1]);
-    if (d < minDist) { minDist = d; closestIdx = i; }
-  }
-  return closestIdx;
-}
 
 function activeStepIndex(polylineIdx: number, steps: NavigationStep[]): number {
   for (let i = steps.length - 1; i >= 0; i--) {
