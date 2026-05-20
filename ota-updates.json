@@ -951,5 +951,32 @@
     "apkVersionName": null,
     "apkUrl": null,
     "status": "pending"
+  },
+  {
+    "updateNumber": 4,
+    "version": "47.4.9",
+    "cycle": "9.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-4 rv9.0.0: Ciclo 9.x: schema versione 46.29.9 + rv 9.0.0 (#1525), fix brace-expansion build (#1526)",
+    "note": "CURRENT_OTA_NUMBER=4. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "9.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "fc1d54ba84aaa3968322f70ddd6633661a8c92f3",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]

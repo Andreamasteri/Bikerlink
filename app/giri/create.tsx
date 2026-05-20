@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from "react";
+import React, { useState, useRef, useMemo, useCallback } from "react";
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
 import { getTileConfig } from "@/lib/map-tiles";
 
 type Style = "curvy" | "balanced" | "fast";
-type Mode = "ai" | "manual";
+type Mode = "ai" | "ai-preview" | "manual";
 
 interface Waypoint { lat: number; lng: number; name: string; }
 interface GeoResult { name: string; lat: number; lng: number; }
@@ -34,8 +34,27 @@ interface RouteResult {
   durationMinutes: number;
   bikerScore: number;
 }
-
 interface UserMotorcycle { id: string; brand: string; model: string; year?: number | null; ridingStyle?: string | null; }
+
+interface AiPreviewItem {
+  role: "start" | "waypoint" | "end";
+  name: string;
+  editedName: string;
+  lat: number;
+  lng: number;
+  geocoding: boolean;
+  resolved: boolean;
+}
+
+interface AiPreviewState {
+  title: string;
+  style: Style;
+  isRoundTrip: boolean;
+  isMultiDay: boolean;
+  daysEstimate: number;
+  avoidHighways: boolean;
+  items: AiPreviewItem[];
+}
 
 async function geocode(q: string): Promise<GeoResult[]> {
   const url = new URL("/api/planned-routes/geocode", getApiUrl());
@@ -81,12 +100,14 @@ export default function GiriCreateScreen() {
   const qc = useQueryClient();
   const topPad = Platform.OS === "web" ? 67 : insets.top;
 
-  // Mode
   const [mode, setMode] = useState<Mode>("ai");
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Route params
+  // AI Preview state
+  const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
+
+  // Manual mode route params
   const [title, setTitle] = useState("Giro in moto");
   const [style, setStyle] = useState<Style>("curvy");
   const [isRoundTrip, setIsRoundTrip] = useState(false);
@@ -100,22 +121,18 @@ export default function GiriCreateScreen() {
   const [selectedMotoId, setSelectedMotoId] = useState<string | null>(null);
   const [fuelLevel, setFuelLevel] = useState<number>(100);
 
-  // Waypoints
   const [waypoints, setWaypoints] = useState<Waypoint[]>([{ lat: 0, lng: 0, name: "" }, { lat: 0, lng: 0, name: "" }]);
   const [wpInputs, setWpInputs] = useState<string[]>(["", ""]);
   const [wpSuggestions, setWpSuggestions] = useState<{ index: number; results: GeoResult[] } | null>(null);
 
-  // Result
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [calculating, setCalculating] = useState(false);
 
   const suggestionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webviewRef = useRef<WebView | null>(null);
 
-  // Tile config for the planner map
   const TILE = getTileConfig("carto_dark");
 
-  // Build the planner map HTML whenever resolved waypoints or route result change
   const plannerMapHtml = useMemo(() => {
     const resolvedPts = routeResult?.rawPoints
       ? routeResult.rawPoints.map(([lat, lng]) => ({ lat, lng }))
@@ -130,7 +147,6 @@ export default function GiriCreateScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waypoints, colors.accent, routeResult?.encoded]);
 
-  // Reverse geocode a tapped lat/lng and add as waypoint
   const handleMapTap = async (lat: number, lng: number) => {
     try {
       const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&accept-language=it`;
@@ -143,7 +159,6 @@ export default function GiriCreateScreen() {
       }
       const newWps = [...waypoints];
       const newInputs = [...wpInputs];
-      // Fill first unresolved waypoint slot, or insert before last
       const emptyIdx = newWps.findIndex((w) => w.lat === 0 && w.lng === 0);
       if (emptyIdx !== -1) {
         newWps[emptyIdx] = { lat, lng, name };
@@ -156,12 +171,9 @@ export default function GiriCreateScreen() {
       setWaypoints(newWps);
       setWpInputs(newInputs);
       setRouteResult(null);
-    } catch {
-      // Silently ignore reverse geocode failure
-    }
+    } catch {}
   };
 
-  // Load user's motorcycles
   const { data: motorcycles = [] } = useQuery<UserMotorcycle[]>({
     queryKey: ["/api/motorcycles"],
   });
@@ -178,44 +190,76 @@ export default function GiriCreateScreen() {
     onError: () => Alert.alert("Errore", "Impossibile salvare il giro."),
   });
 
+  // ── AI Parse + auto-geocoding ──────────────────────────────────────────────
+
   const handleAiParse = async () => {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
     try {
       const result = await parseAI(aiPrompt);
-      setTitle(result.title ?? "Giro in moto");
-      setStyle(result.style ?? "curvy");
-      setIsRoundTrip(result.isRoundTrip ?? false);
-      setIsMultiDay(result.isMultiDay ?? false);
-      setDaysCount(result.daysEstimate ?? 2);
-      setMaxHoursPerDay(result.maxHoursPerDay ?? 6);
-      setAvoidHighways(result.avoidHighways ?? false);
 
-      const newWps: Waypoint[] = [];
-      const newInputs: string[] = [];
-      if (result.startLocation) {
-        newWps.push({ lat: 0, lng: 0, name: result.startLocation });
-        newInputs.push(result.startLocation);
-      }
-      for (const wp of (result.waypoints ?? [])) {
-        newWps.push({ lat: 0, lng: 0, name: wp });
-        newInputs.push(wp);
-      }
+      // Build initial preview items (unresolved)
+      const rawLocations: Array<{ role: AiPreviewItem["role"]; name: string }> = [];
+      if (result.startLocation) rawLocations.push({ role: "start", name: result.startLocation });
+      for (const wp of (result.waypoints ?? [])) rawLocations.push({ role: "waypoint", name: wp });
       if (result.endLocation && result.endLocation !== result.startLocation) {
-        newWps.push({ lat: 0, lng: 0, name: result.endLocation });
-        newInputs.push(result.endLocation);
-      } else if (newWps.length > 0) {
-        newWps.push({ ...newWps[0] });
-        newInputs.push(newWps[0].name);
+        rawLocations.push({ role: "end", name: result.endLocation });
+      } else if (rawLocations.length > 0) {
+        rawLocations.push({ role: "end", name: rawLocations[0].name });
       } else {
-        newWps.push({ lat: 0, lng: 0, name: "" });
-        newInputs.push("");
+        rawLocations.push({ role: "end", name: "" });
       }
-      if (newWps.length < 2) { newWps.push({ lat: 0, lng: 0, name: "" }); newInputs.push(""); }
-      setWaypoints(newWps);
-      setWpInputs(newInputs);
-      setMode("manual");
-      setRouteResult(null);
+      if (rawLocations.length < 2) rawLocations.push({ role: "end", name: "" });
+
+      const initialItems: AiPreviewItem[] = rawLocations.map((loc) => ({
+        role: loc.role,
+        name: loc.name,
+        editedName: loc.name,
+        lat: 0, lng: 0,
+        geocoding: !!loc.name,
+        resolved: false,
+      }));
+
+      const preview: AiPreviewState = {
+        title: result.title ?? "Giro in moto",
+        style: result.style ?? "curvy",
+        isRoundTrip: result.isRoundTrip ?? false,
+        isMultiDay: result.isMultiDay ?? false,
+        daysEstimate: result.daysEstimate ?? 2,
+        avoidHighways: result.avoidHighways ?? false,
+        items: initialItems,
+      };
+
+      setAiPreview(preview);
+      setMode("ai-preview");
+
+      // Auto-geocode each location in parallel
+      initialItems.forEach((item, idx) => {
+        if (!item.name) return;
+        geocode(item.name).then((results) => {
+          const best = results[0];
+          setAiPreview((prev) => {
+            if (!prev) return prev;
+            const updatedItems = [...prev.items];
+            updatedItems[idx] = {
+              ...updatedItems[idx],
+              lat: best ? best.lat : 0,
+              lng: best ? best.lng : 0,
+              geocoding: false,
+              resolved: !!best,
+            };
+            return { ...prev, items: updatedItems };
+          });
+        }).catch(() => {
+          setAiPreview((prev) => {
+            if (!prev) return prev;
+            const updatedItems = [...prev.items];
+            updatedItems[idx] = { ...updatedItems[idx], geocoding: false, resolved: false };
+            return { ...prev, items: updatedItems };
+          });
+        });
+      });
+
     } catch {
       Alert.alert("Errore", "AI non disponibile. Inserisci manualmente.");
       setMode("manual");
@@ -223,6 +267,95 @@ export default function GiriCreateScreen() {
       setAiLoading(false);
     }
   };
+
+  // Update a preview item name (for inline editing of pills)
+  const updatePreviewItemName = useCallback((idx: number, newName: string) => {
+    setAiPreview((prev) => {
+      if (!prev) return prev;
+      const items = [...prev.items];
+      items[idx] = { ...items[idx], editedName: newName, lat: 0, lng: 0, resolved: false };
+      return { ...prev, items };
+    });
+  }, []);
+
+  // Re-geocode a pill after user edits it
+  const regeocodePillItem = useCallback((idx: number, name: string) => {
+    if (!name.trim()) return;
+    setAiPreview((prev) => {
+      if (!prev) return prev;
+      const items = [...prev.items];
+      items[idx] = { ...items[idx], geocoding: true };
+      return { ...prev, items };
+    });
+    geocode(name).then((results) => {
+      const best = results[0];
+      setAiPreview((prev) => {
+        if (!prev) return prev;
+        const items = [...prev.items];
+        items[idx] = { ...items[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, geocoding: false, resolved: !!best };
+        return { ...prev, items };
+      });
+    }).catch(() => {
+      setAiPreview((prev) => {
+        if (!prev) return prev;
+        const items = [...prev.items];
+        items[idx] = { ...items[idx], geocoding: false, resolved: false };
+        return { ...prev, items };
+      });
+    });
+  }, []);
+
+  // Confirm AI preview: transfer state, auto-calculate, then switch to manual
+  const handleConfirmPreview = async () => {
+    if (!aiPreview) return;
+
+    const newWps: Waypoint[] = aiPreview.items.map((item) => ({
+      lat: item.lat,
+      lng: item.lng,
+      name: item.editedName || item.name,
+    }));
+    const newInputs = newWps.map((wp) => wp.name);
+
+    setTitle(aiPreview.title);
+    setStyle(aiPreview.style);
+    setIsRoundTrip(aiPreview.isRoundTrip);
+    setIsMultiDay(aiPreview.isMultiDay);
+    setDaysCount(aiPreview.daysEstimate);
+    setAvoidHighways(aiPreview.avoidHighways);
+    setWaypoints(newWps);
+    setWpInputs(newInputs);
+    setMode("manual");
+
+    // Auto-calculate route immediately using the resolved preview waypoints
+    const resolved = newWps.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+    if (resolved.length < 2) {
+      // Not enough resolved — just show manual form with a hint
+      return;
+    }
+    const toCalc = aiPreview.isRoundTrip ? [...resolved, resolved[0]] : resolved;
+    setCalculating(true);
+    setRouteResult(null);
+    try {
+      const result = await calcRoute(toCalc, aiPreview.style, aiPreview.avoidHighways, false);
+      setRouteResult(result);
+      if (result.durationMinutes > 480 && !aiPreview.isMultiDay) {
+        const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
+        setIsMultiDay(true);
+        setDaysCount(suggestedDays);
+        Alert.alert(
+          "Giro Multi-giorno",
+          `Il percorso dura più di 8 ore.\nAbbiamo attivato il piano multi-giorno su ${suggestedDays} giorni.`,
+          [{ text: "OK" }]
+        );
+      }
+    } catch {
+      Alert.alert("Calcolo automatico fallito", 'Modifica le tappe e premi "Calcola percorso" manualmente.');
+    } finally {
+      setCalculating(false);
+    }
+  };
+
+  // ── Manual mode handlers ───────────────────────────────────────────────────
 
   const handleWpInput = (text: string, index: number) => {
     const newInputs = [...wpInputs]; newInputs[index] = text; setWpInputs(newInputs);
@@ -264,7 +397,6 @@ export default function GiriCreateScreen() {
     try {
       const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip);
       setRouteResult(result);
-      // Auto-trigger multi-day if route exceeds 8h and multi-day is not already on
       if (result.durationMinutes > 480 && !isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
         setIsMultiDay(true);
@@ -280,10 +412,9 @@ export default function GiriCreateScreen() {
     } finally { setCalculating(false); }
   };
 
-  // Fuel stop calculation
   const selectedMoto = motorcycles.find((m) => m.id === selectedMotoId);
-  const avgKmPerLiter = 18; // typical motorcycle average
-  const tankEstimateL = 15; // typical motorcycle tank
+  const avgKmPerLiter = 18;
+  const tankEstimateL = 15;
   const autonomyKm = Math.round(tankEstimateL * avgKmPerLiter * (fuelLevel / 100));
   const fuelStopsNeeded = routeResult ? Math.max(0, Math.ceil(routeResult.distanceKm / autonomyKm) - 1) : 0;
 
@@ -314,6 +445,17 @@ export default function GiriCreateScreen() {
     { key: "fast", label: "Veloce", icon: "rocket-launch-outline", desc: "Percorso più diretto" },
   ];
 
+  const pillRoleLabel = (role: AiPreviewItem["role"]) => {
+    if (role === "start") return "Partenza";
+    if (role === "end") return "Arrivo";
+    return "Tappa";
+  };
+  const pillRoleColor = (role: AiPreviewItem["role"], colors: any) => {
+    if (role === "start") return "#22c55e";
+    if (role === "end") return colors.accentRed;
+    return colors.accent;
+  };
+
   const s = styles(colors);
 
   return (
@@ -333,15 +475,19 @@ export default function GiriCreateScreen() {
       >
         {/* Mode selector */}
         <View style={s.modeRow}>
-          {(["ai", "manual"] as Mode[]).map((m) => (
-            <Pressable key={m} style={[s.modeChip, mode === m && { backgroundColor: colors.accent }]} onPress={() => setMode(m)}>
-              <Ionicons name={m === "ai" ? "sparkles" : "create-outline"} size={14} color={mode === m ? "#000" : colors.text} />
-              <Text style={[s.modeChipText, mode === m && { color: "#000" }]}>{m === "ai" ? "AI" : "Manuale"}</Text>
+          {(["ai", "manual"] as const).map((m) => (
+            <Pressable
+              key={m}
+              style={[s.modeChip, (mode === m || (mode === "ai-preview" && m === "ai")) && { backgroundColor: colors.accent }]}
+              onPress={() => setMode(m)}
+            >
+              <Ionicons name={m === "ai" ? "sparkles" : "create-outline"} size={14} color={(mode === m || (mode === "ai-preview" && m === "ai")) ? "#000" : colors.text} />
+              <Text style={[s.modeChipText, (mode === m || (mode === "ai-preview" && m === "ai")) && { color: "#000" }]}>{m === "ai" ? "AI" : "Manuale"}</Text>
             </Pressable>
           ))}
         </View>
 
-        {/* AI mode */}
+        {/* ── AI INPUT mode ─────────────────────────────────────────────────── */}
         {mode === "ai" && (
           <View style={s.section}>
             <Text style={s.sectionLabel}>Descrivi il tuo giro</Text>
@@ -363,7 +509,139 @@ export default function GiriCreateScreen() {
           </View>
         )}
 
-        {/* Manual mode */}
+        {/* ── AI PREVIEW mode ───────────────────────────────────────────────── */}
+        {mode === "ai-preview" && aiPreview && (
+          <View style={s.section}>
+            {/* Header */}
+            <View style={s.previewHeader}>
+              <Ionicons name="sparkles" size={18} color={colors.accent} />
+              <Text style={s.previewHeaderText}>Anteprima giro generata dall'AI</Text>
+            </View>
+            <Text style={s.previewHint}>Tocca un pill per modificarlo, poi conferma per calcolare il percorso</Text>
+
+            {/* Title pill */}
+            <View style={s.pillSection}>
+              <Text style={s.pillLabel}>TITOLO</Text>
+              <View style={[s.pill, { borderColor: colors.border }]}>
+                <Ionicons name="bookmark-outline" size={14} color={colors.textSecondary} />
+                <TextInput
+                  style={s.pillInput}
+                  value={aiPreview.title}
+                  onChangeText={(t) => setAiPreview((p) => p ? { ...p, title: t } : p)}
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+            </View>
+
+            {/* Style pills */}
+            <View style={s.pillSection}>
+              <Text style={s.pillLabel}>STILE PERCORSO</Text>
+              <View style={s.pillRow}>
+                {(["curvy", "balanced", "fast"] as Style[]).map((st) => (
+                  <Pressable
+                    key={st}
+                    style={[s.stylePill, aiPreview.style === st && { backgroundColor: colors.accent + "33", borderColor: colors.accent }]}
+                    onPress={() => setAiPreview((p) => p ? { ...p, style: st } : p)}
+                  >
+                    <MaterialCommunityIcons
+                      name={st === "curvy" ? "road-variant" : st === "fast" ? "rocket-launch-outline" : "scale-balance"}
+                      size={14}
+                      color={aiPreview.style === st ? colors.accent : colors.textSecondary}
+                    />
+                    <Text style={[s.stylePillText, aiPreview.style === st && { color: colors.accent }]}>
+                      {st === "curvy" ? "Curve" : st === "fast" ? "Veloce" : "Bilanciato"}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* Waypoint pills */}
+            <View style={s.pillSection}>
+              <Text style={s.pillLabel}>TAPPE</Text>
+              {aiPreview.items.map((item, idx) => (
+                <View key={idx} style={s.locationPillRow}>
+                  <View style={[s.locationPillDot, { backgroundColor: pillRoleColor(item.role, colors) }]} />
+                  <View style={[
+                    s.locationPill,
+                    item.resolved && { borderColor: "#22c55e55" },
+                    !item.resolved && !item.geocoding && item.editedName && { borderColor: colors.accentRed + "55" },
+                  ]}>
+                    <Text style={[s.locationPillRole, { color: pillRoleColor(item.role, colors) }]}>
+                      {pillRoleLabel(item.role)}
+                    </Text>
+                    <TextInput
+                      style={s.locationPillInput}
+                      value={item.editedName}
+                      onChangeText={(t) => updatePreviewItemName(idx, t)}
+                      onBlur={() => regeocodePillItem(idx, item.editedName)}
+                      placeholderTextColor={colors.textSecondary}
+                      placeholder="Inserisci luogo..."
+                    />
+                    {item.geocoding && <ActivityIndicator size="small" color={colors.accent} style={{ marginLeft: 4 }} />}
+                    {!item.geocoding && item.resolved && <Ionicons name="checkmark-circle" size={16} color="#22c55e" />}
+                    {!item.geocoding && !item.resolved && item.editedName.length > 0 && (
+                      <Ionicons name="alert-circle-outline" size={16} color={colors.accentRed} />
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Options pills */}
+            <View style={s.pillSection}>
+              <Text style={s.pillLabel}>OPZIONI</Text>
+              <View style={s.optionPillRow}>
+                <Pressable
+                  style={[s.optionPill, aiPreview.isRoundTrip && { backgroundColor: colors.accent + "22", borderColor: colors.accent }]}
+                  onPress={() => setAiPreview((p) => p ? { ...p, isRoundTrip: !p.isRoundTrip } : p)}
+                >
+                  <Ionicons name="repeat-outline" size={14} color={aiPreview.isRoundTrip ? colors.accent : colors.textSecondary} />
+                  <Text style={[s.optionPillText, aiPreview.isRoundTrip && { color: colors.accent }]}>Andata e ritorno</Text>
+                </Pressable>
+                <Pressable
+                  style={[s.optionPill, aiPreview.isMultiDay && { backgroundColor: "#7c3aed22", borderColor: "#a78bfa" }]}
+                  onPress={() => setAiPreview((p) => p ? { ...p, isMultiDay: !p.isMultiDay } : p)}
+                >
+                  <Ionicons name="calendar-outline" size={14} color={aiPreview.isMultiDay ? "#a78bfa" : colors.textSecondary} />
+                  <Text style={[s.optionPillText, aiPreview.isMultiDay && { color: "#a78bfa" }]}>
+                    {aiPreview.isMultiDay ? `${aiPreview.daysEstimate} giorni` : "Multi-giorno"}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[s.optionPill, aiPreview.avoidHighways && { backgroundColor: colors.accent + "22", borderColor: colors.accent }]}
+                  onPress={() => setAiPreview((p) => p ? { ...p, avoidHighways: !p.avoidHighways } : p)}
+                >
+                  <MaterialCommunityIcons name="highway" size={14} color={aiPreview.avoidHighways ? colors.accent : colors.textSecondary} />
+                  <Text style={[s.optionPillText, aiPreview.avoidHighways && { color: colors.accent }]}>Evita autostrade</Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Geocoding status summary */}
+            {aiPreview.items.some((i) => !i.resolved && !i.geocoding && i.editedName) && (
+              <View style={s.previewWarning}>
+                <Ionicons name="warning-outline" size={14} color="#f59e0b" />
+                <Text style={s.previewWarningText}>
+                  Alcune tappe non sono state risolte. Modificale manualmente o il percorso potrebbe non calcolarsi.
+                </Text>
+              </View>
+            )}
+
+            {/* CTA buttons */}
+            <Pressable style={s.primaryBtn} onPress={handleConfirmPreview}>
+              <MaterialCommunityIcons name="map-marker-path" size={18} color="#000" />
+              <Text style={s.primaryBtnText}>Conferma e modifica percorso</Text>
+            </Pressable>
+
+            <Pressable style={s.secondaryBtn} onPress={() => { setMode("ai"); setAiPreview(null); }}>
+              <Ionicons name="arrow-back-outline" size={16} color={colors.textSecondary} />
+              <Text style={s.secondaryBtnText}>Rigenera con AI</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* ── MANUAL mode ───────────────────────────────────────────────────── */}
         {mode === "manual" && (
           <>
             {/* Title */}
@@ -386,7 +664,7 @@ export default function GiriCreateScreen() {
               </View>
             </View>
 
-            {/* Planner map — tap to add waypoints */}
+            {/* Planner map */}
             <View style={s.section}>
               <Text style={s.sectionLabel}>Mappa percorso</Text>
               <View style={s.plannerMapContainer}>
@@ -400,9 +678,7 @@ export default function GiriCreateScreen() {
                   onMessage={(e) => {
                     try {
                       const msg = JSON.parse(e.nativeEvent.data);
-                      if (msg.type === "tap") {
-                        handleMapTap(msg.lat, msg.lng);
-                      }
+                      if (msg.type === "tap") handleMapTap(msg.lat, msg.lng);
                     } catch {}
                   }}
                 />
@@ -459,7 +735,6 @@ export default function GiriCreateScreen() {
             <View style={s.section}>
               <Text style={s.sectionLabel}>Opzioni percorso</Text>
 
-              {/* Round trip */}
               <View style={s.toggleRow}>
                 <View style={s.toggleInfo}>
                   <Ionicons name="repeat-outline" size={18} color={colors.text} />
@@ -488,7 +763,6 @@ export default function GiriCreateScreen() {
                 </View>
               )}
 
-              {/* Multi-day */}
               <View style={s.toggleRow}>
                 <View style={s.toggleInfo}>
                   <Ionicons name="calendar-outline" size={18} color={colors.text} />
@@ -526,7 +800,6 @@ export default function GiriCreateScreen() {
                 </View>
               )}
 
-              {/* Avoid options */}
               <View style={s.toggleRow}>
                 <View style={s.toggleInfo}>
                   <MaterialCommunityIcons name="highway" size={18} color={colors.text} />
@@ -611,11 +884,7 @@ export default function GiriCreateScreen() {
                 <View style={s.resultStats}>
                   {[
                     { icon: "navigate-outline", value: `${routeResult.distanceKm} km`, label: "Distanza" },
-                    {
-                      icon: "time-outline",
-                      value: `${Math.floor(routeResult.durationMinutes / 60)}h ${routeResult.durationMinutes % 60}m`,
-                      label: "Durata"
-                    },
+                    { icon: "time-outline", value: `${Math.floor(routeResult.durationMinutes / 60)}h ${routeResult.durationMinutes % 60}m`, label: "Durata" },
                     { icon: "steering", value: String(Math.round(routeResult.bikerScore * 100)), label: "BikerScore" },
                   ].map((stat, i) => (
                     <View key={i} style={s.resultStat}>
@@ -693,6 +962,32 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   hint: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, marginTop: 6, lineHeight: 18 },
   primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, marginTop: 10, marginBottom: 6 },
   primaryBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#000" },
+  secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12 },
+  secondaryBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.textSecondary },
+
+  // AI Preview styles
+  previewHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  previewHeaderText: { fontFamily: "Inter_700Bold", fontSize: 16, color: colors.text },
+  previewHint: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginBottom: 16, lineHeight: 18 },
+  pillSection: { marginBottom: 16 },
+  pillLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 },
+  pill: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1 },
+  pillInput: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 14, color: colors.text },
+  pillRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  stylePill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  stylePillText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary },
+  locationPillRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
+  locationPillDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
+  locationPill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: colors.border },
+  locationPillRole: { fontFamily: "Inter_600SemiBold", fontSize: 11, flexShrink: 0 },
+  locationPillInput: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 14, color: colors.text },
+  optionPillRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
+  optionPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  optionPillText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary },
+  previewWarning: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#f59e0b22", borderRadius: 10, padding: 12, marginBottom: 10 },
+  previewWarningText: { fontFamily: "Inter_400Regular", fontSize: 13, color: "#f59e0b", flex: 1, lineHeight: 18 },
+
+  // Manual mode styles
   styleRow: { flexDirection: "row", gap: 8 },
   styleCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 12, padding: 12, alignItems: "center", gap: 4, borderWidth: 1, borderColor: colors.border },
   styleLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: colors.text, textAlign: "center" },

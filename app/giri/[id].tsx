@@ -47,7 +47,8 @@ interface CompatibleBiker {
 interface PlannedRoute {
   id: string; userId: string; title: string;
   description?: string | null; distanceKm: number; durationMinutes: number;
-  bikerScore: number; style: "curvy" | "balanced" | "fast";
+  bikerScore: number; realCurvatureScore?: number | null;
+  style: "curvy" | "balanced" | "fast";
   visibility: "public" | "private"; isMultiDay: boolean;
   waypoints: Waypoint[]; polyline?: string | null;
   metadata?: Record<string, unknown>; createdAt: string;
@@ -411,6 +412,16 @@ export default function GiriDetailScreen() {
           <View style={s.bsBarBg}>
             <View style={[s.bsBarFill, { width: `${Math.round(route.bikerScore * 100)}%` as any, backgroundColor: scoreColor }]} />
           </View>
+
+          {/* Real curvature score badge from sensor data */}
+          {route.realCurvatureScore != null && (
+            <View style={s.realScoreBadge}>
+              <MaterialCommunityIcons name="radar" size={13} color="#22c55e" />
+              <Text style={s.realScoreText}>
+                Score reale: {Math.round(route.realCurvatureScore * 100)}/100 — da dati GPS reali
+              </Text>
+            </View>
+          )}
 
           <View style={s.metaRow}>
             <View style={s.metaBadge}>
@@ -786,6 +797,8 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   infoCard: { flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginTop: 4 },
   infoTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text },
   infoDesc: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginTop: 2 },
+  realScoreBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#22c55e18", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  realScoreText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#22c55e", flex: 1 },
   matchBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.accent + "22", borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.accent + "44" },
   matchBannerText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.text, flex: 1 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
