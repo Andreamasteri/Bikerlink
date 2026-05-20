@@ -16,11 +16,35 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import * as Speech from "expo-speech";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { buildNavigationMapHtml } from "@/lib/leaflet-navigation-html";
 import { getTileConfig } from "@/lib/map-tiles";
 import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
+
+// ─── Route cache helpers ───────────────────────────────────────────────────────
+
+const ROUTE_CACHE_PREFIX = "route_cache_";
+
+async function saveRouteToCache(route: PlannedRoute): Promise<void> {
+  try {
+    await AsyncStorage.setItem(
+      `${ROUTE_CACHE_PREFIX}${route.id}`,
+      JSON.stringify(route)
+    );
+  } catch {}
+}
+
+async function loadRouteFromCache(id: string): Promise<PlannedRoute | null> {
+  try {
+    const raw = await AsyncStorage.getItem(`${ROUTE_CACHE_PREFIX}${id}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as PlannedRoute;
+  } catch {
+    return null;
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -137,14 +161,28 @@ export default function NavigateScreen() {
   const [polylinePoints, setPolylinePoints] = useState<Array<[number, number]>>([]);
   const [hasPermission, setHasPermission] = useState(false);
   const [isRerouting, setIsRerouting] = useState(false);
+  const [isOffline, setIsOffline] = useState(false);
 
   const { data: route, isLoading } = useQuery<PlannedRoute>({
     queryKey: ["/api/planned-routes", id],
     queryFn: async () => {
-      const resp = await apiRequest("GET", `/api/planned-routes/${id}`);
-      return resp.json();
+      try {
+        const resp = await apiRequest("GET", `/api/planned-routes/${id}`);
+        const data: PlannedRoute = await resp.json();
+        setIsOffline(false);
+        saveRouteToCache(data);
+        return data;
+      } catch {
+        const cached = await loadRouteFromCache(id ?? "");
+        if (cached) {
+          setIsOffline(true);
+          return cached;
+        }
+        throw new Error("Nessuna connessione e nessuna cache disponibile.");
+      }
     },
     enabled: !!id,
+    retry: false,
   });
 
   // Decode polyline once route loads; also seed active refs
@@ -493,6 +531,14 @@ export default function NavigateScreen() {
         <View style={[s.progressFill, { width: `${progressPct}%` as any }]} />
       </View>
 
+      {/* Offline banner */}
+      {isOffline && (
+        <View style={s.offlineBanner}>
+          <Ionicons name="cloud-offline-outline" size={14} color="#fff" />
+          <Text style={s.offlineBannerText}>Modalità offline — percorso in cache</Text>
+        </View>
+      )}
+
       {/* Instruction panel */}
       <View style={[s.panel, { paddingBottom: bottomPad + 8 }]}>
         {step ? (
@@ -662,4 +708,14 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     paddingHorizontal: 18,
   },
   finishedBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#fff" },
+  offlineBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#c0392b",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  offlineBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#fff" },
 });
