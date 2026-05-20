@@ -65,6 +65,8 @@ button{font:inherit;cursor:pointer}
 .nav-links a:hover,.nav-links a[aria-current="page"]{color:var(--text);opacity:1}
 .nav-cta{font-size:13px;font-weight:700;letter-spacing:1px;padding:9px 18px;background:var(--accent);color:#fff !important;border-radius:var(--radius);text-transform:uppercase}
 .nav-cta:hover{background:var(--accent-hover);opacity:1 !important}
+.nav-planner-link{color:var(--accent) !important;font-weight:700 !important}
+.nav-planner-link:hover{opacity:.8 !important}
 .nav-burger{display:none;background:none;border:1px solid var(--border-mid);color:var(--text);width:40px;height:36px;border-radius:var(--radius);font-size:18px;align-items:center;justify-content:center;margin-left:auto}
 .nav-burger:focus{outline:2px solid var(--accent)}
 @media(max-width:860px){
@@ -267,6 +269,7 @@ function navbar(currentPath: string): string {
       ${link("/community", "Community", "nav.community")}
       ${link("/about", "About", "nav.about")}
       ${link("/faq", "FAQ", "nav.faq")}
+      <a href="/accedi?next=/pianifica" id="navPlannerLink" class="nav-planner-link" data-i18n="nav.planner">🤖 Pianifica Giro</a>
       <a href="/download" class="nav-cta" aria-label="Scarica app" data-i18n="nav.download">Scarica app</a>
       <div class="lang-toggle nav-lang-mobile" role="group" aria-label="Seleziona lingua">
         <button class="lang-btn" id="langIT_m" aria-pressed="true" onclick="setLang('it')">IT</button>
@@ -293,6 +296,7 @@ function navbar(currentPath: string): string {
     it:{
       'nav.features':'Funzionalità','nav.sos':'SOS','nav.motoclub':'MotoClub',
       'nav.community':'Community','nav.about':'About','nav.faq':'FAQ',
+      'nav.planner':'🤖 Pianifica Giro',
       'nav.download':'Scarica app',
       'footer.product':'Prodotto','footer.company':'Azienda','footer.legal':'Legale',
       'footer.features':'Funzionalità','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
@@ -309,6 +313,7 @@ function navbar(currentPath: string): string {
     en:{
       'nav.features':'Features','nav.sos':'SOS','nav.motoclub':'MotoClub',
       'nav.community':'Community','nav.about':'About','nav.faq':'FAQ',
+      'nav.planner':'🤖 AI Planner',
       'nav.download':'Download app',
       'footer.product':'Product','footer.company':'Company','footer.legal':'Legal',
       'footer.features':'Features','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
@@ -355,6 +360,14 @@ function navbar(currentPath: string): string {
   var saved;
   try{saved=localStorage.getItem('bl_lang');}catch(e){}
   applyLang(saved==='en'?'en':'it');
+
+  // Upgrade planner link to /pianifica if already logged in
+  var pl=document.getElementById('navPlannerLink');
+  if(pl){
+    fetch('/api/auth/me',{credentials:'include'}).then(function(r){
+      if(r.ok) pl.setAttribute('href','/pianifica');
+    }).catch(function(){});
+  }
 })();
 </script>`;
 }

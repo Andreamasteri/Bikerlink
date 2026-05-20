@@ -346,7 +346,7 @@ function configureExpoAndLanding(app: express.Application) {
   app.get("/pianifica", (req: Request, res: Response) => {
     const userId = (req.session as any)?.userId as string | undefined;
     if (!userId) {
-      return res.redirect(302, "/accedi");
+      return res.redirect(302, "/accedi?next=/pianifica");
     }
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");

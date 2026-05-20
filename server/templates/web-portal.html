@@ -1101,7 +1101,13 @@ async function submitLogin(e) {
     } else {
       currentUser = data;
       renderNavAuth();
-      navigate('/area-utente');
+      const nextParam = new URLSearchParams(window.location.search).get('next');
+      const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
+      if (safeNext && !ROUTES[safeNext]) {
+        window.location.href = safeNext;
+      } else {
+        navigate(safeNext || '/area-utente');
+      }
     }
   } catch {
     showAlert('login-alert', 'Errore di rete. Riprova.');
