@@ -258,13 +258,22 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
 
 ### Sintomo: utenti devono cancellare i dati dell'app per ricevere l'aggiornamento
 
-**Causa (risolta in OTA-10)**: nel ramo `fetch-not-new` di `lib/ota-check.ts`, quando `fetchUpdateAsync()` restituisce `isNew=false` (bundle già scaricato in una sessione precedente), il codice ritornava senza chiamare `reloadAsync()`. Scenario tipico: app scarica l'OTA in foreground → utente fa force-kill prima di backgroundare → al riavvio `_pendingReload` è in-memory e si azzera → `fetchUpdateAsync` restituisce `isNew=false` → OLD CODE: nessun reload → stuck permanente.
+**Causa radice (identificata dopo OTA-11)**: `reloadAsync()` chiamato all'interno del listener AppState "background" non si completa affidabilmente su Android. Il processo JS viene sospeso dal SO prima che la chiamata nativa possa terminare. Il flag in-memory `_pendingReload` si azzera al kill → sessione successiva: `fetchUpdateAsync()` restituisce `isNew=false` → fix OTA-10 re-schedula il background listener → stesso problema → loop infinito → solo clear dati risolve.
 
-**Fix (OTA-10, commit `2c75142`)**: il ramo `fetch-not-new` ora chiama `_scheduleReloadOnBackground()` e imposta `_pendingReload = true`, identico al ramo `isNew=true`. Al prossimo backgrounding `reloadAsync()` scatta automaticamente.
+**Fix layer 1 — OTA-10 (commit `2c75142`)**: ramo `fetch-not-new` ora chiama `_scheduleReloadOnBackground()` come il ramo `isNew=true`. Risolve il caso force-kill ma non il caso background-listener-inaffidabile.
 
-**File**: `lib/ota-check.ts`, funzione `triggerOtaCheck`, blocco `if (!fetched.isNew)` (dopo `fetchUpdateAsync`).
+**Fix layer 2 — introdotto dopo OTA-11**: flag persistente su AsyncStorage `@bikerlink/ota_pending_reload`.
+- **Scritto** da `triggerOtaCheck()` subito dopo `fetchUpdateAsync()` riuscito (entrambi i rami `isNew=true` e `isNew=false`).
+- **Cancellato** nel listener background (`_scheduleReloadOnBackground`) SE `reloadAsync()` va a buon fine, e nel ramo `no-update` (siamo già aggiornati).
+- **Letto** all'avvio in `OtaStartupChecker` (`app/_layout.tsx`): se il flag è presente, chiama `Updates.reloadAsync()` **immediatamente**, prima ancora dei 3 secondi di ritardo del check normale. Questo garantisce che l'aggiornamento scaricato nella sessione precedente venga applicato al cold start successivo, mentre l'utente è ancora sulla schermata di caricamento.
+- **Fix aggiuntivo**: il listener AppState ora si attiva solo su `"background"` (rimosso `"inactive"` — stato transitorio Android dove il processo viene sospeso prima del completamento).
 
-**Se il sintomo si ripresenta**: verificare che il ramo `fetch-not-new` contenga ancora la chiamata a `_scheduleReloadOnBackground()` e che `_pendingReload = true` sia impostato prima del return.
+**File**: `lib/ota-check.ts` (costante `OTA_PENDING_KEY`, scrittura/cancellazione flag), `app/_layout.tsx` (lettura flag in `OtaStartupChecker`).
+
+**Se il sintomo si ripresenta**: verificare che:
+1. `lib/ota-check.ts` contenga `AsyncStorage.setItem(OTA_PENDING_KEY, "1")` nei rami `fetched` e `fetch-not-new`.
+2. `app/_layout.tsx` in `OtaStartupChecker` legga il flag con `AsyncStorage.getItem(OTA_PENDING_KEY)` e chiami `Updates.reloadAsync()` se presente.
+3. Il listener in `_scheduleReloadOnBackground` si attivi solo su `nextState === "background"` (non `"inactive"`).
 
 ---
 

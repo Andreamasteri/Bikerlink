@@ -20,9 +20,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import * as Updates from "expo-updates";
 import Constants from "expo-constants";
-import { triggerOtaCheck } from "@/lib/ota-check";
+import { triggerOtaCheck, OTA_PENDING_KEY } from "@/lib/ota-check";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { initOtaHardening } from "@/lib/ota-hardening";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { isOtaStuck } from "@/lib/ota-stuck";
 import OtaStuckScreen from "@/components/OtaStuckScreen";
 import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
@@ -290,18 +291,41 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 function OtaStartupChecker() {
   useEffect(() => {
     // Task #1357 — hardening OTA: device-id, heartbeat, error-recovery listener.
-    // Eseguito una sola volta al primo mount del root layout (dopo fonts ready).
-    // Fire-and-forget: nessun await, nessun blocco UI.
     initOtaHardening().catch(() => {});
 
-    const timer = setTimeout(() => {
-      triggerOtaCheck("startup");
-    }, 3000);
+    let timerHandle: ReturnType<typeof setTimeout> | null = null;
+    let mounted = true;
+
+    const doStartup = async () => {
+      // Fix: leggi il flag persistente scritto da ota-check.ts dopo ogni fetch.
+      // Se presente, significa che l'update era già stato scaricato nella sessione
+      // precedente ma reloadAsync() nel background listener non è scattato
+      // (comportamento inaffidabile su Android). Lo applichiamo subito, prima
+      // che l'utente veda qualsiasi schermata, senza aspettare 3 secondi.
+      if (!__DEV__ && Platform.OS !== "web") {
+        try {
+          const pending = await AsyncStorage.getItem(OTA_PENDING_KEY);
+          if (pending === "1" && mounted) {
+            await AsyncStorage.removeItem(OTA_PENDING_KEY);
+            Updates.reloadAsync().catch(() => {});
+            return; // non schedula il check normale
+          }
+        } catch {}
+      }
+      if (!mounted) return;
+      timerHandle = setTimeout(() => {
+        triggerOtaCheck("startup");
+      }, 3000);
+    };
+
+    doStartup();
+
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") triggerOtaCheck("appstate");
     });
     return () => {
-      clearTimeout(timer);
+      mounted = false;
+      if (timerHandle) clearTimeout(timerHandle);
       sub.remove();
     };
   }, []);

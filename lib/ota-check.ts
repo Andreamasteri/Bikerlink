@@ -1,8 +1,17 @@
 import * as Updates from "expo-updates";
 import { AppState, Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/query-client";
 import { incrementStuckSessions, getLastFetchedId, setLastFetchedId } from "@/lib/ota-stuck";
 import { getCachedDeviceId } from "@/lib/device-id";
+
+// Chiave AsyncStorage per il flag di reload pendente.
+// Viene scritto dopo ogni fetchUpdateAsync() riuscito.
+// Letto al cold start in OtaStartupChecker (_layout.tsx): se presente,
+// reloadAsync() viene chiamato immediatamente (prima dei 3s di ritardo),
+// garantendo che l'aggiornamento venga applicato anche se il background
+// listener di AppState non funzionò nella sessione precedente (Android).
+export const OTA_PENDING_KEY = "@bikerlink/ota_pending_reload";
 
 export type OtaTriggerSource = "startup" | "appstate" | "login" | "register" | "manual";
 export type OtaPhase = "check" | "fetch" | "reload" | "no-update" | "fetch-not-new" | "fetched" | "skipped";
@@ -56,12 +65,17 @@ let _bgListenerSub: ReturnType<typeof AppState.addEventListener> | null = null;
 function _scheduleReloadOnBackground() {
   if (_bgListenerSub) return;
   _bgListenerSub = AppState.addEventListener("change", (nextState) => {
-    if (_pendingReload && (nextState === "background" || nextState === "inactive")) {
+    // "inactive" su Android è uno stato transitorio brevissimo — il processo JS
+    // può venire sospeso prima che reloadAsync() completi. Si usa solo "background".
+    if (_pendingReload && nextState === "background") {
       _pendingReload = false;
       if (_bgListenerSub) {
         _bgListenerSub.remove();
         _bgListenerSub = null;
       }
+      // Cancella il flag persistente: se reloadAsync() riesce, al prossimo
+      // cold start non serve un secondo reload.
+      AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
       Updates.reloadAsync().catch(() => {});
     }
   });
@@ -268,6 +282,8 @@ export async function triggerOtaCheck(
     const check = await Updates.checkForUpdateAsync();
     if (!check.isAvailable) {
       consecutiveFailures = 0;
+      // Siamo aggiornati: cancella l'eventuale flag residuo di sessioni precedenti.
+      AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
       reportOtaEvent({ phase: "no-update", source, currentUpdateId, runtimeVersion });
       const r: OtaManualResult = { ok: true, phase: "no-update" };
       _emitOtaResult(r);
@@ -306,11 +322,15 @@ export async function triggerOtaCheck(
       const appIsActive = AppState.currentState === "active";
       if (options?.immediateReload || !appIsActive) {
         phase = "reload";
+        AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
         await Updates.reloadAsync();
         const r: OtaManualResult = { ok: true, phase: "reload" };
         _emitOtaResult(r);
         return r;
       }
+      // Persiste il flag: se il background listener non scatta (Android),
+      // il prossimo cold start chiamerà reloadAsync() prima dei 3s.
+      AsyncStorage.setItem(OTA_PENDING_KEY, "1").catch(() => {});
       _pendingReload = true;
       _scheduleReloadOnBackground();
       const r: OtaManualResult = { ok: true, phase: "fetch-not-new" };
@@ -325,10 +345,11 @@ export async function triggerOtaCheck(
 
     // Task #1164: riavvio differito al backgrounding.
     // Se il check è manuale (admin) o l'app è già in background, riavviamo subito.
-    // Altrimenti aspettiamo che l'utente esca dall'app (AppState → background/inactive).
+    // Altrimenti aspettiamo che l'utente esca dall'app (AppState → background).
     const appIsActive = AppState.currentState === "active";
     if (options?.immediateReload || !appIsActive) {
       phase = "reload";
+      AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
       await Updates.reloadAsync();
       // reloadAsync non ritorna sotto normali condizioni — l'app si riavvia.
       const r: OtaManualResult = { ok: true, phase: "reload" };
@@ -337,6 +358,10 @@ export async function triggerOtaCheck(
     }
 
     // App in primo piano: schedula il reload al prossimo backgrounding.
+    // Persiste il flag su AsyncStorage: se il background listener non scatta
+    // (comportamento inaffidabile su Android), il cold start successivo
+    // rileverà il flag e chiamerà reloadAsync() immediatamente.
+    AsyncStorage.setItem(OTA_PENDING_KEY, "1").catch(() => {});
     _pendingReload = true;
     _scheduleReloadOnBackground();
     const r: OtaManualResult = { ok: true, phase: "fetched" };
