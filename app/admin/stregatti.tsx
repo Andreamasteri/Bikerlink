@@ -678,20 +678,28 @@ export default function FakeUsersAdmin() {
               <Ionicons name="people" size={20} color={Colors.accent} />
               <Text style={styles.controlLabel}>Abilita stregatti</Text>
             </View>
-            <Switch
-              value={allEnabled}
-              onValueChange={(val) => {
-                setPendingToggleVal(val);
-                setTogglePwdInput("");
-                setTogglePwdVisible(true);
-              }}
-              trackColor={{ false: Colors.border, true: Colors.success }}
-              thumbColor={allEnabled ? Colors.text : Colors.textSecondary}
-              disabled={toggleAllMutation.isPending}
-            />
+            {toggleAllMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.accent} />
+            ) : (
+              <Switch
+                value={allEnabled}
+                onValueChange={(val) => {
+                  setPendingToggleVal(val);
+                  setTogglePwdInput("");
+                  setTogglePwdVisible(true);
+                }}
+                trackColor={{ false: Colors.border, true: Colors.success }}
+                thumbColor={allEnabled ? Colors.text : Colors.textSecondary}
+                disabled={toggleAllMutation.isPending}
+              />
+            )}
           </View>
           <Text style={styles.controlDesc}>
-            {allEnabled ? "Tutti gli stregatti sono attivi e visibili" : "Gli stregatti sono disattivati"}
+            {toggleAllMutation.isPending
+              ? "Aggiornamento in corso..."
+              : allEnabled
+              ? "Tutti gli stregatti sono attivi e visibili"
+              : "Gli stregatti sono disattivati"}
           </Text>
           {!!usersError && (
             <Text style={[styles.controlDesc, { color: Colors.error ?? "#e53935" }]}>
