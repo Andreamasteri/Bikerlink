@@ -66,6 +66,27 @@ function requireAuth(req: Request, res: Response, next: () => void) {
   next();
 }
 
+router.get("/position", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const profile = await storage.getUserProfile(userId);
+    if (!profile || profile.latitude == null || profile.longitude == null) {
+      return res.json({ latitude: null, longitude: null, source: null });
+    }
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const isLive = profile.coordinatesUpdatedAt != null && new Date(profile.coordinatesUpdatedAt) > fiveMinAgo;
+    return res.json({
+      latitude: profile.latitude,
+      longitude: profile.longitude,
+      source: isLive ? "live" : "last_known",
+      updatedAt: profile.coordinatesUpdatedAt,
+    });
+  } catch (error) {
+    console.error("Get user position error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 function applyPositionFuzz(lat: number, lng: number, radiusKm: number): { lat: number; lng: number } {
   const R = 6371;
   const r = radiusKm * Math.sqrt(Math.random());

@@ -28,6 +28,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import { useSynecoVisible } from "@/lib/syneco-context";
 import { useSetting } from "@/lib/settings-context";
+import { useLocationGate } from "@/lib/location-context";
 import InteractiveMap, { type ClubMapPin, type InteractiveMapHandle } from "@/components/InteractiveMap";
 import { getRegionCoordinates } from "@/constants/regions";
 import { getCountryFlag, getCountryName, getCountryByCode, EUROPEAN_COUNTRIES, CONTINENT_MAP, getCountriesForContinent, getContinentForCountry, type CountryData, type RegionData } from "@/lib/countries-regions";
@@ -72,6 +73,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const baseUrl = getApiUrl();
   const synecoVisible = useSynecoVisible();
+  const { positionReady: contextPositionReady } = useLocationGate();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapFullscreen, setMapFullscreen] = useState(false);
@@ -333,11 +335,11 @@ export default function MapScreen() {
     return `${selectedCountries.length} paesi`;
   }, [selectedCountries]);
 
-  const getRegionFallback = useCallback(() => {
+  const getRegionFallback = useCallback((): { latitude: number; longitude: number } | null => {
     if (user?.region) {
       return getRegionCoordinates(user.region, user?.country);
     }
-    return { latitude: 41.9028, longitude: 12.4964 };
+    return null;
   }, [user?.region, user?.country]);
 
   const fetchGPSLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
@@ -390,31 +392,43 @@ export default function MapScreen() {
         } catch {}
 
         sendStartupBeacon("fetch_gps_start");
-        if (user?.region) {
-          // Applica la regione del profilo solo se non abbiamo già una posizione GPS locale
-          if (!cancelled) setLocation((prev) => prev ?? getRegionCoordinates(user.region, user.country));
-          if (!cancelled) setLocationLoading(false);
-          const gps = await fetchGPSLocation();
-          if (gps && !cancelled) setLocation(gps);
-          return;
-        }
 
-        if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
-          if (!cancelled) setLocation((prev) => prev ?? { latitude: Number(profileLat), longitude: Number(profileLng) });
-          if (!cancelled) setLocationLoading(false);
-          const gps = await fetchGPSLocation();
-          if (gps && !cancelled) setLocation(gps);
-          return;
+        if (Platform.OS !== "web") {
+          if (user?.region) {
+            if (!cancelled) setLocation((prev) => prev ?? getRegionCoordinates(user.region, user.country));
+            if (!cancelled) setLocationLoading(false);
+            const gps = await fetchGPSLocation();
+            if (gps && !cancelled) setLocation(gps);
+            return;
+          }
+
+          if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
+            if (!cancelled) setLocation((prev) => prev ?? { latitude: Number(profileLat), longitude: Number(profileLng) });
+            if (!cancelled) setLocationLoading(false);
+            const gps = await fetchGPSLocation();
+            if (gps && !cancelled) setLocation(gps);
+            return;
+          }
         }
 
         const gps = await fetchGPSLocation();
-        if (!cancelled) {
-          if (gps) {
-            setLocation(gps);
-          } else {
-            setLocation((prev) => prev ?? getRegionFallback());
-          }
+        if (cancelled) return;
+        if (gps) {
+          setLocation(gps);
           setLocationLoading(false);
+        } else if (Platform.OS !== "web") {
+          const fallback = getRegionFallback();
+          if (fallback) setLocation((prev) => prev ?? fallback);
+          setLocationLoading(false);
+        } else {
+          try {
+            const res = await apiRequest("GET", "/api/user/position");
+            const data = await res.json();
+            if (!cancelled && data?.latitude != null && data?.longitude != null) {
+              setLocation((prev) => prev ?? { latitude: data.latitude, longitude: data.longitude });
+            }
+          } catch {}
+          if (!cancelled) setLocationLoading(false);
         }
       } catch (err) {
         console.warn("[index] initMapLocation fallita:", err);
@@ -430,7 +444,8 @@ export default function MapScreen() {
     if (gps) {
       setLocation(gps);
     } else {
-      setLocation(getRegionFallback());
+      const fallback = getRegionFallback();
+      if (fallback) setLocation(fallback);
     }
   }, [fetchGPSLocation, getRegionFallback]);
 
@@ -857,6 +872,15 @@ export default function MapScreen() {
   }, [router]);
 
   if (authLoading || locationLoading) {
+    return (
+      <View style={styles.loading}>
+        <ActivityIndicator size="large" color={Colors.accent} />
+        <Text style={styles.loadingText}>{t("map.loadingMap")}</Text>
+      </View>
+    );
+  }
+
+  if (Platform.OS === "web" && !location && !contextPositionReady) {
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={Colors.accent} />

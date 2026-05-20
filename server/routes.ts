@@ -197,6 +197,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/match-preferences", matchPreferencesRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
+
+  app.get("/api/user/position", async (req: Request, res: Response) => {
+    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    try {
+      const profile = await storage.getUserProfile(req.session.userId);
+      if (!profile || profile.latitude == null || profile.longitude == null) {
+        return res.json({ latitude: null, longitude: null, source: null });
+      }
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const isLive = profile.coordinatesUpdatedAt != null && new Date(profile.coordinatesUpdatedAt) > fiveMinAgo;
+      return res.json({
+        latitude: profile.latitude,
+        longitude: profile.longitude,
+        source: isLive ? "live" : "last_known",
+        updatedAt: profile.coordinatesUpdatedAt,
+      });
+    } catch (error) {
+      console.error("Get user position error:", error);
+      return res.status(500).json({ message: "Errore interno del server" });
+    }
+  });
   app.use("/api/motorcycles", motorcycleRoutes);
   app.use("/api/proposals", proposalRoutes);
   app.use("/api/chat", chatRoutes);
