@@ -405,7 +405,7 @@ function SensorOverlayPanel({
         </View>
         <View style={s.sensorOverlaySep} />
         <View style={s.sensorOverlayItem}>
-          <Text style={[s.sensorOverlayValue, { color: currentTiltDeg < 0 ? colors.accentRed : currentTiltDeg > 0 ? colors.success : colors.accent }]}>
+          <Text style={[s.sensorOverlayValue, { color: currentTiltDeg < -2 ? colors.accentRed : currentTiltDeg > 2 ? colors.success : colors.accent }]}>
             {currentTiltDeg.toFixed(1)}°
           </Text>
           <Text style={s.sensorOverlayLabel}>{t("tracking.tiltLive")}</Text>
