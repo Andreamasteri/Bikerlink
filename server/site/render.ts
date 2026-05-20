@@ -72,6 +72,29 @@ main{padding-top:64px;min-height:60vh}
 .section-title .accent{color:var(--accent)}
 .section-lead{font-size:17px;color:var(--text2);max-width:680px;margin-bottom:36px}
 
+/* COMPETITOR TABLE */
+.comp-section{padding:80px 24px}
+.comp-section .section-inner{max-width:var(--max);margin:0 auto}
+.comp-highlights{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin:40px 0}
+@media(max-width:640px){.comp-highlights{grid-template-columns:1fr}}
+.comp-highlight{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:24px 20px;display:flex;flex-direction:column;gap:10px}
+.comp-highlight-icon{font-size:24px;line-height:1}
+.comp-highlight-title{font-size:14px;font-weight:700;letter-spacing:.5px;color:var(--text)}
+.comp-highlight-desc{font-size:13px;color:var(--text3);line-height:1.6}
+.comp-highlight-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(255,59,48,.12);color:var(--accent);font-size:11px;font-weight:700;letter-spacing:1px;padding:3px 10px;border-radius:20px;margin-top:auto;align-self:flex-start}
+.comp-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--border);border-radius:12px;margin-top:12px}
+.comp-table{width:100%;border-collapse:collapse;min-width:560px}
+.comp-table th,.comp-table td{padding:12px 14px;text-align:center;font-size:13px;border-bottom:1px solid var(--border)}
+.comp-table td:first-child,.comp-table th:first-child{text-align:left;font-weight:600;color:var(--text);white-space:nowrap}
+.comp-table thead th{background:var(--surface);font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);position:sticky;top:0;z-index:1}
+.comp-table thead th.col-bl{background:var(--accent);color:#fff;letter-spacing:1px}
+.comp-table tbody tr:last-child td{border-bottom:none}
+.comp-table tbody tr:hover td{background:rgba(255,255,255,.03)}
+.comp-table tbody td.col-bl{background:rgba(255,59,48,.07);font-weight:700;color:var(--text)}
+.comp-cell-check{color:#30d158;font-size:15px}
+.comp-cell-cross{color:var(--text3);opacity:.5;font-size:15px}
+.comp-cell-partial{color:#ffd60a;font-size:15px}
+
 /* HERO */
 .page-hero{padding:120px 24px 60px;background:radial-gradient(ellipse 70% 55% at 50% 0%,rgba(255,59,48,.14) 0%,transparent 70%),var(--bg);text-align:center;border-bottom:1px solid var(--border)}
 .page-hero h1{font-family:var(--font-display);font-size:clamp(48px,9vw,96px);line-height:.95;letter-spacing:4px;text-transform:uppercase;margin-bottom:18px}
