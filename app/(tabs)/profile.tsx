@@ -701,6 +701,18 @@ export default function ProfileScreen() {
   const totalRides = profile?.profile?.totalRides ?? 0;
   const totalKm = profile?.profile?.totalKm ?? 0;
   const easterEggs = profile?.profile?.easterEggsCollected ?? 0;
+
+  const { data: telemetryStats } = useQuery<{
+    km_collected: number;
+    sample_count: number;
+    session_count: number;
+    progress_pct: number;
+    target_km: number;
+  }>({
+    queryKey: ["/api/telemetry/stats"],
+    enabled: !!user,
+    staleTime: 60_000,
+  });
   const isBikerOrCoppia = currentUserType === "biker" || currentUserType === "coppia";
 
   const pickCoordFromGPS = async (target: "home" | "fake") => {
@@ -842,6 +854,37 @@ export default function ProfileScreen() {
           </View>
         </View>
       </View>
+
+      {telemetryStats != null && (
+        <View style={styles.section}>
+          <View style={styles.telemetryCard}>
+            <View style={styles.telemetryHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Ionicons name="speedometer-outline" size={16} color={Colors.accent} />
+                <Text style={styles.telemetryTitle}>Telemetria raccolta</Text>
+              </View>
+              <Text style={styles.telemetryPct}>{telemetryStats.progress_pct}%</Text>
+            </View>
+            <View style={styles.telemetryBarBg}>
+              <View
+                style={[
+                  styles.telemetryBarFill,
+                  { width: (`${Math.max(0, Math.min(100, telemetryStats.progress_pct))}%`) as `${number}%` },
+                ]}
+              />
+            </View>
+            <View style={styles.telemetryFooter}>
+              <Text style={styles.telemetryKm}>
+                {telemetryStats.km_collected.toFixed(1)} km
+                <Text style={styles.telemetryTarget}> / {telemetryStats.target_km} km</Text>
+              </Text>
+              <Text style={styles.telemetrySessions}>
+                {telemetryStats.session_count} {telemetryStats.session_count === 1 ? "sessione" : "sessioni"}
+              </Text>
+            </View>
+          </View>
+        </View>
+      )}
 
       {profile?.deletionRequestedAt && (
         <View style={styles.deletionBanner}>
@@ -1724,6 +1767,60 @@ const styles = StyleSheet.create({
   statDivider: {
     width: 1,
     backgroundColor: Colors.border,
+  },
+  telemetryCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: Colors.accent + "33",
+  },
+  telemetryHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  telemetryTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  telemetryPct: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: Colors.accent,
+  },
+  telemetryBarBg: {
+    height: 6,
+    backgroundColor: Colors.border,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  telemetryBarFill: {
+    height: 6,
+    backgroundColor: Colors.accent,
+    borderRadius: 3,
+  },
+  telemetryFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  telemetryKm: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+  },
+  telemetryTarget: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  telemetrySessions: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
   },
   bioCard: {
     backgroundColor: Colors.surface,
