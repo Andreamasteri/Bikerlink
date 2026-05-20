@@ -252,6 +252,45 @@ router.get("/geocode", async (req: Request, res: Response) => {
 
 // ─── Route calculation via GraphHopper ───────────────────────────────────────
 
+// ─── Elevation profile extractor (from GH points with elevation) ──────────────
+
+function extractElevationProfile(
+  encodedOrPoints: string | null,
+  ghPointsWithElevation?: number[][]
+): { profile: Array<{ distanceKm: number; altitudeM: number }>; gainM: number; minM: number; maxM: number } | null {
+  if (!ghPointsWithElevation || ghPointsWithElevation.length < 2) return null;
+  // GH returns [lng, lat, elevation] per point when elevation=true and points_encoded=false
+  const pts = ghPointsWithElevation; // [lng, lat, elev]
+  let cumulativeDist = 0;
+  let gainM = 0;
+  let minM = Infinity;
+  let maxM = -Infinity;
+  const profile: Array<{ distanceKm: number; altitudeM: number }> = [];
+
+  for (let i = 0; i < pts.length; i++) {
+    const elev = pts[i][2] ?? 0;
+    if (i > 0) {
+      const prev = pts[i - 1];
+      cumulativeDist += haversineKm(prev[1], prev[0], pts[i][1], pts[i][0]);
+      const prevElev = prev[2] ?? 0;
+      if (elev > prevElev) gainM += elev - prevElev;
+    }
+    if (elev < minM) minM = elev;
+    if (elev > maxM) maxM = elev;
+    // Downsample: keep 1 point every ~50 points max (cap at 200 points)
+    if (pts.length <= 200 || i % Math.ceil(pts.length / 200) === 0) {
+      profile.push({ distanceKm: Math.round(cumulativeDist * 100) / 100, altitudeM: Math.round(elev) });
+    }
+  }
+
+  return {
+    profile,
+    gainM: Math.round(gainM),
+    minM: minM === Infinity ? 0 : Math.round(minM),
+    maxM: maxM === -Infinity ? 0 : Math.round(maxM),
+  };
+}
+
 router.post("/calculate", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
@@ -261,17 +300,21 @@ router.post("/calculate", async (req: Request, res: Response) => {
     style = "curvy",
     avoidHighways = false,
     avoidTolls = false,
+    avoidFerries = false,
+    avoidUnpaved = false,
     roundTripHours,
     isRoundTrip,
-    roundTripDirection,
+    headingDeg,
   } = req.body as {
     waypoints: Array<{ lat: number; lng: number }>;
     style?: string;
     avoidHighways?: boolean;
     avoidTolls?: boolean;
+    avoidFerries?: boolean;
+    avoidUnpaved?: boolean;
     roundTripHours?: number;
     isRoundTrip?: boolean;
-    roundTripDirection?: string;
+    headingDeg?: number;
   };
 
   if (!waypoints || waypoints.length < 2) {
@@ -317,15 +360,30 @@ router.post("/calculate", async (req: Request, res: Response) => {
       profile: "motorcycle",
       instructions: true,
       calc_points: true,
-      points_encoded: true,
+      points_encoded: false,
       optimize: false,
+      elevation: true,
     };
 
-    // Build priority rules as numbers (not strings) per GH API spec
+    // Heading for round trip
+    if (isRoundTrip && headingDeg !== undefined && headingDeg !== null) {
+      body.heading = headingDeg;
+    }
+
+    // Build priority and speed rules per 5-level curviness
     const priority: Array<{ if: string; multiply_by: number }> = [];
 
-    // Road class preferences by style
-    if (style === "curvy") {
+    if (style === "extra_curvy") {
+      priority.push(
+        { if: "road_class == MOTORWAY", multiply_by: avoidHighways ? 0.0 : 0.05 },
+        { if: "road_class == TRUNK", multiply_by: 0.1 },
+        { if: "road_class == PRIMARY", multiply_by: 0.3 },
+        { if: "road_class == SECONDARY", multiply_by: 1.0 },
+        { if: "road_class == TERTIARY", multiply_by: 1.5 },
+        { if: "road_class == UNCLASSIFIED", multiply_by: 1.4 },
+        { if: "road_class == RESIDENTIAL", multiply_by: 1.2 }
+      );
+    } else if (style === "curvy") {
       priority.push(
         { if: "road_class == MOTORWAY", multiply_by: avoidHighways ? 0.0 : 0.1 },
         { if: "road_class == TRUNK", multiply_by: 0.2 },
@@ -343,15 +401,33 @@ router.post("/calculate", async (req: Request, res: Response) => {
       if (avoidHighways) {
         priority.push({ if: "road_class == MOTORWAY", multiply_by: 0.0 });
       }
+    } else if (style === "direct") {
+      // Direct = fastest possible, motorways preferred
+      if (avoidHighways) {
+        priority.push({ if: "road_class == MOTORWAY", multiply_by: 0.0 });
+      } else {
+        priority.push({ if: "road_class == MOTORWAY", multiply_by: 1.5 });
+      }
     }
 
-    // Toll avoidance: penalize toll roads
+    // Toll avoidance
     if (avoidTolls) {
       priority.push({ if: "toll == ALL", multiply_by: 0.0 });
     }
-    // Highway avoidance (if not already added by curvy style)
-    if (avoidHighways && style !== "curvy" && style !== "balanced") {
+    // Highway avoidance (extra check for modes that don't handle it above)
+    if (avoidHighways && style !== "curvy" && style !== "balanced" && style !== "extra_curvy" && style !== "direct" && style !== "fast") {
       priority.push({ if: "road_class == MOTORWAY", multiply_by: 0.0 });
+    }
+    // Ferry avoidance
+    if (avoidFerries) {
+      priority.push({ if: "road_environment == FERRY", multiply_by: 0.0 });
+    }
+    // Unpaved/sterrato avoidance
+    if (avoidUnpaved) {
+      priority.push({ if: "road_environment == UNPAVED", multiply_by: 0.0 });
+      priority.push({ if: "surface == GRAVEL", multiply_by: 0.0 });
+      priority.push({ if: "surface == DIRT", multiply_by: 0.0 });
+      priority.push({ if: "surface == UNPAVED", multiply_by: 0.0 });
     }
 
     if (priority.length > 0) {
@@ -378,8 +454,35 @@ router.post("/calculate", async (req: Request, res: Response) => {
       return res.json(buildFallbackRoute(waypoints));
     }
 
-    const encoded = path.points as string;
-    const bikerScore = style === "curvy" ? computeBikerScore(encoded) : style === "fast" ? 0.1 : 0.5;
+    // With points_encoded=false, path.points is a GeoJSON object with coordinates array [lng, lat, elev]
+    const ghPoints: number[][] = path.points?.coordinates ?? [];
+    // Re-encode to polyline for storage (lat/lng only)
+    const rawPoints: Array<{ lat: number; lng: number }> = ghPoints.map((p: number[]) => ({ lat: p[1], lng: p[0] }));
+
+    // Compute biker score from raw points
+    const totalAngle = rawPoints.length >= 3 ? (() => {
+      let total = 0;
+      for (let i = 1; i < rawPoints.length - 1; i++) {
+        const v1 = [rawPoints[i].lat - rawPoints[i-1].lat, rawPoints[i].lng - rawPoints[i-1].lng];
+        const v2 = [rawPoints[i+1].lat - rawPoints[i].lat, rawPoints[i+1].lng - rawPoints[i].lng];
+        const dot = v1[0] * v2[0] + v1[1] * v2[1];
+        const mag1 = Math.sqrt(v1[0] ** 2 + v1[1] ** 2);
+        const mag2 = Math.sqrt(v2[0] ** 2 + v2[1] ** 2);
+        if (mag1 > 0 && mag2 > 0) {
+          const cosA = Math.min(1, Math.max(-1, dot / (mag1 * mag2)));
+          total += Math.acos(cosA);
+        }
+      }
+      return total;
+    })() : 0;
+
+    let bikerScore: number;
+    if (style === "extra_curvy") bikerScore = Math.round(Math.min(1, totalAngle / (rawPoints.length * 0.25)) * 100) / 100;
+    else if (style === "curvy") bikerScore = Math.round(Math.min(1, totalAngle / (rawPoints.length * 0.3)) * 100) / 100;
+    else if (style === "balanced") bikerScore = 0.5;
+    else if (style === "fast") bikerScore = 0.15;
+    else bikerScore = 0.05; // direct
+
     const distanceKm = Math.round((path.distance ?? 0) / 100) / 10;
     const durationMinutes = Math.round((path.time ?? 0) / 60000);
 
@@ -393,6 +496,9 @@ router.post("/calculate", async (req: Request, res: Response) => {
       streetName: instr.street_name ?? "",
     }));
 
+    // Extract elevation profile
+    const elevationData = extractElevationProfile(null, ghPoints);
+
     // Compute target duration warning for round-trip
     const targetMinutes = roundTripHours ? roundTripHours * 60 : null;
     const durationDeviation = targetMinutes
@@ -400,10 +506,18 @@ router.post("/calculate", async (req: Request, res: Response) => {
       : null;
 
     return res.json({
-      encoded, rawPoints: null, distanceKm, durationMinutes, bikerScore,
+      encoded: null,
+      rawPoints,
+      distanceKm,
+      durationMinutes,
+      bikerScore,
       navigationSteps,
       targetDurationMinutes: targetMinutes,
       durationDeviationPct: durationDeviation !== null ? Math.round(durationDeviation * 100) : null,
+      elevationProfile: elevationData?.profile ?? null,
+      elevationGainM: elevationData?.gainM ?? null,
+      altitudeMinM: elevationData?.minM ?? null,
+      altitudeMaxM: elevationData?.maxM ?? null,
     });
   } catch (err) {
     console.error("[GraphHopper] fetch error:", err);
@@ -499,6 +613,71 @@ router.post("/weather", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[weather] error:", err);
     return res.status(502).json({ message: "Meteo non disponibile" });
+  }
+});
+
+// ─── POI Photos: GET /poi/:id/photos ──────────────────────────────────────────
+
+router.get("/poi/:id/photos", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+  const poiId = req.params["id"] as string;
+
+  try {
+    const { db } = await import("../db");
+    const { poiPhotos } = await import("@shared/schema");
+    const { eq, desc } = await import("drizzle-orm");
+    const photos = await db
+      .select()
+      .from(poiPhotos)
+      .where(eq(poiPhotos.poiId, poiId))
+      .orderBy(desc(poiPhotos.createdAt))
+      .limit(20);
+    return res.json({ photos });
+  } catch (err) {
+    console.error("[poi photos GET] error:", err);
+    return res.json({ photos: [] });
+  }
+});
+
+// ─── POI Photos: POST /poi/:id/photos ─────────────────────────────────────────
+
+router.post("/poi/:id/photos", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+  const poiId = req.params["id"] as string;
+
+  const { photoBase64, mimeType = "image/jpeg", caption } = req.body as {
+    photoBase64: string;
+    mimeType?: string;
+    caption?: string;
+  };
+
+  if (!photoBase64) return res.status(400).json({ message: "Immagine richiesta" });
+
+  try {
+    const { uploadBuffer, getPublicUrl } = await import("../objectStorage");
+    const { db } = await import("../db");
+    const { poiPhotos } = await import("@shared/schema");
+
+    const buffer = Buffer.from(photoBase64, "base64");
+    const ext = mimeType === "image/png" ? "png" : mimeType === "image/webp" ? "webp" : "jpg";
+    const objectPath = `public/poi-photos/${poiId}/${userId}-${Date.now()}.${ext}`;
+
+    await uploadBuffer(objectPath, buffer, mimeType);
+    const photoUrl = await getPublicUrl(objectPath);
+
+    const [photo] = await db.insert(poiPhotos).values({
+      poiId,
+      userId,
+      photoUrl,
+      caption: caption ?? null,
+    }).returning();
+
+    return res.status(201).json({ photo });
+  } catch (err) {
+    console.error("[poi photos POST] error:", err);
+    return res.status(500).json({ message: "Errore caricamento foto" });
   }
 });
 

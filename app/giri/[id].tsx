@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Linking,
   Image,
+  FlatList,
 } from "react-native";
 import WebView from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -16,12 +17,14 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Svg, { Path, Defs, LinearGradient, Stop, Polygon } from "react-native-svg";
+import * as ImagePicker from "expo-image-picker";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { buildLeafletCurvatureGradientHtml } from "@/lib/leaflet-route-map-html";
 import { getTileConfig } from "@/lib/map-tiles";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
+import ElevationProfile from "@/components/ElevationProfile";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,6 +51,11 @@ interface POI {
   name: string | null; brand: string | null;
 }
 
+interface POIPhoto {
+  id: string; poiId: string; userId: string;
+  photoUrl: string; caption: string | null; createdAt: string;
+}
+
 interface CompatibleBiker {
   userId: string; nickname: string; userType: string;
   avatarUrl: string | null; ridingStyle: string | null;
@@ -58,10 +66,14 @@ interface PlannedRoute {
   id: string; userId: string; title: string;
   description?: string | null; distanceKm: number; durationMinutes: number;
   bikerScore: number; realCurvatureScore?: number | null;
-  style: "curvy" | "balanced" | "fast";
+  style: "direct" | "fast" | "balanced" | "curvy" | "extra_curvy";
   visibility: "public" | "private"; isMultiDay: boolean;
   waypoints: Waypoint[]; polyline?: string | null;
   metadata?: Record<string, unknown>; createdAt: string;
+  elevationProfile?: Array<{ distanceKm: number; altitudeM: number }> | null;
+  elevationGainM?: number | null;
+  altitudeMinM?: number | null;
+  altitudeMaxM?: number | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -106,6 +118,14 @@ function poiTypeIcon(type: string): keyof typeof Ionicons.glyphMap {
   return "location-outline";
 }
 
+function styleLabel(style: string): string {
+  const map: Record<string, string> = {
+    direct: "Diretto", fast: "Veloce", balanced: "Bilanciato",
+    curvy: "Curvy", extra_curvy: "Extra Curvy",
+  };
+  return map[style] ?? style;
+}
+
 function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
   const points: Array<{ lat: number; lng: number }> = [];
   let index = 0, lat = 0, lng = 0;
@@ -123,45 +143,112 @@ function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
 
 const TILE_CONFIG = getTileConfig("carto_dark");
 
-// ─── Elevation Chart Component ────────────────────────────────────────────────
+// ─── POI Photo Gallery Component ──────────────────────────────────────────────
 
-function ElevationChart({ profile, colors }: { profile: ElevationProfile; colors: ReturnType<typeof useColors> }) {
-  const W = 320;
-  const H = 100;
-  const PAD_X = 2;
-  const PAD_Y = 4;
+function POIPhotoGallery({ poiId, colors }: { poiId: string; colors: any }) {
+  const [uploading, setUploading] = useState(false);
+  const qc = useQueryClient();
 
-  const { elevations, minEle, maxEle } = profile;
-  if (elevations.length < 2) return null;
-
-  const eleRange = maxEle - minEle || 1;
-  const pts = elevations.map((e, i) => {
-    const x = PAD_X + (i / (elevations.length - 1)) * (W - PAD_X * 2);
-    const y = H - PAD_Y - ((e - minEle) / eleRange) * (H - PAD_Y * 2);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  const { data: photos = [], isLoading } = useQuery<POIPhoto[]>({
+    queryKey: ["/api/planned-routes/poi", poiId, "photos"],
+    queryFn: async () => {
+      const url = new URL(`/api/planned-routes/poi/${poiId}/photos`, getApiUrl());
+      const resp = await fetch(url.toString(), { credentials: "include" });
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      return data.photos ?? [];
+    },
+    staleTime: 60_000,
   });
 
-  const polyPoints = [
-    `${PAD_X},${H}`,
-    ...pts,
-    `${W - PAD_X},${H}`,
-  ].join(" ");
+  const handleUploadPhoto = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert("Permesso negato", "Per caricare foto è necessario l'accesso alla galleria.");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
 
-  const pathD = pts.reduce((acc, pt, i) => {
-    return acc + (i === 0 ? `M${pt}` : ` L${pt}`);
-  }, "");
+    const asset = result.assets[0];
+    if (!asset.base64) { Alert.alert("Errore", "Impossibile leggere l'immagine."); return; }
+
+    setUploading(true);
+    try {
+      const url = new URL(`/api/planned-routes/poi/${poiId}/photos`, getApiUrl());
+      const resp = await fetch(url.toString(), {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoBase64: asset.base64, mimeType: asset.mimeType ?? "image/jpeg" }),
+      });
+      if (!resp.ok) throw new Error("Upload fallito");
+      qc.invalidateQueries({ queryKey: ["/api/planned-routes/poi", poiId, "photos"] });
+    } catch {
+      Alert.alert("Errore", "Impossibile caricare la foto.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
-    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <Defs>
-        <LinearGradient id="eleGrad" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor={colors.accent} stopOpacity="0.5" />
-          <Stop offset="100%" stopColor={colors.accent} stopOpacity="0.04" />
-        </LinearGradient>
-      </Defs>
-      <Polygon points={polyPoints} fill="url(#eleGrad)" />
-      <Path d={pathD} stroke={colors.accent} strokeWidth="1.8" fill="none" strokeLinejoin="round" />
-    </Svg>
+    <View style={{ marginTop: 8 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+        <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary }}>
+          FOTO COMMUNITY ({photos.length})
+        </Text>
+        <Pressable
+          onPress={handleUploadPhoto}
+          disabled={uploading}
+          style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.accent + "22", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
+        >
+          {uploading
+            ? <ActivityIndicator size="small" color={colors.accent} />
+            : <Ionicons name="camera-outline" size={14} color={colors.accent} />
+          }
+          <Text style={{ fontFamily: "Inter_500Medium", fontSize: 12, color: colors.accent }}>
+            {uploading ? "Caricamento..." : "Aggiungi foto"}
+          </Text>
+        </Pressable>
+      </View>
+      {isLoading && <ActivityIndicator color={colors.accent} size="small" />}
+      {!isLoading && photos.length === 0 && (
+        <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary }}>
+          Nessuna foto ancora. Sii il primo a condividerne una!
+        </Text>
+      )}
+      {photos.length > 0 && (
+        <FlatList
+          horizontal
+          data={photos}
+          keyExtractor={(item) => item.id}
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <View style={{ marginRight: 8 }}>
+              <Image
+                source={{ uri: item.photoUrl }}
+                style={{ width: 90, height: 90, borderRadius: 10 }}
+                resizeMode="cover"
+              />
+              {item.caption && (
+                <Text
+                  style={{ fontFamily: "Inter_400Regular", fontSize: 10, color: colors.textSecondary, marginTop: 2, maxWidth: 90 }}
+                  numberOfLines={1}
+                >
+                  {item.caption}
+                </Text>
+              )}
+            </View>
+          )}
+        />
+      )}
+    </View>
+  );
+}
   );
 }
 
@@ -182,14 +269,16 @@ export default function GiriDetailScreen() {
   const [weatherLoading, setWeatherLoading] = useState(false);
   const [pois, setPois] = useState<POI[] | null>(null);
   const [poisLoading, setPoisLoading] = useState(false);
+  const [selectedPOI, setSelectedPOI] = useState<POI | null>(null);
   const [matchBikers, setMatchBikers] = useState<CompatibleBiker[] | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
   const [hotels, setHotels] = useState<any[] | null>(null);
   const [hotelsLoading, setHotelsLoading] = useState(false);
   const [matchBannerDismissed, setMatchBannerDismissed] = useState(false);
-  const [elevation, setElevation] = useState<ElevationProfile | null>(null);
+  const [elevation, setElevation] = useState<any | null>(null);
   const [elevationLoading, setElevationLoading] = useState(false);
   const [elevationError, setElevationError] = useState(false);
+  const [streetViewTip, setStreetViewTip] = useState(true);
 
   const { data: route, isLoading } = useQuery<PlannedRoute>({
     queryKey: ["/api/planned-routes", id],
@@ -214,15 +303,6 @@ export default function GiriDetailScreen() {
     route?.title ?? "",
     routePoints
   );
-
-  // Auto-load elevation profile when route loads
-  React.useEffect(() => {
-    if (route && !elevation && !elevationLoading && !elevationError) {
-      handleLoadElevation();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [route?.id]);
-
   // Auto-load compatible bikers when route loads (proactive matching)
   React.useEffect(() => {
     if (route && !matchBikers && !matchLoading) {
@@ -231,7 +311,6 @@ export default function GiriDetailScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route?.id]);
 
-  // Auto-load hotel suggestions for multi-day routes
   React.useEffect(() => {
     if (route?.isMultiDay && !hotels && !hotelsLoading) {
       handleLoadHotels();
@@ -248,7 +327,6 @@ export default function GiriDetailScreen() {
     onError: () => Alert.alert("Errore", "Impossibile eliminare il giro."),
   });
 
-  // Map HTML — decoded polyline or waypoint dots
   const mapHtml = useMemo(() => {
     if (!routePoints.length) return null;
     return buildLeafletCurvatureGradientHtml(
@@ -259,7 +337,6 @@ export default function GiriDetailScreen() {
     );
   }, [routePoints, offline.offlineTileBasePath]);
 
-  // Multi-day segments computed from metadata
   const multiDayDays = useMemo(() => {
     if (!route?.isMultiDay) return null;
     const meta = route.metadata ?? {};
@@ -284,6 +361,24 @@ export default function GiriDetailScreen() {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data);
+      if (msg.type === "routeTap" && msg.lat && msg.lng) {
+        const url = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${msg.lat},${msg.lng}`;
+        Alert.alert(
+          "Vedi la strada",
+          "Apri Google Street View per pre-visualizzare il manto stradale in questo punto?",
+          [
+            { text: "Annulla", style: "cancel" },
+            { text: "Apri Street View", onPress: () => Linking.openURL(url) },
+          ]
+        );
+        setStreetViewTip(false);
+      }
+    } catch {}
+  };
+
   const handleLoadWeather = async () => {
     if (!route?.waypoints?.length) return;
     setWeatherLoading(true);
@@ -296,14 +391,13 @@ export default function GiriDetailScreen() {
       const data = await resp.json();
       setWeather((data.waypoints ?? []).filter(Boolean));
     } catch {
-      // fallback to POST
       try {
         const fallbackUrl = new URL("/api/planned-routes/weather", getApiUrl());
         const resp = await fetch(fallbackUrl.toString(), {
           method: "POST", credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            waypoints: route.waypoints,
+            waypoints: route!.waypoints,
             departureTime: new Date(Date.now() + 3600_000).toISOString(),
           }),
         });
@@ -495,12 +589,12 @@ export default function GiriDetailScreen() {
               allowFileAccess
               allowFileAccessFromFileURLs
               allowUniversalAccessFromFileURLs
+              onMessage={handleWebViewMessage}
             />
             <View style={s.mapOverlayBadge}>
               <MaterialCommunityIcons
-                name={route.style === "curvy" ? "road-variant" : route.style === "fast" ? "rocket-launch-outline" : "scale-balance"}
-                size={12}
-                color="#fff"
+                name={route.style === "extra_curvy" || route.style === "curvy" ? "road-variant" : route.style === "fast" || route.style === "direct" ? "rocket-launch-outline" : "scale-balance"}
+                size={12} color="#fff"
               />
               <Text style={s.mapOverlayText}>{route.distanceKm} km</Text>
             </View>
@@ -510,11 +604,34 @@ export default function GiriDetailScreen() {
                 <Text style={s.offlineBadgeText}>Offline</Text>
               </View>
             )}
+            {streetViewTip && (
+              <View style={s.streetViewTip}>
+                <Ionicons name="eye-outline" size={12} color="#fff" />
+                <Text style={s.streetViewTipText}>Tocca il percorso per Street View</Text>
+              </View>
+            )}
           </View>
         ) : (
           <View style={s.mapPlaceholder}>
             <MaterialCommunityIcons name="map-outline" size={40} color={colors.border} />
             <Text style={s.mapPlaceholderText}>Mappa non disponibile</Text>
+          </View>
+        )}
+
+        {/* Elevation profile */}
+        {route.elevationProfile && route.elevationProfile.length > 2 && (
+          <View style={{ marginBottom: 14 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+              <MaterialCommunityIcons name="elevation-rise" size={16} color={colors.accent} />
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text }}>Profilo altimetrico</Text>
+            </View>
+            <ElevationProfile
+              profile={route.elevationProfile}
+              gainM={route.elevationGainM}
+              minM={route.altitudeMinM}
+              maxM={route.altitudeMaxM}
+              height={120}
+            />
           </View>
         )}
 
@@ -541,7 +658,6 @@ export default function GiriDetailScreen() {
             <View style={[s.bsBarFill, { width: `${Math.round(route.bikerScore * 100)}%` as any, backgroundColor: scoreColor }]} />
           </View>
 
-          {/* Real curvature score badge from sensor data */}
           {route.realCurvatureScore != null && (
             <View style={s.realScoreBadge}>
               <MaterialCommunityIcons name="radar" size={13} color="#22c55e" />
@@ -551,22 +667,29 @@ export default function GiriDetailScreen() {
             </View>
           )}
 
+          {/* Elevation summary badge */}
+          {route.elevationGainM != null && route.elevationGainM > 0 && (
+            <View style={s.elevationBadge}>
+              <MaterialCommunityIcons name="elevation-rise" size={13} color="#3b82f6" />
+              <Text style={s.elevationBadgeText}>
+                +{route.elevationGainM} m · {route.altitudeMinM ?? 0}–{route.altitudeMaxM ?? 0} m s.l.m.
+              </Text>
+            </View>
+          )}
+
           <View style={s.metaRow}>
             <View style={s.metaBadge}>
               <MaterialCommunityIcons
-                name={route.style === "curvy" ? "road-variant" : route.style === "fast" ? "rocket-launch-outline" : "scale-balance"}
+                name={route.style === "extra_curvy" || route.style === "curvy" ? "road-variant" : route.style === "fast" || route.style === "direct" ? "rocket-launch-outline" : "scale-balance"}
                 size={13} color={colors.accent}
               />
-              <Text style={s.metaBadgeText}>
-                {route.style === "curvy" ? "Curvy" : route.style === "fast" ? "Veloce" : "Bilanciato"}
-              </Text>
+              <Text style={s.metaBadgeText}>{styleLabel(route.style)}</Text>
             </View>
             {route.isMultiDay && (
               <View style={[s.metaBadge, { backgroundColor: "#7c3aed22" }]}>
                 <Ionicons name="calendar-outline" size={13} color="#a78bfa" />
                 <Text style={[s.metaBadgeText, { color: "#a78bfa" }]}>
-                  Multi-giorno
-                  {(route.metadata?.daysCount) ? ` · ${route.metadata.daysCount}gg` : ""}
+                  Multi-giorno{(route.metadata?.daysCount) ? ` · ${route.metadata.daysCount}gg` : ""}
                 </Text>
               </View>
             )}
@@ -577,60 +700,7 @@ export default function GiriDetailScreen() {
           </View>
         </View>
 
-        {/* Elevation profile */}
-        {(elevationLoading || elevation || elevationError) && (
-          <View style={s.eleCard}>
-            <View style={s.eleTitleRow}>
-              <MaterialCommunityIcons name="terrain" size={16} color={colors.accent} />
-              <Text style={s.eleTitle}>Profilo Altimetrico</Text>
-              {elevationLoading && <ActivityIndicator size="small" color={colors.accent} style={{ marginLeft: 8 }} />}
-            </View>
-
-            {elevationError && !elevationLoading && (
-              <Pressable style={s.eleRetryRow} onPress={handleLoadElevation}>
-                <Ionicons name="refresh-outline" size={14} color={colors.textSecondary} />
-                <Text style={s.eleRetryText}>Dati non disponibili — tocca per riprovare</Text>
-              </Pressable>
-            )}
-
-            {elevation && !elevationLoading && (
-              <>
-                <View style={s.eleChartWrap}>
-                  <ElevationChart profile={elevation} colors={colors} />
-                  <View style={s.eleAxisRow}>
-                    <Text style={s.eleAxisLabel}>{elevation.distanceKm[0]} km</Text>
-                    <Text style={s.eleAxisLabel}>{elevation.distanceKm[Math.floor(elevation.distanceKm.length / 2)]} km</Text>
-                    <Text style={s.eleAxisLabel}>{elevation.distanceKm[elevation.distanceKm.length - 1]} km</Text>
-                  </View>
-                </View>
-
-                <View style={s.eleStatsRow}>
-                  <View style={s.eleStat}>
-                    <Text style={s.eleStatValue}>{elevation.minEle} m</Text>
-                    <Text style={s.eleStatLabel}>Min</Text>
-                  </View>
-                  <View style={s.eleStatDivider} />
-                  <View style={s.eleStat}>
-                    <Text style={s.eleStatValue}>{elevation.maxEle} m</Text>
-                    <Text style={s.eleStatLabel}>Max</Text>
-                  </View>
-                  <View style={s.eleStatDivider} />
-                  <View style={s.eleStat}>
-                    <Text style={[s.eleStatValue, { color: "#22c55e" }]}>+{elevation.totalGain} m</Text>
-                    <Text style={s.eleStatLabel}>Salita</Text>
-                  </View>
-                  <View style={s.eleStatDivider} />
-                  <View style={s.eleStat}>
-                    <Text style={[s.eleStatValue, { color: colors.accentRed }]}>-{elevation.totalLoss} m</Text>
-                    <Text style={s.eleStatLabel}>Discesa</Text>
-                  </View>
-                </View>
-              </>
-            )}
-          </View>
-        )}
-
-        {/* Biker matching banner — proactive, auto-loaded */}
+        {/* Biker matching banner */}
         {matchBikers && matchBikers.length > 0 && !matchBannerDismissed && (
           <View style={s.matchBanner}>
             <MaterialCommunityIcons name="account-group" size={20} color={colors.accent} />
@@ -858,7 +928,7 @@ export default function GiriDetailScreen() {
           const autonomyKm = 250;
           const stopCount = Math.floor(route.distanceKm / autonomyKm);
           if (stopCount === 0) return null;
-          const avgSpeedKmh = route.style === "curvy" ? 60 : route.style === "fast" ? 90 : 70;
+          const avgSpeedKmh = (route.style === "curvy" || route.style === "extra_curvy") ? 60 : (route.style === "fast" || route.style === "direct") ? 90 : 70;
           const stops = Array.from({ length: stopCount }, (_, i) => {
             const km = Math.round((i + 1) * autonomyKm);
             const etaMin = Math.round((km / avgSpeedKmh) * 60);
@@ -900,7 +970,6 @@ export default function GiriDetailScreen() {
               <Text style={s.emptyText}>Nessun POI trovato nella zona</Text>
             ) : (
               <>
-                {/* Group by type */}
                 {["fuel", "restaurant", "cafe", "hotel", "viewpoint"].map((type) => {
                   const group = pois.filter((p) => p.type === type);
                   if (!group.length) return null;
@@ -911,11 +980,27 @@ export default function GiriDetailScreen() {
                         <Text style={s.poiGroupLabel}>{poiTypeLabel(type)} ({group.length})</Text>
                       </View>
                       {group.slice(0, 5).map((poi, i) => (
-                        <View key={i} style={s.poiRow}>
-                          <Text style={s.poiName}>{poi.name ?? poi.brand ?? poiTypeLabel(poi.type)}</Text>
-                          <Text style={s.poiCoords}>{poi.lat.toFixed(3)}, {poi.lng.toFixed(3)}</Text>
-                        </View>
+                        <Pressable
+                          key={i}
+                          style={[s.poiRow, selectedPOI?.id === poi.id && { backgroundColor: colors.accent + "11" }]}
+                          onPress={() => setSelectedPOI(selectedPOI?.id === poi.id ? null : poi)}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={s.poiName}>{poi.name ?? poi.brand ?? poiTypeLabel(poi.type)}</Text>
+                            <Text style={s.poiCoords}>{poi.lat.toFixed(3)}, {poi.lng.toFixed(3)}</Text>
+                          </View>
+                          <Ionicons
+                            name={selectedPOI?.id === poi.id ? "chevron-up" : "chevron-down"}
+                            size={14} color={colors.textSecondary}
+                          />
+                        </Pressable>
                       ))}
+                      {/* POI photo gallery for selected POI */}
+                      {selectedPOI && group.some((p) => p.id === selectedPOI.id) && (
+                        <View style={s.poiPhotoSection}>
+                          <POIPhotoGallery poiId={String(selectedPOI.id)} colors={colors} />
+                        </View>
+                      )}
                     </View>
                   );
                 })}
@@ -951,9 +1036,7 @@ export default function GiriDetailScreen() {
                     <Text style={s.bikerName}>{biker.nickname}</Text>
                     {biker.ridingStyle && <Text style={s.bikerCity}>{biker.ridingStyle}</Text>}
                   </View>
-                  {biker.distanceKm !== null && (
-                    <Text style={s.bikerDist}>{biker.distanceKm} km</Text>
-                  )}
+                  {biker.distanceKm !== null && <Text style={s.bikerDist}>{biker.distanceKm} km</Text>}
                   {biker.isAvailable && <View style={s.onlineDot} />}
                 </Pressable>
               ))
@@ -1005,7 +1088,6 @@ export default function GiriDetailScreen() {
           </View>
         )}
 
-        {/* Fuel stops info */}
         {Number(route.metadata?.fuelStopsNeeded ?? 0) > 0 && (
           <View style={s.infoCard}>
             <MaterialCommunityIcons name="gas-station" size={20} color={colors.accent} />
@@ -1031,6 +1113,8 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   map: { flex: 1 },
   mapOverlayBadge: { position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.7)", borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
   mapOverlayText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#fff" },
+  streetViewTip: { position: "absolute", bottom: 8, left: 8, backgroundColor: "rgba(0,0,0,0.7)", borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
+  streetViewTipText: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#fff" },
   mapPlaceholder: { height: 160, borderRadius: 14, backgroundColor: colors.surface, justifyContent: "center", alignItems: "center", marginBottom: 14, gap: 8 },
   mapPlaceholderText: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary },
   heroCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 16, gap: 12 },
@@ -1042,11 +1126,14 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   heroDivider: { width: 1, height: 50, backgroundColor: colors.border },
   bsBarBg: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" },
   bsBarFill: { height: "100%" as any, borderRadius: 4 },
+  elevationBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#3b82f622", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
+  elevationBadgeText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#3b82f6", flex: 1 },
   metaRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   metaBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.background, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   metaBadgeText: { fontFamily: "Inter_500Medium", fontSize: 12, color: colors.textSecondary },
   section: { marginBottom: 20 },
   sectionTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: colors.text, marginBottom: 12 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   dayCard: { flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: 12, padding: 12, marginBottom: 8, gap: 12 },
   dayBadge: { backgroundColor: colors.accent + "22", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minWidth: 70, alignItems: "center" },
   dayBadgeText: { fontFamily: "Inter_700Bold", fontSize: 12, color: colors.accent },
@@ -1103,6 +1190,7 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   poiRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border, paddingLeft: 20 },
   poiName: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.text, flex: 1 },
   poiCoords: { fontFamily: "Inter_400Regular", fontSize: 11, color: colors.textSecondary },
+  poiPhotoSection: { backgroundColor: colors.surface, borderRadius: 12, padding: 12, marginTop: 4, marginLeft: 20, marginBottom: 8 },
   bikerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   bikerAvatar: { width: 40, height: 40, borderRadius: 20 },
   bikerAvatarFallback: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accent + "33", justifyContent: "center", alignItems: "center" },
@@ -1120,7 +1208,6 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   realScoreText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#22c55e", flex: 1 },
   matchBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.accent + "22", borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.accent + "44" },
   matchBannerText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.text, flex: 1 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   loadMoreBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.border },
   loadMoreText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.accent },
   hotelDayBlock: { marginBottom: 16 },

@@ -22,8 +22,9 @@ import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
 import { getTileConfig } from "@/lib/map-tiles";
 import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import DebugPanel from "@/components/DebugPanel";
+import ElevationProfile from "@/components/ElevationProfile";
 
-type Style = "curvy" | "balanced" | "fast";
+type Style = "direct" | "fast" | "balanced" | "curvy" | "extra_curvy";
 type Mode = "ai" | "ai-preview" | "manual";
 type CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
 
@@ -31,13 +32,24 @@ interface Waypoint { lat: number; lng: number; name: string; }
 interface GeoResult { name: string; lat: number; lng: number; }
 interface RouteResult {
   encoded?: string | null;
-  rawPoints?: [number, number][] | null;
+  rawPoints?: Array<{ lat: number; lng: number }> | null;
   distanceKm: number;
   durationMinutes: number;
   bikerScore: number;
   approximate?: boolean;
   navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
+  elevationProfile?: Array<{ distanceKm: number; altitudeM: number }> | null;
+  elevationGainM?: number | null;
+  altitudeMinM?: number | null;
+  altitudeMaxM?: number | null;
 }
+
+interface WeatherWaypoint {
+  lat: number; lng: number; name: string;
+  tempNow: number | null; precipProb: number; weatherCode: number;
+  weatherDesc: string; isSuitable: boolean;
+}
+
 interface UserMotorcycle { id: string; brand: string; model: string; year?: number | null; ridingStyle?: string | null; }
 
 interface AiPreviewItem {
@@ -75,6 +87,25 @@ function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
   return points;
 }
 
+const STYLE_LEVELS: { key: Style; label: string; shortLabel: string }[] = [
+  { key: "direct", label: "Diretto", shortLabel: "Diretto" },
+  { key: "fast", label: "Veloce", shortLabel: "Veloce" },
+  { key: "balanced", label: "Bilanciato", shortLabel: "Bilanc." },
+  { key: "curvy", label: "Curvy", shortLabel: "Curvy" },
+  { key: "extra_curvy", label: "Extra Curvy", shortLabel: "Extra +" },
+];
+
+const COMPASS_DIRECTIONS: { label: string; deg: number }[] = [
+  { label: "N", deg: 0 },
+  { label: "NE", deg: 45 },
+  { label: "E", deg: 90 },
+  { label: "SE", deg: 135 },
+  { label: "S", deg: 180 },
+  { label: "SO", deg: 225 },
+  { label: "O", deg: 270 },
+  { label: "NO", deg: 315 },
+];
+
 async function geocode(q: string): Promise<GeoResult[]> {
   const url = new URL("/api/planned-routes/geocode", getApiUrl());
   url.searchParams.set("q", q);
@@ -88,15 +119,21 @@ async function calcRoute(
   style: Style,
   avoidHighways: boolean,
   avoidTolls: boolean,
+  avoidFerries: boolean,
+  avoidUnpaved: boolean,
   roundTripHours?: number,
   isRoundTrip?: boolean,
-  roundTripDirection?: CompassDir | null,
+  headingDeg?: number | null,
 ): Promise<RouteResult> {
   const url = new URL("/api/planned-routes/calculate", getApiUrl());
   const resp = await fetch(url.toString(), {
     method: "POST", credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ waypoints, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip, roundTripDirection }),
+    body: JSON.stringify({
+      waypoints, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved,
+      roundTripHours, isRoundTrip,
+      ...(headingDeg !== null && headingDeg !== undefined ? { headingDeg } : {}),
+    }),
   });
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}));
@@ -119,77 +156,30 @@ async function parseAI(prompt: string): Promise<any> {
   return resp.json();
 }
 
-const COMPASS_LAYOUT: (CompassDir | null)[][] = [
-  ["NO", "N", "NE"],
-  ["O",  null, "E"],
-  ["SO", "S", "SE"],
-];
-
-const COMPASS_LABEL: Record<CompassDir, string> = {
-  N: "N", NE: "NE", E: "E", SE: "SE", S: "S", SO: "SO", O: "O", NO: "NO",
-};
-
-function CompassSelector({
-  value,
-  onChange,
-  colors,
-}: {
-  value: CompassDir | null;
-  onChange: (d: CompassDir | null) => void;
-  colors: ReturnType<typeof useColors>;
-}) {
-  return (
-    <View style={{ marginTop: 14, gap: 4 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-        <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary }}>
-          Direzione preferita
-        </Text>
-        {value && (
-          <Pressable onPress={() => onChange(null)}>
-            <Text style={{ fontFamily: "Inter_500Medium", fontSize: 12, color: colors.accent }}>Rimuovi</Text>
-          </Pressable>
-        )}
-      </View>
-      <View style={{ alignSelf: "center", gap: 4 }}>
-        {COMPASS_LAYOUT.map((row, ri) => (
-          <View key={ri} style={{ flexDirection: "row", gap: 4 }}>
-            {row.map((dir, ci) =>
-              dir === null ? (
-                <View key={ci} style={{ width: 52, height: 52, justifyContent: "center", alignItems: "center" }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: value ? colors.accent : colors.border }} />
-                </View>
-              ) : (
-                <Pressable
-                  key={dir}
-                  onPress={() => onChange(value === dir ? null : dir)}
-                  style={{
-                    width: 52, height: 52, borderRadius: 10, justifyContent: "center", alignItems: "center",
-                    backgroundColor: value === dir ? colors.accent + "22" : colors.surface,
-                    borderWidth: 1.5,
-                    borderColor: value === dir ? colors.accent : colors.border,
-                  }}
-                >
-                  <Text style={{
-                    fontFamily: "Inter_700Bold", fontSize: 14,
-                    color: value === dir ? colors.accent : colors.text,
-                  }}>
-                    {COMPASS_LABEL[dir]}
-                  </Text>
-                </Pressable>
-              )
-            )}
-          </View>
-        ))}
-      </View>
-      {value && (
-        <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, textAlign: "center", marginTop: 4 }}>
-          Il percorso partirà verso {value}
-        </Text>
-      )}
-    </View>
-  );
+async function fetchWeatherPreview(waypoints: Waypoint[]): Promise<WeatherWaypoint[]> {
+  const url = new URL("/api/planned-routes/weather", getApiUrl());
+  const resp = await fetch(url.toString(), {
+    method: "POST", credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      waypoints: waypoints.filter((w) => w.lat !== 0 || w.lng !== 0),
+      departureTime: new Date(Date.now() + 3600_000).toISOString(),
+    }),
+  });
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  return (data.waypoints ?? []).filter(Boolean);
 }
 
+function weatherIcon(code: number): keyof typeof Ionicons.glyphMap {
+  if (code === 0) return "sunny-outline";
+  if (code <= 3) return "partly-sunny-outline";
+  if (code <= 59) return "rainy-outline";
+  if (code <= 79) return "snow-outline";
+  if (code <= 99) return "thunderstorm-outline";
+  return "cloud-outline";
+
+}
 export default function GiriCreateScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -216,21 +206,20 @@ export default function GiriCreateScreen() {
   const [mode, setMode] = useState<Mode>("ai");
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
-
-  // AI Preview state
   const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
 
-  // Manual mode route params
   const [title, setTitle] = useState("Giro in moto");
   const [style, setStyle] = useState<Style>("curvy");
   const [isRoundTrip, setIsRoundTrip] = useState(false);
   const [roundTripHours, setRoundTripHours] = useState(3);
-  const [roundTripDirection, setRoundTripDirection] = useState<CompassDir | null>(null);
+  const [headingDeg, setHeadingDeg] = useState<number | null>(null);
   const [isMultiDay, setIsMultiDay] = useState(false);
   const [daysCount, setDaysCount] = useState(2);
   const [maxHoursPerDay, setMaxHoursPerDay] = useState(6);
   const [avoidHighways, setAvoidHighways] = useState(false);
   const [avoidTolls, setAvoidTolls] = useState(false);
+  const [avoidFerries, setAvoidFerries] = useState(false);
+  const [avoidUnpaved, setAvoidUnpaved] = useState(false);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [selectedMotoId, setSelectedMotoId] = useState<string | null>(null);
   const [fuelLevel, setFuelLevel] = useState<number>(100);
@@ -241,6 +230,9 @@ export default function GiriCreateScreen() {
 
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [calculating, setCalculating] = useState(false);
+
+  const [weatherPreview, setWeatherPreview] = useState<WeatherWaypoint[] | null>(null);
+  const [weatherLoading, setWeatherLoading] = useState(false);
 
   const suggestionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCalcTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -255,7 +247,7 @@ export default function GiriCreateScreen() {
     if (routeResult?.encoded) {
       resolvedPts = decodePolyline(routeResult.encoded);
     } else if (routeResult?.rawPoints) {
-      resolvedPts = routeResult.rawPoints.map(([lat, lng]) => ({ lat, lng }));
+      resolvedPts = routeResult.rawPoints.map(({ lat, lng }) => ({ lat, lng }));
     }
     return buildPlannerMapHtml(
       TILE.urlTemplate,
@@ -291,6 +283,7 @@ export default function GiriCreateScreen() {
       setWaypoints(newWps);
       setWpInputs(newInputs);
       setRouteResult(null);
+      setWeatherPreview(null);
     } catch {}
   };
 
@@ -310,22 +303,11 @@ export default function GiriCreateScreen() {
     onError: () => Alert.alert("Errore", "Impossibile salvare il giro."),
   });
 
-  // ── AI Parse + auto-geocoding ──────────────────────────────────────────────
-
   const handleAiParse = async () => {
     if (!aiPrompt.trim()) return;
     setAiLoading(true);
     try {
-      const result = await logFetch<any>(
-        "/api/planned-routes/ai-parse", "POST",
-        () => {
-          const url = new URL("/api/planned-routes/ai-parse", getApiUrl());
-          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: aiPrompt }) });
-        },
-        async (resp) => { if (!resp.ok) throw new Error("AI non disponibile"); return resp.json(); }
-      );
-
-      // Build initial preview items (unresolved)
+      const result = await parseAI(aiPrompt);
       const rawLocations: Array<{ role: AiPreviewItem["role"]; name: string }> = [];
       if (result.startLocation) rawLocations.push({ role: "start", name: result.startLocation });
       for (const wp of (result.waypoints ?? [])) rawLocations.push({ role: "waypoint", name: wp });
@@ -339,12 +321,8 @@ export default function GiriCreateScreen() {
       if (rawLocations.length < 2) rawLocations.push({ role: "end", name: "" });
 
       const initialItems: AiPreviewItem[] = rawLocations.map((loc) => ({
-        role: loc.role,
-        name: loc.name,
-        editedName: loc.name,
-        lat: 0, lng: 0,
-        geocoding: !!loc.name,
-        resolved: false,
+        role: loc.role, name: loc.name, editedName: loc.name,
+        lat: 0, lng: 0, geocoding: !!loc.name, resolved: false,
       }));
 
       const preview: AiPreviewState = {
@@ -356,11 +334,9 @@ export default function GiriCreateScreen() {
         avoidHighways: result.avoidHighways ?? false,
         items: initialItems,
       };
-
       setAiPreview(preview);
       setMode("ai-preview");
 
-      // Auto-geocode each location in parallel
       initialItems.forEach((item, idx) => {
         if (!item.name) return;
         logFetch<GeoResult[]>(
@@ -372,13 +348,7 @@ export default function GiriCreateScreen() {
           setAiPreview((prev) => {
             if (!prev) return prev;
             const updatedItems = [...prev.items];
-            updatedItems[idx] = {
-              ...updatedItems[idx],
-              lat: best ? best.lat : 0,
-              lng: best ? best.lng : 0,
-              geocoding: false,
-              resolved: !!best,
-            };
+            updatedItems[idx] = { ...updatedItems[idx], lat: best ? best.lat : 0, lng: best ? best.lng : 0, geocoding: false, resolved: !!best };
             return { ...prev, items: updatedItems };
           });
         }).catch(() => {
@@ -390,17 +360,14 @@ export default function GiriCreateScreen() {
           });
         });
       });
-
     } catch (err: any) {
-      const msg = err?.message ?? "Servizio AI non disponibile";
-      Alert.alert("Errore AI", msg);
+      Alert.alert("Errore AI", err?.message ?? "Servizio AI non disponibile");
       setMode("manual");
     } finally {
       setAiLoading(false);
     }
   };
 
-  // Update a preview item name (for inline editing of pills)
   const updatePreviewItemName = useCallback((idx: number, newName: string) => {
     setAiPreview((prev) => {
       if (!prev) return prev;
@@ -410,7 +377,6 @@ export default function GiriCreateScreen() {
     });
   }, []);
 
-  // Re-geocode a pill after user edits it
   const regeocodePillItem = useCallback((idx: number, name: string) => {
     if (!name.trim()) return;
     setAiPreview((prev) => {
@@ -441,17 +407,12 @@ export default function GiriCreateScreen() {
     });
   }, []);
 
-  // Confirm AI preview: transfer state, auto-calculate, then switch to manual
   const handleConfirmPreview = async () => {
     if (!aiPreview) return;
-
     const newWps: Waypoint[] = aiPreview.items.map((item) => ({
-      lat: item.lat,
-      lng: item.lng,
-      name: item.editedName || item.name,
+      lat: item.lat, lng: item.lng, name: item.editedName || item.name,
     }));
     const newInputs = newWps.map((wp) => wp.name);
-
     setTitle(aiPreview.title);
     setStyle(aiPreview.style);
     setIsRoundTrip(aiPreview.isRoundTrip);
@@ -462,44 +423,41 @@ export default function GiriCreateScreen() {
     setWpInputs(newInputs);
     setMode("manual");
 
-    // Auto-calculate route immediately using the resolved preview waypoints
     const resolved = newWps.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (resolved.length < 2) {
-      // Not enough resolved — just show manual form with a hint
-      return;
-    }
+    if (resolved.length < 2) return;
     const toCalc = aiPreview.isRoundTrip ? [...resolved, resolved[0]] : resolved;
     setCalculating(true);
     setRouteResult(null);
+    setWeatherPreview(null);
     try {
-      const result = await logFetch<RouteResult>(
-        "/api/planned-routes/calculate", "POST",
-        () => {
-          const url = new URL("/api/planned-routes/calculate", getApiUrl());
-          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, avoidHighways: aiPreview.avoidHighways, avoidTolls: false }) });
-        },
-        async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
-      );
+      const result = await calcRoute(toCalc, aiPreview.style, aiPreview.avoidHighways, false, false, false);
       setRouteResult(result);
       if (result.durationMinutes > 480 && !aiPreview.isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
         setIsMultiDay(true);
         setDaysCount(suggestedDays);
-        Alert.alert(
-          "Giro Multi-giorno",
-          `Il percorso dura più di 8 ore.\nAbbiamo attivato il piano multi-giorno su ${suggestedDays} giorni.`,
-          [{ text: "OK" }]
-        );
+        Alert.alert("Giro Multi-giorno", `Il percorso dura più di 8 ore.\nAbbiamo attivato il piano multi-giorno su ${suggestedDays} giorni.`, [{ text: "OK" }]);
       }
+      // Auto-load weather preview
+      autoLoadWeather(toCalc);
     } catch (err: any) {
-      const msg = err?.message ?? "Calcolo percorso fallito";
-      Alert.alert("Calcolo automatico fallito", `${msg}\nModifica le tappe e premi "Calcola percorso" manualmente.`);
+      Alert.alert("Calcolo automatico fallito", `${err?.message ?? "Errore"}\nModifica le tappe e premi "Calcola percorso" manualmente.`);
     } finally {
       setCalculating(false);
     }
   };
 
-  // ── Manual mode handlers ───────────────────────────────────────────────────
+  const autoLoadWeather = async (wps: Waypoint[]) => {
+    setWeatherLoading(true);
+    try {
+      const data = await fetchWeatherPreview(wps);
+      setWeatherPreview(data.length > 0 ? data : null);
+    } catch {
+      setWeatherPreview(null);
+    } finally {
+      setWeatherLoading(false);
+    }
+  };
 
   const handleWpInput = (text: string, index: number) => {
     const newInputs = [...wpInputs]; newInputs[index] = text; setWpInputs(newInputs);
@@ -549,7 +507,7 @@ export default function GiriCreateScreen() {
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
       setCalculating(true);
       try {
-        const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip, roundTripDirection);
+        const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg);
         setRouteResult(result);
       } catch {
         // silent — user can still trigger manually
@@ -559,7 +517,7 @@ export default function GiriCreateScreen() {
     }, 1500);
     return () => { if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, style, avoidHighways, avoidTolls, isRoundTrip, roundTripHours, roundTripDirection, mode]);
+  }, [waypoints, style, avoidHighways, avoidTolls, isRoundTrip, roundTripHours, headingDeg, mode]);
 
   const handleCalculate = async () => {
     const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
@@ -568,15 +526,9 @@ export default function GiriCreateScreen() {
     }
     const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
     setCalculating(true);
+    setWeatherPreview(null);
     try {
-      const result = await logFetch<RouteResult>(
-        "/api/planned-routes/calculate", "POST",
-        () => {
-          const url = new URL("/api/planned-routes/calculate", getApiUrl());
-          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip, roundTripDirection }) });
-        },
-        async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
-      );
+      const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg);
       setRouteResult(result);
       if (result.durationMinutes > 480 && !isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
@@ -588,9 +540,10 @@ export default function GiriCreateScreen() {
           [{ text: "OK" }]
         );
       }
+      // Auto-load weather preview
+      autoLoadWeather(toCalc);
     } catch (err: any) {
-      const msg = err?.message ?? "Calcolo percorso fallito";
-      Alert.alert("Errore", msg);
+      Alert.alert("Errore", err?.message ?? "Calcolo percorso fallito");
     } finally { setCalculating(false); }
   };
 
@@ -608,38 +561,38 @@ export default function GiriCreateScreen() {
     saveMutation.mutate({
       title,
       waypoints: resolved,
-      polyline: routeResult?.encoded ?? null,
+      polyline: null,
       distanceKm: routeResult?.distanceKm ?? 0,
       durationMinutes: routeResult?.durationMinutes ?? 0,
       bikerScore: routeResult?.bikerScore ?? 0,
       navigationSteps: routeResult?.navigationSteps ?? null,
       style, visibility, isMultiDay,
+      elevationGainM: routeResult?.elevationGainM ?? null,
+      altitudeMinM: routeResult?.altitudeMinM ?? null,
+      altitudeMaxM: routeResult?.altitudeMaxM ?? null,
+      elevationProfile: routeResult?.elevationProfile ?? null,
       metadata: {
-        avoidHighways, avoidTolls, daysCount, maxHoursPerDay,
-        isRoundTrip, roundTripHours, roundTripDirection, motorcycleId: selectedMotoId,
-        fuelStopsNeeded,
+        avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, daysCount, maxHoursPerDay,
+        isRoundTrip, roundTripHours, headingDeg,
+        motorcycleId: selectedMotoId, fuelStopsNeeded,
       },
     });
   };
-
-  const styleOptions: { key: Style; label: string; icon: string; desc: string }[] = [
-    { key: "curvy", label: "Curve", icon: "road-variant", desc: "Strade curve e panoramiche" },
-    { key: "balanced", label: "Bilanciato", icon: "scale-balance", desc: "Mix curve e rettilineo" },
-    { key: "fast", label: "Veloce", icon: "rocket-launch-outline", desc: "Percorso più diretto" },
-  ];
 
   const pillRoleLabel = (role: AiPreviewItem["role"]) => {
     if (role === "start") return "Partenza";
     if (role === "end") return "Arrivo";
     return "Tappa";
   };
-  const pillRoleColor = (role: AiPreviewItem["role"], colors: any) => {
+  const pillRoleColor = (role: AiPreviewItem["role"]) => {
     if (role === "start") return "#22c55e";
     if (role === "end") return colors.accentRed;
     return colors.accent;
   };
 
   const s = styles(colors);
+
+  const styleSliderIndex = STYLE_LEVELS.findIndex((sl) => sl.key === style);
 
   return (
     <View style={[s.container, { paddingTop: topPad }]}>
@@ -697,14 +650,12 @@ export default function GiriCreateScreen() {
         {/* ── AI PREVIEW mode ───────────────────────────────────────────────── */}
         {mode === "ai-preview" && aiPreview && (
           <View style={s.section}>
-            {/* Header */}
             <View style={s.previewHeader}>
               <Ionicons name="sparkles" size={18} color={colors.accent} />
               <Text style={s.previewHeaderText}>Anteprima giro generata dall'AI</Text>
             </View>
             <Text style={s.previewHint}>Tocca un pill per modificarlo, poi conferma per calcolare il percorso</Text>
 
-            {/* Title pill */}
             <View style={s.pillSection}>
               <Text style={s.pillLabel}>TITOLO</Text>
               <View style={[s.pill, { borderColor: colors.border }]}>
@@ -718,7 +669,6 @@ export default function GiriCreateScreen() {
               </View>
             </View>
 
-            {/* Style pills */}
             <View style={s.pillSection}>
               <Text style={s.pillLabel}>STILE PERCORSO</Text>
               <View style={s.pillRow}>
@@ -741,20 +691,17 @@ export default function GiriCreateScreen() {
               </View>
             </View>
 
-            {/* Waypoint pills */}
             <View style={s.pillSection}>
               <Text style={s.pillLabel}>TAPPE</Text>
               {aiPreview.items.map((item, idx) => (
                 <View key={idx} style={s.locationPillRow}>
-                  <View style={[s.locationPillDot, { backgroundColor: pillRoleColor(item.role, colors) }]} />
+                  <View style={[s.locationPillDot, { backgroundColor: pillRoleColor(item.role) }]} />
                   <View style={[
                     s.locationPill,
                     item.resolved && { borderColor: "#22c55e55" },
                     !item.resolved && !item.geocoding && item.editedName && { borderColor: colors.accentRed + "55" },
                   ]}>
-                    <Text style={[s.locationPillRole, { color: pillRoleColor(item.role, colors) }]}>
-                      {pillRoleLabel(item.role)}
-                    </Text>
+                    <Text style={[s.locationPillRole, { color: pillRoleColor(item.role) }]}>{pillRoleLabel(item.role)}</Text>
                     <TextInput
                       style={s.locationPillInput}
                       value={item.editedName}
@@ -773,7 +720,6 @@ export default function GiriCreateScreen() {
               ))}
             </View>
 
-            {/* Options pills */}
             <View style={s.pillSection}>
               <Text style={s.pillLabel}>OPZIONI</Text>
               <View style={s.optionPillRow}>
@@ -803,7 +749,6 @@ export default function GiriCreateScreen() {
               </View>
             </View>
 
-            {/* Geocoding status summary */}
             {aiPreview.items.some((i) => !i.resolved && !i.geocoding && i.editedName) && (
               <View style={s.previewWarning}>
                 <Ionicons name="warning-outline" size={14} color="#f59e0b" />
@@ -813,7 +758,6 @@ export default function GiriCreateScreen() {
               </View>
             )}
 
-            {/* CTA buttons */}
             <Pressable style={s.primaryBtn} onPress={handleConfirmPreview}>
               <MaterialCommunityIcons name="map-marker-path" size={18} color="#000" />
               <Text style={s.primaryBtnText}>Conferma e modifica percorso</Text>
@@ -835,18 +779,27 @@ export default function GiriCreateScreen() {
               <TextInput style={s.input} value={title} onChangeText={setTitle} placeholder="Nome del giro" placeholderTextColor={colors.textSecondary} />
             </View>
 
-            {/* Style */}
+            {/* Curviness slider — 5 levels */}
             <View style={s.section}>
               <Text style={s.sectionLabel}>Stile percorso</Text>
-              <View style={s.styleRow}>
-                {styleOptions.map((opt) => (
-                  <Pressable key={opt.key} style={[s.styleCard, style === opt.key && { borderColor: colors.accent, borderWidth: 2 }]} onPress={() => setStyle(opt.key)}>
-                    <MaterialCommunityIcons name={opt.icon as any} size={22} color={style === opt.key ? colors.accent : colors.textSecondary} />
-                    <Text style={[s.styleLabel, style === opt.key && { color: colors.accent }]}>{opt.label}</Text>
-                    <Text style={s.styleDesc}>{opt.desc}</Text>
+              <View style={s.curvinessRow}>
+                {STYLE_LEVELS.map((sl, idx) => (
+                  <Pressable
+                    key={sl.key}
+                    style={[s.curvinessBtn, style === sl.key && { backgroundColor: colors.accent }]}
+                    onPress={() => setStyle(sl.key)}
+                  >
+                    <Text style={[s.curvinessBtnText, style === sl.key && { color: "#000" }]} numberOfLines={1}>{sl.shortLabel}</Text>
                   </Pressable>
                 ))}
               </View>
+              <Text style={s.curvinessDesc}>
+                {style === "direct" && "Percorso più breve possibile, predilige grandi arterie"}
+                {style === "fast" && "Percorso veloce, rettilineo con poche deviazioni"}
+                {style === "balanced" && "Buon mix di curve e rettilineo"}
+                {style === "curvy" && "Strade curve e panoramiche — ideale per i bikers"}
+                {style === "extra_curvy" && "Massimizza le curve: strade secondarie e tortuose"}
+              </Text>
             </View>
 
             {/* Planner map */}
@@ -931,9 +884,10 @@ export default function GiriCreateScreen() {
                   <Ionicons name="repeat-outline" size={18} color={colors.text} />
                   <Text style={s.toggleLabel}>Andata e ritorno</Text>
                 </View>
-                <Switch value={isRoundTrip} onValueChange={setIsRoundTrip}
+                <Switch value={isRoundTrip} onValueChange={(v) => { setIsRoundTrip(v); if (!v) setHeadingDeg(null); }}
                   trackColor={{ false: colors.border, true: colors.accent }} thumbColor="#fff" />
               </View>
+
               {isRoundTrip && (
                 <View style={s.sliderSection}>
                   <View style={s.sliderLabelRow}>
@@ -951,7 +905,28 @@ export default function GiriCreateScreen() {
                   <View style={s.sliderTicks}>
                     {[1, 3, 6, 9, 12].map((h) => <Text key={h} style={s.sliderTick}>{h}h</Text>)}
                   </View>
-                  <CompassSelector value={roundTripDirection} onChange={setRoundTripDirection} colors={colors} />
+
+                  {/* Compass rose */}
+                  <Text style={[s.sliderLabel, { marginTop: 12, marginBottom: 8 }]}>Direzione di partenza preferita</Text>
+                  <View style={s.compassGrid}>
+                    <Pressable
+                      style={[s.compassCenter, headingDeg === null && { backgroundColor: colors.accent }]}
+                      onPress={() => setHeadingDeg(null)}
+                    >
+                      <Text style={[s.compassDirText, headingDeg === null && { color: "#000" }]}>Qualsiasi</Text>
+                    </Pressable>
+                    <View style={s.compassRing}>
+                      {COMPASS_DIRECTIONS.map((dir) => (
+                        <Pressable
+                          key={dir.label}
+                          style={[s.compassDir, headingDeg === dir.deg && { backgroundColor: colors.accent }]}
+                          onPress={() => setHeadingDeg(headingDeg === dir.deg ? null : dir.deg)}
+                        >
+                          <Text style={[s.compassDirText, headingDeg === dir.deg && { color: "#000" }]}>{dir.label}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
                 </View>
               )}
 
@@ -992,22 +967,23 @@ export default function GiriCreateScreen() {
                 </View>
               )}
 
-              <View style={s.toggleRow}>
-                <View style={s.toggleInfo}>
-                  <MaterialCommunityIcons name="highway" size={18} color={colors.text} />
-                  <Text style={s.toggleLabel}>Evita autostrade</Text>
+              <Text style={[s.sectionLabel, { marginTop: 8, marginBottom: 4 }]}>Evita</Text>
+              {[
+                { key: "avoidHighways" as const, label: "Autostrade", icon: "highway" as const, value: avoidHighways, set: setAvoidHighways },
+                { key: "avoidTolls" as const, label: "Pedaggi", icon: "cash" as const, value: avoidTolls, set: setAvoidTolls },
+                { key: "avoidFerries" as const, label: "Traghetti", icon: "ferry" as const, value: avoidFerries, set: setAvoidFerries },
+                { key: "avoidUnpaved" as const, label: "Strade sterrate", icon: "terrain" as const, value: avoidUnpaved, set: setAvoidUnpaved },
+              ].map((opt) => (
+                <View key={opt.key} style={s.toggleRow}>
+                  <View style={s.toggleInfo}>
+                    <MaterialCommunityIcons name={opt.icon} size={18} color={colors.text} />
+                    <Text style={s.toggleLabel}>{opt.label}</Text>
+                  </View>
+                  <Switch value={opt.value} onValueChange={opt.set}
+                    trackColor={{ false: colors.border, true: colors.accent }} thumbColor="#fff" />
                 </View>
-                <Switch value={avoidHighways} onValueChange={setAvoidHighways}
-                  trackColor={{ false: colors.border, true: colors.accent }} thumbColor="#fff" />
-              </View>
-              <View style={s.toggleRow}>
-                <View style={s.toggleInfo}>
-                  <MaterialCommunityIcons name="cash" size={18} color={colors.text} />
-                  <Text style={s.toggleLabel}>Evita pedaggi</Text>
-                </View>
-                <Switch value={avoidTolls} onValueChange={setAvoidTolls}
-                  trackColor={{ false: colors.border, true: colors.accent }} thumbColor="#fff" />
-              </View>
+              ))}
+
               <View style={s.toggleRow}>
                 <View style={s.toggleInfo}>
                   <Ionicons name="globe-outline" size={18} color={colors.text} />
@@ -1098,12 +1074,46 @@ export default function GiriCreateScreen() {
                       backgroundColor: routeResult.bikerScore >= 0.7 ? "#22c55e" : routeResult.bikerScore >= 0.4 ? colors.accent : colors.textSecondary,
                     }]} />
                   </View>
-                  <Text style={s.bsDesc}>
-                    {routeResult.bikerScore >= 0.7 ? "Percorso molto curvy — ideale per i bikers!"
-                      : routeResult.bikerScore >= 0.4 ? "Buon mix di curve e rettilineo"
-                      : "Percorso prevalentemente rettilineo"}
-                  </Text>
                 </View>
+
+                {/* Elevation profile */}
+                {routeResult.elevationProfile && routeResult.elevationProfile.length > 2 && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={s.bsLabel}>Profilo altimetrico</Text>
+                    <View style={{ marginTop: 6 }}>
+                      <ElevationProfile
+                        profile={routeResult.elevationProfile}
+                        gainM={routeResult.elevationGainM}
+                        minM={routeResult.altitudeMinM}
+                        maxM={routeResult.altitudeMaxM}
+                        height={120}
+                      />
+                    </View>
+                  </View>
+                )}
+
+                {/* Weather preview banner */}
+                {weatherLoading && (
+                  <View style={s.weatherBanner}>
+                    <ActivityIndicator size="small" color={colors.accent} />
+                    <Text style={s.weatherBannerText}>Caricamento meteo...</Text>
+                  </View>
+                )}
+                {!weatherLoading && weatherPreview && weatherPreview.length > 0 && (
+                  <View style={s.weatherBanner}>
+                    <Ionicons name={weatherPreview[0].isSuitable ? "partly-sunny-outline" : "rainy-outline"} size={20} color={weatherPreview[0].isSuitable ? colors.accent : colors.accentRed} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.weatherBannerText}>
+                        {weatherPreview[0].tempNow !== null ? `${Math.round(weatherPreview[0].tempNow)}°C` : ""}
+                        {weatherPreview[0].precipProb > 30 ? ` · 💧 ${weatherPreview[0].precipProb}% pioggia` : ""}
+                        {" · "}{weatherPreview[0].weatherDesc}
+                      </Text>
+                      {!weatherPreview.every((w) => w.isSuitable) && (
+                        <Text style={[s.weatherBannerText, { color: colors.accentRed, fontSize: 11 }]}>⚠ Pioggia prevista in alcune tappe</Text>
+                      )}
+                    </View>
+                  </View>
+                )}
 
                 {isMultiDay && (
                   <View style={s.multiDayPreview}>
@@ -1146,68 +1156,73 @@ export default function GiriCreateScreen() {
 const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingBottom: 10 },
-  backBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
-  navTitle: { fontFamily: "Inter_700Bold", fontSize: 17, color: colors.text },
-  modeRow: { flexDirection: "row", gap: 8, marginBottom: 16 },
-  modeChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surface },
-  modeChipText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.text },
+  backBtn: { width: 40, height: 40, justifyContent: "center" },
+  navTitle: { fontFamily: "Inter_700Bold", fontSize: 16, color: colors.text },
+  modeRow: { flexDirection: "row", gap: 8, marginBottom: 20 },
+  modeChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surface },
+  modeChipText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.text },
   section: { marginBottom: 20 },
-  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10 },
-  aiInput: { backgroundColor: colors.surface, borderRadius: 12, padding: 14, color: colors.text, fontFamily: "Inter_400Regular", fontSize: 14, minHeight: 100, borderWidth: 1, borderColor: colors.border },
-  input: { backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, color: colors.text, fontFamily: "Inter_400Regular", fontSize: 14, borderWidth: 1, borderColor: colors.border, marginBottom: 8 },
-  hint: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, marginTop: 6, lineHeight: 18 },
-  primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, marginTop: 10, marginBottom: 6 },
-  primaryBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#000" },
-  secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 12 },
+  sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
+  aiInput: { backgroundColor: colors.surface, borderRadius: 12, padding: 14, fontFamily: "Inter_400Regular", fontSize: 15, color: colors.text, minHeight: 100, borderWidth: 1, borderColor: colors.border, marginBottom: 12 },
+  primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 14, marginBottom: 10 },
+  primaryBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#000" },
+  secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 14, paddingVertical: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
   secondaryBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.textSecondary },
-
-  // AI Preview styles
-  previewHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 6 },
+  hint: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, textAlign: "center" },
+  previewHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   previewHeaderText: { fontFamily: "Inter_700Bold", fontSize: 16, color: colors.text },
-  previewHint: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginBottom: 16, lineHeight: 18 },
+  previewHint: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginBottom: 16 },
   pillSection: { marginBottom: 16 },
-  pillLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 },
-  pill: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1 },
+  pillLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: colors.textSecondary, marginBottom: 6, letterSpacing: 0.5 },
+  pill: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 12, padding: 12, borderWidth: 1 },
   pillInput: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 14, color: colors.text },
-  pillRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  stylePill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  pillRow: { flexDirection: "row", gap: 8 },
+  stylePill: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, backgroundColor: colors.surface, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: colors.border },
   stylePillText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary },
   locationPillRow: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 8 },
-  locationPillDot: { width: 10, height: 10, borderRadius: 5, flexShrink: 0 },
-  locationPill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: colors.border },
-  locationPillRole: { fontFamily: "Inter_600SemiBold", fontSize: 11, flexShrink: 0 },
+  locationPillDot: { width: 10, height: 10, borderRadius: 5 },
+  locationPill: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: colors.border },
+  locationPillRole: { fontFamily: "Inter_700Bold", fontSize: 11 },
   locationPillInput: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 14, color: colors.text },
   optionPillRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   optionPill: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   optionPillText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary },
-  previewWarning: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#f59e0b22", borderRadius: 10, padding: 12, marginBottom: 10 },
-  previewWarningText: { fontFamily: "Inter_400Regular", fontSize: 13, color: "#f59e0b", flex: 1, lineHeight: 18 },
-
-  // Manual mode styles
-  styleRow: { flexDirection: "row", gap: 8 },
-  styleCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 12, padding: 12, alignItems: "center", gap: 4, borderWidth: 1, borderColor: colors.border },
-  styleLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: colors.text, textAlign: "center" },
-  styleDesc: { fontFamily: "Inter_400Regular", fontSize: 10, color: colors.textSecondary, textAlign: "center" },
+  previewWarning: { flexDirection: "row", alignItems: "flex-start", gap: 8, backgroundColor: "#f59e0b22", borderRadius: 10, padding: 10, marginBottom: 12, borderWidth: 1, borderColor: "#f59e0b44" },
+  previewWarningText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#f59e0b", flex: 1 },
+  curvinessRow: { flexDirection: "row", gap: 6, marginBottom: 8 },
+  curvinessBtn: { flex: 1, alignItems: "center", paddingVertical: 10, borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  curvinessBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: colors.textSecondary },
+  curvinessDesc: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, textAlign: "center" },
+  plannerMapContainer: { height: 220, borderRadius: 14, overflow: "hidden", position: "relative", borderWidth: 1, borderColor: colors.border },
+  plannerMap: { flex: 1 },
+  mapHintBadge: { position: "absolute", bottom: 8, left: "50%", transform: [{ translateX: -70 }], backgroundColor: "rgba(0,0,0,0.7)", borderRadius: 20, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5 },
+  mapHintText: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#fff" },
+  input: { backgroundColor: colors.surface, borderRadius: 10, padding: 12, fontFamily: "Inter_400Regular", fontSize: 14, color: colors.text, borderWidth: 1, borderColor: colors.border, marginBottom: 6 },
   wpRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, marginBottom: 4 },
   wpDot: { width: 20, alignItems: "center", paddingTop: 14 },
   wpDotInner: { width: 10, height: 10, borderRadius: 5 },
-  suggestions: { backgroundColor: colors.surface, borderRadius: 8, borderWidth: 1, borderColor: colors.border, marginBottom: 8 },
-  suggestion: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
+  addWpBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8 },
+  addWpText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.accent },
+  suggestions: { backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.border, overflow: "hidden", marginTop: -4, marginBottom: 6 },
+  suggestion: { flexDirection: "row", alignItems: "center", gap: 8, padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
   suggestionText: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.text, flex: 1 },
-  addWpBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 10, paddingLeft: 28 },
-  addWpText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.accent },
   toggleRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
   toggleInfo: { flexDirection: "row", alignItems: "center", gap: 10 },
-  toggleLabel: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.text },
-  sliderSection: { paddingVertical: 12, paddingHorizontal: 4, gap: 4 },
-  sliderLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
-  sliderLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary, flex: 1 },
-  sliderValue: { fontFamily: "Inter_700Bold", fontSize: 14, color: colors.accent },
-  sliderTicks: { flexDirection: "row", justifyContent: "space-between" },
+  toggleLabel: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.text },
+  sliderSection: { paddingHorizontal: 4, paddingTop: 8, paddingBottom: 4 },
+  sliderLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 },
+  sliderLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary },
+  sliderValue: { fontFamily: "Inter_700Bold", fontSize: 13, color: colors.text },
+  sliderTicks: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 2 },
   sliderTick: { fontFamily: "Inter_400Regular", fontSize: 11, color: colors.textSecondary },
-  motoChip: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.surface, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, marginRight: 8, borderWidth: 1, borderColor: colors.border },
-  motoChipText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.text },
-  resultCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginTop: 8, gap: 14, borderWidth: 1, borderColor: colors.accent + "44" },
+  compassGrid: { gap: 8 },
+  compassRing: { flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center" },
+  compassDir: { width: 48, height: 36, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  compassCenter: { alignSelf: "center", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  compassDirText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: colors.text },
+  motoChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, marginRight: 8 },
+  motoChipText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary },
+  resultCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginTop: 16, marginBottom: 8, gap: 12 },
   resultTitle: { fontFamily: "Inter_700Bold", fontSize: 16, color: colors.text },
   resultStats: { flexDirection: "row", justifyContent: "space-around" },
   resultStat: { alignItems: "center", gap: 4 },
@@ -1216,20 +1231,18 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   bikerScoreSection: { gap: 6 },
   bsLabelRow: { flexDirection: "row", justifyContent: "space-between" },
   bsLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.textSecondary },
-  bsValue: { fontFamily: "Inter_700Bold", fontSize: 13, color: colors.accent },
+  bsValue: { fontFamily: "Inter_700Bold", fontSize: 13, color: colors.text },
   bsBarBg: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" },
-  bsBarFill: { height: "100%", borderRadius: 4 },
+  bsBarFill: { height: "100%" as any, borderRadius: 4 },
   bsDesc: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
-  multiDayPreview: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#7c3aed22", borderRadius: 8, padding: 10 },
-  multiDayPreviewText: { fontFamily: "Inter_500Medium", fontSize: 13, color: "#a78bfa" },
-  fuelPreview: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.accent + "22", borderRadius: 8, padding: 10 },
-  fuelPreviewText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.accent },
-  saveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 12, paddingVertical: 14, marginTop: 8, borderWidth: 2, borderColor: colors.accent },
-  saveBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: colors.accent },
-  plannerMapContainer: { height: 220, borderRadius: 14, overflow: "hidden", position: "relative", borderWidth: 1, borderColor: colors.border },
-  plannerMap: { flex: 1 },
-  mapHintBadge: { position: "absolute", bottom: 10, left: "50%" as any, transform: [{ translateX: -80 }], flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.7)", borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5 },
-  mapHintText: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#ccc" },
+  weatherBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.background, borderRadius: 10, padding: 10, borderWidth: 1, borderColor: colors.border },
+  weatherBannerText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.text },
+  multiDayPreview: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#7c3aed18", borderRadius: 10, padding: 10 },
+  multiDayPreviewText: { fontFamily: "Inter_500Medium", fontSize: 13, color: "#a78bfa", flex: 1 },
+  fuelPreview: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.accent + "18", borderRadius: 10, padding: 10 },
+  fuelPreviewText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.accent, flex: 1 },
+  saveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 14, paddingVertical: 14, borderWidth: 1.5, borderColor: colors.accent, marginTop: 4 },
+  saveBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: colors.accent },
   approxBanner: { position: "absolute", top: 10, left: "50%" as any, transform: [{ translateX: -90 }], flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.75)", borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#f9731650" },
   approxBannerText: { fontFamily: "Inter_500Medium", fontSize: 11, color: "#f97316" },
 });

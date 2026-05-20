@@ -1539,11 +1539,31 @@ export const plannedRoutes = pgTable("planned_routes", {
   visibility: varchar("visibility", { length: 20 }).notNull().default("public"),
   isMultiDay: boolean("is_multi_day").notNull().default(false),
   metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  elevationProfile: jsonb("elevation_profile").$type<Array<{ distanceKm: number; altitudeM: number }>>(),
+  elevationGainM: integer("elevation_gain_m"),
+  altitudeMinM: integer("altitude_min_m"),
+  altitudeMaxM: integer("altitude_max_m"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("planned_routes_user_id_idx").on(table.userId),
   index("planned_routes_visibility_idx").on(table.visibility),
+]);
+
+export const poiPhotos = pgTable("poi_photos", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  poiId: varchar("poi_id", { length: 100 }).notNull(),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  caption: text("caption"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("poi_photos_poi_id_idx").on(table.poiId),
+  index("poi_photos_user_id_idx").on(table.userId),
 ]);
 
 export const routeWeatherCache = pgTable("route_weather_cache", {
@@ -1562,6 +1582,8 @@ export const routeWeatherCache = pgTable("route_weather_cache", {
 
 export type PlannedRoute = typeof plannedRoutes.$inferSelect;
 export type InsertPlannedRoute = typeof plannedRoutes.$inferInsert;
+export type POIPhoto = typeof poiPhotos.$inferSelect;
+export type InsertPOIPhoto = typeof poiPhotos.$inferInsert;
 export type RouteWeatherCache = typeof routeWeatherCache.$inferSelect;
 export type InsertRouteWeatherCache = typeof routeWeatherCache.$inferInsert;
 

@@ -301,6 +301,16 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     }
   }
 
+  function postMsg(data) {
+    try {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(data));
+      } else {
+        window.postMessage(JSON.stringify(data), window.location.origin);
+      }
+    } catch(e) {}
+  }
+
   if (points.length > 1) {
     var bearings = [];
     for (var i = 0; i < points.length - 1; i++) {
@@ -308,13 +318,23 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     }
 
     // Smooth angle change with window=3
+    var polylineSegments = [];
     for (var i = 0; i < points.length - 1; i++) {
       var prevB = i > 0 ? bearings[i-1] : bearings[i];
       var nextB = i < bearings.length - 1 ? bearings[i+1] : bearings[i];
       var angle = (angleDiff(prevB, bearings[i]) + angleDiff(bearings[i], nextB)) / 2;
       var color = curvatureColor(angle);
-      L.polyline([[points[i].lat, points[i].lng], [points[i+1].lat, points[i+1].lng]],
+      var seg = L.polyline([[points[i].lat, points[i].lng], [points[i+1].lat, points[i+1].lng]],
         { color: color, weight: 5, opacity: 0.95 }).addTo(map);
+      // Street View: tap on route → open at midpoint of this segment
+      (function(p1, p2) {
+        seg.on("click", function(e) {
+          var midLat = (p1.lat + p2.lat) / 2;
+          var midLng = (p1.lng + p2.lng) / 2;
+          postMsg({ type: "routeTap", lat: midLat, lng: midLng });
+        });
+      })(points[i], points[i+1]);
+      polylineSegments.push(seg);
     }
 
     function dotIcon(bg) {
