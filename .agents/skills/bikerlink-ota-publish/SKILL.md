@@ -59,7 +59,7 @@ bash scripts/build-apk.sh production   # AAB Play Store
 - **Runtime Version**: `9.0.0` (ciclo corrente, APK v46) ← CICLO 9.x
 - **APK corrente**: versionCode **46**, versionName **46.29.9**
 - **APK precedente (STABILE distribuita)**: versionCode 45, versionName 3.4.0 (buildId: `91cfde53-66e7-45fc-83f0-d7f72a98fcde`, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk)
-- **OTA corrente**: OTA-29 (ultimo del ciclo 8.x — il ciclo 9.x inizia dalla prossima pubblicazione)
+- **OTA corrente**: OTA-10 (ciclo 9.x attivo, rv 9.0.0, v47.10.9, releaseId: `aa1ba7bb-88ae-40d0-91ff-c7106d8a9de7`, slot: stable)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -256,6 +256,18 @@ curl -i -H "expo-runtime-version: 8.0.0" -H "expo-platform: android" \
 
 Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su 204 o 304, il fix di Task #1119 (`server/routes.ts` helper `setExpoUpdatesHeaders`) è regredito o non è stato deployato.
 
+### Sintomo: utenti devono cancellare i dati dell'app per ricevere l'aggiornamento
+
+**Causa (risolta in OTA-10)**: nel ramo `fetch-not-new` di `lib/ota-check.ts`, quando `fetchUpdateAsync()` restituisce `isNew=false` (bundle già scaricato in una sessione precedente), il codice ritornava senza chiamare `reloadAsync()`. Scenario tipico: app scarica l'OTA in foreground → utente fa force-kill prima di backgroundare → al riavvio `_pendingReload` è in-memory e si azzera → `fetchUpdateAsync` restituisce `isNew=false` → OLD CODE: nessun reload → stuck permanente.
+
+**Fix (OTA-10, commit `2c75142`)**: il ramo `fetch-not-new` ora chiama `_scheduleReloadOnBackground()` e imposta `_pendingReload = true`, identico al ramo `isNew=true`. Al prossimo backgrounding `reloadAsync()` scatta automaticamente.
+
+**File**: `lib/ota-check.ts`, funzione `triggerOtaCheck`, blocco `if (!fetched.isNew)` (dopo `fetchUpdateAsync`).
+
+**Se il sintomo si ripresenta**: verificare che il ramo `fetch-not-new` contenga ancora la chiamata a `_scheduleReloadOnBackground()` e che `_pendingReload = true` sia impostato prima del return.
+
+---
+
 ### Sintomo: verifica live (Step J di publish-ota.sh) va in timeout anche se la release è pubblicata
 
 **Causa (storica — ora risolta)**: Lo step J inviava `expo-protocol-version: 1` e tentava `JSON.parse(body)` sul body intero, ma il backend risponde con `multipart/mixed` (Expo Protocol v1). Il parse falliva silenziosamente, l'ID non veniva estratto, il loop di retry continuava fino al timeout.
@@ -283,8 +295,10 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
   - APK v43 (3.2.0): STABILE — buildId: 38cb1b32-4316-4f63-9799-1b9ab36888e8, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk
   - APK v44 (3.3.0): STABILE — buildId: b148edc3-de25-4f55-b5c4-c4466b4ccc0b, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk (baseline pulita per device piantati su OTA-19 — Task #1151)
   - APK v45 (3.4.0): STABILE — buildId: 91cfde53-66e7-45fc-83f0-d7f72a98fcde, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk
-- **Ciclo 9.x: OTA 30+ (rv 9.0.0) ← CORRENTE**
+- **Ciclo 9.x: OTA 1+ (rv 9.0.0) ← CORRENTE**
   - APK v46 (46.29.9): versionCode 46, runtimeVersion 9.0.0
+  - OTA-9 (v47.9.9): fix token auth backend (`req.session.userId ?? null`), releaseId: `dddb488c`
+  - OTA-10 (v47.10.9): fix aggiornamento automatico — ramo `fetch-not-new` ora chiama `reloadAsync()`, releaseId: `aa1ba7bb` ← **CORRENTE**
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
