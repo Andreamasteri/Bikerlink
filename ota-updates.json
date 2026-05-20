@@ -1090,7 +1090,34 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-20T18:31:24.407Z"
+  },
+  {
+    "updateNumber": 9,
+    "version": "47.9.9",
+    "cycle": "9.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-9 rv9.0.0: OTA-9: pulsante info schermata Status, 9 fix pianificazione percorsi, legenda mappa curvilinea, waypoint live, auto-fit mappa, fix duplicati edit percorso, banner routing offline, restyling tab Status, 4 fix profilo + 2 flag admin matching, fix registro OTA",
+    "note": "CURRENT_OTA_NUMBER=9. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "9.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "26e2e07236df0a7f722b56f5e1ea567c85922b56",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "pending"
   }
 ]

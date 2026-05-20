@@ -1066,18 +1066,60 @@ export default function ReadyToRideScreen() {
           </View>
 
           <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
-            <View style={styles.accordionHeader}>
+            <Pressable style={styles.accordionHeader} onPress={() => setGpsPrecisionExpanded(v => !v)}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Ionicons name="navigate-outline" size={18} color={Colors.accent} />
-                <View>
+                <View style={{ flex: 1, paddingRight: 8 }}>
                   <Text style={styles.accordionTitle}>Precisione GPS Tracking</Text>
-                  <Text style={styles.privacyRowDesc}>
+                  <Text style={styles.privacyRowDesc} numberOfLines={1}>
                     {gpsOptions.find((o) => o.key === gpsPrecision)?.label ?? gpsPrecision}
                   </Text>
                 </View>
               </View>
-              <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
-            </View>
+              <Ionicons name={gpsPrecisionExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
+            </Pressable>
+            {gpsPrecisionExpanded && (
+              <View style={[styles.accordionContent, { paddingBottom: 8 }]}>
+                {gpsOptions.map((opt) => {
+                  const isSelected = gpsPrecision === opt.key;
+                  return (
+                    <Pressable
+                      key={opt.key}
+                      style={[
+                        styles.gpsOption,
+                        {
+                          borderColor: isSelected ? Colors.accent : Colors.border,
+                          backgroundColor: isSelected ? Colors.accent + "14" : colors.background,
+                        },
+                      ]}
+                      onPress={() => {
+                        setGpsPrecision(opt.key);
+                        privacyMutation.mutate({ gpsPrecision: opt.key });
+                        setGpsPrecisionExpanded(false);
+                      }}
+                    >
+                      <Ionicons
+                        name={opt.icon as any}
+                        size={20}
+                        color={isSelected ? Colors.accent : Colors.textSecondary}
+                        style={{ marginRight: 12, flexShrink: 0 }}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.gpsOptionLabel, { color: isSelected ? Colors.accent : Colors.text }]}>
+                          {opt.label}
+                        </Text>
+                        <Text style={[styles.gpsOptionDesc, { color: Colors.textSecondary }]}>
+                          {opt.desc}
+                        </Text>
+                      </View>
+                      {isSelected && (
+                        <Ionicons name="checkmark-circle" size={20} color={Colors.accent} style={{ marginLeft: 8, flexShrink: 0 }} />
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
           </View>
         </View>
 
