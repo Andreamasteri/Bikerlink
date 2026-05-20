@@ -468,7 +468,7 @@ export async function runBikerBikerMatching(): Promise<number> {
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: m1.brand,
-            motorcycleModel: m1.model,
+            motorcycleModel: "",
             status: "new",
             isSupermatch,
           });
@@ -1332,7 +1332,7 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: userMotoBrand.motorcycle.brand,
-            motorcycleModel: userMotoBrand.motorcycle.model || "",
+            motorcycleModel: "",
             status: "new",
             isSupermatch,
           });
