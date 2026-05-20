@@ -40,6 +40,8 @@ interface TelemetryStats {
   latestSample: string | null;
 }
 
+const TELEMETRY_STALE_THRESHOLD_HOURS = 24;
+
 function TelemetryCard() {
   const { data, isLoading, error } = useQuery<TelemetryStats>({
     queryKey: ["/api/admin/telemetry/stats"],
@@ -60,6 +62,14 @@ function TelemetryCard() {
     return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" });
   }
 
+  const isStale = data
+    ? !data.latestSample ||
+      (() => {
+        const ts = new Date(data.latestSample!).getTime();
+        return !Number.isFinite(ts) || Date.now() - ts > TELEMETRY_STALE_THRESHOLD_HOURS * 60 * 60 * 1000;
+      })()
+    : false;
+
   return (
     <View style={telStyles.card}>
       <View style={telStyles.cardHeader}>
@@ -67,6 +77,9 @@ function TelemetryCard() {
         <Text style={telStyles.cardTitle}>Telemetria</Text>
         {isLoading && <ActivityIndicator size="small" color="#22c55e" style={{ marginLeft: "auto" }} />}
         {error && !isLoading && <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" style={{ marginLeft: "auto" }} />}
+        {!isLoading && !error && isStale && (
+          <MaterialCommunityIcons name="alert" size={16} color="#f59e0b" style={{ marginLeft: "auto" }} />
+        )}
       </View>
       <View style={telStyles.statsRow}>
         <View style={telStyles.stat}>
@@ -84,6 +97,14 @@ function TelemetryCard() {
           <Text style={telStyles.statLabel}>Km stimati</Text>
         </View>
       </View>
+      {!isLoading && !error && isStale && (
+        <View style={telStyles.staleWarning}>
+          <MaterialCommunityIcons name="alert-outline" size={13} color="#f59e0b" />
+          <Text style={telStyles.staleWarningText}>
+            Nessun campione nelle ultime {TELEMETRY_STALE_THRESHOLD_HOURS}h
+          </Text>
+        </View>
+      )}
       <View style={telStyles.lastSample}>
         <MaterialCommunityIcons name="clock-outline" size={12} color={Colors.textSecondary} />
         <Text style={telStyles.lastSampleText}>Ultimo campione: {data ? formatDate(data.latestSample) : "—"}</Text>
@@ -367,6 +388,22 @@ const telStyles = StyleSheet.create({
     width: 1,
     height: 36,
     backgroundColor: Colors.border,
+  },
+  staleWarning: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  staleWarningText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "#f59e0b",
+    flex: 1,
   },
   lastSample: {
     flexDirection: "row",
