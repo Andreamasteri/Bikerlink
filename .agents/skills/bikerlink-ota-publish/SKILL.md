@@ -266,7 +266,7 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
 - **Scritto** da `triggerOtaCheck()` subito dopo `fetchUpdateAsync()` riuscito (entrambi i rami `isNew=true` e `isNew=false`).
 - **Cancellato** nel listener background (`_scheduleReloadOnBackground`) SE `reloadAsync()` va a buon fine, e nel ramo `no-update` (siamo già aggiornati).
 - **Letto** all'avvio in `OtaStartupChecker` (`app/_layout.tsx`): se il flag è presente, chiama `Updates.reloadAsync()` **immediatamente**, prima ancora dei 3 secondi di ritardo del check normale. Questo garantisce che l'aggiornamento scaricato nella sessione precedente venga applicato al cold start successivo, mentre l'utente è ancora sulla schermata di caricamento.
-- **Fix aggiuntivo**: il listener AppState ora si attiva solo su `"background"` (rimosso `"inactive"` — stato transitorio Android dove il processo viene sospeso prima del completamento).
+- **Fix aggiuntivo**: il listener AppState ora si attiva solo su `"background"` (rimosso `"inactive"` — stato transitorio Android). Aggiunto timer da **5 secondi**: il reload scatta solo se l'app resta in background ≥5s. Se l'utente torna in primo piano prima, il timer si azzera — nessun reload indesiderato per switch rapidi ad altre app. Costante `BG_RELOAD_DELAY_MS = 5_000` in `lib/ota-check.ts`.
 
 **File**: `lib/ota-check.ts` (costante `OTA_PENDING_KEY`, scrittura/cancellazione flag), `app/_layout.tsx` (lettura flag in `OtaStartupChecker`).
 

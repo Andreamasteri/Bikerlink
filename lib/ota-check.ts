@@ -62,21 +62,43 @@ let inFlight = false;
 let _pendingReload = false;
 let _bgListenerSub: ReturnType<typeof AppState.addEventListener> | null = null;
 
+// Quanti ms l'app deve restare in background prima che reloadAsync() scatti.
+// 5s evita reload indesiderati per switch rapidi ad altre app.
+const BG_RELOAD_DELAY_MS = 5_000;
+
 function _scheduleReloadOnBackground() {
   if (_bgListenerSub) return;
+
+  // Timer locale alla closure: si avvia quando l'app va in background,
+  // si cancella se torna in primo piano prima dei 5s.
+  let bgTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const _doReload = () => {
+    bgTimer = null;
+    if (!_pendingReload) return;
+    _pendingReload = false;
+    if (_bgListenerSub) {
+      _bgListenerSub.remove();
+      _bgListenerSub = null;
+    }
+    // Cancella il flag persistente: se reloadAsync() riesce, al prossimo
+    // cold start non serve un secondo reload.
+    AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
+    Updates.reloadAsync().catch(() => {});
+  };
+
   _bgListenerSub = AppState.addEventListener("change", (nextState) => {
-    // "inactive" su Android è uno stato transitorio brevissimo — il processo JS
-    // può venire sospeso prima che reloadAsync() completi. Si usa solo "background".
-    if (_pendingReload && nextState === "background") {
-      _pendingReload = false;
-      if (_bgListenerSub) {
-        _bgListenerSub.remove();
-        _bgListenerSub = null;
+    if (nextState === "background" && _pendingReload) {
+      // Avvia il timer solo se non è già partito.
+      if (!bgTimer) {
+        bgTimer = setTimeout(_doReload, BG_RELOAD_DELAY_MS);
       }
-      // Cancella il flag persistente: se reloadAsync() riesce, al prossimo
-      // cold start non serve un secondo reload.
-      AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
-      Updates.reloadAsync().catch(() => {});
+    } else if (nextState === "active") {
+      // Tornato in primo piano prima dei 5s → annulla il reload.
+      if (bgTimer) {
+        clearTimeout(bgTimer);
+        bgTimer = null;
+      }
     }
   });
 }
