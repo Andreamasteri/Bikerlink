@@ -31,6 +31,28 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 .leaflet-container { background: #1a1a1a !important; }
 .leaflet-control-zoom { display: none !important; }
 .leaflet-control-attribution { font-size: 8px !important; opacity: 0.4; }
+#curvature-legend {
+  position: absolute; bottom: 36px; right: 8px;
+  background: rgba(0,0,0,0.72); border-radius: 8px;
+  padding: 6px 9px; z-index: 2000; pointer-events: none;
+  font-family: -apple-system, sans-serif;
+  display: none;
+}
+#curvature-legend-title {
+  font-size: 9px; color: #aaa; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 5px;
+}
+.cv-row {
+  display: flex; align-items: center; margin-bottom: 3px;
+}
+.cv-row:last-child { margin-bottom: 0; }
+.cv-dot {
+  width: 22px; height: 4px; border-radius: 2px;
+  margin-right: 6px; flex-shrink: 0;
+}
+.cv-label {
+  font-size: 10px; color: #e5e5e5; white-space: nowrap;
+}
 #tap-hint {
   position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
   background: rgba(0,0,0,0.72); color: #ccc; font-size: 11px;
@@ -49,6 +71,12 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 </head>
 <body>
 <div id="map"></div>
+<div id="curvature-legend">
+  <div id="curvature-legend-title">Curvatura</div>
+  <div class="cv-row"><div class="cv-dot" style="background:#22c55e"></div><span class="cv-label">Rettilineo</span></div>
+  <div class="cv-row"><div class="cv-dot" style="background:#eab308"></div><span class="cv-label">Curvilinea</span></div>
+  <div class="cv-row"><div class="cv-dot" style="background:#ef4444"></div><span class="cv-label">Curve strette</span></div>
+</div>
 <div id="tap-hint">Tocca la mappa per aggiungere una tappa</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -119,9 +147,12 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     if (routeFallback) { map.removeLayer(routeFallback); routeFallback = null; }
   }
 
+  var legendEl = document.getElementById("curvature-legend");
+
   function renderCurvatureRoute(pts) {
     clearRouteLayer();
-    if (pts.length < 2) return;
+    if (pts.length < 2) { if (legendEl) legendEl.style.display = "none"; return; }
+    if (legendEl) legendEl.style.display = "block";
     var bearings = [];
     for (var i = 0; i < pts.length - 1; i++) {
       bearings.push(bearing(pts[i], pts[i+1]));
@@ -142,6 +173,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       renderCurvatureRoute(routePts);
     } else {
       clearRouteLayer();
+      if (legendEl) legendEl.style.display = "none";
       if (waypoints.length > 1) {
         routeFallback = L.polyline(waypoints.map(function(w) { return [w.lat, w.lng]; }),
           { color: accent, weight: 2, dashArray: "6 4", opacity: 0.6 }).addTo(map);
@@ -358,10 +390,37 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 .leaflet-container { background: #1a1a1a !important; }
 .leaflet-control-zoom { display: none !important; }
 .leaflet-control-attribution { font-size: 8px !important; opacity: 0.4; }
+#curvature-legend {
+  position: absolute; bottom: 20px; right: 8px;
+  background: rgba(0,0,0,0.72); border-radius: 8px;
+  padding: 6px 9px; z-index: 2000; pointer-events: none;
+  font-family: -apple-system, sans-serif;
+}
+#curvature-legend-title {
+  font-size: 9px; color: #aaa; text-transform: uppercase;
+  letter-spacing: 0.5px; margin-bottom: 5px;
+}
+.cv-row {
+  display: flex; align-items: center; margin-bottom: 3px;
+}
+.cv-row:last-child { margin-bottom: 0; }
+.cv-dot {
+  width: 22px; height: 4px; border-radius: 2px;
+  margin-right: 6px; flex-shrink: 0;
+}
+.cv-label {
+  font-size: 10px; color: #e5e5e5; white-space: nowrap;
+}
 </style>
 </head>
 <body>
 <div id="map"></div>
+<div id="curvature-legend">
+  <div id="curvature-legend-title">Curvatura</div>
+  <div class="cv-row"><div class="cv-dot" style="background:#22c55e"></div><span class="cv-label">Rettilineo</span></div>
+  <div class="cv-row"><div class="cv-dot" style="background:#eab308"></div><span class="cv-label">Curvilinea</span></div>
+  <div class="cv-row"><div class="cv-dot" style="background:#ef4444"></div><span class="cv-label">Curve strette</span></div>
+</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function() {
