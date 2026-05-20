@@ -943,6 +943,14 @@ function TrackingScreenInner() {
   const volumePressTimestampsRef = useRef<number[]>([]);
   const lastVolumeRef = useRef<number | null>(null);
   const handsOffDismissedForRideRef = useRef(false);
+  const telemetryAccumRef = useRef<Array<{
+    timestamp: string;
+    lat: number;
+    lon: number;
+    leanAngle?: number;
+    gForceX?: number;
+    speedKmh?: number;
+  }>>([]);
   const lastAvgSpeedUpdateRef = useRef(0);
 
   // Background GPS toast
@@ -1689,6 +1697,15 @@ function TrackingScreenInner() {
           ? { accelG: currentAccelGRef.current, tiltDeg: currentTiltDegRef.current }
           : {}),
       };
+
+      telemetryAccumRef.current.push({
+        timestamp: point.timestamp,
+        lat: latitude,
+        lon: longitude,
+        leanAngle: point.tiltDeg,
+        gForceX: point.accelG,
+        speedKmh,
+      });
       pointsBufferRef.current.push(point);
       setPointsBuffered(pointsBufferRef.current.length);
       if (pointsBufferRef.current.length >= BATCH_SIZE) {
@@ -1840,6 +1857,7 @@ function TrackingScreenInner() {
     gpsOfflineWriteCountRef.current = 0;
     bufferWriteQueueRef.current = Promise.resolve();
     gpsWasLostRef.current = false;
+    telemetryAccumRef.current = [];
     gpsBlackoutCountRef.current = 0;
     gpsBlackoutSecondsRef.current = 0;
     pendingBgToastCountRef.current = 0;
@@ -2384,6 +2402,11 @@ function TrackingScreenInner() {
         gpsBlackoutSeconds: gpsBlackoutSecondsRef.current,
       });
       await clearGpsBuffer();
+      const telemetrySamples = [...telemetryAccumRef.current];
+      telemetryAccumRef.current = [];
+      if (telemetrySamples.length > 0) {
+        apiRequest("POST", `/api/rides/${rId}/telemetry`, { samples: telemetrySamples }).catch(() => {});
+      }
       await refetchRecords();
       // Capture route points for "Vedi percorso" in Summary Modal
       setSummaryRoutePoints(

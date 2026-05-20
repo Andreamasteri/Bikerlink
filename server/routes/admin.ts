@@ -9,7 +9,7 @@ import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "
 import { storage } from "../storage";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats, siteVisits } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats, siteVisits, rideTelemetry, routes } from "@shared/schema";
 import { DEFAULT_PREFS } from "./match-preferences";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, notInArray, lte, isNull, or, ilike } from "drizzle-orm";
@@ -7596,5 +7596,100 @@ router.get("/site-visits", async (req: Request, res: Response) => {
   }
 });
 
-export default router;
+router.get("/telemetry-stats", async (req: Request, res: Response) => {
+  try {
+    const countResult = await db.execute(
+      sql`
+        SELECT
+          COUNT(DISTINCT user_id)::int AS users_with_telemetry,
+          COUNT(DISTINCT ride_id)::int AS total_rides,
+          COUNT(*)::int               AS total_samples
+        FROM ride_telemetry
+      `
+    );
+    const countRow = countResult.rows[0] as {
+      users_with_telemetry: number;
+      total_rides: number;
+      total_samples: number;
+    } | undefined;
 
+    const kmResult = await db.execute(
+      sql`
+        WITH segments AS (
+          SELECT
+            user_id,
+            lat,
+            lon,
+            LAG(lat) OVER (PARTITION BY ride_id ORDER BY "timestamp") AS prev_lat,
+            LAG(lon) OVER (PARTITION BY ride_id ORDER BY "timestamp") AS prev_lon
+          FROM ride_telemetry
+        )
+        SELECT
+          user_id,
+          SUM(
+            6371.0 * 2 * ASIN(SQRT(
+              POWER(SIN((RADIANS(lat) - RADIANS(prev_lat)) / 2), 2) +
+              COS(RADIANS(prev_lat)) * COS(RADIANS(lat)) *
+              POWER(SIN((RADIANS(lon) - RADIANS(prev_lon)) / 2), 2)
+            ))
+          ) AS dist_km
+        FROM segments
+        WHERE prev_lat IS NOT NULL
+        GROUP BY user_id
+      `
+    );
+
+    const totalKm = kmResult.rows.reduce(
+      (acc: number, r: any) => acc + parseFloat(String(r.dist_km ?? "0")),
+      0
+    );
+    const usersCount = parseInt(String(countRow?.users_with_telemetry ?? "0"), 10);
+    const avgKmPerUser = usersCount > 0 ? Math.round((totalKm / usersCount) * 10) / 10 : 0;
+
+    const settingRows = await db
+      .select({ value: appSettings.value })
+      .from(appSettings)
+      .where(eq(appSettings.key, "telemetry_target_km"))
+      .limit(1);
+    const targetKm =
+      settingRows.length > 0 && settingRows[0].value
+        ? parseInt(settingRows[0].value, 10)
+        : 400;
+
+    return res.json({
+      users_with_telemetry: usersCount,
+      total_rides: parseInt(String(countRow?.total_rides ?? "0"), 10),
+      total_samples: parseInt(String(countRow?.total_samples ?? "0"), 10),
+      total_km: Math.round(totalKm * 10) / 10,
+      avg_km_per_user: avgKmPerUser,
+      target_km: targetKm,
+    });
+  } catch (error) {
+    console.error("Admin telemetry-stats error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.put("/telemetry-target-km", async (req: Request, res: Response) => {
+  try {
+    const { target_km } = req.body;
+    const parsed = parseInt(String(target_km), 10);
+    if (!Number.isFinite(parsed) || parsed < 10 || parsed > 100000) {
+      return res.status(400).json({ message: "Valore non valido (10–100000 km)" });
+    }
+    await storage.upsertAppSetting("telemetry_target_km", String(parsed), null);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "telemetry_target_km",
+      details: `Target telemetria aggiornato: ${parsed} km`,
+    });
+    return res.json({ target_km: parsed });
+  } catch (error) {
+    console.error("Admin telemetry-target-km error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+export default router;

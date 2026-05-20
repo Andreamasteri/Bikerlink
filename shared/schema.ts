@@ -1730,3 +1730,30 @@ export const siteVisits = pgTable("site_visits", {
 
 export type SiteVisit = typeof siteVisits.$inferSelect;
 export type InsertSiteVisit = typeof siteVisits.$inferInsert;
+
+export const rideTelemetry = pgTable("ride_telemetry", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  rideId: varchar("ride_id", { length: 36 })
+    .notNull()
+    .references(() => routes.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  timestamp: timestamp("timestamp").notNull(),
+  lat: doublePrecision("lat").notNull(),
+  lon: doublePrecision("lon").notNull(),
+  leanAngle: doublePrecision("lean_angle"),
+  gForceX: doublePrecision("g_force_x"),
+  gForceY: doublePrecision("g_force_y"),
+  gForceZ: doublePrecision("g_force_z"),
+  speedKmh: doublePrecision("speed_kmh"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("ride_telemetry_ride_id_idx").on(table.rideId),
+  index("ride_telemetry_user_id_idx").on(table.userId),
+]);
+
+export type RideTelemetry = typeof rideTelemetry.$inferSelect;
+export type InsertRideTelemetry = typeof rideTelemetry.$inferInsert;

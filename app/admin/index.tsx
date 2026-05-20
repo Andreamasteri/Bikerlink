@@ -117,6 +117,7 @@ const adminGroups: AdminGroup[] = [
     headerIconSet: "MaterialCommunityIcons",
     items: [
       { key: "sensors", label: "Sensori", icon: "chip", iconSet: "MaterialCommunityIcons", route: "/admin/sensors", accentColor: "#FF9800" },
+      { key: "telemetry", label: "Telemetria", icon: "chart-line", iconSet: "MaterialCommunityIcons", route: "/admin/telemetry", accentColor: "#22C55E" },
     ],
   },
 ];

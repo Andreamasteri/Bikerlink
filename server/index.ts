@@ -1509,6 +1509,30 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] biker_biker_matches.pair_type:", e);
         }
 
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS ride_telemetry (
+              id          VARCHAR(36)       PRIMARY KEY DEFAULT gen_random_uuid(),
+              ride_id     VARCHAR(36)       NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
+              user_id     VARCHAR(36)       NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
+              "timestamp" TIMESTAMP         NOT NULL,
+              lat         DOUBLE PRECISION  NOT NULL,
+              lon         DOUBLE PRECISION  NOT NULL,
+              lean_angle  DOUBLE PRECISION,
+              g_force_x   DOUBLE PRECISION,
+              g_force_y   DOUBLE PRECISION,
+              g_force_z   DOUBLE PRECISION,
+              speed_kmh   DOUBLE PRECISION,
+              created_at  TIMESTAMP         NOT NULL DEFAULT NOW()
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ride_telemetry_ride_id_idx ON ride_telemetry (ride_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ride_telemetry_user_id_idx ON ride_telemetry (user_id)`);
+          console.log("[MIGRATION] ride_telemetry table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] ride_telemetry:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
