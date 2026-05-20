@@ -25,6 +25,7 @@ import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import DebugPanel from "@/components/DebugPanel";
 import ElevationProfile from "@/components/ElevationProfile";
 import { decodePolyline } from "@/lib/polyline";
+import { useLanguage } from "@/lib/language-context";
 
 type Style = "direct" | "fast" | "balanced" | "curvy" | "extra_curvy";
 type Mode = "ai" | "ai-preview" | "manual";
@@ -113,6 +114,7 @@ async function calcRoute(
   roundTripHours?: number,
   isRoundTrip?: boolean,
   headingDeg?: number | null,
+  language?: string,
 ): Promise<RouteResult> {
   const url = new URL("/api/planned-routes/calculate", getApiUrl());
   const resp = await fetch(url.toString(), {
@@ -120,7 +122,7 @@ async function calcRoute(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       waypoints, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved,
-      roundTripHours, isRoundTrip,
+      roundTripHours, isRoundTrip, language,
       ...(headingDeg !== null && headingDeg !== undefined ? { headingDeg } : {}),
     }),
   });
@@ -175,6 +177,7 @@ export default function GiriCreateScreen() {
   const router = useRouter();
   const qc = useQueryClient();
   const topPad = insets.top;
+  const { language } = useLanguage();
 
   const { logs: debugLogs, clearLogs: clearDebugLogs, logFetch } = useApiDebugLog();
   const [debugVisible, setDebugVisible] = useState(__DEV__);
@@ -436,7 +439,7 @@ export default function GiriCreateScreen() {
         "/api/planned-routes/calculate", "POST",
         () => {
           const url = new URL("/api/planned-routes/calculate", getApiUrl());
-          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null }) });
+          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language }) });
         },
         async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
       );
@@ -544,7 +547,7 @@ export default function GiriCreateScreen() {
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
       setCalculating(true);
       try {
-        const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg);
+        const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
         setRouteResult(result);
       } catch {
         // silent — user can still trigger manually
@@ -565,7 +568,7 @@ export default function GiriCreateScreen() {
     setCalculating(true);
     setWeatherPreview(null);
     try {
-      const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg);
+      const result = await calcRoute(toCalc, style, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
       setRouteResult(result);
       if (result.durationMinutes > 480 && !isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));

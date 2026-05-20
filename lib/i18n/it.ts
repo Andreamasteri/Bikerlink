@@ -1198,6 +1198,18 @@ const it: Record<string, string> = {
   "profile.sensorsCalib.resetConfirmMsg": "Verranno usati gli assi predefiniti fino alla prossima calibrazione.",
   "profile.sensorsCalib.resetConfirmOk": "Reimposta",
   "profile.sensorsCalib.resetConfirmCancel": "Annulla",
+
+  "nav.announce.far": "Tra {distance} metri, {instruction}",
+  "nav.announce.via": "su {street}",
+  "nav.announce.arrived": "Sei arrivato a destinazione!",
+  "nav.in_progress": "Navigazione in corso...",
+  "nav.no_gps": "Posizione richiesta",
+  "nav.no_gps_msg": "Abilita la posizione GPS per usare la navigazione.",
+  "nav.map_unavailable": "Mappa non disponibile",
+  "nav.arrived": "Sei arrivato!",
+  "nav.save_ride": "Salva il giro",
+  "nav.close": "Chiudi",
+  "nav.then": "Poi:",
 };
 
 export default it;

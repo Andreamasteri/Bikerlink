@@ -305,6 +305,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     roundTripHours,
     isRoundTrip,
     headingDeg,
+    language,
   } = req.body as {
     waypoints: Array<{ lat: number; lng: number }>;
     style?: string;
@@ -315,6 +316,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     roundTripHours?: number;
     isRoundTrip?: boolean;
     headingDeg?: number;
+    language?: string;
   };
 
   if (!waypoints || waypoints.length < 2) {
@@ -435,9 +437,13 @@ router.post("/calculate", async (req: Request, res: Response) => {
     }
 
     const url = `https://graphhopper.com/api/1/route?key=${apiKey}`;
+    const ghLang = language ?? "it";
     const resp = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Accept-Language": ghLang,
+      },
       body: JSON.stringify(body),
     });
 

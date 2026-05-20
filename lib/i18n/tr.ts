@@ -1112,6 +1112,18 @@ const tr: Record<string, string> = {
 
   "gps_error_title": "GPS Hatası",
   "gps_error_body": "GPS noktaları kaydedilemedi. Geçersiz koordinatlar tespit edildi.",
+
+  "nav.announce.far": "{distance} metre sonra, {instruction}",
+  "nav.announce.via": "{street} üzerinde",
+  "nav.announce.arrived": "Hedefinize ulaştınız!",
+  "nav.in_progress": "Navigasyon devam ediyor...",
+  "nav.no_gps": "Konum gerekli",
+  "nav.no_gps_msg": "Navigasyonu kullanmak için GPS konumunu etkinleştirin.",
+  "nav.map_unavailable": "Harita mevcut değil",
+  "nav.arrived": "Ulaştınız!",
+  "nav.save_ride": "Sürüşü kaydet",
+  "nav.close": "Kapat",
+  "nav.then": "Sonra:",
 };
 
 export default tr;

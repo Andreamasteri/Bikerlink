@@ -1112,6 +1112,18 @@ const de: Record<string, string> = {
 
   "gps_error_title": "GPS-Fehler",
   "gps_error_body": "GPS-Punkte konnten nicht gespeichert werden. Ungültige Koordinaten erkannt.",
+
+  "nav.announce.far": "In {distance} Metern, {instruction}",
+  "nav.announce.via": "auf {street}",
+  "nav.announce.arrived": "Sie haben Ihr Ziel erreicht!",
+  "nav.in_progress": "Navigation läuft...",
+  "nav.no_gps": "Standort erforderlich",
+  "nav.no_gps_msg": "Aktiviere den GPS-Standort für die Navigation.",
+  "nav.map_unavailable": "Karte nicht verfügbar",
+  "nav.arrived": "Sie sind angekommen!",
+  "nav.save_ride": "Fahrt speichern",
+  "nav.close": "Schließen",
+  "nav.then": "Dann:",
 };
 
 export default de;

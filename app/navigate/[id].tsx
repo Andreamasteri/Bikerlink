@@ -21,6 +21,7 @@ import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { buildNavigationMapHtml } from "@/lib/leaflet-navigation-html";
 import { getTileConfig } from "@/lib/map-tiles";
+import { useLocale, useT } from "@/lib/language-context";
 import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
 
 // ─── Route cache helpers ───────────────────────────────────────────────────────
@@ -135,6 +136,8 @@ export default function NavigateScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const locale = useLocale();
+  const t = useT();
 
   const topPad = Platform.OS === "web" ? 67 : insets.top;
   const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
@@ -215,7 +218,7 @@ export default function NavigateScreen() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (!active) return;
       if (status !== "granted") {
-        Alert.alert("Posizione richiesta", "Abilita la posizione GPS per usare la navigazione.", [
+        Alert.alert(t("nav.no_gps"), t("nav.no_gps_msg"), [
           { text: "OK", onPress: () => router.back() }
         ]);
         return;
@@ -288,7 +291,7 @@ export default function NavigateScreen() {
         // Update polyline — triggers mapHtml recompute → WebView reloads with new route
         setPolylinePoints(newPts);
 
-        Speech.speak("Percorso ricalcolato. Prosegui sul nuovo percorso.", { language: "it-IT" });
+        Speech.speak(t("nav.rerouted"), { language: locale });
       }
     } catch (e) {
       console.warn("[Rerouting] failed:", e);
@@ -365,12 +368,16 @@ export default function NavigateScreen() {
         // Voice announcements
         if (distM <= ANNOUNCE_DISTANCE_FAR && !announcedFarRef.current.has(stepIdx)) {
           announcedFarRef.current.add(stepIdx);
-          const streetPart = nextStep.streetName ? ` su ${nextStep.streetName}` : "";
-          const announcement = `Tra ${Math.round(distM)} metri, ${nextStep.text}${streetPart}`;
-          Speech.speak(announcement, { language: "it-IT" });
+          const streetPart = nextStep.streetName
+            ? ` ${t("nav.announce.via").replace("{street}", nextStep.streetName)}`
+            : "";
+          const announcement = t("nav.announce.far")
+            .replace("{distance}", String(Math.round(distM)))
+            .replace("{instruction}", nextStep.text) + streetPart;
+          Speech.speak(announcement, { language: locale });
         } else if (distM <= ANNOUNCE_DISTANCE_NEAR && !announcedNearRef.current.has(stepIdx)) {
           announcedNearRef.current.add(stepIdx);
-          Speech.speak(nextStep.text, { language: "it-IT" });
+          Speech.speak(nextStep.text, { language: locale });
         }
       }
     } else if (stepIdx === steps.length - 1 && pct >= 95) {
@@ -378,11 +385,11 @@ export default function NavigateScreen() {
       if (!isFinished) {
         setIsFinished(true);
         setDistanceToNext(null);
-        Speech.speak("Sei arrivato a destinazione!", { language: "it-IT" });
+        Speech.speak(t("nav.announce.arrived"), { language: locale });
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [polylinePoints, route, mapReady, isFinished]);
+  }, [polylinePoints, route, mapReady, isFinished, locale, t]);
 
   const handleMapMessage = useCallback((event: any) => {
     try {
@@ -457,7 +464,7 @@ export default function NavigateScreen() {
       <View style={[s.container, { paddingTop: topPad, paddingBottom: bottomPad }]}>
         <View style={s.finishedContainer}>
           <MaterialCommunityIcons name="flag-checkered" size={72} color={colors.accent} />
-          <Text style={s.finishedTitle}>Sei arrivato!</Text>
+          <Text style={s.finishedTitle}>{t("nav.arrived")}</Text>
           <Text style={s.finishedSub}>{route.title}</Text>
           <Text style={s.finishedStats}>{route.distanceKm} km · {formatDuration(route.durationMinutes)}</Text>
           <View style={s.finishedActions}>
@@ -466,11 +473,11 @@ export default function NavigateScreen() {
               onPress={() => router.replace(`/route/tracking` as any)}
             >
               <MaterialCommunityIcons name="record-circle" size={18} color="#fff" />
-              <Text style={s.finishedBtnText}>Salva il giro</Text>
+              <Text style={s.finishedBtnText}>{t("nav.save_ride")}</Text>
             </Pressable>
             <Pressable style={[s.finishedBtn, { backgroundColor: colors.surface }]} onPress={handleClose}>
               <Ionicons name="close" size={18} color={colors.text} />
-              <Text style={[s.finishedBtnText, { color: colors.text }]}>Chiudi</Text>
+              <Text style={[s.finishedBtnText, { color: colors.text }]}>{t("nav.close")}</Text>
             </Pressable>
           </View>
         </View>
@@ -498,7 +505,7 @@ export default function NavigateScreen() {
         ) : (
           <View style={[s.map, { justifyContent: "center", alignItems: "center", backgroundColor: colors.surface }]}>
             <MaterialCommunityIcons name="map-outline" size={40} color={colors.border} />
-            <Text style={{ color: colors.textSecondary, marginTop: 8 }}>Mappa non disponibile</Text>
+            <Text style={{ color: colors.textSecondary, marginTop: 8 }}>{t("nav.map_unavailable")}</Text>
           </View>
         )}
 
@@ -511,7 +518,7 @@ export default function NavigateScreen() {
         {isRerouting && (
           <View style={s.reroutingBanner}>
             <ActivityIndicator size="small" color="#fff" />
-            <Text style={s.reroutingText}>Ricalcolo percorso...</Text>
+            <Text style={s.reroutingText}>{t("nav.rerouting")}</Text>
           </View>
         )}
 
@@ -563,7 +570,7 @@ export default function NavigateScreen() {
               <View style={s.nextStepRow}>
                 <Ionicons name={signToIcon(steps[currentStep + 1].sign)} size={14} color={colors.textSecondary} />
                 <Text style={s.nextStepText} numberOfLines={1}>
-                  Poi: {steps[currentStep + 1].text}
+                  {t("nav.then")} {steps[currentStep + 1].text}
                 </Text>
               </View>
             )}
@@ -571,7 +578,7 @@ export default function NavigateScreen() {
         ) : (
           <View style={s.stepRow}>
             <MaterialCommunityIcons name="navigation-outline" size={32} color={colors.accent} />
-            <Text style={s.stepText}>Navigazione in corso...</Text>
+            <Text style={s.stepText}>{t("nav.in_progress")}</Text>
           </View>
         )}
 

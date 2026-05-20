@@ -1160,6 +1160,18 @@ const en: Record<string, string> = {
 
   "gps_error_title": "GPS Error",
   "gps_error_body": "Could not save GPS points. Invalid coordinates detected.",
+
+  "nav.announce.far": "In {distance} meters, {instruction}",
+  "nav.announce.via": "on {street}",
+  "nav.announce.arrived": "You have arrived at your destination!",
+  "nav.in_progress": "Navigation in progress...",
+  "nav.no_gps": "Location required",
+  "nav.no_gps_msg": "Enable GPS location to use navigation.",
+  "nav.map_unavailable": "Map not available",
+  "nav.arrived": "You have arrived!",
+  "nav.save_ride": "Save the ride",
+  "nav.close": "Close",
+  "nav.then": "Then:",
 };
 
 export default en;

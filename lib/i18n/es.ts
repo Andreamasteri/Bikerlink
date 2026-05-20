@@ -1112,6 +1112,18 @@ const es: Record<string, string> = {
 
   "gps_error_title": "Error GPS",
   "gps_error_body": "No se pudieron guardar los puntos GPS. Se detectaron coordenadas inválidas.",
+
+  "nav.announce.far": "En {distance} metros, {instruction}",
+  "nav.announce.via": "por {street}",
+  "nav.announce.arrived": "¡Ha llegado a su destino!",
+  "nav.in_progress": "Navegación en curso...",
+  "nav.no_gps": "Ubicación requerida",
+  "nav.no_gps_msg": "Activa la ubicación GPS para usar la navegación.",
+  "nav.map_unavailable": "Mapa no disponible",
+  "nav.arrived": "¡Ha llegado!",
+  "nav.save_ride": "Guardar ruta",
+  "nav.close": "Cerrar",
+  "nav.then": "Luego:",
 };
 
 export default es;

@@ -1112,6 +1112,18 @@ const el: Record<string, string> = {
 
   "gps_error_title": "Σφάλμα GPS",
   "gps_error_body": "Δεν ήταν δυνατή η αποθήκευση σημείων GPS. Εντοπίστηκαν μη έγκυρες συντεταγμένες.",
+
+  "nav.announce.far": "Σε {distance} μέτρα, {instruction}",
+  "nav.announce.via": "στην {street}",
+  "nav.announce.arrived": "Έχετε φτάσει στον προορισμό σας!",
+  "nav.in_progress": "Πλοήγηση σε εξέλιξη...",
+  "nav.no_gps": "Απαιτείται τοποθεσία",
+  "nav.no_gps_msg": "Ενεργοποιήστε τη θέση GPS για να χρησιμοποιήσετε την πλοήγηση.",
+  "nav.map_unavailable": "Ο χάρτης δεν είναι διαθέσιμος",
+  "nav.arrived": "Έχετε φτάσει!",
+  "nav.save_ride": "Αποθήκευση διαδρομής",
+  "nav.close": "Κλείσιμο",
+  "nav.then": "Έπειτα:",
 };
 
 export default el;
