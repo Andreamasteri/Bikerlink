@@ -66,6 +66,7 @@ interface AiPreviewState {
   title: string;
   style: Style;
   isRoundTrip: boolean;
+  roundTripDirection: CompassDir | null;
   isMultiDay: boolean;
   daysEstimate: number;
   avoidHighways: boolean;
@@ -329,6 +330,7 @@ export default function GiriCreateScreen() {
         title: result.title ?? "Giro in moto",
         style: result.style ?? "curvy",
         isRoundTrip: result.isRoundTrip ?? false,
+        roundTripDirection: null,
         isMultiDay: result.isMultiDay ?? false,
         daysEstimate: result.daysEstimate ?? 2,
         avoidHighways: result.avoidHighways ?? false,
@@ -416,6 +418,7 @@ export default function GiriCreateScreen() {
     setTitle(aiPreview.title);
     setStyle(aiPreview.style);
     setIsRoundTrip(aiPreview.isRoundTrip);
+    setRoundTripDirection(aiPreview.roundTripDirection ?? null);
     setIsMultiDay(aiPreview.isMultiDay);
     setDaysCount(aiPreview.daysEstimate);
     setAvoidHighways(aiPreview.avoidHighways);
@@ -430,7 +433,14 @@ export default function GiriCreateScreen() {
     setRouteResult(null);
     setWeatherPreview(null);
     try {
-      const result = await calcRoute(toCalc, aiPreview.style, aiPreview.avoidHighways, false, false, false);
+      const result = await logFetch<RouteResult>(
+        "/api/planned-routes/calculate", "POST",
+        () => {
+          const url = new URL("/api/planned-routes/calculate", getApiUrl());
+          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null }) });
+        },
+        async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
+      );
       setRouteResult(result);
       if (result.durationMinutes > 480 && !aiPreview.isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
@@ -725,7 +735,7 @@ export default function GiriCreateScreen() {
               <View style={s.optionPillRow}>
                 <Pressable
                   style={[s.optionPill, aiPreview.isRoundTrip && { backgroundColor: colors.accent + "22", borderColor: colors.accent }]}
-                  onPress={() => setAiPreview((p) => p ? { ...p, isRoundTrip: !p.isRoundTrip } : p)}
+                  onPress={() => setAiPreview((p) => p ? { ...p, isRoundTrip: !p.isRoundTrip, roundTripDirection: !p.isRoundTrip ? p.roundTripDirection : null } : p)}
                 >
                   <Ionicons name="repeat-outline" size={14} color={aiPreview.isRoundTrip ? colors.accent : colors.textSecondary} />
                   <Text style={[s.optionPillText, aiPreview.isRoundTrip && { color: colors.accent }]}>Andata e ritorno</Text>
@@ -747,6 +757,13 @@ export default function GiriCreateScreen() {
                   <Text style={[s.optionPillText, aiPreview.avoidHighways && { color: colors.accent }]}>Evita autostrade</Text>
                 </Pressable>
               </View>
+              {aiPreview.isRoundTrip && (
+                <CompassSelector
+                  value={aiPreview.roundTripDirection}
+                  onChange={(d) => setAiPreview((p) => p ? { ...p, roundTripDirection: d } : p)}
+                  colors={colors}
+                />
+              )}
             </View>
 
             {aiPreview.items.some((i) => !i.resolved && !i.geocoding && i.editedName) && (
