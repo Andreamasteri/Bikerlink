@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useApiDebugLog } from "@/hooks/useApiDebugLog";
+import DebugPanel from "@/components/DebugPanel";
 import {
   View,
   Text,
@@ -877,6 +879,24 @@ function TrackingScreenInner() {
   // Battery drain stats (measured per-device, per-mode)
   const [batteryDrainStats, setBatteryDrainStats] = useState<BatteryDrainStats>({ easy: [], medium: [], race: [] });
   const [showBatteryStats, setShowBatteryStats] = useState(false);
+
+  // Debug panel
+  const { logs: debugLogs, clearLogs: clearDebugLogs, logFetch } = useApiDebugLog();
+  const [debugVisible, setDebugVisible] = useState(__DEV__);
+  const logFetchRef = useRef(logFetch);
+  useEffect(() => { logFetchRef.current = logFetch; }, [logFetch]);
+  const debugTapCount = useRef(0);
+  const debugTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleDebugTap = useCallback(() => {
+    debugTapCount.current += 1;
+    if (debugTapTimer.current) clearTimeout(debugTapTimer.current);
+    if (debugTapCount.current >= 5) {
+      debugTapCount.current = 0;
+      setDebugVisible((v) => !v);
+      return;
+    }
+    debugTapTimer.current = setTimeout(() => { debugTapCount.current = 0; }, 1500);
+  }, []);
   const rideStartBatteryLevelRef = useRef<number | null>(null);
   const rideStartBatteryTimeRef = useRef<number>(0);
   const rideBatteryProfileRef = useRef<UpdateProfile>("medium");
@@ -1547,7 +1567,9 @@ function TrackingScreenInner() {
     pointsBufferRef.current = [];
     setPointsBuffered(0);
     try {
-      await apiRequest("POST", `/api/routes/${rId}/points`, { points: toSend });
+      await logFetchRef.current(`/api/routes/${rId}/points`, "POST", () =>
+        apiRequest("POST", `/api/routes/${rId}/points`, { points: toSend })
+      );
       totalPointsSentRef.current += toSend.length;
       setPointsSent(totalPointsSentRef.current);
     } catch (e) {
@@ -1659,13 +1681,15 @@ function TrackingScreenInner() {
             sprintPhaseRef.current = "done";
             setSprintPhase("done");
             // Persist sprint result to dedicated sprint_results table
-            apiRequest("POST", "/api/sprints", {
-              sprint0to100Ms: elapsed,
-              maxAccelerationG: maxAccelGRef.current > 0 ? maxAccelGRef.current : null,
-              maxDecelerationG: maxDecelGRef.current > 0 ? maxDecelGRef.current : null,
-              maxTiltDeg: maxTiltDegRef.current > 0 ? maxTiltDegRef.current : null,
-              routeId: routeIdRef.current,
-            })
+            logFetchRef.current("/api/sprints", "POST", () =>
+              apiRequest("POST", "/api/sprints", {
+                sprint0to100Ms: elapsed,
+                maxAccelerationG: maxAccelGRef.current > 0 ? maxAccelGRef.current : null,
+                maxDecelerationG: maxDecelGRef.current > 0 ? maxDecelGRef.current : null,
+                maxTiltDeg: maxTiltDegRef.current > 0 ? maxTiltDegRef.current : null,
+                routeId: routeIdRef.current,
+              })
+            )
               .then(() => queryClient.invalidateQueries({ queryKey: ["/api/sprints"] }))
               .catch((err) => console.warn("[Sprint] save failed:", err));
             // Check if this is a new personal best
@@ -2200,11 +2224,12 @@ function TrackingScreenInner() {
       // so they don't mix with the new ride's points
       await clearGpsBuffer();
 
-      const routeRes = await apiRequest("POST", "/api/routes", {
-        trackingFrequency: profile === "race" ? 1 : profile === "easy" ? 3 : 2,
-        isSprint: is0100EnabledRef.current,
-      });
-      const route = (await routeRes.json()) as RouteRecord;
+      const route = await logFetchRef.current<RouteRecord>("/api/routes", "POST", () =>
+        apiRequest("POST", "/api/routes", {
+          trackingFrequency: profile === "race" ? 1 : profile === "easy" ? 3 : 2,
+          isSprint: is0100EnabledRef.current,
+        })
+      );
       routeIdRef.current = route.id;
 
       // When 0-100 is active, always force countdown to 10s
@@ -2386,26 +2411,30 @@ function TrackingScreenInner() {
     }
 
     try {
-      await apiRequest("PUT", `/api/routes/${rId}/stop`, {
-        totalDistanceKm: totalKmRef.current,
-        maxSpeedKmh: maxSpeedRef.current,
-        avgSpeedKmh: finalAvgSpeed,
-        maxAltitude: maxAltRef.current,
-        durationSeconds: finalTotalSec,
-        idleTimeSeconds: finalIdleSec,
-        maxAccelerationG: maxAccelGRef.current > 0 ? maxAccelGRef.current : null,
-        maxDecelerationG: maxDecelGRef.current > 0 ? maxDecelGRef.current : null,
-        maxLateralG: maxLateralGRef.current > 0 ? maxLateralGRef.current : null,
-        maxTiltDeg: maxTiltDegRef.current > 0 ? maxTiltDegRef.current : null,
-        sprint0to100Ms: sprint0to100MsRef.current,
-        gpsBlackoutCount: gpsBlackoutCountRef.current,
-        gpsBlackoutSeconds: gpsBlackoutSecondsRef.current,
-      });
+      await logFetchRef.current(`/api/routes/${rId}/stop`, "PUT", () =>
+        apiRequest("PUT", `/api/routes/${rId}/stop`, {
+          totalDistanceKm: totalKmRef.current,
+          maxSpeedKmh: maxSpeedRef.current,
+          avgSpeedKmh: finalAvgSpeed,
+          maxAltitude: maxAltRef.current,
+          durationSeconds: finalTotalSec,
+          idleTimeSeconds: finalIdleSec,
+          maxAccelerationG: maxAccelGRef.current > 0 ? maxAccelGRef.current : null,
+          maxDecelerationG: maxDecelGRef.current > 0 ? maxDecelGRef.current : null,
+          maxLateralG: maxLateralGRef.current > 0 ? maxLateralGRef.current : null,
+          maxTiltDeg: maxTiltDegRef.current > 0 ? maxTiltDegRef.current : null,
+          sprint0to100Ms: sprint0to100MsRef.current,
+          gpsBlackoutCount: gpsBlackoutCountRef.current,
+          gpsBlackoutSeconds: gpsBlackoutSecondsRef.current,
+        })
+      );
       await clearGpsBuffer();
       const telemetrySamples = [...telemetryAccumRef.current];
       telemetryAccumRef.current = [];
       if (telemetrySamples.length > 0) {
-        apiRequest("POST", `/api/rides/${rId}/telemetry`, { samples: telemetrySamples }).catch(() => {});
+        logFetchRef.current(`/api/rides/${rId}/telemetry`, "POST", () =>
+          apiRequest("POST", `/api/rides/${rId}/telemetry`, { samples: telemetrySamples })
+        ).catch(() => {});
       }
       await refetchRecords();
       // Capture route points for "Vedi percorso" in Summary Modal
@@ -2982,9 +3011,11 @@ function TrackingScreenInner() {
         >
           {/* GPS Profile */}
           <View style={styles.profileSection}>
-            <Text style={styles.profileTitle}>
-              FREQUENZA DI AGGIORNAMENTO GPS
-            </Text>
+            <Pressable onPress={handleDebugTap} hitSlop={8}>
+              <Text style={styles.profileTitle}>
+                FREQUENZA DI AGGIORNAMENTO GPS
+              </Text>
+            </Pressable>
             <View style={styles.profileRow}>
               {(["easy", "medium", "race"] as UpdateProfile[]).map((p) => (
                 <TouchableOpacity
@@ -3990,6 +4021,22 @@ function TrackingScreenInner() {
             Acquisiti {bgToastCount} punti GPS in background
           </Text>
         </Animated.View>
+      )}
+
+      {/* ── Debug Panel overlay ───────────────────────────────────────── */}
+      {debugVisible && (
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: "absolute",
+            bottom: insets.bottom + 50,
+            left: 12,
+            right: 12,
+            zIndex: 20,
+          }}
+        >
+          <DebugPanel logs={debugLogs} onClear={clearDebugLogs} />
+        </View>
       )}
     </View>
   );

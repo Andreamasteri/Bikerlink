@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -16,6 +17,8 @@ import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useTelemetry } from "@/hooks/useTelemetry";
+import { useApiDebugLog } from "@/hooks/useApiDebugLog";
+import DebugPanel from "@/components/DebugPanel";
 
 interface GpsPoint {
   latitude: number;
@@ -36,6 +39,22 @@ export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
+  const { logs: debugLogs, clearLogs: clearDebugLogs, logFetch } = useApiDebugLog();
+  const [debugVisible, setDebugVisible] = useState(__DEV__);
+  const logFetchRef = useRef(logFetch);
+  useEffect(() => { logFetchRef.current = logFetch; }, [logFetch]);
+  const debugTapCount = useRef(0);
+  const debugTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleDebugTap = useCallback(() => {
+    debugTapCount.current += 1;
+    if (debugTapTimer.current) clearTimeout(debugTapTimer.current);
+    if (debugTapCount.current >= 5) {
+      debugTapCount.current = 0;
+      setDebugVisible((v) => !v);
+      return;
+    }
+    debugTapTimer.current = setTimeout(() => { debugTapCount.current = 0; }, 1500);
+  }, []);
 
   const [permission, requestPermission] = Location.useForegroundPermissions();
   const [isTracking, setIsTracking] = useState(false);
@@ -67,10 +86,9 @@ export default function TrackingScreen() {
 
   const startMutation = useMutation({
     mutationFn: async (freq: number) => {
-      const res = await apiRequest("POST", "/api/routes", {
-        trackingFrequency: freq,
-      });
-      return res.json();
+      return logFetchRef.current<{ id: string }>("/api/routes", "POST", () =>
+        apiRequest("POST", "/api/routes", { trackingFrequency: freq })
+      );
     },
   });
 
@@ -82,10 +100,9 @@ export default function TrackingScreen() {
       id: string;
       pts: GpsPoint[];
     }) => {
-      const res = await apiRequest("POST", `/api/routes/${id}/points`, {
-        points: pts,
-      });
-      return res.json();
+      return logFetchRef.current(`/api/routes/${id}/points`, "POST", () =>
+        apiRequest("POST", `/api/routes/${id}/points`, { points: pts })
+      );
     },
     onError: (error: Error) => {
       Alert.alert(
@@ -98,8 +115,9 @@ export default function TrackingScreen() {
 
   const stopMutation = useMutation({
     mutationFn: async (id: string) => {
-      const res = await apiRequest("PUT", `/api/routes/${id}/stop`);
-      return res.json();
+      return logFetchRef.current(`/api/routes/${id}/stop`, "PUT", () =>
+        apiRequest("PUT", `/api/routes/${id}/stop`)
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/routes"] });
@@ -345,11 +363,13 @@ export default function TrackingScreen() {
 
       <View style={styles.statsPanel}>
         <View style={styles.statsRow}>
-          <StatBox
-            icon="road-variant"
-            label={t("tracking.distance")}
-            value={`${stats.distance.toFixed(2)} km`}
-          />
+          <Pressable onPress={handleDebugTap} hitSlop={8} style={{ flex: 1 }}>
+            <StatBox
+              icon="road-variant"
+              label={t("tracking.distance")}
+              value={`${stats.distance.toFixed(2)} km`}
+            />
+          </Pressable>
           <StatBox
             icon="speedometer"
             label={t("tracking.speed")}
@@ -420,6 +440,10 @@ export default function TrackingScreen() {
             {isTracking ? t("tracking.stop") : t("tracking.start")}
           </Text>
         </TouchableOpacity>
+
+        {debugVisible && (
+          <DebugPanel logs={debugLogs} onClear={clearDebugLogs} />
+        )}
       </View>
     </View>
   );
