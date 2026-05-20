@@ -899,6 +899,25 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] ota_events.diagnostics:", e);
         }
 
+        // Task #1590 — ota_stuck_events table for circuit-breaker telemetry.
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS ota_stuck_events (
+              id          SERIAL PRIMARY KEY,
+              device_id   VARCHAR(64) NOT NULL,
+              rollback_count  INTEGER NOT NULL DEFAULT 0,
+              stuck_sessions  INTEGER NOT NULL DEFAULT 0,
+              runtime_version VARCHAR(32),
+              created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_stuck_events_created_idx ON ota_stuck_events(created_at DESC)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_stuck_events_rv_idx ON ota_stuck_events(runtime_version)`);
+          console.log("[MIGRATION] ota_stuck_events table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] ota_stuck_events:", e);
+        }
+
         // Helper: read ota_cleanup_retention_days from app_settings (default 90).
         const getOtaRetentionDays = async (): Promise<number> => {
           try {

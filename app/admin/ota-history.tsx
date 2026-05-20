@@ -123,6 +123,24 @@ interface SystemHealth {
   otaErrors?: OtaErrorEntry[];
 }
 
+interface OtaStuckEventRow {
+  id: number;
+  device_id: string;
+  rollback_count: number;
+  stuck_sessions: number;
+  runtime_version: string | null;
+  created_at: string;
+}
+
+interface OtaStuckEventsResponse {
+  events: OtaStuckEventRow[];
+  total: number;
+  uniqueDevices: number;
+  uniqueRvs: number;
+  limit: number;
+  filter: { runtimeVersion: string | null };
+}
+
 const ROME_TZ = "Europe/Rome";
 
 function formatTimestamp(iso: string): string {
@@ -188,6 +206,24 @@ export default function OtaHistoryScreen() {
 
   const { data: systemHealth } = useQuery<SystemHealth>({
     queryKey: ["/api/admin/system-health"],
+    refetchInterval: 30000,
+  });
+
+  const [stuckRvFilter, setStuckRvFilter] = useState("");
+
+  const stuckEventsQueryKey = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set("limit", "200");
+    if (stuckRvFilter.trim()) params.set("runtimeVersion", stuckRvFilter.trim());
+    return [`/api/admin/ota-stuck-events?${params.toString()}`];
+  }, [stuckRvFilter]);
+
+  const {
+    data: stuckEventsData,
+    refetch: refetchStuckEvents,
+    isFetching: isFetchingStuckEvents,
+  } = useQuery<OtaStuckEventsResponse>({
+    queryKey: stuckEventsQueryKey,
     refetchInterval: 30000,
   });
 
@@ -329,6 +365,15 @@ export default function OtaHistoryScreen() {
 
       {/* ── 2. OTA Adoption Card ── */}
       <OtaAdoptionCard stats={otaStats?.stats ?? []} />
+
+      {/* ── 2b. Stuck-state events card ── */}
+      <OtaStuckEventsCard
+        data={stuckEventsData}
+        rvFilter={stuckRvFilter}
+        onRvFilterChange={setStuckRvFilter}
+        onRefresh={refetchStuckEvents}
+        isFetching={isFetchingStuckEvents}
+      />
 
       {/* ── 3. OTA Diagnostics Card ── */}
       <OtaDiagnosticsCard events={otaEventsData?.events ?? []} />
@@ -635,6 +680,94 @@ function OtaAdoptionCard({ stats }: { stats: OtaStatRow[] }) {
           </View>
         );
       })}
+    </View>
+  );
+}
+
+interface OtaStuckEventsCardProps {
+  data: OtaStuckEventsResponse | undefined;
+  rvFilter: string;
+  onRvFilterChange: (v: string) => void;
+  onRefresh: () => void;
+  isFetching: boolean;
+}
+
+function OtaStuckEventsCard({
+  data,
+  rvFilter,
+  onRvFilterChange,
+  onRefresh,
+  isFetching,
+}: OtaStuckEventsCardProps) {
+  const events = data?.events ?? [];
+  const total = data?.total ?? 0;
+  const uniqueDevices = data?.uniqueDevices ?? 0;
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="warning-outline" size={18} color="#FF8800" />
+        <Text style={styles.cardTitle}>Stuck-State Events</Text>
+        <View style={[styles.badge, { backgroundColor: total > 0 ? "#AA4400" : "#444" }]}>
+          <Text style={styles.badgeText}>{total}</Text>
+        </View>
+        <TouchableOpacity onPress={onRefresh} disabled={isFetching} style={{ marginLeft: 8 }}>
+          {isFetching ? (
+            <ActivityIndicator size="small" color="#FF8800" />
+          ) : (
+            <Ionicons name="refresh" size={18} color="#FF8800" />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.hintText}>
+        Circuit breaker attivato · {uniqueDevices} dispositiv{uniqueDevices === 1 ? "o" : "i"} affett{uniqueDevices === 1 ? "o" : "i"} · aggiornato ogni 30s
+      </Text>
+
+      {/* runtimeVersion filter */}
+      <View style={styles.filterRow}>
+        <TextInput
+          style={[styles.filterInput, { flex: 1 }]}
+          placeholder="Filtra per runtimeVersion…"
+          placeholderTextColor={Colors.textMuted ?? "#888"}
+          value={rvFilter}
+          onChangeText={onRvFilterChange}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        {rvFilter.trim().length > 0 && (
+          <TouchableOpacity
+            onPress={() => onRvFilterChange("")}
+            style={[styles.actionBtnWide, { marginTop: 0, paddingHorizontal: 10, backgroundColor: "#555" }]}
+          >
+            <Ionicons name="close-circle-outline" size={14} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {events.length === 0 ? (
+        <Text style={[styles.hintText, { marginTop: 12 }]}>
+          {total === 0
+            ? "Nessun evento stuck-state registrato."
+            : "Nessun evento corrisponde al filtro."}
+        </Text>
+      ) : (
+        events.slice(0, 100).map((e) => (
+          <View key={e.id} style={styles.row}>
+            <Ionicons name="alert-circle-outline" size={14} color="#FF8800" />
+            <View style={{ flex: 1, marginLeft: 6 }}>
+              <Text style={[styles.rowReason, { fontSize: 11 }]} numberOfLines={1}>
+                {e.device_id.substring(0, 16)}…
+                {e.runtime_version ? ` · rv${e.runtime_version}` : ""}
+              </Text>
+              <Text style={styles.rowTime}>
+                rollbacks={e.rollback_count} · sessions={e.stuck_sessions} ·{" "}
+                {formatTimestamp(e.created_at)}
+              </Text>
+            </View>
+          </View>
+        ))
+      )}
     </View>
   );
 }

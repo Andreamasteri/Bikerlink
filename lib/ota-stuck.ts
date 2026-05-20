@@ -69,6 +69,17 @@ export async function isOtaStuck(): Promise<boolean> {
   }
 }
 
+export async function getOtaStuckCounters(): Promise<{
+  rollbackCount: number;
+  stuckSessions: number;
+}> {
+  const [rollbackCount, stuckSessions] = await Promise.all([
+    getCounter(OTA_ROLLBACK_COUNT_KEY),
+    getCounter(OTA_STUCK_SESSIONS_KEY),
+  ]);
+  return { rollbackCount, stuckSessions };
+}
+
 export async function getLastFetchedId(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(OTA_LAST_FETCHED_ID_KEY);

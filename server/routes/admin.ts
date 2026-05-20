@@ -651,6 +651,49 @@ router.get("/ota-stats", async (_req: Request, res: Response) => {
   }
 });
 
+// GET /api/admin/ota-stuck-events — lista eventi circuit-breaker (Task #1590)
+// Filtrabile per runtimeVersion, ordinabile per data (sempre DESC).
+router.get("/ota-stuck-events", async (req: Request, res: Response) => {
+  try {
+    const limitRaw = parseInt(String(req.query.limit ?? "200"), 10);
+    const limit = Math.min(Math.max(isNaN(limitRaw) ? 200 : limitRaw, 1), 500);
+    const rvFilter = req.query.runtimeVersion
+      ? String(req.query.runtimeVersion).substring(0, 32)
+      : null;
+
+    const whereSql = rvFilter
+      ? sql`WHERE runtime_version = ${rvFilter}`
+      : sql``;
+
+    const result = await db.execute(sql`
+      SELECT id, device_id, rollback_count, stuck_sessions, runtime_version, created_at
+      FROM ota_stuck_events
+      ${whereSql}
+      ORDER BY created_at DESC
+      LIMIT ${limit}
+    `);
+
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*)::int AS total,
+             COUNT(DISTINCT device_id)::int AS unique_devices,
+             COUNT(DISTINCT runtime_version)::int AS unique_rvs
+      FROM ota_stuck_events
+    `);
+
+    return res.json({
+      events: result.rows,
+      total: (countResult.rows[0] as { total: number }).total ?? 0,
+      uniqueDevices: (countResult.rows[0] as { unique_devices: number }).unique_devices ?? 0,
+      uniqueRvs: (countResult.rows[0] as { unique_rvs: number }).unique_rvs ?? 0,
+      limit,
+      filter: { runtimeVersion: rvFilter },
+    });
+  } catch (err) {
+    console.error("[OTA-STUCK-EVENTS] read error:", err);
+    return res.status(500).json({ message: "Errore lettura stuck events" });
+  }
+});
+
 router.post("/verify-password", async (req: Request, res: Response) => {
   try {
     const { password } = req.body;

@@ -843,6 +843,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Task #1590 — OTA stuck-state telemetry.
+  // Called by OtaStuckScreen on mount (fire-and-forget from the client).
+  // Persists the event in ota_stuck_events for admin visibility.
+  app.post("/api/ota/stuck-event", async (req: Request, res: Response) => {
+    try {
+      const { deviceId, rollbackCount, stuckSessions, runtimeVersion } = req.body ?? {};
+      const stripNull = (s: string) => s.replace(/\x00/g, "");
+      const safeDeviceId = deviceId ? stripNull(String(deviceId)).substring(0, 64) : "unknown";
+      const safeRv = runtimeVersion ? stripNull(String(runtimeVersion)).substring(0, 32) : null;
+      const safeRollback = Number.isFinite(Number(rollbackCount)) ? Number(rollbackCount) : 0;
+      const safeStuck = Number.isFinite(Number(stuckSessions)) ? Number(stuckSessions) : 0;
+
+      await db.execute(sql`
+        INSERT INTO ota_stuck_events (device_id, rollback_count, stuck_sessions, runtime_version, created_at)
+        VALUES (${safeDeviceId}, ${safeRollback}, ${safeStuck}, ${safeRv}, NOW())
+      `);
+      return res.json({ ok: true });
+    } catch (error) {
+      console.error("[ota/stuck-event] Error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // ────────────────────────────────────────────────────────────────────────────
 
   // Task #1356: Pannello admin OTA minimale (3 zone + log modal).

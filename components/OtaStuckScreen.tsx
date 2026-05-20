@@ -4,7 +4,7 @@
 // Admin/tester escape hatch: long-press (3s) on the version label calls
 // clearOtaStuckState() and reloads the app without reinstalling.
 
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -16,9 +16,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/lib/theme-context";
-import { clearOtaStuckState } from "@/lib/ota-stuck";
+import { clearOtaStuckState, getOtaStuckCounters } from "@/lib/ota-stuck";
 import * as Updates from "expo-updates";
 import { reloadAppAsync } from "expo";
+import { getStableDeviceId } from "@/lib/device-id";
+import { apiRequest } from "@/lib/query-client";
 
 import otaUpdates from "@/ota-updates.json";
 
@@ -46,6 +48,28 @@ export default function OtaStuckScreen({ onCleared }: OtaStuckScreenProps) {
   const insets = useSafeAreaInsets();
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pressing, setPressing] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [deviceId, counters] = await Promise.all([
+          getStableDeviceId(),
+          getOtaStuckCounters(),
+        ]);
+        if (cancelled) return;
+        await apiRequest("POST", "/api/ota/stuck-event", {
+          deviceId,
+          rollbackCount: counters.rollbackCount,
+          stuckSessions: counters.stuckSessions,
+          runtimeVersion: Updates.runtimeVersion ?? null,
+        });
+      } catch {
+        // fire-and-forget: telemetry errors must not affect the UX
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const apkUrl = getApkUrl();
   const versionLabel =
