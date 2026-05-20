@@ -28,6 +28,19 @@ interface GeoZone {
   totalMinutes: number;
 }
 
+interface SessionItem {
+  sid: string;
+  sessionType: string;
+  expiry: string | null;
+}
+
+interface SessionsData {
+  sessions: SessionItem[];
+  webCount: number;
+  mobileCount: number;
+  total: number;
+}
+
 interface AdminUser {
   id: string;
   nickname: string;
@@ -268,6 +281,33 @@ export default function AdminUsers() {
       Alert.alert("Last.fm cancellato", `Rimossi: ${tracks} brani, ${sessions} sessioni, ${snapshots} snapshot`);
     },
     onError: () => Alert.alert("Errore", "Impossibile cancellare i dati Last.fm"),
+  });
+
+  const sessionsQuery = useQuery<SessionsData>({
+    queryKey: ["/api/admin/users", selectedUser?.id, "sessions"],
+    enabled: statsModalVisible && !!selectedUser,
+    queryFn: async () => {
+      const url = new URL(`/api/admin/users/${selectedUser!.id}/sessions`, getApiUrl());
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+  });
+
+  const revokeSessionMutation = useMutation({
+    mutationFn: async ({ userId, sid }: { userId: string; sid: string }) => {
+      const cleanSid = sid.startsWith("…") ? sid.slice(1) : sid;
+      const res = await apiRequest("DELETE", `/api/admin/users/${userId}/sessions/${encodeURIComponent(cleanSid)}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users", selectedUser?.id, "sessions"] });
+    },
+    onError: (err: Error) => Alert.alert("Errore revoca", err.message || "Impossibile revocare la sessione"),
   });
 
   const filteredUsers = users.filter((u) => {
@@ -626,8 +666,84 @@ export default function AdminUsers() {
           </View>
         )}
 
+        {renderSessionsSection()}
         {renderGeoInsightSection()}
       </ScrollView>
+    );
+  }
+
+  function renderSessionsSection() {
+    const sd = sessionsQuery.data;
+    const loading = sessionsQuery.isLoading;
+    const userId = selectedUser?.id;
+    if (!userId) return null;
+
+    return (
+      <View style={statsStyles.section}>
+        <Text style={statsStyles.sectionTitle}>Sessioni attive</Text>
+        {loading && (
+          <Text style={[statsStyles.label, { color: Colors.textSecondary, marginTop: 4 }]}>Caricamento…</Text>
+        )}
+        {sessionsQuery.isError && (
+          <Text style={[statsStyles.label, { color: Colors.error, marginTop: 4 }]}>Errore nel caricamento</Text>
+        )}
+        {sd && (
+          <>
+            <View style={{ flexDirection: "row", gap: 12, marginBottom: 10 }}>
+              <View style={[sessionStyles.countBadge, { backgroundColor: Colors.maleIcon + "22" }]}>
+                <Ionicons name="desktop-outline" size={14} color={Colors.maleIcon} />
+                <Text style={[sessionStyles.countText, { color: Colors.maleIcon }]}>Web: {sd.webCount}</Text>
+              </View>
+              <View style={[sessionStyles.countBadge, { backgroundColor: Colors.accent + "22" }]}>
+                <Ionicons name="phone-portrait-outline" size={14} color={Colors.accent} />
+                <Text style={[sessionStyles.countText, { color: Colors.accent }]}>Mobile: {sd.mobileCount}</Text>
+              </View>
+              <View style={[sessionStyles.countBadge, { backgroundColor: Colors.surfaceLight }]}>
+                <Text style={[sessionStyles.countText, { color: Colors.textSecondary }]}>Totale: {sd.total}</Text>
+              </View>
+            </View>
+            {sd.sessions.length === 0 ? (
+              <Text style={[statsStyles.label, { color: Colors.textSecondary }]}>Nessuna sessione attiva</Text>
+            ) : (
+              sd.sessions.map((session) => (
+                <View key={session.sid} style={sessionStyles.sessionRow}>
+                  <View style={sessionStyles.sessionInfo}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Ionicons
+                        name={session.sessionType === "web" ? "desktop-outline" : "phone-portrait-outline"}
+                        size={14}
+                        color={session.sessionType === "web" ? Colors.maleIcon : Colors.accent}
+                      />
+                      <Text style={sessionStyles.sessionSid}>{session.sid}</Text>
+                    </View>
+                    {session.expiry && (
+                      <Text style={sessionStyles.sessionExpiry}>
+                        Scade: {formatDateIT(session.expiry)}
+                      </Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={sessionStyles.revokeBtn}
+                    onPress={() => {
+                      Alert.alert("Revoca sessione", `Revocare la sessione ${session.sid}?`, [
+                        { text: "Annulla", style: "cancel" as const },
+                        {
+                          text: "Revoca",
+                          style: "destructive" as const,
+                          onPress: () => revokeSessionMutation.mutate({ userId, sid: session.sid }),
+                        },
+                      ]);
+                    }}
+                    disabled={revokeSessionMutation.isPending}
+                  >
+                    <Text style={sessionStyles.revokeBtnText}>Revoca</Text>
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+          </>
+        )}
+      </View>
     );
   }
 
@@ -972,6 +1088,62 @@ export default function AdminUsers() {
     </View>
   );
 }
+
+const sessionStyles = StyleSheet.create({
+  countBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  countText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+  sessionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sessionInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  sessionSid: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  sessionExpiry: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginLeft: 20,
+  },
+  revokeBtn: {
+    backgroundColor: Colors.error + "22",
+    borderWidth: 1,
+    borderColor: Colors.error + "66",
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginLeft: 8,
+  },
+  revokeBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.error,
+  },
+});
 
 const fzStyles = StyleSheet.create({
   row: {

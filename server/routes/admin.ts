@@ -7916,10 +7916,14 @@ router.delete("/users/:userId/sessions/:sid", async (req: Request, res: Response
   try {
     const { userId, sid } = req.params;
     if (!userId || !sid) return res.status(400).json({ message: "Parametri mancanti" });
-    await db.execute(
+    const result = await db.execute(
       sql`DELETE FROM session WHERE sess->>'userId' = ${userId} AND sid LIKE ${'%' + sid}`
     );
-    return res.json({ ok: true });
+    const affected = result.rowCount ?? 0;
+    if (affected === 0) {
+      return res.status(404).json({ ok: false, message: "Sessione non trovata o già scaduta" });
+    }
+    return res.json({ ok: true, deleted: affected });
   } catch (error) {
     console.error("Admin revoke session error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
