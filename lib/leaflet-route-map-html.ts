@@ -83,15 +83,69 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     });
   }
 
-  var routeLayer = null;
+  // ── Curvature gradient helpers ────────────────────────────────────────────
+  function bearing(p1, p2) {
+    var dLng = (p2.lng - p1.lng) * Math.PI / 180;
+    var lat1 = p1.lat * Math.PI / 180;
+    var lat2 = p2.lat * Math.PI / 180;
+    var y = Math.sin(dLng) * Math.cos(lat2);
+    var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+    return Math.atan2(y, x) * 180 / Math.PI;
+  }
+  function angleDiff(a, b) {
+    var d = Math.abs(a - b) % 360;
+    return d > 180 ? 360 - d : d;
+  }
+  function curvatureColor(angle) {
+    var t = Math.min(1, angle / 90);
+    if (t < 0.33) {
+      var s = t / 0.33;
+      return "rgb(" + Math.round(34 + s*(234-34)) + "," + Math.round(197 + s*(179-197)) + ",58)";
+    } else if (t < 0.66) {
+      var s2 = (t - 0.33) / 0.33;
+      return "rgb(" + Math.round(234 + s2*(249-234)) + "," + Math.round(179 + s2*(115-179)) + ",0)";
+    } else {
+      var s3 = (t - 0.66) / 0.34;
+      return "rgb(" + Math.round(249 + s3*(239-249)) + "," + Math.round(115 + s3*(68-115)) + ",68)";
+    }
+  }
+
+  var routeSegments = [];
+  var routeFallback = null;
+
+  function clearRouteLayer() {
+    routeSegments.forEach(function(seg) { map.removeLayer(seg); });
+    routeSegments = [];
+    if (routeFallback) { map.removeLayer(routeFallback); routeFallback = null; }
+  }
+
+  function renderCurvatureRoute(pts) {
+    clearRouteLayer();
+    if (pts.length < 2) return;
+    var bearings = [];
+    for (var i = 0; i < pts.length - 1; i++) {
+      bearings.push(bearing(pts[i], pts[i+1]));
+    }
+    for (var j = 0; j < pts.length - 1; j++) {
+      var prevB = j > 0 ? bearings[j-1] : bearings[j];
+      var nextB = j < bearings.length - 1 ? bearings[j+1] : bearings[j];
+      var angle = (angleDiff(prevB, bearings[j]) + angleDiff(bearings[j], nextB)) / 2;
+      var col = curvatureColor(angle);
+      var seg = L.polyline([[pts[j].lat, pts[j].lng], [pts[j+1].lat, pts[j+1].lng]],
+        { color: col, weight: 4.5, opacity: 0.92 }).addTo(map);
+      routeSegments.push(seg);
+    }
+  }
+
   function renderRoute() {
-    if (routeLayer) { map.removeLayer(routeLayer); routeLayer = null; }
     if (routePts.length > 1) {
-      routeLayer = L.polyline(routePts.map(function(p) { return [p.lat, p.lng]; }),
-        { color: accent, weight: 4, opacity: 0.85 }).addTo(map);
-    } else if (waypoints.length > 1) {
-      routeLayer = L.polyline(waypoints.map(function(w) { return [w.lat, w.lng]; }),
-        { color: accent, weight: 2, dashArray: "6 4", opacity: 0.6 }).addTo(map);
+      renderCurvatureRoute(routePts);
+    } else {
+      clearRouteLayer();
+      if (waypoints.length > 1) {
+        routeFallback = L.polyline(waypoints.map(function(w) { return [w.lat, w.lng]; }),
+          { color: accent, weight: 2, dashArray: "6 4", opacity: 0.6 }).addTo(map);
+      }
     }
   }
 
@@ -185,6 +239,20 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     renderDirectionArrow(currentDir);
     var pts = newRoutePts && newRoutePts.length > 1 ? newRoutePts : waypoints;
     if (pts.length > 1) {
+      var lats = pts.map(function(p) { return p.lat; });
+      var lngs = pts.map(function(p) { return p.lng; });
+      map.fitBounds([[Math.min.apply(null,lats), Math.min.apply(null,lngs)],
+                     [Math.max.apply(null,lats), Math.max.apply(null,lngs)]], { padding: [24,24] });
+    }
+  };
+
+  // Live curvature update — called via JS injection after auto-recalculate
+  window.updateRouteWithCurvature = function(pts, fitMap) {
+    routePts = pts;
+    renderCurvatureRoute(pts);
+    renderWaypoints();
+    renderDirectionArrow(currentDir);
+    if (fitMap && pts.length > 1) {
       var lats = pts.map(function(p) { return p.lat; });
       var lngs = pts.map(function(p) { return p.lng; });
       map.fitBounds([[Math.min.apply(null,lats), Math.min.apply(null,lngs)],

@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Animated,
 } from "react-native";
 import WebView from "react-native-webview";
 import Slider from "@react-native-community/slider";
@@ -239,6 +240,10 @@ export default function GiriCreateScreen() {
   const autoCalcTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webviewRef = useRef<WebView | null>(null);
 
+  // BikerScore animation
+  const bikerScoreAnim = useRef(new Animated.Value(0)).current;
+  const prevBikerScore = useRef(0);
+
   const TILE = getTileConfig("carto_dark");
 
   const isApproxRoute = !!routeResult && (!!routeResult.approximate || !routeResult.encoded);
@@ -248,23 +253,19 @@ export default function GiriCreateScreen() {
       ? (aiPreview?.roundTripDirection ?? null)
       : (COMPASS_DIRECTIONS.find((d) => d.deg === headingDeg)?.label ?? null);
 
+  // Route polyline is injected via JS (window.updateRouteWithCurvature) — not baked into HTML.
+  // This avoids full WebView reloads on every auto-recalculate.
   const plannerMapHtml = useMemo(() => {
-    let resolvedPts: Array<{ lat: number; lng: number }> | undefined;
-    if (routeResult?.encoded) {
-      resolvedPts = decodePolyline(routeResult.encoded);
-    } else if (routeResult?.rawPoints) {
-      resolvedPts = routeResult.rawPoints.map(({ lat, lng }) => ({ lat, lng }));
-    }
     return buildPlannerMapHtml(
       TILE.urlTemplate,
       TILE.maximumZ,
       colors.accent,
       waypoints,
-      resolvedPts,
+      undefined,
       compassDirLabel
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waypoints, colors.accent, routeResult?.encoded, routeResult?.rawPoints]);
+  }, [waypoints, colors.accent]);
 
   useEffect(() => {
     const js = `(function(){ if(typeof window.updateCompassDirection==='function'){ window.updateCompassDirection(${JSON.stringify(compassDirLabel)}); } })(); true;`;
@@ -518,6 +519,34 @@ export default function GiriCreateScreen() {
     setRouteResult(null);
   };
 
+  // ── Animate BikerScore bar when value changes ─────────────────────────────
+  useEffect(() => {
+    const score = routeResult ? Math.round(routeResult.bikerScore * 100) : 0;
+    Animated.spring(bikerScoreAnim, {
+      toValue: score,
+      useNativeDriver: false,
+      tension: 60,
+      friction: 10,
+    }).start();
+    prevBikerScore.current = score;
+  }, [routeResult?.bikerScore]);
+
+  // ── Inject curvature gradient into WebView whenever routeResult updates ───
+  useEffect(() => {
+    if (!routeResult || !webviewRef.current) return;
+    let pts: Array<{ lat: number; lng: number }> = [];
+    if (routeResult.encoded) {
+      pts = decodePolyline(routeResult.encoded);
+    } else if (routeResult.rawPoints) {
+      pts = routeResult.rawPoints.map(({ lat, lng }) => ({ lat, lng }));
+    }
+    if (pts.length < 2) return;
+    const ptsJson = JSON.stringify(pts);
+    // fitMap=false: avoid jarring re-pan on every live update
+    const js = `(function(){ if(typeof window.updateRouteWithCurvature==='function'){ window.updateRouteWithCurvature(${ptsJson}, false); } })(); true;`;
+    webviewRef.current.injectJavaScript(js);
+  }, [routeResult?.encoded, routeResult?.rawPoints]);
+
   // ── Debounced auto-recalculate when resolved waypoints change ─────────────
   useEffect(() => {
     if (mode !== "manual") return;
@@ -535,7 +564,7 @@ export default function GiriCreateScreen() {
       } finally {
         setCalculating(false);
       }
-    }, 1500);
+    }, 500);
     return () => { if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waypoints, style, avoidHighways, avoidTolls, isRoundTrip, roundTripHours, headingDeg, mode]);
@@ -1094,12 +1123,28 @@ export default function GiriCreateScreen() {
                 <View style={s.bikerScoreSection}>
                   <View style={s.bsLabelRow}>
                     <Text style={s.bsLabel}>BikerScore (curvatura)</Text>
-                    <Text style={s.bsValue}>{Math.round(routeResult.bikerScore * 100)}/100</Text>
+                    <Animated.Text style={[s.bsValue, {
+                      color: bikerScoreAnim.interpolate({
+                        inputRange: [0, 40, 70, 100],
+                        outputRange: [colors.textSecondary, colors.accent, colors.accent, "#22c55e"],
+                        extrapolate: "clamp",
+                      }),
+                    }]}>
+                      {Math.round(routeResult.bikerScore * 100)}/100
+                    </Animated.Text>
                   </View>
                   <View style={s.bsBarBg}>
-                    <View style={[s.bsBarFill, {
-                      width: `${Math.round(routeResult.bikerScore * 100)}%`,
-                      backgroundColor: routeResult.bikerScore >= 0.7 ? "#22c55e" : routeResult.bikerScore >= 0.4 ? colors.accent : colors.textSecondary,
+                    <Animated.View style={[s.bsBarFill, {
+                      width: bikerScoreAnim.interpolate({
+                        inputRange: [0, 100],
+                        outputRange: ["0%", "100%"],
+                        extrapolate: "clamp",
+                      }),
+                      backgroundColor: bikerScoreAnim.interpolate({
+                        inputRange: [0, 40, 70, 100],
+                        outputRange: [colors.textSecondary, colors.accent, colors.accent, "#22c55e"],
+                        extrapolate: "clamp",
+                      }),
                     }]} />
                   </View>
                 </View>
