@@ -1,0 +1,50 @@
+[Unit]
+Description=GraphHopper Routing Server — BikerLink
+Documentation=https://github.com/graphhopper/graphhopper
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__GH_USER__
+Group=__GH_USER__
+WorkingDirectory=__GH_DIR__
+
+# Variabili d'ambiente
+Environment="JAVA_OPTS=-Xmx__JAVA_HEAP__ -Xms4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+Environment="GH_TOKEN=__GH_TOKEN__"
+
+# Comando avvio
+ExecStart=/usr/bin/java \
+    $JAVA_OPTS \
+    -jar __GH_DIR__/graphhopper.jar \
+    server __GH_DIR__/config.yml
+
+# Riavvio automatico in caso di crash
+Restart=always
+RestartSec=10
+StartLimitIntervalSec=120
+StartLimitBurst=5
+
+# Limiti risorse
+MemoryMax=22G
+MemoryHigh=20G
+TasksMax=512
+LimitNOFILE=65536
+
+# Sicurezza
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=__GH_DIR__/data __GH_DIR__/logs
+
+# Timeout (il grafo può impiegare 2-3 min a caricarsi all'avvio)
+TimeoutStartSec=300
+TimeoutStopSec=30
+
+# Output log
+StandardOutput=append:__GH_DIR__/logs/stdout.log
+StandardError=append:__GH_DIR__/logs/stderr.log
+
+[Install]
+WantedBy=multi-user.target

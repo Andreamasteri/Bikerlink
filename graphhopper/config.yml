@@ -1,0 +1,118 @@
+# =============================================================================
+# GraphHopper 9.x — Configurazione BikerLink
+# Profilo: motorcycle con preferenza curve (curvy roads)
+# Map Matching: abilitato
+# Custom Model API: abilitato per pesi telemetria dinamici (Fase 3)
+# =============================================================================
+
+graphhopper:
+
+  # --- Dati OSM ---
+  datareader.file: data/italy-latest.osm.pbf
+
+  # Cartella dove viene salvato il grafo buildato
+  graph.location: data/italy-latest-gh
+
+  # --- Profili di routing ---
+  profiles:
+    - name: motorcycle
+      vehicle: motorcycle
+      weighting: custom
+      custom_model:
+        # Velocità base: usa la velocità massima della strada (limitata al profilo moto)
+        speed:
+          - if: "true"
+            limit_to: "max_speed"
+          # Autostrade: riduzione drastica (i bikers vogliono strade panoramiche)
+          - if: "road_class == MOTORWAY"
+            multiply_by: "0.1"
+          # Strade principali a lunga percorrenza: leggera penalità
+          - if: "road_class == PRIMARY"
+            multiply_by: "0.85"
+          # Strade secondarie e terziarie: leggero boost (più interessanti)
+          - if: "road_class == SECONDARY || road_class == TERTIARY"
+            multiply_by: "1.05"
+
+        # Priorità: penalizza strade monotone, premia quelle panoramiche
+        priority:
+          # Autostrade: fortemente penalizzate
+          - if: "road_class == MOTORWAY"
+            multiply_by: "0.05"
+          # Strade a pedaggio: penalizzate
+          - if: "toll == ALL"
+            multiply_by: "0.2"
+          # Sterrati/fuoristrada: penalizzati (moto stradali)
+          - if: "surface == UNPAVED || surface == GRAVEL"
+            multiply_by: "0.3"
+          # Strade secondarie: leggermente favorite
+          - if: "road_class == SECONDARY"
+            multiply_by: "1.1"
+          # Strade terziarie: favorite (spesso più panoramiche)
+          - if: "road_class == TERTIARY"
+            multiply_by: "1.2"
+          # Strade locali: preferite per routing curvy
+          - if: "road_class == RESIDENTIAL || road_class == UNCLASSIFIED"
+            multiply_by: "1.15"
+
+    # Profilo alternativo: motorcycle_fast (ottimizzato per tempo, non curve)
+    - name: motorcycle_fast
+      vehicle: motorcycle
+      weighting: fastest
+
+  # ---------------------------------------------------------------------------
+  # Strategia di accelerazione per i profili
+  #
+  # - motorcycle:      usa Landmark (LM) — compatibile con custom_model dinamici
+  #                    inviati per-request via API (Fase 3 telemetria).
+  #                    Con CH attivo, le richieste con custom_model richiederebbero
+  #                    ch.disable=true, ma LM lo supporta nativamente senza flag extra.
+  #
+  # - motorcycle_fast: usa Contraction Hierarchies (CH) — massima velocità per
+  #                    routing senza customizzazione dinamica.
+  # ---------------------------------------------------------------------------
+  profiles_lm:
+    - profile: motorcycle
+      active_landmarks: 16
+
+  profiles_ch:
+    - profile: motorcycle_fast
+
+  graph.flag_encoders: motorcycle
+
+  # Necessario per esporre osm_way_id nei dettagli del Map Matching
+  graph.encoded_values: road_class,surface,toll,max_speed
+  prepare.ch.weightings: fastest
+
+  # --- Map Matching ---
+  map_matching:
+    enabled: true
+    max_visited_nodes: 10000
+    # Distanza massima dal punto GPS al segmento (metri)
+    measurement_error_sigma: 50.0
+
+  # --- Custom Model API ---
+  # Permette di inviare custom model dinamici via API (necessario per Fase 3)
+  custom_model_dir: custom_models
+
+  # --- Server HTTP ---
+  server:
+    application_connectors:
+      - type: http
+        port: 8989
+        # Bind SOLO su localhost: Nginx fa da proxy
+        bind_host: 127.0.0.1
+    request_log:
+      appenders: []
+
+  # --- Logging ---
+  import.osm.ignored_highways: footway,cycleway,path,steps,platform
+
+logging:
+  level: WARN
+  appenders:
+    - type: file
+      currentLogFilename: /opt/graphhopper/logs/graphhopper.log
+      archivedLogFilenamePattern: /opt/graphhopper/logs/graphhopper-%d.log.gz
+      archivedFileCount: 7
+    - type: console
+      threshold: ERROR
