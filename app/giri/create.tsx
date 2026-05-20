@@ -11,6 +11,8 @@ import {
   Switch,
   Animated,
 } from "react-native";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
 import WebView from "react-native-webview";
 import Slider from "@react-native-community/slider";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -41,6 +43,7 @@ interface RouteResult {
   durationMinutes: number;
   bikerScore: number;
   approximate?: boolean;
+  warning?: string | null;
   navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
   elevationProfile?: Array<{ distanceKm: number; altitudeM: number }> | null;
   elevationGainM?: number | null;
@@ -206,6 +209,40 @@ export default function GiriCreateScreen() {
     }
     titleTapTimer.current = setTimeout(() => { titleTapCount.current = 0; }, 1500);
   }, []);
+
+  const [isImportingGpx, setIsImportingGpx] = useState(false);
+
+  const handleImportGpx = useCallback(async () => {
+    try {
+      setIsImportingGpx(true);
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ["application/gpx+xml", "application/octet-stream", "*/*"],
+        copyToCacheDirectory: true,
+      });
+      if (result.canceled || !result.assets?.[0]) return;
+      const asset = result.assets[0];
+      const gpxContent = await FileSystem.readAsStringAsync(asset.uri);
+      const rawName = asset.name ?? "";
+      const guessedTitle = rawName.replace(/\.gpx$/i, "").replace(/[_-]+/g, " ").trim();
+      const url = new URL("/api/planned-routes/import-gpx", getApiUrl());
+      const resp = await fetch(url.toString(), {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gpxContent, title: guessedTitle || undefined }),
+      });
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.message ?? "Importazione fallita");
+      }
+      const route = await resp.json() as { id: string };
+      qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
+      router.replace(`/giri/${route.id}` as any);
+    } catch (err: unknown) {
+      Alert.alert("Errore GPX", err instanceof Error ? err.message : "Impossibile leggere il file GPX.");
+    } finally {
+      setIsImportingGpx(false);
+    }
+  }, [router, qc]);
 
   const [mode, setMode] = useState<Mode>("ai");
   const [aiPrompt, setAiPrompt] = useState("");
@@ -438,7 +475,8 @@ export default function GiriCreateScreen() {
     setTitle(aiPreview.title);
     setStyle(aiPreview.style);
     setIsRoundTrip(aiPreview.isRoundTrip);
-    setRoundTripDirection(aiPreview.roundTripDirection ?? null);
+    const dirDeg = COMPASS_DIRECTIONS.find((d) => d.label === (aiPreview.roundTripDirection ?? ""))?.deg ?? null;
+    setHeadingDeg(dirDeg);
     setIsMultiDay(aiPreview.isMultiDay);
     setDaysCount(aiPreview.daysEstimate);
     setAvoidHighways(aiPreview.avoidHighways);
@@ -990,10 +1028,23 @@ export default function GiriCreateScreen() {
                   )}
                 </View>
               ))}
-              <Pressable style={s.addWpBtn} onPress={addWaypoint}>
-                <Ionicons name="add-circle-outline" size={18} color={colors.accent} />
-                <Text style={s.addWpText}>Aggiungi tappa</Text>
-              </Pressable>
+              <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                <Pressable style={[s.addWpBtn, { flex: 1 }]} onPress={addWaypoint}>
+                  <Ionicons name="add-circle-outline" size={18} color={colors.accent} />
+                  <Text style={s.addWpText}>Aggiungi tappa</Text>
+                </Pressable>
+                <Pressable
+                  style={[s.addWpBtn, { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 10, justifyContent: "center", opacity: isImportingGpx ? 0.6 : 1 }]}
+                  onPress={handleImportGpx}
+                  disabled={isImportingGpx}
+                >
+                  {isImportingGpx
+                    ? <ActivityIndicator size="small" color={colors.accent} />
+                    : <Ionicons name="cloud-upload-outline" size={18} color={colors.accent} />
+                  }
+                  <Text style={s.addWpText}>Importa GPX</Text>
+                </Pressable>
+              </View>
             </View>
 
             {/* Options */}
@@ -1169,6 +1220,14 @@ export default function GiriCreateScreen() {
             {/* Route result */}
             {routeResult && (
               <View style={s.resultCard}>
+                {routeResult.warning === "my_style_fallback" && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#f59e0b22", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#f59e0b44", marginBottom: 4 }}>
+                    <Ionicons name="warning-outline" size={15} color="#f59e0b" />
+                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: "#f59e0b", flex: 1 }}>
+                      Profilo "Il mio stile" non disponibile — usato il profilo geometrico
+                    </Text>
+                  </View>
+                )}
                 <Text style={s.resultTitle}>Percorso calcolato</Text>
                 <View style={s.resultStats}>
                   {[

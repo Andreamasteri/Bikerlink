@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,19 +9,21 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
-
   BackHandler,
 } from "react-native";
-import { useRouter } from "expo-router";
-import { useMutation } from "@tanstack/react-query";
+import WebView from "react-native-webview";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import MapPickerContent from "@/components/MapPickerModal";
 import { useT } from "@/lib/language-context";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
+import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
+import { getTileConfig } from "@/lib/map-tiles";
 
 function getWaypointTypes(t: (key: string) => string) {
   return [
@@ -56,6 +58,9 @@ export default function CreateRouteScreen() {
   const WAYPOINT_TYPES = getWaypointTypes(t);
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { editId } = useLocalSearchParams<{ editId?: string }>();
+  const isEditMode = !!editId;
+  const webviewRef = useRef<any>(null);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -81,6 +86,37 @@ export default function CreateRouteScreen() {
   const [createdRouteId, setCreatedRouteId] = useState<string | null>(null);
   const [isSettingVisibility, setIsSettingVisibility] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Edit mode: load existing route
+  const { data: existingRoute, isLoading: isLoadingExisting } = useQuery({
+    queryKey: ["/api/custom-routes", editId],
+    queryFn: async () => {
+      if (!editId) return null;
+      const url = new URL(`/api/custom-routes/${editId}`, getApiUrl());
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) return null;
+      return res.json() as Promise<{ id: string; title: string; description: string | null; waypoints: Array<{ id: string; name: string; description: string | null; latitude: number; longitude: number; waypointType: string; orderIndex: number }> }>;
+    },
+    enabled: !!editId,
+  });
+
+  useEffect(() => {
+    if (!existingRoute) return;
+    setTitle(existingRoute.title);
+    setDescription(existingRoute.description ?? "");
+    const wps: LocalWaypoint[] = existingRoute.waypoints
+      .sort((a, b) => a.orderIndex - b.orderIndex)
+      .map((wp) => ({
+        localId: wp.id,
+        name: wp.name,
+        description: wp.description ?? "",
+        latitude: wp.latitude,
+        longitude: wp.longitude,
+        waypointType: wp.waypointType,
+        orderIndex: wp.orderIndex,
+      }));
+    setWaypoints(wps);
+  }, [existingRoute]);
 
   const handleImportGpx = useCallback(async () => {
     try {
@@ -114,30 +150,58 @@ export default function CreateRouteScreen() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const routeRes = await apiRequest("POST", "/api/custom-routes", {
-        title: title.trim(),
-        description: description.trim() || null,
-        isPublic: false,
-      });
-      const route = await routeRes.json();
-
-      for (let i = 0; i < waypoints.length; i++) {
-        const wp = waypoints[i];
-        await apiRequest("POST", `/api/custom-routes/${route.id}/waypoints`, {
-          name: wp.name,
-          description: wp.description || null,
-          latitude: wp.latitude,
-          longitude: wp.longitude,
-          waypointType: wp.waypointType,
-          orderIndex: i,
+      if (isEditMode && editId) {
+        // Update title/description
+        await apiRequest("PUT", `/api/custom-routes/${editId}`, {
+          title: title.trim(),
+          description: description.trim() || null,
         });
-      }
+        // Delete old waypoints then re-create (simple approach)
+        await apiRequest("DELETE", `/api/custom-routes/${editId}/waypoints`);
+        for (let i = 0; i < waypoints.length; i++) {
+          const wp = waypoints[i];
+          await apiRequest("POST", `/api/custom-routes/${editId}/waypoints`, {
+            name: wp.name,
+            description: wp.description || null,
+            latitude: wp.latitude,
+            longitude: wp.longitude,
+            waypointType: wp.waypointType,
+            orderIndex: i,
+          });
+        }
+        queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+        return { id: editId };
+      } else {
+        const routeRes = await apiRequest("POST", "/api/custom-routes", {
+          title: title.trim(),
+          description: description.trim() || null,
+          isPublic: false,
+        });
+        const route = await routeRes.json();
 
-      return route;
+        for (let i = 0; i < waypoints.length; i++) {
+          const wp = waypoints[i];
+          await apiRequest("POST", `/api/custom-routes/${route.id}/waypoints`, {
+            name: wp.name,
+            description: wp.description || null,
+            latitude: wp.latitude,
+            longitude: wp.longitude,
+            waypointType: wp.waypointType,
+            orderIndex: i,
+          });
+        }
+
+        return route;
+      }
     },
     onSuccess: (route) => {
-      setCreatedRouteId(route.id);
-      setShowPublishDialog(true);
+      if (isEditMode) {
+        queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+        router.replace(`/routes/${route.id}` as any);
+      } else {
+        setCreatedRouteId(route.id);
+        setShowPublishDialog(true);
+      }
     },
     onError: (err: Error) => {
       Alert.alert("Errore", err.message);
@@ -220,6 +284,25 @@ export default function CreateRouteScreen() {
 
   const canSave = title.trim().length > 0 && waypoints.length >= 2;
 
+  // Curvature map
+  const tileConfig = useMemo(() => getTileConfig(), []);
+  const curvatureMapHtml = useMemo(() => buildPlannerMapHtml(
+    tileConfig.url,
+    tileConfig.maxZoom,
+    Colors.accent,
+    waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })),
+    waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })),
+    null,
+  ), []);
+
+  useEffect(() => {
+    if (!webviewRef.current || waypoints.length < 2) return;
+    const pts = JSON.stringify(waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })));
+    const wps = JSON.stringify(waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })));
+    const js = `(function(){ if(typeof window.updateRouteWithCurvature==='function'){ window.updateRouteWithCurvature(${pts}, true); } if(typeof window.setWaypoints==='function'){ window.setWaypoints(${wps}); } })(); true;`;
+    webviewRef.current.injectJavaScript(js);
+  }, [waypoints]);
+
   return (
     <View style={[styles.container]}>
       <ScrollView
@@ -259,6 +342,23 @@ export default function CreateRouteScreen() {
           />
         </View>
 
+
+        {/* Curvature map — shown when there are at least 2 waypoints */}
+        {waypoints.length >= 2 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Anteprima percorso (curvatura)</Text>
+            <View style={{ height: 200, borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: Colors.border }}>
+              <WebView
+                ref={webviewRef}
+                source={{ html: curvatureMapHtml, baseUrl: "" }}
+                style={{ flex: 1 }}
+                scrollEnabled={false}
+                javaScriptEnabled
+                originWhitelist={["*"]}
+              />
+            </View>
+          </View>
+        )}
 
         <View style={styles.waypointHeader}>
           <Text style={styles.sectionTitle}>Tappe ({waypoints.length})</Text>

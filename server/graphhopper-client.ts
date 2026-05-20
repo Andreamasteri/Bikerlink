@@ -131,6 +131,9 @@ export interface RouteRequest {
   elevation?: boolean;
   details?: string[];
   custom_model?: Record<string, unknown>;
+  optimize?: boolean;
+  heading?: number;
+  language?: string;
 }
 
 export interface RouteResult {
@@ -147,7 +150,7 @@ export interface RouteResult {
 
 /**
  * Calcola un percorso tra due o più waypoint.
- * Usare come alternativa self-hosted a planned-routes.ts (che chiama la Cloud API).
+ * Supporta sia self-hosted che Cloud API come fallback.
  */
 export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
   if (!isSelfHosted && !CLOUD_API_KEY) {
@@ -166,9 +169,15 @@ export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
   };
   if (req.details?.length) body.details = req.details;
   if (req.custom_model) body.custom_model = req.custom_model;
+  if (req.optimize !== undefined) body.optimize = req.optimize;
+  if (req.heading !== undefined) body.heading = req.heading;
+
+  const extraHeaders: Record<string, string> = {};
+  if (req.language) extraHeaders["Accept-Language"] = req.language;
 
   const res = await ghFetch("/route", {
     method: "POST",
+    headers: extraHeaders,
     body: JSON.stringify(body),
   });
 

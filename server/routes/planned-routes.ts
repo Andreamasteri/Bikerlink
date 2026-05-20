@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import { storage } from "../storage";
 import type { InsertPlannedRoute } from "@shared/schema";
 import { haversineKm } from "../geo";
+import { calculateRoute as ghCalculateRoute, isSelfHosted } from "../graphhopper-client";
 
 const router = Router();
 
@@ -144,17 +145,35 @@ async function fetchWeatherForWaypoints(
 
 // ─── Fallback route builder ───────────────────────────────────────────────────
 
+function computeBikerScoreFromPoints(pts: Array<{ lat: number; lng: number }>): number {
+  if (pts.length < 3) return 0;
+  let totalAngle = 0;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const v1 = [pts[i].lat - pts[i-1].lat, pts[i].lng - pts[i-1].lng];
+    const v2 = [pts[i+1].lat - pts[i].lat, pts[i+1].lng - pts[i].lng];
+    const dot = v1[0] * v2[0] + v1[1] * v2[1];
+    const mag1 = Math.sqrt(v1[0] ** 2 + v1[1] ** 2);
+    const mag2 = Math.sqrt(v2[0] ** 2 + v2[1] ** 2);
+    if (mag1 > 0 && mag2 > 0) {
+      const cosA = Math.min(1, Math.max(-1, dot / (mag1 * mag2)));
+      totalAngle += Math.acos(cosA);
+    }
+  }
+  return Math.round(Math.min(1, totalAngle / (pts.length * 0.3)) * 100) / 100;
+}
+
 function buildFallbackRoute(waypoints: Array<{ lat: number; lng: number }>) {
   let totalDist = 0;
   for (let i = 1; i < waypoints.length; i++) {
     totalDist += haversineKm(waypoints[i-1].lat, waypoints[i-1].lng, waypoints[i].lat, waypoints[i].lng);
   }
+  const rawPoints = waypoints.map((wp) => ({ lat: wp.lat, lng: wp.lng }));
   return {
     encoded: null as string | null,
-    rawPoints: waypoints.map((wp) => [wp.lat, wp.lng] as [number, number]),
+    rawPoints,
     distanceKm: Math.round(totalDist * 10) / 10,
     durationMinutes: Math.round(totalDist / 70 * 60),
-    bikerScore: 0.5,
+    bikerScore: computeBikerScoreFromPoints(rawPoints),
     approximate: true,
   };
 }
@@ -200,9 +219,15 @@ Analizza la richiesta e restituisci SOLO un oggetto JSON con:
     if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
     const data = await resp.json() as any;
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error("No JSON");
-    return res.json(JSON.parse(jsonMatch[0]));
+    // Robust JSON extraction: strip markdown fences then find balanced braces
+    const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
+    const first = stripped.indexOf("{");
+    const last = stripped.lastIndexOf("}");
+    if (first === -1 || last <= first) throw new Error("No JSON in response");
+    let parsed: any;
+    try { parsed = JSON.parse(stripped.slice(first, last + 1)); }
+    catch { try { parsed = JSON.parse(stripped); } catch { throw new Error("Unparsable JSON"); } }
+    return res.json(parsed);
   } catch (err) {
     console.error("[AI parse] error:", err);
     return res.status(503).json({ message: "Servizio AI non disponibile: errore durante l'elaborazione della richiesta" });
@@ -332,6 +357,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     avoidUnpaved = false,
     roundTripHours,
     isRoundTrip,
+    roundTripDirection,
     headingDeg,
     language,
   } = req.body as {
@@ -344,6 +370,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     avoidUnpaved?: boolean;
     roundTripHours?: number;
     isRoundTrip?: boolean;
+    roundTripDirection?: string;
     headingDeg?: number;
     language?: string;
   };
@@ -379,11 +406,12 @@ router.post("/calculate", async (req: Request, res: Response) => {
     ];
   }
 
-  const apiKey = process.env.GRAPHHOPPER_API_KEY;
-  if (!apiKey) {
-    console.warn("[GraphHopper] GRAPHHOPPER_API_KEY non configurata, uso percorso approssimativo");
+  if (!isSelfHosted && !process.env.GRAPHHOPPER_API_KEY) {
+    console.warn("[GraphHopper] non configurato, uso percorso approssimativo");
     return res.json(buildFallbackRoute(effectiveWaypoints));
   }
+
+  let myStyleWarning: string | null = null;
 
   try {
     const body: any = {
@@ -512,7 +540,8 @@ router.post("/calculate", async (req: Request, res: Response) => {
           }
         }
       } catch {
-        // Silent: fallback al profilo geometrico
+        // Fallback al profilo geometrico — segnala il fallback nella risposta
+        myStyleWarning = "my_style_fallback";
       }
     }
 
@@ -520,24 +549,27 @@ router.post("/calculate", async (req: Request, res: Response) => {
       body.custom_model = { priority };
     }
 
-    const url = `https://graphhopper.com/api/1/route?key=${apiKey}`;
-    const ghLang = language ?? "it";
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept-Language": ghLang,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!resp.ok) {
-      const errText = await resp.text();
-      console.error("[GraphHopper] error:", errText);
-      return res.json(buildFallbackRoute(waypoints));
+    let ghData: any;
+    try {
+      const ghResult = await ghCalculateRoute({
+        points: body.points as [number, number][],
+        profile: body.profile as string,
+        instructions: body.instructions as boolean,
+        calc_points: body.calc_points as boolean,
+        points_encoded: false,
+        optimize: body.optimize as boolean,
+        elevation: body.elevation as boolean,
+        ...(body.heading !== undefined ? { heading: body.heading as number } : {}),
+        ...(body.custom_model ? { custom_model: body.custom_model as Record<string, unknown> } : {}),
+        language: language ?? "it",
+      });
+      ghData = ghResult;
+    } catch (ghErr) {
+      console.error("[GraphHopper] error:", ghErr);
+      return res.json({ ...buildFallbackRoute(waypoints), ...(myStyleWarning ? { warning: myStyleWarning } : {}) });
     }
 
-    const data = await resp.json() as any;
+    const data = ghData as any;
     const path = data.paths?.[0];
     if (!path) {
       console.warn("[GraphHopper] nessun percorso trovato, uso fallback approssimativo");
@@ -549,29 +581,8 @@ router.post("/calculate", async (req: Request, res: Response) => {
     // Re-encode to polyline for storage (lat/lng only)
     const rawPoints: Array<{ lat: number; lng: number }> = ghPoints.map((p: number[]) => ({ lat: p[1], lng: p[0] }));
 
-    // Compute biker score from raw points
-    const totalAngle = rawPoints.length >= 3 ? (() => {
-      let total = 0;
-      for (let i = 1; i < rawPoints.length - 1; i++) {
-        const v1 = [rawPoints[i].lat - rawPoints[i-1].lat, rawPoints[i].lng - rawPoints[i-1].lng];
-        const v2 = [rawPoints[i+1].lat - rawPoints[i].lat, rawPoints[i+1].lng - rawPoints[i].lng];
-        const dot = v1[0] * v2[0] + v1[1] * v2[1];
-        const mag1 = Math.sqrt(v1[0] ** 2 + v1[1] ** 2);
-        const mag2 = Math.sqrt(v2[0] ** 2 + v2[1] ** 2);
-        if (mag1 > 0 && mag2 > 0) {
-          const cosA = Math.min(1, Math.max(-1, dot / (mag1 * mag2)));
-          total += Math.acos(cosA);
-        }
-      }
-      return total;
-    })() : 0;
-
-    let bikerScore: number;
-    if (style === "extra_curvy") bikerScore = Math.round(Math.min(1, totalAngle / (rawPoints.length * 0.25)) * 100) / 100;
-    else if (style === "curvy") bikerScore = Math.round(Math.min(1, totalAngle / (rawPoints.length * 0.3)) * 100) / 100;
-    else if (style === "balanced") bikerScore = 0.5;
-    else if (style === "fast") bikerScore = 0.15;
-    else bikerScore = 0.05; // direct
+    // Compute biker score from raw points using shared helper
+    const bikerScore = computeBikerScoreFromPoints(rawPoints);
 
     const distanceKm = Math.round((path.distance ?? 0) / 100) / 10;
     const durationMinutes = Math.round((path.time ?? 0) / 60000);
@@ -608,10 +619,11 @@ router.post("/calculate", async (req: Request, res: Response) => {
       elevationGainM: elevationData?.gainM ?? null,
       altitudeMinM: elevationData?.minM ?? null,
       altitudeMaxM: elevationData?.maxM ?? null,
+      ...(myStyleWarning ? { warning: myStyleWarning } : {}),
     });
   } catch (err) {
     console.error("[GraphHopper] fetch error:", err);
-    return res.json(buildFallbackRoute(waypoints));
+    return res.json({ ...buildFallbackRoute(waypoints), ...(myStyleWarning ? { warning: myStyleWarning } : {}) });
   }
 });
 
@@ -1075,24 +1087,40 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
   if (!gpxContent) return res.status(400).json({ message: "Contenuto GPX richiesto" });
 
   try {
-    // Parse waypoints from <wpt> tags
-    const wptRegex = /<wpt\s+lat="([^"]+)"\s+lon="([^"]+)"[^>]*>[\s\S]*?(?:<name>([^<]*)<\/name>)?[\s\S]*?<\/wpt>/g;
+    // Robust attr extractor — works regardless of attribute order or quote style
+    function gpxAttr(tag: string, attr: string): string | null {
+      const m = tag.match(new RegExp(`\\b${attr}\\s*=\\s*['"]([^'"]+)['"]`, "i"));
+      return m?.[1] ?? null;
+    }
+
+    // Parse waypoints from <wpt> tags (attribute-order-independent)
+    const wptOpenTagRegex = /<wpt\b([^>]*?)>/g;
     const waypoints: Array<{ lat: number; lng: number; name: string }> = [];
-    let wptMatch;
-    while ((wptMatch = wptRegex.exec(gpxContent)) !== null) {
+    let wptTagMatch;
+    while ((wptTagMatch = wptOpenTagRegex.exec(gpxContent)) !== null) {
+      const attrs = wptTagMatch[1];
+      const lat = gpxAttr(attrs, "lat");
+      const lon = gpxAttr(attrs, "lon");
+      if (!lat || !lon) continue;
+      // Grab <name> content from the wpt element
+      const rest = gpxContent.slice(wptTagMatch.index + wptTagMatch[0].length);
+      const nameM = rest.match(/^[\s\S]*?(?:<name>([^<]*)<\/name>)?[\s\S]*?<\/wpt>/);
       waypoints.push({
-        lat: parseFloat(wptMatch[1]),
-        lng: parseFloat(wptMatch[2]),
-        name: wptMatch[3] ?? "",
+        lat: parseFloat(lat),
+        lng: parseFloat(lon),
+        name: nameM?.[1] ?? "",
       });
     }
 
-    // Parse track points from <trkpt> tags
-    const trkPtRegex = /<trkpt\s+lat="([^"]+)"\s+lon="([^"]+)"/g;
+    // Parse track points from <trkpt> tags (attribute-order-independent)
+    const trkPtOpenTagRegex = /<trkpt\b([^>]*?)\/?>/g;
     const trackPoints: [number, number][] = [];
     let trkMatch;
-    while ((trkMatch = trkPtRegex.exec(gpxContent)) !== null) {
-      trackPoints.push([parseFloat(trkMatch[1]), parseFloat(trkMatch[2])]);
+    while ((trkMatch = trkPtOpenTagRegex.exec(gpxContent)) !== null) {
+      const attrs = trkMatch[1];
+      const lat = gpxAttr(attrs, "lat");
+      const lon = gpxAttr(attrs, "lon");
+      if (lat && lon) trackPoints.push([parseFloat(lat), parseFloat(lon)]);
     }
 
     // Extract title
