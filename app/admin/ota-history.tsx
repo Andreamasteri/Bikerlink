@@ -137,6 +137,7 @@ interface OtaStuckEventsResponse {
   total: number;
   uniqueDevices: number;
   uniqueRvs: number;
+  lastEventAt: string | null;
   limit: number;
   filter: { runtimeVersion: string | null };
 }
@@ -702,6 +703,7 @@ function OtaStuckEventsCard({
   const events = data?.events ?? [];
   const total = data?.total ?? 0;
   const uniqueDevices = data?.uniqueDevices ?? 0;
+  const lastEventAt = data?.lastEventAt ?? null;
 
   return (
     <View style={styles.card}>
@@ -723,6 +725,11 @@ function OtaStuckEventsCard({
       <Text style={styles.hintText}>
         Circuit breaker attivato · {uniqueDevices} dispositiv{uniqueDevices === 1 ? "o" : "i"} affett{uniqueDevices === 1 ? "o" : "i"} · aggiornato ogni 30s
       </Text>
+      {lastEventAt != null && (
+        <Text style={[styles.hintText, { marginTop: 2 }]}>
+          Ultimo evento: {formatTimestamp(lastEventAt)}
+        </Text>
+      )}
 
       {/* runtimeVersion filter */}
       <View style={styles.filterRow}>

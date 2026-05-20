@@ -676,15 +676,24 @@ router.get("/ota-stuck-events", async (req: Request, res: Response) => {
     const countResult = await db.execute(sql`
       SELECT COUNT(*)::int AS total,
              COUNT(DISTINCT device_id)::int AS unique_devices,
-             COUNT(DISTINCT runtime_version)::int AS unique_rvs
+             COUNT(DISTINCT runtime_version)::int AS unique_rvs,
+             MAX(created_at) AS last_event_at
       FROM ota_stuck_events
     `);
 
+    const countRow = countResult.rows[0] as {
+      total: number;
+      unique_devices: number;
+      unique_rvs: number;
+      last_event_at: string | null;
+    };
+
     return res.json({
       events: result.rows,
-      total: (countResult.rows[0] as { total: number }).total ?? 0,
-      uniqueDevices: (countResult.rows[0] as { unique_devices: number }).unique_devices ?? 0,
-      uniqueRvs: (countResult.rows[0] as { unique_rvs: number }).unique_rvs ?? 0,
+      total: countRow.total ?? 0,
+      uniqueDevices: countRow.unique_devices ?? 0,
+      uniqueRvs: countRow.unique_rvs ?? 0,
+      lastEventAt: countRow.last_event_at ?? null,
       limit,
       filter: { runtimeVersion: rvFilter },
     });
