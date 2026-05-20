@@ -794,7 +794,7 @@ async function saveRoute() {
       return;
     }
 
-    showToast('Giro salvato! Aprilo nell\'app BikerLink.', 'success');
+    showToastWithLink('Giro salvato!', '/area-utente', 'Vedi i miei giri →', 'success');
     saveBtn.textContent = '✅ Salvato';
     setTimeout(() => {
       saveBtn.disabled = false;
@@ -850,6 +850,22 @@ function setStatus(msg) {
 function showToast(msg, type) {
   const el = document.getElementById('toast');
   el.textContent = msg;
+  el.className = `toast show toast-${type}`;
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.classList.remove('show'); }, 4000);
+}
+
+function showToastWithLink(msg, href, linkText, type) {
+  const el = document.getElementById('toast');
+  el.textContent = '';
+  const span = document.createElement('span');
+  span.textContent = msg + ' ';
+  const a = document.createElement('a');
+  a.href = href;
+  a.textContent = linkText;
+  a.style.cssText = 'color:#fff;text-decoration:underline';
+  el.appendChild(span);
+  el.appendChild(a);
   el.className = `toast show toast-${type}`;
   clearTimeout(el._timer);
   el._timer = setTimeout(() => { el.classList.remove('show'); }, 4000);
