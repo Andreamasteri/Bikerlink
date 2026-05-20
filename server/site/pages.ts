@@ -1021,6 +1021,8 @@ export function buildAbout(baseUrl: string): { meta: PageMeta; body: string } {
   </div>
 </section>
 
+${COMP_SECTION}
+
 <section class="cta-block">
   <h2>Una <span style="color:var(--accent)">community</span> vera.</h2>
   <p>Scarica BikerLink, prova le funzioni, e dicci cosa pensi.</p>
