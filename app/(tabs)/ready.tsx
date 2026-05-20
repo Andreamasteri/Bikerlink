@@ -604,9 +604,9 @@ export default function ReadyToRideScreen() {
           offlineRandomize={offlineRandomize}
         />
 
-        <View style={styles.privacyCard}>
+        <View style={styles.settingsGroup}>
           {ghostModeFeatureEnabled && (
-            <>
+            <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
               <View style={styles.privacyRow}>
                 <Ionicons
                   name={isGhostMode ? "eye-off" : "eye"}
@@ -628,302 +628,277 @@ export default function ReadyToRideScreen() {
                   thumbColor="#fff"
                 />
               </View>
-              <View style={styles.privacyDivider} />
-            </>
-          )}
-
-          <View style={styles.privacyRow}>
-            <Ionicons
-              name="eye-off-outline"
-              size={20}
-              color={hideFromMap ? Colors.accent : Colors.textSecondary}
-              style={styles.privacyRowIcon}
-            />
-            <View style={styles.privacyRowText}>
-              <Text style={styles.privacyRowLabel}>{t("ready.privacy.hideFromMapLabel")}</Text>
-              <Text style={styles.privacyRowDesc}>
-                {t("ready.privacy.hideFromMapDesc")}
-              </Text>
-            </View>
-            <Switch
-              value={hideFromMap}
-              onValueChange={(val) => privacyMutation.mutate({ hideFromMap: val })}
-              disabled={privacyMutation.isPending}
-              trackColor={{ false: Colors.border, true: Colors.accent }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={styles.privacyDivider} />
-
-          <View style={styles.privacyRow}>
-            <Ionicons
-              name="shuffle-outline"
-              size={20}
-              color={offlineRandomize ? Colors.accent : Colors.textSecondary}
-              style={styles.privacyRowIcon}
-            />
-            <View style={styles.privacyRowText}>
-              <Text style={styles.privacyRowLabel}>{t("ready.privacy.offlineRandomizeLabel")}</Text>
-              <Text style={styles.privacyRowDesc}>
-                {t("ready.privacy.offlineRandomizeDesc")}
-              </Text>
-            </View>
-            <Switch
-              value={offlineRandomize}
-              onValueChange={(val) => privacyMutation.mutate({ offlinePositionRandomize: val })}
-              disabled={privacyMutation.isPending}
-              trackColor={{ false: Colors.border, true: Colors.accent }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          <View style={styles.privacyDivider} />
-
-          <Pressable style={styles.accordionHeader} onPress={() => setPrivacyExpanded((v) => !v)}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Ionicons name="shield-outline" size={18} color={Colors.accent} />
-              <Text style={styles.accordionTitle}>Privacy & Posizione</Text>
-            </View>
-            <Ionicons name={privacyExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
-          </Pressable>
-
-          {privacyExpanded && (
-            <View style={styles.accordionContent}>
-              <View style={styles.privacyRow}>
-                <Ionicons name="locate-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
-                <View style={styles.privacyRowText}>
-                  <Text style={styles.privacyRowLabel}>Altera Posizione</Text>
-                  {positionFuzz ? (
-                    <Text style={styles.privacyWarning}>Disattivala prima di un giro in compagnia!</Text>
-                  ) : (
-                    <Text style={styles.privacyRowDesc}>Sposta randomicamente la posizione visibile.</Text>
-                  )}
-                </View>
-                <Switch
-                  value={positionFuzz}
-                  onValueChange={(val) => { setPositionFuzz(val); privacyMutation.mutate({ positionFuzz: val }); }}
-                  trackColor={{ false: Colors.border, true: Colors.accent }}
-                  thumbColor="#fff"
-                />
-              </View>
-              {positionFuzz && (
-                <View style={styles.kmRow}>
-                  <Ionicons name="resize-outline" size={15} color={Colors.textSecondary} />
-                  <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio:</Text>
-                  <TextInput
-                    style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
-                    keyboardType="number-pad"
-                    value={String(positionFuzzKm)}
-                    onChangeText={(v) => {
-                      const n = parseInt(v, 10);
-                      if (!isNaN(n) && n >= 1 && n <= 50) {
-                        setPositionFuzzKm(n);
-                        privacyMutation.mutate({ positionFuzzKm: n });
-                      }
-                    }}
-                    maxLength={2}
-                    selectTextOnFocus
-                  />
-                  <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km (max 50)</Text>
-                </View>
-              )}
-
-              <View style={styles.privacyDivider} />
-
-              <View style={styles.privacyRow}>
-                <Ionicons name="home-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
-                <View style={styles.privacyRowText}>
-                  <Text style={styles.privacyRowLabel}>Fake Home</Text>
-                  <Text style={styles.privacyRowDesc}>Vicino a casa, la posizione viene sostituita.</Text>
-                </View>
-                <Switch
-                  value={fakeHomeEnabled}
-                  onValueChange={(val) => { setFakeHomeEnabled(val); privacyMutation.mutate({ fakeHomeEnabled: val }); }}
-                  trackColor={{ false: Colors.border, true: Colors.accent }}
-                  thumbColor="#fff"
-                />
-              </View>
-              {fakeHomeEnabled && (
-                <>
-                  <FakeZoneCoordPanel
-                    realLabel="Posizione Casa (reale)"
-                    fakeLabel="Posizione Fittizia"
-                    realLat={homeLatitude}
-                    realLng={homeLongitude}
-                    fakeLat={fakeHomeLatitude}
-                    fakeLng={fakeHomeLongitude}
-                    realTarget="homeReal"
-                    fakeTarget="homeFake"
-                    colors={colors}
-                    onPickGPS={pickFromGPS}
-                    onOpenMap={openMapPicker}
-                  />
-                  <View style={styles.kmRow}>
-                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio attivazione:</Text>
-                    <TextInput
-                      style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
-                      keyboardType="number-pad"
-                      value={String(fakeHomeRadius)}
-                      onChangeText={(v) => {
-                        const n = parseInt(v, 10);
-                        if (!isNaN(n) && n >= 1 && n <= 100) {
-                          setFakeHomeRadius(n);
-                          privacyMutation.mutate({ fakeHomeRadius: n });
-                        }
-                      }}
-                      maxLength={3}
-                      selectTextOnFocus
-                    />
-                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km</Text>
-                  </View>
-                </>
-              )}
-
-              <View style={styles.privacyDivider} />
-
-              <View style={styles.privacyRow}>
-                <Ionicons name="business-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
-                <View style={styles.privacyRowText}>
-                  <Text style={styles.privacyRowLabel}>Fake Work</Text>
-                  <Text style={styles.privacyRowDesc}>Vicino al lavoro, la posizione viene sostituita.</Text>
-                </View>
-                <Switch
-                  value={fakeWorkEnabled}
-                  onValueChange={(val) => { setFakeWorkEnabled(val); privacyMutation.mutate({ fakeWorkEnabled: val }); }}
-                  trackColor={{ false: Colors.border, true: Colors.accent }}
-                  thumbColor="#fff"
-                />
-              </View>
-              {fakeWorkEnabled && (
-                <>
-                  <FakeZoneCoordPanel
-                    realLabel="Posizione Lavoro (reale)"
-                    fakeLabel="Posizione Fittizia"
-                    realLat={workLatitude}
-                    realLng={workLongitude}
-                    fakeLat={fakeWorkLatitude}
-                    fakeLng={fakeWorkLongitude}
-                    realTarget="workReal"
-                    fakeTarget="workFake"
-                    colors={colors}
-                    onPickGPS={pickFromGPS}
-                    onOpenMap={openMapPicker}
-                  />
-                  <View style={styles.kmRow}>
-                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio attivazione:</Text>
-                    <TextInput
-                      style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
-                      keyboardType="number-pad"
-                      value={String(fakeWorkRadius)}
-                      onChangeText={(v) => {
-                        const n = parseInt(v, 10);
-                        if (!isNaN(n) && n >= 1 && n <= 100) {
-                          setFakeWorkRadius(n);
-                          privacyMutation.mutate({ fakeWorkRadius: n });
-                        }
-                      }}
-                      maxLength={3}
-                      selectTextOnFocus
-                    />
-                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km</Text>
-                  </View>
-                </>
-              )}
-
-              <View style={styles.privacyDivider} />
-
-              <View style={styles.privacyRow}>
-                <Ionicons name="location-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
-                <View style={styles.privacyRowText}>
-                  <Text style={styles.privacyRowLabel}>Fake Whatever</Text>
-                  <Text style={styles.privacyRowDesc}>Per qualsiasi altro luogo, sostituisci la posizione.</Text>
-                </View>
-                <Switch
-                  value={fakeWhateverEnabled}
-                  onValueChange={(val) => { setFakeWhateverEnabled(val); privacyMutation.mutate({ fakeWhateverEnabled: val }); }}
-                  trackColor={{ false: Colors.border, true: Colors.accent }}
-                  thumbColor="#fff"
-                />
-              </View>
-              {fakeWhateverEnabled && (
-                <>
-                  <FakeZoneCoordPanel
-                    realLabel="Posizione (reale)"
-                    fakeLabel="Posizione Fittizia"
-                    realLat={whateverLatitude}
-                    realLng={whateverLongitude}
-                    fakeLat={fakeWhateverLatitude}
-                    fakeLng={fakeWhateverLongitude}
-                    realTarget="whateverReal"
-                    fakeTarget="whateverFake"
-                    colors={colors}
-                    onPickGPS={pickFromGPS}
-                    onOpenMap={openMapPicker}
-                  />
-                  <View style={styles.kmRow}>
-                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio attivazione:</Text>
-                    <TextInput
-                      style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
-                      keyboardType="number-pad"
-                      value={String(fakeWhateverRadius)}
-                      onChangeText={(v) => {
-                        const n = parseInt(v, 10);
-                        if (!isNaN(n) && n >= 1 && n <= 100) {
-                          setFakeWhateverRadius(n);
-                          privacyMutation.mutate({ fakeWhateverRadius: n });
-                        }
-                      }}
-                      maxLength={3}
-                      selectTextOnFocus
-                    />
-                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km</Text>
-                  </View>
-                </>
-              )}
             </View>
           )}
 
-          <View style={styles.privacyDivider} />
-
-          <Pressable style={styles.accordionHeader} onPress={() => setGpsPrecisionExpanded((v) => !v)}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <Ionicons name="navigate-outline" size={18} color={Colors.accent} />
-              <Text style={styles.accordionTitle}>Precisione GPS Tracking</Text>
-            </View>
-            <Ionicons name={gpsPrecisionExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
-          </Pressable>
-
-          {gpsPrecisionExpanded && (
-            <View style={styles.accordionContent}>
-              {gpsOptions.map((opt) => {
-                const isSelected = gpsPrecision === opt.key;
-                return (
-                  <Pressable
-                    key={opt.key}
-                    style={[
-                      styles.gpsOption,
-                      { borderColor: isSelected ? Colors.accent : Colors.border, backgroundColor: isSelected ? Colors.accent + "15" : Colors.background },
-                    ]}
-                    onPress={() => { setGpsPrecision(opt.key); privacyMutation.mutate({ gpsPrecision: opt.key }); }}
-                  >
-                    <Ionicons name={opt.icon as any} size={20} color={isSelected ? Colors.accent : Colors.textSecondary} />
-                    <View style={{ flex: 1, marginLeft: 10 }}>
-                      <Text style={[styles.gpsOptionLabel, { color: isSelected ? Colors.accent : Colors.text }]}>{opt.label}</Text>
-                      <Text style={[styles.gpsOptionDesc, { color: Colors.textSecondary }]}>{opt.desc}</Text>
-                    </View>
-                    {isSelected && <Ionicons name="checkmark-circle" size={20} color={Colors.accent} />}
-                  </Pressable>
-                );
-              })}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: Colors.accent + "10", borderRadius: 8, padding: 8, marginTop: 4 }}>
-                <Ionicons name="information-circle-outline" size={14} color={Colors.accent} />
-                <Text style={{ flex: 1, fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>
-                  {t("profile.unitsModeOverride")}
+          <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.privacyRow}>
+              <Ionicons
+                name="eye-off-outline"
+                size={20}
+                color={hideFromMap ? Colors.accent : Colors.textSecondary}
+                style={styles.privacyRowIcon}
+              />
+              <View style={styles.privacyRowText}>
+                <Text style={styles.privacyRowLabel}>{t("ready.privacy.hideFromMapLabel")}</Text>
+                <Text style={styles.privacyRowDesc}>
+                  {t("ready.privacy.hideFromMapDesc")}
                 </Text>
               </View>
+              <Switch
+                value={hideFromMap}
+                onValueChange={(val) => privacyMutation.mutate({ hideFromMap: val })}
+                disabled={privacyMutation.isPending}
+                trackColor={{ false: Colors.border, true: Colors.accent }}
+                thumbColor="#fff"
+              />
             </View>
-          )}
+          </View>
+
+          <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.privacyRow}>
+              <Ionicons
+                name="shuffle-outline"
+                size={20}
+                color={offlineRandomize ? Colors.accent : Colors.textSecondary}
+                style={styles.privacyRowIcon}
+              />
+              <View style={styles.privacyRowText}>
+                <Text style={styles.privacyRowLabel}>{t("ready.privacy.offlineRandomizeLabel")}</Text>
+                <Text style={styles.privacyRowDesc}>
+                  {t("ready.privacy.offlineRandomizeDesc")}
+                </Text>
+              </View>
+              <Switch
+                value={offlineRandomize}
+                onValueChange={(val) => privacyMutation.mutate({ offlinePositionRandomize: val })}
+                disabled={privacyMutation.isPending}
+                trackColor={{ false: Colors.border, true: Colors.accent }}
+                thumbColor="#fff"
+              />
+            </View>
+          </View>
+
+          <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+            <Pressable style={styles.accordionHeader} onPress={() => setPrivacyExpanded((v) => !v)}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="shield-outline" size={18} color={Colors.accent} />
+                <Text style={styles.accordionTitle}>Privacy & Posizione</Text>
+              </View>
+              <Ionicons name={privacyExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
+            </Pressable>
+
+            {privacyExpanded && (
+              <View style={styles.accordionContent}>
+                <View style={styles.privacyRow}>
+                  <Ionicons name="locate-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
+                  <View style={styles.privacyRowText}>
+                    <Text style={styles.privacyRowLabel}>Altera Posizione</Text>
+                    {positionFuzz ? (
+                      <Text style={styles.privacyWarning}>Disattivala prima di un giro in compagnia!</Text>
+                    ) : (
+                      <Text style={styles.privacyRowDesc}>Sposta randomicamente la posizione visibile.</Text>
+                    )}
+                  </View>
+                  <Switch
+                    value={positionFuzz}
+                    onValueChange={(val) => { setPositionFuzz(val); privacyMutation.mutate({ positionFuzz: val }); }}
+                    trackColor={{ false: Colors.border, true: Colors.accent }}
+                    thumbColor="#fff"
+                  />
+                </View>
+                {positionFuzz && (
+                  <View style={styles.kmRow}>
+                    <Ionicons name="resize-outline" size={15} color={Colors.textSecondary} />
+                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio:</Text>
+                    <TextInput
+                      style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
+                      keyboardType="number-pad"
+                      value={String(positionFuzzKm)}
+                      onChangeText={(v) => {
+                        const n = parseInt(v, 10);
+                        if (!isNaN(n) && n >= 1 && n <= 50) {
+                          setPositionFuzzKm(n);
+                          privacyMutation.mutate({ positionFuzzKm: n });
+                        }
+                      }}
+                      maxLength={2}
+                      selectTextOnFocus
+                    />
+                    <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km (max 50)</Text>
+                  </View>
+                )}
+
+                <View style={styles.privacyDivider} />
+
+                <View style={styles.privacyRow}>
+                  <Ionicons name="home-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
+                  <View style={styles.privacyRowText}>
+                    <Text style={styles.privacyRowLabel}>Fake Home</Text>
+                    <Text style={styles.privacyRowDesc}>Vicino a casa, la posizione viene sostituita.</Text>
+                  </View>
+                  <Switch
+                    value={fakeHomeEnabled}
+                    onValueChange={(val) => { setFakeHomeEnabled(val); privacyMutation.mutate({ fakeHomeEnabled: val }); }}
+                    trackColor={{ false: Colors.border, true: Colors.accent }}
+                    thumbColor="#fff"
+                  />
+                </View>
+                {fakeHomeEnabled && (
+                  <>
+                    <FakeZoneCoordPanel
+                      realLabel="Posizione Casa (reale)"
+                      fakeLabel="Posizione Fittizia"
+                      realLat={homeLatitude}
+                      realLng={homeLongitude}
+                      fakeLat={fakeHomeLatitude}
+                      fakeLng={fakeHomeLongitude}
+                      realTarget="homeReal"
+                      fakeTarget="homeFake"
+                      colors={colors}
+                      onPickGPS={pickFromGPS}
+                      onOpenMap={openMapPicker}
+                    />
+                    <View style={styles.kmRow}>
+                      <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio attivazione:</Text>
+                      <TextInput
+                        style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
+                        keyboardType="number-pad"
+                        value={String(fakeHomeRadius)}
+                        onChangeText={(v) => {
+                          const n = parseInt(v, 10);
+                          if (!isNaN(n) && n >= 1 && n <= 100) {
+                            setFakeHomeRadius(n);
+                            privacyMutation.mutate({ fakeHomeRadius: n });
+                          }
+                        }}
+                        maxLength={3}
+                        selectTextOnFocus
+                      />
+                      <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km</Text>
+                    </View>
+                  </>
+                )}
+
+                <View style={styles.privacyDivider} />
+
+                <View style={styles.privacyRow}>
+                  <Ionicons name="business-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
+                  <View style={styles.privacyRowText}>
+                    <Text style={styles.privacyRowLabel}>Fake Work</Text>
+                    <Text style={styles.privacyRowDesc}>Vicino al lavoro, la posizione viene sostituita.</Text>
+                  </View>
+                  <Switch
+                    value={fakeWorkEnabled}
+                    onValueChange={(val) => { setFakeWorkEnabled(val); privacyMutation.mutate({ fakeWorkEnabled: val }); }}
+                    trackColor={{ false: Colors.border, true: Colors.accent }}
+                    thumbColor="#fff"
+                  />
+                </View>
+                {fakeWorkEnabled && (
+                  <>
+                    <FakeZoneCoordPanel
+                      realLabel="Posizione Lavoro (reale)"
+                      fakeLabel="Posizione Fittizia"
+                      realLat={workLatitude}
+                      realLng={workLongitude}
+                      fakeLat={fakeWorkLatitude}
+                      fakeLng={fakeWorkLongitude}
+                      realTarget="workReal"
+                      fakeTarget="workFake"
+                      colors={colors}
+                      onPickGPS={pickFromGPS}
+                      onOpenMap={openMapPicker}
+                    />
+                    <View style={styles.kmRow}>
+                      <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio attivazione:</Text>
+                      <TextInput
+                        style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
+                        keyboardType="number-pad"
+                        value={String(fakeWorkRadius)}
+                        onChangeText={(v) => {
+                          const n = parseInt(v, 10);
+                          if (!isNaN(n) && n >= 1 && n <= 100) {
+                            setFakeWorkRadius(n);
+                            privacyMutation.mutate({ fakeWorkRadius: n });
+                          }
+                        }}
+                        maxLength={3}
+                        selectTextOnFocus
+                      />
+                      <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km</Text>
+                    </View>
+                  </>
+                )}
+
+                <View style={styles.privacyDivider} />
+
+                <View style={styles.privacyRow}>
+                  <Ionicons name="location-outline" size={20} color={Colors.accent} style={styles.privacyRowIcon} />
+                  <View style={styles.privacyRowText}>
+                    <Text style={styles.privacyRowLabel}>Fake Whatever</Text>
+                    <Text style={styles.privacyRowDesc}>Per qualsiasi altro luogo, sostituisci la posizione.</Text>
+                  </View>
+                  <Switch
+                    value={fakeWhateverEnabled}
+                    onValueChange={(val) => { setFakeWhateverEnabled(val); privacyMutation.mutate({ fakeWhateverEnabled: val }); }}
+                    trackColor={{ false: Colors.border, true: Colors.accent }}
+                    thumbColor="#fff"
+                  />
+                </View>
+                {fakeWhateverEnabled && (
+                  <>
+                    <FakeZoneCoordPanel
+                      realLabel="Posizione (reale)"
+                      fakeLabel="Posizione Fittizia"
+                      realLat={whateverLatitude}
+                      realLng={whateverLongitude}
+                      fakeLat={fakeWhateverLatitude}
+                      fakeLng={fakeWhateverLongitude}
+                      realTarget="whateverReal"
+                      fakeTarget="whateverFake"
+                      colors={colors}
+                      onPickGPS={pickFromGPS}
+                      onOpenMap={openMapPicker}
+                    />
+                    <View style={styles.kmRow}>
+                      <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>Raggio attivazione:</Text>
+                      <TextInput
+                        style={[styles.kmInput, { color: Colors.text, borderColor: Colors.border, backgroundColor: Colors.background }]}
+                        keyboardType="number-pad"
+                        value={String(fakeWhateverRadius)}
+                        onChangeText={(v) => {
+                          const n = parseInt(v, 10);
+                          if (!isNaN(n) && n >= 1 && n <= 100) {
+                            setFakeWhateverRadius(n);
+                            privacyMutation.mutate({ fakeWhateverRadius: n });
+                          }
+                        }}
+                        maxLength={3}
+                        selectTextOnFocus
+                      />
+                      <Text style={[styles.kmLabel, { color: Colors.textSecondary }]}>km</Text>
+                    </View>
+                  </>
+                )}
+              </View>
+            )}
+          </View>
+
+          <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+            <View style={styles.accordionHeader}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Ionicons name="navigate-outline" size={18} color={Colors.accent} />
+                <View>
+                  <Text style={styles.accordionTitle}>Precisione GPS Tracking</Text>
+                  <Text style={styles.privacyRowDesc}>
+                    {gpsOptions.find((o) => o.key === gpsPrecision)?.label ?? gpsPrecision}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
+            </View>
+          </View>
         </View>
 
         {sosEnabled && (
@@ -1095,14 +1070,16 @@ const styles = StyleSheet.create({
       web: { boxShadow: "0px 4px 8px rgba(0,0,0,0.3)" },
     }),
   },
-  privacyCard: {
+  settingsGroup: {
     width: "100%",
     maxWidth: 420,
-    marginTop: 20,
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
+    marginTop: 16,
+    gap: 6,
+  },
+  settingCard: {
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 4,
   },
   privacyRow: {
     flexDirection: "row",
