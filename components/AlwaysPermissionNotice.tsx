@@ -85,42 +85,49 @@ export default function AlwaysPermissionNotice({ onDismiss }: Props) {
             </View>
           )}
 
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: colors.accent }]}
-            onPress={handleOpenSettings}
-            activeOpacity={0.85}
-          >
-            <Ionicons
-              name="settings-outline"
-              size={18}
-              color={colors.background}
-              style={styles.btnIcon}
-            />
-            <Text style={[styles.primaryBtnText, { color: colors.background }]}>
-              Apri Impostazioni
-            </Text>
-          </TouchableOpacity>
-
           {!denied && (
             <TouchableOpacity
-              style={[
-                styles.secondaryBtn,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-              ]}
+              style={[styles.primaryBtn, { backgroundColor: colors.accent }]}
               onPress={handleRequest}
               activeOpacity={0.85}
             >
               <Ionicons
                 name="location-outline"
                 size={18}
-                color={colors.accent}
+                color={colors.background}
                 style={styles.btnIcon}
               />
-              <Text style={[styles.secondaryBtnText, { color: colors.accent }]}>
+              <Text style={[styles.primaryBtnText, { color: colors.background }]}>
                 Richiedi permesso
               </Text>
             </TouchableOpacity>
           )}
+
+          <TouchableOpacity
+            style={
+              denied
+                ? [styles.primaryBtn, { backgroundColor: colors.accent }]
+                : [styles.secondaryBtn, { backgroundColor: colors.surface, borderColor: colors.border }]
+            }
+            onPress={handleOpenSettings}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="settings-outline"
+              size={18}
+              color={denied ? colors.background : colors.accent}
+              style={styles.btnIcon}
+            />
+            <Text
+              style={
+                denied
+                  ? [styles.primaryBtnText, { color: colors.background }]
+                  : [styles.secondaryBtnText, { color: colors.accent }]
+              }
+            >
+              Apri Impostazioni
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.dismissBtn}
