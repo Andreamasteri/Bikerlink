@@ -16,6 +16,7 @@ import {
   TouchableOpacity,
   FlatList,
   SectionList,
+  Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
@@ -343,11 +344,23 @@ export default function MapScreen() {
     try {
       let coords: { latitude: number; longitude: number } | null = null;
 
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      sendStartupBeacon("gps_permission_result", { status });
-      if (status !== "granted") return null;
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      if (Platform.OS === "web") {
+        if (typeof navigator !== "undefined" && navigator.geolocation) {
+          coords = await new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+              () => resolve(null),
+              { timeout: 8000, maximumAge: 60000 }
+            );
+          });
+        }
+      } else {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        sendStartupBeacon("gps_permission_result", { status });
+        if (status !== "granted") return null;
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
+      }
 
       if (coords) {
         try {
