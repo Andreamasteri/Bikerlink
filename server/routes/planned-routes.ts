@@ -181,18 +181,7 @@ function buildFallbackRoute(waypoints: Array<{ lat: number; lng: number }>) {
 
 // ─── AI: parse natural language route request ─────────────────────────────────
 
-router.post("/ai-parse", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
-  if (!userId) return;
-
-  const { prompt } = req.body as { prompt?: string };
-  if (!prompt) return res.status(400).json({ message: "Testo richiesto" });
-
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
-
-  try {
-    const systemPrompt = `Sei un assistente per pianificazione giri in moto.
+const AI_SYSTEM_PROMPT = `Sei un assistente per pianificazione giri in moto.
 Analizza la richiesta e restituisci SOLO un oggetto JSON con:
 - title: string
 - startLocation: string
@@ -206,21 +195,36 @@ Analizza la richiesta e restituisci SOLO un oggetto JSON con:
 - avoidHighways: boolean
 - notes: string`;
 
+router.post("/ai-parse", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const { prompt } = req.body as { prompt?: string };
+  if (!prompt) return res.status(400).json({ message: "Testo richiesto" });
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+
+  try {
     const resp = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `${systemPrompt}\n\nRichiesta: ${prompt}` }] }],
+          contents: [{ parts: [{ text: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}` }] }],
           generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
         }),
+        signal: controller.signal,
       }
     );
+    clearTimeout(timeout);
     if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
     const data = await resp.json() as any;
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    // Robust JSON extraction: strip markdown fences then find balanced braces
     const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
     const first = stripped.indexOf("{");
     const last = stripped.lastIndexOf("}");
@@ -229,9 +233,95 @@ Analizza la richiesta e restituisci SOLO un oggetto JSON con:
     try { parsed = JSON.parse(stripped.slice(first, last + 1)); }
     catch { try { parsed = JSON.parse(stripped); } catch { throw new Error("Unparsable JSON"); } }
     return res.json(parsed);
-  } catch (err) {
+  } catch (err: any) {
+    clearTimeout(timeout);
     console.error("[AI parse] error:", err);
+    if (err.name === "AbortError") {
+      return res.status(504).json({ message: "Il servizio AI ha impiegato troppo tempo, riprova" });
+    }
     return res.status(503).json({ message: "Servizio AI non disponibile: errore durante l'elaborazione della richiesta" });
+  }
+});
+
+router.post("/ai-stream", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const { prompt } = req.body as { prompt?: string };
+  if (!prompt) return res.status(400).json({ message: "Testo richiesto" });
+
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  req.on("close", () => { controller.abort(); clearTimeout(timeout); });
+
+  try {
+    const resp = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}` }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+        }),
+        signal: controller.signal,
+      }
+    );
+
+    if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
+
+    let fullText = "";
+    const reader = (resp.body as any).getReader();
+    const decoder = new TextDecoder();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      const lines = chunk.split("\n");
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const json = JSON.parse(line.slice(6));
+            const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+            if (text) {
+              fullText += text;
+              res.write(`data: ${JSON.stringify({ text })}\n\n`);
+            }
+          } catch { /* partial line, skip */ }
+        }
+      }
+    }
+
+    clearTimeout(timeout);
+
+    const stripped = fullText.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
+    const first = stripped.indexOf("{");
+    const last = stripped.lastIndexOf("}");
+    let parsed: any = null;
+    if (first !== -1 && last > first) {
+      try { parsed = JSON.parse(stripped.slice(first, last + 1)); } catch { /* ignore */ }
+    }
+
+    res.write(`event: done\ndata: ${JSON.stringify({ parsed })}\n\n`);
+    res.end();
+  } catch (err: any) {
+    clearTimeout(timeout);
+    console.error("[AI stream] error:", err);
+    const msg = err.name === "AbortError"
+      ? "Il servizio AI ha impiegato troppo tempo, riprova"
+      : "Errore durante l'elaborazione AI";
+    res.write(`event: error\ndata: ${JSON.stringify({ message: msg })}\n\n`);
+    res.end();
   }
 });
 

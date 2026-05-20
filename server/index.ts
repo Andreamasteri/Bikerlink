@@ -341,6 +341,18 @@ function configureExpoAndLanding(app: express.Application) {
     });
   }
 
+  // ── AI Trip Planner page (auth-gated) ────────────────────────────────────
+  const pianificaPath = path.resolve(process.cwd(), "server", "templates", "pianifica.html");
+  app.get("/pianifica", (req: Request, res: Response) => {
+    const userId = (req.session as any)?.userId as string | undefined;
+    if (!userId) {
+      return res.redirect(302, "/accedi");
+    }
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.sendFile(pianificaPath);
+  });
+
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets"), {
     setHeaders(res, filePath) {
       const isImage = /\.(webp|png|jpg|jpeg|gif|svg|ico|avif)$/i.test(filePath);

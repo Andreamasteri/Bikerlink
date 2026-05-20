@@ -825,6 +825,7 @@ function renderNavAuth() {
   if (!area) return;
   if (currentUser) {
     area.innerHTML = `
+      <a class="nav-link-btn" href="/pianifica" style="color:var(--accent);font-weight:700">🤖 Pianifica Giro</a>
       <button class="nav-auth-btn btn-area" onclick="navigate('/area-utente')">${t('nav.area')}</button>
       ${currentUser.role === 'admin' ? `<button class="nav-link-btn" onclick="navigate('/admin/media')">${t('nav.admin')}</button>` : ''}
       ${currentUser.role === 'admin' ? `<button class="nav-link-btn" onclick="navigate('/admin/settings')" style="color:var(--accent)">⚙ Settings</button>` : ''}

@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>BikerLink — Pianifica Giro AI</title>
+  <meta name="robots" content="noindex"/>
+  <link rel="icon" href="/assets/images/playstore-icon.png"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --accent: #FF6600;
+      --accent-dim: rgba(255,102,0,0.12);
+      --accent-glow: rgba(255,102,0,0.30);
+      --bg: #0D0D0D;
+      --bg-alt: #111111;
+      --surface: #161616;
+      --surface2: #1E1E1E;
+      --border: rgba(255,255,255,0.07);
+      --border-mid: rgba(255,255,255,0.12);
+      --text: #F2F2F2;
+      --text2: #999999;
+      --text3: #555555;
+      --success: #22C55E;
+      --error: #EF4444;
+      --font-display: 'Bebas Neue', sans-serif;
+      --font-body: 'DM Sans', system-ui, sans-serif;
+      --radius: 4px;
+      --max: 1200px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      font-family: var(--font-body);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { opacity: 0.82; }
+
+    /* NAVBAR */
+    .navbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      height: 64px; display: flex; align-items: center;
+      background: rgba(13,13,13,0.92);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .navbar-inner {
+      max-width: var(--max); margin: 0 auto; padding: 0 24px;
+      width: 100%; display: flex; align-items: center; gap: 16px;
+    }
+    .nav-logo {
+      font-family: var(--font-display); font-size: 22px; letter-spacing: 2px;
+      color: var(--text); white-space: nowrap; cursor: pointer;
+    }
+    .nav-logo .dot { color: var(--accent); }
+    .nav-sep { color: var(--text3); font-size: 16px; }
+    .nav-page-title {
+      font-family: var(--font-display); font-size: 18px; letter-spacing: 1px;
+      color: var(--accent); text-transform: uppercase;
+    }
+    .nav-back {
+      margin-left: auto; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;
+      color: var(--text3); text-transform: uppercase; cursor: pointer;
+      background: none; border: none; font-family: var(--font-body);
+      transition: color 0.2s;
+    }
+    .nav-back:hover { color: var(--text); }
+
+    /* MAIN */
+    #main { padding-top: 64px; min-height: 100vh; }
+
+    /* PROMPT SECTION */
+    .prompt-section {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 32px 24px;
+    }
+    .prompt-inner { max-width: var(--max); margin: 0 auto; }
+    .prompt-header { margin-bottom: 20px; }
+    .prompt-eyebrow {
+      font-size: 11px; font-weight: 700; letter-spacing: 3px;
+      color: var(--accent); text-transform: uppercase;
+      display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    }
+    .prompt-eyebrow::before { content: ''; display: block; width: 24px; height: 1px; background: var(--accent); }
+    .prompt-title {
+      font-family: var(--font-display); font-size: 36px; letter-spacing: 2px;
+      color: var(--text); text-transform: uppercase; line-height: 1;
+    }
+    .prompt-title strong { color: var(--accent); }
+    .prompt-desc { font-size: 14px; color: var(--text2); margin-top: 8px; }
+    .prompt-row {
+      display: flex; gap: 12px; align-items: flex-end; margin-top: 20px;
+    }
+    .prompt-input-wrap { flex: 1; }
+    .prompt-label {
+      font-size: 11px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--text3); margin-bottom: 8px; display: block;
+    }
+    .prompt-input {
+      width: 100%; padding: 14px 16px;
+      background: var(--bg); border: 1px solid var(--border-mid);
+      border-radius: var(--radius); color: var(--text);
+      font-family: var(--font-body); font-size: 15px;
+      transition: border-color 0.2s; resize: none;
+    }
+    .prompt-input:focus { outline: none; border-color: var(--accent); }
+    .prompt-input::placeholder { color: var(--text3); }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 28px; font-size: 13px; font-weight: 700;
+      letter-spacing: 1px; text-transform: uppercase; border: none;
+      border-radius: 2px; cursor: pointer;
+      transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+      white-space: nowrap; font-family: var(--font-body);
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { box-shadow: 0 6px 24px var(--accent-glow); }
+    .btn-outline { background: transparent; color: var(--text); border: 1px solid var(--border-mid); }
+    .btn-outline:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-sm { padding: 9px 18px; font-size: 11px; }
+    .loader {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.2); border-top-color: currentColor;
+      border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* DASHBOARD */
+    .dashboard {
+      max-width: var(--max); margin: 0 auto; padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 20px;
+    }
+    .panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .panel-title {
+      font-family: var(--font-display); font-size: 16px; letter-spacing: 1px;
+      text-transform: uppercase; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .panel-badge {
+      font-size: 10px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 20px;
+      background: var(--accent-dim); color: var(--accent);
+      border: 1px solid rgba(255,102,0,0.25);
+    }
+    .panel-body { flex: 1; padding: 18px; overflow: hidden; }
+
+    /* PANEL 1: AI LOG */
+    .panel-log { grid-column: 1; grid-row: 1 / 3; min-height: 500px; }
+    .log-stream {
+      height: 100%; min-height: 420px; max-height: 600px;
+      overflow-y: auto; font-family: 'DM Mono', 'Fira Code', monospace;
+      font-size: 13px; line-height: 1.7; color: var(--text2);
+      word-break: break-word; white-space: pre-wrap;
+      padding-right: 4px;
+    }
+    .log-stream::-webkit-scrollbar { width: 4px; }
+    .log-stream::-webkit-scrollbar-track { background: transparent; }
+    .log-stream::-webkit-scrollbar-thumb { background: var(--border-mid); border-radius: 2px; }
+    .log-cursor {
+      display: inline-block; width: 2px; height: 14px;
+      background: var(--accent); vertical-align: middle;
+      animation: blink 1s step-end infinite; margin-left: 2px;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+    .log-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 300px; color: var(--text3); text-align: center;
+    }
+    .log-empty-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.4; }
+    .log-empty p { font-size: 14px; }
+
+    /* PANEL 2: DETTAGLI */
+    .panel-details { grid-column: 2; grid-row: 1; }
+    .details-empty {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 160px; color: var(--text3); text-align: center;
+    }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .detail-item { background: var(--surface2); border-radius: 4px; padding: 12px 14px; }
+    .detail-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 2px;
+      text-transform: uppercase; color: var(--text3); margin-bottom: 4px;
+    }
+    .detail-value { font-size: 14px; font-weight: 600; color: var(--text); }
+    .detail-title-row {
+      background: var(--accent-dim); border: 1px solid rgba(255,102,0,0.2);
+      border-radius: 4px; padding: 14px 16px; margin-bottom: 14px;
+    }
+    .detail-title-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+    .detail-title-value { font-family: var(--font-display); font-size: 22px; letter-spacing: 1px; color: var(--text); }
+    .waypoints-list { margin-top: 14px; }
+    .waypoints-label { font-size: 10px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--text3); margin-bottom: 8px; }
+    .wp-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; color: var(--text2);
+    }
+    .wp-item:last-child { border-bottom: none; }
+    .wp-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text3); flex-shrink: 0;
+    }
+    .wp-dot.start { background: var(--success); }
+    .wp-dot.end { background: var(--accent); }
+    .wp-dot.wp { background: var(--text3); }
+    .style-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 700; letter-spacing: 1px;
+      text-transform: uppercase; padding: 3px 10px; border-radius: 20px;
+    }
+    .style-curvy { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+    .style-balanced { background: rgba(251,191,36,0.12); color: #fcd34d; border: 1px solid rgba(251,191,36,0.3); }
+    .style-fast { background: rgba(239,68,68,0.12); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+
+    /* PANEL 3: MAP */
+    .panel-map { grid-column: 2; grid-row: 2; min-height: 320px; }
+    #route-map { width: 100%; height: 100%; min-height: 280px; }
+    .map-placeholder {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; min-height: 280px; color: var(--text3); text-align: center;
+      background: var(--bg-alt);
+    }
+    .map-placeholder-icon { font-size: 40px; margin-bottom: 10px; opacity: 0.3; }
+    .map-placeholder p { font-size: 13px; }
+
+    /* SAVE BAR */
+    .save-bar {
+      display: none; align-items: center; gap: 16px;
+      padding: 16px 24px; background: var(--surface);
+      border-top: 1px solid var(--border-mid);
+      position: sticky; bottom: 0; z-index: 100;
+    }
+    .save-bar.show { display: flex; }
+    .save-bar-text { font-size: 14px; color: var(--text2); flex: 1; }
+    .save-bar-text strong { color: var(--text); }
+
+    /* ALERT TOAST */
+    .toast {
+      position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+      padding: 12px 24px; border-radius: 4px; font-size: 14px; font-weight: 600;
+      z-index: 2000; display: none; white-space: nowrap;
+    }
+    .toast.show { display: block; animation: slideUp 0.3s ease; }
+    .toast-success { background: var(--success); color: #fff; }
+    .toast-error { background: var(--error); color: #fff; }
+    @keyframes slideUp { from { opacity:0; transform: translateX(-50%) translateY(12px); } to { opacity:1; transform: translateX(-50%) translateY(0); } }
+
+    /* RESPONSIVE */
+    @media (max-width: 900px) {
+      .dashboard { grid-template-columns: 1fr; }
+      .panel-log { grid-column: 1; grid-row: auto; }
+      .panel-details { grid-column: 1; grid-row: auto; }
+      .panel-map { grid-column: 1; grid-row: auto; }
+      .prompt-row { flex-direction: column; }
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="navbar-inner">
+    <a href="/" class="nav-logo">BIKER<span class="dot">.</span>LINK</a>
+    <span class="nav-sep">|</span>
+    <span class="nav-page-title">Pianifica Giro AI</span>
+    <button class="nav-back" onclick="history.back()">← Torna indietro</button>
+  </div>
+</nav>
+
+<div id="main">
+
+  <!-- PROMPT SECTION -->
+  <section class="prompt-section">
+    <div class="prompt-inner">
+      <div class="prompt-header">
+        <div class="prompt-eyebrow">Intelligenza artificiale</div>
+        <h1 class="prompt-title">Descrivi il tuo <strong>giro</strong></h1>
+        <p class="prompt-desc">Scrivi in linguaggio naturale cosa vuoi fare — l'AI analizzerà la richiesta e costruirà il percorso in tempo reale.</p>
+      </div>
+      <div class="prompt-row">
+        <div class="prompt-input-wrap">
+          <label class="prompt-label" for="prompt-input">La tua richiesta</label>
+          <textarea class="prompt-input" id="prompt-input" rows="2"
+            placeholder="es. giro curvy sulle Dolomiti, circa 300 km, evita autostrade, partenza da Trento"></textarea>
+        </div>
+        <button class="btn btn-primary" id="start-btn" onclick="startPlanning()">
+          <span id="btn-label">🤖 Pianifica</span>
+        </button>
+      </div>
+      <div id="status-msg" style="margin-top:10px;font-size:13px;color:var(--text3);min-height:20px"></div>
+    </div>
+  </section>
+
+  <!-- THREE-PANEL DASHBOARD -->
+  <div class="dashboard">
+
+    <!-- PANEL 1: AI LOG -->
+    <div class="panel panel-log">
+      <div class="panel-header">
+        <span class="panel-title">🤖 AI Log</span>
+        <span class="panel-badge" id="log-badge">In attesa</span>
+      </div>
+      <div class="panel-body">
+        <div class="log-stream" id="log-stream">
+          <div class="log-empty">
+            <div class="log-empty-icon">💬</div>
+            <p>L'output dell'AI apparirà qui in tempo reale</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 2: DETTAGLI GIRO -->
+    <div class="panel panel-details">
+      <div class="panel-header">
+        <span class="panel-title">📋 Dettagli Giro</span>
+        <span class="panel-badge" id="details-badge">In attesa</span>
+      </div>
+      <div class="panel-body" id="details-body">
+        <div class="details-empty">
+          <p style="font-size:14px;color:var(--text3)">I dettagli appariranno al completamento dell'analisi AI</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL 3: MAPPA -->
+    <div class="panel panel-map">
+      <div class="panel-header">
+        <span class="panel-title">🗺️ Mappa Percorso</span>
+        <span class="panel-badge" id="map-badge">In attesa</span>
+      </div>
+      <div class="panel-body" style="padding:0;position:relative">
+        <div class="map-placeholder" id="map-placeholder">
+          <div class="map-placeholder-icon">📍</div>
+          <p>La mappa si caricherà dopo la geocodifica dei waypoint</p>
+        </div>
+        <div id="route-map" style="display:none"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- SAVE BAR -->
+  <div class="save-bar" id="save-bar">
+    <span class="save-bar-text" id="save-bar-text">Giro pianificato pronto</span>
+    <button class="btn btn-outline btn-sm" onclick="resetPlanner()">↺ Nuova pianificazione</button>
+    <button class="btn btn-primary btn-sm" id="save-btn" onclick="saveRoute()">💾 Salva Giro</button>
+  </div>
+
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+let currentParsed = null;
+let leafletMap = null;
+let routeLayer = null;
+let markerLayer = null;
+let isStreaming = false;
+
+// ── PLANNING ───────────────────────────────────────────────────────────────
+async function startPlanning() {
+  const prompt = document.getElementById('prompt-input').value.trim();
+  if (!prompt) { showToast('Inserisci una descrizione del giro', 'error'); return; }
+  if (isStreaming) return;
+
+  isStreaming = true;
+  currentParsed = null;
+
+  const startBtn = document.getElementById('start-btn');
+  const btnLabel = document.getElementById('btn-label');
+  startBtn.disabled = true;
+  btnLabel.innerHTML = '<span class="loader"></span> Elaborazione...';
+
+  setStatus('Connessione al servizio AI...');
+  setBadge('log-badge', 'Streaming', true);
+  setBadge('details-badge', 'In attesa', false);
+  setBadge('map-badge', 'In attesa', false);
+
+  resetPanels();
+
+  const logEl = document.getElementById('log-stream');
+  logEl.innerHTML = '';
+
+  let logText = '';
+  let currentEventType = 'data';
+
+  let response;
+  try {
+    response = await fetch('/api/planned-routes/ai-stream', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+  } catch {
+    handleStreamError('Errore di rete, riprova');
+    return;
+  }
+
+  if (!response.ok) {
+    if (response.status === 401) { window.location.href = '/accedi'; return; }
+    let msg = 'Errore dal server';
+    try { const j = await response.json(); msg = j.message || msg; } catch {}
+    handleStreamError(msg);
+    return;
+  }
+
+  setStatus('AI in elaborazione...');
+
+  const cursor = document.createElement('span');
+  cursor.className = 'log-cursor';
+  logEl.appendChild(cursor);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  function processLines(lines) {
+    for (const line of lines) {
+      if (line.startsWith('event: ')) {
+        currentEventType = line.slice(7).trim();
+      } else if (line.startsWith('data: ')) {
+        const raw = line.slice(6);
+        try {
+          const payload = JSON.parse(raw);
+          if (currentEventType === 'done') {
+            handleDone(payload.parsed, logEl, cursor);
+            return true; // signal done
+          } else if (currentEventType === 'error') {
+            handleStreamError(payload.message || 'Errore AI');
+            return true;
+          } else if (payload.text) {
+            logText += payload.text;
+            cursor.remove();
+            logEl.textContent = logText;
+            logEl.appendChild(cursor);
+            logEl.scrollTop = logEl.scrollHeight;
+          }
+        } catch { /* partial */ }
+        currentEventType = 'data';
+      }
+    }
+    return false;
+  }
+
+  try {
+    outer: while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const parts = buffer.split('\n');
+      buffer = parts.pop() || '';
+
+      if (processLines(parts)) break outer;
+    }
+
+    // flush remainder
+    if (buffer) {
+      const parts = buffer.split('\n');
+      processLines(parts);
+    }
+
+    // If no done event was fired, finalize gracefully
+    if (isStreaming) {
+      cursor.remove();
+      logEl.textContent = logText;
+      logEl.scrollTop = logEl.scrollHeight;
+      setBadge('log-badge', 'Completato', false);
+
+      const stripped = logText.replace(/```(?:json)?\s*/g, '').replace(/```\s*/g, '').trim();
+      const f = stripped.indexOf('{'), l = stripped.lastIndexOf('}');
+      let parsed = null;
+      if (f !== -1 && l > f) { try { parsed = JSON.parse(stripped.slice(f, l + 1)); } catch {} }
+      handleDone(parsed, null, null);
+    }
+  } catch {
+    handleStreamError('Connessione interrotta');
+  }
+}
+
+// ── DONE HANDLER ───────────────────────────────────────────────────────────
+async function handleDone(parsed, logEl, cursor) {
+  isStreaming = false;
+  if (cursor) cursor.remove();
+  if (logEl) { logEl.scrollTop = logEl.scrollHeight; }
+
+  setBadge('log-badge', 'Completato', false);
+  setStatus('');
+
+  const startBtn = document.getElementById('start-btn');
+  startBtn.disabled = false;
+  document.getElementById('btn-label').innerHTML = '🤖 Pianifica';
+
+  if (!parsed) {
+    setBadge('details-badge', 'Errore', false);
+    showToast('Impossibile estrarre i dettagli del giro', 'error');
+    return;
+  }
+
+  currentParsed = parsed;
+  renderDetails(parsed);
+  setBadge('details-badge', 'Pronto', false);
+
+  // Geocode waypoints and draw map
+  await geocodeAndDrawMap(parsed);
+
+  document.getElementById('save-bar').classList.add('show');
+}
+
+function handleStreamError(msg) {
+  isStreaming = false;
+  setBadge('log-badge', 'Errore', false);
+  setStatus('');
+
+  const startBtn = document.getElementById('start-btn');
+  startBtn.disabled = false;
+  document.getElementById('btn-label').innerHTML = '🤖 Pianifica';
+
+  showToast(msg || 'Errore AI', 'error');
+}
+
+// ── RENDER DETAILS ─────────────────────────────────────────────────────────
+function renderDetails(p) {
+  const styleClass = p.style === 'curvy' ? 'style-curvy' : p.style === 'fast' ? 'style-fast' : 'style-balanced';
+  const styleLabel = p.style === 'curvy' ? '🔄 Curvy' : p.style === 'fast' ? '⚡ Veloce' : '⚖️ Bilanciato';
+
+  const waypoints = Array.isArray(p.waypoints) ? p.waypoints : [];
+  const allPoints = [
+    { role: 'start', name: p.startLocation || '—' },
+    ...waypoints.map(w => ({ role: 'wp', name: w })),
+    { role: 'end', name: (p.endLocation && p.endLocation !== p.startLocation) ? p.endLocation : (p.isRoundTrip ? p.startLocation : p.endLocation) || '—' },
+  ];
+
+  document.getElementById('details-body').innerHTML = `
+    <div class="detail-title-row">
+      <div class="detail-title-label">Titolo giro</div>
+      <div class="detail-title-value">${esc(p.title || 'Giro in moto')}</div>
+    </div>
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="detail-label">Stile</div>
+        <div class="detail-value"><span class="style-badge ${styleClass}">${styleLabel}</span></div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Tipo</div>
+        <div class="detail-value">${p.isRoundTrip ? '🔁 Andata e ritorno' : '➡️ A/R separato'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Giorni</div>
+        <div class="detail-value">${p.isMultiDay ? (p.daysEstimate || 2) + ' giorni' : 'Giornaliero'}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">Autostrade</div>
+        <div class="detail-value">${p.avoidHighways ? '🚫 Evitate' : '✅ Ammesse'}</div>
+      </div>
+    </div>
+    <div class="waypoints-list">
+      <div class="waypoints-label">Tappe</div>
+      ${allPoints.map(pt => `
+        <div class="wp-item">
+          <div class="wp-dot ${pt.role}"></div>
+          <span>${esc(pt.name)}</span>
+          ${pt.role === 'start' ? '<span style="font-size:10px;color:var(--success);margin-left:auto;font-weight:700">PARTENZA</span>' : ''}
+          ${pt.role === 'end' ? '<span style="font-size:10px;color:var(--accent);margin-left:auto;font-weight:700">ARRIVO</span>' : ''}
+        </div>
+      `).join('')}
+    </div>
+    ${p.notes ? `<div style="margin-top:14px;padding:12px 14px;background:var(--surface2);border-radius:4px;font-size:13px;color:var(--text2)">${esc(p.notes)}</div>` : ''}
+  `;
+
+  document.getElementById('save-bar-text').innerHTML = `Giro <strong>${esc(p.title || 'Giro in moto')}</strong> pronto al salvataggio`;
+}
+
+// ── MAP ────────────────────────────────────────────────────────────────────
+async function geocodeAndDrawMap(parsed) {
+  setBadge('map-badge', 'Geocodifica...', true);
+
+  const waypoints = Array.isArray(parsed.waypoints) ? parsed.waypoints : [];
+  const locations = [parsed.startLocation, ...waypoints];
+  if (parsed.endLocation && parsed.endLocation !== parsed.startLocation) {
+    locations.push(parsed.endLocation);
+  }
+
+  const coords = [];
+  for (const loc of locations) {
+    if (!loc || !loc.trim()) continue;
+    try {
+      const res = await fetch(`/api/planned-routes/geocode?q=${encodeURIComponent(loc)}`, { credentials: 'include' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data[0]) coords.push({ lat: data[0].lat, lng: data[0].lng, name: loc });
+      }
+    } catch { /* ignore */ }
+  }
+
+  if (coords.length === 0) {
+    setBadge('map-badge', 'Nessun punto', false);
+    return;
+  }
+
+  initMap();
+  drawMapPoints(coords);
+  setBadge('map-badge', coords.length + ' tappe', false);
+}
+
+function initMap() {
+  const mapPlaceholder = document.getElementById('map-placeholder');
+  const mapEl = document.getElementById('route-map');
+  mapPlaceholder.style.display = 'none';
+  mapEl.style.display = 'block';
+
+  if (!leafletMap) {
+    leafletMap = L.map('route-map', { zoomControl: true, scrollWheelZoom: true });
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap contributors © CARTO',
+      maxZoom: 18,
+    }).addTo(leafletMap);
+  } else {
+    if (routeLayer) { leafletMap.removeLayer(routeLayer); routeLayer = null; }
+    if (markerLayer) { leafletMap.removeLayer(markerLayer); markerLayer = null; }
+  }
+}
+
+function drawMapPoints(coords) {
+  if (!leafletMap || coords.length === 0) return;
+
+  const group = L.layerGroup();
+
+  coords.forEach((c, i) => {
+    const isStart = i === 0;
+    const isEnd = i === coords.length - 1;
+    const color = isStart ? '#22c55e' : isEnd ? '#FF6600' : '#aaaaaa';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,0.7);box-shadow:0 0 6px ${color}66"></div>`,
+      iconSize: [12, 12],
+      iconAnchor: [6, 6],
+    });
+    const marker = L.marker([c.lat, c.lng], { icon })
+      .bindPopup(`<strong>${c.name}</strong>${isStart ? '<br><em>Partenza</em>' : isEnd ? '<br><em>Arrivo</em>' : ''}`);
+    group.addLayer(marker);
+  });
+
+  if (coords.length > 1) {
+    const latlngs = coords.map(c => [c.lat, c.lng]);
+    const polyline = L.polyline(latlngs, { color: '#FF6600', weight: 3, opacity: 0.8, dashArray: '8 6' });
+    group.addLayer(polyline);
+  }
+
+  markerLayer = group.addTo(leafletMap);
+
+  const bounds = L.latLngBounds(coords.map(c => [c.lat, c.lng]));
+  leafletMap.fitBounds(bounds, { padding: [32, 32] });
+}
+
+// ── SAVE ───────────────────────────────────────────────────────────────────
+async function saveRoute() {
+  if (!currentParsed) return;
+
+  const saveBtn = document.getElementById('save-btn');
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = '<span class="loader"></span> Salvataggio...';
+
+  const waypoints = Array.isArray(currentParsed.waypoints) ? currentParsed.waypoints : [];
+  const allLocations = [currentParsed.startLocation || '', ...waypoints];
+  if (currentParsed.endLocation && currentParsed.endLocation !== currentParsed.startLocation) {
+    allLocations.push(currentParsed.endLocation);
+  }
+
+  const payload = {
+    title: currentParsed.title || 'Giro AI',
+    style: currentParsed.style || 'balanced',
+    isRoundTrip: !!currentParsed.isRoundTrip,
+    isMultiDay: !!currentParsed.isMultiDay,
+    daysEstimate: currentParsed.daysEstimate || 1,
+    maxHoursPerDay: currentParsed.maxHoursPerDay || 6,
+    avoidHighways: !!currentParsed.avoidHighways,
+    notes: currentParsed.notes || '',
+    visibility: 'private',
+    waypoints: allLocations.filter(Boolean).map(name => ({ lat: 0, lng: 0, name })),
+    distanceKm: 0,
+    durationMinutes: 0,
+    bikerScore: 0,
+  };
+
+  try {
+    const res = await fetch('/api/planned-routes', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      let msg = 'Errore durante il salvataggio';
+      try { const j = await res.json(); msg = j.message || msg; } catch {}
+      if (res.status === 401) { window.location.href = '/accedi'; return; }
+      showToast(msg, 'error');
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Salva Giro';
+      return;
+    }
+
+    showToast('Giro salvato! Aprilo nell\'app BikerLink.', 'success');
+    saveBtn.textContent = '✅ Salvato';
+    setTimeout(() => {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Salva Giro';
+    }, 3000);
+  } catch {
+    showToast('Errore di rete, riprova', 'error');
+    saveBtn.disabled = false;
+    saveBtn.textContent = '💾 Salva Giro';
+  }
+}
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function resetPlanner() {
+  currentParsed = null;
+  isStreaming = false;
+  document.getElementById('save-bar').classList.remove('show');
+  document.getElementById('details-body').innerHTML = '<div class="details-empty"><p style="font-size:14px;color:var(--text3)">I dettagli appariranno al completamento dell\'analisi AI</p></div>';
+  document.getElementById('log-stream').innerHTML = '<div class="log-empty"><div class="log-empty-icon">💬</div><p>L\'output dell\'AI apparirà qui in tempo reale</p></div>';
+  setBadge('log-badge', 'In attesa', false);
+  setBadge('details-badge', 'In attesa', false);
+  setBadge('map-badge', 'In attesa', false);
+  setStatus('');
+  if (leafletMap && markerLayer) { leafletMap.removeLayer(markerLayer); markerLayer = null; }
+  if (leafletMap && routeLayer) { leafletMap.removeLayer(routeLayer); routeLayer = null; }
+  document.getElementById('route-map').style.display = 'none';
+  document.getElementById('map-placeholder').style.display = 'flex';
+}
+
+function resetPanels() {
+  document.getElementById('save-bar').classList.remove('show');
+  document.getElementById('details-body').innerHTML = '<div class="details-empty"><p style="font-size:14px;color:var(--text3)">I dettagli appariranno al completamento dell\'analisi AI</p></div>';
+  setBadge('details-badge', 'In attesa', false);
+  setBadge('map-badge', 'In attesa', false);
+  if (leafletMap && markerLayer) { leafletMap.removeLayer(markerLayer); markerLayer = null; }
+  document.getElementById('route-map').style.display = 'none';
+  document.getElementById('map-placeholder').style.display = 'flex';
+}
+
+function setBadge(id, text, pulse) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.style.animation = pulse ? 'badgePulse 1s ease-in-out infinite' : '';
+}
+
+function setStatus(msg) {
+  document.getElementById('status-msg').textContent = msg;
+}
+
+function showToast(msg, type) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show toast-${type}`;
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.classList.remove('show'); }, 4000);
+}
+
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Add badge pulse animation
+const style = document.createElement('style');
+style.textContent = `@keyframes badgePulse{0%,100%{opacity:1}50%{opacity:0.4}}`;
+document.head.appendChild(style);
+
+// Keyboard shortcut
+document.getElementById('prompt-input').addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    startPlanning();
+  }
+});
+</script>
+</body>
+</html>
