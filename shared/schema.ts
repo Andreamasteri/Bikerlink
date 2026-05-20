@@ -799,7 +799,6 @@ export const bikerBikerMatches = pgTable("biker_biker_matches", {
     sql`LEAST(${table.biker1Id}, ${table.biker2Id})`,
     sql`GREATEST(${table.biker1Id}, ${table.biker2Id})`,
     table.motorcycleBrand,
-    table.motorcycleModel,
   ),
 ]);
 

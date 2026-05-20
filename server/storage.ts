@@ -2050,7 +2050,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db.execute(sql`
       INSERT INTO biker_biker_matches (id, biker1_id, biker2_id, motorcycle_brand, motorcycle_model, status, is_supermatch, pair_type)
       VALUES (gen_random_uuid(), ${idA}, ${idB}, ${data.motorcycleBrand}, ${data.motorcycleModel}, ${status}, ${isSupermatch}, ${pairType})
-      ON CONFLICT (LEAST(biker1_id, biker2_id), GREATEST(biker1_id, biker2_id), motorcycle_brand, motorcycle_model)
+      ON CONFLICT (LEAST(biker1_id, biker2_id), GREATEST(biker1_id, biker2_id), motorcycle_brand)
       DO UPDATE SET
         status = 'new',
         is_supermatch = EXCLUDED.is_supermatch,
