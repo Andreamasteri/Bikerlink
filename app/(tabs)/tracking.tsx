@@ -788,7 +788,7 @@ function RouteMapModal({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-function TrackingNativeScreen() {
+function TrackingScreenInner() {
   const t = useT();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -5166,5 +5166,5 @@ const styles = StyleSheet.create({
 });
 
 export default function TrackingScreen() {
-  return <TrackingNativeScreen />;
+  return <TrackingScreenInner />;
 }
