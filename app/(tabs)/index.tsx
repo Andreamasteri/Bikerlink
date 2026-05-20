@@ -1783,7 +1783,10 @@ export default function MapScreen() {
                           </View>
                         )}
                       </Pressable>
-                      <Pressable onPress={() => toggleContinentInModal(continent.key)}>
+                      <Pressable onPress={() => toggleContinentInModal(continent.key)} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={styles.continentSelectAllText}>
+                          {allSelected ? "Deseleziona tutti" : "Seleziona tutti"}
+                        </Text>
                         <Ionicons
                           name={allSelected ? "checkbox" : partialSelected ? "remove-circle" : "square-outline"}
                           size={22}
@@ -2524,6 +2527,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
+  },
+  continentSelectAllText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
   },
   partialBadge: {
     backgroundColor: Colors.accent + "30",
