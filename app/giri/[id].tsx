@@ -21,6 +21,7 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { buildLeafletCurvatureGradientHtml } from "@/lib/leaflet-route-map-html";
 import { getTileConfig } from "@/lib/map-tiles";
+import { useOfflineTiles } from "@/hooks/useOfflineTiles";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -145,6 +146,21 @@ export default function GiriDetailScreen() {
     enabled: !!id,
   });
 
+  // Decode points for offline tiles hook
+  const routePoints = useMemo(() => {
+    if (!route) return [];
+    if (route.polyline) return decodePolyline(route.polyline);
+    return (route.waypoints ?? [])
+      .filter((wp) => wp.lat !== 0 || wp.lng !== 0)
+      .map((wp) => ({ lat: wp.lat, lng: wp.lng }));
+  }, [route]);
+
+  const offline = useOfflineTiles(
+    route?.id,
+    route?.title ?? "",
+    routePoints
+  );
+
   // Auto-load compatible bikers when route loads (proactive matching)
   React.useEffect(() => {
     if (route && !matchBikers && !matchLoading) {
@@ -172,18 +188,14 @@ export default function GiriDetailScreen() {
 
   // Map HTML — decoded polyline or waypoint dots
   const mapHtml = useMemo(() => {
-    if (!route) return null;
-    let points: Array<{ lat: number; lng: number }> = [];
-    if (route.polyline) {
-      points = decodePolyline(route.polyline);
-    } else if (route.waypoints?.length) {
-      points = route.waypoints
-        .filter((wp) => wp.lat !== 0 || wp.lng !== 0)
-        .map((wp) => ({ lat: wp.lat, lng: wp.lng }));
-    }
-    if (!points.length) return null;
-    return buildLeafletCurvatureGradientHtml(TILE_CONFIG.urlTemplate, TILE_CONFIG.maximumZ, points);
-  }, [route]);
+    if (!routePoints.length) return null;
+    return buildLeafletCurvatureGradientHtml(
+      TILE_CONFIG.urlTemplate,
+      TILE_CONFIG.maximumZ,
+      routePoints,
+      offline.offlineTileBasePath
+    );
+  }, [routePoints, offline.offlineTileBasePath]);
 
   // Multi-day segments computed from metadata
   const multiDayDays = useMemo(() => {
@@ -373,6 +385,9 @@ export default function GiriDetailScreen() {
               scrollEnabled={false}
               javaScriptEnabled
               originWhitelist={["*"]}
+              allowFileAccess
+              allowFileAccessFromFileURLs
+              allowUniversalAccessFromFileURLs
             />
             <View style={s.mapOverlayBadge}>
               <MaterialCommunityIcons
@@ -382,6 +397,12 @@ export default function GiriDetailScreen() {
               />
               <Text style={s.mapOverlayText}>{route.distanceKm} km</Text>
             </View>
+            {offline.status === "available" && (
+              <View style={s.offlineBadge}>
+                <Ionicons name="cloud-offline-outline" size={12} color="#22c55e" />
+                <Text style={s.offlineBadgeText}>Offline</Text>
+              </View>
+            )}
           </View>
         ) : (
           <View style={s.mapPlaceholder}>
@@ -528,6 +549,93 @@ export default function GiriDetailScreen() {
             <Text style={s.actionLabel}>GPX</Text>
           </Pressable>
         </View>
+
+        {/* Offline map download card */}
+        {routePoints.length > 0 && (
+          <View style={s.offlineCard}>
+            <View style={s.offlineCardHeader}>
+              <Ionicons
+                name={offline.status === "available" ? "cloud-done-outline" : "cloud-offline-outline"}
+                size={20}
+                color={offline.status === "available" ? "#22c55e" : colors.accent}
+              />
+              <Text style={s.offlineCardTitle}>Mappa offline</Text>
+              {offline.status === "available" && (
+                <View style={s.offlineAvailableBadge}>
+                  <Text style={s.offlineAvailableText}>Disponibile</Text>
+                </View>
+              )}
+            </View>
+
+            {offline.status === "none" && offline.estimate && (
+              <Text style={s.offlineEstimate}>
+                ~{offline.estimate.tileCount} tile · {offline.estimate.estimatedMB.toFixed(1)} MB
+              </Text>
+            )}
+
+            {offline.status === "downloading" && (
+              <View style={s.offlineProgressArea}>
+                <View style={s.offlineProgressBg}>
+                  <View
+                    style={[
+                      s.offlineProgressFill,
+                      { width: `${offline.total > 0 ? Math.round((offline.progress / offline.total) * 100) : 0}%` as any },
+                    ]}
+                  />
+                </View>
+                <Text style={s.offlineProgressText}>
+                  {offline.progress} / {offline.total} tile
+                </Text>
+              </View>
+            )}
+
+            {offline.status === "available" && offline.entry && (
+              <Text style={s.offlineEstimate}>
+                {(offline.entry.bytesEstimated / 1_000_000).toFixed(1)} MB ·{" "}
+                {offline.entry.tileCount} tile
+              </Text>
+            )}
+
+            <View style={s.offlineActions}>
+              {offline.status === "none" && (
+                <Pressable style={s.offlineBtn} onPress={offline.startDownload}>
+                  <Ionicons name="download-outline" size={16} color="#fff" />
+                  <Text style={s.offlineBtnText}>Scarica mappa offline</Text>
+                </Pressable>
+              )}
+              {offline.status === "downloading" && (
+                <Pressable style={[s.offlineBtn, s.offlineBtnCancel]} onPress={offline.cancelDownload}>
+                  <Ionicons name="close-circle-outline" size={16} color={colors.accentRed} />
+                  <Text style={[s.offlineBtnText, { color: colors.accentRed }]}>Annulla</Text>
+                </Pressable>
+              )}
+              {offline.status === "available" && (
+                <Pressable
+                  style={[s.offlineBtn, s.offlineBtnDelete]}
+                  onPress={() =>
+                    Alert.alert(
+                      "Elimina mappa offline",
+                      "Rimuovere i tile scaricati per questo percorso?",
+                      [
+                        { text: "Annulla", style: "cancel" },
+                        { text: "Elimina", style: "destructive", onPress: offline.deleteOffline },
+                      ]
+                    )
+                  }
+                >
+                  <Ionicons name="trash-outline" size={16} color={colors.accentRed} />
+                  <Text style={[s.offlineBtnText, { color: colors.accentRed }]}>Rimuovi</Text>
+                </Pressable>
+              )}
+              {offline.status === "error" && (
+                <Pressable style={s.offlineBtn} onPress={offline.startDownload}>
+                  <Ionicons name="refresh-outline" size={16} color="#fff" />
+                  <Text style={s.offlineBtnText}>Riprova</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
 
         {/* Weather */}
         {weather && weather.length > 0 && (
@@ -821,4 +929,21 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   fuelStopMeta: { flexDirection: "row", gap: 10, marginTop: 2 },
   fuelStopKm: { fontFamily: "Inter_500Medium", fontSize: 12, color: colors.accent },
   fuelStopEta: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
+  offlineBadge: { position: "absolute", bottom: 8, left: 8, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.75)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  offlineBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#22c55e" },
+  offlineCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 20, gap: 10 },
+  offlineCardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  offlineCardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: colors.text, flex: 1 },
+  offlineAvailableBadge: { backgroundColor: "#22c55e22", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  offlineAvailableText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#22c55e" },
+  offlineEstimate: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary },
+  offlineProgressArea: { gap: 6 },
+  offlineProgressBg: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" },
+  offlineProgressFill: { height: "100%" as any, backgroundColor: colors.accent, borderRadius: 4 },
+  offlineProgressText: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
+  offlineActions: { flexDirection: "row", gap: 8 },
+  offlineBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
+  offlineBtnCancel: { backgroundColor: colors.accentRed + "18" },
+  offlineBtnDelete: { backgroundColor: colors.accentRed + "18" },
+  offlineBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
 });

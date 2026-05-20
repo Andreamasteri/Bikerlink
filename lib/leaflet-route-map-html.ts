@@ -205,9 +205,13 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 export function buildLeafletCurvatureGradientHtml(
   tileUrl: string,
   tileMaxZoom: number,
-  points: Array<{ lat: number; lng: number }>
+  points: Array<{ lat: number; lng: number }>,
+  offlineTileBasePath?: string | null
 ): string {
   const pointsJson = JSON.stringify(points);
+  const offlinePathJs = offlineTileBasePath
+    ? JSON.stringify(offlineTileBasePath)
+    : "null";
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -228,8 +232,35 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 <script>
 (function() {
   var points = ${pointsJson};
+  var offlineBasePath = ${offlinePathJs};
   var map = L.map("map", { zoomControl: false, attributionControl: true });
-  L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
+
+  if (offlineBasePath) {
+    var OfflineTileLayer = L.TileLayer.extend({
+      getTileUrl: function(coords) {
+        return offlineBasePath + coords.z + "/" + coords.x + "/" + coords.y + ".png";
+      },
+      createTile: function(coords, done) {
+        var img = document.createElement("img");
+        img.setAttribute("role", "presentation");
+        var offlineUrl = this.getTileUrl(coords);
+        var onlineUrl = ${JSON.stringify(tileUrl)}
+          .replace("{z}", coords.z)
+          .replace("{x}", coords.x)
+          .replace("{y}", coords.y);
+        img.onload = function() { done(null, img); };
+        img.onerror = function() {
+          img.src = onlineUrl;
+          img.onerror = function() { done(new Error("tile load failed"), img); };
+        };
+        img.src = offlineUrl;
+        return img;
+      }
+    });
+    new OfflineTileLayer("", { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
+  } else {
+    L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
+  }
 
   function bearing(p1, p2) {
     var dLng = (p2.lng - p1.lng) * Math.PI / 180;
