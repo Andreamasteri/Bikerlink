@@ -56,6 +56,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
   const hadBackgroundPermissionRef = useRef(false);
   const webGpsDoneRef = useRef(false);
   const webPositionFoundRef = useRef(false);
+  const lastMobileSourceRef = useRef<string | null>(null);
 
   const { data: gpsData } = useQuery<{ required: boolean }>({
     queryKey: ["/api/settings/gps-required"],
@@ -307,6 +308,36 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
           setWebResolvedPosition({ latitude: mobile.latitude, longitude: mobile.longitude });
           setPositionReady(true);
           webPositionFoundRef.current = true;
+        }
+      }
+    }, WEB_POSITION_POLL_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [tryResolveWebPositionFromDb]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+
+    const interval = setInterval(async () => {
+      const mobile = await tryResolveWebPositionFromDb();
+      if (!mobile) return;
+
+      const prevSource = lastMobileSourceRef.current;
+      lastMobileSourceRef.current = mobile.source;
+
+      if (mobile.source === "live") {
+        setWebResolvedPosition({ latitude: mobile.latitude, longitude: mobile.longitude });
+        setPositionReady(true);
+        webPositionFoundRef.current = true;
+      } else if (prevSource === "live" && mobile.source !== "live") {
+        if (typeof navigator !== "undefined" && navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              setWebResolvedPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+            },
+            () => {},
+            { timeout: 8000, maximumAge: 60000 }
+          );
         }
       }
     }, WEB_POSITION_POLL_INTERVAL);
