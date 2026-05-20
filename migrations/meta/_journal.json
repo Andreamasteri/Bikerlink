@@ -64,6 +64,20 @@
       "when": 1747958400001,
       "tag": "0007_gps_rejection_stats",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1748044800000,
+      "tag": "0008_match_unique_index_brand_only",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1748131200000,
+      "tag": "0009_drop_motorcycle_model_column",
+      "breakpoints": true
     }
   ]
 }

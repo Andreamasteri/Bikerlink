@@ -468,7 +468,6 @@ export async function runBikerBikerMatching(): Promise<number> {
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: m1.brand,
-            motorcycleModel: "",
             status: "new",
             isSupermatch,
           });
@@ -539,7 +538,6 @@ export async function runBikerBikerTypeStyleMatching(): Promise<number> {
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: "tipo:" + m1.motorcycleType,
-            motorcycleModel: m1.ridingStyle,
             status: "new",
             isSupermatch: false,
           });
@@ -615,7 +613,6 @@ export async function runClubBrandMatching(): Promise<number> {
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: `club:${brand}`,
-            motorcycleModel: club.id,
             status: "new",
             isSupermatch: false,
           });
@@ -649,7 +646,6 @@ export async function runClubBrandMatching(): Promise<number> {
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: `club_zav:${brand}`,
-            motorcycleModel: club.id,
             status: "new",
             isSupermatch: false,
             pairType: "bz",
@@ -741,7 +737,6 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
           biker1Id: idA,
           biker2Id: idB,
           motorcycleBrand: brand,
-          motorcycleModel: "",
           status: "new",
           isSupermatch: false,
           pairType: musicPairType,
@@ -898,7 +893,6 @@ export async function runGpsBasedMatching(): Promise<number> {
           biker1Id: idA,
           biker2Id: idB,
           motorcycleBrand: gpsLabel,
-          motorcycleModel: "",
           status: "new",
           isSupermatch: gpsLabel === "gps_full",
         });
@@ -965,7 +959,6 @@ export async function runEventMatching(): Promise<number> {
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: "eventi",
-            motorcycleModel: "",
             status: "new",
             isSupermatch: false,
           });
@@ -1043,7 +1036,6 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
           biker1Id: idA,
           biker2Id: idB,
           motorcycleBrand: `tipo_zav:${mtype}`,
-          motorcycleModel: rstyle,
           status: "new",
           isSupermatch: false,
           pairType: "bz",
@@ -1130,7 +1122,6 @@ export async function runDistanceMatching(): Promise<number> {
           biker1Id: idA,
           biker2Id: idB,
           motorcycleBrand: brand,
-          motorcycleModel: "",
           status: "new",
           isSupermatch: false,
           pairType,
@@ -1251,7 +1242,6 @@ export async function runRouteTypeZoneMatching(): Promise<number> {
           biker1Id: idA,
           biker2Id: idB,
           motorcycleBrand: brand,
-          motorcycleModel: "",
           status: "new",
           isSupermatch: false,
           pairType,
@@ -1332,7 +1322,6 @@ export async function runMatchingForUser(userId: string): Promise<{ bikerBiker: 
             biker1Id: idA,
             biker2Id: idB,
             motorcycleBrand: userMotoBrand.motorcycle.brand,
-            motorcycleModel: "",
             status: "new",
             isSupermatch,
           });

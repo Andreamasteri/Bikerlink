@@ -380,7 +380,6 @@ router.post("/request/:requestId/accept", requireAuth, async (req: Request, res:
           biker1Id: request[0].senderId,
           biker2Id: currentUserId,
           motorcycleBrand: "direct",
-          motorcycleModel: "direct",
           status: "accepted",
         });
       } catch (insertErr: any) {

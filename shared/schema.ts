@@ -787,7 +787,6 @@ export const bikerBikerMatches = pgTable("biker_biker_matches", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   motorcycleBrand: varchar("motorcycle_brand", { length: 100 }).notNull(),
-  motorcycleModel: varchar("motorcycle_model", { length: 100 }).notNull(),
   status: varchar("status", { length: 20 }).notNull().default("new"),
   isSupermatch: boolean("is_supermatch").notNull().default(false),
   pairType: varchar("pair_type", { length: 10 }).notNull().default("bb"),

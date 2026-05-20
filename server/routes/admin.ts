@@ -6596,7 +6596,7 @@ async function handleMatchInspectorUserDetail(req: Request, res: Response): Prom
     const gpsRouteCount = parseInt(String((gpsCountRow.rows[0] as { cnt: string })?.cnt ?? "0"), 10);
 
     const bbRows = await db.execute(sql`
-      SELECT bbm.id, bbm.motorcycle_brand, bbm.motorcycle_model, bbm.status, bbm.is_supermatch, bbm.created_at,
+      SELECT bbm.id, bbm.motorcycle_brand, bbm.status, bbm.is_supermatch, bbm.created_at,
         CASE WHEN bbm.biker1_id = ${userId} THEN bbm.biker2_id ELSE bbm.biker1_id END AS other_id,
         u.nickname AS other_nickname, u.avatar_url AS other_avatar,
         up.latitude AS other_lat, up.longitude AS other_lng
