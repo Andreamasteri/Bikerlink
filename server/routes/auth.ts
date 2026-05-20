@@ -10,6 +10,7 @@ import { createClubInvitesForMoto, createRegionalClubInvite } from "./motoclubs"
 import { onlineTracker } from "../online-tracker";
 import { revokeAllUserSessions, revokeSessionsByType } from "../session-utils";
 import { closeSseClient } from "../chat-sse";
+import { addSessionSseClient, removeSessionSseClient, notifySessionDisplaced } from "../session-sse";
 import { parseVisitorCookie, recordVisit } from "../lib/visitor-tracking";
 
 /**
@@ -388,6 +389,10 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     const sessionType: "mobile" | "web" =
       loginPlatform === "android" || loginPlatform === "ios" ? "mobile" : "web";
 
+    if (sessionType === "web") {
+      notifySessionDisplaced(user.id);
+    }
+
     await revokeSessionsByType(user.id, sessionType).catch((e) => {
       console.warn(`[login] revokeSessionsByType failed (non-blocking): ${e?.message}`);
     });
@@ -453,6 +458,32 @@ router.post("/logout", (req: Request, res: Response) => {
     }
     res.clearCookie("connect.sid");
     return res.json({ message: "Logout effettuato" });
+  });
+});
+
+router.get("/session-events", (req: Request, res: Response) => {
+  const userId = req.session?.userId;
+  if (!userId) {
+    return res.status(401).json({ message: "Non autenticato" });
+  }
+
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+
+  res.write("event: connected\ndata: {}\n\n");
+
+  const connId = addSessionSseClient(userId, res);
+
+  const heartbeat = setInterval(() => {
+    try { res.write(":heartbeat\n\n"); } catch { clearInterval(heartbeat); }
+  }, 15000);
+
+  req.on("close", () => {
+    clearInterval(heartbeat);
+    removeSessionSseClient(userId, connId);
   });
 });
 

@@ -601,6 +601,19 @@
   </div>
 </div>
 
+<!-- SESSION DISPLACED MODAL -->
+<div class="modal-overlay" id="session-displaced-modal" style="z-index:9999">
+  <div class="modal" style="max-width:400px;text-align:center">
+    <div style="font-size:40px;margin-bottom:16px">🔒</div>
+    <h2 class="modal-title" style="font-size:20px;margin-bottom:12px">Sessione terminata</h2>
+    <p style="color:var(--text2);font-size:14px;line-height:1.6;margin-bottom:20px">
+      Hai effettuato l'accesso da un'altra scheda o dispositivo.<br>
+      Verrai reindirizzato alla pagina di accesso.
+    </p>
+    <div id="session-displaced-countdown" style="font-family:var(--font-display);font-size:28px;color:var(--accent);letter-spacing:2px">3</div>
+  </div>
+</div>
+
 <!-- CONFIRM DELETE MODAL -->
 <div class="modal-overlay" id="confirm-modal">
   <div class="modal" style="max-width:380px">
@@ -781,6 +794,7 @@ let currentUser = null;
 let currentPath = '';
 let pendingDeleteId = null;
 let mediaItems = [];
+let sessionEventSource = null;
 
 function t(key) {
   return I18N[currentLang][key] || I18N['it'][key] || key;
@@ -841,13 +855,53 @@ async function checkAuth() {
     const res = await fetch('/api/auth/me', { credentials: 'include' });
     if (res.ok) {
       currentUser = await res.json();
+      connectSessionEvents();
     } else {
       currentUser = null;
+      disconnectSessionEvents();
     }
   } catch {
     currentUser = null;
+    disconnectSessionEvents();
   }
   renderNavAuth();
+}
+
+function connectSessionEvents() {
+  if (sessionEventSource) return;
+  try {
+    sessionEventSource = new EventSource('/api/auth/session-events', { withCredentials: true });
+    sessionEventSource.addEventListener('session_displaced', function() {
+      disconnectSessionEvents();
+      currentUser = null;
+      renderNavAuth();
+      const overlay = document.getElementById('session-displaced-modal');
+      if (overlay) overlay.classList.add('show');
+      let count = 3;
+      const countEl = document.getElementById('session-displaced-countdown');
+      const timer = setInterval(function() {
+        count--;
+        if (countEl) countEl.textContent = String(count);
+        if (count <= 0) {
+          clearInterval(timer);
+          window.location.href = '/accedi';
+        }
+      }, 1000);
+    });
+    sessionEventSource.onerror = function() {
+      if (sessionEventSource) {
+        sessionEventSource.close();
+        sessionEventSource = null;
+      }
+    };
+  } catch {}
+}
+
+function disconnectSessionEvents() {
+  if (sessionEventSource) {
+    try { sessionEventSource.close(); } catch {}
+    sessionEventSource = null;
+  }
 }
 
 function renderNavAuth() {
@@ -868,6 +922,7 @@ function renderNavAuth() {
 }
 
 async function logout() {
+  disconnectSessionEvents();
   await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
   currentUser = null;
   renderNavAuth();
@@ -1101,6 +1156,7 @@ async function submitLogin(e) {
     } else {
       currentUser = data;
       renderNavAuth();
+      connectSessionEvents();
       const nextParam = new URLSearchParams(window.location.search).get('next');
       const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null;
       if (safeNext && !ROUTES[safeNext]) {
