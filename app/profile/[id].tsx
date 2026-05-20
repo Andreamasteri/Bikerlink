@@ -505,7 +505,7 @@ export default function PublicProfileScreen() {
           return (
             <TouchableOpacity
               style={styles.geoButton}
-              onPress={() => router.push({
+              onPress={() => router.navigate({
                 pathname: "/(tabs)/index",
                 params: {
                   focusLat: String(profile.latitude),

@@ -862,9 +862,18 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       topArtistName: topTrack?.artistName ?? null,
       primaryClubName,
       primaryClubId,
-      latitude: (!profile?.hideFromMap && !targetUser.ghostMode) ? (profile?.latitude ?? null) : null,
-      longitude: (!profile?.hideFromMap && !targetUser.ghostMode) ? (profile?.longitude ?? null) : null,
-      coordinatesUpdatedAt: (!profile?.hideFromMap && !targetUser.ghostMode) ? (profile?.coordinatesUpdatedAt ?? null) : null,
+      ...(() => {
+        const visibleCoords = !profile?.hideFromMap && !targetUser.ghostMode;
+        if (!visibleCoords || profile?.latitude == null || profile?.longitude == null) {
+          return { latitude: null, longitude: null, coordinatesUpdatedAt: null };
+        }
+        const isOwner = requesterId === userId;
+        if (!isOwner && profile.positionFuzz && (profile.positionFuzzKm ?? 0) > 0) {
+          const fuzzed = applyPositionFuzz(profile.latitude, profile.longitude, profile.positionFuzzKm ?? 1);
+          return { latitude: fuzzed.lat, longitude: fuzzed.lng, coordinatesUpdatedAt: profile.coordinatesUpdatedAt ?? null };
+        }
+        return { latitude: profile.latitude, longitude: profile.longitude, coordinatesUpdatedAt: profile.coordinatesUpdatedAt ?? null };
+      })(),
     });
   } catch (error) {
     console.error("Get public user profile error:", error);
