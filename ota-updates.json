@@ -1118,7 +1118,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-20T22:00:10.911Z"
+  },
+  {
+    "updateNumber": 10,
+    "version": "47.10.9",
+    "cycle": "9.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-10 rv9.0.0: OTA-10: fix aggiornamento automatico — bundle gia scaricato ora applicato correttamente senza dover cancellare i dati dell app",
+    "note": "CURRENT_OTA_NUMBER=10. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "9.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "aa1ba7bb-88ae-40d0-91ff-c7106d8a9de7",
+    "bundleUrl": "private/ota/ota-47.10.9-1779316607898.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "2c75142298c8b08da0b9299abd9177ae25f72486",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-20T22:36:52.213Z"
   }
 ]
