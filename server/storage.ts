@@ -383,6 +383,7 @@ export interface IStorage {
   createCustomRouteWaypoint(data: InsertCustomRouteWaypoint): Promise<CustomRouteWaypoint>;
   updateCustomRouteWaypoint(id: string, data: Partial<InsertCustomRouteWaypoint>): Promise<CustomRouteWaypoint | undefined>;
   deleteCustomRouteWaypoint(id: string): Promise<void>;
+  deleteAllCustomRouteWaypoints(routeId: string): Promise<void>;
 
   createSosRequest(data: InsertSosRequest): Promise<SosRequest>;
   getSosRequest(id: string): Promise<SosRequest | undefined>;
@@ -2001,6 +2002,10 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCustomRouteWaypoint(id: string): Promise<void> {
     await db.delete(customRouteWaypoints).where(eq(customRouteWaypoints.id, id));
+  }
+
+  async deleteAllCustomRouteWaypoints(routeId: string): Promise<void> {
+    await db.delete(customRouteWaypoints).where(eq(customRouteWaypoints.routeId, routeId));
   }
 
   async createSosRequest(data: InsertSosRequest): Promise<SosRequest> {

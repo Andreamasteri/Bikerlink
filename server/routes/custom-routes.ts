@@ -197,6 +197,22 @@ router.delete("/api/custom-routes/:id", async (req, res) => {
   }
 });
 
+router.delete("/api/custom-routes/:id/waypoints", async (req, res) => {
+  try {
+    const userId = (req.session as any)?.userId;
+    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+
+    const route = await storage.getCustomRoute(req.params.id);
+    if (!route) return res.status(404).json({ error: "Percorso non trovato" });
+    if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
+
+    await storage.deleteAllCustomRouteWaypoints(route.id);
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.post("/api/custom-routes/:id/waypoints", async (req, res) => {
   try {
     const userId = (req.session as any)?.userId;
