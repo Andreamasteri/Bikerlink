@@ -120,6 +120,49 @@ do_export() {
     usage
   fi
 
+  # ─── Guard: messaggio identico all'ultima OTA pubblicata ─────
+  local DUP_CHECK
+  DUP_CHECK=$(RELEASE_MSG_V="$RELEASE_MESSAGE" OTA_UPDATES_FILE_PATH="$OTA_UPDATES_FILE" node -e "
+    const fs = require('fs');
+    try {
+      const appJson = JSON.parse(fs.readFileSync('app.json','utf8'));
+      const rv = appJson?.expo?.runtimeVersion ?? null;
+      const data = JSON.parse(fs.readFileSync(process.env.OTA_UPDATES_FILE_PATH,'utf8'));
+      const cycle = data.filter(e => typeof e.updateNumber === 'number' && e.runtimeVersion === rv);
+      if (cycle.length === 0) { console.log('OK'); process.exit(0); }
+      const lastEntry = cycle[cycle.length - 1];
+      const lastMsg = (lastEntry.message ?? '').trim().toLowerCase();
+      const newMsg  = (process.env.RELEASE_MSG_V ?? '').trim().toLowerCase();
+      if (lastMsg === newMsg) {
+        console.log('DUPLICATE:OTA-' + lastEntry.updateNumber);
+      } else {
+        console.log('OK');
+      }
+    } catch(e) {
+      console.log('READ_ERROR:' + e.message.replace(/\n/g,' '));
+    }
+  " 2>/dev/null || echo "READ_ERROR:node_failed")
+
+  if [[ "$DUP_CHECK" == DUPLICATE:* ]]; then
+    local DUP_OTA="${DUP_CHECK#DUPLICATE:}"
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║  ⛔ EXPORT BLOCCATO — Messaggio identico a $DUP_OTA      ║"
+    echo "╠══════════════════════════════════════════════════════════╣"
+    echo "║  Il messaggio fornito è uguale (case-insensitive) al    ║"
+    echo "║  messaggio dell'ultima OTA già pubblicata:              ║"
+    echo "║                                                          ║"
+    echo "║  \"$RELEASE_MESSAGE\""
+    echo "║                                                          ║"
+    echo "║  Fornire un messaggio distinto che descriva le          ║"
+    echo "║  modifiche reali incluse in questa OTA.                 ║"
+    echo "╚══════════════════════════════════════════════════════════╝"
+    exit 1
+  elif [[ "$DUP_CHECK" == READ_ERROR:* ]]; then
+    echo "   ⚠ Impossibile verificare il messaggio dell'ultima OTA: ${DUP_CHECK#READ_ERROR:}"
+    echo "   Procedendo con cautela..."
+  fi
+
   # ─── Guard: stage file esistente → Stage 2 ancora pendente ──
   # Non richiedere stdin: questo script può essere eseguito da workflow
   # non interattivi e una read() vuota causerebbe exit silenzioso.
