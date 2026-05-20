@@ -116,6 +116,8 @@ function formatDuration(mins: number): string {
 const TILE_CONFIG = getTileConfig("carto_dark");
 const ANNOUNCE_DISTANCE_FAR = 200;
 const ANNOUNCE_DISTANCE_NEAR = 50;
+const REROUTE_DISTANCE_M = 200;
+const REROUTE_DELAY_MS = 5000;
 
 export default function NavigateScreen() {
   const colors = useColors();
@@ -131,6 +133,13 @@ export default function NavigateScreen() {
   const announcedFarRef = useRef<Set<number>>(new Set());
   const announcedNearRef = useRef<Set<number>>(new Set());
 
+  // Rerouting refs
+  const offRouteStartRef = useRef<number | null>(null);
+  const isReroutingRef = useRef(false);
+  const activeStepsRef = useRef<NavigationStep[] | null>(null);
+  const activeTotalKmRef = useRef<number | null>(null);
+  const activeTotalMinRef = useRef<number | null>(null);
+
   const [mapReady, setMapReady] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [distanceToNext, setDistanceToNext] = useState<number | null>(null);
@@ -140,6 +149,7 @@ export default function NavigateScreen() {
   const [isFinished, setIsFinished] = useState(false);
   const [polylinePoints, setPolylinePoints] = useState<Array<[number, number]>>([]);
   const [hasPermission, setHasPermission] = useState(false);
+  const [isRerouting, setIsRerouting] = useState(false);
 
   const { data: route, isLoading } = useQuery<PlannedRoute>({
     queryKey: ["/api/planned-routes", id],
@@ -150,7 +160,7 @@ export default function NavigateScreen() {
     enabled: !!id,
   });
 
-  // Decode polyline once route loads
+  // Decode polyline once route loads; also seed active refs
   useEffect(() => {
     if (!route) return;
     let pts: Array<[number, number]> = [];
@@ -162,8 +172,15 @@ export default function NavigateScreen() {
         .map((wp) => [wp.lat, wp.lng]);
     }
     setPolylinePoints(pts);
-    if (route.distanceKm) setRemainingKm(route.distanceKm);
-    if (route.durationMinutes) setRemainingMin(route.durationMinutes);
+    if (route.distanceKm) {
+      setRemainingKm(route.distanceKm);
+      activeTotalKmRef.current = route.distanceKm;
+    }
+    if (route.durationMinutes) {
+      setRemainingMin(route.durationMinutes);
+      activeTotalMinRef.current = route.durationMinutes;
+    }
+    activeStepsRef.current = route.navigationSteps ?? null;
   }, [route]);
 
   // Request location permission and start watching
@@ -205,10 +222,79 @@ export default function NavigateScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasPermission, route?.id, polylinePoints.length]);
 
+  const triggerReroute = useCallback(async (lat: number, lng: number) => {
+    if (isReroutingRef.current || !route) return;
+    isReroutingRef.current = true;
+    offRouteStartRef.current = null;
+    setIsRerouting(true);
+
+    try {
+      const wps = (route.waypoints ?? []).filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+      const destination = wps.length > 0 ? wps[wps.length - 1] : null;
+      if (!destination) return;
+
+      const resp = await apiRequest("POST", "/api/planned-routes/calculate", {
+        waypoints: [{ lat, lng }, { lat: destination.lat, lng: destination.lng }],
+        style: "curvy",
+      });
+      const newRoute = await resp.json();
+
+      let newPts: Array<[number, number]> = [];
+      if (newRoute.polyline) {
+        newPts = decodePolyline(newRoute.polyline);
+      } else if (newRoute.waypoints?.length) {
+        newPts = (newRoute.waypoints as Array<{ lat: number; lng: number }>)
+          .filter((wp) => wp.lat !== 0 || wp.lng !== 0)
+          .map((wp) => [wp.lat, wp.lng]);
+      }
+
+      if (newPts.length > 1) {
+        // Update active route refs before re-render
+        activeStepsRef.current = newRoute.navigationSteps ?? null;
+        if (newRoute.distanceKm) activeTotalKmRef.current = newRoute.distanceKm;
+        if (newRoute.durationMinutes) activeTotalMinRef.current = newRoute.durationMinutes;
+
+        // Reset step tracking
+        announcedFarRef.current.clear();
+        announcedNearRef.current.clear();
+        setCurrentStep(0);
+        setMapReady(false); // WebView will reload; block JS injection until new bridge is ready
+
+        // Update polyline — triggers mapHtml recompute → WebView reloads with new route
+        setPolylinePoints(newPts);
+
+        Speech.speak("Percorso ricalcolato. Prosegui sul nuovo percorso.", { language: "it-IT" });
+      }
+    } catch (e) {
+      console.warn("[Rerouting] failed:", e);
+    } finally {
+      isReroutingRef.current = false;
+      setIsRerouting(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route]);
+
+  const triggerRerouteRef = useRef(triggerReroute);
+  useEffect(() => { triggerRerouteRef.current = triggerReroute; }, [triggerReroute]);
+
   const handlePositionUpdate = useCallback((lat: number, lng: number, heading: number) => {
     if (polylinePoints.length === 0) return;
 
     const closestIdx = closestPointIndexOnPolyline(lat, lng, polylinePoints);
+    const closestDist = haversineM(lat, lng, polylinePoints[closestIdx][0], polylinePoints[closestIdx][1]);
+
+    // ── Off-route detection ──────────────────────────────────────────────────
+    if (!isReroutingRef.current) {
+      if (closestDist > REROUTE_DISTANCE_M) {
+        if (offRouteStartRef.current === null) {
+          offRouteStartRef.current = Date.now();
+        } else if (Date.now() - offRouteStartRef.current >= REROUTE_DELAY_MS) {
+          triggerRerouteRef.current(lat, lng);
+        }
+      } else {
+        offRouteStartRef.current = null;
+      }
+    }
 
     // Progress
     const pct = Math.min(100, Math.round((closestIdx / Math.max(1, polylinePoints.length - 1)) * 100));
@@ -221,8 +307,8 @@ export default function NavigateScreen() {
       );
     }
 
-    // Steps
-    const steps = route?.navigationSteps;
+    // Steps — use active (possibly rerouted) steps
+    const steps = activeStepsRef.current ?? route?.navigationSteps;
     if (!steps || steps.length === 0) return;
 
     const stepIdx = activeStepIndex(closestIdx, steps);
@@ -245,14 +331,13 @@ export default function NavigateScreen() {
         const remKm = Math.round(remDist / 100) / 10;
         setRemainingKm(remKm);
 
-        const totalKm = route?.distanceKm ?? remKm;
-        const totalMin = route?.durationMinutes ?? 0;
+        const totalKm = activeTotalKmRef.current ?? route?.distanceKm ?? remKm;
+        const totalMin = activeTotalMinRef.current ?? route?.durationMinutes ?? 0;
         if (totalKm > 0 && totalMin > 0) {
           setRemainingMin(Math.round((remKm / totalKm) * totalMin));
         }
 
         // Voice announcements
-        const currentStepObj = steps[stepIdx];
         if (distM <= ANNOUNCE_DISTANCE_FAR && !announcedFarRef.current.has(stepIdx)) {
           announcedFarRef.current.add(stepIdx);
           const streetPart = nextStep.streetName ? ` su ${nextStep.streetName}` : "";
@@ -318,14 +403,16 @@ export default function NavigateScreen() {
 
   const s = styles(colors);
 
-  // Build map HTML
+  // Build map HTML — rebuilt whenever polylinePoints change (including after reroute)
   const mapHtml = React.useMemo(() => {
     if (polylinePoints.length < 2) return null;
-    const stepPoints = (route?.navigationSteps ?? []).map((step) => {
+    const stepsForMap = activeStepsRef.current ?? route?.navigationSteps ?? [];
+    const stepPoints = stepsForMap.map((step) => {
       const idx = step.interval[0];
       return idx < polylinePoints.length ? polylinePoints[idx] : polylinePoints[0];
     });
     return buildNavigationMapHtml(TILE_CONFIG.urlTemplate, polylinePoints, stepPoints);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [polylinePoints, route?.navigationSteps]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -366,7 +453,7 @@ export default function NavigateScreen() {
     );
   }
 
-  const steps = route.navigationSteps ?? [];
+  const steps = activeStepsRef.current ?? route.navigationSteps ?? [];
   const step = steps[currentStep];
 
   return (
@@ -394,6 +481,14 @@ export default function NavigateScreen() {
         <Pressable style={[s.closeBtn, { top: topPad + 8 }]} onPress={handleClose} hitSlop={12}>
           <Ionicons name="close" size={20} color="#fff" />
         </Pressable>
+
+        {/* Rerouting banner */}
+        {isRerouting && (
+          <View style={s.reroutingBanner}>
+            <ActivityIndicator size="small" color="#fff" />
+            <Text style={s.reroutingText}>Ricalcolo percorso...</Text>
+          </View>
+        )}
 
         {/* Remaining info badge */}
         {remainingKm !== null && (
@@ -497,6 +592,19 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   },
   remainingKm: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
   remainingMin: { fontFamily: "Inter_400Regular", fontSize: 12, color: "rgba(255,255,255,0.7)", marginTop: 2 },
+  reroutingBanner: {
+    position: "absolute",
+    bottom: 12,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(0,0,0,0.82)",
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+  },
+  reroutingText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
   progressBg: { height: 4, backgroundColor: colors.border },
   progressFill: { height: 4, backgroundColor: colors.accent, borderRadius: 2 },
   panel: {

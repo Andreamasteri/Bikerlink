@@ -119,9 +119,20 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     }
   }
 
+  function updateRoute(newCoords) {
+    routeCoords = newCoords;
+    totalSegments = Math.max(1, routeCoords.length - 1);
+    buildRoute(0);
+    try {
+      var bounds = L.latLngBounds(routeCoords.map(function(c) { return [c[0], c[1]]; }));
+      map.fitBounds(bounds, { padding: [30, 30] });
+    } catch(e) {}
+  }
+
   window.navBridge = {
     updatePosition: updatePosition,
     fitRoute: fitRoute,
+    updateRoute: updateRoute,
     init: function() {
       buildRoute(0);
       isInitialized = true;
