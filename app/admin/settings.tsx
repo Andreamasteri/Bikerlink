@@ -1488,7 +1488,9 @@ export default function AdminSettings() {
 
   const matchGateMutation = useMutation({
     mutationFn: async (val: boolean) => {
-      await apiRequest("PUT", "/api/admin/match-settings", { visible: val });
+      await apiRequest("PUT", "/api/admin/settings/match_preferences_visible", {
+        value: val ? "true" : "false",
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/match-settings"] });

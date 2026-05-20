@@ -6567,23 +6567,13 @@ router.get("/match-health", requireAdmin, async (req: Request, res: Response) =>
   }
 });
 
-// PUT /api/admin/match-settings
-// Attiva/disattiva la sezione preferenze matching per tutti gli utenti
-router.put("/match-settings", async (req: Request, res: Response) => {
-  try {
-    const { visible } = req.body as { visible: boolean };
-    if (typeof visible !== "boolean") {
-      return res.status(400).json({ message: "visible deve essere boolean" });
-    }
-    await storage.upsertAppSetting(
-      "match_preferences_visible",
-      visible ? "true" : "false"
-    );
-    return res.json({ ok: true, visible });
-  } catch (err) {
-    console.error("[ADMIN match-settings] PUT error:", err);
-    return res.status(500).json({ message: "Errore interno" });
-  }
+// PUT /api/admin/match-settings — DEPRECATO
+// Usare PUT /api/admin/settings/match_preferences_visible (con log moderatore)
+router.put("/match-settings", (_req: Request, res: Response) => {
+  return res.status(410).json({
+    message:
+      "Endpoint deprecato. Usare PUT /api/admin/settings/match_preferences_visible",
+  });
 });
 
 // ── MATCH INSPECTOR ───────────────────────────────────────────────────────────
