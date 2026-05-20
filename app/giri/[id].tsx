@@ -25,6 +25,7 @@ import { buildLeafletCurvatureGradientHtml } from "@/lib/leaflet-route-map-html"
 import { getTileConfig } from "@/lib/map-tiles";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
 import ElevationProfile from "@/components/ElevationProfile";
+import { decodePolyline } from "@/lib/polyline";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,20 +127,6 @@ function styleLabel(style: string): string {
   return map[style] ?? style;
 }
 
-function decodePolyline(encoded: string): Array<{ lat: number; lng: number }> {
-  const points: Array<{ lat: number; lng: number }> = [];
-  let index = 0, lat = 0, lng = 0;
-  while (index < encoded.length) {
-    let shift = 0, result = 0, b: number;
-    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lat += result & 1 ? ~(result >> 1) : result >> 1;
-    shift = 0; result = 0;
-    do { b = encoded.charCodeAt(index++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
-    lng += result & 1 ? ~(result >> 1) : result >> 1;
-    points.push({ lat: lat / 1e5, lng: lng / 1e5 });
-  }
-  return points;
-}
 
 const TILE_CONFIG = getTileConfig("carto_dark");
 
