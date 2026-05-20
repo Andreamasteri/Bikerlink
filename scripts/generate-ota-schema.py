@@ -12,6 +12,37 @@ from reportlab.platypus import (
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from datetime import date
 import os
+import re
+import json
+
+# ── Lettura dinamica dei valori di release ─────────────────────────────────────
+def _read_current_ota_number():
+    """Legge CURRENT_OTA_NUMBER da lib/ota.ts."""
+    try:
+        with open("lib/ota.ts", encoding="utf-8") as f:
+            content = f.read()
+        m = re.search(r"CURRENT_OTA_NUMBER\s*=\s*(\d+)", content)
+        if m:
+            return int(m.group(1))
+    except Exception:
+        pass
+    return None
+
+def _read_runtime_version():
+    """Legge expo.runtimeVersion da app.json."""
+    try:
+        with open("app.json", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("expo", {}).get("runtimeVersion") or None
+    except Exception:
+        pass
+    return None
+
+CURRENT_OTA_NUMBER = _read_current_ota_number()
+RUNTIME_VERSION    = _read_runtime_version()
+
+OTA_LABEL = f"#{CURRENT_OTA_NUMBER}" if CURRENT_OTA_NUMBER is not None else "N/A"
+RV_LABEL  = RUNTIME_VERSION if RUNTIME_VERSION else "N/A"
 
 # ── Colori BikerLink ──────────────────────────────────────────────────────────
 BL_ORANGE   = colors.HexColor("#E8541A")
@@ -309,7 +340,7 @@ story.append(Spacer(1, 8))
 # ── Footer ────────────────────────────────────────────────────────────────────
 story.append(HRFlowable(width=W, thickness=0.5, color=BL_BORDER, spaceBefore=4, spaceAfter=4))
 story.append(p(
-    f"BikerLink OTA System  ·  Ciclo runtimeVersion 9.0.0  ·  OTA corrente: #7  ·  "
+    f"BikerLink OTA System  ·  Ciclo runtimeVersion {RV_LABEL}  ·  OTA corrente: {OTA_LABEL}  ·  "
     f"biker-link.replit.app  ·  {date.today().strftime('%d/%m/%Y')}",
     "footer"
 ))

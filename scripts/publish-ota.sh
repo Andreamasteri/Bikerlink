@@ -739,6 +739,14 @@ do_publish() {
   KEEP_DIST=0
   rm -f "$STATE_FILE" "$STATE_OTA_TS_BAK" "$STATE_OTA_UPDATES_BAK"
 
+  # ─── Step L: Generazione PDF schema OTA ───────────────────
+  echo "[L] Generazione PDF schema OTA (docs/ota-schema-a4.pdf)..."
+  if python3 scripts/generate-ota-schema.py; then
+    echo "   ✔ PDF aggiornato: docs/ota-schema-a4.pdf"
+  else
+    echo "   ⚠ Generazione PDF fallita (non bloccante — OTA già attiva)"
+  fi
+
   echo ""
   echo "╔══════════════════════════════════════════════════════════════════╗"
   echo "║  ✅ OTA-$NEXT_OTA pubblicata con successo!"
