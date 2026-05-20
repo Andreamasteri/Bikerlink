@@ -1062,7 +1062,8 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "superseded"
+    "status": "superseded",
+    "publishedAt": "2026-05-20T04:03:46.220Z"
   },
   {
     "updateNumber": 8,
