@@ -1034,7 +1034,62 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-20T03:48:17.497Z"
+  },
+  {
+    "updateNumber": 7,
+    "version": "47.7.9",
+    "cycle": "9.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-7 rv9.0.0: (distribuita — stato locale revertito da commit 25360696, entry ripristinata manualmente prima di OTA-8)",
+    "note": "CURRENT_OTA_NUMBER=7. OTA-7 era già stata pubblicata e distribuita ai dispositivi, ma il commit 25360696 ha revertito lo stato locale. Questa entry è stata ripristinata manualmente (Task #1755) per permettere allo script di calcolare correttamente OTA-8 come prossimo numero.",
+    "runtimeVersion": "9.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "superseded"
+  },
+  {
+    "updateNumber": 8,
+    "version": "46.8.9",
+    "cycle": "9.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-8 rv9.0.0: percorsi curvy GraphHopper + navigazione offline + telemetria sensori + rerouting automatico + voce multilingua + mappe offline + profilo aggiustamenti + status screen + match-settings fix (#1625-#1752)",
+    "note": "CURRENT_OTA_NUMBER=8. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "9.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "2a0fc390-878a-4922-aec9-96524f9c1c49",
+    "bundleUrl": "private/ota/ota-47.8.9-1779301879362.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "25360696e5db4f6febbe6521a54b6c95991d7f2f",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-20T18:31:24.407Z"
   }
 ]
