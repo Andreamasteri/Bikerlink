@@ -549,6 +549,7 @@ router.get("/ota-events", async (req: Request, res: Response) => {
     const sourceFilter = req.query.source ? String(req.query.source).substring(0, 32) : null;
     const platformFilter = req.query.platform ? String(req.query.platform).substring(0, 16) : null;
     const updateIdFilter = req.query.updateId ? String(req.query.updateId).substring(0, 64) : null;
+    const deviceIdFilter = req.query.deviceId ? String(req.query.deviceId).substring(0, 64) : null;
 
     // Build WHERE clause fragments using sql template for type safety.
     const whereFragments = [
@@ -556,6 +557,7 @@ router.get("/ota-events", async (req: Request, res: Response) => {
       sourceFilter ? sql`source = ${sourceFilter}` : undefined,
       platformFilter ? sql`platform = ${platformFilter}` : undefined,
       updateIdFilter ? sql`current_update_id ILIKE ${"%" + updateIdFilter + "%"}` : undefined,
+      deviceIdFilter ? sql`ip ILIKE ${"%" + deviceIdFilter + "%"}` : undefined,
     ].filter((f): f is NonNullable<typeof f> => f !== undefined);
 
     const whereSql = whereFragments.length > 0
@@ -570,10 +572,121 @@ router.get("/ota-events", async (req: Request, res: Response) => {
       LIMIT ${limit}
     `);
 
-    return res.json({ events: result.rows, limit, filters: { phase: phaseFilter, source: sourceFilter, platform: platformFilter, updateId: updateIdFilter } });
+    return res.json({ events: result.rows, limit, filters: { phase: phaseFilter, source: sourceFilter, platform: platformFilter, updateId: updateIdFilter, deviceId: deviceIdFilter } });
   } catch (err) {
     console.error("[OTA-EVENTS] read error:", err);
     return res.status(500).json({ message: "Errore lettura eventi OTA" });
+  }
+});
+
+// GET /api/admin/ota-device-history?deviceId=X&limit=50
+// Returns the full OTA timeline for a specific device (identified by ip/token).
+// The most-recent event is used to derive the device's current update state.
+router.get("/ota-device-history", async (req: Request, res: Response) => {
+  try {
+    const rawDeviceId = req.query.deviceId ? String(req.query.deviceId).trim().substring(0, 64) : null;
+    if (!rawDeviceId) {
+      return res.status(400).json({ message: "deviceId è obbligatorio" });
+    }
+    // Default: exact match. Pass fuzzy=true for contains-search (useful when
+    // admins only have a partial IP or token fragment).
+    const fuzzy = req.query.fuzzy === "true";
+    const pageRaw = parseInt(String(req.query.page ?? "1"), 10);
+    const page = Math.max(isNaN(pageRaw) ? 1 : pageRaw, 1);
+    const pageSizeRaw = parseInt(String(req.query.pageSize ?? "100"), 10);
+    const pageSize = Math.min(Math.max(isNaN(pageSizeRaw) ? 100 : pageSizeRaw, 1), 500);
+    const offset = (page - 1) * pageSize;
+
+    const matchSql = fuzzy
+      ? sql`ip ILIKE ${"%" + rawDeviceId + "%"}`
+      : sql`ip = ${rawDeviceId}`;
+
+    // Total count for pagination
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*)::int AS total FROM ota_events WHERE ${matchSql}
+    `);
+    const totalCount = (countResult.rows[0] as { total: number }).total ?? 0;
+
+    const result = await db.execute(sql`
+      SELECT id, created_at, phase, source, platform, runtime_version, current_update_id, release_id, error, fail_count, ip, diagnostics
+      FROM ota_events
+      WHERE ${matchSql}
+      ORDER BY created_at DESC
+      LIMIT ${pageSize} OFFSET ${offset}
+    `);
+
+    const events = result.rows as Array<{
+      id: string;
+      created_at: string;
+      phase: string;
+      source: string | null;
+      platform: string | null;
+      runtime_version: string | null;
+      current_update_id: string | null;
+      release_id: string | null;
+      error: string | null;
+      fail_count: number;
+      ip: string | null;
+    }>;
+
+    // currentState is always derived from the very first event (most recent)
+    // regardless of pagination page so it stays stable as the user pages.
+    let currentState = null;
+    if (page === 1 && events.length > 0) {
+      const first = events[0];
+      currentState = {
+        updateId: first.current_update_id,
+        runtimeVersion: first.runtime_version,
+        platform: first.platform,
+        lastSeen: first.created_at,
+        lastPhase: first.phase,
+        lastError: first.error,
+      };
+    } else if (page > 1 && totalCount > 0) {
+      // Fetch just the most-recent event for the current-state summary
+      const latestResult = await db.execute(sql`
+        SELECT phase, platform, runtime_version, current_update_id, error, created_at
+        FROM ota_events
+        WHERE ${matchSql}
+        ORDER BY created_at DESC
+        LIMIT 1
+      `);
+      if (latestResult.rows.length > 0) {
+        const r = latestResult.rows[0] as {
+          phase: string;
+          platform: string | null;
+          runtime_version: string | null;
+          current_update_id: string | null;
+          error: string | null;
+          created_at: string;
+        };
+        currentState = {
+          updateId: r.current_update_id,
+          runtimeVersion: r.runtime_version,
+          platform: r.platform,
+          lastSeen: r.created_at,
+          lastPhase: r.phase,
+          lastError: r.error,
+        };
+      }
+    }
+
+    const totalPages = Math.ceil(totalCount / pageSize);
+
+    return res.json({
+      events,
+      currentState,
+      total: totalCount,
+      page,
+      pageSize,
+      totalPages,
+      hasMore: page < totalPages,
+      deviceId: rawDeviceId,
+      fuzzy,
+    });
+  } catch (err) {
+    console.error("[OTA-DEVICE-HISTORY] read error:", err);
+    return res.status(500).json({ message: "Errore lettura storico dispositivo" });
   }
 });
 

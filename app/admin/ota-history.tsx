@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import * as Clipboard from "expo-clipboard";
 import Colors from "@/constants/colors";
 import otaUpdates from "@/ota-updates.json";
 import { runManualOtaCheck } from "@/lib/ota-check";
+import { getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
 
 interface OtaUpdate {
@@ -106,6 +107,27 @@ interface OtaStatRow {
 
 interface OtaStatsResponse {
   stats: OtaStatRow[];
+}
+
+interface OtaDeviceCurrentState {
+  updateId: string | null;
+  runtimeVersion: string | null;
+  platform: string | null;
+  lastSeen: string;
+  lastPhase: string;
+  lastError: string | null;
+}
+
+interface OtaDeviceHistoryResponse {
+  events: OtaEventRow[];
+  currentState: OtaDeviceCurrentState | null;
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasMore: boolean;
+  deviceId: string;
+  fuzzy: boolean;
 }
 
 interface OtaErrorEntry {
@@ -227,6 +249,82 @@ export default function OtaHistoryScreen() {
     queryKey: stuckEventsQueryKey,
     refetchInterval: 30000,
   });
+
+  const [deviceSearchInput, setDeviceSearchInput] = useState("");
+  const [deviceFuzzy, setDeviceFuzzy] = useState(false);
+
+  const [deviceHistoryState, setDeviceHistoryState] = useState<{
+    events: OtaEventRow[];
+    currentState: OtaDeviceCurrentState | null;
+    total: number;
+    page: number;
+    totalPages: number;
+    hasMore: boolean;
+    deviceId: string;
+  } | null>(null);
+  const [isFetchingDeviceHistory, setIsFetchingDeviceHistory] = useState(false);
+  const [deviceHistoryError, setDeviceHistoryError] = useState<string | null>(null);
+  const deviceSearchRef = useRef<string>("");
+
+  const fetchDeviceHistory = useCallback(async (deviceId: string, page: number, fuzzy: boolean, append: boolean) => {
+    const trimmed = deviceId.trim();
+    if (!trimmed) return;
+    setIsFetchingDeviceHistory(true);
+    setDeviceHistoryError(null);
+    try {
+      const params = new URLSearchParams({
+        deviceId: trimmed,
+        page: String(page),
+        pageSize: "100",
+      });
+      if (fuzzy) params.set("fuzzy", "true");
+      const baseUrl = getApiUrl();
+      const url = new URL(`/api/admin/ota-device-history?${params.toString()}`, baseUrl);
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: OtaDeviceHistoryResponse = await res.json();
+      setDeviceHistoryState(prev => ({
+        events: append && prev ? [...prev.events, ...data.events] : data.events,
+        currentState: page === 1 ? data.currentState : (prev?.currentState ?? data.currentState),
+        total: data.total,
+        page: data.page,
+        totalPages: data.totalPages,
+        hasMore: data.hasMore,
+        deviceId: data.deviceId,
+      }));
+    } catch {
+      setDeviceHistoryError("Errore nel caricamento dello storico dispositivo");
+    } finally {
+      setIsFetchingDeviceHistory(false);
+    }
+  }, []);
+
+  const handleDeviceSearch = useCallback(() => {
+    const trimmed = deviceSearchInput.trim();
+    if (!trimmed) return;
+    deviceSearchRef.current = trimmed;
+    setDeviceHistoryState(null);
+    fetchDeviceHistory(trimmed, 1, deviceFuzzy, false);
+  }, [deviceSearchInput, deviceFuzzy, fetchDeviceHistory]);
+
+  const handleDeviceLoadMore = useCallback(() => {
+    if (!deviceHistoryState?.hasMore || isFetchingDeviceHistory) return;
+    fetchDeviceHistory(deviceHistoryState.deviceId, deviceHistoryState.page + 1, deviceFuzzy, true);
+  }, [deviceHistoryState, deviceFuzzy, isFetchingDeviceHistory, fetchDeviceHistory]);
+
+  const handleDeviceClear = useCallback(() => {
+    setDeviceSearchInput("");
+    setDeviceHistoryState(null);
+    setDeviceHistoryError(null);
+    deviceSearchRef.current = "";
+  }, []);
+
+  const handleDeviceRefresh = useCallback(() => {
+    const id = deviceSearchRef.current;
+    if (!id) return;
+    setDeviceHistoryState(null);
+    fetchDeviceHistory(id, 1, deviceFuzzy, false);
+  }, [deviceFuzzy, fetchDeviceHistory]);
 
   const [otaFilterPhase, setOtaFilterPhase] = useState("");
   const [otaFilterSource, setOtaFilterSource] = useState("");
@@ -366,6 +464,21 @@ export default function OtaHistoryScreen() {
 
       {/* ── 2. OTA Adoption Card ── */}
       <OtaAdoptionCard stats={otaStats?.stats ?? []} />
+
+      {/* ── 2a. Per-device OTA history ── */}
+      <OtaDeviceHistoryCard
+        searchInput={deviceSearchInput}
+        onSearchInputChange={setDeviceSearchInput}
+        onSearch={handleDeviceSearch}
+        onClear={handleDeviceClear}
+        onRefresh={handleDeviceRefresh}
+        onLoadMore={handleDeviceLoadMore}
+        historyState={deviceHistoryState}
+        isFetching={isFetchingDeviceHistory}
+        error={deviceHistoryError}
+        fuzzy={deviceFuzzy}
+        onFuzzyToggle={setDeviceFuzzy}
+      />
 
       {/* ── 2b. Stuck-state events card ── */}
       <OtaStuckEventsCard
@@ -681,6 +794,251 @@ function OtaAdoptionCard({ stats }: { stats: OtaStatRow[] }) {
           </View>
         );
       })}
+    </View>
+  );
+}
+
+interface DeviceHistoryState {
+  events: OtaEventRow[];
+  currentState: OtaDeviceCurrentState | null;
+  total: number;
+  page: number;
+  totalPages: number;
+  hasMore: boolean;
+  deviceId: string;
+}
+
+interface OtaDeviceHistoryCardProps {
+  searchInput: string;
+  onSearchInputChange: (v: string) => void;
+  onSearch: () => void;
+  onClear: () => void;
+  onRefresh: () => void;
+  onLoadMore: () => void;
+  historyState: DeviceHistoryState | null;
+  isFetching: boolean;
+  error: string | null;
+  fuzzy: boolean;
+  onFuzzyToggle: (v: boolean) => void;
+}
+
+function OtaDeviceHistoryCard({
+  searchInput,
+  onSearchInputChange,
+  onSearch,
+  onClear,
+  onRefresh,
+  onLoadMore,
+  historyState,
+  isFetching,
+  error,
+  fuzzy,
+  onFuzzyToggle,
+}: OtaDeviceHistoryCardProps) {
+  const hasResult = !!historyState;
+  const current = historyState?.currentState ?? null;
+  const events = historyState?.events ?? [];
+
+  const updateIdToOtaNum = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const entry of otaUpdates as OtaUpdate[]) {
+      if (entry.androidUpdateId) m.set(entry.androidUpdateId, entry.updateNumber);
+      if (entry.iosUpdateId) m.set(entry.iosUpdateId, entry.updateNumber);
+    }
+    return m;
+  }, []);
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <Ionicons name="phone-portrait-outline" size={18} color={Colors.accent} />
+        <Text style={styles.cardTitle}>Storico per Dispositivo</Text>
+        {isFetching && <ActivityIndicator size="small" color={Colors.accent} />}
+        {hasResult && !isFetching && (
+          <TouchableOpacity onPress={onRefresh} style={{ marginLeft: 4 }}>
+            <Ionicons name="refresh" size={16} color={Colors.accent} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <Text style={styles.hintText}>
+        Cerca per Device ID (indirizzo IP) per vedere la timeline OTA completa del dispositivo.
+      </Text>
+
+      <View style={[styles.filterRow, { marginTop: 10 }]}>
+        <TextInput
+          style={[styles.filterInput, { flex: 1 }]}
+          placeholder="Device ID / IP…"
+          placeholderTextColor={Colors.textMuted ?? "#888"}
+          value={searchInput}
+          onChangeText={onSearchInputChange}
+          onSubmitEditing={onSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+          returnKeyType="search"
+          testID="device-id-search-input"
+        />
+        <TouchableOpacity
+          onPress={onSearch}
+          style={[styles.actionBtnWide, { marginTop: 0, paddingHorizontal: 14 }]}
+          disabled={!searchInput.trim() || isFetching}
+          testID="device-id-search-btn"
+        >
+          <Ionicons name="search" size={14} color="#fff" />
+        </TouchableOpacity>
+        {hasResult && (
+          <TouchableOpacity
+            onPress={onClear}
+            style={[styles.actionBtnWide, { marginTop: 0, paddingHorizontal: 10, backgroundColor: "#555" }]}
+          >
+            <Ionicons name="close-circle-outline" size={14} color="#fff" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Fuzzy / exact toggle */}
+      <TouchableOpacity
+        onPress={() => onFuzzyToggle(!fuzzy)}
+        style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 }}
+      >
+        <View
+          style={{
+            width: 14,
+            height: 14,
+            borderRadius: 3,
+            borderWidth: 1,
+            borderColor: Colors.accent,
+            backgroundColor: fuzzy ? Colors.accent : "transparent",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {fuzzy && <Ionicons name="checkmark" size={10} color="#fff" />}
+        </View>
+        <Text style={[styles.hintText, { marginTop: 0, fontStyle: "normal" }]}>
+          Ricerca parziale (contiene)
+        </Text>
+      </TouchableOpacity>
+
+      {error && (
+        <Text style={[styles.hintText, { marginTop: 10, color: "#FF8888" }]}>{error}</Text>
+      )}
+
+      {hasResult && current && (
+        <View
+          style={{
+            marginTop: 12,
+            padding: 10,
+            backgroundColor: "rgba(0,0,0,0.25)",
+            borderRadius: 8,
+            borderWidth: 1,
+            borderColor: Colors.border ?? "#333",
+          }}
+        >
+          <Text
+            style={{
+              color: Colors.text,
+              fontFamily: "Inter_600SemiBold",
+              fontSize: 12,
+              marginBottom: 6,
+            }}
+          >
+            Stato attuale · {historyState!.total} eventi totali
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+            {current.updateId && (
+              <View style={[styles.badge, { backgroundColor: "#1a4a2e" }]}>
+                <Text style={styles.badgeText}>
+                  {updateIdToOtaNum.has(current.updateId)
+                    ? `OTA-${updateIdToOtaNum.get(current.updateId)}`
+                    : current.updateId.substring(0, 12) + "…"}
+                </Text>
+              </View>
+            )}
+            {current.runtimeVersion && (
+              <View style={styles.rvBadge}>
+                <Text style={styles.rvText}>rv {current.runtimeVersion}</Text>
+              </View>
+            )}
+            {current.platform && (
+              <View style={[styles.rvBadge, { backgroundColor: "rgba(255,255,255,0.07)" }]}>
+                <Text style={styles.rvText}>{current.platform}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={[styles.hintText, { marginTop: 6, textAlign: "left", fontStyle: "normal" }]}>
+            Ultimo: {current.lastPhase}
+            {current.lastError ? ` — ${current.lastError}` : ""} · {formatTimestamp(current.lastSeen)}
+          </Text>
+        </View>
+      )}
+
+      {hasResult && current === null && !isFetching && (
+        <Text style={[styles.hintText, { marginTop: 12, color: "#FF8888" }]}>
+          Nessun evento trovato per questo dispositivo.{fuzzy ? "" : " Prova con la ricerca parziale."}
+        </Text>
+      )}
+
+      {hasResult && events.length > 0 && (
+        <View style={{ marginTop: 10 }}>
+          <Text
+            style={{
+              color: Colors.textSecondary,
+              fontFamily: "Inter_500Medium",
+              fontSize: 11,
+              marginBottom: 4,
+            }}
+          >
+            Timeline — {events.length} / {historyState!.total} eventi (pag. {historyState!.page}/{historyState!.totalPages})
+          </Text>
+          {events.map((e) => {
+            const isErr = !!e.error && !e.error.startsWith("ok:");
+            const color = isErr ? "#FF4444" : "#44AA44";
+            const icon: keyof typeof Ionicons.glyphMap = isErr
+              ? "alert-circle-outline"
+              : "checkmark-circle-outline";
+            return (
+              <View key={e.id} style={styles.row}>
+                <Ionicons name={icon} size={14} color={color} />
+                <View style={{ flex: 1, marginLeft: 6 }}>
+                  <Text style={[styles.rowReason, { fontSize: 11 }]} numberOfLines={2}>
+                    {e.phase}
+                    {e.source ? ` · ${e.source}` : ""}
+                    {e.platform ? ` · ${e.platform}` : ""}
+                    {e.error ? ` — ${e.error}` : ""}
+                  </Text>
+                  <Text style={styles.rowTime}>
+                    rv={e.runtime_version ?? "?"} · uid=
+                    {(e.current_update_id ?? "?").substring(0, 12)}
+                    {e.release_id ? ` · rel=${e.release_id.substring(0, 8)}` : ""}
+                    {e.fail_count > 0 ? ` · fail#${e.fail_count}` : ""} ·{" "}
+                    {formatTimestamp(e.created_at)}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+
+          {historyState!.hasMore && (
+            <TouchableOpacity
+              onPress={onLoadMore}
+              disabled={isFetching}
+              style={[styles.actionBtnWide, { marginTop: 8, backgroundColor: "#333" }]}
+            >
+              {isFetching ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="chevron-down-outline" size={14} color="#fff" />
+                  <Text style={styles.actionBtnText}>
+                    Carica altri ({historyState!.total - events.length} rimanenti)
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 }
