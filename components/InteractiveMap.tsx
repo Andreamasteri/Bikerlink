@@ -190,7 +190,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     saveMapStyleMutation.mutate(next);
   }, [resolvedProvider, saveMapStyleMutation]);
 
-  const showDayNightButton = mapsEnabled && userChoiceEnabled &&
+  const showDayNightButton = mapsEnabled &&
     (resolvedProvider === "carto_light" || resolvedProvider === "carto_dark");
 
   useEffect(() => {
