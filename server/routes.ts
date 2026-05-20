@@ -236,7 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
   app.use("/api/sos", sosRoutes);
-  app.use("/api/rides", telemetryRoutes);
+  app.use("/api/telemetry", telemetryRoutes);
   app.use("/api/motoclubs", motoclubsRoutes);
   app.use("/api/friends", friendsRoutes);
   app.use("/api/lastfm", lastfmRoutes);

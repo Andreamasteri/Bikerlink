@@ -8,6 +8,8 @@ import {
   boolean,
   timestamp,
   doublePrecision,
+  real,
+  bigint,
   jsonb,
   index,
   uniqueIndex,
@@ -1731,28 +1733,30 @@ export const siteVisits = pgTable("site_visits", {
 export type SiteVisit = typeof siteVisits.$inferSelect;
 export type InsertSiteVisit = typeof siteVisits.$inferInsert;
 
+// ── RIDE TELEMETRY (Log Sensori Telemetria — Task #1686) ─────────────────────
 export const rideTelemetry = pgTable("ride_telemetry", {
-  id: varchar("id", { length: 36 })
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  rideId: varchar("ride_id", { length: 36 })
-    .notNull()
-    .references(() => routes.id, { onDelete: "cascade" }),
+  id: serial("id").primaryKey(),
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  timestamp: timestamp("timestamp").notNull(),
+  sessionId: varchar("session_id", { length: 36 }).notNull(),
+  sessionType: varchar("session_type", { length: 10 }).notNull().default("ride"),
+  ts: bigint("ts", { mode: "bigint" }).notNull(),
   lat: doublePrecision("lat").notNull(),
   lon: doublePrecision("lon").notNull(),
-  leanAngle: doublePrecision("lean_angle"),
-  gForceX: doublePrecision("g_force_x"),
-  gForceY: doublePrecision("g_force_y"),
-  gForceZ: doublePrecision("g_force_z"),
-  speedKmh: doublePrecision("speed_kmh"),
+  speedKmh: real("speed_kmh"),
+  leanAngle: real("lean_angle"),
+  gforceX: real("gforce_x"),
+  gforceY: real("gforce_y"),
+  gforceZ: real("gforce_z"),
+  heading: real("heading"),
+  altitudeM: real("altitude_m"),
+  matched: boolean("matched").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
-  index("ride_telemetry_ride_id_idx").on(table.rideId),
   index("ride_telemetry_user_id_idx").on(table.userId),
+  index("ride_telemetry_session_id_idx").on(table.sessionId),
+  index("ride_telemetry_ts_idx").on(table.ts),
 ]);
 
 export type RideTelemetry = typeof rideTelemetry.$inferSelect;

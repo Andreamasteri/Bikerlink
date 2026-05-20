@@ -1509,25 +1509,32 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] biker_biker_matches.pair_type:", e);
         }
 
+        // Task #1686 — ride_telemetry table for sensor log infrastructure
         try {
           await db.execute(sql`
             CREATE TABLE IF NOT EXISTS ride_telemetry (
-              id          VARCHAR(36)       PRIMARY KEY DEFAULT gen_random_uuid(),
-              ride_id     VARCHAR(36)       NOT NULL REFERENCES routes(id) ON DELETE CASCADE,
-              user_id     VARCHAR(36)       NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
-              "timestamp" TIMESTAMP         NOT NULL,
-              lat         DOUBLE PRECISION  NOT NULL,
-              lon         DOUBLE PRECISION  NOT NULL,
-              lean_angle  DOUBLE PRECISION,
-              g_force_x   DOUBLE PRECISION,
-              g_force_y   DOUBLE PRECISION,
-              g_force_z   DOUBLE PRECISION,
-              speed_kmh   DOUBLE PRECISION,
-              created_at  TIMESTAMP         NOT NULL DEFAULT NOW()
+              id          SERIAL PRIMARY KEY,
+              user_id     VARCHAR(36) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              session_id  VARCHAR(36) NOT NULL,
+              session_type VARCHAR(10) NOT NULL DEFAULT 'ride',
+              ts          BIGINT NOT NULL,
+              lat         DOUBLE PRECISION NOT NULL,
+              lon         DOUBLE PRECISION NOT NULL,
+              speed_kmh   REAL,
+              lean_angle  REAL,
+              gforce_x    REAL,
+              gforce_y    REAL,
+              gforce_z    REAL,
+              heading     REAL,
+              altitude_m  REAL,
+              matched     BOOLEAN NOT NULL DEFAULT false,
+              created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
             )
           `);
-          await db.execute(sql`CREATE INDEX IF NOT EXISTS ride_telemetry_ride_id_idx ON ride_telemetry (ride_id)`);
-          await db.execute(sql`CREATE INDEX IF NOT EXISTS ride_telemetry_user_id_idx ON ride_telemetry (user_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ride_telemetry_user_id_idx    ON ride_telemetry (user_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ride_telemetry_session_id_idx ON ride_telemetry (session_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ride_telemetry_ts_idx         ON ride_telemetry (ts)`);
+
           console.log("[MIGRATION] ride_telemetry table ensured");
         } catch (e) {
           console.warn("[MIGRATION] ride_telemetry:", e);

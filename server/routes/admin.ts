@@ -7596,76 +7596,47 @@ router.get("/site-visits", async (req: Request, res: Response) => {
   }
 });
 
-router.get("/telemetry-stats", async (req: Request, res: Response) => {
+router.get("/telemetry/stats", async (_req: Request, res: Response) => {
   try {
-    const countResult = await db.execute(
-      sql`
-        SELECT
-          COUNT(DISTINCT user_id)::int AS users_with_telemetry,
-          COUNT(DISTINCT ride_id)::int AS total_rides,
-          COUNT(*)::int               AS total_samples
-        FROM ride_telemetry
-      `
-    );
-    const countRow = countResult.rows[0] as {
-      users_with_telemetry: number;
-      total_rides: number;
-      total_samples: number;
-    } | undefined;
-
-    const kmResult = await db.execute(
-      sql`
-        WITH segments AS (
+    const [samplesResult, usersResult, kmResult, latestResult] = await Promise.all([
+      db.execute(sql`SELECT COUNT(*) AS total FROM ride_telemetry`),
+      db.execute(sql`SELECT COUNT(DISTINCT user_id) AS total FROM ride_telemetry`),
+      db.execute(sql`
+        WITH ordered AS (
           SELECT
-            user_id,
-            lat,
-            lon,
-            LAG(lat) OVER (PARTITION BY ride_id ORDER BY "timestamp") AS prev_lat,
-            LAG(lon) OVER (PARTITION BY ride_id ORDER BY "timestamp") AS prev_lon
+            lat, lon, ts, session_id,
+            LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
+            LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
           FROM ride_telemetry
+        ),
+        distances AS (
+          SELECT
+            2 * 6371 * ASIN(
+              SQRT(
+                POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
+                + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
+                * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
+              )
+            ) AS dist_km
+          FROM ordered
+          WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
+            AND ABS(lat - prev_lat) < 0.5
+            AND ABS(lon - prev_lon) < 0.5
         )
-        SELECT
-          user_id,
-          SUM(
-            6371.0 * 2 * ASIN(SQRT(
-              POWER(SIN((RADIANS(lat) - RADIANS(prev_lat)) / 2), 2) +
-              COS(RADIANS(prev_lat)) * COS(RADIANS(lat)) *
-              POWER(SIN((RADIANS(lon) - RADIANS(prev_lon)) / 2), 2)
-            ))
-          ) AS dist_km
-        FROM segments
-        WHERE prev_lat IS NOT NULL
-        GROUP BY user_id
-      `
-    );
+        SELECT COALESCE(SUM(dist_km), 0) AS km_collected
+        FROM distances
+      `),
+      db.execute(sql`SELECT MAX(created_at) AS latest FROM ride_telemetry`),
+    ]);
 
-    const totalKm = kmResult.rows.reduce(
-      (acc: number, r: any) => acc + parseFloat(String(r.dist_km ?? "0")),
-      0
-    );
-    const usersCount = parseInt(String(countRow?.users_with_telemetry ?? "0"), 10);
-    const avgKmPerUser = usersCount > 0 ? Math.round((totalKm / usersCount) * 10) / 10 : 0;
+    const totalSamples = parseInt((samplesResult.rows[0] as { total: string } | undefined)?.total ?? "0", 10);
+    const activeUsers = parseInt((usersResult.rows[0] as { total: string } | undefined)?.total ?? "0", 10);
+    const kmCollected = Math.round(parseFloat((kmResult.rows[0] as { km_collected: string } | undefined)?.km_collected ?? "0") * 10) / 10;
+    const latestSample = (latestResult.rows[0] as { latest: string | null } | undefined)?.latest ?? null;
 
-    const settingRows = await db
-      .select({ value: appSettings.value })
-      .from(appSettings)
-      .where(eq(appSettings.key, "telemetry_target_km"))
-      .limit(1);
-    const targetKm =
-      settingRows.length > 0 && settingRows[0].value
-        ? parseInt(settingRows[0].value, 10)
-        : 400;
-
-    return res.json({
-      users_with_telemetry: usersCount,
-      total_rides: parseInt(String(countRow?.total_rides ?? "0"), 10),
-      total_samples: parseInt(String(countRow?.total_samples ?? "0"), 10),
-      total_km: Math.round(totalKm * 10) / 10,
-      avg_km_per_user: avgKmPerUser,
-      target_km: targetKm,
-    });
-  } catch (error) {
-    console.error("Admin telemetry-stats error:", error);
+    return res.json({ totalSamples, activeUsers, kmCollected, latestSample });
+  } catch (err) {
+    console.error("[admin/telemetry/stats] error:", err);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
