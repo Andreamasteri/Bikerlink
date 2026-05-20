@@ -26,7 +26,6 @@ import {
   MountAxisCalibration,
   MountCalibWizard,
   loadMountCalibration,
-  clearMountCalibration,
 } from "@/components/MountCalibWizard";
 
 interface ProposalItem {
@@ -205,7 +204,6 @@ export default function ProposalsScreen() {
   const [activeHub, setActiveHub] = useState<"proposte" | "giri" | "percorsi" | "pianificati">("proposte");
   const [mountCalib, setMountCalib] = useState<MountAxisCalibration | null>(null);
   const [showMountCalibWizard, setShowMountCalibWizard] = useState(false);
-  const [calibExpanded, setCalibExpanded] = useState(false);
 
   useEffect(() => {
     loadMountCalibration().then(setMountCalib).catch(() => {});
@@ -265,60 +263,6 @@ export default function ProposalsScreen() {
 
       {activeHub === "giri" ? (
         <View style={{ flex: 1 }}>
-          <View style={styles.calibSection}>
-            <Pressable style={styles.calibHeader} onPress={() => setCalibExpanded(v => !v)}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Ionicons name="hardware-chip-outline" size={18} color={Colors.accent} />
-                <Text style={styles.calibTitle}>{t("profile.sensorsCalib")}</Text>
-                {mountCalib && (
-                  <View style={styles.calibBadge}>
-                    <Text style={styles.calibBadgeText}>{t("tracking.mountCalib.calibratedBadge")}</Text>
-                  </View>
-                )}
-              </View>
-              <Ionicons name={calibExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
-            </Pressable>
-            {calibExpanded && (
-              <View style={styles.calibBody}>
-                <Text style={styles.calibStatus}>
-                  {mountCalib
-                    ? `${t("profile.sensorsCalib.calibratedOn")} ${new Date(mountCalib.timestamp).toLocaleDateString()}`
-                    : t("tracking.mountCalib.notCalibrated")}
-                </Text>
-                <View style={styles.calibActions}>
-                  <TouchableOpacity
-                    style={styles.calibBtn}
-                    onPress={() => setShowMountCalibWizard(true)}
-                  >
-                    <Ionicons name="compass-outline" size={15} color={Colors.accent} />
-                    <Text style={styles.calibBtnText}>{t("profile.sensorsCalib.recalibrate")}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.calibBtn, styles.calibBtnReset]}
-                    onPress={() => {
-                      Alert.alert(
-                        t("profile.sensorsCalib.resetConfirmTitle"),
-                        t("profile.sensorsCalib.resetConfirmMsg"),
-                        [
-                          { text: t("profile.sensorsCalib.resetConfirmCancel"), style: "cancel" },
-                          {
-                            text: t("profile.sensorsCalib.resetConfirmOk"),
-                            style: "destructive",
-                            onPress: () => {
-                              clearMountCalibration().then(() => setMountCalib(null));
-                            },
-                          },
-                        ]
-                      );
-                    }}
-                  >
-                    <Ionicons name="refresh-outline" size={15} color={Colors.textSecondary} />
-                    <Text style={[styles.calibBtnText, { color: Colors.textSecondary }]}>{t("profile.sensorsCalib.reset")}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-          </View>
           <View style={{ flex: 1 }}>
             <TrackingScreen />
           </View>
@@ -509,69 +453,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.accent,
-  },
-  calibSection: {
-    backgroundColor: Colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  calibHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  calibTitle: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  calibBadge: {
-    backgroundColor: Colors.accent + "20",
-    borderRadius: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  calibBadgeText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: Colors.accent,
-  },
-  calibBody: {
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 10,
-  },
-  calibStatus: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
-  calibActions: {
-    flexDirection: "row",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  calibBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: Colors.accent + "15",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: Colors.accent + "30",
-  },
-  calibBtnReset: {
-    backgroundColor: Colors.border,
-    borderColor: Colors.border,
-  },
-  calibBtnText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
     color: Colors.accent,
   },
 });

@@ -405,7 +405,7 @@ function SensorOverlayPanel({
         </View>
         <View style={s.sensorOverlaySep} />
         <View style={s.sensorOverlayItem}>
-          <Text style={[s.sensorOverlayValue, { color: colors.accent }]}>
+          <Text style={[s.sensorOverlayValue, { color: currentTiltDeg < 0 ? colors.accentRed : currentTiltDeg > 0 ? colors.success : colors.accent }]}>
             {currentTiltDeg.toFixed(1)}°
           </Text>
           <Text style={s.sensorOverlayLabel}>{t("tracking.tiltLive")}</Text>
@@ -2662,6 +2662,21 @@ function TrackingNativeScreen() {
               </TouchableOpacity>
             )}
 
+            {/* ── Race Mode sensor overlay (always visible below map) ───── */}
+            {profile === "race" && !is0100Enabled && sensorsEnabled && !isCalibrating && (
+              <SensorOverlayPanel
+                currentG={currentG}
+                currentLateralG={currentLateralG}
+                currentTiltDeg={currentTiltDeg}
+                maxAccelG={maxAccelG}
+                mountAxisCalib={mountAxisCalib}
+                sensorsEnabled={sensorsEnabled}
+                colors={Colors}
+                styles={styles}
+                t={t}
+              />
+            )}
+
             {/* Stats — standard mode */}
             {!is0100Enabled && (
               <View style={styles.statsRow}>
@@ -2743,52 +2758,8 @@ function TrackingNativeScreen() {
               </View>
             )}
 
-            {/* ── Race Mode sensor overlay ─────────────────────────────── */}
-            {profile === "race" && !is0100Enabled && (
-              <>
-                {/* Toggle row */}
-                <TouchableOpacity
-                  style={styles.sensorOverlayToggleRow}
-                  onPress={() => setShowSensorOverlay((v) => !v)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name="pulse-outline"
-                    size={16}
-                    color={showSensorOverlay ? Colors.accentRed : Colors.textSecondary}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.sensorOverlayToggleLabel}>
-                      {t("tracking.sensorOverlay")}
-                    </Text>
-                    <Text style={styles.sensorOverlayToggleHint}>
-                      {t("tracking.sensorOverlayHint")}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={showSensorOverlay}
-                    onValueChange={setShowSensorOverlay}
-                    trackColor={{ false: Colors.border, true: Colors.accentRed + "80" }}
-                    thumbColor={showSensorOverlay ? Colors.accentRed : Colors.textSecondary}
-                  />
-                </TouchableOpacity>
-
-                {/* Live sensor panel */}
-                {showSensorOverlay && !isCalibrating && (
-                  <SensorOverlayPanel
-                    currentG={currentG}
-                    currentLateralG={currentLateralG}
-                    currentTiltDeg={currentTiltDeg}
-                    maxAccelG={maxAccelG}
-                    mountAxisCalib={mountAxisCalib}
-                    sensorsEnabled={sensorsEnabled}
-                    colors={Colors}
-                    styles={styles}
-                    t={t}
-                  />
-                )}
-              </>
-            )}
+            {/* ── Race Mode sensor overlay placeholder ─────────────────── */}
+            {/* (panel moved below map — see mapCard section) */}
 
             {/* Stats — 0-100 sprint mode */}
             {is0100Enabled && (
@@ -3017,13 +2988,6 @@ function TrackingNativeScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
-          <Ionicons
-            name="speedometer"
-            size={28}
-            color={Colors.accent}
-            style={styles.headerIcon}
-          />
-
           {/* GPS Profile */}
           <View style={styles.profileSection}>
             <Text style={styles.profileTitle}>
@@ -3502,9 +3466,6 @@ function TrackingNativeScreen() {
                 />
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
                   <Text style={styles.triggerLabel}>Sensori telefono (G)</Text>
-                  <View style={{ backgroundColor: Colors.warning + "30", borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1 }}>
-                    <Text style={{ fontSize: 10, fontWeight: "700", color: Colors.warning, letterSpacing: 0.5 }}>BETA</Text>
-                  </View>
                   {sensorsEnabled && (
                     <TouchableOpacity
                       onPress={() => setShowMountCalibWizard(true)}
