@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BikerLink OTA System — Schema A4</title>
+<style>
+  /* ── Reset & base ───────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --orange:  #E8541A;
+    --dark:    #1A1A2E;
+    --grey:    #4A4A6A;
+    --light:   #F5F5F7;
+    --border:  #D0D0E0;
+    --green:   #1B5E35;
+    --blue:    #1A5FA8;
+    --red:     #C62828;
+    --white:   #ffffff;
+    --alt-row: #EEF0F8;
+  }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 8.5pt;
+    color: #1A1A2E;
+    background: #e8eaf0;
+    padding: 10mm;
+  }
+
+  /* ── A4 page container ──────────────────────────────────────── */
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    background: var(--white);
+    margin: 0 auto;
+    padding: 13mm 14mm 12mm;
+    box-shadow: 0 2px 16px rgba(0,0,0,.18);
+  }
+
+  /* ── Print rules ────────────────────────────────────────────── */
+  @page {
+    size: A4;
+    margin: 13mm 14mm 12mm;
+  }
+
+  @media print {
+    body {
+      background: none;
+      padding: 0;
+    }
+    .page {
+      box-shadow: none;
+      margin: 0;
+      padding: 0;
+      width: 100%;
+    }
+    .page-break { page-break-before: always; }
+  }
+
+  /* ── Header ─────────────────────────────────────────────────── */
+  header {
+    background: var(--dark);
+    color: var(--white);
+    border-radius: 5px;
+    padding: 7px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  header h1 {
+    font-size: 13pt;
+    font-weight: 700;
+    letter-spacing: -.3px;
+  }
+  header h1 span { color: var(--orange); }
+  .header-meta {
+    text-align: right;
+    font-size: 7pt;
+    color: #99AACC;
+    line-height: 1.5;
+  }
+  .divider {
+    height: 3px;
+    background: linear-gradient(90deg, var(--orange) 0%, #FF8A50 100%);
+    border-radius: 2px;
+    margin-bottom: 8px;
+  }
+
+  /* ── Section headers ────────────────────────────────────────── */
+  .section-title {
+    background: var(--dark);
+    color: var(--white);
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 3px;
+    margin: 8px 0 4px;
+    border-left: 3px solid var(--orange);
+  }
+
+  /* ── Tables ──────────────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 7.5pt;
+    table-layout: fixed;
+  }
+  th {
+    background: var(--dark);
+    color: var(--white);
+    text-align: left;
+    padding: 4px 6px;
+    font-weight: 600;
+    font-size: 7pt;
+    border-bottom: 2px solid var(--orange);
+  }
+  td {
+    padding: 3px 6px;
+    border: 0.4pt solid var(--border);
+    vertical-align: top;
+    line-height: 1.35;
+  }
+  tr:nth-child(odd) td  { background: var(--white); }
+  tr:nth-child(even) td { background: var(--alt-row); }
+
+  /* colonna #/badge */
+  .num { width: 6mm; text-align: center; font-weight: 700; color: var(--grey); }
+  code {
+    font-family: 'Courier New', monospace;
+    font-size: 7pt;
+    color: var(--blue);
+    background: #EEF3FF;
+    border-radius: 2px;
+    padding: 0 2px;
+    word-break: break-all;
+  }
+  .bold { font-weight: 700; }
+  .small { font-size: 6.8pt; color: var(--grey); }
+  .tag-force {
+    display: inline-block;
+    background: var(--orange);
+    color: var(--white);
+    border-radius: 2px;
+    padding: 0 3px;
+    font-size: 6pt;
+    font-weight: 700;
+  }
+  .tag-rollback td { background: #FFF3F0 !important; }
+
+  /* colori header sezione alternati */
+  .th-blue  th { background: var(--blue); }
+  .th-green th { background: var(--green); }
+
+  /* layout affiancato */
+  .two-col {
+    display: flex;
+    gap: 5mm;
+    align-items: flex-start;
+  }
+  .two-col .col-left  { flex: 0 0 86mm; }
+  .two-col .col-right { flex: 1; }
+
+  /* ── Footer ──────────────────────────────────────────────────── */
+  footer {
+    margin-top: 6px;
+    border-top: 0.5pt solid var(--border);
+    padding-top: 4px;
+    font-size: 6.8pt;
+    color: var(--grey);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ══ HEADER ══════════════════════════════════════════════════════════ -->
+  <header>
+    <h1>🏍️ Biker<span>Link</span> OTA System</h1>
+    <div class="header-meta">
+      Schema di aggiornamento Over-The-Air<br>
+      Ciclo 9.0.0 · OTA corrente #7<br>
+      biker-link.replit.app
+    </div>
+  </header>
+  <div class="divider"></div>
+
+  <!-- ══ 1. FLUSSO DI PUBBLICAZIONE ══════════════════════════════════════ -->
+  <div class="section-title">🚀&nbsp; 1.&nbsp; Flusso di Pubblicazione OTA</div>
+  <table>
+    <colgroup>
+      <col style="width:5mm">
+      <col style="width:18mm">
+      <col style="width:38mm">
+      <col style="width:76mm">
+      <col style="width:28mm">
+    </colgroup>
+    <thead>
+      <tr><th class="num">#</th><th>Fase</th><th>Comando / Azione</th><th>Cosa succede</th><th>File coinvolto</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="num">1</td>
+        <td class="bold">Pre-flight<br>Validazione</td>
+        <td><code>bash scripts/validate-ota.sh</code></td>
+        <td>Controlla CURRENT_OTA_NUMBER, entry ota-updates.json, URL backend, nessun PENDING, hash git valido, live-server guard HTTP 200</td>
+        <td class="small">lib/ota.ts<br>ota-updates.json<br>app.json</td>
+      </tr>
+      <tr>
+        <td class="num">2</td>
+        <td class="bold">Export bundle<br>(Stage 1)</td>
+        <td><code>bash scripts/publish-ota.sh export "messaggio"</code></td>
+        <td>Bump CURRENT_OTA_NUMBER, aggiunge entry pending in ota-updates.json, esegue <code>npx expo export --platform android</code>, verifica marker nel .hbc</td>
+        <td class="small">lib/ota.ts<br>ota-updates.json<br>dist-ota/</td>
+      </tr>
+      <tr>
+        <td class="num">3</td>
+        <td class="bold">Verifica bundle</td>
+        <td><code>(automatico nello Stage 1)</code></td>
+        <td>Cerca <code>CURRENT_OTA_NUMBER=N</code> nel binario .hbc con <code>grep -oa</code>. Blocca se non trovato o se il numero non corrisponde</td>
+        <td class="small">dist-ota/_expo/static/<br>js/android/*.hbc</td>
+      </tr>
+      <tr>
+        <td class="num">4</td>
+        <td class="bold">Upload &amp; Crea<br>release (Stage 2)</td>
+        <td><code>bash scripts/publish-ota.sh publish</code></td>
+        <td>Login admin, upload bundle su Object Storage (<code>private/ota/</code>), POST <code>/api/admin/ota/create</code> con bundleUrl + metadata</td>
+        <td class="small">server/routes.ts<br>/api/admin/ota/create</td>
+      </tr>
+      <tr>
+        <td class="num">5</td>
+        <td class="bold">Promozione<br>slot stable</td>
+        <td><code>(automatico nello Stage 2)</code></td>
+        <td>POST <code>/api/admin/ota/:id/assign-slot</code> con <code>slot=stable</code>. Aggiorna ota-updates.json (status→published). Tutti i client ricevono l'OTA al prossimo check</td>
+        <td class="small">/api/admin/ota/<br>:id/assign-slot</td>
+      </tr>
+      <tr class="tag-rollback">
+        <td class="num">6</td>
+        <td class="bold">Rollback<br>(se necessario)</td>
+        <td><code>bash scripts/rollback-ota.sh &lt;updateNumber&gt;</code></td>
+        <td>Login admin, POST <code>/api/admin/ota/:releaseId/publish</code> sull'entry storica, aggiorna lib/ota.ts e ota-updates.json (target→published, corrente→rolled-back)</td>
+        <td class="small">scripts/rollback-ota.sh<br>ota-updates.json<br>lib/ota.ts</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ 2 + 3. TRIGGER + LOGICA CLIENT ══════════════════════════════════ -->
+  <div class="section-title">📱&nbsp; 2.&nbsp; Trigger controllo aggiornamenti (client)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3.&nbsp; Logica client</div>
+  <div class="two-col">
+
+    <!-- Colonna sinistra: trigger -->
+    <div class="col-left">
+      <table class="th-blue">
+        <colgroup>
+          <col style="width:24mm"><col style="width:20mm"><col style="width:22mm"><col style="width:14mm">
+        </colgroup>
+        <thead>
+          <tr><th>Trigger</th><th>Sorgente</th><th>Cooldown</th><th>Force?</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">Avvio app</td>
+            <td><code>startup</code></td>
+            <td class="small">60 s (normale)<br>5 min (3+ fail)</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td class="bold">Ritorno in foreground</td>
+            <td><code>appstate</code></td>
+            <td class="small">60 s</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td class="bold">OTA Gate (login / registrazione)</td>
+            <td><code>login<br>register</code></td>
+            <td class="small">60 s</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td class="bold">Manuale (admin panel)</td>
+            <td><code>manual</code></td>
+            <td class="small">Nessuno</td>
+            <td><span class="tag-force">SÌ</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Colonna destra: logica client -->
+    <div class="col-right">
+      <table>
+        <colgroup>
+          <col style="width:24mm"><col style="width:54mm"><col style="width:18mm">
+        </colgroup>
+        <thead>
+          <tr><th>Componente</th><th>Funzione</th><th>File</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bold">Probe HTTP</td>
+            <td>Fetch parallelo a <code>/api/expo-updates</code> con timeout 8&nbsp;s per diagnostica rete vs SDK</td>
+            <td><code>ota-check.ts</code></td>
+          </tr>
+          <tr>
+            <td class="bold">Deferred Reload</td>
+            <td>Se app in primo piano al fetch, il riavvio è differito al prossimo backgrounding (<code>AppState→background</code>)</td>
+            <td><code>ota-check.ts</code></td>
+          </tr>
+          <tr>
+            <td class="bold">Device ID<br>(Extra-Params)</td>
+            <td><code>Updates.setExtraParamAsync("device-id", id)</code> — persiste nello storage nativo, incluso in ogni chiamata OTA</td>
+            <td><code>ota-hardening.ts</code></td>
+          </tr>
+          <tr>
+            <td class="bold">Heartbeat Post-Load</td>
+            <td>POST <code>/api/ota/heartbeat</code> entro 1&nbsp;500&nbsp;ms dal boot se <code>updateId</code> presente. Resetta i contatori stuck</td>
+            <td><code>ota-hardening.ts</code></td>
+          </tr>
+          <tr>
+            <td class="bold">Circuit Breaker<br>(Stuck Gate)</td>
+            <td><code>isOtaStuck()</code> = true se <code>rollbackCount ≥ 3</code> o <code>stuckSessions ≥ 3</code>. Blocca i check OTA</td>
+            <td><code>ota-stuck.ts</code></td>
+          </tr>
+          <tr>
+            <td class="bold">Recovery UI</td>
+            <td>Banner all'utente con opzione <code>clearOtaStuckState()</code> per resettare i contatori e riprendere gli aggiornamenti</td>
+            <td><code>ota-stuck.ts</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ 4. BACKEND ENDPOINT ══════════════════════════════════════════════ -->
+  <div class="section-title">🌐&nbsp; 4.&nbsp; Backend — Endpoint REST</div>
+  <table class="th-blue">
+    <colgroup>
+      <col style="width:12mm"><col style="width:56mm"><col style="width:12mm"><col style="width:85mm">
+    </colgroup>
+    <thead>
+      <tr><th>Metodo</th><th>Path</th><th>Auth</th><th>Funzione</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="bold" style="color:#1A5FA8">GET</td>
+        <td><code>/api/expo-updates</code></td>
+        <td>—</td>
+        <td>Serve il manifest OTA (Expo Protocol v1, <code>multipart/mixed</code>). Slot-routing per device-id via <code>expo-extra-params</code></td>
+      </tr>
+      <tr>
+        <td class="bold" style="color:#1B5E35">POST</td>
+        <td><code>/api/admin/ota/create</code></td>
+        <td>Admin</td>
+        <td>Crea una nuova release OTA con bundleUrl, metadata e <code>status=pending</code></td>
+      </tr>
+      <tr>
+        <td class="bold" style="color:#1B5E35">POST</td>
+        <td><code>/api/admin/ota/:id/assign-slot</code></td>
+        <td>Admin</td>
+        <td>Promuove la release allo <code>slot=stable</code>. I client iniziano a riceverla al prossimo check</td>
+      </tr>
+      <tr>
+        <td class="bold" style="color:#1B5E35">POST</td>
+        <td><code>/api/admin/ota/:id/publish</code></td>
+        <td>Admin</td>
+        <td>Usato dal rollback: riattiva una release storica (<code>status→active</code>)</td>
+      </tr>
+      <tr>
+        <td class="bold" style="color:#1B5E35">POST</td>
+        <td><code>/api/ota/heartbeat</code></td>
+        <td>—</td>
+        <td>Riceve heartbeat post-load dal client (<code>deviceId</code>, <code>releaseId</code>, <code>otaNumber</code>). Conferma che il bundle è attivo</td>
+      </tr>
+      <tr>
+        <td class="bold" style="color:#1B5E35">POST</td>
+        <td><code>/api/admin/ota-error</code></td>
+        <td>—</td>
+        <td>Telemetria errori OTA (<code>phase</code>, <code>source</code>, <code>errorCode</code>, <code>nativeStack</code>, <code>probe</code>, <code>networkInfo</code>). Fire-and-forget dal client</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ 5. SOURCE OF TRUTH ═══════════════════════════════════════════════ -->
+  <div class="section-title">📄&nbsp; 5.&nbsp; Source of Truth — File chiave</div>
+  <table class="th-green">
+    <colgroup>
+      <col style="width:36mm"><col style="width:95mm"><col style="width:34mm">
+    </colgroup>
+    <thead>
+      <tr><th>File</th><th>Ruolo</th><th>Aggiornato da</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>lib/ota.ts</code></td>
+        <td>Contiene <code>CURRENT_OTA_NUMBER</code> (costante TS inclusa nel bundle). Deve corrispondere all'ultima entry in ota-updates.json</td>
+        <td class="small">publish-ota.sh (Stage 1)<br>rollback-ota.sh</td>
+      </tr>
+      <tr>
+        <td><code>ota-updates.json</code></td>
+        <td>Registro storico di tutte le OTA: updateNumber, version, runtimeVersion, releaseId, bundleUrl, status, commitBase, publishedAt</td>
+        <td class="small">publish-ota.sh (Stage 1+2)<br>rollback-ota.sh</td>
+      </tr>
+      <tr>
+        <td><code>app.json</code></td>
+        <td>Contiene <code>expo.runtimeVersion</code> (separa i cicli OTA) e <code>expo.updates.url</code> (endpoint backend custom)</td>
+        <td class="small">Manuale (solo cambio ciclo)</td>
+      </tr>
+      <tr>
+        <td><code>scripts/publish-ota.sh</code></td>
+        <td>Script 2-stage: export (Step A-E) + publish (Step 1-7). Gestisce backup, rollback automatico su errore e state file <code>.local/ota-state.json</code></td>
+        <td class="small">Manuale / CI</td>
+      </tr>
+      <tr>
+        <td><code>scripts/validate-ota.sh</code></td>
+        <td>Pre-flight: 8 check (import, metodi Updates, CURRENT_OTA_NUMBER, PENDING, commitBase, duplicati, URL backend, live-server guard)</td>
+        <td class="small">Manuale prima di ogni publish</td>
+      </tr>
+      <tr>
+        <td><code>scripts/rollback-ota.sh</code></td>
+        <td>Riattiva una release storica tramite <code>releaseId</code>. Aggiorna ota-updates.json e lib/ota.ts</td>
+        <td class="small">Manuale in caso di regressione</td>
+      </tr>
+      <tr>
+        <td><code>lib/ota-check.ts</code></td>
+        <td><code>triggerOtaCheck()</code>: orchestrazione check→fetch→reload con cooldown, Circuit Breaker, Probe HTTP, Deferred Reload e telemetria</td>
+        <td class="small">(runtime client)</td>
+      </tr>
+      <tr>
+        <td><code>lib/ota-hardening.ts</code></td>
+        <td><code>initOtaHardening()</code>: Device ID via Extra-Params, listener rollback runtime, heartbeat post-load dopo 1&nbsp;500&nbsp;ms</td>
+        <td class="small">(runtime client)</td>
+      </tr>
+      <tr>
+        <td><code>lib/ota-stuck.ts</code></td>
+        <td>AsyncStorage: rollbackCount, stuckSessions, lastFetchedId. <code>isOtaStuck()</code> attiva il Circuit Breaker dopo 3 eventi</td>
+        <td class="small">(runtime client)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ FOOTER ═══════════════════════════════════════════════════════════ -->
+  <footer>
+    BikerLink OTA System &nbsp;·&nbsp; Ciclo runtimeVersion 9.0.0 &nbsp;·&nbsp; OTA corrente: #7
+    &nbsp;·&nbsp; biker-link.replit.app &nbsp;·&nbsp; Generato il <script>document.write(new Date().toLocaleDateString('it-IT'))</script>
+  </footer>
+
+</div>
+</body>
+</html>

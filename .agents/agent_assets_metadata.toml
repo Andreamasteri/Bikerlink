@@ -533,3 +533,9 @@ id = "SCDfDgTeiLAzIDImcSyCP"
 uri = "file://server/public/assets/competitor-analysis.png"
 type = "image"
 title = "Tabella Comparativa — Immagine 1200×630px"
+
+[[outputs]]
+id = "KoyMbP-mcAjKWTEFSq9Wv"
+uri = "file://docs/ota-schema-a4.pdf"
+type = "pdf"
+title = "BikerLink OTA System — Schema A4"
