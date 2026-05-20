@@ -201,6 +201,7 @@ BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
 EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
 
 [userenv.development]
+EXPO_WEB_URL = "http://localhost:8081"
 
 [[ports]]
 localPort = 5000
