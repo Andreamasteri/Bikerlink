@@ -19,7 +19,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
@@ -320,12 +320,18 @@ export default function ProfileScreen() {
   });
   const showSearchPref = showSearchPrefData?.enabled === true;
 
-  const { data: matchPrefGateData } = useQuery<{ visible: boolean }>({
+  const { data: matchPrefGateData, refetch: refetchMatchPrefGate } = useQuery<{ visible: boolean }>({
     queryKey: ["/api/match-preferences/gate"],
     staleTime: 120_000,
     enabled: !!user,
   });
   const matchPrefGateVisible = matchPrefGateData?.visible === true;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) refetchMatchPrefGate();
+    }, [user, refetchMatchPrefGate])
+  );
 
   const { data: matchPrefsData } = useQuery<{ preferences: MatchPrefsPayload }>({
     queryKey: ["/api/match-preferences"],
@@ -764,7 +770,7 @@ export default function ProfileScreen() {
         refreshControl={
           <RefreshControl
             refreshing={profileQuery.isRefetching}
-            onRefresh={() => profileQuery.refetch()}
+            onRefresh={() => { profileQuery.refetch(); refetchMatchPrefGate(); }}
             tintColor={colors.accent}
           />
       }
