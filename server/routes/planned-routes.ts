@@ -1167,6 +1167,12 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
+    // ── Elevation cache check (stored in metadata, no expiry — data is static) ──
+    const meta = (route.metadata ?? {}) as Record<string, unknown>;
+    if (meta.elevationCache) {
+      return res.json({ ...(meta.elevationCache as object), cached: true });
+    }
+
     // Build sample points from polyline or waypoints
     let rawPoints: [number, number][] = [];
     if (route.polyline) {
@@ -1235,7 +1241,7 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
       else totalLoss += Math.abs(diff);
     }
 
-    return res.json({
+    const payload = {
       elevations,
       distanceKm: distKm.map((d) => Math.round(d * 10) / 10),
       minEle: Math.round(minEle),
@@ -1243,7 +1249,14 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
       totalGain: Math.round(totalGain),
       totalLoss: Math.round(totalLoss),
       points: sampled.length,
-    });
+    };
+
+    // Persist elevation cache in metadata (fire-and-forget — don't block the response)
+    storage.updatePlannedRoute(id, {
+      metadata: { ...meta, elevationCache: payload },
+    }).catch((err: unknown) => console.error("[elevation] cache save error:", err));
+
+    return res.json(payload);
   } catch (err) {
     console.error("[elevation] error:", err);
     return res.status(500).json({ message: "Errore profilo altimetrico" });
