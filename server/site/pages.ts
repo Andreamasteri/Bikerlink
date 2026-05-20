@@ -235,7 +235,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
     title: "BikerLink — App per motociclisti: GPS, Community, SOS",
     description:
       "App verticale per motociclisti: mappa biker live, MotoClub, SOS emergenza, contest foto. Gratis, italiana, in continua evoluzione.",
-    ogImage: `${baseUrl}/assets/images/hero-biker.jpg`,
+    ogImage: `${baseUrl}/assets/images/hero-biker.webp`,
     headExtras: HOME_CSS,
     jsonld: [
       organizationJsonLd(baseUrl),
@@ -249,7 +249,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
         description:
           "App social verticale per motociclisti: community, GPS live, MotoClub, SOS biker.",
         url: baseUrl,
-        image: `${baseUrl}/assets/images/hero-biker.jpg`,
+        image: `${baseUrl}/assets/images/hero-biker.webp`,
       },
     ],
   };
@@ -321,7 +321,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
     </div>
   </div>
   <div class="home-split-photo">
-    <img src="/assets/images/hero-mountain-rider.jpg" alt="Motociclista su strada di montagna" width="800" height="900" loading="lazy" />
+    <img src="/assets/images/hero-mountain-rider.webp" alt="Motociclista su strada di montagna" width="800" height="900" loading="lazy" />
   </div>
 </section>
 
@@ -332,12 +332,12 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
     <h2 class="section-title" id="features-heading">Tutto ciò che <span class="accent">un biker</span> vuole.</h2>
     <p class="section-lead">Sei funzioni che lavorano insieme: dalla mappa live agli SOS, dai MotoClub ai contest. Niente fronzoli, niente abbonamenti.</p>
     <div class="grid grid-3">
-      <article class="card"><div class="card-img"><img src="/assets/images/bike-road-1.jpg" alt="Moto su strada — mappa biker live" loading="lazy" /></div><h3>Mappa biker live</h3><p>Vedi chi è online vicino a te in tempo reale. Filtra per moto, brand, disponibilità a un giro.</p></article>
-      <article class="card"><div class="card-img"><img src="/assets/images/motoclub-ride.jpg" alt="Gruppo di motociclisti — MotoClub" loading="lazy" /></div><h3>MotoClub</h3><p>Crea o entra in un club. Admin, codici invito, chat di gruppo dedicata.</p></article>
-      <article class="card"><div class="card-img"><img src="/assets/images/bike-road-2.jpg" alt="Moto sulla strada — SOS Biker emergenza" loading="lazy" /></div><h3>SOS Biker</h3><p>Un tasto. La community vicina riceve la notifica con la tua posizione precisa.</p></article>
-      <article class="card"><div class="card-img"><img src="/assets/images/contest-1.jpg" alt="Foto contest moto — PicContest BikerLink" loading="lazy" /></div><h3>Contest foto</h3><p>Concorsi fotografici settimanali. Mostra la tua moto, il tuo giro, vinci visibilità.</p></article>
-      <article class="card"><div class="card-img"><img src="/assets/images/telemetry-dash.jpg" alt="Dashboard telemetria — tracking GPS percorsi" loading="lazy" /></div><h3>Tracking percorsi</h3><p>Registra i tuoi giri con velocità, km, G-force. Storico privato e statistiche.</p></article>
-      <article class="card"><div class="card-img"><img src="/assets/images/card-biker.jpg" alt="Biker solitario — matching compagni di viaggio" loading="lazy" /></div><h3>Matching biker</h3><p>Trova compagni di viaggio compatibili per moto, stile di guida e gusti musicali.</p></article>
+      <article class="card"><div class="card-img"><img src="/assets/images/bike-road-1.webp" alt="Moto su strada — mappa biker live" loading="lazy" /></div><h3>Mappa biker live</h3><p>Vedi chi è online vicino a te in tempo reale. Filtra per moto, brand, disponibilità a un giro.</p></article>
+      <article class="card"><div class="card-img"><img src="/assets/images/motoclub-ride.webp" alt="Gruppo di motociclisti — MotoClub" loading="lazy" /></div><h3>MotoClub</h3><p>Crea o entra in un club. Admin, codici invito, chat di gruppo dedicata.</p></article>
+      <article class="card"><div class="card-img"><img src="/assets/images/bike-road-2.webp" alt="Moto sulla strada — SOS Biker emergenza" loading="lazy" /></div><h3>SOS Biker</h3><p>Un tasto. La community vicina riceve la notifica con la tua posizione precisa.</p></article>
+      <article class="card"><div class="card-img"><img src="/assets/images/contest-1.webp" alt="Foto contest moto — PicContest BikerLink" loading="lazy" /></div><h3>Contest foto</h3><p>Concorsi fotografici settimanali. Mostra la tua moto, il tuo giro, vinci visibilità.</p></article>
+      <article class="card"><div class="card-img"><img src="/assets/images/telemetry-dash.webp" alt="Dashboard telemetria — tracking GPS percorsi" loading="lazy" /></div><h3>Tracking percorsi</h3><p>Registra i tuoi giri con velocità, km, G-force. Storico privato e statistiche.</p></article>
+      <article class="card"><div class="card-img"><img src="/assets/images/card-biker.webp" alt="Biker solitario — matching compagni di viaggio" loading="lazy" /></div><h3>Matching biker</h3><p>Trova compagni di viaggio compatibili per moto, stile di guida e gusti musicali.</p></article>
     </div>
     <div style="margin-top:32px"><a class="btn btn-outline" href="/features">Tutte le funzionalità →</a></div>
   </div>
@@ -351,7 +351,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
     <p class="section-lead">Che tu vada da solo, in coppia o con il tuo equipaggio — BikerLink è costruita per te.</p>
     <div class="home-who-grid" role="list">
       <article class="home-who-card" role="listitem">
-        <img src="/assets/images/card-biker.jpg" alt="Biker solitario su moto sportiva" width="600" height="800" loading="lazy" />
+        <img src="/assets/images/card-biker.webp" alt="Biker solitario su moto sportiva" width="600" height="800" loading="lazy" />
         <div class="home-who-overlay" aria-hidden="true"></div>
         <div class="home-who-num" aria-hidden="true">/01</div>
         <div class="home-who-body">
@@ -361,7 +361,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
         </div>
       </article>
       <article class="home-who-card" role="listitem">
-        <img src="/assets/images/card-zavorrine.jpg" alt="Passeggero in moto — le zavorrine" width="600" height="800" loading="lazy" />
+        <img src="/assets/images/card-zavorrine.webp" alt="Passeggero in moto — le zavorrine" width="600" height="800" loading="lazy" />
         <div class="home-who-overlay" aria-hidden="true"></div>
         <div class="home-who-num" aria-hidden="true">/02</div>
         <div class="home-who-body">
@@ -371,7 +371,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
         </div>
       </article>
       <article class="home-who-card" role="listitem">
-        <img src="/assets/images/card-coppie.jpg" alt="Coppia in moto" width="600" height="800" loading="lazy" />
+        <img src="/assets/images/card-coppie.webp" alt="Coppia in moto" width="600" height="800" loading="lazy" />
         <div class="home-who-overlay" aria-hidden="true"></div>
         <div class="home-who-num" aria-hidden="true">/03</div>
         <div class="home-who-body">
@@ -418,7 +418,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
       </div>
     </div>
     <div class="home-tele-photo">
-      <img src="/assets/images/telemetry-dash.jpg" alt="Dashboard telemetria BikerLink — velocità e G-force" width="800" height="560" loading="lazy" />
+      <img src="/assets/images/telemetry-dash.webp" alt="Dashboard telemetria BikerLink — velocità e G-force" width="800" height="560" loading="lazy" />
     </div>
   </div>
 </section>
@@ -427,7 +427,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
 <section class="home-ai-plan" aria-labelledby="ai-plan-heading">
   <div class="home-ai-plan-inner">
     <div class="home-ai-plan-photo" aria-hidden="true">
-      <img src="/assets/images/bike-road-2.jpg" alt="Percorso moto curvy tra le montagne" width="800" height="560" loading="lazy" />
+      <img src="/assets/images/bike-road-2.webp" alt="Percorso moto curvy tra le montagne" width="800" height="560" loading="lazy" />
     </div>
     <div class="home-ai-plan-content">
       <span class="section-eyebrow">Pianificazione intelligente</span>
@@ -469,7 +469,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
     </a>
     <div class="home-contest-grid" role="list">
       <article class="home-contest-card" role="listitem">
-        <img src="/assets/images/contest-1.jpg" alt="Foto contest #1 — Moto in gara" width="400" height="533" loading="lazy" />
+        <img src="/assets/images/contest-1.webp" alt="Foto contest #1 — Moto in gara" width="400" height="533" loading="lazy" />
         <div class="home-contest-overlay" aria-hidden="true"></div>
         <div class="home-contest-rank gold">🏆 1°</div>
         <div class="home-contest-meta">
@@ -478,7 +478,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
         </div>
       </article>
       <article class="home-contest-card" role="listitem">
-        <img src="/assets/images/contest-2.jpg" alt="Foto contest #2 — Biker su passo di montagna" width="400" height="533" loading="lazy" />
+        <img src="/assets/images/contest-2.webp" alt="Foto contest #2 — Biker su passo di montagna" width="400" height="533" loading="lazy" />
         <div class="home-contest-overlay" aria-hidden="true"></div>
         <div class="home-contest-rank">🥈 2°</div>
         <div class="home-contest-meta">
@@ -487,7 +487,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
         </div>
       </article>
       <article class="home-contest-card" role="listitem">
-        <img src="/assets/images/contest-3.jpg" alt="Foto contest #3 — Moto sul passo" width="400" height="533" loading="lazy" />
+        <img src="/assets/images/contest-3.webp" alt="Foto contest #3 — Moto sul passo" width="400" height="533" loading="lazy" />
         <div class="home-contest-overlay" aria-hidden="true"></div>
         <div class="home-contest-rank">🥉 3°</div>
         <div class="home-contest-meta">
@@ -505,9 +505,9 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
     <span class="section-eyebrow">Pensata per te</span>
     <h2 class="section-title" id="trust-heading">Niente abbonamenti.<br/><span class="accent">Niente compromessi.</span></h2>
     <div class="grid grid-3" style="margin-top:24px">
-      <article class="card"><div class="card-img"><img src="/assets/images/card-biker.jpg" alt="Biker solitario — privacy e libertà" loading="lazy" /></div><h3>Privacy reale</h3><p>Ghost Mode, fuzzing GPS, Fake Home. Scegli tu cosa rendere visibile.</p><div class="meta">GDPR · Italian-made</div></article>
-      <article class="card"><div class="card-img"><img src="/assets/images/bike-road-1.jpg" alt="Moto su strada veloce" loading="lazy" /></div><h3>Veloce e leggera</h3><p>App nativa, caricamento progressivo, mappa ottimizzata anche con connessione lenta.</p><div class="meta">Android · iOS in arrivo</div></article>
-      <article class="card"><div class="card-img"><img src="/assets/images/motoclub-ride.jpg" alt="Community di motociclisti in gruppo" loading="lazy" /></div><h3>Community moderata</h3><p>Sistema di segnalazioni, moderazione automatica, EULA chiaro. Zero tolleranza per spam e abusi.</p><div class="meta">24/7</div></article>
+      <article class="card"><div class="card-img"><img src="/assets/images/card-biker.webp" alt="Biker solitario — privacy e libertà" loading="lazy" /></div><h3>Privacy reale</h3><p>Ghost Mode, fuzzing GPS, Fake Home. Scegli tu cosa rendere visibile.</p><div class="meta">GDPR · Italian-made</div></article>
+      <article class="card"><div class="card-img"><img src="/assets/images/bike-road-1.webp" alt="Moto su strada veloce" loading="lazy" /></div><h3>Veloce e leggera</h3><p>App nativa, caricamento progressivo, mappa ottimizzata anche con connessione lenta.</p><div class="meta">Android · iOS in arrivo</div></article>
+      <article class="card"><div class="card-img"><img src="/assets/images/motoclub-ride.webp" alt="Community di motociclisti in gruppo" loading="lazy" /></div><h3>Community moderata</h3><p>Sistema di segnalazioni, moderazione automatica, EULA chiaro. Zero tolleranza per spam e abusi.</p><div class="meta">24/7</div></article>
     </div>
   </div>
 </section>
@@ -580,12 +580,12 @@ export function buildFeatures(
 
 <section class="section">
   <div class="section-inner">
-    ${feature("Mappa", "Vedi i biker vicino a te, in tempo reale", "Mappa interattiva con posizione live degli utenti online. Filtri per modello, brand, disponibilità a un giro. Heartbeat ogni 30 secondi per visibilità affidabile.", "/assets/images/bike-road-1.jpg", "Moto su strada — mappa biker live", "/community", "Vai alla community")}
-    ${feature("MotoClub", "Crea il tuo club. Gestiscilo come vuoi.", "Sistema completo: creazione club, codici invito, pannello admin, approvazioni manuali o auto-join, chat di gruppo dedicata con hashtag e filtri. Pensato per veri equipaggi e gruppi locali.", "/assets/images/motoclub-ride.jpg", "Gruppo di motociclisti — MotoClub BikerLink", "/motoclub", "Scopri i MotoClub")}
-    ${feature("SOS", "Un tasto. La rete ti trova.", "Quando attivi l'SOS, la tua posizione precisa viene inviata ai motociclisti entro il raggio scelto. Chat privata istantanea con chi accetta. Tutto integrato, niente numeri da chiamare in panico.", "/assets/images/bike-road-2.jpg", "Moto sulla strada — SOS emergenza biker", "/sos", "Come funziona l'SOS")}
-    ${feature("Contest foto", "Mostra la tua moto. Vinci visibilità.", "Concorsi fotografici settimanali con voto degli iscritti. Categorie tematiche, classifica live, profili in evidenza per i vincitori. Pubblica la foto del tuo ultimo giro e raccontala.", "/assets/images/contest-1.jpg", "Foto contest moto — BikerLink PicContest", "/community", "Vedi i contest")}
-    ${feature("Tracking GPS", "Registra ogni giro. Senza limiti.", "Tracker preciso con km, velocità media, G-force longitudinale e accelerazione. Storico privato, statistiche cumulative, e modalità Ghost se non vuoi essere visibile durante il giro.", "/assets/images/telemetry-dash.jpg", "Dashboard telemetria moto — tracking GPS BikerLink", "/about", "Leggi la mission")}
-    ${feature("Matching biker", "Trova compagni di viaggio compatibili.", "Algoritmo basato su moto posseduta, stile di guida, zona, e gusti musicali (integrazione Last.fm opzionale). Più che un'app di incontri — un modo per non partire più da soli.", "/assets/images/card-biker.jpg", "Biker solitario — matching compagni di viaggio", "/faq", "Domande frequenti")}
+    ${feature("Mappa", "Vedi i biker vicino a te, in tempo reale", "Mappa interattiva con posizione live degli utenti online. Filtri per modello, brand, disponibilità a un giro. Heartbeat ogni 30 secondi per visibilità affidabile.", "/assets/images/bike-road-1.webp", "Moto su strada — mappa biker live", "/community", "Vai alla community")}
+    ${feature("MotoClub", "Crea il tuo club. Gestiscilo come vuoi.", "Sistema completo: creazione club, codici invito, pannello admin, approvazioni manuali o auto-join, chat di gruppo dedicata con hashtag e filtri. Pensato per veri equipaggi e gruppi locali.", "/assets/images/motoclub-ride.webp", "Gruppo di motociclisti — MotoClub BikerLink", "/motoclub", "Scopri i MotoClub")}
+    ${feature("SOS", "Un tasto. La rete ti trova.", "Quando attivi l'SOS, la tua posizione precisa viene inviata ai motociclisti entro il raggio scelto. Chat privata istantanea con chi accetta. Tutto integrato, niente numeri da chiamare in panico.", "/assets/images/bike-road-2.webp", "Moto sulla strada — SOS emergenza biker", "/sos", "Come funziona l'SOS")}
+    ${feature("Contest foto", "Mostra la tua moto. Vinci visibilità.", "Concorsi fotografici settimanali con voto degli iscritti. Categorie tematiche, classifica live, profili in evidenza per i vincitori. Pubblica la foto del tuo ultimo giro e raccontala.", "/assets/images/contest-1.webp", "Foto contest moto — BikerLink PicContest", "/community", "Vedi i contest")}
+    ${feature("Tracking GPS", "Registra ogni giro. Senza limiti.", "Tracker preciso con km, velocità media, G-force longitudinale e accelerazione. Storico privato, statistiche cumulative, e modalità Ghost se non vuoi essere visibile durante il giro.", "/assets/images/telemetry-dash.webp", "Dashboard telemetria moto — tracking GPS BikerLink", "/about", "Leggi la mission")}
+    ${feature("Matching biker", "Trova compagni di viaggio compatibili.", "Algoritmo basato su moto posseduta, stile di guida, zona, e gusti musicali (integrazione Last.fm opzionale). Più che un'app di incontri — un modo per non partire più da soli.", "/assets/images/card-biker.webp", "Biker solitario — matching compagni di viaggio", "/faq", "Domande frequenti")}
   </div>
 </section>
 
