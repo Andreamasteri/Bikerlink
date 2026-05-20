@@ -1296,6 +1296,9 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/primal-user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: () => {
+      Alert.alert("Errore", "Impossibile aggiornare impostazione Primal User");
+    },
   });
 
   const { data: mapsData } = useQuery<{ enabled: boolean; provider: string; userChoiceEnabled: boolean }>({

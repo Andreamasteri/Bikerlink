@@ -1847,6 +1847,27 @@ router.put("/settings/maps_enabled", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/settings/primal_user_enabled", async (req: Request, res: Response) => {
+  try {
+    const { value } = req.body as { value: string };
+    if (value !== "true" && value !== "false") {
+      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
+    }
+    const setting = await storage.upsertAppSetting("primal_user_enabled", value);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "update_setting",
+      targetType: "app_setting",
+      targetId: "primal_user_enabled",
+      details: `primal_user_enabled = ${value}`,
+    });
+    return res.json(setting);
+  } catch (error) {
+    console.error("Admin primal_user_enabled error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/settings/maps_provider", async (req: Request, res: Response) => {
   try {
     const { value } = req.body as { value: string };
