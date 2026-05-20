@@ -213,6 +213,8 @@ a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var
 .lang-btn{font-size:11px;font-weight:700;letter-spacing:1px;padding:5px 9px;border:none;background:transparent;color:var(--text3);cursor:pointer;transition:all .15s;font-family:var(--font-body);line-height:1}
 .lang-btn.active{background:var(--accent);color:#fff}
 .lang-btn:hover:not(.active){color:var(--text)}
+.nav-lang-mobile{display:none;margin-left:0;margin-top:6px}
+@media(max-width:860px){.nav-lang-mobile{display:flex}}
 `;
 
 // Minify the inline stylesheet: strip CSS comments, collapse newlines and
@@ -253,6 +255,10 @@ function navbar(currentPath: string): string {
       ${link("/about", "About", "nav.about")}
       ${link("/faq", "FAQ", "nav.faq")}
       <a href="/download" class="nav-cta" aria-label="Scarica app" data-i18n="nav.download">Scarica app</a>
+      <div class="lang-toggle nav-lang-mobile" role="group" aria-label="Seleziona lingua">
+        <button class="lang-btn" id="langIT_m" aria-pressed="true" onclick="setLang('it')">IT</button>
+        <button class="lang-btn" id="langEN_m" aria-pressed="false" onclick="setLang('en')">EN</button>
+      </div>
     </nav>
     <div class="lang-toggle" role="group" aria-label="Seleziona lingua">
       <button class="lang-btn" id="langIT" aria-pressed="true" onclick="setLang('it')">IT</button>
@@ -317,6 +323,13 @@ function navbar(currentPath: string): string {
       btnEN.classList.toggle('active',lang==='en');
       btnIT.setAttribute('aria-pressed',lang==='it'?'true':'false');
       btnEN.setAttribute('aria-pressed',lang==='en'?'true':'false');
+    }
+    var btnITm=document.getElementById('langIT_m'),btnENm=document.getElementById('langEN_m');
+    if(btnITm&&btnENm){
+      btnITm.classList.toggle('active',lang==='it');
+      btnENm.classList.toggle('active',lang==='en');
+      btnITm.setAttribute('aria-pressed',lang==='it'?'true':'false');
+      btnENm.setAttribute('aria-pressed',lang==='en'?'true':'false');
     }
     document.documentElement.lang=lang==='en'?'en':'it';
   }
