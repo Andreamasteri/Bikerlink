@@ -1575,6 +1575,26 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[INIT] Phase 3.5 lastfm placeholder cleanup error:", e);
         }
 
+        // Phase 3.6: one-time cleanup — remove legacy 8.x OTA records
+        try {
+          const { storage: stOta } = await import("./storage");
+          const ota8xCleaned = await stOta.getAppSetting("ota_8x_cleanup_done_v1").catch(() => null);
+          if (!ota8xCleaned) {
+            const { db: dbOta } = await import("./db");
+            const { sql: sqlOta } = await import("drizzle-orm");
+            const evRes = await dbOta.execute(sqlOta`DELETE FROM ota_events WHERE runtime_version = '8.0.0'`);
+            const rlRes = await dbOta.execute(sqlOta`DELETE FROM ota_releases WHERE runtime_version = '8.0.0'`);
+            const evDel = (evRes as any)?.rowCount ?? "?";
+            const rlDel = (rlRes as any)?.rowCount ?? "?";
+            console.log(`[INIT] Phase 3.6 OTA 8.x cleanup: ota_events=${evDel} deleted, ota_releases=${rlDel} deleted`);
+            await stOta.upsertAppSetting("ota_8x_cleanup_done_v1", "done");
+          } else {
+            console.log("[INIT] Phase 3.6 OTA 8.x cleanup already done, skipping");
+          }
+        } catch (e) {
+          console.warn("[INIT] Phase 3.6 OTA 8.x cleanup error:", e);
+        }
+
         // Phase 4: motoclub migration + reseed (heavy — many DB inserts)
         await delay(2_000);
         try {
