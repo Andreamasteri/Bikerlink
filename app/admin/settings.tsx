@@ -930,6 +930,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/home-message"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   async function handleSaveHomeMessageText() {
@@ -964,6 +965,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const musicMatchMutation = useMutation({
@@ -983,6 +985,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/music-match"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const musicExportMutation = useMutation({
@@ -1002,6 +1005,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/music-export-playlist"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const musicImportMutation = useMutation({
@@ -1021,6 +1025,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/music-import-playlist"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const customRoutesMutation = useMutation({
@@ -1040,6 +1045,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/custom-routes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const motoclubZavMutation = useMutation({
@@ -1059,6 +1065,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/motoclub-include-zav"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const autoMatchMutation = useMutation({
@@ -1078,6 +1085,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const refetchIntervalMutation = useMutation({
@@ -1097,6 +1105,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/profile-refetch-interval"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const { data: floatingWidgetData } = useQuery<{ enabled: boolean }>({
@@ -1127,6 +1136,7 @@ export default function AdminSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/show-distance-counter"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const coordMaxAgeMutation = useMutation({
@@ -1146,6 +1156,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/coordinates_max_age_seconds"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const showSearchPrefMutation = useMutation({
@@ -1165,6 +1176,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/show-search-preference"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const motoclubCreationMutation = useMutation({
@@ -1184,6 +1196,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/motoclub-user-creation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const { data: matchingStats, refetch: refetchMatchingStats } = useQuery<{
@@ -1250,6 +1263,7 @@ export default function AdminSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/matching_countries"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const reconcileClubInvitesMutation = useMutation({
@@ -1325,6 +1339,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const mapsProviderMutation = useMutation({
@@ -1345,6 +1360,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const mapsUserChoiceMutation = useMutation({
@@ -1365,6 +1381,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const [isUploadingEula, setIsUploadingEula] = useState(false);
@@ -1421,6 +1438,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/ota-gate-enabled"] });
       refetchOtaGate();
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const otaWaitMutation = useMutation({
@@ -1431,6 +1449,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/ota-wait-seconds"] });
       refetchOtaWait();
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const { data: matchGateData, refetch: refetchMatchGate } = useQuery<{ visible: boolean }>({
@@ -1446,6 +1465,7 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/match-settings"] });
       refetchMatchGate();
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   const [otaRetentionInput, setOtaRetentionInput] = useState("90");
@@ -1593,6 +1613,7 @@ export default function AdminSettings() {
       setEditingKey(null);
       setEditValue("");
     },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   async function handleUploadEula() {
