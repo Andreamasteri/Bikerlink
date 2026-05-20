@@ -1540,6 +1540,35 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] ride_telemetry:", e);
         }
 
+        // Fase 2 — Map Matching: aggiungi colonna `matched` a ride_telemetry
+        try {
+          await db.execute(sql`
+            ALTER TABLE ride_telemetry
+            ADD COLUMN IF NOT EXISTS matched BOOLEAN NOT NULL DEFAULT false
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS ride_telemetry_matched_idx ON ride_telemetry (matched)`);
+          console.log("[MIGRATION] ride_telemetry.matched column ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] ride_telemetry.matched:", e);
+        }
+
+        // Fase 2 — Map Matching: crea tabella segment_telemetry
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS segment_telemetry (
+              osm_way_id    BIGINT          PRIMARY KEY,
+              avg_lean_angle DOUBLE PRECISION,
+              max_lean_angle DOUBLE PRECISION,
+              avg_gforce    DOUBLE PRECISION,
+              sample_count  INTEGER         NOT NULL DEFAULT 0,
+              last_updated  TIMESTAMP       NOT NULL DEFAULT NOW()
+            )
+          `);
+          console.log("[MIGRATION] segment_telemetry table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] segment_telemetry:", e);
+        }
+
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
         initState.initializing = false;
 
@@ -2198,6 +2227,18 @@ function setupErrorHandler(app: express.Application) {
           console.log("[INIT] Phase 13 schema snapshot saved");
         } catch (e) {
           console.warn("[INIT] Phase 13 schema snapshot failed (non-fatal):", e);
+        }
+
+        // Phase 14 — Map Matching nightly scheduler (02:00 Europe/Rome)
+        // Associa i punti GPS raccolti dalla telemetria ai segmenti stradali OSM.
+        // Richiede GRAPHHOPPER_URL (self-hosted) o GRAPHHOPPER_API_KEY (cloud).
+        // Documentazione: server/README-graphhopper.md
+        try {
+          const { scheduleNightlyMapMatching } = await import("./map-matching-job");
+          scheduleNightlyMapMatching();
+          console.log("[INIT] Phase 14 map matching nightly scheduler registered (02:00 Europe/Rome)");
+        } catch (e) {
+          console.warn("[INIT] Phase 14 map matching scheduler failed (non-fatal):", e);
         }
       })().catch((err) => {
         console.error("[INIT] Startup phase chain error:", err);

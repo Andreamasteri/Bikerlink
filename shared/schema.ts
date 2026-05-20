@@ -15,6 +15,7 @@ import {
   uniqueIndex,
   pgEnum,
   primaryKey,
+  bigint,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1757,7 +1758,20 @@ export const rideTelemetry = pgTable("ride_telemetry", {
   index("ride_telemetry_user_id_idx").on(table.userId),
   index("ride_telemetry_session_id_idx").on(table.sessionId),
   index("ride_telemetry_ts_idx").on(table.ts),
+  index("ride_telemetry_matched_idx").on(table.matched),
 ]);
 
 export type RideTelemetry = typeof rideTelemetry.$inferSelect;
 export type InsertRideTelemetry = typeof rideTelemetry.$inferInsert;
+
+export const segmentTelemetry = pgTable("segment_telemetry", {
+  osmWayId: bigint("osm_way_id", { mode: "number" }).primaryKey(),
+  avgLeanAngle: doublePrecision("avg_lean_angle"),
+  maxLeanAngle: doublePrecision("max_lean_angle"),
+  avgGforce: doublePrecision("avg_gforce"),
+  sampleCount: integer("sample_count").notNull().default(0),
+  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+});
+
+export type SegmentTelemetry = typeof segmentTelemetry.$inferSelect;
+export type InsertSegmentTelemetry = typeof segmentTelemetry.$inferInsert;

@@ -7641,6 +7641,40 @@ router.get("/telemetry/stats", async (_req: Request, res: Response) => {
   }
 });
 
+// ─── Map Matching monitor ──────────────────────────────────────────────────────
+
+router.get("/map-matching-stats", async (_req: Request, res: Response) => {
+  try {
+    const { getMapMatchingStats } = await import("../map-matching-job");
+    const stats = await getMapMatchingStats();
+    return res.json(stats);
+  } catch (err) {
+    console.error("[admin/map-matching-stats] error:", err);
+    return res.status(500).json({ message: "Errore caricamento stats map matching" });
+  }
+});
+
+router.post("/map-matching/run", async (req: Request, res: Response) => {
+  try {
+    const { runMapMatchingJob, isMapMatchingRunning } = await import("../map-matching-job");
+    if (isMapMatchingRunning()) {
+      return res.status(409).json({ message: "Job già in esecuzione" });
+    }
+    // Avvia il job in background senza bloccare la risposta HTTP
+    runMapMatchingJob()
+      .then((result) => {
+        console.log("[MAP-MATCH] Esecuzione manuale completata:", result);
+      })
+      .catch((err) => {
+        console.error("[MAP-MATCH] Errore esecuzione manuale:", err);
+      });
+    return res.json({ message: "Job avviato", started: true });
+  } catch (err) {
+    console.error("[admin/map-matching/run] error:", err);
+    return res.status(500).json({ message: "Errore avvio job" });
+  }
+});
+
 router.put("/telemetry-target-km", async (req: Request, res: Response) => {
   try {
     const { target_km } = req.body;

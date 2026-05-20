@@ -24,6 +24,15 @@ interface TelemetryAdminStats {
   target_km: number;
 }
 
+interface MapMatchingStats {
+  pending: number;
+  matched: number;
+  segments: number;
+  lastRun: string | null;
+  isRunning: boolean;
+  ghConfigured: boolean;
+}
+
 async function adminFetch(path: string): Promise<Response> {
   const res = await fetch(new URL(path, getApiUrl()).toString(), {
     headers: { ...(await authFetchHeaders()) },
@@ -61,6 +70,7 @@ export default function AdminTelemetryScreen() {
   const qc = useQueryClient();
   const [targetInput, setTargetInput] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [runningJob, setRunningJob] = useState(false);
 
   const { data: stats, isLoading, error, refetch } = useQuery<TelemetryAdminStats>({
     queryKey: ["/api/admin/telemetry-stats"],
@@ -69,6 +79,13 @@ export default function AdminTelemetryScreen() {
     onSuccess: (d) => {
       if (!targetInput) setTargetInput(String(d.target_km));
     },
+  });
+
+  const { data: mmStats, refetch: refetchMm } = useQuery<MapMatchingStats>({
+    queryKey: ["/api/admin/map-matching-stats"],
+    queryFn: () => adminFetch("/api/admin/map-matching-stats").then((r) => r.json()),
+    staleTime: 15_000,
+    refetchInterval: (data) => (data?.isRunning ? 5_000 : 30_000),
   });
 
   const handleSaveTarget = async () => {
@@ -102,9 +119,47 @@ export default function AdminTelemetryScreen() {
     }
   };
 
+  const handleRunMapMatching = async () => {
+    if (runningJob || mmStats?.isRunning) return;
+    setRunningJob(true);
+    try {
+      const res = await fetch(
+        new URL("/api/admin/map-matching/run", getApiUrl()).toString(),
+        {
+          method: "POST",
+          headers: { ...(await authFetchHeaders()) },
+          credentials: "include",
+        }
+      );
+      if (res.status === 409) {
+        Alert.alert("Info", "Job già in esecuzione.");
+        return;
+      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      Alert.alert("Avviato", "Job map matching avviato in background. Aggiorna tra qualche minuto.");
+      setTimeout(() => refetchMm(), 3_000);
+    } catch {
+      Alert.alert("Errore", "Impossibile avviare il job.");
+    } finally {
+      setRunningJob(false);
+    }
+  };
+
   const progressPct = stats
     ? Math.min(100, Math.round((stats.total_km / stats.target_km) * 100))
     : 0;
+
+  const formatLastRun = (iso: string | null | undefined): string => {
+    if (!iso) return "Mai eseguito";
+    try {
+      return new Date(iso).toLocaleString("it-IT", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      });
+    } catch {
+      return iso;
+    }
+  };
 
   return (
     <ScrollView
@@ -221,9 +276,93 @@ export default function AdminTelemetryScreen() {
         </>
       )}
 
+      {/* ── Map Matching section ── */}
+      <View style={styles.section}>
+        <View style={styles.mmHeader}>
+          <MaterialCommunityIcons name="map-marker-check" size={18} color="#f59e0b" />
+          <Text style={styles.sectionTitle}>Map Matching OSM</Text>
+        </View>
+        <Text style={styles.settingDesc}>
+          Pipeline notturna (02:00) che associa i punti GPS ai segmenti stradali OSM tramite GraphHopper.
+        </Text>
+
+        {mmStats && (
+          <View style={styles.statsGrid}>
+            <StatCard
+              label="Campioni in attesa"
+              value={mmStats.pending.toLocaleString("it-IT")}
+              icon="timer-sand"
+              color="#f59e0b"
+            />
+            <StatCard
+              label="Campioni matchati"
+              value={mmStats.matched.toLocaleString("it-IT")}
+              icon="check-circle"
+              color="#22c55e"
+            />
+            <StatCard
+              label="Segmenti OSM noti"
+              value={mmStats.segments.toLocaleString("it-IT")}
+              icon="road"
+              color="#3b82f6"
+            />
+          </View>
+        )}
+
+        <View style={styles.mmMeta}>
+          <View style={styles.mmMetaRow}>
+            <MaterialCommunityIcons
+              name="clock-outline"
+              size={14}
+              color={Colors.textSecondary}
+            />
+            <Text style={styles.mmMetaText}>
+              Ultima esecuzione: {formatLastRun(mmStats?.lastRun)}
+            </Text>
+          </View>
+          <View style={styles.mmMetaRow}>
+            <MaterialCommunityIcons
+              name={mmStats?.ghConfigured ? "check-circle-outline" : "alert-circle-outline"}
+              size={14}
+              color={mmStats?.ghConfigured ? "#22c55e" : "#ef4444"}
+            />
+            <Text style={[styles.mmMetaText, { color: mmStats?.ghConfigured ? "#22c55e" : "#ef4444" }]}>
+              {mmStats?.ghConfigured
+                ? "GraphHopper configurato"
+                : "GraphHopper non configurato (impostare GRAPHHOPPER_URL)"}
+            </Text>
+          </View>
+          {mmStats?.isRunning && (
+            <View style={styles.mmMetaRow}>
+              <ActivityIndicator size="small" color={Colors.accent} />
+              <Text style={[styles.mmMetaText, { color: Colors.accent }]}>
+                Job in esecuzione…
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={[
+            styles.runJobBtn,
+            (runningJob || mmStats?.isRunning || !mmStats?.ghConfigured) && { opacity: 0.5 },
+          ]}
+          onPress={handleRunMapMatching}
+          disabled={runningJob || mmStats?.isRunning || !mmStats?.ghConfigured}
+          activeOpacity={0.8}
+        >
+          {runningJob ? (
+            <ActivityIndicator size="small" color="#000" />
+          ) : (
+            <MaterialCommunityIcons name="play-circle" size={18} color="#000" />
+          )}
+          <Text style={styles.runJobBtnText}>Esegui ora</Text>
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity
         style={styles.refreshBtn}
-        onPress={() => refetch()}
+        onPress={() => { refetch(); refetchMm(); }}
         activeOpacity={0.8}
       >
         <Ionicons name="refresh" size={16} color={Colors.accent} />
@@ -368,5 +507,41 @@ const styles = StyleSheet.create({
     color: "#ef4444",
     textAlign: "center",
     marginTop: 32,
+  },
+  mmHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  mmMeta: {
+    marginTop: 12,
+    gap: 6,
+  },
+  mmMetaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  mmMetaText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  runJobBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 14,
+  },
+  runJobBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "#000",
   },
 });
