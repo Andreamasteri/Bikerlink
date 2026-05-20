@@ -175,7 +175,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   if (!prompt) return res.status(400).json({ message: "Testo richiesto" });
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.json(fallbackAiParse(prompt));
+  if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
 
   try {
     const systemPrompt = `Sei un assistente per pianificazione giri in moto.
@@ -211,7 +211,7 @@ Analizza la richiesta e restituisci SOLO un oggetto JSON con:
     return res.json(JSON.parse(jsonMatch[0]));
   } catch (err) {
     console.error("[AI parse] error:", err);
-    return res.json(fallbackAiParse(prompt));
+    return res.status(503).json({ message: "Servizio AI non disponibile: errore durante l'elaborazione della richiesta" });
   }
 });
 
@@ -276,7 +276,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
   }
 
   const apiKey = process.env.GRAPHHOPPER_API_KEY;
-  if (!apiKey) return res.json(buildFallbackRoute(waypoints));
+  if (!apiKey) return res.status(503).json({ message: "Servizio di routing non disponibile: chiave GRAPHHOPPER_API_KEY mancante" });
 
   try {
     const body: any = {
@@ -333,13 +333,14 @@ router.post("/calculate", async (req: Request, res: Response) => {
     });
 
     if (!resp.ok) {
-      console.error("[GraphHopper] error:", await resp.text());
-      return res.json(buildFallbackRoute(waypoints));
+      const errText = await resp.text();
+      console.error("[GraphHopper] error:", errText);
+      return res.status(503).json({ message: "Servizio di routing non disponibile: errore GraphHopper" });
     }
 
     const data = await resp.json() as any;
     const path = data.paths?.[0];
-    if (!path) return res.json(buildFallbackRoute(waypoints));
+    if (!path) return res.status(503).json({ message: "Servizio di routing non disponibile: nessun percorso trovato" });
 
     const encoded = path.points as string;
     const bikerScore = style === "curvy" ? computeBikerScore(encoded) : style === "fast" ? 0.1 : 0.5;
@@ -359,7 +360,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[GraphHopper] fetch error:", err);
-    return res.json(buildFallbackRoute(waypoints));
+    return res.status(503).json({ message: "Servizio di routing non disponibile: errore di rete" });
   }
 });
 

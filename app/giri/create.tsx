@@ -78,7 +78,10 @@ async function calcRoute(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ waypoints, style, avoidHighways, avoidTolls, roundTripHours, isRoundTrip }),
   });
-  if (!resp.ok) throw new Error("Calcolo fallito");
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}));
+    throw new Error(body.message ?? "Calcolo percorso fallito");
+  }
   return resp.json();
 }
 
@@ -89,7 +92,10 @@ async function parseAI(prompt: string): Promise<any> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ prompt }),
   });
-  if (!resp.ok) throw new Error("AI non disponibile");
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}));
+    throw new Error(body.message ?? "Servizio AI non disponibile");
+  }
   return resp.json();
 }
 
@@ -260,8 +266,9 @@ export default function GiriCreateScreen() {
         });
       });
 
-    } catch {
-      Alert.alert("Errore", "AI non disponibile. Inserisci manualmente.");
+    } catch (err: any) {
+      const msg = err?.message ?? "Servizio AI non disponibile";
+      Alert.alert("Errore AI", msg);
       setMode("manual");
     } finally {
       setAiLoading(false);
@@ -348,8 +355,9 @@ export default function GiriCreateScreen() {
           [{ text: "OK" }]
         );
       }
-    } catch {
-      Alert.alert("Calcolo automatico fallito", 'Modifica le tappe e premi "Calcola percorso" manualmente.');
+    } catch (err: any) {
+      const msg = err?.message ?? "Calcolo percorso fallito";
+      Alert.alert("Calcolo automatico fallito", `${msg}\nModifica le tappe e premi "Calcola percorso" manualmente.`);
     } finally {
       setCalculating(false);
     }
@@ -407,8 +415,9 @@ export default function GiriCreateScreen() {
           [{ text: "OK" }]
         );
       }
-    } catch {
-      Alert.alert("Errore", "Calcolo percorso fallito.");
+    } catch (err: any) {
+      const msg = err?.message ?? "Calcolo percorso fallito";
+      Alert.alert("Errore", msg);
     } finally { setCalculating(false); }
   };
 
