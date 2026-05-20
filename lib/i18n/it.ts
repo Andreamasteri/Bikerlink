@@ -241,6 +241,9 @@ const it: Record<string, string> = {
   "map.bikersAvailable": "Biker\nDisponibili",
   "map.passengersAvailable": "Zavorrine\nDisponibili",
   "map.loadingMap": "Caricamento mappa...",
+  "map.waitingLocationTitle": "In attesa della tua posizione",
+  "map.waitingLocationDesc": "Il GPS non è disponibile o non è ancora stata salvata una posizione dal tuo dispositivo mobile. Consenti l'accesso alla posizione per caricare la mappa.",
+  "map.allowLocation": "Consenti posizione",
   "map.searchPlaceholder": "Cerca per nickname...",
 
   "profile.bikerType": "Biker",

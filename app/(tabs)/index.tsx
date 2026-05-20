@@ -73,7 +73,7 @@ export default function MapScreen() {
   const insets = useSafeAreaInsets();
   const baseUrl = getApiUrl();
   const synecoVisible = useSynecoVisible();
-  const { positionReady: contextPositionReady } = useLocationGate();
+  const { positionReady: contextPositionReady, requestPermission } = useLocationGate();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
   const [mapFullscreen, setMapFullscreen] = useState(false);
@@ -883,8 +883,26 @@ export default function MapScreen() {
   if (Platform.OS === "web" && !location && !contextPositionReady) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={Colors.accent} />
-        <Text style={styles.loadingText}>{t("map.loadingMap")}</Text>
+        <Ionicons name="location-outline" size={56} color={Colors.accent} style={{ marginBottom: 20 }} />
+        <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "600", marginBottom: 8 }]}>
+          {t("map.waitingLocationTitle")}
+        </Text>
+        <Text style={[styles.loadingText, { fontSize: 14, opacity: 0.7, marginBottom: 28, textAlign: "center", paddingHorizontal: 32 }]}>
+          {t("map.waitingLocationDesc")}
+        </Text>
+        <TouchableOpacity
+          onPress={requestPermission}
+          style={{
+            backgroundColor: Colors.accent,
+            paddingHorizontal: 28,
+            paddingVertical: 12,
+            borderRadius: 24,
+          }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
+            {t("map.allowLocation")}
+          </Text>
+        </TouchableOpacity>
       </View>
     );
   }

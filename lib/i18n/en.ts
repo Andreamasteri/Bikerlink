@@ -241,6 +241,9 @@ const en: Record<string, string> = {
   "map.bikersAvailable": "Bikers\nAvailable",
   "map.passengersAvailable": "Pillions\nAvailable",
   "map.loadingMap": "Loading map...",
+  "map.waitingLocationTitle": "Waiting for your location",
+  "map.waitingLocationDesc": "GPS is not available or no position has been saved from your mobile device yet. Allow location access to load the map.",
+  "map.allowLocation": "Allow location",
   "map.searchPlaceholder": "Search by nickname...",
 
   "profile.bikerType": "Biker",
