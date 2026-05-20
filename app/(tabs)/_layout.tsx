@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { Tabs, useRouter, usePathname, type Href } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { View, Pressable, Text, StyleSheet, Linking, Modal, Animated, Platform } from "react-native";
+import { View, Pressable, Text, StyleSheet, Linking, Modal, Animated } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -191,13 +191,10 @@ export default function TabLayout() {
   const tabBarHeight = 60 + insets.bottom;
   const tabBarPaddingBottom = insets.bottom;
 
-  const isWeb = Platform.OS === "web";
-  const gpsTabHref = (isGpsGateActive && !isWeb) ? null : undefined;
+  const gpsTabHref = isGpsGateActive ? null : undefined;
 
-  const HIDDEN_TAB_NAMES = isWeb
-    ? new Set<string>([])
-    : new Set(["tracking", "garage", "giri", "ride"]);
-  if (isGpsGateActive && !isWeb) {
+  const HIDDEN_TAB_NAMES = new Set(["tracking", "garage", "giri", "ride"]);
+  if (isGpsGateActive) {
     ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi", "arcade", "giri"].forEach(
       (n) => HIDDEN_TAB_NAMES.add(n)
     );
@@ -251,7 +248,7 @@ export default function TabLayout() {
 
   return (
     <>
-      {isGpsGateActive && !isWeb && (
+      {isGpsGateActive && (
         <View style={[gpsBannerStyles.banner, { paddingTop: insets.top + 12 }]}>
           <Ionicons name="navigate-outline" size={28} color="#fff" />
           <Text style={gpsBannerStyles.title}>GPS non attivo</Text>
@@ -460,7 +457,7 @@ export default function TabLayout() {
               <Ionicons name="navigate" size={size} color={color} />
             ),
             headerTitle: t("tracking.recordRide"),
-            href: isWeb ? undefined : null,
+            href: null,
             headerLeft: () => (
               <Pressable onPress={() => router.back()} style={{ marginLeft: 8 }}>
                 <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -479,7 +476,7 @@ export default function TabLayout() {
                 <Ionicons name="heart" size={size} color={color} />
               ),
             headerTitle: isBikerOrCoppia ? t("garage.myGarage") : t("garage.myWishlist"),
-            href: isWeb ? undefined : null,
+            href: null,
           }}
         />
         <Tabs.Screen

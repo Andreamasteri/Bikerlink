@@ -5,7 +5,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Platform,
   Alert,
   ActivityIndicator,
   Linking,
@@ -176,8 +175,8 @@ export default function GiriDetailScreen() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const topPad = insets.top;
+  const bottomPad = insets.bottom;
 
   const [weather, setWeather] = useState<WeatherWaypoint[] | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);

@@ -278,8 +278,8 @@ export async function triggerOtaCheck(
     // If an update is available but we're still running the same bundle ID we
     // had last time we tried to fetch, the previous fetch+reload didn't advance
     // the bundle → potential stuck state. Increment the stuck-sessions counter.
-    // Skip in __DEV__ (expo-updates is a no-op anyway) and on web.
-    if (!__DEV__ && Platform.OS !== "web") {
+    // Skip in __DEV__ (expo-updates is a no-op anyway).
+    if (!__DEV__) {
       try {
         const lastFetchedId = await getLastFetchedId();
         if (lastFetchedId && lastFetchedId === currentUpdateId) {

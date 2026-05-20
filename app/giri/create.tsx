@@ -6,7 +6,6 @@ import {
   ScrollView,
   Pressable,
   StyleSheet,
-  Platform,
   Alert,
   ActivityIndicator,
   Switch,
@@ -196,7 +195,7 @@ export default function GiriCreateScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const qc = useQueryClient();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
+  const topPad = insets.top;
 
   const { logs: debugLogs, clearLogs: clearDebugLogs, logFetch } = useApiDebugLog();
   const [debugVisible, setDebugVisible] = useState(__DEV__);

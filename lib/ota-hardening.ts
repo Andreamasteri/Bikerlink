@@ -61,7 +61,6 @@ let _seenDownloadErrorSeq = -1;
 export async function sendOtaHeartbeatOnce(): Promise<void> {
   if (_heartbeatSent) return;
   if (__DEV__) return; // expo-updates è no-op in dev
-  if (Platform.OS === "web") return;
 
   const updateId = Updates.updateId;
   if (!updateId) return; // nessun OTA caricato (embedded bundle): non c'è nulla da segnalare
@@ -113,7 +112,6 @@ export async function sendOtaHeartbeatOnce(): Promise<void> {
 function attachErrorRecoveryListener() {
   if (_stateListenerSub) return;
   if (__DEV__) return;
-  if (Platform.OS === "web") return;
 
   try {
     _stateListenerSub = Updates.addUpdatesStateChangeListener((event) => {
@@ -196,7 +194,6 @@ function reportOtaListenerError(
 export async function initOtaHardening(): Promise<void> {
   if (_hardeningInited) return;
   _hardeningInited = true;
-  if (Platform.OS === "web") return;
 
   // 1. Inietta device ID via Expo-Extra-Params (vedi contratto in testa al file).
   //    Persiste tra restart: expo-updates salva gli extra params nello storage

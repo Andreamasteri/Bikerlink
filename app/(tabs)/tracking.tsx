@@ -786,43 +786,6 @@ function RouteMapModal({
 }
 
 
-// ─── Web fallback ─────────────────────────────────────────────────────────────
-
-type IoniconsName = React.ComponentProps<typeof Ionicons>["name"];
-
-const WEB_FALLBACK_FEATURES: { icon: IoniconsName; label: string }[] = [
-  { icon: "navigate", label: "Tracciamento GPS live" },
-  { icon: "speedometer-outline", label: "Velocità e accelerazione" },
-  { icon: "map-outline", label: "Registrazione percorso" },
-  { icon: "flash-outline", label: "Sprint 0-100 km/h" },
-];
-
-function TrackingWebFallback() {
-  const insets = useSafeAreaInsets();
-  const colors = useColors();
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const botPad = Platform.OS === "web" ? 34 : insets.bottom;
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: topPad, paddingBottom: botPad, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 }}>
-      <Ionicons name="phone-portrait-outline" size={64} color={colors.textSecondary} />
-      <Text style={{ fontFamily: "Inter_700Bold", fontSize: 22, color: colors.text, marginTop: 20, textAlign: "center" }}>
-        Disponibile solo su app mobile
-      </Text>
-      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 15, color: colors.textSecondary, marginTop: 12, textAlign: "center", lineHeight: 22 }}>
-        Il tracciamento GPS in tempo reale, la registrazione del giro e i sensori richiedono l'app BikerLink su iOS o Android.
-      </Text>
-      <View style={{ marginTop: 28, backgroundColor: colors.surface, borderRadius: 14, padding: 16, width: "100%", gap: 10 }}>
-        {WEB_FALLBACK_FEATURES.map((item) => (
-          <View key={item.icon} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Ionicons name={item.icon} size={20} color={colors.accent} />
-            <Text style={{ fontFamily: "Inter_500Medium", fontSize: 14, color: colors.text }}>{item.label}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 function TrackingNativeScreen() {
@@ -2101,20 +2064,18 @@ function TrackingNativeScreen() {
     rideStartBatteryTimeRef.current = Date.now();
     rideBatteryProfileRef.current = profileRef.current;
     try {
-      if (Platform.OS !== "web") {
-        const [level, state] = await Promise.all([
-          Battery.getBatteryLevelAsync(),
-          Battery.getBatteryStateAsync(),
-        ]);
-        const isCharging =
-          state === Battery.BatteryState.CHARGING ||
-          state === Battery.BatteryState.FULL;
-        if (isCharging) {
-          if (__DEV__) console.log(`[BikerLink] Battery at ride start: device is charging (state=${state}) — skipping battery drain tracking`);
-        } else if (level >= 0) {
-          rideStartBatteryLevelRef.current = level;
-          if (__DEV__) console.log(`[BikerLink] Battery at ride start: ${(level * 100).toFixed(1)}% (profile=${profileRef.current})`);
-        }
+      const [level, state] = await Promise.all([
+        Battery.getBatteryLevelAsync(),
+        Battery.getBatteryStateAsync(),
+      ]);
+      const isCharging =
+        state === Battery.BatteryState.CHARGING ||
+        state === Battery.BatteryState.FULL;
+      if (isCharging) {
+        if (__DEV__) console.log(`[BikerLink] Battery at ride start: device is charging (state=${state}) — skipping battery drain tracking`);
+      } else if (level >= 0) {
+        rideStartBatteryLevelRef.current = level;
+        if (__DEV__) console.log(`[BikerLink] Battery at ride start: ${(level * 100).toFixed(1)}% (profile=${profileRef.current})`);
       }
     } catch (e) {
       if (__DEV__) console.warn("[BikerLink] Battery read at ride start failed:", e);
@@ -2343,7 +2304,6 @@ function TrackingNativeScreen() {
     const rideDurationMs = stopTime - rideStartTime;
     const rideDurationMinutes = rideDurationMs / 60000;
     if (
-      Platform.OS !== "web" &&
       rideStartBattery !== null &&
       rideDurationMinutes >= BATTERY_MIN_RIDE_MINUTES
     ) {
@@ -5205,11 +5165,6 @@ const styles = StyleSheet.create({
   },
 });
 
-// ─── Platform router ──────────────────────────────────────────────────────────
-
 export default function TrackingScreen() {
-  if (Platform.OS === "web") {
-    return <TrackingWebFallback />;
-  }
   return <TrackingNativeScreen />;
 }

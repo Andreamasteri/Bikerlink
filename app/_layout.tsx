@@ -579,8 +579,8 @@ export default function RootLayout() {
   useEffect(() => {
     const forceReady = async () => {
       // Task #1587: check stuck state before revealing the app.
-      // Only on native — expo-updates is a no-op in dev/web.
-      if (Platform.OS !== "web" && !__DEV__) {
+      // Only when not in dev — expo-updates is a no-op in dev.
+      if (!__DEV__) {
         try {
           const stuck = await isOtaStuck();
           setOtaStuck(stuck);
