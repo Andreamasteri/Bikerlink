@@ -785,8 +785,7 @@ export default function ReadyToRideScreen() {
         />
 
         <View style={styles.settingsGroup}>
-          {ghostModeFeatureEnabled && (
-            <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+          <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
               <View style={styles.privacyRow}>
                 <Ionicons
                   name={isGhostMode ? "eye-off" : "eye"}
@@ -809,7 +808,6 @@ export default function ReadyToRideScreen() {
                 />
               </View>
             </View>
-          )}
 
           <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
             <View style={styles.privacyRow}>
@@ -859,7 +857,7 @@ export default function ReadyToRideScreen() {
             </View>
           </View>
 
-          <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+          <View style={[styles.settingCard, { backgroundColor: colors.surface, marginTop: 50 }]}>
             <Pressable style={styles.accordionHeader} onPress={() => setPrivacyExpanded((v) => !v)}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Ionicons name="shield-outline" size={18} color={Colors.accent} />
@@ -1065,7 +1063,7 @@ export default function ReadyToRideScreen() {
             )}
           </View>
 
-          <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+          <View style={[styles.settingCard, { backgroundColor: colors.surface, marginTop: 80 }]}>
             <Pressable style={styles.accordionHeader} onPress={() => setGpsPrecisionExpanded(v => !v)}>
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Ionicons name="navigate-outline" size={18} color={Colors.accent} />
@@ -1260,7 +1258,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   content: {
-    alignItems: "center",
+    alignItems: "flex-start",
     padding: 24,
     gap: 8,
   },
@@ -1297,6 +1295,8 @@ const styles = StyleSheet.create({
     maxWidth: 420,
     marginTop: 16,
     gap: 6,
+    alignItems: "flex-start",
+    alignSelf: "stretch",
   },
   settingCard: {
     borderRadius: 12,
