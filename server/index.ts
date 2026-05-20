@@ -341,7 +341,14 @@ function configureExpoAndLanding(app: express.Application) {
     });
   }
 
-  app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
+  app.use("/assets", express.static(path.resolve(process.cwd(), "assets"), {
+    setHeaders(res, filePath) {
+      const isImage = /\.(webp|png|jpg|jpeg|gif|svg|ico|avif)$/i.test(filePath);
+      if (isImage) {
+        res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      }
+    },
+  }));
   app.use("/music", express.static(path.resolve(process.cwd(), "server/public/music"), {
     setHeaders(res) {
       res.setHeader("Content-Type", "audio/mpeg");
