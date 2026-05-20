@@ -42,8 +42,21 @@ button{font:inherit;cursor:pointer}
 .skip-link{position:absolute;left:-9999px;top:0;background:var(--accent);color:#fff;padding:10px 18px;font-weight:700;z-index:10000}
 .skip-link:focus{left:8px;top:8px;opacity:1}
 
+/* MUSIC BAR */
+.music-bar{position:fixed;top:0;left:0;right:0;z-index:1001;height:40px;display:flex;align-items:center;gap:10px;padding:0 16px;background:rgba(8,8,8,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,59,48,.15)}
+.music-bar-icon{color:var(--accent);display:flex;align-items:center;flex-shrink:0;opacity:.8}
+.music-bar-icon svg{width:14px;height:14px;fill:currentColor}
+.music-bar-track{font-size:11px;font-weight:600;letter-spacing:.5px;color:var(--text2);flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-family:var(--font-body)}
+.music-bar-btn{background:none;border:1px solid rgba(255,255,255,.1);color:var(--text2);width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:border-color .15s,color .15s;padding:0;line-height:1}
+.music-bar-btn:hover{border-color:var(--accent);color:var(--accent)}
+.music-bar-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.music-bar-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.music-bar-btn.play-btn svg.icon-play{display:block}.music-bar-btn.play-btn.playing svg.icon-play{display:none}
+.music-bar-btn.play-btn svg.icon-pause{display:none}.music-bar-btn.play-btn.playing svg.icon-pause{display:block}
+.music-bar-btn.mute-btn svg.icon-volume{display:block}.music-bar-btn.mute-btn.muted svg.icon-volume{display:none}
+.music-bar-btn.mute-btn svg.icon-mute{display:none}.music-bar-btn.mute-btn.muted svg.icon-mute{display:block}
 /* NAVBAR */
-.navbar{position:fixed;top:0;left:0;right:0;z-index:1000;height:64px;display:flex;align-items:center;background:rgba(10,10,10,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.navbar{position:fixed;top:40px;left:0;right:0;z-index:1000;height:64px;display:flex;align-items:center;background:rgba(10,10,10,.85);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
 .nav-inner{max-width:var(--max);margin:0 auto;padding:0 24px;width:100%;display:flex;align-items:center;gap:24px}
 .nav-logo{font-family:var(--font-display);font-size:24px;letter-spacing:2px;color:var(--text);display:flex;align-items:center;gap:8px;white-space:nowrap;font-weight:700}
 .nav-logo .dot{color:var(--accent)}
@@ -62,7 +75,7 @@ button{font:inherit;cursor:pointer}
 }
 
 /* MAIN/SECTIONS */
-main{padding-top:64px;min-height:60vh}
+main{padding-top:104px;min-height:60vh}
 .section{padding:80px 24px;position:relative}
 .section-inner{max-width:var(--max);margin:0 auto}
 .section.alt{background:var(--bg-alt);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
@@ -413,6 +426,99 @@ function footer(): string {
 </footer>`;
 }
 
+function musicBar(): string {
+  const tracks = [
+    { src: "/music/chill-road-1.mp3", label: "Chill Road #1" },
+    { src: "/music/chill-road-2.mp3", label: "Chill Road #2" },
+    { src: "/music/chill-road-3.mp3", label: "Chill Road #3" },
+    { src: "/music/chill-road-4.mp3", label: "Chill Road #4" },
+  ];
+  const tracksJson = JSON.stringify(tracks);
+  return `
+<div class="music-bar" role="region" aria-label="Player musica ambient">
+  <span class="music-bar-icon" aria-hidden="true">
+    <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+  </span>
+  <span class="music-bar-track" id="musicTrackName">Chill Road #1</span>
+  <button class="music-bar-btn play-btn" id="musicPlayBtn" aria-label="Play / Pausa" title="Play / Pausa">
+    <svg class="icon-play" viewBox="0 0 24 24" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+    <svg class="icon-pause" viewBox="0 0 24 24" aria-hidden="true"><line x1="6" y1="4" x2="6" y2="20"/><line x1="18" y1="4" x2="18" y2="20"/></svg>
+  </button>
+  <button class="music-bar-btn mute-btn" id="musicMuteBtn" aria-label="Muto / Volume" title="Muto / Volume">
+    <svg class="icon-volume" viewBox="0 0 24 24" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+    <svg class="icon-mute" viewBox="0 0 24 24" aria-hidden="true"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+  </button>
+</div>
+<script>
+(function(){
+  var TRACKS=${tracksJson};
+  var idx=0,playing=false,muted=false;
+  var audio=new Audio();
+  audio.preload='none';
+
+  var playBtn=document.getElementById('musicPlayBtn');
+  var muteBtn=document.getElementById('musicMuteBtn');
+  var trackName=document.getElementById('musicTrackName');
+
+  function loadTrack(i){
+    idx=i%TRACKS.length;
+    audio.src=TRACKS[idx].src;
+    if(trackName)trackName.textContent=TRACKS[idx].label;
+  }
+
+  function restoreState(){
+    try{
+      var s=JSON.parse(localStorage.getItem('bl_music')||'{}');
+      idx=(s.idx||0)%TRACKS.length;
+      muted=!!s.muted;
+    }catch(e){idx=0;muted=false;}
+    audio.muted=muted;
+    if(muteBtn)muteBtn.classList.toggle('muted',muted);
+    loadTrack(idx);
+  }
+
+  function saveState(){
+    try{localStorage.setItem('bl_music',JSON.stringify({idx:idx,muted:muted}));}catch(e){}
+  }
+
+  function setPlaying(p){
+    playing=p;
+    if(playBtn)playBtn.classList.toggle('playing',playing);
+  }
+
+  audio.addEventListener('ended',function(){
+    loadTrack(idx+1);
+    audio.play().then(function(){setPlaying(true);}).catch(function(){setPlaying(false);});
+    saveState();
+  });
+
+  if(playBtn){
+    playBtn.addEventListener('click',function(){
+      if(!playing){
+        if(!audio.src||audio.src===''){loadTrack(idx);}
+        audio.play().then(function(){setPlaying(true);saveState();}).catch(function(){setPlaying(false);});
+      }else{
+        audio.pause();
+        setPlaying(false);
+        saveState();
+      }
+    });
+  }
+
+  if(muteBtn){
+    muteBtn.addEventListener('click',function(){
+      muted=!muted;
+      audio.muted=muted;
+      muteBtn.classList.toggle('muted',muted);
+      saveState();
+    });
+  }
+
+  restoreState();
+})();
+</script>`;
+}
+
 export function renderPage(
   meta: PageMeta,
   bodyHtml: string,
@@ -455,6 +561,7 @@ ${jsonldScript(meta.jsonld)}
 </head>
 <body>
 <a class="skip-link" href="#main-content">Salta al contenuto</a>
+${musicBar()}
 ${navbar(meta.path)}
 <main id="main-content" role="main">
 ${bodyHtml}

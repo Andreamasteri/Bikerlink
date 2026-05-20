@@ -342,6 +342,13 @@ function configureExpoAndLanding(app: express.Application) {
   }
 
   app.use("/assets", express.static(path.resolve(process.cwd(), "assets")));
+  app.use("/music", express.static(path.resolve(process.cwd(), "server/public/music"), {
+    setHeaders(res) {
+      res.setHeader("Content-Type", "audio/mpeg");
+      res.setHeader("Accept-Ranges", "bytes");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+    },
+  }));
 
   // SECURITY (Task #1080): le foto extra delle moto vengono scritte come
   // /uploads/motorcycles/<random>.webp. Servire questo path come static
