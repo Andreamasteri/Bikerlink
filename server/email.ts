@@ -528,6 +528,81 @@ export async function sendNewEventNotificationEmail(evt: {
   }
 }
 
+export interface OtaStuckAlertResult {
+  sent: string[];
+  failed: string[];
+}
+
+export async function sendOtaStuckAlertEmail(opts: {
+  to: string[];
+  eventCount: number;
+  uniqueDevices: number;
+  threshold: number;
+  windowMinutes: number;
+  runtimeVersions: Array<{ runtime_version: string | null; count: number }>;
+}): Promise<OtaStuckAlertResult> {
+  const { to, eventCount, uniqueDevices, threshold, windowMinutes, runtimeVersions } = opts;
+  const now = new Date();
+  const esc = (v: string) =>
+    v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  const rvRows = runtimeVersions
+    .map(
+      (rv) =>
+        `<tr><td style="padding:6px 12px;color:#aaa;font-size:13px;">${esc(rv.runtime_version ?? "unknown")}</td><td style="padding:6px 12px;color:#fff;font-size:13px;">${rv.count} eventi</td></tr>`
+    )
+    .join("");
+
+  const subject = `[BikerLink] ⚠️ OTA Stuck Spike: ${eventCount} eventi in ${windowMinutes} min`;
+  const html = `
+    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:520px;margin:0 auto;padding:20px;">
+      <div style="text-align:center;margin-bottom:24px;">
+        <h1 style="color:#FF6B35;margin:0;font-size:26px;">🏍️ BikerLink</h1>
+        <p style="color:#888;font-size:13px;margin-top:4px;">Alert automatico — OTA Circuit Breaker</p>
+      </div>
+      <div style="background:#1a1a2e;border-radius:12px;padding:24px;color:#fff;">
+        <h2 style="margin-top:0;font-size:18px;color:#FF6B35;">⚠️ Spike OTA stuck-state rilevato</h2>
+        <p style="color:#ccc;font-size:14px;line-height:1.6;">
+          Il sistema ha rilevato <strong style="color:#FF6B35;">${eventCount} eventi</strong> di stuck-state
+          negli ultimi <strong>${windowMinutes} minuti</strong>,
+          su <strong>${uniqueDevices} dispositivi</strong> distinti.<br/>
+          La soglia configurata è <strong>${threshold} eventi</strong>.
+        </p>
+        <table style="width:100%;border-collapse:collapse;margin-top:16px;">
+          <tr>
+            <th style="text-align:left;padding:6px 12px;color:#FF6B35;font-size:13px;border-bottom:1px solid #333;">Runtime Version</th>
+            <th style="text-align:left;padding:6px 12px;color:#FF6B35;font-size:13px;border-bottom:1px solid #333;">Occorrenze</th>
+          </tr>
+          ${rvRows || `<tr><td colspan="2" style="padding:6px 12px;color:#888;font-size:13px;">Nessun breakdown disponibile</td></tr>`}
+        </table>
+        <p style="color:#999;font-size:12px;margin-top:20px;">
+          Rilevato il ${now.toLocaleString("it-IT", { timeZone: "Europe/Rome" })} (Europe/Rome)<br/>
+          Puoi modificare la soglia di alert nel pannello Admin → Impostazioni (chiave: <code>ota_stuck_alert_threshold</code>).
+        </p>
+      </div>
+      <p style="text-align:center;color:#666;font-size:11px;margin-top:16px;">
+        © ${now.getFullYear()} BikerLink — notifica automatica
+      </p>
+    </div>
+  `;
+
+  const results = await Promise.all(
+    to.map(async (recipient) => {
+      const ok = await sendEmail(recipient, subject, html);
+      return { recipient, ok };
+    })
+  );
+
+  const sent = results.filter((r) => r.ok).map((r) => r.recipient);
+  const failed = results.filter((r) => !r.ok).map((r) => r.recipient);
+
+  if (failed.length > 0) {
+    console.warn(`[OTA-STUCK-ALERT] Invio fallito per ${failed.length} destinatari: ${failed.join(", ")}`);
+  }
+
+  return { sent, failed };
+}
+
 export async function sendPasswordResetConfirmationEmail(to: string, nickname: string): Promise<boolean> {
   const subject = "BikerLink - Password aggiornata";
   const html = `

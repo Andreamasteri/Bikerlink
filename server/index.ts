@@ -913,6 +913,12 @@ function setupErrorHandler(app: express.Application) {
           `);
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_stuck_events_created_idx ON ota_stuck_events(created_at DESC)`);
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_stuck_events_rv_idx ON ota_stuck_events(runtime_version)`);
+          // Seed default alert threshold in app_settings (only if not already set).
+          const existingThreshold = await storage.getAppSetting("ota_stuck_alert_threshold");
+          if (!existingThreshold?.value) {
+            await storage.upsertAppSetting("ota_stuck_alert_threshold", "5");
+            console.log("[MIGRATION] ota_stuck_alert_threshold seeded to 5");
+          }
           console.log("[MIGRATION] ota_stuck_events table ensured");
         } catch (e) {
           console.warn("[MIGRATION] ota_stuck_events:", e);
@@ -2032,6 +2038,110 @@ function setupErrorHandler(app: express.Application) {
             setInterval(runOtaStuckEventsCleanup, SIX_HOURS_MS_STUCK);
           }, 60 * 1000);
           console.log(`[INIT] Phase 12.6 ota_stuck_events cleanup scheduled (1min delay, then every 6h, retention=${OTA_STUCK_EVENTS_RETENTION})`);
+        }
+
+        // Phase 12.7 — OTA stuck-state spike alert (every 15 min)
+        // Queries ota_stuck_events for events in the last hour. If the count
+        // reaches the configurable threshold (app_settings key:
+        // ota_stuck_alert_threshold, default: 5) an alert email is sent to all
+        // admin/moderator accounts plus the hardcoded bikerlinkapp@gmail.com.
+        // A 1-hour cooldown (app_settings key: ota_stuck_last_alert_at) prevents
+        // flooding when the spike persists across multiple check cycles.
+        {
+          const STUCK_ALERT_INTERVAL_MS = 15 * 60 * 1000;
+          const STUCK_ALERT_WINDOW_MINUTES = 60;
+          const STUCK_ALERT_COOLDOWN_MS = 60 * 60 * 1000;
+          const STUCK_ALERT_FALLBACK_EMAIL = "bikerlinkapp@gmail.com";
+
+          const runOtaStuckCheck = async () => {
+            try {
+              // 1. Read configurable threshold from app_settings (default 5).
+              const thresholdRaw = await storage.getAppSetting("ota_stuck_alert_threshold").catch(() => null);
+              const threshold = Math.max(1, parseInt(thresholdRaw?.value ?? "5", 10) || 5);
+
+              // 2. Count events in the last window.
+              const windowResult = await db.execute(sql`
+                SELECT
+                  COUNT(*)::int                  AS event_count,
+                  COUNT(DISTINCT device_id)::int AS unique_devices
+                FROM ota_stuck_events
+                WHERE created_at >= NOW() - INTERVAL '1 hour'
+              `);
+              const row = windowResult.rows[0] as { event_count: number; unique_devices: number } | undefined;
+              const eventCount = row?.event_count ?? 0;
+              const uniqueDevices = row?.unique_devices ?? 0;
+
+              if (eventCount < threshold) {
+                console.log(`[OTA-STUCK-ALERT] ${eventCount}/${threshold} eventi nell'ultima ora — sotto soglia, nessun alert.`);
+                return;
+              }
+
+              // 3. Enforce cooldown: skip if last alert was within 1 hour.
+              const lastAlertSetting = await storage.getAppSetting("ota_stuck_last_alert_at").catch(() => null);
+              if (lastAlertSetting?.value) {
+                const lastAt = new Date(lastAlertSetting.value).getTime();
+                if (!isNaN(lastAt) && Date.now() - lastAt < STUCK_ALERT_COOLDOWN_MS) {
+                  console.log(`[OTA-STUCK-ALERT] Soglia superata (${eventCount}/${threshold}) ma in cooldown — prossimo alert dopo ${new Date(lastAt + STUCK_ALERT_COOLDOWN_MS).toISOString()}`);
+                  return;
+                }
+              }
+
+              // 4. runtimeVersion breakdown.
+              const rvResult = await db.execute(sql`
+                SELECT runtime_version, COUNT(*)::int AS count
+                FROM ota_stuck_events
+                WHERE created_at >= NOW() - INTERVAL '1 hour'
+                GROUP BY runtime_version
+                ORDER BY count DESC
+                LIMIT 10
+              `);
+              const runtimeVersions = rvResult.rows as Array<{ runtime_version: string | null; count: number }>;
+
+              // 5. Build recipient list: bikerlinkapp + all admin/mod emails.
+              let recipients: string[] = [STUCK_ALERT_FALLBACK_EMAIL];
+              try {
+                const allUsers = await storage.getAllUsers();
+                const adminEmails = allUsers
+                  .filter((u) => (u.role === "admin" || u.role === "moderator") && u.email)
+                  .map((u) => u.email as string);
+                recipients = Array.from(new Set([STUCK_ALERT_FALLBACK_EMAIL, ...adminEmails]));
+              } catch (e) {
+                console.warn("[OTA-STUCK-ALERT] Impossibile caricare utenti admin, uso solo fallback email:", e);
+              }
+
+              // 6. Send alert email and inspect per-recipient outcomes.
+              const { sendOtaStuckAlertEmail } = await import("./email");
+              const alertResult = await sendOtaStuckAlertEmail({
+                to: recipients,
+                eventCount,
+                uniqueDevices,
+                threshold,
+                windowMinutes: STUCK_ALERT_WINDOW_MINUTES,
+                runtimeVersions,
+              });
+
+              // 7. Persist last-alert timestamp ONLY if at least one send succeeded.
+              // If all sends failed, skip the cooldown update so the next cycle can retry.
+              if (alertResult.sent.length > 0) {
+                await storage.upsertAppSetting("ota_stuck_last_alert_at", new Date().toISOString());
+                console.log(`[OTA-STUCK-ALERT] Alert inviato a ${alertResult.sent.join(", ")} — ${eventCount} eventi su ${uniqueDevices} dispositivi (soglia=${threshold}).`);
+                if (alertResult.failed.length > 0) {
+                  console.warn(`[OTA-STUCK-ALERT] Invio parzialmente fallito per: ${alertResult.failed.join(", ")}`);
+                }
+              } else {
+                console.warn(`[OTA-STUCK-ALERT] Tutti gli invii falliti (${recipients.length} destinatari) — cooldown NON impostato, il prossimo ciclo riproverà.`);
+              }
+            } catch (err) {
+              console.warn("[OTA-STUCK-ALERT] Errore controllo stuck-state:", err);
+            }
+          };
+
+          // First run after 5 minutes (allow DB/migrations to settle), then every 15 min.
+          setTimeout(() => {
+            runOtaStuckCheck();
+            setInterval(runOtaStuckCheck, STUCK_ALERT_INTERVAL_MS);
+          }, 5 * 60 * 1000);
+          console.log("[INIT] Phase 12.7 OTA stuck-state alert scheduled (5min delay, then every 15min, window=60min)");
         }
 
         // Phase 13 — schema snapshot (non-blocking, fire-and-forget)
