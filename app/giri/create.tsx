@@ -272,6 +272,7 @@ export default function GiriCreateScreen() {
 
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [calculating, setCalculating] = useState(false);
+  const [dismissedWarnings, setDismissedWarnings] = useState<Set<string>>(new Set());
 
   const [weatherPreview, setWeatherPreview] = useState<WeatherWaypoint[] | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
@@ -500,6 +501,7 @@ export default function GiriCreateScreen() {
         async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
       );
       setRouteResult(result);
+      setDismissedWarnings(new Set());
       if (result.durationMinutes > 480 && !aiPreview.isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
         setIsMultiDay(true);
@@ -605,6 +607,7 @@ export default function GiriCreateScreen() {
       try {
         const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
         setRouteResult(result);
+        setDismissedWarnings(new Set());
       } catch {
         // silent — user can still trigger manually
       } finally {
@@ -626,6 +629,7 @@ export default function GiriCreateScreen() {
     try {
       const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
       setRouteResult(result);
+      setDismissedWarnings(new Set());
       if (result.durationMinutes > 480 && !isMultiDay) {
         const suggestedDays = Math.max(2, Math.min(14, Math.ceil(result.durationMinutes / (maxHoursPerDay * 60))));
         setIsMultiDay(true);
@@ -1220,12 +1224,26 @@ export default function GiriCreateScreen() {
             {/* Route result */}
             {routeResult && (
               <View style={s.resultCard}>
-                {routeResult.warning === "my_style_fallback" && (
+                {routeResult.warning === "routing_unavailable" && !dismissedWarnings.has("routing_unavailable") && (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#ef444422", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#ef444444", marginBottom: 4 }}>
+                    <Ionicons name="warning-outline" size={15} color="#ef4444" />
+                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: "#ef4444", flex: 1 }}>
+                      Routing non disponibile — percorso in linea retta
+                    </Text>
+                    <Pressable onPress={() => setDismissedWarnings((prev) => new Set([...prev, "routing_unavailable"]))} hitSlop={8}>
+                      <Ionicons name="close" size={15} color="#ef4444" />
+                    </Pressable>
+                  </View>
+                )}
+                {routeResult.warning === "my_style_fallback" && !dismissedWarnings.has("my_style_fallback") && (
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#f59e0b22", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#f59e0b44", marginBottom: 4 }}>
                     <Ionicons name="warning-outline" size={15} color="#f59e0b" />
                     <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: "#f59e0b", flex: 1 }}>
                       Profilo "Il mio stile" non disponibile — usato il profilo geometrico
                     </Text>
+                    <Pressable onPress={() => setDismissedWarnings((prev) => new Set([...prev, "my_style_fallback"]))} hitSlop={8}>
+                      <Ionicons name="close" size={15} color="#f59e0b" />
+                    </Pressable>
                   </View>
                 )}
                 <Text style={s.resultTitle}>Percorso calcolato</Text>

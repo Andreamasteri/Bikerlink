@@ -175,6 +175,7 @@ function buildFallbackRoute(waypoints: Array<{ lat: number; lng: number }>) {
     durationMinutes: Math.round(totalDist / 70 * 60),
     bikerScore: computeBikerScoreFromPoints(rawPoints),
     approximate: true,
+    warning: "routing_unavailable" as const,
   };
 }
 
@@ -566,7 +567,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
       ghData = ghResult;
     } catch (ghErr) {
       console.error("[GraphHopper] error:", ghErr);
-      return res.json({ ...buildFallbackRoute(waypoints), ...(myStyleWarning ? { warning: myStyleWarning } : {}) });
+      return res.json(buildFallbackRoute(waypoints));
     }
 
     const data = ghData as any;
