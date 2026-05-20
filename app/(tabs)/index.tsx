@@ -115,6 +115,7 @@ export default function MapScreen() {
   const [inviteSending, setInviteSending] = useState(false);
   const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const lastFocusParamRef = useRef<string | null>(null);
+  const [showLocationNudge, setShowLocationNudge] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -349,10 +350,17 @@ export default function MapScreen() {
           coords = await new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
             navigator.geolocation.getCurrentPosition(
               (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-              () => resolve(null),
+              async () => {
+                const dismissed = await AsyncStorage.getItem("location_nudge_dismissed").catch(() => null);
+                if (!dismissed) setShowLocationNudge(true);
+                resolve(null);
+              },
               { timeout: 8000, maximumAge: 60000 }
             );
           });
+        } else {
+          const dismissed = await AsyncStorage.getItem("location_nudge_dismissed").catch(() => null);
+          if (!dismissed) setShowLocationNudge(true);
         }
       } else {
         const { status } = await Location.requestForegroundPermissionsAsync();
@@ -1010,6 +1018,32 @@ export default function MapScreen() {
           <Ionicons name="expand" size={16} color={Colors.text} />
         </View>
       </Pressable>
+
+      {Platform.OS === "web" && showLocationNudge && (
+        <View style={styles.locationNudge}>
+          <View style={styles.locationNudgeContent}>
+            <Ionicons name="location-outline" size={18} color="#F59E0B" style={{ marginTop: 1 }} />
+            <Text style={styles.locationNudgeText}>{t("home.locationNudge")}</Text>
+          </View>
+          <View style={styles.locationNudgeActions}>
+            <TouchableOpacity
+              style={styles.locationNudgeHowBtn}
+              onPress={() => Linking.openURL("https://support.google.com/chrome/answer/142065")}
+            >
+              <Text style={styles.locationNudgeHowText}>{t("home.locationNudgeHow")}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.locationNudgeDismissBtn}
+              onPress={async () => {
+                setShowLocationNudge(false);
+                await AsyncStorage.setItem("location_nudge_dismissed", "1").catch(() => {});
+              }}
+            >
+              <Ionicons name="close" size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <Modal visible={mapFullscreen} animationType="fade" onRequestClose={() => setMapFullscreen(false)}>
         <View style={styles.fullscreenContainer}>
@@ -2669,5 +2703,47 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     marginTop: 2,
+  },
+  locationNudge: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    backgroundColor: "#1C1A12",
+    borderWidth: 1,
+    borderColor: "#F59E0B44",
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  locationNudgeContent: {
+    flexDirection: "row" as const,
+    alignItems: "flex-start" as const,
+    gap: 8,
+  },
+  locationNudgeText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    lineHeight: 18,
+  },
+  locationNudgeActions: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "flex-end" as const,
+    gap: 8,
+  },
+  locationNudgeHowBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    backgroundColor: "#F59E0B22",
+  },
+  locationNudgeHowText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#F59E0B",
+  },
+  locationNudgeDismissBtn: {
+    padding: 4,
   },
 });

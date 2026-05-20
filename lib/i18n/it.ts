@@ -287,6 +287,9 @@ const it: Record<string, string> = {
   "garage.selectBrandFirst": "Seleziona prima la marca",
 
   "home.locationUnavailable": "Posizione non disponibile",
+  "home.locationNudge": "La mappa mostra una posizione predefinita perché la geolocalizzazione non è abilitata.",
+  "home.locationNudgeHow": "Come abilitarla",
+  "home.locationNudgeDismiss": "Chiudi",
   "home.available": "Disponibili",
   "home.users": "Utenti",
   "home.alsoOffline": "Anche offline",

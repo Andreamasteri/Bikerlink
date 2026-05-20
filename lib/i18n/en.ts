@@ -287,6 +287,9 @@ const en: Record<string, string> = {
   "garage.selectBrandFirst": "Select a brand first",
 
   "home.locationUnavailable": "Location unavailable",
+  "home.locationNudge": "The map is showing a default location because geolocation is not enabled.",
+  "home.locationNudgeHow": "How to enable it",
+  "home.locationNudgeDismiss": "Dismiss",
   "home.available": "Available",
   "home.users": "Users",
   "home.alsoOffline": "Also offline",
