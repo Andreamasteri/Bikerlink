@@ -5,7 +5,7 @@ import { rideTelemetry } from "@shared/schema";
 
 const router = Router();
 
-const TARGET_KM = parseFloat(process.env.TELEMETRY_TARGET_KM ?? "400");
+const TARGET_KM = parseFloat(process.env.TELEMETRY_TARGET_KM ?? "1000");
 
 function requireAuth(req: Request, res: Response): string | null {
   const userId = req.session?.userId;
@@ -31,7 +31,7 @@ router.post("/batch", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "session_id obbligatorio" });
     }
 
-    const validSessionTypes = ["ride", "trip", "free"];
+    const validSessionTypes = ["ride", "trip", "free", "ideal_lap"];
     const resolvedType = validSessionTypes.includes(session_type ?? "") ? session_type! : "ride";
 
     if (!Array.isArray(samples) || samples.length === 0) {
@@ -103,6 +103,7 @@ router.get("/stats", async (req: Request, res: Response) => {
         COUNT(DISTINCT session_id) AS session_count
       FROM ride_telemetry
       WHERE user_id = ${userId}
+        AND session_type NOT IN ('ideal_lap')
     `);
 
     const row = statsResult.rows[0] as { sample_count: string; session_count: string } | undefined;
@@ -120,6 +121,7 @@ router.get("/stats", async (req: Request, res: Response) => {
           LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
         FROM ride_telemetry
         WHERE user_id = ${userId}
+          AND session_type NOT IN ('ideal_lap')
       ),
       distances AS (
         SELECT
@@ -152,6 +154,25 @@ router.get("/stats", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[telemetry/stats] error:", err);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/reset", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  try {
+    const result = await db.execute(sql`
+      DELETE FROM ride_telemetry
+      WHERE user_id = ${userId}
+        AND session_type NOT IN ('ideal_lap')
+    `);
+
+    const deleted = result.rowCount ?? 0;
+    return res.json({ deleted });
+  } catch (err) {
+    console.error("[telemetry/reset] error:", err);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });

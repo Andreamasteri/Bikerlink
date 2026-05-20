@@ -47,7 +47,144 @@ import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 import { MATCH_PREF_ITEMS, DEFAULT_MATCH_PREFS, type MatchPrefsPayload } from "@/lib/match-pref-items";
 import { loadIndex, deleteAllOfflineTiles, deleteTilesForRoute, type OfflineTilesIndex } from "@/lib/offline-tiles";
+import { useIdealLapRecorder } from "@/hooks/useIdealLapRecorder";
 
+// ─── IdealLapSlot ─────────────────────────────────────────────────────────────
+type LapSlotProps = {
+  index: number;
+  onSaved: () => void;
+};
+
+function IdealLapSlot({ index, onSaved }: LapSlotProps) {
+  const { lapState, sampleCount, saving, start, stop, save } = useIdealLapRecorder(index);
+
+  const handleSave = async () => {
+    try {
+      await save();
+      onSaved();
+    } catch {
+      Alert.alert("Errore", "Impossibile salvare il giro. Riprova.");
+    }
+  };
+
+  const statusLabel =
+    lapState === "recording"
+      ? `● ${sampleCount} camp.`
+      : lapState === "ready_to_save"
+      ? `${sampleCount} camp. pronti`
+      : lapState === "saved"
+      ? "✓ Salvato"
+      : "";
+
+  const statusColor =
+    lapState === "recording"
+      ? "#e74c3c"
+      : lapState === "ready_to_save"
+      ? Colors.accent
+      : lapState === "saved"
+      ? "#27ae60"
+      : Colors.textSecondary;
+
+  const isRecording = lapState === "recording";
+  const isReadyToSave = lapState === "ready_to_save";
+
+  return (
+    <View style={lapSlotStyles.container}>
+      <View style={lapSlotStyles.header}>
+        <Text style={lapSlotStyles.title}>Giro {index + 1}</Text>
+        {statusLabel ? (
+          <Text style={[lapSlotStyles.status, { color: statusColor }]}>{statusLabel}</Text>
+        ) : null}
+      </View>
+      <View style={lapSlotStyles.buttons}>
+        <TouchableOpacity
+          style={[lapSlotStyles.btn, (isRecording || isReadyToSave) && lapSlotStyles.btnDisabled]}
+          onPress={start}
+          disabled={isRecording || isReadyToSave}
+        >
+          <Ionicons name="play" size={12} color={isRecording || isReadyToSave ? Colors.textSecondary : "#fff"} />
+          <Text style={[lapSlotStyles.btnText, (isRecording || isReadyToSave) && lapSlotStyles.btnTextDisabled]}>
+            Start
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[lapSlotStyles.btn, lapSlotStyles.btnStop, !isRecording && lapSlotStyles.btnDisabled]}
+          onPress={stop}
+          disabled={!isRecording}
+        >
+          <Ionicons name="stop" size={12} color={isRecording ? "#fff" : Colors.textSecondary} />
+          <Text style={[lapSlotStyles.btnText, !isRecording && lapSlotStyles.btnTextDisabled]}>Stop</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[lapSlotStyles.btn, lapSlotStyles.btnSave, !isReadyToSave && lapSlotStyles.btnDisabled]}
+          onPress={handleSave}
+          disabled={!isReadyToSave || saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="cloud-upload-outline" size={12} color={isReadyToSave ? "#fff" : Colors.textSecondary} />
+          )}
+          <Text style={[lapSlotStyles.btnText, !isReadyToSave && lapSlotStyles.btnTextDisabled]}>Salva</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const lapSlotStyles = StyleSheet.create({
+  container: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 10,
+    gap: 8,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  title: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  status: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+  },
+  buttons: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  btn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: Colors.accent,
+    borderRadius: 6,
+    paddingVertical: 6,
+  },
+  btnStop: {
+    backgroundColor: "#e74c3c",
+  },
+  btnSave: {
+    backgroundColor: "#27ae60",
+  },
+  btnDisabled: {
+    backgroundColor: Colors.border,
+  },
+  btnText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
+  btnTextDisabled: {
+    color: Colors.textSecondary,
+  },
+});
 
 interface ProfileData {
   id: string;
@@ -452,6 +589,8 @@ export default function ProfileScreen() {
   const [offlineMapsExpanded, setOfflineMapsExpanded] = useState(false);
   const [offlineMapsIndex, setOfflineMapsIndex] = useState<OfflineTilesIndex>({});
   const [docsExpanded, setDocsExpanded] = useState(false);
+  const [telemetryExpanded, setTelemetryExpanded] = useState(false);
+  const [idealLapResetKey, setIdealLapResetKey] = useState(0);
   const [mapPickerVisible, setMapPickerVisible] = useState(false);
   const [mapPickerTarget, setMapPickerTarget] = useState<"home" | "fake" | null>(null);
   const [mapPickerCoord, setMapPickerCoord] = useState<{ latitude: number; longitude: number }>({ latitude: 41.9, longitude: 12.5 });
@@ -857,13 +996,24 @@ export default function ProfileScreen() {
       {telemetryStats != null && (
         <View style={styles.section}>
           <View style={styles.telemetryCard}>
-            <View style={styles.telemetryHeader}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setTelemetryExpanded((v) => !v)}
+              style={styles.telemetryHeader}
+            >
               <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                 <Ionicons name="speedometer-outline" size={16} color={Colors.accent} />
                 <Text style={styles.telemetryTitle}>Telemetria raccolta</Text>
               </View>
-              <Text style={styles.telemetryPct}>{telemetryStats.progress_pct}%</Text>
-            </View>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={styles.telemetryPct}>{telemetryStats.progress_pct}%</Text>
+                <Ionicons
+                  name={telemetryExpanded ? "chevron-up" : "chevron-down"}
+                  size={14}
+                  color={Colors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
             <View style={styles.telemetryBarBg}>
               <View
                 style={[
@@ -881,6 +1031,50 @@ export default function ProfileScreen() {
                 {telemetryStats.session_count} {telemetryStats.session_count === 1 ? "sessione" : "sessioni"}
               </Text>
             </View>
+            {telemetryExpanded && (
+              <View style={styles.telemetryExpanded}>
+                <View style={styles.telemetryExpandedHeader}>
+                  <Text style={styles.telemetryExpandedTitle}>Giri Ideali</Text>
+                  <TouchableOpacity
+                    style={styles.telemetryResetBtn}
+                    onPress={() => {
+                      Alert.alert(
+                        "Azzera telemetria",
+                        "Sei sicuro di voler cancellare tutti i km raccolti verso il target 1000 km? I Giri Ideali salvati non verranno eliminati.",
+                        [
+                          { text: "Annulla", style: "cancel" },
+                          {
+                            text: "Azzera",
+                            style: "destructive",
+                            onPress: async () => {
+                              try {
+                                await apiRequest("DELETE", "/api/telemetry/reset");
+                                queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
+                                setIdealLapResetKey((k) => k + 1);
+                              } catch {
+                                Alert.alert("Errore", "Impossibile azzerare la telemetria.");
+                              }
+                            },
+                          },
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={13} color="#e74c3c" />
+                    <Text style={styles.telemetryResetBtnText}>Reset km</Text>
+                  </TouchableOpacity>
+                </View>
+                {[0, 1, 2, 3].map((i) => (
+                  <IdealLapSlot
+                    key={`${idealLapResetKey}-${i}`}
+                    index={i}
+                    onSaved={() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
+                    }}
+                  />
+                ))}
+              </View>
+            )}
           </View>
         </View>
       )}
@@ -1779,6 +1973,38 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+  },
+  telemetryExpanded: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 12,
+    gap: 10,
+  },
+  telemetryExpandedHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  telemetryExpandedTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  telemetryResetBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "#e74c3c44",
+    backgroundColor: "#e74c3c11",
+  },
+  telemetryResetBtnText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#e74c3c",
   },
   bioCard: {
     backgroundColor: Colors.surface,
