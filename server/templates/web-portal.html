@@ -916,6 +916,7 @@ function renderNavAuth() {
     `;
   } else {
     area.innerHTML = `
+      <button class="nav-auth-btn btn-area" onclick="navigate('/registrati')">${t('page.register')}</button>
       <button class="nav-auth-btn btn-login" onclick="navigate('/accedi')">${t('nav.login')}</button>
     `;
   }
