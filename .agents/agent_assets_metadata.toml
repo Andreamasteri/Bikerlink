@@ -348,6 +348,12 @@ uri = "file://assets/images/playstore-feature-graphic.png"
 type = "image"
 title = "bikerlink feature graphic clean"
 
+[[generated]]
+id = "mgVzOe_4aYyP40B813-tg"
+uri = "file://attached_assets/hero-handlebar.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "4Y78ngKHwO0VLy8lAIKVp"
 uri = "file://manuale-utente-bikerlink.docx"
