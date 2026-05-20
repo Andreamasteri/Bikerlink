@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, Switch, Modal, ScrollView, Pressable } from "react-native";
-import { EUROPEAN_COUNTRIES } from "@/lib/countries-regions";
+import { CONTINENT_MAP, getCountriesForContinent } from "@/lib/countries-regions";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -885,11 +885,6 @@ export default function AdminSettings() {
   });
   const sosEnabled = sosData?.enabled !== false;
 
-  const { data: phoneSensorsData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/phone-sensors-enabled"],
-  });
-  const phoneSensorsEnabled = phoneSensorsData?.enabled === true;
-
   const { data: musicMatchData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/music-match"],
   });
@@ -968,24 +963,6 @@ export default function AdminSettings() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/sos-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-    },
-  });
-
-  const phoneSensorsMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/phone_sensors_enabled", baseUrl);
-      const res = await globalThis.fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: enabled ? "true" : "false" }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/phone-sensors-enabled"] });
     },
   });
 
@@ -1741,10 +1718,30 @@ export default function AdminSettings() {
     );
   }
 
-  const sortedMatchingCountries = useMemo(() => {
-    const itEntry = EUROPEAN_COUNTRIES.find((c) => c.code === "IT");
-    const rest = EUROPEAN_COUNTRIES.filter((c) => c.code !== "IT").sort((a, b) => a.name.localeCompare(b.name));
-    return itEntry ? [itEntry, ...rest] : rest;
+  const [expandedContinents, setExpandedContinents] = useState<Set<string>>(new Set(["EU"]));
+
+  const toggleContinent = (key: string) => {
+    setExpandedContinents((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const continentCountriesMap = useMemo(() => {
+    return CONTINENT_MAP.map((continent) => {
+      const countries = getCountriesForContinent(continent.key);
+      if (continent.key === "EU") {
+        const it = countries.find((c) => c.code === "IT");
+        const rest = countries.filter((c) => c.code !== "IT");
+        return { ...continent, countries: it ? [it, ...rest] : rest };
+      }
+      return { ...continent, countries };
+    });
   }, []);
 
   const splashSetting = defaultSettings.find(s => s.key === "splash_message")!;
@@ -2041,27 +2038,58 @@ export default function AdminSettings() {
             ? t("admin.allCountries")
             : `${matchingCountries.length} ${matchingCountries.length === 1 ? "paese selezionato" : "paesi selezionati"}`}
         </Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10, marginBottom: 8 }}>
-          {sortedMatchingCountries.map((c) => {
-            const isSelected = matchingCountries.includes(c.code);
+        <View style={{ marginTop: 10, marginBottom: 8 }}>
+          {continentCountriesMap.map((continent) => {
+            const isExpanded = expandedContinents.has(continent.key);
+            const selectedCount = continent.countries.filter((c) => matchingCountries.includes(c.code)).length;
             return (
-              <TouchableOpacity
-                key={c.code}
-                onPress={() => {
-                  setMatchingCountries((prev) =>
-                    prev.includes(c.code) ? prev.filter((x) => x !== c.code) : [...prev, c.code]
-                  );
-                }}
-                style={[styles.countryChip, isSelected && styles.countryChipSelected]}
-              >
-                <Text style={styles.countryChipFlag}>{c.flag}</Text>
-                <Text style={[styles.countryChipText, isSelected && styles.countryChipTextSelected]}>
-                  {c.name}
-                </Text>
-              </TouchableOpacity>
+              <View key={continent.key} style={styles.continentBlock}>
+                <TouchableOpacity
+                  style={styles.continentHeader}
+                  onPress={() => toggleContinent(continent.key)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.continentLabel}>{continent.label}</Text>
+                  <View style={styles.continentHeaderRight}>
+                    {selectedCount > 0 && (
+                      <View style={styles.continentBadge}>
+                        <Text style={styles.continentBadgeText}>{selectedCount}</Text>
+                      </View>
+                    )}
+                    <Ionicons
+                      name={isExpanded ? "chevron-up" : "chevron-down"}
+                      size={16}
+                      color={Colors.textSecondary}
+                    />
+                  </View>
+                </TouchableOpacity>
+                {isExpanded && (
+                  <View style={styles.continentCountries}>
+                    {continent.countries.map((c) => {
+                      const isSelected = matchingCountries.includes(c.code);
+                      return (
+                        <TouchableOpacity
+                          key={c.code}
+                          onPress={() => {
+                            setMatchingCountries((prev) =>
+                              prev.includes(c.code) ? prev.filter((x) => x !== c.code) : [...prev, c.code]
+                            );
+                          }}
+                          style={[styles.countryChip, isSelected && styles.countryChipSelected]}
+                        >
+                          <Text style={styles.countryChipFlag}>{c.flag}</Text>
+                          <Text style={[styles.countryChipText, isSelected && styles.countryChipTextSelected]}>
+                            {c.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
             );
           })}
-        </ScrollView>
+        </View>
         <TouchableOpacity
           style={[styles.saveBtn, { alignSelf: "flex-end", marginTop: 4 }]}
           onPress={() => matchingCountriesMutation.mutate(matchingCountries)}
@@ -2542,27 +2570,6 @@ export default function AdminSettings() {
         </View>
         <Text style={styles.synecoDesc}>
           {sosEnabled ? t("admin.sosActive") : t("admin.sosInactive")}
-        </Text>
-      </View>
-
-      <View style={styles.synecoCard}>
-        <View style={styles.synecoHeader}>
-          <View style={styles.synecoInfo}>
-            <Ionicons name="phone-portrait-outline" size={20} color={phoneSensorsEnabled ? Colors.accentRed : Colors.textSecondary} />
-            <Text style={styles.synecoLabel}>Sensori Telefono (G-force)</Text>
-          </View>
-          <Switch
-            value={phoneSensorsEnabled}
-            onValueChange={(val) => phoneSensorsMutation.mutate(val)}
-            trackColor={{ false: Colors.border, true: Colors.accentRed + "80" }}
-            thumbColor={phoneSensorsEnabled ? Colors.accentRed : Colors.textSecondary}
-            disabled={phoneSensorsMutation.isPending}
-          />
-        </View>
-        <Text style={styles.synecoDesc}>
-          {phoneSensorsEnabled
-            ? t("admin.gforceBetaVisible")
-            : t("admin.gforceBetaHidden")}
         </Text>
       </View>
 
@@ -3909,6 +3916,52 @@ const styles = StyleSheet.create({
   },
   countryChipTextSelected: {
     color: Colors.warning, fontFamily: "Inter_600SemiBold",
+  },
+  continentBlock: {
+    marginBottom: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  continentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: Colors.card,
+  },
+  continentLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  continentHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  continentBadge: {
+    backgroundColor: Colors.warning,
+    borderRadius: 10,
+    minWidth: 20,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  continentBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: Colors.background,
+  },
+  continentCountries: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    padding: 8,
+    gap: 4,
+    backgroundColor: Colors.background,
   },
 });
 
