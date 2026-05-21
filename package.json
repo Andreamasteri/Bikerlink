@@ -20,6 +20,8 @@
     "ios": "expo run:ios"
   },
   "dependencies": {
+    "@ai-sdk/google": "^3.0.78",
+    "@ai-sdk/openai": "^3.0.64",
     "@emnapi/runtime": "^1.8.1",
     "@expo-google-fonts/inter": "^0.4.0",
     "@expo/vector-icons": "^15.1.1",
@@ -39,6 +41,7 @@
     "@types/sharp": "^0.31.1",
     "@types/supertest": "^7.2.0",
     "@xmldom/xmldom": "^0.8.12",
+    "ai": "^6.0.188",
     "archiver": "^7.0.1",
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.1",

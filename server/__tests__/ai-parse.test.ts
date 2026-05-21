@@ -27,15 +27,18 @@ vi.mock("../graphhopper-client", () => ({
 }));
 
 // Create stable mock references via vi.hoisted so they exist when vi.mock factory runs
-const genaiMocks = vi.hoisted(() => ({
-  generateContent: vi.fn(),
-  generateContentStream: vi.fn(),
+const aiMocks = vi.hoisted(() => ({
+  generateObject: vi.fn(),
+  streamText: vi.fn(),
 }));
 
-vi.mock("@google/genai", () => ({
-  GoogleGenAI: class MockGoogleGenAI {
-    models = genaiMocks;
-  },
+vi.mock("ai", () => ({
+  generateObject: aiMocks.generateObject,
+  streamText: aiMocks.streamText,
+}));
+
+vi.mock("@ai-sdk/google", () => ({
+  createGoogleGenerativeAI: vi.fn(() => vi.fn(() => ({ provider: "google", modelId: "gemini-2.5-flash" }))),
 }));
 
 // ---------------------------------------------------------------------------
@@ -180,28 +183,28 @@ describe("fallbackAiParse — field detection from natural language", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. Unit tests — JSON parsing logic (via mocked Gemini response)
+// 2. Unit tests — generateObject response (via mocked Vercel AI SDK)
 // ---------------------------------------------------------------------------
 
-describe("POST /api/planned-routes/ai-parse — JSON parsing from Gemini text", () => {
+describe("POST /api/planned-routes/ai-parse — structured object from AI", () => {
   let app: express.Application;
 
   beforeEach(() => {
     process.env.GEMINI_API_KEY = "test-key-unit";
     app = buildApp();
-    genaiMocks.generateContent.mockReset();
-    genaiMocks.generateContentStream.mockReset();
+    aiMocks.generateObject.mockReset();
+    aiMocks.streamText.mockReset();
   });
 
   afterEach(() => {
     delete process.env.GEMINI_API_KEY;
   });
 
-  function mockGeminiOk(text: string) {
-    genaiMocks.generateContent.mockResolvedValue({ text });
+  function mockAiOk(object: Record<string, unknown>) {
+    aiMocks.generateObject.mockResolvedValue({ object });
   }
 
-  it("parses clean JSON response without code fence", async () => {
+  it("returns structured object with title, startLocation, and style", async () => {
     const payload = {
       title: "Giro sulle Alpi",
       startLocation: "Milano",
@@ -215,7 +218,7 @@ describe("POST /api/planned-routes/ai-parse — JSON parsing from Gemini text", 
       avoidHighways: false,
       notes: "",
     };
-    mockGeminiOk(JSON.stringify(payload));
+    mockAiOk(payload);
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -227,10 +230,21 @@ describe("POST /api/planned-routes/ai-parse — JSON parsing from Gemini text", 
     expect(res.body.style).toBe("curvy");
   });
 
-  it("parses JSON wrapped in ```json ... ``` markdown code fence", async () => {
-    const payload = { title: "Dolomiti", startLocation: "Bolzano", endLocation: "Trento", waypoints: [], style: "balanced", isRoundTrip: true, isMultiDay: false, daysEstimate: 1, maxHoursPerDay: 6, avoidHighways: false, notes: "" };
-    const text = "```json\n" + JSON.stringify(payload) + "\n```";
-    mockGeminiOk(text);
+  it("returns object with isRoundTrip and endLocation", async () => {
+    const payload = {
+      title: "Dolomiti",
+      startLocation: "Bolzano",
+      endLocation: "Trento",
+      waypoints: [],
+      style: "balanced",
+      isRoundTrip: true,
+      isMultiDay: false,
+      daysEstimate: 1,
+      maxHoursPerDay: 6,
+      avoidHighways: false,
+      notes: "",
+    };
+    mockAiOk(payload);
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -241,10 +255,21 @@ describe("POST /api/planned-routes/ai-parse — JSON parsing from Gemini text", 
     expect(res.body.isRoundTrip).toBe(true);
   });
 
-  it("parses JSON wrapped in plain ``` ... ``` code fence", async () => {
-    const payload = { title: "Toscana", startLocation: "Firenze", endLocation: "Siena", waypoints: [], style: "fast", isRoundTrip: false, isMultiDay: false, daysEstimate: 1, maxHoursPerDay: 6, avoidHighways: true, notes: "" };
-    const text = "```\n" + JSON.stringify(payload) + "\n```";
-    mockGeminiOk(text);
+  it("returns object with avoidHighways flag", async () => {
+    const payload = {
+      title: "Toscana",
+      startLocation: "Firenze",
+      endLocation: "Siena",
+      waypoints: [],
+      style: "fast",
+      isRoundTrip: false,
+      isMultiDay: false,
+      daysEstimate: 1,
+      maxHoursPerDay: 6,
+      avoidHighways: true,
+      notes: "",
+    };
+    mockAiOk(payload);
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -255,10 +280,21 @@ describe("POST /api/planned-routes/ai-parse — JSON parsing from Gemini text", 
     expect(res.body.avoidHighways).toBe(true);
   });
 
-  it("parses JSON embedded in surrounding prose text", async () => {
-    const payload = { title: "Sicilia", startLocation: "Palermo", endLocation: "Catania", waypoints: ["Agrigento"], style: "balanced", isRoundTrip: false, isMultiDay: true, daysEstimate: 3, maxHoursPerDay: 6, avoidHighways: false, notes: "" };
-    const text = "Ecco la pianificazione del tuo giro:\n" + JSON.stringify(payload) + "\nBuon viaggio!";
-    mockGeminiOk(text);
+  it("returns object with isMultiDay and daysEstimate fields", async () => {
+    const payload = {
+      title: "Sicilia",
+      startLocation: "Palermo",
+      endLocation: "Catania",
+      waypoints: ["Agrigento"],
+      style: "balanced",
+      isRoundTrip: false,
+      isMultiDay: true,
+      daysEstimate: 3,
+      maxHoursPerDay: 6,
+      avoidHighways: false,
+      notes: "",
+    };
+    mockAiOk(payload);
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -270,12 +306,12 @@ describe("POST /api/planned-routes/ai-parse — JSON parsing from Gemini text", 
     expect(res.body.daysEstimate).toBe(3);
   });
 
-  it("returns 503 when Gemini response contains no JSON object", async () => {
-    mockGeminiOk("Mi dispiace, non riesco a elaborare questa richiesta.");
+  it("returns 503 when generateObject throws an unexpected error", async () => {
+    aiMocks.generateObject.mockRejectedValue(new Error("Schema validation failed"));
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
-      .send({ prompt: "testo senza JSON" });
+      .send({ prompt: "testo ambiguo" });
 
     expect(res.status).toBe(503);
     expect(res.body).toHaveProperty("message");
@@ -283,27 +319,25 @@ describe("POST /api/planned-routes/ai-parse — JSON parsing from Gemini text", 
 });
 
 // ---------------------------------------------------------------------------
-// 3. Integration tests — Gemini errors → 503
+// 3. Integration tests — AI errors → HTTP error codes
 // ---------------------------------------------------------------------------
 
-describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () => {
+describe("POST /api/planned-routes/ai-parse — AI HTTP error handling", () => {
   let app: express.Application;
 
   beforeEach(() => {
     process.env.GEMINI_API_KEY = "test-key-integration";
-    process.env.GEMINI_RETRY_DELAY_MS = "0";
     app = buildApp();
-    genaiMocks.generateContent.mockReset();
-    genaiMocks.generateContentStream.mockReset();
+    aiMocks.generateObject.mockReset();
+    aiMocks.streamText.mockReset();
   });
 
   afterEach(() => {
     delete process.env.GEMINI_API_KEY;
-    delete process.env.GEMINI_RETRY_DELAY_MS;
   });
 
-  it("returns 503 with message body when Gemini responds with HTTP 500", async () => {
-    genaiMocks.generateContent.mockRejectedValue(new Error("Gemini 500"));
+  it("returns 503 with message body when AI responds with HTTP 500", async () => {
+    aiMocks.generateObject.mockRejectedValue(new Error("Gemini 500"));
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -315,9 +349,9 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
     expect(res.body.message.length).toBeGreaterThan(0);
   });
 
-  it("returns 429 with rate-limit message when Gemini responds with HTTP 429", async () => {
+  it("returns 429 with rate-limit message when AI responds with HTTP 429", async () => {
     const err = new Error("Gemini 429 quota exceeded");
-    genaiMocks.generateContent.mockRejectedValue(err);
+    aiMocks.generateObject.mockRejectedValue(err);
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -328,8 +362,8 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
     expect(res.body.message).toMatch(/limit|quota|richieste/i);
   });
 
-  it("returns 503 with message body when Gemini responds with HTTP 503", async () => {
-    genaiMocks.generateContent.mockRejectedValue(new Error("Gemini 503"));
+  it("returns 503 with message body when AI responds with HTTP 503", async () => {
+    aiMocks.generateObject.mockRejectedValue(new Error("Gemini 503"));
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -342,7 +376,7 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
   it("returns 504 with message body when SDK throws AbortError", async () => {
     const abortErr = new Error("The operation was aborted");
     abortErr.name = "AbortError";
-    genaiMocks.generateContent.mockRejectedValue(abortErr);
+    aiMocks.generateObject.mockRejectedValue(abortErr);
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -354,7 +388,7 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
   });
 
   it("returns 503 with message body when SDK throws a generic network error", async () => {
-    genaiMocks.generateContent.mockRejectedValue(new Error("ECONNREFUSED"));
+    aiMocks.generateObject.mockRejectedValue(new Error("ECONNREFUSED"));
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")

@@ -1,5 +1,7 @@
 import { Router, Request, Response } from "express";
-import { GoogleGenAI } from "@google/genai";
+import { generateObject, streamText } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { z } from "zod";
 import { storage } from "../storage";
 import type { InsertPlannedRoute } from "@shared/schema";
 import { haversineKm } from "../geo";
@@ -198,41 +200,36 @@ Analizza la richiesta e restituisci SOLO un oggetto JSON con:
 
 const AI_TIMEOUT_MS = parseInt(process.env.GEMINI_TIMEOUT_MS ?? "30000", 10) || 30000;
 const AI_MAX_RETRIES = 2;
-function getRetryDelayMs() { return parseInt(process.env.GEMINI_RETRY_DELAY_MS ?? "1500", 10); }
 
-function isRateLimitError(err: any): boolean {
-  const msg = (err?.message ?? "").toLowerCase();
-  const status = err?.status ?? err?.statusCode ?? err?.code;
-  return status === 429 || msg.includes("429") || msg.includes("quota") || msg.includes("rate limit") || msg.includes("resource_exhausted");
-}
-
-function isTransientError(err: any): boolean {
-  if (isRateLimitError(err)) return true;
-  const msg = (err?.message ?? "").toLowerCase();
-  const status = err?.status ?? err?.statusCode ?? err?.code;
-  return status === 503 || msg.includes("503") || msg.includes("unavailable") || msg.includes("overloaded");
-}
+const routeSchema = z.object({
+  title: z.string(),
+  startLocation: z.string(),
+  endLocation: z.string(),
+  waypoints: z.array(z.string()),
+  style: z.enum(["curvy", "balanced", "fast"]),
+  isRoundTrip: z.boolean(),
+  isMultiDay: z.boolean(),
+  daysEstimate: z.number(),
+  maxHoursPerDay: z.number(),
+  avoidHighways: z.boolean(),
+  notes: z.string(),
+});
 
 function geminiErrorMessage(err: any): { httpStatus: number; message: string } {
   if (err.name === "AbortError") {
     return { httpStatus: 504, message: "Il servizio AI ha impiegato troppo tempo, riprova tra qualche secondo" };
   }
-  if (isRateLimitError(err)) {
+  const msg = (err?.message ?? "").toLowerCase();
+  const status = err?.status ?? err?.statusCode ?? err?.code;
+  const isRateLimit = status === 429 || msg.includes("429") || msg.includes("quota") || msg.includes("rate limit") || msg.includes("resource_exhausted");
+  if (isRateLimit) {
     return { httpStatus: 429, message: "Troppe richieste AI: limite di utilizzo raggiunto, riprova tra qualche minuto" };
   }
-  if (isTransientError(err)) {
+  const isTransient = status === 503 || msg.includes("503") || msg.includes("unavailable") || msg.includes("overloaded");
+  if (isTransient) {
     return { httpStatus: 503, message: "Servizio AI temporaneamente non disponibile, riprova tra qualche secondo" };
   }
   return { httpStatus: 503, message: "Errore durante l'elaborazione della richiesta AI" };
-}
-
-function parseGeminiText(text: string): any {
-  const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
-  const first = stripped.indexOf("{");
-  const last = stripped.lastIndexOf("}");
-  if (first === -1 || last <= first) throw new Error("No JSON in response");
-  try { return JSON.parse(stripped.slice(first, last + 1)); }
-  catch { return JSON.parse(stripped); }
 }
 
 router.post("/ai-parse", async (req: Request, res: Response) => {
@@ -245,38 +242,33 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
 
-  const genai = new GoogleGenAI({ apiKey });
-  let lastErr: any;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const onClose = () => { controller.abort(); clearTimeout(timeout); };
+  req.on("close", onClose);
 
-  for (let attempt = 1; attempt <= AI_MAX_RETRIES; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
-    const onClose = () => { controller.abort(); clearTimeout(timeout); };
-    req.on("close", onClose);
+  const googleProvider = createGoogleGenerativeAI({ apiKey });
 
-    try {
-      const result = await genai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
-        config: { temperature: 0.1, maxOutputTokens: 512 },
-        abortSignal: controller.signal,
-      });
-      clearTimeout(timeout);
-      req.off("close", onClose);
-      const parsed = parseGeminiText(result.text ?? "");
-      return res.json(parsed);
-    } catch (err: any) {
-      clearTimeout(timeout);
-      req.off("close", onClose);
-      lastErr = err;
-      console.error(`[AI parse] attempt ${attempt}/${AI_MAX_RETRIES} error:`, err?.message ?? err);
-      if (err.name === "AbortError" || !isTransientError(err) || attempt === AI_MAX_RETRIES) break;
-      await new Promise(r => setTimeout(r, getRetryDelayMs() * attempt));
-    }
+  try {
+    const { object } = await generateObject({
+      model: googleProvider("gemini-2.5-flash"),
+      schema: routeSchema,
+      prompt: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
+      maxRetries: AI_MAX_RETRIES,
+      temperature: 0.1,
+      maxTokens: 512,
+      abortSignal: controller.signal,
+    });
+    clearTimeout(timeout);
+    req.off("close", onClose);
+    return res.json(object);
+  } catch (err: any) {
+    clearTimeout(timeout);
+    req.off("close", onClose);
+    console.error("[AI parse] error:", err?.message ?? err);
+    const { httpStatus, message } = geminiErrorMessage(err);
+    return res.status(httpStatus).json({ message });
   }
-
-  const { httpStatus, message } = geminiErrorMessage(lastErr);
-  return res.status(httpStatus).json({ message });
 });
 
 router.post("/ai-stream", async (req: Request, res: Response) => {
@@ -295,54 +287,46 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
-  const genai = new GoogleGenAI({ apiKey });
-  let lastErr: any;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+  const onClose = () => { controller.abort(); clearTimeout(timeout); };
+  req.on("close", onClose);
 
-  for (let attempt = 1; attempt <= AI_MAX_RETRIES; attempt++) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
-    const onClose = () => { controller.abort(); clearTimeout(timeout); };
-    req.on("close", onClose);
+  const googleProvider = createGoogleGenerativeAI({ apiKey });
 
-    try {
-      const stream = await genai.models.generateContentStream({
-        model: "gemini-2.5-flash",
-        contents: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
-        config: { temperature: 0.1, maxOutputTokens: 512 },
-        abortSignal: controller.signal,
-      });
+  try {
+    const result = streamText({
+      model: googleProvider("gemini-2.5-flash"),
+      prompt: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
+      maxRetries: AI_MAX_RETRIES,
+      temperature: 0.1,
+      maxTokens: 512,
+      abortSignal: controller.signal,
+    });
 
-      let fullText = "";
-      for await (const chunk of stream) {
-        const text = chunk.text ?? "";
-        if (text) {
-          fullText += text;
-          res.write(`data: ${JSON.stringify({ text })}\n\n`);
-        }
+    let fullText = "";
+    for await (const chunk of result.textStream) {
+      if (chunk) {
+        fullText += chunk;
+        res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
       }
-
-      clearTimeout(timeout);
-      req.off("close", onClose);
-
-      let parsed: any = null;
-      try { parsed = parseGeminiText(fullText); } catch { /* keep null */ }
-      res.write(`event: done\ndata: ${JSON.stringify({ parsed })}\n\n`);
-      res.end();
-      return;
-    } catch (err: any) {
-      clearTimeout(timeout);
-      req.off("close", onClose);
-      lastErr = err;
-      console.error(`[AI stream] attempt ${attempt}/${AI_MAX_RETRIES} error:`, err?.message ?? err);
-      if (err.name === "AbortError" || !isTransientError(err) || attempt === AI_MAX_RETRIES) break;
-      res.write(`data: ${JSON.stringify({ retry: attempt, message: "Nuovo tentativo in corso..." })}\n\n`);
-      await new Promise(r => setTimeout(r, getRetryDelayMs() * attempt));
     }
-  }
 
-  const { message } = geminiErrorMessage(lastErr);
-  res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
-  res.end();
+    clearTimeout(timeout);
+    req.off("close", onClose);
+
+    let parsed: any = null;
+    try { parsed = routeSchema.parse(JSON.parse(fullText)); } catch { /* keep null */ }
+    res.write(`event: done\ndata: ${JSON.stringify({ parsed })}\n\n`);
+    res.end();
+  } catch (err: any) {
+    clearTimeout(timeout);
+    req.off("close", onClose);
+    console.error("[AI stream] error:", err?.message ?? err);
+    const { message } = geminiErrorMessage(err);
+    res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
+    res.end();
+  }
 });
 
 export function fallbackAiParse(prompt: string) {
