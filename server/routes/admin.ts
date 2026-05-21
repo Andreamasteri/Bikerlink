@@ -376,6 +376,52 @@ function checkOtaErrorRate(ip: string | undefined): boolean {
   return true;
 }
 
+// Rolling-window spike detector for reload-failed events per device.
+// Fires an [OTA-ALERT] log + inserts a DB sentinel event when a device sends
+// >= RELOAD_FAIL_THRESHOLD reload-failed events within a 1-hour window.
+const reloadFailureMap = new Map<string, number[]>();
+const RELOAD_FAIL_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RELOAD_FAIL_THRESHOLD = 3;
+
+function checkAndAlertReloadFailureSpike(
+  deviceId: string,
+  runtimeVersion: string,
+  updateId: string,
+  platform: string | undefined,
+): void {
+  const now = Date.now();
+  const arr = reloadFailureMap.get(deviceId) ?? [];
+  const fresh = arr.filter((t) => now - t < RELOAD_FAIL_WINDOW_MS);
+  fresh.push(now);
+  reloadFailureMap.set(deviceId, fresh);
+
+  // Probabilistic cleanup to prevent unbounded memory growth.
+  if (Math.random() < 0.01 && reloadFailureMap.size > 500) {
+    for (const [k, v] of reloadFailureMap) {
+      if (v.every((t) => now - t > RELOAD_FAIL_WINDOW_MS)) reloadFailureMap.delete(k);
+    }
+  }
+
+  if (fresh.length === RELOAD_FAIL_THRESHOLD) {
+    // Alert exactly once at threshold crossing to avoid repeated alert storms.
+    const alertMsg = `reload-failed spike: ${fresh.length} failures in 1h window for device ${deviceId} (rv=${runtimeVersion} uid=${updateId} pf=${platform ?? "?"})`;
+    console.warn(`[OTA-ALERT] ${alertMsg}`);
+    // Persist alert as a sentinel event so it surfaces in the OTA history panel.
+    db.insert(otaEvents).values({
+      phase: "reload-failed-spike",
+      source: "alert",
+      platform: platform?.substring(0, 16),
+      runtimeVersion: runtimeVersion.substring(0, 32),
+      currentUpdateId: updateId.substring(0, 64),
+      error: alertMsg.substring(0, 500),
+      failCount: fresh.length,
+      deviceId: deviceId.substring(0, 64),
+    }).catch((err: unknown) => {
+      console.error("[OTA-ALERT] DB sentinel insert failed:", err);
+    });
+  }
+}
+
 router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, res: Response) => {
   try {
     // Task #1125: keep the legacy in-memory per-IP gate as defense-in-depth
@@ -458,6 +504,17 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
       // probabilistico qui per evitare contention DB sull'endpoint pubblico.
     } catch (dbErr) {
       console.error("[OTA-EVENT] DB insert failed:", dbErr);
+    }
+
+    // Task #1956: detect reload-failed spikes per device.
+    // Check only when phase is "reload-failed" and a stable deviceId is available.
+    if ((entry.phase ?? "") === "reload-failed" && typeof deviceId === "string" && deviceId.trim().length > 0) {
+      checkAndAlertReloadFailureSpike(
+        deviceId.substring(0, 64),
+        entry.runtimeVersion,
+        entry.updateId,
+        entry.platform,
+      );
     }
 
     return res.json({ ok: true });
