@@ -510,7 +510,7 @@ export default function PublicProfileScreen() {
                 try {
                   await AsyncStorage.setItem(
                     "pending_focus_coords",
-                    JSON.stringify({ lat: profile.latitude, lng: profile.longitude, ts: Date.now() })
+                    JSON.stringify({ lat: profile.latitude, lng: profile.longitude, ts: Date.now(), userId: id, nickname: profile.nickname })
                   );
                 } catch {}
                 router.navigate({ pathname: "/(tabs)/index" });

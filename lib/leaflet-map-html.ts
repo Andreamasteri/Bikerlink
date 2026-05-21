@@ -12,6 +12,30 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 .leaflet-control-attribution { font-size: 8px !important; opacity: 0.4; }
 .labels-hidden .nick-label { display: none !important; }
 .spiderified .nick-label { display: none !important; }
+@keyframes bl-pulse-ring {
+  0%   { transform: scale(0.2); opacity: 0.9; }
+  100% { transform: scale(3.5); opacity: 0; }
+}
+.bl-pulse-ring {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 3px solid #FF6600;
+  animation: bl-pulse-ring 0.7s ease-out forwards;
+  pointer-events: none;
+}
+.bl-pulse-ring-2 {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 3px solid #FF6600;
+  animation: bl-pulse-ring 0.7s ease-out 0.25s forwards;
+  pointer-events: none;
+  opacity: 0;
+}
+.bl-pulse-ring-3 {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 3px solid #FF6600;
+  animation: bl-pulse-ring 0.7s ease-out 0.5s forwards;
+  pointer-events: none;
+  opacity: 0;
+}
 </style>
 </head>
 <body>
@@ -50,7 +74,9 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   var currentTileUrl = null;
   var markersLayer = L.layerGroup().addTo(map);
   var circlesLayer = L.layerGroup().addTo(map);
+  var pulseLayer = L.layerGroup().addTo(map);
   var userDotMarker = null;
+  var userPositions = {};
 
   /* Spiderfier: apre a ventaglio i marker biker sovrapposti.
      nearbyDistance allineato alla dimensione effettiva delle icone (30px ~
@@ -235,6 +261,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 
       clearAllMarkers();
       circlesLayer.clearLayers();
+      userPositions = {};
 
       /* GPS blue dot */
       if (userDotMarker) { map.removeLayer(userDotMarker); userDotMarker = null; }
@@ -275,6 +302,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 
       /* Users — registrati con OMS per spiderfy su sovrapposizione */
       (m.users || []).forEach(function(u) {
+        userPositions[u.id] = { lat: u.lat, lng: u.lng };
         var color = getUserColor(u.userType, u.sex);
         var svg = getUserSvg(u.userType, u.sex);
         var omsData = { type: "user", id: u.id, nickname: u.nickname || "" };
@@ -386,6 +414,26 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 
     focusOn: function(lat, lng, zoom) {
       map.setView([lat, lng], zoom || 14, { animate: true });
+    },
+
+    highlightUser: function(userId) {
+      var pos = userPositions[userId];
+      if (!pos) return;
+      pulseLayer.clearLayers();
+      var pulseHtml =
+        "<div style=\\"position:relative;width:44px;height:44px;\\">" +
+        "<div class=\\"bl-pulse-ring\\" style=\\"position:absolute;top:0;left:0;\\"></div>" +
+        "<div class=\\"bl-pulse-ring-2\\" style=\\"position:absolute;top:0;left:0;\\"></div>" +
+        "<div class=\\"bl-pulse-ring-3\\" style=\\"position:absolute;top:0;left:0;\\"></div>" +
+        "</div>";
+      var pulseMarker = L.marker([pos.lat, pos.lng], {
+        icon: L.divIcon({ html: pulseHtml, className: "", iconSize: [44, 44], iconAnchor: [22, 22] }),
+        zIndexOffset: 3000,
+        interactive: false
+      }).addTo(pulseLayer);
+      setTimeout(function() {
+        try { pulseLayer.removeLayer(pulseMarker); } catch(e) {}
+      }, 1800);
     },
 
     centerOnUser: function(lat, lng) {

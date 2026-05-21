@@ -116,7 +116,7 @@ interface InteractiveMapProps {
 }
 
 export interface InteractiveMapHandle {
-  focusOnCoordinate: (coords: { latitude: number; longitude: number }) => void;
+  focusOnCoordinate: (coords: { latitude: number; longitude: number; userId?: string }) => void;
 }
 
 const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(function InteractiveMap({
@@ -352,11 +352,17 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   }, [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete]);
 
   useImperativeHandle(ref, () => ({
-    focusOnCoordinate: (coords: { latitude: number; longitude: number }) => {
+    focusOnCoordinate: (coords: { latitude: number; longitude: number; userId?: string }) => {
       inject(
         "window.leafletBridge && window.leafletBridge.focusOn(" +
         coords.latitude + "," + coords.longitude + ",15)"
       );
+      if (coords.userId) {
+        const uid = JSON.stringify(coords.userId);
+        inject(
+          "setTimeout(function(){ window.leafletBridge && window.leafletBridge.highlightUser(" + uid + "); }, 600);"
+        );
+      }
     },
   }), [inject]);
 

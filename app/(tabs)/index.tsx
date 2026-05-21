@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { Animated } from "react-native";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import {
   View,
@@ -85,7 +86,9 @@ export default function MapScreen() {
   const [countriesLoaded, setCountriesLoaded] = useState(false);
   const [showHomeMessage, setShowHomeMessage] = useState(false);
   const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [pendingFocusCoords, setPendingFocusCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [pendingFocusCoords, setPendingFocusCoords] = useState<{ lat: number; lng: number; userId?: string; nickname?: string } | null>(null);
+  const [focusToast, setFocusToast] = useState<string | null>(null);
+  const focusToastAnim = useRef(new Animated.Value(0)).current;
   const [showLocationNudge, setShowLocationNudge] = useState(false);
   const locationNudgeCheckedRef = useRef(false);
 
@@ -179,7 +182,7 @@ export default function MapScreen() {
           const lat = parseFloat(parsed.lat);
           const lng = parseFloat(parsed.lng);
           if (isNaN(lat) || isNaN(lng)) return;
-          setPendingFocusCoords({ lat, lng });
+          setPendingFocusCoords({ lat, lng, userId: parsed.userId, nickname: parsed.nickname });
         } catch {}
       })();
     }, [])
@@ -188,11 +191,19 @@ export default function MapScreen() {
   useEffect(() => {
     if (!mapReady) return;
     if (!pendingFocusCoords) return;
-    const { lat, lng } = pendingFocusCoords;
+    const { lat, lng, userId, nickname } = pendingFocusCoords;
     setPendingFocusCoords(null);
     const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
-    activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng });
-  }, [mapReady, pendingFocusCoords, mapFullscreen]);
+    activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId });
+    if (nickname) {
+      setFocusToast(`Vista centrata su ${nickname}`);
+      Animated.sequence([
+        Animated.timing(focusToastAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+        Animated.delay(2200),
+        Animated.timing(focusToastAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start(() => setFocusToast(null));
+    }
+  }, [mapReady, pendingFocusCoords, mapFullscreen, focusToastAnim]);
 
   useEffect(() => {
     if (mapFullscreen) {
@@ -730,6 +741,28 @@ export default function MapScreen() {
         onSave={() => saveCountries(selectedCountries)}
         onClose={() => setShowAreaModal(false)}
       />
+
+      {/* Focus toast */}
+      {focusToast != null && (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            bottom: 120,
+            left: 24,
+            right: 24,
+            alignItems: "center",
+            opacity: focusToastAnim,
+            transform: [{ translateY: focusToastAnim.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
+            zIndex: 9999,
+          }}
+        >
+          <View style={{ backgroundColor: "rgba(30,30,30,0.92)", paddingHorizontal: 18, paddingVertical: 10, borderRadius: 24, flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: "rgba(255,102,0,0.4)" }}>
+            <Ionicons name="navigate" size={16} color="#FF6600" />
+            <Text style={{ color: "#fff", fontSize: 14, fontFamily: "Inter_600SemiBold" }}>{focusToast}</Text>
+          </View>
+        </Animated.View>
+      )}
 
       {/* Fullscreen Map */}
       <FullscreenMapModal
