@@ -1344,7 +1344,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-21T14:13:44.521Z"
+  },
+  {
+    "updateNumber": 4,
+    "version": "48.4.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-4 rv10.0.0: OTA-4: matching targetUserTypes+route crossing, file split 80+ moduli, compatibility badge, undo reject match, dedup requireAuth, fix TS profile.ts",
+    "note": "CURRENT_OTA_NUMBER=4. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "644717ce-c711-4166-a2d1-eccb45e5c399",
+    "bundleUrl": "private/ota/ota-48.4.10-1779401392198.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "607f5ba3112f0f80d8aa4170e5490b27c304ac29",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-21T22:09:54.784Z"
   }
 ]

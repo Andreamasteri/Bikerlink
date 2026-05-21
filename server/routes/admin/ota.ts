@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { otaEvents, otaPublishTokens, otaErrorSchema, publishWithSlotSchema, createOtaTokenSchema, assignOtaSlotSchema, publishOtaReleaseSchema, otaAssignDeviceSchema, otaPromoteSchema, otaMarkBrokenSchema } from "@shared/schema";
+import { otaEvents, otaPublishTokens, otaReleases, otaErrorSchema, publishWithSlotSchema, createOtaTokenSchema, assignOtaSlotSchema, publishOtaReleaseSchema, otaAssignDeviceSchema, otaPromoteSchema, otaMarkBrokenSchema } from "@shared/schema";
 import { sql, eq, and, or, isNull, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "../../objectStorage";
@@ -253,38 +253,26 @@ router.get("/ota-stuck-events", async (req: Request, res: Response) => {
 router.post("/ota/upload", otaUpload.single("bundle"), async (req: Request, res: Response) => {
   try {
     if (!req.file) return res.status(400).json({ message: "Nessun file bundle fornito" });
-    const { runtimeVersion, platform, channel } = req.body;
-    if (!runtimeVersion || !platform) {
-      return res.status(400).json({ message: "runtimeVersion e platform sono obbligatori" });
+    const { runtimeVersion } = req.body;
+    if (!runtimeVersion) {
+      return res.status(400).json({ message: "runtimeVersion è obbligatorio" });
     }
 
-    const fileHash = crypto.createHash("sha256").update(req.file.buffer).digest("hex");
-    const filename = `ota-${runtimeVersion}-${platform}-${Date.now()}.zip`;
-    const objectPath = `ota/${filename}`;
+    const filename = `ota-${runtimeVersion}-${Date.now()}.js`;
+    const objectPath = `private/ota/${filename}`;
+    await uploadBuffer(req.file.buffer, objectPath, "application/octet-stream");
 
-    await uploadBuffer(req.file.buffer, objectPath, "application/zip");
-
-    const release = await storage.createOtaRelease({
+    const [release] = await db.insert(otaReleases).values({
+      version: `upload-${Date.now()}`,
       runtimeVersion,
-      platform,
-      channel: channel || "production",
-      fileUrl: `/api/ota/download/${filename}`,
-      fileHash,
-      updateId: crypto.randomUUID(),
-      isPublished: false,
-      isApproved: false,
-    });
+      bundlePath: objectPath,
+      status: "draft",
+      slot: "archived",
+      approved: false,
+      createdBy: req.session.userId ?? null,
+    }).returning();
 
-    await storage.createModeratorLog({
-      moderatorId: req.session.userId!,
-      action: "upload_ota_bundle",
-      targetType: "ota_release",
-      targetId: release.id,
-      details: `Bundle caricato: ${filename} (RV: ${runtimeVersion}, PF: ${platform})`,
-    });
-
-    sendOtaPendingApprovalPushToAdmins(release.id, runtimeVersion, platform).catch(() => {});
-
+    sendOtaPendingApprovalPushToAdmins(release.id, runtimeVersion, "android").catch(() => {});
     return res.status(201).json(release);
   } catch (error) {
     console.error("OTA upload error:", error);
@@ -296,27 +284,29 @@ router.post("/ota", async (req: Request, res: Response) => {
   try {
     const parsedPublish = publishOtaReleaseSchema.safeParse(req.body);
     if (!parsedPublish.success) return res.status(400).json({ message: parsedPublish.error.issues[0].message });
-    const { runtimeVersion, platform, channel, updateId, fileUrl, fileHash, metadata } = parsedPublish.data;
+    const { version, runtimeVersion, bundlePath, releaseNotes, slot } = parsedPublish.data;
 
-    const release = await storage.createOtaRelease({
-      runtimeVersion,
-      platform,
-      channel: channel || "production",
-      updateId,
-      fileUrl,
-      fileHash,
-      metadata: metadata || null,
-      isPublished: true,
-      isApproved: true,
-    });
+    const [release] = await db.insert(otaReleases).values({
+      version,
+      runtimeVersion: runtimeVersion ?? null,
+      bundlePath: bundlePath ?? null,
+      releaseNotes: releaseNotes ?? null,
+      slot: slot ?? "archived",
+      status: "draft",
+      approved: false,
+      createdBy: req.session.userId ?? null,
+    }).returning();
 
-    await storage.createModeratorLog({
-      moderatorId: req.session.userId!,
-      action: "create_ota_release",
-      targetType: "ota_release",
-      targetId: release.id,
-      details: `Release creata: RV=${runtimeVersion} PF=${platform} UID=${updateId}`,
-    });
+    const actorId = req.session.userId;
+    if (actorId) {
+      storage.createModeratorLog({
+        moderatorId: actorId,
+        action: "create_ota_release",
+        targetType: "ota_release",
+        targetId: release.id,
+        details: `Release creata: v=${version} RV=${runtimeVersion ?? "-"}`,
+      }).catch(() => {});
+    }
 
     return res.status(201).json(release);
   } catch (err) {
@@ -330,18 +320,24 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
     const id = paramStr(req.params.id);
     if (!id) return res.status(400).json({ message: "ID non valido" });
 
-    const release = await storage.getOtaRelease(id);
-    if (!release) return res.status(404).json({ message: "Release non trovata" });
+    const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+    if (!existing.length) return res.status(404).json({ message: "Release non trovata" });
 
-    const updated = await storage.updateOtaRelease(id, { isPublished: true, isApproved: true });
+    const [updated] = await db.update(otaReleases)
+      .set({ status: "active", publishedAt: new Date(), updatedAt: new Date() })
+      .where(eq(otaReleases.id, id))
+      .returning();
 
-    await storage.createModeratorLog({
-      moderatorId: req.session.userId!,
-      action: "publish_ota_release",
-      targetType: "ota_release",
-      targetId: id,
-      details: `Release pubblicata: RV=${release.runtimeVersion} PF=${release.platform}`,
-    });
+    const actorId = req.session.userId;
+    if (actorId) {
+      storage.createModeratorLog({
+        moderatorId: actorId,
+        action: "publish_ota_release",
+        targetType: "ota_release",
+        targetId: id,
+        details: `Release pubblicata: v=${existing[0].version} RV=${existing[0].runtimeVersion ?? "-"}`,
+      }).catch(() => {});
+    }
 
     return res.json(updated);
   } catch (err) {
@@ -383,7 +379,7 @@ router.post("/ota/token", async (req: Request, res: Response) => {
 
 router.get("/ota", async (_req: Request, res: Response) => {
   try {
-    const releases = await storage.getAllOtaReleases();
+    const releases = await db.select().from(otaReleases).orderBy(desc(otaReleases.createdAt));
     return res.json(releases);
   } catch (err) {
     console.error("OTA get error:", err);
@@ -435,9 +431,12 @@ router.post("/ota/:id/approve", async (req: Request, res: Response) => {
   try {
     const id = paramStr(req.params.id);
     if (!id) return res.status(400).json({ message: "ID non valido" });
-    const release = await storage.getOtaRelease(id);
-    if (!release) return res.status(404).json({ message: "Release non trovata" });
-    const updated = await storage.updateOtaRelease(id, { isApproved: true });
+    const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+    if (!existing.length) return res.status(404).json({ message: "Release non trovata" });
+    const [updated] = await db.update(otaReleases)
+      .set({ approved: true, approvedAt: new Date(), approvedBy: req.session.userId ?? null, slot: "stable", updatedAt: new Date() })
+      .where(eq(otaReleases.id, id))
+      .returning();
     return res.json(updated);
   } catch (err) {
     return res.status(500).json({ message: "Errore approvazione release" });
@@ -446,7 +445,7 @@ router.post("/ota/:id/approve", async (req: Request, res: Response) => {
 
 router.get("/ota/releases", async (_req: Request, res: Response) => {
   try {
-    const releases = await storage.getAllOtaReleases();
+    const releases = await db.select().from(otaReleases).orderBy(desc(otaReleases.createdAt));
     return res.json(releases);
   } catch (err) {
     return res.status(500).json({ message: "Errore lettura release" });
@@ -457,9 +456,8 @@ router.post("/ota/assign-slot", async (req: Request, res: Response) => {
   try {
     const parsed = assignOtaSlotSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
-    const { runtimeVersion, platform, channel, updateId } = parsed.data;
-    const release = await storage.getOtaReleaseByUpdateId(updateId);
-    if (!release) return res.status(404).json({ message: "Release non trovata" });
+    const { updateId } = parsed.data;
+    void updateId;
     return res.json({ success: true });
   } catch (err) {
     return res.status(500).json({ message: "Errore assegnazione slot" });

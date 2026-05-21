@@ -247,7 +247,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
 
       const user = await storage.getUser(userId);
       if (user && (user.userType === "zavorrina" || user.userType === "coppia")) {
-        triggerProposalProfileMatchingForZavorrina(userId).catch(e => console.error("[triggerMatchingForZavorrina error]", e));
+        triggerProposalProfileMatchingForZavorrina(userId);
       }
 
       return res.json(profile);
@@ -257,7 +257,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
 
       const user = await storage.getUser(userId);
       if (user && (user.userType === "zavorrina" || user.userType === "coppia")) {
-        triggerProposalProfileMatchingForZavorrina(userId).catch(e => console.error("[triggerMatchingForZavorrina error]", e));
+        triggerProposalProfileMatchingForZavorrina(userId);
       }
 
       return res.json(profile);
@@ -404,7 +404,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
 
     const user = await storage.getUser(userId);
     if (user && (user.userType === "zavorrina" || user.userType === "coppia")) {
-      triggerProposalProfileMatchingForZavorrina(userId).catch(e => console.error("[triggerMatchingForZavorrina error]", e));
+      triggerProposalProfileMatchingForZavorrina(userId);
     }
 
     onlineTracker.setAvailability(userId, isAvailable);

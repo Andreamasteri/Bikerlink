@@ -519,7 +519,7 @@ import stregattiRouter from './admin/stregatti';
 import miscRouter from './admin/misc';
 import matchingRouter from './admin/matching';
 
-router.use('/ota', otaRouter);
+router.use('/', otaRouter);
 router.use('/users', usersRouter);
 router.use('/settings', settingsRouter);
 router.use('/advertisements', adsRouter);
