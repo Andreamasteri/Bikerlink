@@ -90,6 +90,8 @@ export default function CreateRouteScreen() {
   const [isImporting, setIsImporting] = useState(false);
   const [routePolylinePts, setRoutePolylinePts] = useState<Array<{ lat: number; lng: number }>>([]);
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+  const routeAbortControllerRef = useRef<AbortController | null>(null);
+  const routeDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Edit mode: load existing route
   const { data: existingRoute, isLoading: isLoadingExisting } = useQuery({
@@ -310,26 +312,39 @@ export default function CreateRouteScreen() {
     webviewRef.current.injectJavaScript(js);
   }, []);
 
-  const calculateRealRoute = useCallback(async (wps: LocalWaypoint[]) => {
+  const calculateRealRoute = useCallback(async (wps: LocalWaypoint[], signal: AbortSignal) => {
     if (wps.length < 2) {
       setRoutePolylinePts([]);
       return;
     }
     setIsCalculatingRoute(true);
     try {
-      const res = await apiRequest("POST", "/api/planned-routes/calculate", {
-        waypoints: wps.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })),
-        style: "balanced",
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/planned-routes/calculate", baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        signal,
+        body: JSON.stringify({
+          waypoints: wps.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })),
+          style: "balanced",
+        }),
       });
+      if (signal.aborted) return;
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json() as { rawPoints?: Array<{ lat: number; lng: number }> };
       const pts = data.rawPoints && data.rawPoints.length > 1 ? data.rawPoints : [];
       setRoutePolylinePts(pts);
       injectWaypoints(wps, pts.length > 1 ? pts : undefined);
-    } catch {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.name === "AbortError") return;
       setRoutePolylinePts([]);
       injectWaypoints(wps);
     } finally {
-      setIsCalculatingRoute(false);
+      if (!signal.aborted) {
+        setIsCalculatingRoute(false);
+      }
     }
   }, [injectWaypoints]);
 
@@ -343,6 +358,16 @@ export default function CreateRouteScreen() {
     if (waypoints.length < 2) {
       curvatureMapMountedRef.current = false;
       setRoutePolylinePts([]);
+      // Cancel any in-flight request and pending debounce
+      if (routeDebounceTimerRef.current !== null) {
+        clearTimeout(routeDebounceTimerRef.current);
+        routeDebounceTimerRef.current = null;
+      }
+      if (routeAbortControllerRef.current) {
+        routeAbortControllerRef.current.abort();
+        routeAbortControllerRef.current = null;
+      }
+      setIsCalculatingRoute(false);
       return;
     }
 
@@ -365,8 +390,33 @@ export default function CreateRouteScreen() {
       injectWaypoints(waypoints, routePolylinePtsRef.current.length > 1 ? routePolylinePtsRef.current : undefined);
     }
 
-    // Trigger real road routing (fallback to straight lines on error)
-    calculateRealRoute(waypoints);
+    // Debounce + abort: cancel any pending timer and previous in-flight request,
+    // then wait 600ms before firing a new route calculation.
+    if (routeDebounceTimerRef.current !== null) {
+      clearTimeout(routeDebounceTimerRef.current);
+    }
+    if (routeAbortControllerRef.current) {
+      routeAbortControllerRef.current.abort();
+    }
+
+    const snapshotWaypoints = waypoints;
+    routeDebounceTimerRef.current = setTimeout(() => {
+      const controller = new AbortController();
+      routeAbortControllerRef.current = controller;
+      routeDebounceTimerRef.current = null;
+      calculateRealRoute(snapshotWaypoints, controller.signal);
+    }, 600);
+
+    return () => {
+      if (routeDebounceTimerRef.current !== null) {
+        clearTimeout(routeDebounceTimerRef.current);
+        routeDebounceTimerRef.current = null;
+      }
+      if (routeAbortControllerRef.current) {
+        routeAbortControllerRef.current.abort();
+        routeAbortControllerRef.current = null;
+      }
+    };
   }, [waypoints, tileConfig, injectWaypoints, calculateRealRoute]);
 
   return (
