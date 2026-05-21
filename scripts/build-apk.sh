@@ -250,6 +250,7 @@ echo ""
 sleep 5
 
 # ── 6. Build EAS (set -e disabilitato attorno al comando per catturare exit code) ─
+EAS_OUTPUT_TMP=$(mktemp)
 set +e
 CI=1 \
 EAS_NO_VCS=1 \
@@ -259,20 +260,52 @@ npx eas-cli@18 build \
   --profile "$PROFILE" \
   --non-interactive \
   --no-wait \
-  --clear-cache
-BUILD_EXIT=$?
+  --clear-cache 2>&1 | tee "$EAS_OUTPUT_TMP"
+BUILD_EXIT=${PIPESTATUS[0]}
 set -e
+
+# Estrai BUILD_ID dall'output EAS (URL del tipo .../builds/<UUID>)
+BUILD_ID=$(grep -oP '(?<=/builds/)[0-9a-f-]{36}' "$EAS_OUTPUT_TMP" | head -1 || true)
+rm -f "$EAS_OUTPUT_TMP"
 
 # ── 7. Log risultato ─────────────────────────────────────────────────────────
 if [ $BUILD_EXIT -eq 0 ]; then
-  echo "$TIMESTAMP  APK BUILD INVIATA (--no-wait) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY versionName=$VERSION_NAME versionCode=$VERSION_CODE committed=$GIT_COMMITTED" >> "$LOG_FILE"
+  echo "$TIMESTAMP  APK BUILD INVIATA (--no-wait) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY versionName=$VERSION_NAME versionCode=$VERSION_CODE committed=$GIT_COMMITTED buildId=${BUILD_ID:-sconosciuto}" >> "$LOG_FILE"
   echo ""
   echo "  ✅ Build inviata ai server EAS — controlla https://expo.dev per lo stato."
   echo ""
+  if [ -n "$BUILD_ID" ]; then
+    echo "  📋 BUILD_ID: $BUILD_ID"
+    echo ""
+  else
+    echo "  ⚠  BUILD_ID non rilevato dall'output EAS."
+    echo "  Recuperalo da: https://expo.dev → Projects → Builds"
+    echo ""
+  fi
   echo "  Salvataggio snapshot build (per pre-build-check prossima run)..."
   bash scripts/save-build-snapshot.sh "" "" 2>/dev/null || true
-  echo "  ⚠  Ricorda: dopo che EAS completa la build, aggiorna lo snapshot con:"
-  echo "     bash scripts/save-build-snapshot.sh <BUILD_ID> <APK_URL>"
+  echo ""
+  echo "  ┌─────────────────────────────────────────────────────────────────┐"
+  echo "  │  PROSSIMO PASSO — Monitoraggio automatico build EAS            │"
+  echo "  │                                                                 │"
+  if [ -n "$BUILD_ID" ]; then
+    echo "  │  Esegui questo comando per monitorare la build e salvare        │"
+    echo "  │  lo snapshot automaticamente al completamento:                  │"
+    echo "  │                                                                 │"
+    echo "  │    bash scripts/poll-eas-build.sh $BUILD_ID  │"
+    echo "  │                                                                 │"
+    echo "  │  Oppure, se preferisci farlo manualmente dopo il completamento: │"
+    echo "  │    bash scripts/save-build-snapshot.sh $BUILD_ID               │"
+  else
+    echo "  │  Recupera il BUILD_ID da https://expo.dev → Projects → Builds  │"
+    echo "  │  poi esegui:                                                    │"
+    echo "  │                                                                 │"
+    echo "  │    bash scripts/poll-eas-build.sh <BUILD_ID>                   │"
+    echo "  │                                                                 │"
+    echo "  │  Oppure manualmente dopo il completamento:                      │"
+    echo "  │    bash scripts/save-build-snapshot.sh <BUILD_ID>              │"
+  fi
+  echo "  └─────────────────────────────────────────────────────────────────┘"
 
   # ── Step M: Aggiornamento PROVVISORIO skill bikerlink-versioning ────────────
   # ⚠  Questo aggiornamento è provvisorio: la build è stata *inviata* a EAS con
