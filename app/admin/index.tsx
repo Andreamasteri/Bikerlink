@@ -40,6 +40,80 @@ interface TelemetryStats {
   latestSample: string | null;
 }
 
+interface GHStatus {
+  mode: "self-hosted" | "cloud" | "disabled";
+  profile: string;
+  healthy: boolean;
+  url: string;
+}
+
+function GraphHopperCard() {
+  const { data, isLoading, error } = useQuery<GHStatus>({
+    queryKey: ["/api/admin/graphhopper-status"],
+    queryFn: async () => {
+      const res = await fetch(new URL("/api/admin/graphhopper-status", getApiUrl()).toString(), {
+        headers: { ...(await authFetchHeaders()) },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  const modeLabel: Record<string, string> = {
+    "self-hosted": "Self-Hosted",
+    cloud: "Cloud API",
+    disabled: "Disabilitato",
+  };
+  const modeColor: Record<string, string> = {
+    "self-hosted": "#22c55e",
+    cloud: "#f59e0b",
+    disabled: "#ef4444",
+  };
+  const color = data ? modeColor[data.mode] ?? "#6b7280" : "#6b7280";
+
+  return (
+    <View style={ghStyles.card}>
+      <View style={ghStyles.cardHeader}>
+        <MaterialCommunityIcons name="map-marker-path" size={18} color={color} />
+        <Text style={ghStyles.cardTitle}>GraphHopper</Text>
+        {isLoading && <ActivityIndicator size="small" color={color} style={{ marginLeft: "auto" }} />}
+        {error && !isLoading && (
+          <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" style={{ marginLeft: "auto" }} />
+        )}
+        {!isLoading && !error && data && (
+          <View style={[ghStyles.healthDot, { backgroundColor: data.healthy ? "#22c55e" : "#ef4444", marginLeft: "auto" }]} />
+        )}
+      </View>
+      <View style={ghStyles.row}>
+        <View style={ghStyles.stat}>
+          <Text style={[ghStyles.statValue, { color }]}>{data ? modeLabel[data.mode] ?? data.mode : "—"}</Text>
+          <Text style={ghStyles.statLabel}>Modalità</Text>
+        </View>
+        <View style={ghStyles.divider} />
+        <View style={ghStyles.stat}>
+          <Text style={ghStyles.statValue}>{data ? data.profile : "—"}</Text>
+          <Text style={ghStyles.statLabel}>Profilo</Text>
+        </View>
+        <View style={ghStyles.divider} />
+        <View style={ghStyles.stat}>
+          <Text style={[ghStyles.statValue, { color: data ? (data.healthy ? "#22c55e" : "#ef4444") : Colors.textSecondary }]}>
+            {data ? (data.healthy ? "OK" : "Errore") : "—"}
+          </Text>
+          <Text style={ghStyles.statLabel}>Health</Text>
+        </View>
+      </View>
+      {!isLoading && !error && data?.mode === "cloud" && (
+        <View style={ghStyles.warningBanner}>
+          <MaterialCommunityIcons name="alert-outline" size={13} color="#f59e0b" />
+          <Text style={ghStyles.warningText}>Profilo motorcycle non disponibile su Cloud. Usando 'car'.</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 const TELEMETRY_STALE_THRESHOLD_HOURS = 24;
 
 function TelemetryCard() {
@@ -248,6 +322,7 @@ export default function AdminDashboard() {
       <Text style={styles.subtitle}>Gestisci tutti gli aspetti dell'app</Text>
 
       <TelemetryCard />
+      <GraphHopperCard />
 
       {adminGroups.map((group) => (
         <React.Fragment key={group.title}>
@@ -341,6 +416,74 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.text,
     textAlign: "center",
+  },
+});
+
+const ghStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 14,
+  },
+  cardTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: Colors.text,
+  },
+  healthDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  stat: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: Colors.text,
+  },
+  statLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  divider: {
+    width: 1,
+    height: 36,
+    backgroundColor: Colors.border,
+  },
+  warningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    marginTop: 4,
+  },
+  warningText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: "#f59e0b",
+    flex: 1,
   },
 });
 

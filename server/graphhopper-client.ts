@@ -20,6 +20,21 @@ const CLOUD_URL = "https://graphhopper.com/api/1";
 export const GH_BASE_URL = SELF_HOSTED_URL ?? CLOUD_URL;
 export const isSelfHosted = Boolean(SELF_HOSTED_URL);
 
+/**
+ * Profilo attivo: "motorcycle" quando si usa il server self-hosted,
+ * "car" quando si usa la Cloud API (il piano gratuito non supporta motorcycle).
+ */
+export const ACTIVE_PROFILE = isSelfHosted ? "motorcycle" : "car";
+
+// ─── Startup log ───────────────────────────────────────────────────────────────
+if (isSelfHosted) {
+  console.log(`[GraphHopper] Self-hosted mode — URL: ${GH_BASE_URL} — profile: motorcycle`);
+} else if (CLOUD_API_KEY) {
+  console.warn("[GraphHopper] Cloud API mode — profile forced to 'car' (motorcycle not available on free plan)");
+} else {
+  console.warn("[GraphHopper] Non configurato — nessuna variabile GRAPHHOPPER_URL o GRAPHHOPPER_API_KEY. Routing approssimativo attivo.");
+}
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 function buildHeaders(): Record<string, string> {
@@ -159,9 +174,10 @@ export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
     );
   }
 
+  const effectiveProfile = req.profile ?? ACTIVE_PROFILE;
   const body: Record<string, unknown> = {
     points: req.points,
-    profile: req.profile ?? "motorcycle",
+    profile: effectiveProfile,
     instructions: req.instructions ?? true,
     calc_points: req.calc_points ?? true,
     points_encoded: req.points_encoded ?? true,

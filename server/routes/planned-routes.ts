@@ -6,7 +6,7 @@ import { storage } from "../storage";
 import type { InsertPlannedRoute } from "@shared/schema";
 import { savePlannedRouteSchema, poiSearchSchema, aiPromptSchema, poiRequestSchema, calculateRouteRequestSchema, plannedGpxImportSchema, weatherWaypointsSchema, poiPhotoSchema, hotelsSchema, segmentMultidaySchema, updatePlannedRouteBodySchema } from "@shared/schema";
 import { haversineKm } from "../geo";
-import { calculateRoute as ghCalculateRoute, isSelfHosted } from "../graphhopper-client";
+import { calculateRoute as ghCalculateRoute, isSelfHosted, ACTIVE_PROFILE } from "../graphhopper-client";
 
 const router = Router();
 
@@ -501,7 +501,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
   try {
     const body: any = {
       points: effectiveWaypoints.map((wp) => [wp.lng, wp.lat]),
-      profile: "motorcycle",
+      profile: ACTIVE_PROFILE,
       instructions: true,
       calc_points: true,
       points_encoded: false,
@@ -636,9 +636,8 @@ router.post("/calculate", async (req: Request, res: Response) => {
 
     let ghData: any;
     try {
-      const ghResult = await ghCalculateRoute({
+      const ghReqBase = {
         points: body.points as [number, number][],
-        profile: body.profile as string,
         instructions: body.instructions as boolean,
         calc_points: body.calc_points as boolean,
         points_encoded: false,
@@ -647,8 +646,21 @@ router.post("/calculate", async (req: Request, res: Response) => {
         ...(body.heading !== undefined ? { heading: body.heading as number } : {}),
         ...(body.custom_model ? { custom_model: body.custom_model as Record<string, unknown> } : {}),
         language: language ?? "it",
-      });
-      ghData = ghResult;
+      };
+      try {
+        const ghResult = await ghCalculateRoute({ ...ghReqBase, profile: body.profile as string });
+        ghData = ghResult;
+      } catch (firstErr: any) {
+        const errMsg = firstErr?.message ?? "";
+        const is400Profile = errMsg.includes("400") && errMsg.toLowerCase().includes("profile");
+        if (is400Profile && body.profile !== "car") {
+          console.warn(`[GraphHopper] 400 profile error con '${body.profile}', retry automatico con 'car'`);
+          const ghResult = await ghCalculateRoute({ ...ghReqBase, profile: "car" });
+          ghData = ghResult;
+        } else {
+          throw firstErr;
+        }
+      }
     } catch (ghErr) {
       console.error("[GraphHopper] error:", ghErr);
       return res.json(buildFallbackRoute(waypoints));

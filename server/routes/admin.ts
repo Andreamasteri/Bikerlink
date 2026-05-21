@@ -7903,4 +7903,34 @@ router.delete("/users/:userId/sessions/:sid", async (req: Request, res: Response
   }
 });
 
+// ─── GraphHopper Status ────────────────────────────────────────────────────────
+
+router.get("/graphhopper-status", async (req: Request, res: Response) => {
+  const userId = (req.session as any)?.userId as string | undefined;
+  if (!userId) return res.status(401).json({ message: "Non autenticato" });
+  const user = await storage.getUser(userId);
+  if (!user?.isAdmin) return res.status(403).json({ message: "Non autorizzato" });
+
+  try {
+    const { isSelfHosted, ACTIVE_PROFILE, GH_BASE_URL, getServerInfo } = await import("../graphhopper-client");
+
+    const mode: "self-hosted" | "cloud" | "disabled" =
+      isSelfHosted ? "self-hosted" : process.env.GRAPHHOPPER_API_KEY ? "cloud" : "disabled";
+
+    const info = await getServerInfo();
+    const healthy = info.status === "ok" || info.status === "running" || info.graph_loaded === true;
+
+    return res.json({
+      mode,
+      profile: ACTIVE_PROFILE,
+      healthy,
+      url: GH_BASE_URL,
+      details: info,
+    });
+  } catch (err) {
+    console.error("[admin/graphhopper-status] error:", err);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 export default router;
