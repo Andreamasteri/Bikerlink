@@ -15,6 +15,7 @@ import * as path from "path";
 import { initUptimeTracking, startMetroMonitor, stopMetroMonitor } from "./uptime";
 import { matchEnrichmentSemaphore, MATCH_ENRICHMENT_GLOBAL_LIMIT } from "./lib/concurrency";
 import { storage } from "./storage";
+import { runMigrations } from "./migrate";
 
 const app = express();
 const log = console.log;
@@ -546,6 +547,16 @@ function setupErrorHandler(app: express.Application) {
 }
 
 (async () => {
+  // Task #1869: run pending SQL migrations before the server accepts traffic.
+  // If any migration fails, the process exits with a non-zero code so the
+  // deploy is blocked and the error is clearly visible in the logs.
+  try {
+    await runMigrations();
+  } catch (err) {
+    console.error("[startup] Migration runner failed — aborting server start:", err);
+    process.exit(1);
+  }
+
   app.set("trust proxy", 1);
 
   app.get("/healthz", (_req: Request, res: Response) => {
