@@ -158,6 +158,79 @@ router.get("/stats", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/ideal-laps", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        session_id,
+        MIN(ts) AS started_at_ms,
+        COUNT(*) AS sample_count,
+        MAX(speed_kmh) AS max_speed_kmh,
+        MAX(ABS(lean_angle)) AS max_lean_deg,
+        MAX(
+          SQRT(
+            COALESCE(gforce_x, 0) * COALESCE(gforce_x, 0)
+            + COALESCE(gforce_y, 0) * COALESCE(gforce_y, 0)
+            + COALESCE(gforce_z, 0) * COALESCE(gforce_z, 0)
+          )
+        ) AS max_gforce
+      FROM ride_telemetry
+      WHERE user_id = ${userId}
+        AND session_type = 'ideal_lap'
+      GROUP BY session_id
+      ORDER BY MIN(ts) DESC
+    `);
+
+    type LapRow = {
+      session_id: string;
+      started_at_ms: string;
+      sample_count: string;
+      max_speed_kmh: string | null;
+      max_lean_deg: string | null;
+      max_gforce: string | null;
+    };
+
+    const laps = (result.rows as LapRow[]).map((r, idx) => ({
+      sessionId: r.session_id,
+      startedAt: new Date(Number(r.started_at_ms)).toISOString(),
+      sampleCount: parseInt(r.sample_count, 10),
+      maxSpeedKmh: r.max_speed_kmh != null ? Math.round(parseFloat(r.max_speed_kmh) * 10) / 10 : null,
+      maxLeanDeg: r.max_lean_deg != null ? Math.round(parseFloat(r.max_lean_deg) * 10) / 10 : null,
+      maxGforce: r.max_gforce != null ? Math.round(parseFloat(r.max_gforce) * 100) / 100 : null,
+      lapNumber: (result.rows as LapRow[]).length - idx,
+    }));
+
+    return res.json({ laps });
+  } catch (err) {
+    console.error("[telemetry/ideal-laps] error:", err);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const { sessionId } = req.params;
+  if (!sessionId) return res.status(400).json({ message: "sessionId obbligatorio" });
+
+  try {
+    await db.execute(sql`
+      DELETE FROM ride_telemetry
+      WHERE user_id = ${userId}
+        AND session_id = ${sessionId}
+        AND session_type = 'ideal_lap'
+    `);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[telemetry/ideal-laps DELETE] error:", err);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.delete("/reset", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
