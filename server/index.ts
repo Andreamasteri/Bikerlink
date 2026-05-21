@@ -1815,6 +1815,26 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[INIT] Phase 3.6 OTA 8.x cleanup error:", e);
         }
 
+        // Phase 3.7: one-time cleanup — remove legacy 9.x OTA records (SDK 55→56 migration)
+        try {
+          const { storage: stOta9 } = await import("./storage");
+          const ota9xCleaned = await stOta9.getAppSetting("ota_9x_cleanup_done_v1").catch(() => null);
+          if (!ota9xCleaned) {
+            const { db: dbOta9 } = await import("./db");
+            const { sql: sqlOta9 } = await import("drizzle-orm");
+            const evRes9 = await dbOta9.execute(sqlOta9`DELETE FROM ota_events WHERE runtime_version LIKE '9.%'`);
+            const rlRes9 = await dbOta9.execute(sqlOta9`DELETE FROM ota_releases WHERE runtime_version LIKE '9.%'`);
+            const evDel9 = (evRes9 as any)?.rowCount ?? "?";
+            const rlDel9 = (rlRes9 as any)?.rowCount ?? "?";
+            console.log(`[INIT] Phase 3.7 OTA 9.x cleanup: ota_events=${evDel9} deleted, ota_releases=${rlDel9} deleted`);
+            await stOta9.upsertAppSetting("ota_9x_cleanup_done_v1", "done");
+          } else {
+            console.log("[INIT] Phase 3.7 OTA 9.x cleanup already done, skipping");
+          }
+        } catch (e) {
+          console.warn("[INIT] Phase 3.7 OTA 9.x cleanup error:", e);
+        }
+
         // Phase 4: motoclub migration + reseed (heavy — many DB inserts)
         await delay(2_000);
         try {

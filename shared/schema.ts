@@ -16,7 +16,6 @@ import {
   pgEnum,
   primaryKey,
 } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 export const users = pgTable("users", {
@@ -999,7 +998,7 @@ export const registerSchema = z.object({
   region: z.string().max(100).optional(),
   country: z.string().max(2).optional(),
   eulaAccepted: z.literal(true, {
-    errorMap: () => ({ message: "Devi accettare i termini di utilizzo" }),
+    message: "Devi accettare i termini di utilizzo",
   }),
   invitationCode: z.string().optional(),
 });

@@ -141,7 +141,7 @@
         "expo-device-id": "extra-params"
       }
     },
-    "runtimeVersion": "9.0.0",
+    "runtimeVersion": "10.0.0",
     "extra": {
       "router": {
         "origin": "https://replit.com/"
