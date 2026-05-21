@@ -248,6 +248,15 @@ interface ProfileData {
   }>;
 }
 
+interface PendingOtaRelease {
+  id: string;
+  version: string;
+  runtime_version: string | null;
+  status: string;
+  slot: string | null;
+  published_at: string | null;
+}
+
 function getUserTypeColor(userType: string, sex?: string, coupleSexConfig?: string): string {
   if (userType === "coppia") {
     return Colors.coupleIcon;
@@ -869,14 +878,6 @@ export default function ProfileScreen() {
   const isAdmin = profile?.role === "admin" || (user as any)?.role === "admin";
 
   // Task #1886: OTA pending-approval polling (solo admin, ogni 30s)
-  interface PendingOtaRelease {
-    id: string;
-    version: string;
-    runtime_version: string | null;
-    status: string;
-    slot: string | null;
-    published_at: string | null;
-  }
   const { data: pendingOtaData, refetch: refetchPendingOta } = useQuery<PendingOtaRelease[]>({
     queryKey: ["/api/admin/ota/pending"],
     enabled: isAdmin,
