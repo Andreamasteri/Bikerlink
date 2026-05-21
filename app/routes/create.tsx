@@ -93,6 +93,7 @@ export default function CreateRouteScreen() {
   const routeAbortControllerRef = useRef<AbortController | null>(null);
   const routeDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [routeStats, setRouteStats] = useState<{ distanceKm: number; durationMinutes: number } | null>(null);
+  const [routeStyle, setRouteStyle] = useState<"curvy" | "balanced" | "fastest">("balanced");
 
   // Edit mode: load existing route
   const { data: existingRoute, isLoading: isLoadingExisting } = useQuery({
@@ -313,7 +314,7 @@ export default function CreateRouteScreen() {
     webviewRef.current.injectJavaScript(js);
   }, []);
 
-  const calculateRealRoute = useCallback(async (wps: LocalWaypoint[], signal: AbortSignal) => {
+  const calculateRealRoute = useCallback(async (wps: LocalWaypoint[], signal: AbortSignal, style: "curvy" | "balanced" | "fastest" = "balanced") => {
     if (wps.length < 2) {
       setRoutePolylinePts([]);
       setRouteStats(null);
@@ -330,7 +331,7 @@ export default function CreateRouteScreen() {
         signal,
         body: JSON.stringify({
           waypoints: wps.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })),
-          style: "balanced",
+          style,
         }),
       });
       if (signal.aborted) return;
@@ -408,11 +409,12 @@ export default function CreateRouteScreen() {
     }
 
     const snapshotWaypoints = waypoints;
+    const snapshotStyle = routeStyle;
     routeDebounceTimerRef.current = setTimeout(() => {
       const controller = new AbortController();
       routeAbortControllerRef.current = controller;
       routeDebounceTimerRef.current = null;
-      calculateRealRoute(snapshotWaypoints, controller.signal);
+      calculateRealRoute(snapshotWaypoints, controller.signal, snapshotStyle);
     }, 600);
 
     return () => {
@@ -425,7 +427,7 @@ export default function CreateRouteScreen() {
         routeAbortControllerRef.current = null;
       }
     };
-  }, [waypoints, tileConfig, injectWaypoints, calculateRealRoute]);
+  }, [waypoints, tileConfig, injectWaypoints, calculateRealRoute, routeStyle]);
 
   return (
     <View style={[styles.container]}>
@@ -466,6 +468,36 @@ export default function CreateRouteScreen() {
           />
         </View>
 
+
+        {/* Route style selector — shown when there are at least 2 waypoints */}
+        {waypoints.length >= 2 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Stile percorso</Text>
+            <View style={styles.styleSelector}>
+              {(["curvy", "balanced", "fastest"] as const).map((s) => {
+                const isActive = routeStyle === s;
+                const meta = {
+                  curvy: { label: "Panoramico", icon: "terrain" as const, color: "#4CAF50" },
+                  balanced: { label: "Bilanciato", icon: "swap-horizontal" as const, color: Colors.accent },
+                  fastest: { label: "Veloce", icon: "flash" as const, color: "#FF9800" },
+                }[s];
+                return (
+                  <TouchableOpacity
+                    key={s}
+                    style={[styles.styleBtn, isActive && { borderColor: meta.color, backgroundColor: meta.color + "18" }]}
+                    onPress={() => setRouteStyle(s)}
+                    testID={`route-style-${s}`}
+                  >
+                    <Ionicons name={meta.icon} size={18} color={isActive ? meta.color : Colors.textSecondary} />
+                    <Text style={[styles.styleBtnText, isActive && { color: meta.color, fontWeight: "700" as const }]}>
+                      {meta.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* Curvature map — shown when there are at least 2 waypoints */}
         {waypoints.length >= 2 && curvatureMapHtml !== "" && (
@@ -1038,6 +1070,28 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 15,
     fontWeight: "600" as const,
+  },
+  styleSelector: {
+    flexDirection: "row" as const,
+    gap: 8,
+    marginTop: 4,
+  },
+  styleBtn: {
+    flex: 1,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 6,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingVertical: 10,
+    backgroundColor: Colors.surfaceLight,
+  },
+  styleBtnText: {
+    fontSize: 13,
+    fontWeight: "500" as const,
+    color: Colors.textSecondary,
   },
   routeStatsRow: {
     flexDirection: "row" as const,
