@@ -34,4 +34,6 @@ router.get("/email-configured", async (_req: Request, res: Response) => {
   }
 });
 
+export { verifyEmailStore, resendVerificationStore, verifyAttempts, clearVerifyAttempts, VERIFY_EMAIL_WINDOW_MS, VERIFY_EMAIL_MAX, RESEND_VERIFICATION_WINDOW_MS, RESEND_VERIFICATION_MAX, VERIFY_MAX_ATTEMPTS, VERIFY_ATTEMPT_WINDOW_MS } from "./auth/register";
+
 export default router;

@@ -1,10 +1,7 @@
 import React from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
-import { Typography } from "@/components/Typography"; // Assuming Typography exists or use Text
-
-import { Text } from "react-native";
 
 interface HeaderProps {
   onBack: () => void;

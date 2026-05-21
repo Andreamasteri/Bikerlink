@@ -1,5 +1,4 @@
 import React from "react";
-import { View, Text, StyleSheet, Switch, TextInput, TouchableOpacity, ActivityIndicator, Ionicons } from "@expo/vector-icons";
 import { View as RNView, Text as RNText, StyleSheet as RNStyleSheet, Switch as RNSwitch, TextInput as RNTextInput, TouchableOpacity as RNTouchableOpacity, ActivityIndicator as RNActivityIndicator } from "react-native";
 import { Ionicons as IoniconsSet } from "@expo/vector-icons";
 import Colors from "@/constants/colors";

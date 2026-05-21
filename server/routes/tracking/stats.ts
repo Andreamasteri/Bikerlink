@@ -106,7 +106,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       avgSpeedKmh = totalDistanceKm > 0 ? totalDistanceKm / (netTravelSeconds / 3600) : 0;
     }
 
-    const updatePayload: Partial<import("../../shared/schema").InsertRoute> = {
+    const updatePayload: Partial<import("@shared/schema").InsertRoute> = {
       status: "completed",
       totalDistanceKm,
       maxSpeedKmh,
@@ -270,7 +270,7 @@ router.patch("/:id/title", async (req: Request, res: Response) => {
       return res.status(400).json({ message: parsedTitle.error.issues[0].message });
     }
     const { title } = parsedTitle.data;
-    const titleUpdate: Partial<import("../../shared/schema").InsertRoute> = { title: title.trim() };
+    const titleUpdate: Partial<import("@shared/schema").InsertRoute> = { title: title.trim() };
     await storage.updateRoute(id, titleUpdate);
     return res.json({ ok: true });
   } catch (error) {

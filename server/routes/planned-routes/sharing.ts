@@ -19,7 +19,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
     const originWp = waypoints.find((wp) => wp.lat !== 0 && wp.lng !== 0);
     if (!originWp) return res.json({ bikers: [], count: 0 });
 
-    const { db } = await import("../db");
+    const { db } = await import("../../db");
     const { sql } = await import("drizzle-orm");
 
     const styleToRiderStyles: Record<string, string[]> = {

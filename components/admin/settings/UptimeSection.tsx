@@ -1,5 +1,4 @@
 import React from "react";
-import { View, Text, StyleSheet, Switch, Ionicons } from "@expo/vector-icons";
 import { View as RNView, Text as RNText, StyleSheet as RNStyleSheet, Switch as RNSwitch } from "react-native";
 import { Ionicons as IoniconsSet } from "@expo/vector-icons";
 import Colors from "@/constants/colors";

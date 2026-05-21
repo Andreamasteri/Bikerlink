@@ -204,7 +204,7 @@ ${TAP_HINT_HTML}
 })();
 </script>
 </body>
-</html>\`;
+</html>`;
 }
 
 export function buildLeafletPostRideHtml(
@@ -215,7 +215,7 @@ export function buildLeafletPostRideHtml(
 ): string {
   const pointsJson = JSON.stringify(points);
 
-  return \`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
@@ -260,7 +260,7 @@ export function buildLeafletPostRideHtml(
 })();
 </script>
 </body>
-</html>\`;
+</html>`;
 }
 
 export function buildLeafletCurvatureGradientHtml(
@@ -273,7 +273,7 @@ export function buildLeafletCurvatureGradientHtml(
   const offlinePathJs = offlineTileBasePath
     ? JSON.stringify(offlineTileBasePath)
     : "null";
-  return \`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
@@ -361,7 +361,7 @@ export function buildLeafletCurvatureGradientHtml(
 })();
 </script>
 </body>
-</html>\`;
+</html>`;
 }
 
 export function buildLeafletRouteMapHtml(
@@ -384,7 +384,7 @@ export function buildLeafletRouteMapHtml(
   const polylinePoints = trackPoints ?? waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
   const polylineJson = JSON.stringify(polylinePoints);
 
-  return \`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>

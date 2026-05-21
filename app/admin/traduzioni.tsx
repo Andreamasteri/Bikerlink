@@ -527,4 +527,3 @@ export default function TraduzioniScreen() {
   );
 }
 
-const styles = StyleSheet.create({});

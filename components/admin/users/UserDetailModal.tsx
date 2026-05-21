@@ -1,6 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, MaterialIcons } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from "react-native";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { AdminUser } from "./UserCard";
 

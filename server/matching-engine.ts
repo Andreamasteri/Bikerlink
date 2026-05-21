@@ -1,5 +1,7 @@
-export * from "./matching/engine";
 export { MatchResult } from "./matching/types";
+export { runZavTypeStyleMatching, getActiveClubMembershipKeys, clubScopeAllows, timeRangesOverlap, sameDay, MATCH_RULES } from "./matching/engine";
+export { deriveTargetUserTypes, resolveMatchPool, routesIntersect, areCompatible, routeProfileOf } from "./matching/engine";
+export type { MatchPrefRow, MatchRule } from "./matching/engine";
 
 import {
   motoClubs,
@@ -26,21 +28,23 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { haversineDistance } from "./geo";
 import {
-  runMatching,
-  runWishlistMatching,
-  runBikerBikerMatching,
-  runBikerBikerTypeStyleMatching,
-  runClubBrandMatching,
   runDistanceMatching,
   runRouteTypeZoneMatching,
   runMatchingForUser,
   runProposalMatchingForUser,
-  runProposalZoneNotifications,
   loadMatchPreferencesMap,
   bothPrefsEnabled,
   prefEnabled,
-  baseModelName,
 } from "./matching/engine";
+export {
+  runDistanceMatching,
+  runRouteTypeZoneMatching,
+  runMatchingForUser,
+  runProposalMatchingForUser,
+  loadMatchPreferencesMap,
+  bothPrefsEnabled,
+  prefEnabled,
+};
 
 const MATCH_DEBOUNCE_MS = 10_000;
 

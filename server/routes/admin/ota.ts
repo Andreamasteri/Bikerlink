@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { otaEvents, otaStuckEvents, otaPublishTokens, otaErrorSchema, publishWithSlotSchema, createOtaTokenSchema, assignOtaSlotSchema, publishOtaReleaseSchema, otaAssignDeviceSchema, otaPromoteSchema, otaMarkBrokenSchema } from "@shared/schema";
+import { otaEvents, otaPublishTokens, otaErrorSchema, publishWithSlotSchema, createOtaTokenSchema, assignOtaSlotSchema, publishOtaReleaseSchema, otaAssignDeviceSchema, otaPromoteSchema, otaMarkBrokenSchema } from "@shared/schema";
 import { sql, eq, and, or, isNull, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "../../objectStorage";
