@@ -25,6 +25,70 @@ export const SEARCH_TYPE_I18N: Record<string, string> = {
   find_a_biker: "FindABiker",
 };
 
+const TARGET_TYPE_I18N: Record<string, string> = {
+  biker: "proposal.targetBiker",
+  zavorrina: "proposal.targetZavorrina",
+  hitchhiker: "proposal.targetHitchhiker",
+  hitcher: "proposal.targetHotcher",
+  coppia: "userType.coppia",
+};
+
+function getTargetLabel(types: string[] | null | undefined, t: (k: string) => string): string | null {
+  if (!types || types.length === 0) return null;
+  return types
+    .map((type) => {
+      const key = TARGET_TYPE_I18N[type];
+      return key ? t(key) : type;
+    })
+    .filter(Boolean)
+    .join(" / ") || null;
+}
+
+function CompatibilityBadge({ myTargets, theirTargets, t }: {
+  myTargets: string[] | null | undefined;
+  theirTargets: string[] | null | undefined;
+  t: (k: string) => string;
+}) {
+  const myLabel = getTargetLabel(myTargets, t);
+  const theirLabel = getTargetLabel(theirTargets, t);
+  if (!myLabel && !theirLabel) return null;
+
+  const label =
+    myLabel && theirLabel
+      ? `${myLabel} ↔ ${theirLabel}`
+      : myLabel || theirLabel;
+
+  return (
+    <View style={compatBadgeStyles.row}>
+      <Ionicons name="git-compare-outline" size={12} color={Colors.accent} />
+      <Text style={compatBadgeStyles.text} numberOfLines={1}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+const compatBadgeStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 6,
+    marginBottom: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: Colors.accent + "14",
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  text: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accent,
+    flexShrink: 1,
+  },
+});
+
 export const SUPERMATCH_COLOR = "#FF8C00";
 
 const sharedStyles = StyleSheet.create({
@@ -239,6 +303,12 @@ export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onCh
         </View>
       </View>
 
+      <CompatibilityBadge
+        myTargets={isBiker ? ["zavorrina"] : ["biker"]}
+        theirTargets={isBiker ? ["biker"] : ["zavorrina"]}
+        t={t}
+      />
+
       {isNew && (
         <MatchActions
           onAccept={onAccept}
@@ -443,6 +513,12 @@ export function MatchCardFull({ match, currentUserId, onAccept, onReject, onChat
           )}
         </View>
       </View>
+
+      <CompatibilityBadge
+        myTargets={myProposal?.targetUserTypes}
+        theirTargets={otherProposal?.targetUserTypes}
+        t={t}
+      />
 
       {otherProposal?.departureAddress && (
         <View style={sharedStyles.infoRow}>
