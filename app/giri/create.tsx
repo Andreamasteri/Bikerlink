@@ -993,6 +993,11 @@ export default function GiriCreateScreen() {
                     <Text style={s.approxBannerText}>percorso approssimativo</Text>
                   </View>
                 )}
+                {calculating && (
+                  <View style={s.calcSpinnerBadge}>
+                    <ActivityIndicator size="small" color="#fff" />
+                  </View>
+                )}
               </View>
             </View>
 
@@ -1465,4 +1470,5 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   saveBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: colors.accent },
   approxBanner: { position: "absolute", top: 10, left: "50%" as any, transform: [{ translateX: -90 }], flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: "rgba(0,0,0,0.75)", borderRadius: 16, paddingHorizontal: 10, paddingVertical: 5, borderWidth: 1, borderColor: "#f9731650" },
   approxBannerText: { fontFamily: "Inter_500Medium", fontSize: 11, color: "#f97316" },
+  calcSpinnerBadge: { position: "absolute", top: 10, right: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: "rgba(0,0,0,0.65)", alignItems: "center", justifyContent: "center" },
 });
