@@ -458,9 +458,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const _expectedRuntimeVersion: string = (() => {
     try {
       const appJson = JSON.parse(fs.readFileSync(path.resolve("app.json"), "utf8"));
-      return appJson?.expo?.runtimeVersion ?? "8.0.0";
+      return appJson?.expo?.runtimeVersion ?? "9.0.0";
     } catch {
-      return "8.0.0";
+      return "9.0.0";
     }
   })();
 
@@ -595,6 +595,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const runtimeVersion = req.headers["expo-runtime-version"] as string | undefined;
       const platform = req.headers["expo-platform"] as string | undefined;
       const currentUpdateId = req.headers["expo-current-update-id"] as string | undefined;
+
+      // Task #1843: reject non-semver runtime_version headers before any DB persistence.
+      // Payloads like SQL injection strings or "unknown" must never reach ota_events.
+      // Valid Expo clients always send a semver string matching the app's runtimeVersion.
+      const SEMVER_RE = /^\d+\.\d+\.\d+$/;
+      if (runtimeVersion !== undefined && !SEMVER_RE.test(runtimeVersion)) {
+        return res.status(400).json({ message: "expo-runtime-version non valida (formato atteso: X.Y.Z)" });
+      }
 
       // Task #1148: anomaly logging — header mancanti e runtime mismatch sono
       // sempre loggati (vedi `isAnomaly` in logEvent). Servono per individuare
@@ -845,6 +853,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!releaseId || typeof releaseId !== "string") {
         return res.status(400).json({ message: "releaseId obbligatorio" });
       }
+      // Validate runtimeVersion format — must be semver (X.Y.Z). Reject and return 400
+      // for payloads that are not valid semver to prevent injection / dirty data in ota_events.
+      if (runtimeVersion !== undefined && runtimeVersion !== null && !(/^\d+\.\d+\.\d+$/).test(String(runtimeVersion))) {
+        return res.status(400).json({ message: "runtime_version non valida (formato atteso: X.Y.Z)" });
+      }
       // ota_events.source is varchar(32) — truncate deviceId to match the column constraint.
       // Expo installation IDs are UUIDs (36 chars) so we keep the first 32 chars which
       // are unique enough for filtering and idempotency checks.
@@ -911,6 +924,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/ota/stuck-event", async (req: Request, res: Response) => {
     try {
       const { deviceId, rollbackCount, stuckSessions, runtimeVersion } = req.body ?? {};
+      // Validate runtimeVersion format — must be semver (X.Y.Z). Reject and return 400
+      // for payloads that are not valid semver to prevent injection / dirty data in ota_stuck_events.
+      if (runtimeVersion !== undefined && runtimeVersion !== null && !(/^\d+\.\d+\.\d+$/).test(String(runtimeVersion))) {
+        return res.status(400).json({ message: "runtime_version non valida (formato atteso: X.Y.Z)" });
+      }
       const stripNull = (s: string) => s.replace(/\x00/g, "");
       const safeDeviceId = deviceId ? stripNull(String(deviceId)).substring(0, 64) : "unknown";
       const safeRv = runtimeVersion ? stripNull(String(runtimeVersion)).substring(0, 32) : null;

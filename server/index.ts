@@ -961,6 +961,31 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] ota_stuck_events:", e);
         }
 
+        // Task #1843: one-time + idempotent cleanup of dirty runtime_version values.
+        // Deletes rows in ota_events where runtime_version is NULL, 'unknown', contains
+        // SQL injection patterns (apostrophe, '--', 'OR '), or is a test value ('999.0.0').
+        // Safe to re-run: rows already cleaned will produce DELETE 0.
+        try {
+          const cleanResult = await db.execute(sql`
+            DELETE FROM ota_events
+            WHERE
+              runtime_version IS NULL
+              OR runtime_version = 'unknown'
+              OR runtime_version LIKE '%''%'
+              OR runtime_version LIKE '%--%'
+              OR runtime_version LIKE '%OR %'
+              OR runtime_version = '999.0.0'
+          `);
+          const deletedCount = (cleanResult as any).rowCount ?? 0;
+          if (deletedCount > 0) {
+            console.log(`[MIGRATION] ota_events dirty-rv cleanup: deleted ${deletedCount} row(s) with invalid runtime_version`);
+          } else {
+            console.log("[MIGRATION] ota_events dirty-rv cleanup: 0 dirty rows found — table is clean");
+          }
+        } catch (e) {
+          console.warn("[MIGRATION] ota_events dirty-rv cleanup failed (non-fatal):", e);
+        }
+
         // Helper: read ota_cleanup_retention_days from app_settings (default 90).
         const getOtaRetentionDays = async (): Promise<number> => {
           try {
