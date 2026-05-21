@@ -551,3 +551,21 @@ id = "KoyMbP-mcAjKWTEFSq9Wv"
 uri = "file://docs/ota-schema-a4.pdf"
 type = "pdf"
 title = "BikerLink OTA System — Schema A4"
+
+[[outputs]]
+id = "E1fvuh_h9gefiT3o159uR"
+uri = "file://screenshots/hero.jpg"
+type = "image"
+title = "BikerLink — Hero Section"
+
+[[outputs]]
+id = "tdTIJ14gtcm2TeytJxa4Z"
+uri = "file://server/public/assets/images/hero-handlebar.webp"
+type = "image"
+title = "Hero — hero-handlebar.webp"
+
+[[outputs]]
+id = "p6iLQsUdzf6SINZ_8ji9G"
+uri = "file://server/public/assets/images/hero-handlebar-sm.webp"
+type = "image"
+title = "Hero (small) — hero-handlebar-sm.webp"
