@@ -92,6 +92,7 @@ export default function CreateRouteScreen() {
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
   const routeAbortControllerRef = useRef<AbortController | null>(null);
   const routeDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [routeStats, setRouteStats] = useState<{ distanceKm: number; durationMinutes: number } | null>(null);
 
   // Edit mode: load existing route
   const { data: existingRoute, isLoading: isLoadingExisting } = useQuery({
@@ -315,6 +316,7 @@ export default function CreateRouteScreen() {
   const calculateRealRoute = useCallback(async (wps: LocalWaypoint[], signal: AbortSignal) => {
     if (wps.length < 2) {
       setRoutePolylinePts([]);
+      setRouteStats(null);
       return;
     }
     setIsCalculatingRoute(true);
@@ -333,13 +335,19 @@ export default function CreateRouteScreen() {
       });
       if (signal.aborted) return;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json() as { rawPoints?: Array<{ lat: number; lng: number }> };
+      const data = await res.json() as { rawPoints?: Array<{ lat: number; lng: number }>; distanceKm?: number; durationMinutes?: number };
       const pts = data.rawPoints && data.rawPoints.length > 1 ? data.rawPoints : [];
       setRoutePolylinePts(pts);
+      if (typeof data.distanceKm === "number" && typeof data.durationMinutes === "number") {
+        setRouteStats({ distanceKm: data.distanceKm, durationMinutes: data.durationMinutes });
+      } else {
+        setRouteStats(null);
+      }
       injectWaypoints(wps, pts.length > 1 ? pts : undefined);
     } catch (err: unknown) {
       if (err instanceof Error && err.name === "AbortError") return;
       setRoutePolylinePts([]);
+      setRouteStats(null);
       injectWaypoints(wps);
     } finally {
       if (!signal.aborted) {
@@ -479,6 +487,19 @@ export default function CreateRouteScreen() {
                 </View>
               )}
             </View>
+            {routeStats && !isCalculatingRoute && (
+              <View style={styles.routeStatsRow}>
+                <Ionicons name="navigate" size={14} color={Colors.accent} />
+                <Text style={styles.routeStatText}>{routeStats.distanceKm % 1 === 0 ? routeStats.distanceKm : routeStats.distanceKm.toFixed(1)} km</Text>
+                <Text style={styles.routeStatSep}>·</Text>
+                <Ionicons name="time-outline" size={14} color={Colors.accent} />
+                <Text style={styles.routeStatText}>
+                  {routeStats.durationMinutes >= 60
+                    ? `${Math.floor(routeStats.durationMinutes / 60)}h ${routeStats.durationMinutes % 60 > 0 ? `${routeStats.durationMinutes % 60} min` : ""}`.trim()
+                    : `${routeStats.durationMinutes} min`}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -1017,5 +1038,22 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 15,
     fontWeight: "600" as const,
+  },
+  routeStatsRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  routeStatText: {
+    fontSize: 13,
+    fontWeight: "600" as const,
+    color: Colors.text,
+  },
+  routeStatSep: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    marginHorizontal: 2,
   },
 });
