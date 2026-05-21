@@ -50,7 +50,6 @@ import { PlayerProvider } from "@/lib/player-context";
 import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
 import FloatingWidget from "@/components/FloatingWidget";
 import UptimeWidget from "@/components/UptimeWidget";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon, recoverLastBeacon } from "@/lib/startup-beacon";
 import { isTrackingActive, registerLayoutWatcherCallbacks } from "@/lib/tracking-active";
 import { initCrashLogger, resetCrashLogger, markClean } from "@/lib/crash-logger";

@@ -1174,7 +1174,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-20T23:29:25.685Z"
+  },
+  {
+    "updateNumber": 12,
+    "version": "47.12.9",
+    "cycle": "9.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-12 rv9.0.0: fix OTA: reload dopo 5s background + flag AsyncStorage cold-start",
+    "note": "CURRENT_OTA_NUMBER=12. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "9.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "3e27f53c-5f0c-4d71-ad05-e0c0a987b06a",
+    "bundleUrl": "private/ota/ota-47.12.9-1779321729036.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "331134027f2879ba4ee66650241b11e13021b18b",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-21T00:02:13.269Z"
   }
 ]

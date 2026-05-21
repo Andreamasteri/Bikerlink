@@ -308,7 +308,8 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
   - APK v46 (46.29.9): versionCode 46, runtimeVersion 9.0.0
   - OTA-9 (v47.9.9): fix token auth backend (`req.session.userId ?? null`), releaseId: `dddb488c`
   - OTA-10 (v47.10.9): fix aggiornamento automatico — ramo `fetch-not-new` ora chiama `reloadAsync()`, releaseId: `aa1ba7bb`
-  - OTA-11 (v47.11.9): telemetria target 1000km + giri ideali collassabili + rimosso testo debug profilo, releaseId: `ff9b0c47` ← **CORRENTE**
+  - OTA-11 (v47.11.9): telemetria target 1000km + giri ideali collassabili + rimosso testo debug profilo, releaseId: `ff9b0c47`
+  - OTA-12 (v47.12.9): fix OTA affidabilità — flag AsyncStorage cold-start + timer 5s background + marker BL-OTA-N per verifica bundle, releaseId: `3e27f53c` ← **CORRENTE**
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
