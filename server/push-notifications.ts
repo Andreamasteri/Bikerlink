@@ -377,6 +377,37 @@ export async function sendEventiPushNotifications(
   }
 }
 
+export async function sendOtaPendingApprovalPushToAdmins(version: string): Promise<void> {
+  try {
+    const adminRows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(eq(users.role, "admin"));
+
+    const userIdByToken = new Map<string, string>();
+    const msgs: ExpoPushMessage[] = [];
+
+    for (const row of adminRows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        msgs.push({
+          to: row.expoPushToken,
+          title: `OTA v${version} pronta`,
+          body: "Apri il Profilo per distribuirla",
+          sound: "default" as const,
+          data: { type: "ota_pending_approval", version },
+          channelId: "matches",
+        });
+      }
+    }
+
+    if (msgs.length === 0) return;
+    await sendExpoMessages(msgs, userIdByToken);
+  } catch (err) {
+    console.warn("[Push] sendOtaPendingApprovalPushToAdmins error (non-fatal):", err);
+  }
+}
+
 export async function sendAdminGpsAlertPush(opts: {
   userId: string;
   nickname: string | null;

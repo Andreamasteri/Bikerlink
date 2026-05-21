@@ -1455,6 +1455,10 @@ function setupErrorHandler(app: express.Application) {
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_events_release_phase_idx ON ota_events(release_id, phase)`);
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_events_source_created_idx ON ota_events(source, created_at DESC)`);
           await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_events_phase_created_idx ON ota_events(phase, created_at DESC)`);
+          // Task #1887: indice UNIQUE parziale per guard idempotente della push admin su nuove OTA.
+          // Scoped SOLO alla fase 'admin-publish-push' così non interferisce con altri eventi
+          // ripetuti per lo stesso release_id (es. admin-publish, assign-slot, ecc.).
+          await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS ota_events_push_guard_uniq_idx ON ota_events(release_id) WHERE phase = 'admin-publish-push' AND release_id IS NOT NULL`);
           console.log("[MIGRATION] ota_releases slot/success + ota_events debug indices ensured");
         } catch (e) {
           console.warn("[MIGRATION] ota_releases slot columns:", e);

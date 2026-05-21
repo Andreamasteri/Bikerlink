@@ -16,6 +16,7 @@ import { DEFAULT_PREFS } from "./match-preferences";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, notInArray, lte, isNull, or, ilike } from "drizzle-orm";
 import { sendEmail, sendEmailDetailed, getEmailDiagnostics } from "../email";
+import { sendOtaPendingApprovalPushToAdmins } from "../push-notifications";
 import {
   verifyEmailStore,
   resendVerificationStore,
@@ -5074,6 +5075,36 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
       });
     } catch (e) {
       console.error("[OTA] event log on publish failed:", e);
+    }
+    // Notifica push agli admin: nuova OTA in attesa di approvazione.
+    // Idempotente con guard ATOMIC: usa l'indice UNIQUE parziale su ota_events(phase, release_id)
+    // per garantire che la push venga inviata al massimo una volta per release.
+    // Se l'INSERT va a buon fine (rows.length > 0), è la prima pubblicazione → invia push.
+    // Se l'INSERT è bloccato dal CONFLICT (rows.length === 0), la push è già stata inviata → skip.
+    // Nota: la push viene inviata DOPO il commit dell'evento, così da non marcare
+    // la release come "notificata" prima che la notifica sia stata effettivamente consegnata.
+    try {
+      const row = result.rows[0] as { id?: string; version?: string };
+      const releaseId = row.id ? String(row.id).substring(0, 64) : undefined;
+      const version = row.version ?? "?";
+      if (releaseId) {
+        const guard = await db.execute(sql`
+          INSERT INTO ota_events (phase, source, platform, runtime_version, release_id, error, fail_count)
+          VALUES ('admin-publish-push', 'admin', 'android', '?', ${releaseId}, ${'ok:push enqueued v=' + version}, 0)
+          ON CONFLICT (release_id) WHERE phase = 'admin-publish-push' AND release_id IS NOT NULL
+          DO NOTHING
+          RETURNING id
+        `);
+        if (guard.rows.length > 0) {
+          // Guard acquisita: prima volta per questa release — invia la push.
+          void sendOtaPendingApprovalPushToAdmins(version);
+          console.log(`[OTA] Admin push notification enqueued for release ${releaseId} v${version}`);
+        } else {
+          console.log(`[OTA] Admin push already sent for release ${releaseId} — skipping duplicate`);
+        }
+      }
+    } catch (e) {
+      console.warn("[OTA] push notification on publish failed (non-fatal):", e);
     }
     return res.json(result.rows[0]);
   } catch (error) {
