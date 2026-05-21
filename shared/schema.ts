@@ -804,6 +804,32 @@ export const bikerBikerMatches = pgTable("biker_biker_matches", {
   ),
 ]);
 
+export const proposalProfileMatches = pgTable("proposal_profile_matches", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id", { length: 36 })
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  bikerId: varchar("biker_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  zavarrinaId: varchar("zavorrina_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  distanceKm: doublePrecision("distance_km"),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("ppm_biker_id_idx").on(table.bikerId),
+  index("ppm_zavorrina_id_idx").on(table.zavarrinaId),
+  index("ppm_proposal_id_idx").on(table.proposalId),
+  uniqueIndex("ppm_proposal_zavorrina_unique_idx").on(table.proposalId, table.zavarrinaId),
+]);
+
+export type ProposalProfileMatch = typeof proposalProfileMatches.$inferSelect;
+export type InsertProposalProfileMatch = typeof proposalProfileMatches.$inferInsert;
+
 export const emailVerificationTokens = pgTable("email_verification_tokens", {
   id: varchar("id", { length: 36 })
     .primaryKey()

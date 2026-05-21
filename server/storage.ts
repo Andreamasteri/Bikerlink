@@ -141,6 +141,9 @@ import {
   type InsertPlannedRoute,
   type RouteWeatherCache,
   type InsertRouteWeatherCache,
+  proposalProfileMatches,
+  type ProposalProfileMatch,
+  type InsertProposalProfileMatch,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -429,6 +432,14 @@ export interface IStorage {
   deletePlannedRoute(id: string): Promise<void>;
   upsertRouteWeatherCache(data: InsertRouteWeatherCache): Promise<RouteWeatherCache>;
   getRouteWeatherCache(routeId: string): Promise<RouteWeatherCache | undefined>;
+
+  // Proposal-Profile Matches
+  createProposalProfileMatch(data: InsertProposalProfileMatch): Promise<ProposalProfileMatch | null>;
+  getProposalProfileMatchesForUser(userId: string): Promise<ProposalProfileMatch[]>;
+  getProposalProfileMatchesForProposal(proposalId: string): Promise<ProposalProfileMatch[]>;
+  getAllExistingProposalProfileMatchKeys(): Promise<Set<string>>;
+  updateProposalProfileMatch(id: string, data: Partial<InsertProposalProfileMatch>): Promise<ProposalProfileMatch | undefined>;
+  deleteProposalProfileMatch(id: string, userId: string): Promise<boolean>;
 }
 
 /**
@@ -2513,6 +2524,51 @@ export class DatabaseStorage implements IStorage {
       .where(eq(routeWeatherCache.routeId, routeId))
       .limit(1);
     return cache;
+  }
+
+  async createProposalProfileMatch(data: InsertProposalProfileMatch): Promise<ProposalProfileMatch | null> {
+    const [match] = await db.insert(proposalProfileMatches).values(data).onConflictDoNothing().returning();
+    return match ?? null;
+  }
+
+  async getProposalProfileMatchesForUser(userId: string): Promise<ProposalProfileMatch[]> {
+    return db.select().from(proposalProfileMatches).where(
+      or(
+        eq(proposalProfileMatches.bikerId, userId),
+        eq(proposalProfileMatches.zavarrinaId, userId)
+      )
+    ).orderBy(desc(proposalProfileMatches.createdAt)).limit(200);
+  }
+
+  async getProposalProfileMatchesForProposal(proposalId: string): Promise<ProposalProfileMatch[]> {
+    return db.select().from(proposalProfileMatches)
+      .where(eq(proposalProfileMatches.proposalId, proposalId))
+      .orderBy(desc(proposalProfileMatches.createdAt));
+  }
+
+  async getAllExistingProposalProfileMatchKeys(): Promise<Set<string>> {
+    const rows = await db.select({
+      proposalId: proposalProfileMatches.proposalId,
+      zavarrinaId: proposalProfileMatches.zavarrinaId,
+    }).from(proposalProfileMatches);
+    const keys = new Set<string>();
+    for (const r of rows) {
+      keys.add(`${r.proposalId}:${r.zavarrinaId}`);
+    }
+    return keys;
+  }
+
+  async updateProposalProfileMatch(id: string, data: Partial<InsertProposalProfileMatch>): Promise<ProposalProfileMatch | undefined> {
+    const [updated] = await db.update(proposalProfileMatches).set(data).where(eq(proposalProfileMatches.id, id)).returning();
+    return updated;
+  }
+
+  async deleteProposalProfileMatch(id: string, userId: string): Promise<boolean> {
+    const [match] = await db.select().from(proposalProfileMatches).where(eq(proposalProfileMatches.id, id));
+    if (!match) return false;
+    if (match.bikerId !== userId && match.zavarrinaId !== userId) return false;
+    await db.delete(proposalProfileMatches).where(eq(proposalProfileMatches.id, id));
+    return true;
   }
 }
 

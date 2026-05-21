@@ -15,6 +15,7 @@ import { sendAdminGpsAlertPush } from "../push-notifications";
 import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
 import { onlineTracker } from "../online-tracker";
 import { reportRateLimiter, getTrustedClientIp } from "../lib/abuse-rate-limit";
+import { triggerProposalProfileMatchingForZavorrina } from "../matching-engine";
 
 const router = Router();
 
@@ -776,6 +777,10 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
       await storage.createUserProfile({ userId, latitude, longitude, coordinatesUpdatedAt: new Date() } as any);
     }
     storage.saveCoordinateHistory(userId, latitude, longitude).catch(() => {});
+    const updatedUser = await storage.getUser(userId);
+    if (updatedUser?.userType === "zavorrina" || updatedUser?.userType === "coppia") {
+      triggerProposalProfileMatchingForZavorrina(userId);
+    }
     return res.json({ message: "Posizione aggiornata" });
   } catch (error) {
     console.error("Update location error:", error);
@@ -817,10 +822,22 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     if (existingProfile) {
       const profile = await storage.updateUserProfile(userId, updateData as any);
       onlineTracker.setAvailability(userId, isAvailable);
+      if (latitude != null && longitude != null) {
+        const avUser = await storage.getUser(userId);
+        if (avUser?.userType === "zavorrina" || avUser?.userType === "coppia") {
+          triggerProposalProfileMatchingForZavorrina(userId);
+        }
+      }
       return res.json(profile);
     } else {
       const profile = await storage.createUserProfile({ userId, ...updateData } as any);
       onlineTracker.setAvailability(userId, isAvailable);
+      if (latitude != null && longitude != null) {
+        const avUser = await storage.getUser(userId);
+        if (avUser?.userType === "zavorrina" || avUser?.userType === "coppia") {
+          triggerProposalProfileMatchingForZavorrina(userId);
+        }
+      }
       return res.json(profile);
     }
   } catch (error) {

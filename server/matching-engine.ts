@@ -17,6 +17,7 @@ import {
   zavarrinaWishlistMotos,
   type Proposal,
 } from "@shared/schema";
+import { systemAccountConditions } from "./lib/system-account-filter";
 import { and, avg, eq, inArray, isNotNull, gt, lt, sql, ne } from "drizzle-orm";
 import { sendMatchPushNotifications, sendZoneProposalPushNotifications } from "./push-notifications";
 import it from "../lib/i18n/it";
@@ -1633,6 +1634,125 @@ export async function runProposalZoneNotifications(proposal: Proposal): Promise<
 }
 
 /**
+ * Proposal-to-Profile matching: for each active find_a_guest / hitcher proposal,
+ * find zavorrine whose profile coordinates fall within the proposal's searchRadius
+ * and create proposal_profile_matches records (idempotent via unique constraint).
+ *
+ * @param filterProposalId  when provided, only processes that single proposal
+ * @param filterZavarrinaId when provided, only checks proposals near this zavorrina
+ */
+export async function runProposalToProfileMatching(
+  filterProposalId?: string,
+  filterZavarrinaId?: string,
+): Promise<number> {
+  try {
+    const GUEST_TYPES = new Set(["find_a_guest", "hitcher"]);
+
+    let activeProposals: Proposal[] = await storage.getActiveProposalsWithLocation();
+    activeProposals = activeProposals.filter(
+      (p) => p.searchType && GUEST_TYPES.has(p.searchType)
+        && p.departureLatitude != null
+        && p.departureLongitude != null
+    );
+
+    if (filterProposalId) {
+      activeProposals = activeProposals.filter((p) => p.id === filterProposalId);
+    }
+    if (activeProposals.length === 0) return 0;
+
+    const existingKeys = await storage.getAllExistingProposalProfileMatchKeys();
+
+    const allZavorrine = await db
+      .select({
+        userId: users.id,
+        lat: userProfiles.latitude,
+        lng: userProfiles.longitude,
+      })
+      .from(userProfiles)
+      .innerJoin(users, eq(users.id, userProfiles.userId))
+      .where(
+        and(
+          eq(users.status, "active"),
+          eq(users.isFake, false),
+          ...systemAccountConditions(users),
+          isNotNull(userProfiles.latitude),
+          isNotNull(userProfiles.longitude),
+          inArray(users.userType, ["zavorrina", "coppia"]),
+        )
+      );
+
+    let zavarrine = allZavorrine;
+    if (filterZavarrinaId) {
+      zavarrine = allZavorrine.filter((z) => z.userId === filterZavarrinaId);
+    }
+    if (zavarrine.length === 0) return 0;
+
+    let matchCount = 0;
+
+    for (const proposal of activeProposals) {
+      const pLat = proposal.departureLatitude!;
+      const pLng = proposal.departureLongitude!;
+      const radius = proposal.searchRadius ?? 50;
+
+      for (const zav of zavarrine) {
+        if (zav.userId === proposal.userId) continue;
+        if (zav.lat == null || zav.lng == null) continue;
+
+        const key = `${proposal.id}:${zav.userId}`;
+        if (existingKeys.has(key)) continue;
+
+        const distKm = haversineDistance(pLat, pLng, zav.lat, zav.lng);
+        if (distKm > radius) continue;
+
+        const created = await storage.createProposalProfileMatch({
+          proposalId: proposal.id,
+          bikerId: proposal.userId,
+          zavarrinaId: zav.userId,
+          distanceKm: Math.round(distKm * 10) / 10,
+          status: "new",
+        });
+
+        if (created) {
+          existingKeys.add(key);
+          matchCount++;
+          try {
+            const title = it["push.proposalMatch.title"] ?? "Hai un nuovo match proposta! 🔥";
+            const body = it["push.proposalMatch.body"] ?? "Una proposta compatibile è stata trovata per il tuo viaggio.";
+            await storage.createNotification({
+              userId: proposal.userId,
+              title,
+              body,
+              notificationType: "proposal_match",
+              referenceType: "proposal_profile_match",
+              referenceId: created.id,
+            });
+            await storage.createNotification({
+              userId: zav.userId,
+              title,
+              body,
+              notificationType: "proposal_match",
+              referenceType: "proposal_profile_match",
+              referenceId: created.id,
+            });
+          } catch (notifErr) {
+            console.error("[ProposalProfileMatching] Error sending notifications:", notifErr);
+          }
+          sendMatchPushNotifications([proposal.userId, zav.userId]);
+        }
+      }
+    }
+
+    if (matchCount > 0) {
+      console.log(`[ProposalProfileMatching] nuovi match: ${matchCount}`);
+    }
+    return matchCount;
+  } catch (err) {
+    console.error("[ProposalProfileMatching] errore:", err);
+    return 0;
+  }
+}
+
+/**
  * Trigger proposal matching + zone notifications immediately after a new proposal
  * is created. Fire-and-forget — does not block the HTTP response.
  */
@@ -1647,9 +1767,38 @@ export function triggerProposalCreatedMatching(proposal: Proposal): void {
       console.error("[ProposalCreated] Errore matching immediato:", err);
     }
     try {
+      await runProposalToProfileMatching(proposal.id);
+    } catch (err) {
+      console.error("[ProposalCreated] Errore proposal-profile matching:", err);
+    }
+    try {
       await runProposalZoneNotifications(proposal);
     } catch (err) {
       console.error("[ProposalCreated] Errore zone notifications:", err);
+    }
+  });
+}
+
+const lastZavarrinaProfileMatchAt = new Map<string, number>();
+const ZAVORRINA_PROFILE_MATCH_DEBOUNCE_MS = 2 * 60 * 1000;
+
+/**
+ * Trigger proposal-profile matching when a zavorrina updates her location.
+ * Fire-and-forget with debounce to avoid hammering on rapid GPS updates.
+ */
+export function triggerProposalProfileMatchingForZavorrina(userId: string): void {
+  const now = Date.now();
+  const last = lastZavarrinaProfileMatchAt.get(userId) ?? 0;
+  if (now - last < ZAVORRINA_PROFILE_MATCH_DEBOUNCE_MS) return;
+  lastZavarrinaProfileMatchAt.set(userId, now);
+  setImmediate(async () => {
+    try {
+      const count = await runProposalToProfileMatching(undefined, userId);
+      if (count > 0) {
+        console.log(`[ProposalProfileMatching] ${count} match per zavorrina ${userId}`);
+      }
+    } catch (err) {
+      console.error("[ProposalProfileMatching] Errore zavorrina hook:", err);
     }
   });
 }
@@ -1818,6 +1967,13 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           if (zoneCount > 0) console.log(`[Matching] Found ${zoneCount} new route-zone matches`);
         } catch (err) {
           console.error("[Matching] RouteTypeZone matching error (non-blocking):", err);
+        }
+
+        try {
+          const ppCount = await runProposalToProfileMatching();
+          if (ppCount > 0) console.log(`[Matching] Found ${ppCount} new proposal-profile matches`);
+        } catch (err) {
+          console.error("[Matching] ProposalProfile matching error (non-blocking):", err);
         }
       } else {
         console.log("[Matching] Auto matching disabilitato dall'admin, skip");

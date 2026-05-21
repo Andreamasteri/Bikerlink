@@ -273,7 +273,66 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
       }
     }
 
-    return res.json([...bestByUser.values()]);
+    const wishlistMatchesList = [...bestByUser.values()].map((m) => ({ ...m, matchType: "wishlist" as const }));
+
+    // Append proposal-profile matches (biker proposal → zavorrina profile, no wishlist required)
+    const ppMatches = await storage.getProposalProfileMatchesForUser(userId);
+    const ppResults = await allLimited(
+      ppMatches
+        .filter((m) => !blockedIds.has(m.bikerId === userId ? m.zavarrinaId : m.bikerId))
+        .map((match) => async () => {
+          const biker = userMap.get(match.bikerId) ?? await storage.getUser(match.bikerId);
+          const zavorrina = userMap.get(match.zavarrinaId) ?? await storage.getUser(match.zavarrinaId);
+          const otherUser = match.bikerId === userId ? zavorrina : biker;
+
+          if (!biker || !zavorrina) return null;
+          if (isSystemAccount(otherUser ?? {})) return null;
+          if (allowedCountries.length > 0 && (!otherUser?.country || !allowedCountries.includes(otherUser.country))) return null;
+
+          const otherProfile = otherUser?.id ? (profileMap.get(otherUser.id) ?? await storage.getUserProfile(otherUser.id)) : undefined;
+          const otherLat: number | null = otherProfile?.latitude ?? null;
+          const otherLng: number | null = otherProfile?.longitude ?? null;
+          const otherCoordUpdatedAt: Date | null = otherProfile?.coordinatesUpdatedAt ?? null;
+
+          let distanceKm: number | null = null;
+          let distanceFlag: "ok" | "old_psn" | "no_psn" = "no_psn";
+          if (myLat != null && myLng != null && otherLat != null && otherLng != null) {
+            const myOld = isCoordOld(myCoordUpdatedAt, maxAgeSec);
+            const otherOld = isCoordOld(otherCoordUpdatedAt, maxAgeSec);
+            if (myOld || otherOld) {
+              distanceFlag = "old_psn";
+            } else {
+              distanceKm = Math.round(haversineKm(myLat, myLng, otherLat, otherLng) * 10) / 10;
+              distanceFlag = "ok";
+            }
+          }
+
+          return {
+            ...match,
+            matchType: "proposal_profile" as const,
+            isSupermatch: false,
+            bikerNickname: biker.nickname,
+            bikerType: biker.userType,
+            zavarrinaNickname: zavorrina.nickname,
+            zavarrinaType: zavorrina.userType,
+            bikerMoto: null,
+            wishlistMoto: null,
+            otherLat,
+            otherLng,
+            distanceKm,
+            distanceFlag,
+            myLat,
+            myLng,
+          };
+        })
+    );
+
+    const allMatches = [
+      ...wishlistMatchesList,
+      ...ppResults.filter(Boolean) as NonNullable<(typeof ppResults)[number]>[],
+    ];
+
+    return res.json(allMatches);
   } catch (error) {
     console.error("Get garage matches error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
@@ -285,6 +344,90 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
       return res.status(503).json({ message: "Server occupato, riprova più tardi" });
     }
     console.error("Get garage matches outer error:", err);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.get("/proposal-profile-matches", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const blockedIds = new Set(await storage.getBlockedUserIds(userId));
+    const matches = await storage.getProposalProfileMatchesForUser(userId);
+
+    const results = await allLimited(
+      matches.map((match) => async () => {
+        const otherUserId = match.bikerId === userId ? match.zavarrinaId : match.bikerId;
+        if (blockedIds.has(otherUserId)) return null;
+
+        const biker = await storage.getUser(match.bikerId);
+        const zavorrina = await storage.getUser(match.zavarrinaId);
+        const proposal = await storage.getProposal(match.proposalId);
+
+        if (isSystemAccount(biker ?? {})) return null;
+        if (isSystemAccount(zavorrina ?? {})) return null;
+
+        return {
+          ...match,
+          matchType: "proposal_profile" as const,
+          bikerNickname: biker?.nickname,
+          bikerType: biker?.userType,
+          zavarrinaNickname: zavorrina?.nickname,
+          zavarrinaType: zavorrina?.userType,
+          proposal: proposal ?? null,
+        };
+      })
+    );
+
+    return res.json(results.filter(Boolean));
+  } catch (error) {
+    console.error("Get proposal-profile matches error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/proposal-profile-matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const matchId = req.params.id as string;
+    const match = await storage.getProposalProfileMatchesForUser(userId).then((ms) => ms.find((m) => m.id === matchId));
+    if (!match) return res.status(404).json({ message: "Match non trovato" });
+    if (match.bikerId !== userId && match.zavarrinaId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+    const updated = await storage.updateProposalProfileMatch(matchId, { status: "accepted" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Accept proposal-profile match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/proposal-profile-matches/:id/reject", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const matchId = req.params.id as string;
+    const match = await storage.getProposalProfileMatchesForUser(userId).then((ms) => ms.find((m) => m.id === matchId));
+    if (!match) return res.status(404).json({ message: "Match non trovato" });
+    if (match.bikerId !== userId && match.zavarrinaId !== userId) {
+      return res.status(403).json({ message: "Non autorizzato" });
+    }
+    const updated = await storage.updateProposalProfileMatch(matchId, { status: "rejected" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Reject proposal-profile match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.delete("/proposal-profile-matches/:id", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const matchId = req.params.id as string;
+    const deleted = await storage.deleteProposalProfileMatch(matchId, userId);
+    if (!deleted) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
+    return res.json({ success: true });
+  } catch (error) {
+    console.error("Delete proposal-profile match error:", error);
     return res.status(500).json({ message: "Errore interno del server" });
   }
 });
