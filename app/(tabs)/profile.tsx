@@ -257,6 +257,16 @@ interface PendingOtaRelease {
   published_at: string | null;
 }
 
+type IdealLap = {
+  sessionId: string;
+  startedAt: string;
+  sampleCount: number;
+  maxSpeedKmh: number | null;
+  maxLeanDeg: number | null;
+  maxGforce: number | null;
+  lapNumber: number;
+};
+
 function getUserTypeColor(userType: string, sex?: string, coupleSexConfig?: string): string {
   if (userType === "coppia") {
     return Colors.coupleIcon;
@@ -858,16 +868,6 @@ export default function ProfileScreen() {
     enabled: !!user,
     staleTime: 60_000,
   });
-
-  type IdealLap = {
-    sessionId: string;
-    startedAt: string;
-    sampleCount: number;
-    maxSpeedKmh: number | null;
-    maxLeanDeg: number | null;
-    maxGforce: number | null;
-    lapNumber: number;
-  };
 
   const { data: idealLapsData } = useQuery<{ laps: IdealLap[] }>({
     queryKey: ["/api/telemetry/ideal-laps"],
