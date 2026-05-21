@@ -200,6 +200,7 @@ function GroupHeader({
   isCollapsed,
   onToggleCollapse,
   onEdit,
+  onToggleStatus,
 }: {
   baseName: string;
   count: number;
@@ -208,6 +209,7 @@ function GroupHeader({
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onEdit: () => void;
+  onToggleStatus: () => void;
 }) {
   const dotColor = allActive ? Colors.success : someActive ? Colors.warning : Colors.error;
   const statusLabel = allActive ? "Attivo" : someActive ? "Parziale" : "In pausa";
@@ -222,9 +224,14 @@ function GroupHeader({
         <View style={[styles.groupSectionDot, { backgroundColor: dotColor }]} />
         <Text style={styles.groupSectionName} numberOfLines={1}>{baseName}</Text>
         <Text style={styles.groupSectionCount}> · {count} immagini</Text>
-        <View style={[styles.groupStatusBadge, { backgroundColor: dotColor + "22" }]}>
+        <TouchableOpacity
+          onPress={onToggleStatus}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.7}
+          style={[styles.groupStatusBadge, { backgroundColor: dotColor + "22" }]}
+        >
           <Text style={[styles.groupStatusText, { color: dotColor }]}>{statusLabel}</Text>
-        </View>
+        </TouchableOpacity>
       </TouchableOpacity>
       <TouchableOpacity style={styles.groupSectionEdit} onPress={onEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
         <MaterialIcons name="folder-special" size={18} color={Colors.accent} />
@@ -457,6 +464,31 @@ export default function AdminAds() {
       setEditingGroupId(null);
     },
     onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
+  const groupToggleMutation = useMutation({
+    mutationFn: async ({ groupId, isActive }: { groupId: string; isActive: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/advertisements/group/${groupId}`, { isActive });
+      return res.json();
+    },
+    onMutate: async ({ groupId, isActive }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/admin/advertisements"] });
+      const previous = queryClient.getQueryData<Campaign[]>(["/api/admin/advertisements"]);
+      queryClient.setQueryData<Campaign[]>(["/api/admin/advertisements"], (old) =>
+        old ? old.map((c) => c.groupId === groupId ? { ...c, isActive } : c) : old
+      );
+      return { previous };
+    },
+    onError: (_err: Error, _vars, context: any) => {
+      if (context?.previous) {
+        queryClient.setQueryData(["/api/admin/advertisements"], context.previous);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
+    },
   });
 
   const bulkDeleteMutation = useMutation({
@@ -825,6 +857,7 @@ export default function AdminAds() {
                   isCollapsed={collapsedGroups.has(item.groupId)}
                   onToggleCollapse={() => toggleGroupCollapse(item.groupId)}
                   onEdit={() => openGroupEdit(item.groupId)}
+                  onToggleStatus={() => groupToggleMutation.mutate({ groupId: item.groupId, isActive: !item.allActive })}
                 />
               );
             }
