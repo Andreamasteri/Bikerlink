@@ -27,21 +27,21 @@ Ogni agente deve leggere questa skill **prima** di toccare uno qualsiasi di ques
 |---|---|---|---|
 | `<build>` | versionCode APK | Numero intero incrementale dell'APK pubblicato su Play Store | Viene pubblicato un nuovo APK nativo (nuova build EAS) |
 | `<ota_inglobata>` | OTA inglobata | Numero dell'ultima OTA inclusa in questo APK | Viene pubblicato un nuovo APK che porta dentro le OTA accumulate |
-| `<ciclo_ota>` | Ciclo OTA | Numero del ciclo `runtimeVersion` (es. `9.0.0` → `9`) | Cambia `runtimeVersion` in `app.json` (breaking change nativo) |
+| `<ciclo_ota>` | Ciclo OTA | Numero del ciclo `runtimeVersion` (es. `10.0.0` → `10`) | Cambia `runtimeVersion` in `app.json` (breaking change nativo) |
 
 ### Esempio di lettura
 
-`46.29.9` significa:
-- **APK build 46** (versionCode 46 su Play Store)
-- **OTA-29 inglobata** (l'ultimo OTA del ciclo precedente era il 29)
-- **Ciclo 9** (runtimeVersion `9.0.0`)
+`48.13.10` significa:
+- **APK build 48** (versionCode 48 su Play Store)
+- **OTA-13 inglobata** (l'ultimo OTA del ciclo precedente era il 13)
+- **Ciclo 10** (runtimeVersion `10.0.0`)
 
 ### Versione OTA dentro il ciclo
 
-Le OTA pubblicate durante il ciclo 9.x avranno versione `46.<updateNumber>.9`:
-- OTA-30 → `46.30.9`
-- OTA-31 → `46.31.9`
-- OTA-32 → `46.32.9`
+Le OTA pubblicate durante il ciclo 10.x avranno versione `48.<updateNumber>.10`:
+- OTA-1 → `48.1.10`
+- OTA-2 → `48.2.10`
+- OTA-3 → `48.3.10`
 
 ---
 
@@ -51,12 +51,12 @@ Il progetto usa il bare workflow (directory `android/` committata). I tre file d
 
 | File | Campo | Valore corrente |
 |---|---|---|
-| `app.json` | `expo.version` | `46.29.9` |
-| `app.json` | `expo.android.versionCode` | `46` |
-| `app.json` | `expo.runtimeVersion` | `9.0.0` |
-| `android/app/build.gradle` | `versionCode` | `46` |
-| `android/app/build.gradle` | `versionName` | `"46.29.9"` |
-| `android/app/src/main/res/values/strings.xml` | `expo_runtime_version` | `9.0.0` |
+| `app.json` | `expo.version` | `48.13.10` |
+| `app.json` | `expo.android.versionCode` | `48` |
+| `app.json` | `expo.runtimeVersion` | `10.0.0` |
+| `android/app/build.gradle` | `versionCode` | `48` |
+| `android/app/build.gradle` | `versionName` | `"48.13.10"` |
+| `android/app/src/main/res/values/strings.xml` | `expo_runtime_version` | `10.0.0` |
 
 ⚠️ **Aggiornare sempre tutti e tre i file contemporaneamente.** Un disallineamento causa errori di update check a runtime.
 
@@ -91,7 +91,9 @@ La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` (hardcodata ne
 | v43 | 43 | 3.2.0 | 8.0.0 | 8.x | — | Prima build ciclo 8 |
 | v44 | 44 | 3.3.0 | 8.0.0 | 8.x | — | Baseline pulita Task #1151 |
 | v45 | 45 | 3.4.0 | 8.0.0 | 8.x | OTA 1–29 | Ultimo APK ciclo 8 — ciclo CHIUSO a OTA-29 |
-| v46 | 46 | 46.29.9 | 9.0.0 | 9.x | OTA 30+ | **Corrente** — primo APK con schema semantico |
+| v46 | 46 | 46.29.9 | 9.0.0 | 9.x | OTA 1–13 | Primo APK schema semantico — ciclo CHIUSO a OTA-13 |
+| v47 | 47 | 47.2.9 | 9.0.0 | 9.x | OTA 1–13 | Ultimo APK ciclo 9 — SDK 56 migration |
+| v48 | 48 | 48.13.10 | 10.0.0 | 10.x | — | **Corrente** — primo APK ciclo 10, SDK 56 |
 
 > **Cicli precedenti** (schema vecchio `major.minor.patch` senza significato semantico):
 > - Ciclo 2.x: rv 2.0.0
@@ -101,6 +103,7 @@ La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` (hardcodata ne
 > - Ciclo 6.x: rv 6.0.0
 > - Ciclo 7.x: rv 7.0.0
 > - Ciclo 8.x: rv 8.0.0 — ultimo prima dell'adozione dello schema semantico (Task #1525)
+> - Ciclo 9.x: rv 9.0.0 — CHIUSO a OTA-13 (Task #1801 SDK 56 migration)
 
 ---
 
@@ -110,13 +113,13 @@ La riga che calcola la versione OTA in `scripts/publish-ota.sh`:
 
 ```bash
 # Formato versione OTA: <build>.<updateNumber>.<ciclo_ota>
-# 46 = versionCode APK corrente, NEXT_OTA = numero progressivo OTA nel ciclo, 9 = ciclo runtimeVersion (9.0.0)
-local VERSION="46.${NEXT_OTA}.9"
+# 48 = versionCode APK corrente, NEXT_OTA = numero progressivo OTA nel ciclo, 10 = ciclo runtimeVersion (10.0.0)
+local VERSION="48.${NEXT_OTA}.10"
 ```
 
 Quando viene pubblicato un nuovo APK con un nuovo ciclo, aggiornare:
-- Il primo numero (`46` → nuovo versionCode)
-- Il terzo numero (`9` → numero del nuovo ciclo runtimeVersion)
+- Il primo numero (`48` → nuovo versionCode)
+- Il terzo numero (`10` → numero del nuovo ciclo runtimeVersion)
 - Il commento sopra la riga
 
 ---

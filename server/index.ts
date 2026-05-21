@@ -784,8 +784,11 @@ function setupErrorHandler(app: express.Application) {
 
         try {
           await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_match_at TIMESTAMP`);
+          console.log("[MIGRATION] users.last_seen_match_at: OK (column added or already present)");
         } catch (e) {
-          console.warn("[MIGRATION] users.last_seen_match_at:", e);
+          // CRITICO: se questa migrazione fallisce, gli endpoint che toccano users (login, admin,
+          // telemetria OTA) ritornano 500. Loggare a livello ERROR per visibilità immediata nei log.
+          console.error("[MIGRATION][ERROR] users.last_seen_match_at FAILED — endpoint users potrebbero ritornare 500:", e);
         }
 
         try {

@@ -1232,5 +1232,63 @@
     "apkUrl": null,
     "status": "published",
     "publishedAt": "2026-05-21T00:11:12.946Z"
+  },
+  {
+    "updateNumber": null,
+    "version": "48.13.10",
+    "cycle": "10.x",
+    "channel": "release-apk",
+    "platform": "android",
+    "message": "APK v48 ciclo 10: runtimeVersion 10.0.0, SDK 56, versionCode 48, versionName 48.13.10",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "note": "Task #1860: apertura ciclo 10.0.0 — versionCode 48, versionName 48.13.10, runtimeVersion 10.0.0. Migrazione da SDK 56 (task #1801). CURRENT_OTA_NUMBER=0, __OTA_BUILD_TAG__=BL-OTA-0-cycle10. Build EAS da avviare.",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": null,
+    "bundleUrl": null,
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": null,
+    "easDashboard": null,
+    "apkBuildId": "a5c14e8f-d110-49e5-95c7-f0a241afe9ad",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/a5c14e8f-d110-49e5-95c7-f0a241afe9ad",
+    "apkVersionCode": 48,
+    "apkVersionName": "48.13.10",
+    "apkUrl": null,
+    "apkCompletedAt": null,
+    "deviceTestStatus": "pending",
+    "deviceTestNote": "APK v48 (versionCode 48, versionName 48.13.10, rv 10.0.0, ciclo 10) — build EAS inviata 2026-05-21T04:09Z (buildId: a5c14e8f). Dopo completamento EAS: scaricare APK, aggiornare apkUrl + apkCompletedAt, verificare su Android (no crash al boot, login funzionante, mappe visibili), impostare deviceTestStatus=verified.",
+    "status": "building"
+  },
+  {
+    "updateNumber": 1,
+    "version": "48.1.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-1 rv10.0.0: smoke test ciclo 10 — primo bundle post-migrazione SDK 56",
+    "note": "CURRENT_OTA_NUMBER=1. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "959f72c5-b185-41d7-ac96-d23abbed9c86",
+    "bundleUrl": "private/ota/ota-48.1.10-1779337500853.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "be77de0ba205b6dfbb915e8178bab898e13d4981",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-21T04:25:03.738Z"
   }
 ]

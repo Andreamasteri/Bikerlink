@@ -28,7 +28,6 @@ import { haversineKm } from "@/lib/geo";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient } from "@/lib/query-client";
 import { useRouter, useFocusEffect } from "expo-router";
-import { useIsFocused } from "@react-navigation/native";
 import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { getCurrentLocale } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
@@ -973,9 +972,19 @@ function TrackingScreenInner() {
   // Count stored when app returns from background while this tab is not focused,
   // so we can show the toast when the user navigates back to this tab.
   const pendingBgToastCountRef = useRef(0);
-  // Ref kept in sync with useIsFocused so the AppState closure can read it.
-  const isTabFocused = useIsFocused();
+  // Tracked via useFocusEffect (replaces @react-navigation/native useIsFocused — SDK 56 compat).
+  const [isTabFocused, setIsTabFocused] = useState(true);
   const isTabFocusedRef = useRef(isTabFocused);
+  useFocusEffect(
+    useCallback(() => {
+      setIsTabFocused(true);
+      isTabFocusedRef.current = true;
+      return () => {
+        setIsTabFocused(false);
+        isTabFocusedRef.current = false;
+      };
+    }, [])
+  );
   useEffect(() => { isTabFocusedRef.current = isTabFocused; }, [isTabFocused]);
 
   // Derived

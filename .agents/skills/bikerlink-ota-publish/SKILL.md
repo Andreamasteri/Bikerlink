@@ -56,10 +56,10 @@ bash scripts/build-apk.sh production   # AAB Play Store
 
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
-- **Runtime Version**: `9.0.0` (ciclo corrente, APK v47) ← CICLO 9.x
-- **APK corrente**: versionCode **47**, versionName **47.2.9**
-- **APK precedente (STABILE distribuita)**: versionCode 46, versionName 46.29.9 (buildId: `e03f51d8-9f2b-496f-bba2-e0fe90b69fb7`, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk)
-- **OTA corrente**: OTA-13 (ciclo 9.x attivo, rv 9.0.0, v47.13.9, releaseId: `4dde7100-d204-4622-8000-0618aad21282`, slot: stable)
+- **Runtime Version**: `10.0.0` (ciclo corrente, APK v48) ← CICLO 10.x
+- **APK corrente**: versionCode **48**, versionName **48.13.10** ← NUOVO APK DA BUILDARE
+- **APK precedente (ultima STABILE distribuita)**: versionCode 47, versionName 47.2.9, rv 9.0.0
+- **OTA corrente**: OTA-1 (ciclo 10.x — smoke test locale pubblicato; prossima OTA reale dopo APK v48 distribuito e deploy produzione)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -69,6 +69,15 @@ bash scripts/build-apk.sh production   # AAB Play Store
 ⛔ **MAI** eseguire `npx eas-cli update` — EAS Updates è dismesso.
 ⛔ **MAI** modificare manualmente `lib/ota.ts` o `ota-updates.json` prima dello script.
 ✅ Usare **sempre** `bash scripts/publish-ota.sh` — tutto è automatico.
+
+## ⚠ Bug noto produzione: OTA CREATE restituisce 500
+Il deploy di produzione (`https://biker-link.replit.app`) ha un bug nel server_dist compilato:
+l'endpoint `POST /api/admin/ota` genera SQL `VALUES (, , $1, $2, 'draft', $3)` dove `version`
+e `runtime_version` risultano `undefined` nel template Drizzle. Il codice sorgente locale è
+corretto — il bug è nella versione compilata in produzione (server_dist obsoleto).
+**Fix**: eseguire un nuovo deploy del progetto (aggiorna il server_dist in produzione).
+Finché non viene eseguito il deploy, usare `BIKERLINK_BACKEND_URL=http://localhost:5000`
+per pubblicare OTA verso il backend locale (funziona per test/dev, non serve utenti reali).
 
 ## File chiave
 - `lib/ota.ts` — contiene `CURRENT_OTA_NUMBER` (aggiornato dallo script)
@@ -139,10 +148,10 @@ che la release è già live in produzione: in quel caso lo script avvisa di aggi
 manualmente `ota-updates.json` e NON ripristina (la release è già attiva).
 
 ### Versioning automatico
-Lo script calcola la versione come `<build>.<updateNumber>.<ciclo_ota>` (es. Ciclo 9.x, OTA-30 → `46.30.9`).
-- **46** = versionCode APK corrente
+Lo script calcola la versione come `<build>.<updateNumber>.<ciclo_ota>` (es. Ciclo 10.x, OTA-1 → `48.1.10`).
+- **48** = versionCode APK corrente
 - **updateNumber** = numero progressivo OTA nel ciclo (calcolato automaticamente)
-- **9** = ciclo runtimeVersion corrente (9.0.0)
+- **10** = ciclo runtimeVersion corrente (10.0.0)
 Non è necessario specificare la versione manualmente. Leggere `.agents/skills/bikerlink-versioning/SKILL.md` per la convenzione completa.
 
 ---
@@ -304,13 +313,19 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
   - APK v43 (3.2.0): STABILE — buildId: 38cb1b32-4316-4f63-9799-1b9ab36888e8, APK: https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk
   - APK v44 (3.3.0): STABILE — buildId: b148edc3-de25-4f55-b5c4-c4466b4ccc0b, APK: https://expo.dev/artifacts/eas/nTJjWowt3HRSs7BqRvdCRi.apk (baseline pulita per device piantati su OTA-19 — Task #1151)
   - APK v45 (3.4.0): STABILE — buildId: 91cfde53-66e7-45fc-83f0-d7f72a98fcde, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk
-- **Ciclo 9.x: OTA 1+ (rv 9.0.0) ← CORRENTE**
+- **Ciclo 9.x: OTA 1–13 (rv 9.0.0) — CHIUSO a OTA-13 (Task #1801 SDK 56 migration)**
   - APK v46 (46.29.9): versionCode 46, runtimeVersion 9.0.0
-  - OTA-9 (v47.9.9): fix token auth backend (`req.session.userId ?? null`), releaseId: `dddb488c`
-  - OTA-10 (v47.10.9): fix aggiornamento automatico — ramo `fetch-not-new` ora chiama `reloadAsync()`, releaseId: `aa1ba7bb`
-  - OTA-11 (v47.11.9): telemetria target 1000km + giri ideali collassabili + rimosso testo debug profilo, releaseId: `ff9b0c47`
-  - OTA-12 (v47.12.9): fix OTA affidabilità — flag AsyncStorage cold-start + timer 5s background + marker BL-OTA-N per verifica bundle, releaseId: `3e27f53c`
-  - OTA-13 (v47.13.9): testo "CIAOOTA" rosso in basso a destra nel profilo utente, releaseId: `4dde7100` ← **CORRENTE**
+  - APK v47 (47.2.9): versionCode 47, runtimeVersion 9.0.0 — ultimo APK ciclo 9
+  - OTA-9 (v47.9.9): fix token auth backend, releaseId: `dddb488c`
+  - OTA-10 (v47.10.9): fix aggiornamento automatico, releaseId: `aa1ba7bb`
+  - OTA-11 (v47.11.9): telemetria 1000km + giri ideali collassabili, releaseId: `ff9b0c47`
+  - OTA-12 (v47.12.9): fix OTA affidabilità — flag AsyncStorage cold-start + timer 5s, releaseId: `3e27f53c`
+  - OTA-13 (v47.13.9): testo "CIAOOTA" rosso profilo — **ULTIMA OTA CICLO 9**, releaseId: `4dde7100`
+- **Ciclo 10.x: OTA 0+ (rv 10.0.0) ← CORRENTE**
+  - APK v48 (48.13.10): versionCode 48, runtimeVersion 10.0.0 — build EAS inviata (buildId: a5c14e8f)
+  - CURRENT_OTA_NUMBER=1, __OTA_BUILD_TAG__="BL-OTA-1-cycle10"
+  - OTA-1 (v48.1.10): smoke test locale ciclo 10 post-migrazione SDK 56, releaseId: `959f72c5`
+  - Prima OTA reale sarà OTA-2 (dopo APK v48 distribuito agli utenti + nuovo deploy produzione)
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:
