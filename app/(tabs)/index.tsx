@@ -10,7 +10,7 @@ import {
   Linking,
   Platform,
 } from "react-native";
-import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -51,7 +51,6 @@ type UserWithProfileCoords = Omit<User, "password"> & {
 
 export default function MapScreen() {
   const router = useRouter();
-  useLocalSearchParams();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const t = useT();
   const insets = useSafeAreaInsets();
