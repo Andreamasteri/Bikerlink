@@ -211,6 +211,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT false`);
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP`);
           await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS approved_by VARCHAR(100)`);
+          await db.execute(sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS target_user_types jsonb`);
           console.log("[INIT] Phase 2: Schema extensions ensured");
         } catch (e) {
           console.warn("[INIT] Phase 2 error (columns):", e);
@@ -222,7 +223,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
         await seedAppleReviewerAccount();
         await seedGooglePlayReviewerAccount();
         await ensureBikerLinkOfficialOnBoot();
-        
+
         startMatchingEngine();
         await initMissingClubConversations();
         console.log("[INIT] Phase 3: Core services and seeding completed");

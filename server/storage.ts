@@ -172,7 +172,7 @@ export interface IStorage {
   upsertUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile>;
 
   getProposals(filters?: { status?: string }): Promise<Proposal[]>;
-  getActiveProposalsWithLocation(): Promise<Proposal[]>;
+  getActiveProposalsWithLocation(): Promise<(Proposal & { authorUserType?: string | null })[]>;
   getProposal(id: string): Promise<Proposal | undefined>;
   createProposal(proposal: InsertProposal): Promise<Proposal>;
   updateProposal(id: string, data: Partial<InsertProposal>): Promise<Proposal | undefined>;
@@ -648,8 +648,8 @@ export class DatabaseStorage implements IStorage {
     return participant;
   }
 
-  async getActiveProposalsWithLocation(): Promise<Proposal[]> {
-    const results = await db.select({ proposal: proposals, role: users.role })
+  async getActiveProposalsWithLocation(): Promise<(Proposal & { authorUserType?: string | null })[]> {
+    const results = await db.select({ proposal: proposals, userType: users.userType })
       .from(proposals)
       .innerJoin(users, eq(users.id, proposals.userId))
       .where(
@@ -657,11 +657,11 @@ export class DatabaseStorage implements IStorage {
           eq(proposals.status, "active"),
           sql`${proposals.departureLatitude} IS NOT NULL`,
           sql`${proposals.departureLongitude} IS NOT NULL`,
-          sql`${proposals.searchType} IS NOT NULL`,
+          sql`(${proposals.searchType} IS NOT NULL OR ${proposals.targetUserTypes} IS NOT NULL)`,
           ...systemAccountConditions(users),
         )
       );
-    return results.map(r => r.proposal);
+    return results.map(r => ({ ...r.proposal, authorUserType: r.userType }));
   }
 
   async getProposalMatches(userId: string): Promise<ProposalMatch[]> {

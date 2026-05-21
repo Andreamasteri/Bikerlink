@@ -40,6 +40,13 @@ const ZAVORRINA_SEARCH_TYPES = [
   { key: "hitchhiker", label: "HitchHiker", subtitleKey: "proposals.sub.hitchhikerZav", icon: "thumb-up", color: Colors.accent },
 ];
 
+const TARGET_USER_TYPE_OPTIONS = [
+  { key: "biker", labelKey: "proposal.targetBiker", icon: "motorbike", color: Colors.maleIcon },
+  { key: "zavorrina", labelKey: "proposal.targetZavorrina", icon: "seat-passenger", color: Colors.femaleIcon },
+  { key: "hitchhiker", labelKey: "proposal.targetHitchhiker", icon: "thumb-up", color: Colors.success },
+  { key: "hotcher", labelKey: "proposal.targetHotcher", icon: "account-arrow-right", color: Colors.accent },
+];
+
 function formatDateInput(val: string): string {
   const nums = val.replace(/\D/g, "");
   if (nums.length <= 2) return nums;
@@ -87,6 +94,7 @@ export default function CreateProposalScreen() {
   const t = useT();
 
   const [selectedSearchTypes, setSelectedSearchTypes] = useState<string[]>([]);
+  const [selectedTargetUserTypes, setSelectedTargetUserTypes] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [searchRadius, setSearchRadius] = useState("50");
@@ -162,6 +170,13 @@ export default function CreateProposalScreen() {
     setSelectedSearchTypes((prev) => {
       if (prev.includes(key)) return prev.filter((k) => k !== key);
       if (prev.length >= 4) return prev;
+      return [...prev, key];
+    });
+  };
+
+  const toggleTargetUserType = (key: string) => {
+    setSelectedTargetUserTypes((prev) => {
+      if (prev.includes(key)) return prev.filter((k) => k !== key);
       return [...prev, key];
     });
   };
@@ -332,6 +347,7 @@ export default function CreateProposalScreen() {
       proposalType,
       searchType: selectedSearchTypes[0] || null,
       searchTypes: selectedSearchTypes,
+      targetUserTypes: selectedTargetUserTypes.length > 0 ? selectedTargetUserTypes : null,
       title: title.trim(),
       description: description.trim() || null,
       searchRadius: parseInt(searchRadius) || 50,
@@ -394,6 +410,36 @@ export default function CreateProposalScreen() {
           selectedSearchTypes={selectedSearchTypes}
           toggleSearchType={toggleSearchType}
         />
+
+        <Text style={styles.sectionTitle}>{t("proposal.targetSection")}</Text>
+        <View style={styles.typeGrid}>
+          {TARGET_USER_TYPE_OPTIONS.map((opt) => {
+            const isSelected = selectedTargetUserTypes.includes(opt.key);
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                style={[
+                  styles.typeCard,
+                  isSelected && { borderColor: opt.color, backgroundColor: opt.color + "15" },
+                ]}
+                onPress={() => toggleTargetUserType(opt.key)}
+                testID={`target-type-${opt.key}`}
+              >
+                <MaterialCommunityIcons
+                  name={opt.icon as any}
+                  size={28}
+                  color={isSelected ? opt.color : Colors.textSecondary}
+                />
+                <Text style={[styles.typeCardLabel, isSelected && { color: opt.color }]}>
+                  {t(opt.labelKey)}
+                </Text>
+                {isSelected && (
+                  <Ionicons name="checkmark-circle" size={16} color={opt.color} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
         {selectedSearchTypes.length > 0 && (
           <>

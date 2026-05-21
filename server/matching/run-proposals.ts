@@ -15,11 +15,10 @@ import { areCompatible } from "./scoring";
 
 export async function runProposalMatchingForUser(userId: string): Promise<number> {
   try {
-    const userProposals = await db.select().from(proposals).where(eq(proposals.userId, userId)).orderBy(desc(proposals.createdAt));
-    const myActiveProposals = userProposals.filter(p => p.status === "active");
+    const allActiveProposals = await storage.getActiveProposalsWithLocation();
+    const myActiveProposals = allActiveProposals.filter(p => p.userId === userId);
     if (myActiveProposals.length === 0) return 0;
 
-    const allActiveProposals = await storage.getActiveProposalsWithLocation();
     const otherActiveProposals = allActiveProposals.filter(p => p.userId !== userId);
     if (otherActiveProposals.length === 0) return 0;
 
@@ -30,13 +29,14 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
     const proposalPrefsMap = await loadMatchPreferencesMap();
 
     let matchCount = 0;
-    const BB_SEARCH_TYPES = new Set(["find_a_friend", "hitcher", "hitchhiker"]);
 
     for (const p1 of myActiveProposals) {
       for (const p2 of otherActiveProposals) {
         if (!areCompatible(p1, p2)) continue;
 
-        const isBikerBikerProposal = BB_SEARCH_TYPES.has(p1.searchType ?? "") && BB_SEARCH_TYPES.has(p2.searchType ?? "");
+        const isBikerBikerProposal =
+          (p1.authorUserType ?? "biker") === "biker" &&
+          (p2.authorUserType ?? "biker") === "biker";
         if (isBikerBikerProposal) {
           if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerBikerDistance")) continue;
         } else {
@@ -99,8 +99,14 @@ export async function runProposalZoneNotifications(proposal: Proposal): Promise<
     const searchRadius = proposal.searchRadius || 50;
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    let targetUserTypes: string[] = [];
-    if (proposal.searchType === "find_a_friend") {
+    let targetUserTypes: string[];
+    const explicitTargets = Array.isArray(proposal.targetUserTypes)
+      ? (proposal.targetUserTypes as string[])
+      : null;
+
+    if (explicitTargets && explicitTargets.length > 0) {
+      targetUserTypes = explicitTargets;
+    } else if (proposal.searchType === "find_a_friend") {
       targetUserTypes = ["biker", "coppia"];
     } else if (proposal.searchType === "find_a_biker" || proposal.searchType === "hitchhiker") {
       targetUserTypes = ["biker", "coppia"];

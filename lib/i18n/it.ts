@@ -198,6 +198,15 @@ const it: Record<string, string> = {
   "proposals.sub.hitchhikerZav": "Mi serve un passaggio",
 
   "proposals.searchType.findPassenger": "Trova Zavorrina",
+  "proposal.targetSection": "Chi vuoi raggiungere?",
+  "proposal.targetBiker": "Biker",
+  "proposal.targetBikerDesc": "Cerca altri biker o coppie in zona",
+  "proposal.targetZavorrina": "Zavorrina",
+  "proposal.targetZavorinaDesc": "Cerca una passeggera",
+  "proposal.targetHitchhiker": "Autostoppista",
+  "proposal.targetHitchhikerDesc": "Cerca chi vuole un passaggio",
+  "proposal.targetHotcher": "Hotcher",
+  "proposal.targetHotcherDesc": "Cerca chi offre un passaggio",
 
   "match.accepted": "Accettato",
   "match.rejected": "Rifiutato",

@@ -198,6 +198,15 @@ const en: Record<string, string> = {
   "proposals.sub.hitchhikerZav": "I need a ride",
 
   "proposals.searchType.findPassenger": "Find Pillion",
+  "proposal.targetSection": "Who are you looking for?",
+  "proposal.targetBiker": "Biker",
+  "proposal.targetBikerDesc": "Looking for other bikers or couples nearby",
+  "proposal.targetZavorrina": "Pillion",
+  "proposal.targetZavorinaDesc": "Looking for a pillion passenger",
+  "proposal.targetHitchhiker": "Hitchhiker",
+  "proposal.targetHitchhikerDesc": "Looking for someone who needs a ride",
+  "proposal.targetHotcher": "Hotcher",
+  "proposal.targetHotcherDesc": "Looking for someone offering a ride",
 
   "match.accepted": "Accepted",
   "match.rejected": "Rejected",
