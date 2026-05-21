@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
-import { sprintResults, users, userMotorcycles } from "@shared/schema";
+import { sprintResults, users, userMotorcycles, createSprintSchema } from "@shared/schema";
 import { eq, asc, and, gte, lte, sql } from "drizzle-orm";
 
 const router = Router();
@@ -18,15 +18,14 @@ router.post("/", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const { sprint0to100Ms, maxAccelerationG, maxDecelerationG, maxTiltDeg, routeId } = req.body;
-
-    if (typeof sprint0to100Ms !== "number" || !isFinite(sprint0to100Ms) || sprint0to100Ms <= 0) {
-      return res.status(400).json({ message: "Tempo sprint non valido" });
+    const parsed = createSprintSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
     }
-    // Preserve null to denote "sensor not active" — only store a value when it's a valid finite number.
-    const safeAccelG = typeof maxAccelerationG === "number" && isFinite(maxAccelerationG) ? maxAccelerationG : null;
-    const safeDecelG = typeof maxDecelerationG === "number" && isFinite(maxDecelerationG) ? maxDecelerationG : null;
-    const safeTiltDeg = typeof maxTiltDeg === "number" && isFinite(maxTiltDeg) ? maxTiltDeg : null;
+    const { sprint0to100Ms, maxAccelerationG, maxDecelerationG, maxTiltDeg, routeId } = parsed.data;
+    const safeAccelG = maxAccelerationG ?? null;
+    const safeDecelG = maxDecelerationG ?? null;
+    const safeTiltDeg = maxTiltDeg ?? null;
 
     const [result] = await db
       .insert(sprintResults)

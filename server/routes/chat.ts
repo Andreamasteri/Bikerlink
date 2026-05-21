@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubMembers, users, messages, conversationParticipants } from "@shared/schema";
+import { motoClubs, motoClubMembers, users, messages, conversationParticipants, createConversationSchema, sendMessageSchema } from "@shared/schema";
 import { eq, and, ne, inArray, desc } from "drizzle-orm";
 import { sendEmail } from "../email";
 import { sendChatPushNotifications, sendMotoclubPushNotifications } from "../push-notifications";
@@ -585,7 +585,11 @@ router.post("/conversations", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const { conversationType, title, proposalId, participantIds } = req.body;
+    const parsedConv = createConversationSchema.safeParse(req.body);
+    if (!parsedConv.success) {
+      return res.status(400).json({ message: parsedConv.error.errors[0].message });
+    }
+    const { conversationType, title, proposalId, participantIds } = parsedConv.data;
 
     if (participantIds?.length === 1) {
       const targetUserId = participantIds[0];
@@ -846,7 +850,11 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     if (!userId) return;
 
     const id = req.params.id as string;
-    const { messageType, content, imageUrl, latitude, longitude } = req.body;
+    const parsedMsg = sendMessageSchema.safeParse(req.body);
+    if (!parsedMsg.success) {
+      return res.status(400).json({ message: parsedMsg.error.errors[0].message });
+    }
+    const { messageType, content, imageUrl, latitude, longitude } = parsedMsg.data;
 
     const [conversation, participants] = await Promise.all([
       storage.getConversation(id),

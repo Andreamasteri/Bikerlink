@@ -11,7 +11,7 @@ import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "
 import { storage } from "../storage";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats, siteVisits, rideTelemetry, routes, otaPublishTokens } from "@shared/schema";
+import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, otaEvents, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats, siteVisits, rideTelemetry, routes, otaPublishTokens, otaErrorSchema, createAdCampaignSchema, createInviteCodeSchema, upsertSettingSchema, emailConfigSchema, disableFeatureSchema, toggleProtectedSchema, publishWithSlotSchema, createOtaTokenSchema, assignOtaSlotSchema, publishOtaReleaseSchema, booleanSettingValueSchema, stringSettingValueSchema, mapsProviderSchema, clientErrorSchema, startupBeaconSchema, verifyPasswordSchema, userStatusSchema, userRoleSchema, userEmailAdminSchema, adminSetPasswordSchema, primalSchema, workshopSchema, easterEggSchema, easterEggBatchSchema, reportResolveSchema, emailTestSchema, emailRateLimitResetSchema, themeDefaultSchema, matchingCountriesSchema, coordinatesMaxAgeSchema, genericSettingSchema, adsBulkSchema, adsCreateSchema, adsUpdateSchema, adsBulkDeleteSchema, adsGroupUpdateSchema, stregattaSchema, stregattaToggleSchema, rejectNoteSchema, simulateActivitySchema, updateInvitationCodeAdminSchema, enabledSchema, backupFrequencySchema, reconcileClubInvitesSchema, translationKeySchema, coordinateHistorySettingsSchema, bgLocationSettingsSchema, privacyRulesSchema, nativeVersionSchema, otaAssignDeviceSchema, otaPromoteSchema, otaMarkBrokenSchema, urlSettingSchema, maintenanceSettingsSchema, curvyScoreWeightsSchema, telemetryTargetKmSchema } from "@shared/schema";
 import { DEFAULT_PREFS } from "./match-preferences";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { eq, and, ne, desc, sql, count, notExists, inArray, notInArray, lte, isNull, or, ilike } from "drizzle-orm";
@@ -385,37 +385,17 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
     if (!checkOtaErrorRate(ip)) {
       return res.status(429).json({ message: "Troppi eventi OTA: rallenta." });
     }
+    const parsedOtaErr = otaErrorSchema.safeParse(req.body);
+    if (!parsedOtaErr.success) {
+      return res.status(400).json({ message: parsedOtaErr.error.errors[0].message });
+    }
     const {
       error, failCount, updateId, runtimeVersion, phase, source, platform,
       // Task #1625: stable device fingerprint (replaces IP-based tracking).
       deviceId,
       // Task #1148: nuovi campi diagnostici opzionali (tutti troncati sotto).
       errorCode, errorCause, errorUserInfo, nativeStack, updateUrl, channel, networkInfo, probe,
-    } = req.body as {
-      error?: string;
-      failCount?: number;
-      updateId?: string;
-      runtimeVersion?: string;
-      phase?: string;
-      source?: string;
-      platform?: string;
-      deviceId?: string;
-      errorCode?: string;
-      errorCause?: string;
-      errorUserInfo?: string;
-      nativeStack?: string;
-      updateUrl?: string;
-      channel?: string;
-      networkInfo?: string;
-      probe?: {
-        status?: unknown;
-        contentType?: unknown;
-        bodySnippet?: unknown;
-        durationMs?: unknown;
-        error?: unknown;
-      };
-    };
-    if (!error) return res.status(400).json({ message: "error is required" });
+    } = parsedOtaErr.data;
 
     // Sanitizza/tronca esplicitamente il blocco diagnostico — anche se il
     // frontend dovrebbe già farlo, qui è la fonte di verità per i limiti.
@@ -486,7 +466,8 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
 
 router.post("/client-error", clientErrorLimiter, clientErrorJson, (req: Request, res: Response) => {
   try {
-    const { message, stack, componentStack, platform, appVersion, isFatal } = req.body || {};
+    const parsedCe = clientErrorSchema.safeParse(req.body || {});
+    const { message, stack, componentStack, platform, appVersion, isFatal } = parsedCe.success ? parsedCe.data : {};
     // GDPR/CCPA compliance: do NOT log req.ip — client IP must not appear in error logs
     console.error("[CLIENT-ERROR]", JSON.stringify({
       message: message || "unknown",
@@ -505,15 +486,9 @@ router.post("/client-error", clientErrorLimiter, clientErrorJson, (req: Request,
 
 router.post("/startup-beacon", startupBeaconLimiter, startupBeaconJson, (req: Request, res: Response) => {
   try {
-    const body = (req.body ?? {}) as {
-      step?: string;
-      ts?: number;
-      recovered?: boolean;
-      platform?: string;
-      [key: string]: unknown;
-    };
-    const { step, ts, recovered, platform, ...rest } = body;
-    if (!step) return res.status(400).json({ message: "step is required" });
+    const parsedSb = startupBeaconSchema.safeParse(req.body ?? {});
+    if (!parsedSb.success) return res.status(400).json({ message: parsedSb.error.errors[0].message });
+    const { step, ts, recovered, platform, ...rest } = parsedSb.data;
     const tsNum = typeof ts === "number" ? ts : Date.now();
     const entry: StartupBeaconEntry = {
       step: String(step).substring(0, 100),
@@ -891,10 +866,9 @@ router.get("/ota-stuck-events", async (req: Request, res: Response) => {
 
 router.post("/verify-password", async (req: Request, res: Response) => {
   try {
-    const { password } = req.body;
-    if (!password || typeof password !== "string") {
-      return res.status(400).json({ message: "Password mancante" });
-    }
+    const parsedVp = verifyPasswordSchema.safeParse(req.body);
+    if (!parsedVp.success) return res.status(400).json({ message: parsedVp.error.errors[0].message });
+    const { password } = parsedVp.data;
     const user = (req as any).currentUser;
     const fullUser = await storage.getUser(user.id);
     if (!fullUser || !fullUser.password) {
@@ -995,10 +969,9 @@ router.get("/users/stats/summary", async (_req: Request, res: Response) => {
 router.put("/users/:id/status", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { status } = req.body;
-    if (!["active", "suspended", "blocked"].includes(status)) {
-      return res.status(400).json({ message: "Stato non valido" });
-    }
+    const parsedUs = userStatusSchema.safeParse(req.body);
+    if (!parsedUs.success) return res.status(400).json({ message: parsedUs.error.errors[0].message });
+    const { status } = parsedUs.data;
     const targetUser = await storage.getUser(id);
     if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
     if (isProtectedUser(targetUser.nickname)) {
@@ -1029,10 +1002,9 @@ router.put("/users/:id/status", async (req: Request, res: Response) => {
 router.put("/users/:id/role", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { role } = req.body;
-    if (!["user", "moderator", "admin"].includes(role)) {
-      return res.status(400).json({ message: "Ruolo non valido" });
-    }
+    const parsedUr = userRoleSchema.safeParse(req.body);
+    if (!parsedUr.success) return res.status(400).json({ message: parsedUr.error.errors[0].message });
+    const { role } = parsedUr.data;
     const targetUser = await storage.getUser(id);
     if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
     if (isProtectedUser(targetUser.nickname)) {
@@ -1060,10 +1032,9 @@ router.put("/users/:id/role", async (req: Request, res: Response) => {
 router.put("/users/:id/email", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { email } = req.body;
-    if (!email || !email.includes("@")) {
-      return res.status(400).json({ message: "Email non valida" });
-    }
+    const parsedUe = userEmailAdminSchema.safeParse(req.body);
+    if (!parsedUe.success) return res.status(400).json({ message: parsedUe.error.errors[0].message });
+    const { email } = parsedUe.data;
     const targetUser = await storage.getUser(id);
     if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
     if (isProtectedUser(targetUser.nickname)) {
@@ -1091,10 +1062,9 @@ router.put("/users/:id/email", async (req: Request, res: Response) => {
 router.put("/users/:id/password", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { password } = req.body;
-    if (!password || password.length < 6) {
-      return res.status(400).json({ message: "La password deve avere almeno 6 caratteri" });
-    }
+    const parsedAsp = adminSetPasswordSchema.safeParse(req.body);
+    if (!parsedAsp.success) return res.status(400).json({ message: parsedAsp.error.errors[0].message });
+    const { password } = parsedAsp.data;
     const targetUser = await storage.getUser(id);
     if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
     if (isProtectedUser(targetUser.nickname)) {
@@ -1137,7 +1107,9 @@ router.put("/users/:id/password", async (req: Request, res: Response) => {
 router.put("/users/:id/primal", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { isPrimal } = req.body;
+    const parsedPr = primalSchema.safeParse(req.body);
+    if (!parsedPr.success) return res.status(400).json({ message: parsedPr.error.errors[0].message });
+    const { isPrimal } = parsedPr.data;
     const user = await storage.updateUser(id, { isPrimal: !!isPrimal });
     if (!user) {
       return res.status(404).json({ message: "Utente non trovato" });
@@ -1230,7 +1202,9 @@ router.get("/workshops", async (_req: Request, res: Response) => {
 
 router.post("/workshops", async (req: Request, res: Response) => {
   try {
-    const workshop = await storage.createWorkshop(req.body);
+    const parsedWs = workshopSchema.safeParse(req.body);
+    if (!parsedWs.success) return res.status(400).json({ message: parsedWs.error.errors[0].message });
+    const workshop = await storage.createWorkshop(parsedWs.data);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "create_workshop",
@@ -1248,7 +1222,9 @@ router.post("/workshops", async (req: Request, res: Response) => {
 router.put("/workshops/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const workshop = await storage.updateWorkshop(id, req.body);
+    const parsedWsu = workshopSchema.partial().passthrough().safeParse(req.body);
+    if (!parsedWsu.success) return res.status(400).json({ message: parsedWsu.error.errors[0].message });
+    const workshop = await storage.updateWorkshop(id, parsedWsu.data);
     if (!workshop) {
       return res.status(404).json({ message: "Officina non trovata" });
     }
@@ -1316,7 +1292,9 @@ router.get("/easter-eggs", async (_req: Request, res: Response) => {
 
 router.post("/easter-eggs", async (req: Request, res: Response) => {
   try {
-    const egg = await storage.createEasterEgg(req.body);
+    const parsedEe = easterEggSchema.safeParse(req.body);
+    if (!parsedEe.success) return res.status(400).json({ message: parsedEe.error.errors[0].message });
+    const egg = await storage.createEasterEgg(parsedEe.data);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "create_easter_egg",
@@ -1333,9 +1311,11 @@ router.post("/easter-eggs", async (req: Request, res: Response) => {
 
 router.post("/easter-eggs/batch", async (req: Request, res: Response) => {
   try {
-    const count = parseInt(req.body.count) || 10;
-    const radius = parseInt(req.body.radius) || 30;
-    const points = parseInt(req.body.points) || 10;
+    const parsedEb = easterEggBatchSchema.safeParse(req.body);
+    if (!parsedEb.success) return res.status(400).json({ message: parsedEb.error.errors[0].message });
+    const count = parseInt(String(parsedEb.data.count ?? "")) || 10;
+    const radius = parseInt(String(parsedEb.data.radius ?? "")) || 30;
+    const points = parseInt(String(parsedEb.data.points ?? "")) || 10;
     const existing = await storage.getEasterEggs();
     const startNum = existing.length + 1;
     const created = [];
@@ -1369,7 +1349,9 @@ router.post("/easter-eggs/batch", async (req: Request, res: Response) => {
 router.put("/easter-eggs/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const egg = await storage.updateEasterEgg(id, req.body);
+    const parsedEeu = easterEggSchema.safeParse(req.body);
+    if (!parsedEeu.success) return res.status(400).json({ message: parsedEeu.error.errors[0].message });
+    const egg = await storage.updateEasterEgg(id, parsedEeu.data);
     if (!egg) {
       return res.status(404).json({ message: "Easter egg non trovato" });
     }
@@ -1452,7 +1434,9 @@ router.get("/campaigns", async (_req: Request, res: Response) => {
 
 router.post("/campaigns", async (req: Request, res: Response) => {
   try {
-    const campaign = await storage.createAdCampaign(req.body);
+    const parsedCamp = createAdCampaignSchema.safeParse(req.body);
+    if (!parsedCamp.success) return res.status(400).json({ message: parsedCamp.error.errors[0].message });
+    const campaign = await storage.createAdCampaign(parsedCamp.data);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "create_campaign",
@@ -1470,7 +1454,9 @@ router.post("/campaigns", async (req: Request, res: Response) => {
 router.put("/campaigns/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const campaign = await storage.updateAdCampaign(id, req.body);
+    const parsedCampUpd = createAdCampaignSchema.partial().safeParse(req.body);
+    if (!parsedCampUpd.success) return res.status(400).json({ message: parsedCampUpd.error.errors[0].message });
+    const campaign = await storage.updateAdCampaign(id, parsedCampUpd.data);
     if (!campaign) {
       return res.status(404).json({ message: "Campagna non trovata" });
     }
@@ -1519,10 +1505,9 @@ router.get("/reports", async (req: Request, res: Response) => {
 router.put("/reports/:id/resolve", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { status } = req.body;
-    if (!["resolved", "dismissed"].includes(status)) {
-      return res.status(400).json({ message: "Stato non valido" });
-    }
+    const parsedRr = reportResolveSchema.safeParse(req.body);
+    if (!parsedRr.success) return res.status(400).json({ message: parsedRr.error.errors[0].message });
+    const { status } = parsedRr.data;
     const report = await storage.updateReport(id, {
       status,
       resolvedBy: req.session.userId!,
@@ -1716,10 +1701,9 @@ router.get("/settings/email-config", async (_req: Request, res: Response) => {
 
 router.put("/settings/email-config", async (req: Request, res: Response) => {
   try {
-    const { gmailUser, gmailAppPassword, adminPassword } = req.body;
-    if (!adminPassword) {
-      return res.status(400).json({ message: "Password admin richiesta" });
-    }
+    const parsedEmail = emailConfigSchema.safeParse(req.body);
+    if (!parsedEmail.success) return res.status(400).json({ message: parsedEmail.error.errors[0].message });
+    const { gmailUser, gmailAppPassword, adminPassword } = parsedEmail.data;
 
     const admin = (req as any).currentUser;
     if (!admin) {
@@ -1765,7 +1749,9 @@ router.get("/email-status", async (_req: Request, res: Response) => {
 // completo se fallisce). Default destinatario: bikerlinkapp@gmail.com.
 router.post("/email-test", async (req: Request, res: Response) => {
   try {
-    const rawTo = typeof req.body?.to === "string" ? req.body.to.trim() : "";
+    const parsedEt = emailTestSchema.safeParse(req.body ?? {});
+    if (!parsedEt.success) return res.status(400).json({ ok: false, error: parsedEt.error.errors[0].message });
+    const rawTo = typeof parsedEt.data.to === "string" ? parsedEt.data.to.trim() : "";
     const to = rawTo || "bikerlinkapp@gmail.com";
     const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRe.test(to)) {
@@ -1853,14 +1839,9 @@ router.get("/email-rate-limit-status", async (_req: Request, res: Response) => {
 // - scope=all     : cancella tutto
 router.post("/email-rate-limit-reset", async (req: Request, res: Response) => {
   try {
-    const { scope, ip, userId } = req.body as { scope?: string; ip?: string; userId?: string };
-    if (!scope) {
-      return res.status(400).json({ message: "Parametro 'scope' richiesto" });
-    }
-    const validScopes = new Set(["verify", "resend", "user-lockouts", "all"]);
-    if (!validScopes.has(scope)) {
-      return res.status(400).json({ message: "Scope non valido. Usa: verify | resend | user-lockouts | all" });
-    }
+    const parsedElr = emailRateLimitResetSchema.safeParse(req.body);
+    if (!parsedElr.success) return res.status(400).json({ message: parsedElr.error.errors[0].message });
+    const { scope, ip, userId } = parsedElr.data;
 
     const cleared: string[] = [];
 
@@ -1916,7 +1897,9 @@ router.post("/migrate/verify-real-users", async (_req: Request, res: Response) =
 
 router.put("/settings/disable-feature", async (req: Request, res: Response) => {
   try {
-    const { key } = req.body as { key: string };
+    const parsedDisable = disableFeatureSchema.safeParse(req.body);
+    if (!parsedDisable.success) return res.status(400).json({ message: parsedDisable.error.errors[0].message });
+    const { key } = parsedDisable.data;
     const allowedKeys = ["ads_enabled", "syneco_branding_visible"];
 
     if (!allowedKeys.includes(key)) {
@@ -1941,14 +1924,13 @@ router.put("/settings/disable-feature", async (req: Request, res: Response) => {
 
 router.put("/settings/toggle-protected", async (req: Request, res: Response) => {
   try {
-    const { key, value, adminPassword } = req.body;
+    const parsedToggle = toggleProtectedSchema.safeParse(req.body);
+    if (!parsedToggle.success) return res.status(400).json({ message: parsedToggle.error.errors[0].message });
+    const { key, value, adminPassword } = parsedToggle.data;
     const allowedKeys = ["email_verification_enabled", "ads_enabled", "syneco_branding_visible", "donation_enabled", "donation_text", "gps_required", "marketplace_enabled", "fake_users_enabled", "ghost_mode_enabled", "phone_field_enabled", "user_available_on_login", "floating_widget_enabled", "units_preference_enabled"];
 
     if (!allowedKeys.includes(key)) {
       return res.status(400).json({ message: "Chiave non valida" });
-    }
-    if (!adminPassword) {
-      return res.status(400).json({ message: "Password admin richiesta" });
     }
 
     const admin = await storage.getUser(req.session.userId!);
@@ -1979,7 +1961,9 @@ router.put("/settings/toggle-protected", async (req: Request, res: Response) => 
 
 router.put("/settings/motoclub_include_zav", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
+    const parsedMzav = stringSettingValueSchema.safeParse(req.body);
+    if (!parsedMzav.success) return res.status(400).json({ message: parsedMzav.error.errors[0].message });
+    const { value } = parsedMzav.data;
     const newEnabled = value !== "false";
 
     const current = await storage.getAppSetting("motoclub_include_zav");
@@ -2045,10 +2029,9 @@ router.put("/settings/motoclub_include_zav", async (req: Request, res: Response)
 
 router.put("/settings/show_search_preference", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
-    if (value !== "true" && value !== "false") {
-      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
-    }
+    const parsedSsp = booleanSettingValueSchema.safeParse(req.body);
+    if (!parsedSsp.success) return res.status(400).json({ message: parsedSsp.error.errors[0].message });
+    const { value } = parsedSsp.data;
     const setting = await storage.upsertAppSetting("show_search_preference", value);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -2066,10 +2049,9 @@ router.put("/settings/show_search_preference", async (req: Request, res: Respons
 
 router.put("/settings/match_preferences_visible", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
-    if (value !== "true" && value !== "false") {
-      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
-    }
+    const parsedMpv = booleanSettingValueSchema.safeParse(req.body);
+    if (!parsedMpv.success) return res.status(400).json({ message: parsedMpv.error.errors[0].message });
+    const { value } = parsedMpv.data;
     const setting = await storage.upsertAppSetting("match_preferences_visible", value);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -2087,10 +2069,9 @@ router.put("/settings/match_preferences_visible", async (req: Request, res: Resp
 
 router.put("/settings/search_preference_locked", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
-    if (value !== "true" && value !== "false") {
-      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
-    }
+    const parsedSpl = booleanSettingValueSchema.safeParse(req.body);
+    if (!parsedSpl.success) return res.status(400).json({ message: parsedSpl.error.errors[0].message });
+    const { value } = parsedSpl.data;
     const setting = await storage.upsertAppSetting("search_preference_locked", value);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -2108,10 +2089,9 @@ router.put("/settings/search_preference_locked", async (req: Request, res: Respo
 
 router.put("/settings/maps_enabled", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
-    if (value !== "true" && value !== "false") {
-      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
-    }
+    const parsedMe = booleanSettingValueSchema.safeParse(req.body);
+    if (!parsedMe.success) return res.status(400).json({ message: parsedMe.error.errors[0].message });
+    const { value } = parsedMe.data;
     const setting = await storage.upsertAppSetting("maps_enabled", value);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -2129,10 +2109,9 @@ router.put("/settings/maps_enabled", async (req: Request, res: Response) => {
 
 router.put("/settings/primal_user_enabled", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
-    if (value !== "true" && value !== "false") {
-      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
-    }
+    const parsedPue = booleanSettingValueSchema.safeParse(req.body);
+    if (!parsedPue.success) return res.status(400).json({ message: parsedPue.error.errors[0].message });
+    const { value } = parsedPue.data;
     const setting = await storage.upsertAppSetting("primal_user_enabled", value);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -2150,11 +2129,9 @@ router.put("/settings/primal_user_enabled", async (req: Request, res: Response) 
 
 router.put("/settings/maps_provider", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
-    const allowed = ["carto_light", "carto_dark", "esri_gray"];
-    if (!allowed.includes(value)) {
-      return res.status(400).json({ message: "Provider non valido" });
-    }
+    const parsedMp = mapsProviderSchema.safeParse(req.body);
+    if (!parsedMp.success) return res.status(400).json({ message: parsedMp.error.errors[0].message });
+    const { value } = parsedMp.data;
     const setting = await storage.upsertAppSetting("maps_provider", value);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -2172,7 +2149,9 @@ router.put("/settings/maps_provider", async (req: Request, res: Response) => {
 
 router.put("/settings/music_provider", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
+    const parsedMup = stringSettingValueSchema.safeParse(req.body);
+    if (!parsedMup.success) return res.status(400).json({ message: parsedMup.error.errors[0].message });
+    const { value } = parsedMup.data;
     if (value !== "lastfm") {
       return res.status(400).json({ message: "Provider non valido: usare 'lastfm'" });
     }
@@ -2194,10 +2173,9 @@ router.put("/settings/music_provider", async (req: Request, res: Response) => {
 
 router.put("/settings/theme_user_switching_enabled", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
-    if (value !== "true" && value !== "false") {
-      return res.status(400).json({ message: "Valore non valido: usare 'true' o 'false'" });
-    }
+    const parsedTuse = booleanSettingValueSchema.safeParse(req.body);
+    if (!parsedTuse.success) return res.status(400).json({ message: parsedTuse.error.errors[0].message });
+    const { value } = parsedTuse.data;
     const setting = await storage.upsertAppSetting("theme_user_switching_enabled", value);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -2215,11 +2193,9 @@ router.put("/settings/theme_user_switching_enabled", async (req: Request, res: R
 
 router.put("/settings/theme_default", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body as { value: string };
-    const valid = ["attuale", "asfalto", "velocita", "rotta"];
-    if (!valid.includes(value)) {
-      return res.status(400).json({ message: "Tema non valido" });
-    }
+    const parsedTd = themeDefaultSchema.safeParse(req.body);
+    if (!parsedTd.success) return res.status(400).json({ message: parsedTd.error.errors[0].message });
+    const { value } = parsedTd.data;
     const setting = await storage.upsertAppSetting("theme_default", value);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -2249,7 +2225,9 @@ router.get("/settings/matching_countries", async (_req: Request, res: Response) 
 
 router.put("/settings/matching_countries", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body;
+    const parsedMc = matchingCountriesSchema.safeParse(req.body);
+    if (!parsedMc.success) return res.status(400).json({ message: parsedMc.error.errors[0].message });
+    const { value } = parsedMc.data;
     let parsed: unknown;
     try { parsed = value ? JSON.parse(value) : []; } catch { return res.status(400).json({ message: "Formato JSON non valido" }); }
     if (!Array.isArray(parsed) || !parsed.every((c: unknown) => typeof c === "string" && /^[A-Z]{2}$/i.test(c))) {
@@ -2284,8 +2262,10 @@ router.get("/settings/coordinates_max_age_seconds", async (_req: Request, res: R
 
 router.put("/settings/coordinates_max_age_seconds", async (req: Request, res: Response) => {
   try {
-    const { value } = req.body;
-    const numVal = parseInt(value, 10);
+    const parsedCma = coordinatesMaxAgeSchema.safeParse(req.body);
+    if (!parsedCma.success) return res.status(400).json({ message: parsedCma.error.errors[0].message });
+    const { value } = parsedCma.data;
+    const numVal = parseInt(String(value), 10);
     if (isNaN(numVal) || numVal < 10) {
       return res.status(400).json({ message: "Valore deve essere >= 10 secondi" });
     }
@@ -2307,7 +2287,9 @@ router.put("/settings/coordinates_max_age_seconds", async (req: Request, res: Re
 router.put("/settings/:key", async (req: Request, res: Response) => {
   try {
     const key = req.params.key as string;
-    const { value, valueJson } = req.body;
+    const parsedGs = genericSettingSchema.safeParse(req.body);
+    if (!parsedGs.success) return res.status(400).json({ message: parsedGs.error.errors[0].message });
+    const { value, valueJson } = parsedGs.data;
     const setting = await storage.upsertAppSetting(key, value, valueJson);
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -2440,18 +2422,9 @@ router.post("/advertisements/bulk", adUpload.array("images", 10), async (req: Re
     if (!files || files.length === 0) {
       return res.status(400).json({ message: "Nessuna immagine ricevuta" });
     }
-    const { baseName, targetUserType, displayDuration, linkUrl, groupId: externalGroupId, startIndex: startIndexStr, totalImages: totalImagesStr } = req.body as {
-      baseName?: string;
-      targetUserType?: string;
-      displayDuration?: string;
-      linkUrl?: string;
-      groupId?: string;
-      startIndex?: string;
-      totalImages?: string;
-    };
-    if (!baseName?.trim()) {
-      return res.status(400).json({ message: "Nome base campagna obbligatorio" });
-    }
+    const parsedAb = adsBulkSchema.safeParse(req.body);
+    if (!parsedAb.success) return res.status(400).json({ message: parsedAb.error.errors[0].message });
+    const { baseName, targetUserType, displayDuration, linkUrl, groupId: externalGroupId, startIndex: startIndexStr, totalImages: totalImagesStr } = parsedAb.data as any;
     const duration = parseInt(displayDuration ?? "10") || 10;
     const { randomUUID } = await import("crypto");
     const startIndex = parseInt(startIndexStr ?? "0") || 0;
@@ -2529,10 +2502,9 @@ router.post("/advertisements/bulk", adUpload.array("images", 10), async (req: Re
 
 router.post("/advertisements", adUpload.single("image"), async (req: Request, res: Response) => {
   try {
-    const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = req.body;
-    if (!name) {
-      return res.status(400).json({ message: "Nome campagna obbligatorio" });
-    }
+    const parsedAc = adsCreateSchema.safeParse(req.body);
+    if (!parsedAc.success) return res.status(400).json({ message: parsedAc.error.errors[0].message });
+    const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = parsedAc.data;
     let imageUrl: string | null = null;
     if (req.file) {
       imageUrl = await uploadAdImageToObjectStorage(req.file.buffer, req.file.originalname, req.file.mimetype);
@@ -2576,19 +2548,22 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
   try {
     const id = paramStr(req.params.id);
     if (id === null) return res.status(400).json({ message: "ID non valido" });
+    const parsedAu = adsUpdateSchema.safeParse(req.body);
+    if (!parsedAu.success) return res.status(400).json({ message: parsedAu.error.errors[0].message });
+    const adBody = parsedAu.data as any;
     const updates: any = {};
-    if (req.body.name !== undefined) updates.name = req.body.name;
-    if (req.body.sponsor !== undefined) updates.sponsor = req.body.sponsor;
-    if (req.body.linkUrl !== undefined) updates.linkUrl = req.body.linkUrl;
-    if (req.body.description !== undefined) updates.description = req.body.description;
-    if (req.body.isActive !== undefined) updates.isActive = req.body.isActive === true || req.body.isActive === "true";
-    if (req.body.targetUserType !== undefined) updates.targetUserType = req.body.targetUserType;
-    if (req.body.rotationDuration !== undefined) updates.rotationDuration = parseInt(req.body.rotationDuration);
-    if (req.body.rotationMode !== undefined) updates.rotationMode = req.body.rotationMode;
-    if (req.body.sortOrder !== undefined) updates.sortOrder = parseInt(req.body.sortOrder);
-    if (req.body.startDate !== undefined) updates.startDate = req.body.startDate ? new Date(req.body.startDate) : null;
-    if (req.body.endDate !== undefined) updates.endDate = req.body.endDate ? new Date(req.body.endDate) : null;
-    if (req.body.placement !== undefined) updates.placement = req.body.placement;
+    if (adBody.name !== undefined) updates.name = adBody.name;
+    if (adBody.sponsor !== undefined) updates.sponsor = adBody.sponsor;
+    if (adBody.linkUrl !== undefined) updates.linkUrl = adBody.linkUrl;
+    if (adBody.description !== undefined) updates.description = adBody.description;
+    if (adBody.isActive !== undefined) updates.isActive = adBody.isActive === true || adBody.isActive === "true";
+    if (adBody.targetUserType !== undefined) updates.targetUserType = adBody.targetUserType;
+    if (adBody.rotationDuration !== undefined) updates.rotationDuration = parseInt(adBody.rotationDuration);
+    if (adBody.rotationMode !== undefined) updates.rotationMode = adBody.rotationMode;
+    if (adBody.sortOrder !== undefined) updates.sortOrder = parseInt(adBody.sortOrder);
+    if (adBody.startDate !== undefined) updates.startDate = adBody.startDate ? new Date(adBody.startDate) : null;
+    if (adBody.endDate !== undefined) updates.endDate = adBody.endDate ? new Date(adBody.endDate) : null;
+    if (adBody.placement !== undefined) updates.placement = adBody.placement;
     let oldImageUrl: string | null = null;
     if (req.file) {
       const existing = await storage.getAdCampaign(id);
@@ -2639,10 +2614,9 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
 
 router.delete("/advertisements/bulk-delete", async (req: Request, res: Response) => {
   try {
-    const { ids } = req.body as { ids?: string[] };
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ message: "Array di ID campagne obbligatorio" });
-    }
+    const parsedBd = adsBulkDeleteSchema.safeParse(req.body);
+    if (!parsedBd.success) return res.status(400).json({ message: parsedBd.error.errors[0].message });
+    const { ids } = parsedBd.data;
     const toDelete = await db.select().from(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
     await db.delete(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
     for (const campaign of toDelete) {
@@ -2675,7 +2649,9 @@ router.delete("/advertisements/bulk-delete", async (req: Request, res: Response)
 router.put("/advertisements/group/:groupId", async (req: Request, res: Response) => {
   try {
     const { groupId } = req.params;
-    const { name, linkUrl, isActive } = req.body as { name?: string; linkUrl?: string; isActive?: boolean };
+    const parsedGu = adsGroupUpdateSchema.safeParse(req.body);
+    if (!parsedGu.success) return res.status(400).json({ message: parsedGu.error.errors[0].message });
+    const { name, linkUrl, isActive } = parsedGu.data as any;
     if (!name?.trim()) {
       return res.status(400).json({ message: "Nome base obbligatorio" });
     }
@@ -3039,10 +3015,9 @@ router.get("/stregatti", async (req: Request, res: Response) => {
 
 router.post("/stregatti", async (req: Request, res: Response) => {
   try {
-    const { nickname, userType, sex, coupleSexConfig, birthYear, region, bio, moto, wishlistDescription, wishlistMotos } = req.body;
-    if (!nickname || !userType) {
-      return res.status(400).json({ message: "Nickname e tipo utente obbligatori" });
-    }
+    const parsedSt = stregattaSchema.safeParse(req.body);
+    if (!parsedSt.success) return res.status(400).json({ message: parsedSt.error.errors[0].message });
+    const { nickname, userType, sex, coupleSexConfig, birthYear, region, bio, moto, wishlistDescription, wishlistMotos } = parsedSt.data as any;
     const existingNickname = await storage.getUserByNickname(nickname);
     if (existingNickname) {
       return res.status(409).json({ message: "Nickname già in uso" });
@@ -3053,7 +3028,7 @@ router.post("/stregatti", async (req: Request, res: Response) => {
     // defense-in-depth nel caso quel guard venga rimosso accidentalmente in futuro.
     const fakeSecret = (await import("node:crypto")).randomBytes(32).toString("base64url");
     const hashedPassword = await bcrypt.hash(fakeSecret, 10);
-    const country = req.body.country || "IT";
+    const country = (parsedSt.data as any).country || "IT";
     const user = await storage.createUser({
       nickname,
       email,
@@ -3581,13 +3556,9 @@ router.get("/users/:id/geo-insights", async (req: Request, res: Response) => {
 
 router.put("/stregatti/toggle-all", async (req: Request, res: Response) => {
   try {
-    const { enabled, adminPassword } = req.body;
-    if (typeof enabled !== "boolean") {
-      return res.status(400).json({ message: "Il campo 'enabled' deve essere un booleano" });
-    }
-    if (!adminPassword) {
-      return res.status(400).json({ message: "Password admin richiesta" });
-    }
+    const parsedSta = stregattaToggleSchema.safeParse(req.body);
+    if (!parsedSta.success) return res.status(400).json({ message: parsedSta.error.errors[0].message });
+    const { enabled, adminPassword } = parsedSta.data;
     const admin = await storage.getUser(req.session.userId!);
     if (!admin) {
       return res.status(401).json({ message: "Non autenticato" });
@@ -3963,7 +3934,8 @@ router.post("/motoclubs/requests/:id/reject", async (req: Request, res: Response
   try {
     const adminId = req.session.userId!;
     const requestId = req.params.id;
-    const { note } = req.body as { note?: string };
+    const parsedRn = rejectNoteSchema.safeParse(req.body ?? {});
+    const { note } = parsedRn.success ? parsedRn.data : {};
 
     const [request] = await db.select().from(motoClubRequests).where(eq(motoClubRequests.id, requestId)).limit(1);
 
@@ -4079,7 +4051,9 @@ router.delete("/motoclubs/:id/members/:userId", async (req: Request, res: Respon
 router.post("/motoclubs/:id/simulate-activity", async (req: Request, res: Response) => {
   try {
     const { id: clubId } = req.params;
-    const { message, count = 1 } = req.body as { message?: string; count?: number };
+    const parsedSim = simulateActivitySchema.safeParse(req.body ?? {});
+    if (!parsedSim.success) return res.status(400).json({ message: parsedSim.error.errors[0].message });
+    const { message, count = 1 } = parsedSim.data as any;
 
     const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId)).limit(1);
     if (!club) return res.status(404).json({ message: "Club non trovato" });
@@ -4238,8 +4212,10 @@ router.get("/invitation-codes", async (_req: Request, res: Response) => {
 
 router.post("/invitation-codes", async (req: Request, res: Response) => {
   try {
-    const { code, label, giftMessage, maxUses, expiresAt } = req.body;
-    if (!code || typeof code !== "string" || code.trim().length < 2) {
+    const parsedInvCode = createInviteCodeSchema.safeParse(req.body);
+    if (!parsedInvCode.success) return res.status(400).json({ message: parsedInvCode.error.errors[0].message });
+    const { code, label, giftMessage, maxUses, expiresAt } = parsedInvCode.data;
+    if (!code || code.trim().length < 2) {
       return res.status(400).json({ message: "Codice non valido (minimo 2 caratteri)" });
     }
     const created = await storage.createInvitationCode({
@@ -4248,7 +4224,7 @@ router.post("/invitation-codes", async (req: Request, res: Response) => {
       giftMessage: giftMessage?.trim() || null,
       createdBy: (req as any).currentUser?.id ?? null,
       maxUses: Number(maxUses) || 100,
-      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      expiresAt: expiresAt ?? undefined,
     });
     return res.status(201).json(created);
   } catch (error: any) {
@@ -4264,7 +4240,9 @@ router.put("/invitation-codes/:id", async (req: Request, res: Response) => {
   try {
     const id = paramStr(req.params.id);
     if (id === null) return res.status(400).json({ message: "ID non valido" });
-    const { label, giftMessage, maxUses, isActive, expiresAt } = req.body;
+    const parsedUic = updateInvitationCodeAdminSchema.safeParse(req.body);
+    if (!parsedUic.success) return res.status(400).json({ message: parsedUic.error.errors[0].message });
+    const { label, giftMessage, maxUses, isActive, expiresAt } = parsedUic.data as any;
     const existing = await storage.getInvitationCodeById(id);
     if (!existing) return res.status(404).json({ message: "Codice non trovato" });
 
@@ -4569,10 +4547,9 @@ router.post("/backup/media", async (_req: Request, res: Response) => {
 
 router.put("/backup/schedule", async (req: Request, res: Response) => {
   try {
-    const { enabled } = req.body;
-    if (typeof enabled !== "boolean") {
-      return res.status(400).json({ message: "enabled deve essere un booleano" });
-    }
+    const parsedBs = enabledSchema.safeParse(req.body);
+    if (!parsedBs.success) return res.status(400).json({ message: parsedBs.error.errors[0].message });
+    const { enabled } = parsedBs.data;
     const { setAutoBackupEnabled } = await import("../backup-service");
     await setAutoBackupEnabled(enabled);
     return res.json({ ok: true, enabled });
@@ -4620,7 +4597,9 @@ router.get("/backup/frequency", async (_req: Request, res: Response) => {
 
 router.post("/backup/frequency", async (req: Request, res: Response) => {
   try {
-    const { dbHours, mediaHours } = req.body as { dbHours?: unknown; mediaHours?: unknown };
+    const parsedBf = backupFrequencySchema.safeParse(req.body);
+    if (!parsedBf.success) return res.status(400).json({ message: parsedBf.error.errors[0].message });
+    const { dbHours, mediaHours } = parsedBf.data as any;
     const parsed: { dbHours?: number; mediaHours?: number } = {};
     if (dbHours !== undefined) {
       const n = Number(dbHours);
@@ -4686,7 +4665,8 @@ router.post("/sync-prod-to-dev", async (req: Request, res: Response) => {
 
 router.post("/reconcile-club-invites", async (req: Request, res: Response) => {
   try {
-    const userId = req.body.userId || req.session.userId!;
+    const parsedRci = reconcileClubInvitesSchema.safeParse(req.body ?? {});
+    const userId = (parsedRci.success ? parsedRci.data.userId : undefined) || req.session.userId!;
     const userMotos = await db.select().from(userMotorcycles).where(eq(userMotorcycles.userId, userId));
 
     if (userMotos.length === 0) {
@@ -5012,9 +4992,9 @@ router.post("/ota/upload", otaUpload.single("bundle"), async (req: Request, res:
 
 router.post("/ota", async (req: Request, res: Response) => {
   try {
-    const { version, bundlePath, releaseNotes, runtimeVersion } = req.body;
-    if (!version || !bundlePath) return res.status(400).json({ message: "version e bundlePath obbligatori" });
-    if (!runtimeVersion) return res.status(400).json({ message: "runtimeVersion obbligatorio" });
+    const parsedOta = publishOtaReleaseSchema.safeParse(req.body);
+    if (!parsedOta.success) return res.status(400).json({ message: parsedOta.error.errors[0].message });
+    const { version, bundlePath, releaseNotes, runtimeVersion } = parsedOta.data as any;
     // Task #1123: PRIMARY GATE — refuse to insert any release whose
     // bundle_path is not a legitimate `private/ota/<file>.js` produced by
     // /ota/upload. Without this an admin (or attacker with an admin session)
@@ -5045,7 +5025,9 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
     // Multiple releases can be active simultaneously (one per slot).
     // Just activate this release. If the caller also wants to assign a slot,
     // they must call /api/admin/ota/assign-slot afterwards (or use assignSlot body param).
-    const { assignSlot } = req.body ?? {};
+    const parsedSlot = publishWithSlotSchema.safeParse(req.body ?? {});
+    if (!parsedSlot.success) return res.status(400).json({ message: parsedSlot.error.errors[0].message });
+    const { assignSlot } = parsedSlot.data;
 
     if (assignSlot && !/^(stable|previous-stable|test-\d+)$/.test(assignSlot)) {
       return res.status(400).json({ message: "assignSlot non valido. Formati ammessi: stable, test-1, test-2, ..." });
@@ -5115,8 +5097,9 @@ router.get("/ota", async (_req: Request, res: Response) => {
 // POST /api/admin/ota/token — genera un nuovo token OTA
 router.post("/ota/token", async (req: Request, res: Response) => {
   try {
-    const label = typeof req.body?.label === "string" ? req.body.label.substring(0, 100) : "default";
-    const expiresInDays = typeof req.body?.expiresInDays === "number" ? req.body.expiresInDays : 365;
+    const parsedToken = createOtaTokenSchema.safeParse(req.body);
+    if (!parsedToken.success) return res.status(400).json({ message: parsedToken.error.errors[0].message });
+    const { label, expiresInDays = 365 } = parsedToken.data;
     const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
     const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
@@ -5508,15 +5491,11 @@ router.get("/translations/table", async (_req: Request, res: Response) => {
 
 router.patch("/translations/key", async (req: Request, res: Response) => {
   try {
-    const { key, lang, value } = req.body as { key?: string; lang?: string; value?: string };
-    if (!key || typeof key !== "string") {
-      return res.status(400).json({ message: "key mancante" });
-    }
-    if (!lang || !ALLOWED_LANGS.has(lang)) {
+    const parsedTk = translationKeySchema.safeParse(req.body);
+    if (!parsedTk.success) return res.status(400).json({ message: parsedTk.error.errors[0].message });
+    const { key, lang, value } = parsedTk.data;
+    if (!ALLOWED_LANGS.has(lang)) {
       return res.status(400).json({ message: "lang non valido (en, de, es, fr, el, tr)" });
-    }
-    if (typeof value !== "string" || value.trim().length === 0) {
-      return res.status(400).json({ message: "value mancante o vuoto" });
     }
     const filePath = LANG_FILE_MAP[lang];
     const changed = applyTranslationsToFile(filePath, { [key]: value.trim() });
@@ -5581,7 +5560,9 @@ router.get("/coordinate-history/settings", async (_req: Request, res: Response) 
 
 router.put("/coordinate-history/settings", async (req: Request, res: Response) => {
   try {
-    const { enabled, interval, maxRecords, mode, selectedUsers } = req.body;
+    const parsedChs = coordinateHistorySettingsSchema.safeParse(req.body);
+    if (!parsedChs.success) return res.status(400).json({ message: parsedChs.error.errors[0].message });
+    const { enabled, interval, maxRecords, mode, selectedUsers } = parsedChs.data as any;
     if (enabled !== undefined) {
       await storage.upsertAppSetting("coordinate_history_enabled", enabled ? "true" : "false");
     }
@@ -5939,7 +5920,9 @@ router.get("/settings/bg-location", async (_req: Request, res: Response) => {
 
 router.patch("/settings/bg-location", async (req: Request, res: Response) => {
   try {
-    const { enabled, trigger, intervalSeconds, notificationText, ghostModeContinue } = req.body;
+    const parsedBgl = bgLocationSettingsSchema.safeParse(req.body);
+    if (!parsedBgl.success) return res.status(400).json({ message: parsedBgl.error.errors[0].message });
+    const { enabled, trigger, intervalSeconds, notificationText, ghostModeContinue } = parsedBgl.data as any;
     const validTriggers = ["always", "tracking", "sos", "tracking_or_sos"];
 
     if (enabled !== undefined) {
@@ -5992,10 +5975,9 @@ router.get("/settings/floating-widget", async (_req: Request, res: Response) => 
 
 router.patch("/settings/floating-widget", async (req: Request, res: Response) => {
   try {
-    const { enabled } = req.body;
-    if (typeof enabled !== "boolean") {
-      return res.status(400).json({ message: "enabled deve essere un booleano" });
-    }
+    const parsedFw = enabledSchema.safeParse(req.body);
+    if (!parsedFw.success) return res.status(400).json({ message: parsedFw.error.errors[0].message });
+    const { enabled } = parsedFw.data;
     await storage.upsertAppSetting("floating_widget_enabled", enabled ? "true" : "false");
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -6024,10 +6006,9 @@ router.get("/settings/show-distance-counter", requireAdmin, async (_req: Request
 
 router.patch("/settings/show-distance-counter", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { enabled } = req.body;
-    if (typeof enabled !== "boolean") {
-      return res.status(400).json({ message: "enabled deve essere un booleano" });
-    }
+    const parsedSdc = enabledSchema.safeParse(req.body);
+    if (!parsedSdc.success) return res.status(400).json({ message: parsedSdc.error.errors[0].message });
+    const { enabled } = parsedSdc.data;
     await storage.upsertAppSetting("show_distance_in_online_counter", enabled ? "true" : "false");
     return res.json({ enabled });
   } catch (error) {
@@ -6060,28 +6041,16 @@ router.get("/privacy-rules", requireAdmin, async (_req: Request, res: Response) 
 
 router.patch("/privacy-rules", requireAdmin, async (req: Request, res: Response) => {
   try {
-    const { showDistanceInCounter, offlinePositionRandomize, mapVisibilityFilter } = req.body as {
-      showDistanceInCounter?: boolean;
-      offlinePositionRandomize?: boolean;
-      mapVisibilityFilter?: string;
-    };
-    const validFilters = ["all", "online_only", "available_only"];
+    const parsedPrv = privacyRulesSchema.safeParse(req.body);
+    if (!parsedPrv.success) return res.status(400).json({ message: parsedPrv.error.errors[0].message });
+    const { showDistanceInCounter, offlinePositionRandomize, mapVisibilityFilter } = parsedPrv.data;
     if (showDistanceInCounter !== undefined) {
-      if (typeof showDistanceInCounter !== "boolean") {
-        return res.status(400).json({ message: "showDistanceInCounter deve essere un booleano" });
-      }
       await storage.upsertAppSetting("show_distance_in_online_counter", showDistanceInCounter ? "true" : "false");
     }
     if (offlinePositionRandomize !== undefined) {
-      if (typeof offlinePositionRandomize !== "boolean") {
-        return res.status(400).json({ message: "offlinePositionRandomize deve essere un booleano" });
-      }
       await storage.upsertAppSetting("offline_position_randomize_default", offlinePositionRandomize ? "true" : "false");
     }
     if (mapVisibilityFilter !== undefined) {
-      if (!validFilters.includes(mapVisibilityFilter)) {
-        return res.status(400).json({ message: "mapVisibilityFilter non valido" });
-      }
       await storage.upsertAppSetting("map_visibility_filter", mapVisibilityFilter);
     }
     await storage.createModeratorLog({
@@ -6100,26 +6069,9 @@ router.patch("/privacy-rules", requireAdmin, async (req: Request, res: Response)
 
 router.put("/settings/native-version", async (req: Request, res: Response) => {
   try {
-    const { android, ios } = req.body as {
-      android: { latestVersion: string; minVersion: string; storeUrl: string };
-      ios: { latestVersion: string; minVersion: string; storeUrl: string };
-    };
-    if (!android || !ios) {
-      return res.status(400).json({ message: "Payload non valido: android e ios richiesti" });
-    }
-    const semverRe = /^\d+\.\d+\.\d+$/;
-    const urlRe = /^https:\/\/.+/;
-    const validate = (p: typeof android, name: string) => {
-      if (!semverRe.test(p.latestVersion)) throw new Error(`${name}.latestVersion non valido (formato X.Y.Z richiesto)`);
-      if (!semverRe.test(p.minVersion)) throw new Error(`${name}.minVersion non valido (formato X.Y.Z richiesto)`);
-      if (!urlRe.test(p.storeUrl)) throw new Error(`${name}.storeUrl non valido (URL https:// richiesto)`);
-    };
-    try {
-      validate(android, "android");
-      validate(ios, "ios");
-    } catch (e: unknown) {
-      return res.status(400).json({ message: e instanceof Error ? e.message : "Payload non valido" });
-    }
+    const parsedNv = nativeVersionSchema.safeParse(req.body);
+    if (!parsedNv.success) return res.status(400).json({ message: parsedNv.error.errors[0].message });
+    const { android, ios } = parsedNv.data;
     await Promise.all([
       storage.upsertAppSetting("native_android_latest", android.latestVersion),
       storage.upsertAppSetting("native_android_min", android.minVersion),
@@ -7044,7 +6996,9 @@ router.get("/users/:userId/match-preferences", async (req: Request, res: Respons
 router.put("/users/:userId/match-preferences", async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const body = req.body as Partial<typeof DEFAULT_PREFS>;
+    const parsedMpa = genericSettingSchema.safeParse(req.body ?? {});
+    if (!parsedMpa.success) return res.status(400).json({ message: parsedMpa.error.errors[0].message });
+    const body = (req.body ?? {}) as Partial<typeof DEFAULT_PREFS>;
 
     const updates: Record<string, boolean> = Object.fromEntries(
       (Object.keys(DEFAULT_PREFS) as Array<keyof typeof DEFAULT_PREFS>)
@@ -7163,8 +7117,9 @@ router.get("/ota/releases", async (_req: Request, res: Response) => {
 // body: { releaseId: string, slot: string }
 router.post("/ota/assign-slot", async (req: Request, res: Response) => {
   try {
-    const { releaseId, slot } = req.body ?? {};
-    if (!releaseId || !slot) return res.status(400).json({ message: "releaseId e slot obbligatori" });
+    const parsedAssign = assignOtaSlotSchema.safeParse(req.body ?? {});
+    if (!parsedAssign.success) return res.status(400).json({ message: parsedAssign.error.errors[0].message });
+    const { releaseId, slot } = parsedAssign.data;
     // Accetta: stable, previous-stable, test-N (N intero ≥1) — N configurable
     if (!/^(stable|previous-stable|test-\d+)$/.test(slot)) {
       return res.status(400).json({ message: "slot non valido. Formati ammessi: stable, previous-stable, test-1, test-2, ..." });
@@ -7219,8 +7174,9 @@ router.post("/ota/assign-slot", async (req: Request, res: Response) => {
 // body: { deviceId: string, slot: string, expiresAt?: string (ISO date) }
 router.post("/ota/assign-device", async (req: Request, res: Response) => {
   try {
-    const { deviceId, slot, expiresAt } = req.body ?? {};
-    if (!deviceId || !slot) return res.status(400).json({ message: "deviceId e slot obbligatori" });
+    const parsedAd = otaAssignDeviceSchema.safeParse(req.body ?? {});
+    if (!parsedAd.success) return res.status(400).json({ message: parsedAd.error.errors[0].message });
+    const { deviceId, slot, expiresAt } = parsedAd.data;
     // Accetta: stable, test-N (N intero ≥1) — N configurable; previous-stable non usabile per device
     if (!/^(stable|test-\d+)$/.test(slot)) {
       return res.status(400).json({ message: "slot non valido. Formati ammessi: stable, test-1, test-2, ..." });
@@ -7291,8 +7247,9 @@ router.delete("/ota/device-assignments/:deviceId", async (req: Request, res: Res
 // body: { fromSlot: string }
 router.post("/ota/promote", async (req: Request, res: Response) => {
   try {
-    const { fromSlot } = req.body ?? {};
-    if (!fromSlot) return res.status(400).json({ message: "fromSlot obbligatorio" });
+    const parsedProm = otaPromoteSchema.safeParse(req.body ?? {});
+    if (!parsedProm.success) return res.status(400).json({ message: parsedProm.error.errors[0].message });
+    const { fromSlot } = parsedProm.data;
     // Accetta qualsiasi test-N (N intero ≥1) — N configurable
     if (!/^test-\d+$/.test(fromSlot)) {
       return res.status(400).json({ message: "fromSlot deve essere un test slot: test-1, test-2, ..." });
@@ -7392,8 +7349,9 @@ router.post("/ota/revert", async (req: Request, res: Response) => {
 // body: { releaseId: string }
 router.post("/ota/mark-broken", async (req: Request, res: Response) => {
   try {
-    const { releaseId } = req.body ?? {};
-    if (!releaseId) return res.status(400).json({ message: "releaseId obbligatorio" });
+    const parsedMb = otaMarkBrokenSchema.safeParse(req.body ?? {});
+    if (!parsedMb.success) return res.status(400).json({ message: parsedMb.error.errors[0].message });
+    const { releaseId } = parsedMb.data;
     const result = await db.execute(sql`
       UPDATE ota_releases SET status = 'broken', updated_at = NOW()
       WHERE id = ${releaseId}
@@ -7500,7 +7458,9 @@ router.get("/settings/apk-url", async (_req: Request, res: Response) => {
 // Aggiorna o svuota l'URL APK nel DB (non tocca l'env var).
 router.put("/settings/apk-url", async (req: Request, res: Response) => {
   try {
-    const { url } = req.body as { url?: string };
+    const parsedApk = urlSettingSchema.safeParse(req.body ?? {});
+    if (!parsedApk.success) return res.status(400).json({ message: parsedApk.error.errors[0].message });
+    const { url } = parsedApk.data;
     const trimmed = typeof url === "string" ? url.trim() : "";
     await storage.upsertAppSetting("apk_download_url", trimmed || "", undefined);
     return res.json({ ok: true, url: trimmed || null });
@@ -7524,7 +7484,9 @@ router.get("/settings/play-store-url", async (_req: Request, res: Response) => {
 // ── PUT /api/admin/settings/play-store-url ────────────────────────────────
 router.put("/settings/play-store-url", async (req: Request, res: Response) => {
   try {
-    const { url } = req.body as { url?: string };
+    const parsedPsu = urlSettingSchema.safeParse(req.body ?? {});
+    if (!parsedPsu.success) return res.status(400).json({ message: parsedPsu.error.errors[0].message });
+    const { url } = parsedPsu.data;
     const trimmed = typeof url === "string" ? url.trim() : "";
     if (trimmed && trimmed.length > 2048) {
       return res.status(400).json({ message: "URL troppo lungo (max 2048 caratteri)" });
@@ -7554,7 +7516,9 @@ router.get("/settings/website-url", async (_req: Request, res: Response) => {
 // ── PUT /api/admin/settings/website-url ───────────────────────────────────
 router.put("/settings/website-url", async (req: Request, res: Response) => {
   try {
-    const { url } = req.body as { url?: string };
+    const parsedWu = urlSettingSchema.safeParse(req.body ?? {});
+    if (!parsedWu.success) return res.status(400).json({ message: parsedWu.error.errors[0].message });
+    const { url } = parsedWu.data;
     const trimmed = typeof url === "string" ? url.trim() : "";
     if (trimmed && trimmed.length > 2048) {
       return res.status(400).json({ message: "URL troppo lungo (max 2048 caratteri)" });
@@ -7592,7 +7556,9 @@ router.get("/settings/maintenance", async (_req: Request, res: Response) => {
 // Aggiorna lo stato manutenzione e il messaggio.
 router.put("/settings/maintenance", async (req: Request, res: Response) => {
   try {
-    const { enabled, message } = req.body as { enabled?: boolean; message?: string };
+    const parsedMaint = maintenanceSettingsSchema.safeParse(req.body ?? {});
+    if (!parsedMaint.success) return res.status(400).json({ message: parsedMaint.error.errors[0].message });
+    const { enabled, message } = parsedMaint.data as any;
     await Promise.all([
       storage.upsertAppSetting("maintenance_enabled", enabled ? "true" : "false", undefined),
       storage.upsertAppSetting("maintenance_message", typeof message === "string" ? message.trim() : "", undefined),
@@ -7845,11 +7811,9 @@ router.post("/curvy-score/run", async (req: Request, res: Response) => {
 
 router.put("/curvy-score/weights", async (req: Request, res: Response) => {
   try {
-    const { weight_lean, weight_gforce, min_samples } = req.body as {
-      weight_lean?: number;
-      weight_gforce?: number;
-      min_samples?: number;
-    };
+    const parsedCsw = curvyScoreWeightsSchema.safeParse(req.body ?? {});
+    if (!parsedCsw.success) return res.status(400).json({ message: parsedCsw.error.errors[0].message });
+    const { weight_lean, weight_gforce, min_samples } = parsedCsw.data;
     if (weight_lean !== undefined) {
       if (typeof weight_lean !== "number" || weight_lean <= 0 || weight_lean > 1) {
         return res.status(400).json({ message: "weight_lean deve essere tra 0 e 1" });
@@ -7878,7 +7842,9 @@ router.put("/curvy-score/weights", async (req: Request, res: Response) => {
 
 router.put("/telemetry-target-km", async (req: Request, res: Response) => {
   try {
-    const { target_km } = req.body;
+    const parsedTtk = telemetryTargetKmSchema.safeParse(req.body);
+    if (!parsedTtk.success) return res.status(400).json({ message: parsedTtk.error.errors[0].message });
+    const { target_km } = parsedTtk.data;
     const parsed = parseInt(String(target_km), 10);
     if (!Number.isFinite(parsed) || parsed < 10 || parsed > 100000) {
       return res.status(400).json({ message: "Valore non valido (10–100000 km)" });

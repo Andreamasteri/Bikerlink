@@ -4,6 +4,7 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
 import { storage } from "../storage";
 import type { InsertPlannedRoute } from "@shared/schema";
+import { savePlannedRouteSchema, poiSearchSchema, aiPromptSchema, poiRequestSchema, calculateRouteRequestSchema, plannedGpxImportSchema, weatherWaypointsSchema, poiPhotoSchema, hotelsSchema, segmentMultidaySchema, updatePlannedRouteBodySchema } from "@shared/schema";
 import { haversineKm } from "../geo";
 import { calculateRoute as ghCalculateRoute, isSelfHosted } from "../graphhopper-client";
 
@@ -236,8 +237,9 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const { prompt } = req.body as { prompt?: string };
-  if (!prompt) return res.status(400).json({ message: "Testo richiesto" });
+  const parsedAi = aiPromptSchema.safeParse(req.body);
+  if (!parsedAi.success) return res.status(400).json({ message: parsedAi.error.errors[0].message });
+  const { prompt } = parsedAi.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
@@ -275,8 +277,9 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const { prompt } = req.body as { prompt?: string };
-  if (!prompt) return res.status(400).json({ message: "Testo richiesto" });
+  const parsedAiStream = aiPromptSchema.safeParse(req.body);
+  if (!parsedAiStream.success) return res.status(400).json({ message: parsedAiStream.error.errors[0].message });
+  const { prompt } = parsedAiStream.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
@@ -442,6 +445,10 @@ router.post("/calculate", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
+  const parsedCalc = calculateRouteRequestSchema.safeParse(req.body);
+  if (!parsedCalc.success) {
+    return res.status(400).json({ message: parsedCalc.error.errors[0].message });
+  }
   const {
     waypoints,
     style = "curvy",
@@ -455,24 +462,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     roundTripDirection,
     headingDeg,
     language,
-  } = req.body as {
-    waypoints: Array<{ lat: number; lng: number }>;
-    style?: string;
-    drivingProfile?: "geometric" | "real" | "my_style";
-    avoidHighways?: boolean;
-    avoidTolls?: boolean;
-    avoidFerries?: boolean;
-    avoidUnpaved?: boolean;
-    roundTripHours?: number;
-    isRoundTrip?: boolean;
-    roundTripDirection?: string;
-    headingDeg?: number;
-    language?: string;
-  };
-
-  if (!waypoints || waypoints.length < 2) {
-    return res.status(400).json({ message: "Almeno 2 waypoint richiesti" });
-  }
+  } = parsedCalc.data;
 
   // ── Compass direction: insert intermediate waypoint in given bearing ────────
   const DIRECTION_DEGREES: Record<string, number> = {
@@ -796,12 +786,9 @@ router.post("/weather", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const { waypoints, departureTime } = req.body as {
-    waypoints: Array<{ lat: number; lng: number; name?: string }>;
-    departureTime?: string;
-  };
-
-  if (!waypoints?.length) return res.status(400).json({ message: "Waypoint richiesti" });
+  const parsedWw = weatherWaypointsSchema.safeParse(req.body);
+  if (!parsedWw.success) return res.status(400).json({ message: parsedWw.error.errors[0].message });
+  const { waypoints, departureTime } = parsedWw.data;
 
   try {
     const departure = departureTime ? new Date(departureTime) : new Date(Date.now() + 3600_000);
@@ -844,13 +831,9 @@ router.post("/poi/:id/photos", async (req: Request, res: Response) => {
   if (!userId) return;
   const poiId = req.params["id"] as string;
 
-  const { photoBase64, mimeType = "image/jpeg", caption } = req.body as {
-    photoBase64: string;
-    mimeType?: string;
-    caption?: string;
-  };
-
-  if (!photoBase64) return res.status(400).json({ message: "Immagine richiesta" });
+  const parsedPph = poiPhotoSchema.safeParse(req.body);
+  if (!parsedPph.success) return res.status(400).json({ message: parsedPph.error.errors[0].message });
+  const { photoBase64, mimeType = "image/jpeg", caption } = parsedPph.data;
 
   try {
     const { uploadBuffer, getPublicUrl } = await import("../objectStorage");
@@ -910,12 +893,11 @@ router.post("/poi", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const { bbox, types = ["fuel", "rest", "viewpoint", "hotel"] } = req.body as {
-    bbox: { minLat: number; minLng: number; maxLat: number; maxLng: number };
-    types?: string[];
-  };
-
-  if (!bbox) return res.status(400).json({ message: "Bounding box richiesta" });
+  const parsedPoi = poiRequestSchema.safeParse(req.body);
+  if (!parsedPoi.success) {
+    return res.status(400).json({ message: parsedPoi.error.errors[0].message });
+  }
+  const { bbox, types = ["fuel", "rest", "viewpoint", "hotel"] } = parsedPoi.data;
 
   try {
     const pois = await fetchPOI(bbox, types);
@@ -975,13 +957,9 @@ router.post("/hotels", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const { dayEndPoints, checkIn, nights = 1 } = req.body as {
-    dayEndPoints: Array<{ lat: number; lng: number; name?: string }>;
-    checkIn?: string;
-    nights?: number;
-  };
-
-  if (!dayEndPoints?.length) return res.status(400).json({ message: "Punti fine tappa richiesti" });
+  const parsedHot = hotelsSchema.safeParse(req.body);
+  if (!parsedHot.success) return res.status(400).json({ message: parsedHot.error.errors[0].message });
+  const { dayEndPoints, checkIn, nights = 1 } = parsedHot.data;
 
   try {
     const checkInDate = checkIn ?? new Date().toISOString().split("T")[0];
@@ -1025,17 +1003,9 @@ router.post("/segment-multiday", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const { waypoints, distanceKm, durationMinutes, daysCount = 2, maxHoursPerDay = 6 } = req.body as {
-    waypoints: Array<{ lat: number; lng: number; name?: string }>;
-    distanceKm: number;
-    durationMinutes: number;
-    daysCount: number;
-    maxHoursPerDay: number;
-  };
-
-  if (!waypoints?.length || waypoints.length < 2) {
-    return res.status(400).json({ message: "Waypoint richiesti" });
-  }
+  const parsedSmd = segmentMultidaySchema.safeParse(req.body);
+  if (!parsedSmd.success) return res.status(400).json({ message: parsedSmd.error.errors[0].message });
+  const { waypoints, distanceKm, durationMinutes, daysCount = 2, maxHoursPerDay = 6 } = parsedSmd.data;
 
   try {
     const maxMinutesPerDay = maxHoursPerDay * 60;
@@ -1173,13 +1143,11 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const { gpxContent, title: titleOverride, visibility = "public" } = req.body as {
-    gpxContent: string;
-    title?: string;
-    visibility?: string;
-  };
-
-  if (!gpxContent) return res.status(400).json({ message: "Contenuto GPX richiesto" });
+  const parsedGpxImport = plannedGpxImportSchema.safeParse(req.body);
+  if (!parsedGpxImport.success) {
+    return res.status(400).json({ message: parsedGpxImport.error.errors[0].message });
+  }
+  const { gpxContent, title: titleOverride, visibility = "public" } = parsedGpxImport.data;
 
   try {
     // Robust attr extractor — works regardless of attribute order or quote style
@@ -1267,8 +1235,11 @@ router.post("/", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const body = req.body as Partial<InsertPlannedRoute> & { title: string; navigationSteps?: any[] };
-  if (!body.title) return res.status(400).json({ message: "Titolo richiesto" });
+  const parsedRoute = savePlannedRouteSchema.safeParse(req.body);
+  if (!parsedRoute.success) {
+    return res.status(400).json({ message: parsedRoute.error.errors[0].message });
+  }
+  const body = parsedRoute.data;
 
   try {
     const route = await storage.createPlannedRoute({
@@ -1340,7 +1311,9 @@ router.patch("/:id", async (req: Request, res: Response) => {
     if (!existing) return res.status(404).json({ message: "Non trovato" });
     if (existing.userId !== userId) return res.status(403).json({ message: "Non autorizzato" });
 
-    const updated = await storage.updatePlannedRoute(id, req.body);
+    const parsedUpd = updatePlannedRouteBodySchema.safeParse(req.body);
+    if (!parsedUpd.success) return res.status(400).json({ message: parsedUpd.error.errors[0].message });
+    const updated = await storage.updatePlannedRoute(id, parsedUpd.data);
     return res.json(updated);
   } catch (err) {
     console.error("[planned-routes] update error:", err);

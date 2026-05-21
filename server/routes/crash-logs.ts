@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type RequestHandler } from "express";
 import { db } from "../db";
-import { appCrashLogs, users } from "@shared/schema";
+import { appCrashLogs, users, crashLogsSchema } from "@shared/schema";
 import { eq, desc, and, gte, lte, inArray, count, sql } from "drizzle-orm";
 import { storage } from "../storage";
 
@@ -54,14 +54,14 @@ publicRouter.post("/", (req: Request, res: Response): void => {
     return;
   }
 
-  const { logs } = req.body as { logs?: unknown };
-  if (!Array.isArray(logs) || logs.length === 0) {
-    res.status(400).json({ message: "logs deve essere un array non vuoto" });
+  const parsed = crashLogsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ message: parsed.error.errors[0].message });
     return;
   }
 
   const userId = req.session.userId;
-  const batch = (logs as CrashLogEntryInput[]).slice(0, MAX_BATCH);
+  const batch = (parsed.data.logs as CrashLogEntryInput[]).slice(0, MAX_BATCH);
 
   const validCrashTypes = ["crash_system", "crash_js", "clean_close"] as const;
   type ValidCrashType = typeof validCrashTypes[number];

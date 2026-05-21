@@ -1893,3 +1893,1064 @@ export const otaPublishTokens = pgTable("ota_publish_tokens", {
 
 export type OtaPublishToken = typeof otaPublishTokens.$inferSelect;
 export type InsertOtaPublishToken = typeof otaPublishTokens.$inferInsert;
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ZOD VALIDATION SCHEMAS — Task #1840
+// Every endpoint that receives req.body validates with schema.safeParse() and
+// returns HTTP 400 with Zod's error message on failure.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ── Motorcycles ───────────────────────────────────────────────────────────────
+
+export const createMotorcycleSchema = z.object({
+  brand: z.string().min(1, "Marca obbligatoria"),
+  model: z.string().min(1, "Modello obbligatorio"),
+  year: z.number().int().min(1900).max(new Date().getFullYear() + 2).optional().nullable(),
+  displacement: z.number().int().min(1).optional().nullable(),
+  motorcycleType: z.string().optional().nullable(),
+  ridingStyle: z.string().optional().nullable(),
+  photoUrl: z.string().optional().nullable(),
+  isForSale: z.boolean().optional(),
+  saleDescription: z.string().max(2000).optional().nullable(),
+  isDefault: z.boolean().optional(),
+  motoDescription: z.string().max(2000).optional().nullable(),
+});
+export type CreateMotorcycleInput = z.infer<typeof createMotorcycleSchema>;
+
+export const updateMotorcycleSchema = createMotorcycleSchema.partial();
+export type UpdateMotorcycleInput = z.infer<typeof updateMotorcycleSchema>;
+
+export const uploadPhotoSchema = z.object({
+  imageBase64: z.string().min(1, "Immagine obbligatoria"),
+  filename: z.string().optional(),
+});
+export type UploadPhotoInput = z.infer<typeof uploadPhotoSchema>;
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+export const updateUserMeSchema = z.object({
+  nickname: z.string().min(1).max(50).optional(),
+  phone: z.string().optional().nullable(),
+  sex: z.string().optional().nullable(),
+  coupleSexConfig: z.string().optional().nullable(),
+  birthYear: z.number().int().min(1900).max(new Date().getFullYear()).optional().nullable(),
+  region: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
+  floatingWidgetEnabled: z.boolean().optional(),
+  bio: z.string().max(2000).optional().nullable(),
+  maxPickupDistance: z.number().min(0).optional().nullable(),
+  latitude: z.number().finite().optional().nullable(),
+  longitude: z.number().finite().optional().nullable(),
+  unitsPreference: z.object({
+    timeFormat: z.enum(["12h", "24h"]),
+    speedUnit: z.enum(["kmh", "mph", "knots"]),
+    distanceUnit: z.enum(["km_m", "mi_ft", "mi_yd", "nmi_ftm"]),
+  }).nullable().optional(),
+  mapFilters: z.record(z.boolean()).nullable().optional(),
+});
+export type UpdateUserMeInput = z.infer<typeof updateUserMeSchema>;
+
+export const updateLocationSchema = z.object({
+  latitude: z.number().finite("Latitudine non valida"),
+  longitude: z.number().finite("Longitudine non valida"),
+  isAvailable: z.boolean().optional(),
+});
+export type UpdateLocationInput = z.infer<typeof updateLocationSchema>;
+
+// ── Wishlist ──────────────────────────────────────────────────────────────────
+
+export const updateWishlistSchema = z.object({
+  description: z.string().max(2000).optional().nullable(),
+});
+export type UpdateWishlistInput = z.infer<typeof updateWishlistSchema>;
+
+export const addWishlistMotoSchema = z.object({
+  brand: z.string().optional().nullable(),
+  model: z.string().optional().nullable(),
+  motorcycleType: z.string().optional().nullable(),
+  ridingStyle: z.string().optional().nullable(),
+}).refine((d) => d.brand || d.model || d.motorcycleType, {
+  message: "Specifica marca e modello oppure tipo moto",
+});
+export type AddWishlistMotoInput = z.infer<typeof addWishlistMotoSchema>;
+
+export const updateWishlistMotoSchema = z.object({
+  brand: z.string().optional().nullable(),
+  model: z.string().optional().nullable(),
+  motorcycleType: z.string().optional().nullable(),
+  ridingStyle: z.string().optional().nullable(),
+});
+export type UpdateWishlistMotoInput = z.infer<typeof updateWishlistMotoSchema>;
+
+// ── Tracking & GPS ────────────────────────────────────────────────────────────
+
+export const createRouteSchema = z.object({
+  title: z.string().max(200).optional().nullable(),
+  trackingFrequency: z.number().int().min(1).max(60).optional(),
+  isSprint: z.boolean().optional(),
+});
+export type CreateRouteInput = z.infer<typeof createRouteSchema>;
+
+export const routePointSchema = z.object({
+  latitude: z.number().finite("Latitudine non valida"),
+  longitude: z.number().finite("Longitudine non valida"),
+  altitude: z.number().optional().nullable(),
+  speedKmh: z.number().optional().nullable(),
+  accelG: z.number().optional().nullable(),
+  tiltDeg: z.number().optional().nullable(),
+  timestamp: z.string().optional().nullable(),
+});
+export type RoutePointInput = z.infer<typeof routePointSchema>;
+
+export const addRoutePointsSchema = z.object({
+  points: z.array(routePointSchema).min(1, "Nessun punto GPS fornito"),
+});
+export type AddRoutePointsInput = z.infer<typeof addRoutePointsSchema>;
+
+export const stopRouteSchema = z.object({
+  totalDistanceKm: z.number().optional(),
+  maxSpeedKmh: z.number().optional(),
+  avgSpeedKmh: z.number().optional(),
+  maxAltitude: z.number().optional(),
+  durationSeconds: z.number().optional(),
+  idleTimeSeconds: z.number().optional(),
+  maxTiltDeg: z.number().optional().nullable(),
+  maxAccelerationG: z.number().optional().nullable(),
+  maxDecelerationG: z.number().optional().nullable(),
+  maxLateralG: z.number().optional().nullable(),
+  sprint0to100Ms: z.number().optional().nullable(),
+  gpsBlackoutCount: z.number().optional(),
+  gpsBlackoutSeconds: z.number().optional(),
+});
+export type StopRouteInput = z.infer<typeof stopRouteSchema>;
+
+export const routeStatsSchema = z.object({
+  totalDistanceKm: z.number().optional(),
+  maxSpeedKmh: z.number().optional(),
+  avgSpeedKmh: z.number().optional(),
+  maxAltitude: z.number().optional(),
+  idleTimeSeconds: z.number().optional(),
+});
+export type RouteStatsInput = z.infer<typeof routeStatsSchema>;
+
+export const updateRouteTitleSchema = z.object({
+  title: z.string().min(1, "Titolo obbligatorio").max(200),
+});
+export type UpdateRouteTitleInput = z.infer<typeof updateRouteTitleSchema>;
+
+// ── Sprints ───────────────────────────────────────────────────────────────────
+
+export const createSprintSchema = z.object({
+  sprint0to100Ms: z.number().finite().positive("Tempo sprint non valido"),
+  maxAccelerationG: z.number().finite().optional().nullable(),
+  maxDecelerationG: z.number().finite().optional().nullable(),
+  maxTiltDeg: z.number().finite().optional().nullable(),
+  routeId: z.string().optional().nullable(),
+});
+export type CreateSprintInput = z.infer<typeof createSprintSchema>;
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+
+export const createConversationSchema = z.object({
+  conversationType: z.enum(["direct", "private", "contact", "group", "club"]),
+  title: z.string().max(200).optional().nullable(),
+  proposalId: z.string().optional().nullable(),
+  participantIds: z.array(z.string()).min(1, "Almeno un partecipante richiesto"),
+});
+export type CreateConversationInput = z.infer<typeof createConversationSchema>;
+
+export const sendMessageSchema = z.object({
+  conversationId: z.string().min(1, "ID conversazione obbligatorio"),
+  messageType: z.enum(["text", "image", "location", "audio", "video", "system", "playlist"]).default("text"),
+  content: z.string().max(10000).optional().nullable(),
+  imageUrl: z.string().optional().nullable(),
+  latitude: z.number().finite().optional().nullable(),
+  longitude: z.number().finite().optional().nullable(),
+  playlistId: z.string().optional().nullable(),
+});
+export type SendMessageInput = z.infer<typeof sendMessageSchema>;
+
+// ── SOS ───────────────────────────────────────────────────────────────────────
+
+export const createSosSchema = z.object({
+  reason: z.string().min(1, "Motivo richiesto").max(500),
+  latitude: z.number().finite("Latitudine non valida"),
+  longitude: z.number().finite("Longitudine non valida"),
+  radiusKm: z.number().positive().optional(),
+});
+export type CreateSosInput = z.infer<typeof createSosSchema>;
+
+// ── Motoclubs ─────────────────────────────────────────────────────────────────
+
+export const createMotoClubSchema = z.object({
+  name: z.string().min(1, "Nome obbligatorio").max(100),
+  clubType: z.enum(["brand", "region", "generic", "model", "chapter"]).optional(),
+  brandName: z.string().max(100).optional().nullable(),
+  modelName: z.string().max(100).optional().nullable(),
+  description: z.string().max(2000).optional().nullable(),
+  logoUrl: z.string().optional().nullable(),
+  region: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
+  language: z.string().optional().nullable(),
+});
+export type CreateMotoClubInput = z.infer<typeof createMotoClubSchema>;
+
+export const respondToInviteSchema = z.object({
+  response: z.enum(["accepted", "declined"]),
+});
+export type RespondToInviteInput = z.infer<typeof respondToInviteSchema>;
+
+// ── Feedback ──────────────────────────────────────────────────────────────────
+
+export const createFeedbackSchema = z.object({
+  ticketType: z.enum(["bug", "suggestion", "feedback", "other"]).optional().default("feedback"),
+  subject: z.string().min(1, "Oggetto obbligatorio").max(200, "L'oggetto non può superare 200 caratteri"),
+  message: z.string().min(1, "Messaggio obbligatorio").max(4000, "Il messaggio non può superare 4000 caratteri"),
+});
+export type CreateFeedbackInput = z.infer<typeof createFeedbackSchema>;
+
+// ── Planned Routes ────────────────────────────────────────────────────────────
+
+export const aiParsePromptSchema = z.object({
+  prompt: z.string().min(1, "Testo richiesto").max(2000, "Testo troppo lungo (max 2000 caratteri)"),
+});
+export type AiParsePromptInput = z.infer<typeof aiParsePromptSchema>;
+
+export const plannedRouteWaypointSchema = z.object({
+  lat: z.number().finite("Latitudine waypoint non valida"),
+  lng: z.number().finite("Longitudine waypoint non valida"),
+  name: z.string().optional(),
+  address: z.string().optional(),
+});
+
+export const savePlannedRouteSchema = z.object({
+  title: z.string().min(1, "Titolo obbligatorio").max(200),
+  waypoints: z.array(plannedRouteWaypointSchema).min(2, "Almeno 2 waypoint richiesti").optional(),
+  style: z.enum(["curvy", "balanced", "fast"]).optional().nullable(),
+  isRoundTrip: z.boolean().optional(),
+  isMultiDay: z.boolean().optional(),
+  avoidHighways: z.boolean().optional(),
+  notes: z.string().max(2000).optional().nullable(),
+  startLocation: z.string().optional().nullable(),
+  endLocation: z.string().optional().nullable(),
+  daysEstimate: z.number().int().min(1).optional().nullable(),
+  maxHoursPerDay: z.number().min(1).optional().nullable(),
+  totalDistanceKm: z.number().optional().nullable(),
+  bikerScore: z.number().optional().nullable(),
+  metadata: z.record(z.unknown()).optional().nullable(),
+});
+export type SavePlannedRouteInput = z.infer<typeof savePlannedRouteSchema>;
+
+export const updatePlannedRouteSchema = savePlannedRouteSchema.partial();
+export type UpdatePlannedRouteInput = z.infer<typeof updatePlannedRouteSchema>;
+
+export const gpxImportSchema = z.object({
+  gpxContent: z.string().min(1, "Contenuto GPX obbligatorio"),
+  title: z.string().max(200).optional(),
+});
+export type GpxImportInput = z.infer<typeof gpxImportSchema>;
+
+export const calculateRouteSchema = z.object({
+  waypoints: z.array(z.object({
+    lat: z.number().finite(),
+    lng: z.number().finite(),
+    name: z.string().optional(),
+  })).min(2, "Almeno 2 waypoint richiesti"),
+  avoidHighways: z.boolean().optional(),
+  style: z.enum(["curvy", "balanced", "fast"]).optional(),
+});
+export type CalculateRouteInput = z.infer<typeof calculateRouteSchema>;
+
+export const poiSearchSchema = z.object({
+  bbox: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional(),
+  types: z.array(z.string()).optional(),
+  lat: z.number().finite().optional(),
+  lng: z.number().finite().optional(),
+  radius: z.number().positive().optional(),
+});
+export type PoiSearchInput = z.infer<typeof poiSearchSchema>;
+
+// ── Custom Routes ─────────────────────────────────────────────────────────────
+
+export const createCustomRouteSchema = z.object({
+  title: z.string().min(1, "Titolo obbligatorio").max(200),
+  description: z.string().max(2000).optional().nullable(),
+  isPublic: z.boolean().optional(),
+  visibility: z.enum(["public", "friends", "private"]).optional(),
+});
+export type CreateCustomRouteInput = z.infer<typeof createCustomRouteSchema>;
+
+export const updateCustomRouteSchema = z.object({
+  title: z.string().min(1).max(200).optional(),
+  description: z.string().max(2000).optional().nullable(),
+  isPublic: z.boolean().optional(),
+  visibility: z.enum(["public", "friends", "private"]).optional(),
+  totalDistanceKm: z.number().optional().nullable(),
+});
+export type UpdateCustomRouteInput = z.infer<typeof updateCustomRouteSchema>;
+
+export const createWaypointSchema = z.object({
+  name: z.string().min(1, "Nome obbligatorio").max(200),
+  latitude: z.number().finite("Latitudine non valida"),
+  longitude: z.number().finite("Longitudine non valida"),
+  description: z.string().max(2000).optional().nullable(),
+  waypointType: z.string().optional(),
+  orderIndex: z.number().int().optional(),
+});
+export type CreateWaypointInput = z.infer<typeof createWaypointSchema>;
+
+export const updateWaypointSchema = createWaypointSchema.partial();
+export type UpdateWaypointInput = z.infer<typeof updateWaypointSchema>;
+
+// ── Admin — OTA ───────────────────────────────────────────────────────────────
+
+export const otaErrorSchema = z.object({
+  error: z.string().min(1, "error is required"),
+  failCount: z.number().int().optional(),
+  updateId: z.string().optional(),
+  runtimeVersion: z.string().optional(),
+  phase: z.string().optional(),
+  source: z.string().optional(),
+  platform: z.string().optional(),
+  deviceId: z.string().optional(),
+  errorCode: z.string().optional(),
+  errorCause: z.string().optional(),
+  errorUserInfo: z.string().optional(),
+  nativeStack: z.string().optional(),
+  updateUrl: z.string().optional(),
+  channel: z.string().optional(),
+  networkInfo: z.string().optional(),
+  probe: z.object({
+    status: z.number().optional(),
+    contentType: z.string().optional(),
+    bodySnippet: z.string().optional(),
+    durationMs: z.number().optional(),
+    error: z.string().optional(),
+  }).optional(),
+});
+export type OtaErrorInput = z.infer<typeof otaErrorSchema>;
+
+export const createOtaReleaseSchema = z.object({
+  version: z.string().min(1, "Versione obbligatoria").max(50),
+  runtimeVersion: z.string().max(50).optional().nullable(),
+  bundlePath: z.string().optional().nullable(),
+  releaseNotes: z.string().max(5000).optional().nullable(),
+  slot: z.enum(["stable", "beta", "canary", "archived"]).optional(),
+});
+export type CreateOtaReleaseInput = z.infer<typeof createOtaReleaseSchema>;
+
+export const publishOtaReleaseSchema = z.object({
+  bundlePath: z.string().min(1, "bundlePath è obbligatorio"),
+  releaseNotes: z.string().max(5000).optional().nullable(),
+  slot: z.enum(["stable", "beta", "canary", "archived"]).optional(),
+});
+export type PublishOtaReleaseInput = z.infer<typeof publishOtaReleaseSchema>;
+
+export const assignOtaSlotSchema = z.object({
+  releaseId: z.string().min(1, "releaseId è obbligatorio"),
+  slot: z.string().min(1, "slot è obbligatorio"),
+});
+export type AssignOtaSlotInput = z.infer<typeof assignOtaSlotSchema>;
+
+export const createOtaTokenSchema = z.object({
+  label: z.string().min(1, "Label obbligatoria").max(100),
+  expiresInDays: z.number().int().min(1).max(3650).optional().nullable(),
+});
+export type CreateOtaTokenInput = z.infer<typeof createOtaTokenSchema>;
+
+// ── Admin — Ad campaigns ──────────────────────────────────────────────────────
+
+export const createAdCampaignSchema = z.object({
+  name: z.string().min(1, "Nome obbligatorio").max(200),
+  sponsor: z.string().max(200).optional().nullable(),
+  linkUrl: z.string().url("URL non valido").optional().nullable().or(z.literal("")),
+  targetUserType: z.enum(["biker", "zavorrina", "coppia", "all"]).optional(),
+  rotationDuration: z.number().int().min(1).optional(),
+  startDate: z.coerce.date().optional().nullable(),
+  endDate: z.coerce.date().optional().nullable(),
+  imageUrl: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+export type CreateAdCampaignInput = z.infer<typeof createAdCampaignSchema>;
+
+// ── Admin — Invite codes ──────────────────────────────────────────────────────
+
+export const createInviteCodeSchema = z.object({
+  code: z.string().max(50).optional(),
+  label: z.string().max(200).optional().nullable(),
+  giftMessage: z.string().max(500).optional().nullable(),
+  maxUses: z.number().int().min(1).optional(),
+  expiresAt: z.coerce.date().optional().nullable(),
+});
+export type CreateInviteCodeInput = z.infer<typeof createInviteCodeSchema>;
+
+// ── Admin — Settings ──────────────────────────────────────────────────────────
+
+export const upsertSettingSchema = z.object({
+  key: z.string().min(1, "Chiave obbligatoria").max(100),
+  value: z.string(),
+});
+export type UpsertSettingInput = z.infer<typeof upsertSettingSchema>;
+
+// ── Events ────────────────────────────────────────────────────────────────────
+
+export const createEventSchema = z.object({
+  title: z.string().min(1, "Titolo obbligatorio").max(200),
+  eventDate: z.coerce.date({ required_error: "Data evento obbligatoria" }),
+  locationName: z.string().min(1, "Luogo obbligatorio").max(300),
+  description: z.string().max(5000).optional().nullable(),
+  eventType: z.string().optional(),
+  latitude: z.number().finite().optional().nullable(),
+  longitude: z.number().finite().optional().nullable(),
+  eventTime: z.string().optional().nullable(),
+  isRecurring: z.boolean().optional(),
+  recurrenceInfo: z.string().optional().nullable(),
+  maxParticipants: z.number().int().min(1).optional().nullable(),
+  websiteUrl: z.string().url().optional().nullable().or(z.literal("")).optional(),
+  autoInviteReason: z.string().optional().nullable(),
+  autoInviteRegion: z.string().optional().nullable(),
+  autoInviteBrand: z.string().optional().nullable(),
+});
+export type CreateEventInput = z.infer<typeof createEventSchema>;
+
+export const updateEventSchema = createEventSchema.partial();
+export type UpdateEventInput = z.infer<typeof updateEventSchema>;
+
+export const eventParticipationSchema = z.object({
+  status: z.enum(["going", "interested", "not_going"]),
+});
+export type EventParticipationInput = z.infer<typeof eventParticipationSchema>;
+
+// ── Invitations ───────────────────────────────────────────────────────────────
+
+export const generateInvitationSchema = z.object({
+  maxUses: z.number().int().min(1).optional(),
+  expiresAt: z.coerce.date().optional().nullable(),
+});
+export type GenerateInvitationInput = z.infer<typeof generateInvitationSchema>;
+
+// ── Arcade ────────────────────────────────────────────────────────────────────
+
+export const arcadeScoreSchema = z.object({
+  game: z.string().min(1, "Gioco obbligatorio"),
+  score: z.number().int().min(0, "Punteggio non valido"),
+});
+export type ArcadeScoreInput = z.infer<typeof arcadeScoreSchema>;
+
+// ── Crash logs ────────────────────────────────────────────────────────────────
+
+export const crashLogsSchema = z.object({
+  logs: z.array(z.unknown()).min(1, "logs deve essere un array non vuoto").max(50, "Massimo 50 log per batch"),
+});
+export type CrashLogsInput = z.infer<typeof crashLogsSchema>;
+
+// ── Planned Routes — AI prompt ─────────────────────────────────────────────
+
+export const aiPromptSchema = z.object({
+  prompt: z.string().min(1, "Testo richiesto").max(2000),
+});
+export type AiPromptInput = z.infer<typeof aiPromptSchema>;
+
+// ── Planned Routes — POI request (object bbox) ─────────────────────────────
+
+export const poiRequestSchema = z.object({
+  bbox: z.object({
+    minLat: z.number().finite(),
+    minLng: z.number().finite(),
+    maxLat: z.number().finite(),
+    maxLng: z.number().finite(),
+  }),
+  types: z.array(z.string()).optional(),
+});
+export type PoiRequestInput = z.infer<typeof poiRequestSchema>;
+
+// ── Planned Routes — Calculate route (full request) ───────────────────────
+
+export const calculateRouteRequestSchema = z.object({
+  waypoints: z.array(z.object({
+    lat: z.number().finite(),
+    lng: z.number().finite(),
+    name: z.string().optional(),
+  })).min(2, "Almeno 2 waypoint richiesti"),
+  style: z.string().optional(),
+  drivingProfile: z.enum(["geometric", "real", "my_style"]).optional(),
+  avoidHighways: z.boolean().optional(),
+  avoidTolls: z.boolean().optional(),
+  avoidFerries: z.boolean().optional(),
+  avoidUnpaved: z.boolean().optional(),
+  roundTripHours: z.number().positive().optional(),
+  isRoundTrip: z.boolean().optional(),
+  roundTripDirection: z.string().optional(),
+  headingDeg: z.number().optional(),
+  language: z.string().optional(),
+});
+export type CalculateRouteRequestInput = z.infer<typeof calculateRouteRequestSchema>;
+
+// ── Planned Routes — GPX import (planned-routes version) ──────────────────
+
+export const plannedGpxImportSchema = z.object({
+  gpxContent: z.string().min(1, "Contenuto GPX obbligatorio"),
+  title: z.string().max(200).optional(),
+  visibility: z.enum(["public", "friends", "private"]).optional(),
+});
+export type PlannedGpxImportInput = z.infer<typeof plannedGpxImportSchema>;
+
+// ── Admin — Settings ──────────────────────────────────────────────────────
+
+export const emailConfigSchema = z.object({
+  gmailUser: z.string().optional().nullable(),
+  gmailAppPassword: z.string().optional().nullable(),
+  adminPassword: z.string().min(1, "Password admin richiesta"),
+});
+export type EmailConfigInput = z.infer<typeof emailConfigSchema>;
+
+export const disableFeatureSchema = z.object({
+  key: z.string().min(1, "Chiave obbligatoria"),
+});
+export type DisableFeatureInput = z.infer<typeof disableFeatureSchema>;
+
+export const toggleProtectedSchema = z.object({
+  key: z.string().min(1, "Chiave obbligatoria"),
+  value: z.string(),
+  adminPassword: z.string().min(1, "Password admin richiesta"),
+});
+export type ToggleProtectedInput = z.infer<typeof toggleProtectedSchema>;
+
+// ── Admin — OTA publish with slot ─────────────────────────────────────────
+
+export const publishWithSlotSchema = z.object({
+  assignSlot: z.string().optional(),
+});
+export type PublishWithSlotInput = z.infer<typeof publishWithSlotSchema>;
+
+// ── Admin — Boolean setting value ─────────────────────────────────────────
+
+export const booleanSettingValueSchema = z.object({
+  value: z.enum(["true", "false"], { required_error: "value è obbligatorio", invalid_type_error: "Valore non valido: usare 'true' o 'false'" }),
+});
+export type BooleanSettingValueInput = z.infer<typeof booleanSettingValueSchema>;
+
+export const stringSettingValueSchema = z.object({
+  value: z.string().min(1, "value è obbligatorio"),
+});
+export type StringSettingValueInput = z.infer<typeof stringSettingValueSchema>;
+
+export const mapsProviderSchema = z.object({
+  value: z.enum(["carto_light", "carto_dark", "esri_gray"], { required_error: "value è obbligatorio", invalid_type_error: "Provider non valido" }),
+});
+export type MapsProviderInput = z.infer<typeof mapsProviderSchema>;
+
+// ── Users — dynamic profile / push-token / ghost-mode / privacy / availability / report ───
+
+export const updateProfileDynamicSchema = z.object({
+  isAvailable: z.boolean().optional(),
+  latitude: z.number().finite().nullable().optional(),
+  longitude: z.number().finite().nullable().optional(),
+  searchPreference: z.string().optional(),
+  preferredMapStyle: z.string().optional(),
+  emailChatNotifications: z.boolean().optional(),
+  notificationPreferences: z.record(z.unknown()).optional(),
+  pushNotificationsEnabled: z.boolean().optional(),
+}).passthrough();
+export type UpdateProfileDynamicInput = z.infer<typeof updateProfileDynamicSchema>;
+
+export const pushTokenSchema = z.object({
+  token: z.string().nullable().optional(),
+});
+export type PushTokenInput = z.infer<typeof pushTokenSchema>;
+
+export const ghostModeSchema = z.object({
+  enabled: z.boolean({ required_error: "enabled è obbligatorio", invalid_type_error: "enabled deve essere un booleano" }),
+});
+export type GhostModeInput = z.infer<typeof ghostModeSchema>;
+
+export const availabilitySchema = z.object({
+  isAvailable: z.boolean({ required_error: "isAvailable è obbligatorio", invalid_type_error: "isAvailable deve essere un booleano" }),
+  latitude: z.number().finite().nullable().optional(),
+  longitude: z.number().finite().nullable().optional(),
+});
+export type AvailabilityInput = z.infer<typeof availabilitySchema>;
+
+export const privacySettingsSchema = z.object({
+  hideFromMap: z.boolean().optional(),
+  positionFuzz: z.boolean().optional(),
+  positionFuzzKm: z.number().int().min(1).max(50).optional(),
+  fakeHomeEnabled: z.boolean().optional(),
+  homeLatitude: z.number().finite().nullable().optional(),
+  homeLongitude: z.number().finite().nullable().optional(),
+  fakeHomeLatitude: z.number().finite().nullable().optional(),
+  fakeHomeLongitude: z.number().finite().nullable().optional(),
+  fakeHomeRadius: z.number().positive().nullable().optional(),
+  gpsPrecision: z.string().optional(),
+  offlinePositionRandomize: z.boolean().optional(),
+  fakeWorkEnabled: z.boolean().optional(),
+  workLatitude: z.number().finite().nullable().optional(),
+  workLongitude: z.number().finite().nullable().optional(),
+  fakeWorkLatitude: z.number().finite().nullable().optional(),
+  fakeWorkLongitude: z.number().finite().nullable().optional(),
+  fakeWorkRadius: z.number().positive().nullable().optional(),
+  fakeWhateverEnabled: z.boolean().optional(),
+  whateverLatitude: z.number().finite().nullable().optional(),
+  whateverLongitude: z.number().finite().nullable().optional(),
+  fakeWhateverLatitude: z.number().finite().nullable().optional(),
+  fakeWhateverLongitude: z.number().finite().nullable().optional(),
+  fakeWhateverRadius: z.number().positive().nullable().optional(),
+}).passthrough();
+export type PrivacySettingsInput = z.infer<typeof privacySettingsSchema>;
+
+export const userReportSchema = z.object({
+  reason: z.string().min(1, "Motivo obbligatorio"),
+  description: z.string().max(500).optional(),
+});
+export type UserReportInput = z.infer<typeof userReportSchema>;
+
+// ── MotoClubs — propose-location ──────────────────────────────────────────────
+
+export const proposeLocationSchema = z.object({
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  address: z.string().optional(),
+});
+export type ProposeLocationInput = z.infer<typeof proposeLocationSchema>;
+
+// ── Feedback — update ticket ──────────────────────────────────────────────────
+
+export const updateFeedbackTicketSchema = z.object({
+  status: z.string().optional(),
+  internalNote: z.string().optional(),
+});
+export type UpdateFeedbackTicketInput = z.infer<typeof updateFeedbackTicketSchema>;
+
+// ── Events — reject / invite-user ────────────────────────────────────────────
+
+export const rejectEventSchema = z.object({
+  reason: z.string().min(1, "Il motivo del rifiuto è obbligatorio"),
+});
+export type RejectEventInput = z.infer<typeof rejectEventSchema>;
+
+export const inviteUserToEventSchema = z.object({
+  userId: z.string().min(1, "userId obbligatorio"),
+});
+export type InviteUserToEventInput = z.infer<typeof inviteUserToEventSchema>;
+
+// ── Planned Routes — weather / poi-photo / hotels / segment-multiday / update ─
+
+export const weatherWaypointsSchema = z.object({
+  waypoints: z.array(z.object({
+    lat: z.number().finite(),
+    lng: z.number().finite(),
+    name: z.string().optional(),
+  })).min(1, "Waypoint richiesti"),
+  departureTime: z.string().optional(),
+});
+export type WeatherWaypointsInput = z.infer<typeof weatherWaypointsSchema>;
+
+export const poiPhotoSchema = z.object({
+  photoBase64: z.string().min(1, "Immagine richiesta"),
+  mimeType: z.string().optional(),
+  caption: z.string().optional(),
+});
+export type PoiPhotoInput = z.infer<typeof poiPhotoSchema>;
+
+export const hotelsSchema = z.object({
+  dayEndPoints: z.array(z.object({
+    lat: z.number().finite(),
+    lng: z.number().finite(),
+    name: z.string().optional(),
+  })).min(1, "Punti fine tappa richiesti"),
+  checkIn: z.string().optional(),
+  nights: z.number().int().min(1).optional(),
+});
+export type HotelsInput = z.infer<typeof hotelsSchema>;
+
+export const segmentMultidaySchema = z.object({
+  waypoints: z.array(z.object({
+    lat: z.number().finite(),
+    lng: z.number().finite(),
+    name: z.string().optional(),
+  })).min(2, "Waypoint richiesti"),
+  distanceKm: z.number().positive(),
+  durationMinutes: z.number().positive(),
+  daysCount: z.number().int().min(1).optional(),
+  maxHoursPerDay: z.number().positive().optional(),
+});
+export type SegmentMultidayInput = z.infer<typeof segmentMultidaySchema>;
+
+export const updatePlannedRouteBodySchema = z.object({
+  title: z.string().optional(),
+  description: z.string().optional(),
+  totalDistanceKm: z.number().optional(),
+  estimatedDurationMinutes: z.number().optional(),
+  difficulty: z.string().optional(),
+  isPublic: z.boolean().optional(),
+  tags: z.array(z.string()).optional(),
+  waypoints: z.array(z.unknown()).optional(),
+  routeData: z.record(z.unknown()).optional(),
+}).passthrough();
+export type UpdatePlannedRouteBodyInput = z.infer<typeof updatePlannedRouteBodySchema>;
+
+// ── Admin — client-error / startup-beacon ────────────────────────────────────
+
+export const clientErrorSchema = z.object({
+  message: z.string().optional(),
+  stack: z.string().optional(),
+  componentStack: z.string().optional(),
+  platform: z.string().optional(),
+  appVersion: z.string().optional(),
+  isFatal: z.boolean().optional(),
+}).passthrough();
+export type ClientErrorInput = z.infer<typeof clientErrorSchema>;
+
+export const startupBeaconSchema = z.object({
+  step: z.string().min(1, "step is required"),
+  ts: z.number().optional(),
+  recovered: z.boolean().optional(),
+  platform: z.string().optional(),
+}).passthrough();
+export type StartupBeaconInput = z.infer<typeof startupBeaconSchema>;
+
+// ── Admin — user management ───────────────────────────────────────────────────
+
+export const verifyPasswordSchema = z.object({
+  password: z.string().min(1, "Password mancante"),
+});
+export type VerifyPasswordInput = z.infer<typeof verifyPasswordSchema>;
+
+export const userStatusSchema = z.object({
+  status: z.enum(["active", "suspended", "blocked"], { required_error: "Stato non valido", invalid_type_error: "Stato non valido" }),
+});
+export type UserStatusInput = z.infer<typeof userStatusSchema>;
+
+export const userRoleSchema = z.object({
+  role: z.enum(["user", "moderator", "admin"], { required_error: "Ruolo non valido", invalid_type_error: "Ruolo non valido" }),
+});
+export type UserRoleInput = z.infer<typeof userRoleSchema>;
+
+export const userEmailAdminSchema = z.object({
+  email: z.string().email("Email non valida"),
+});
+export type UserEmailAdminInput = z.infer<typeof userEmailAdminSchema>;
+
+export const adminSetPasswordSchema = z.object({
+  password: z.string().min(6, "La password deve avere almeno 6 caratteri"),
+});
+export type AdminSetPasswordInput = z.infer<typeof adminSetPasswordSchema>;
+
+export const primalSchema = z.object({
+  isPrimal: z.boolean().optional(),
+});
+export type PrimalInput = z.infer<typeof primalSchema>;
+
+// ── Admin — workshops / easter-eggs ──────────────────────────────────────────
+
+export const workshopSchema = z.object({
+  name: z.string().min(1, "Nome officina obbligatorio"),
+}).passthrough();
+export type WorkshopInput = z.infer<typeof workshopSchema>;
+
+export const easterEggSchema = z.object({
+  name: z.string().optional(),
+  latitude: z.number().finite().optional(),
+  longitude: z.number().finite().optional(),
+}).passthrough();
+export type EasterEggInput = z.infer<typeof easterEggSchema>;
+
+export const easterEggBatchSchema = z.object({
+  count: z.union([z.number(), z.string()]).optional(),
+  radius: z.union([z.number(), z.string()]).optional(),
+  points: z.union([z.number(), z.string()]).optional(),
+});
+export type EasterEggBatchInput = z.infer<typeof easterEggBatchSchema>;
+
+// ── Admin — reports / email ───────────────────────────────────────────────────
+
+export const reportResolveSchema = z.object({
+  status: z.enum(["resolved", "dismissed"], { required_error: "Stato non valido", invalid_type_error: "Stato non valido" }),
+});
+export type ReportResolveInput = z.infer<typeof reportResolveSchema>;
+
+export const emailTestSchema = z.object({
+  to: z.string().optional(),
+});
+export type EmailTestInput = z.infer<typeof emailTestSchema>;
+
+export const emailRateLimitResetSchema = z.object({
+  scope: z.enum(["verify", "resend", "user-lockouts", "all"], { required_error: "Parametro 'scope' richiesto", invalid_type_error: "Scope non valido. Usa: verify | resend | user-lockouts | all" }),
+  ip: z.string().optional(),
+  userId: z.string().optional(),
+});
+export type EmailRateLimitResetInput = z.infer<typeof emailRateLimitResetSchema>;
+
+// ── Admin — additional settings ───────────────────────────────────────────────
+
+export const musicProviderSchema = z.object({
+  value: z.literal("lastfm").transform(() => "lastfm" as const),
+}).or(z.object({ value: z.string().min(1) }).transform(({ value }) => {
+  if (value !== "lastfm") throw new Error("Provider non valido: usare 'lastfm'");
+  return { value: "lastfm" as const };
+}));
+
+export const themeDefaultSchema = z.object({
+  value: z.enum(["attuale", "asfalto", "velocita", "rotta"], { required_error: "Tema non valido", invalid_type_error: "Tema non valido" }),
+});
+export type ThemeDefaultInput = z.infer<typeof themeDefaultSchema>;
+
+export const matchingCountriesSchema = z.object({
+  value: z.string(),
+});
+export type MatchingCountriesInput = z.infer<typeof matchingCountriesSchema>;
+
+export const coordinatesMaxAgeSchema = z.object({
+  value: z.union([z.string(), z.number()]),
+});
+export type CoordinatesMaxAgeInput = z.infer<typeof coordinatesMaxAgeSchema>;
+
+export const genericSettingSchema = z.object({
+  value: z.string().optional(),
+  valueJson: z.unknown().optional(),
+}).passthrough();
+export type GenericSettingInput = z.infer<typeof genericSettingSchema>;
+
+// ── Admin — advertisements ────────────────────────────────────────────────────
+
+export const adsBulkSchema = z.object({
+  baseName: z.string().min(1, "Nome base campagna obbligatorio"),
+  targetUserType: z.string().optional(),
+  displayDuration: z.string().optional(),
+  linkUrl: z.string().optional(),
+  groupId: z.string().optional(),
+  startIndex: z.string().optional(),
+  totalImages: z.string().optional(),
+}).passthrough();
+export type AdsBulkInput = z.infer<typeof adsBulkSchema>;
+
+export const adsCreateSchema = z.object({
+  name: z.string().min(1, "Nome campagna obbligatorio"),
+  sponsor: z.string().optional(),
+  linkUrl: z.string().optional(),
+  description: z.string().optional(),
+  targetUserType: z.string().optional(),
+  rotationDuration: z.union([z.string(), z.number()]).optional(),
+  rotationMode: z.string().optional(),
+  sortOrder: z.union([z.string(), z.number()]).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
+  placement: z.string().optional(),
+  imageUrl: z.string().optional(),
+}).passthrough();
+export type AdsCreateInput = z.infer<typeof adsCreateSchema>;
+
+export const adsUpdateSchema = z.object({
+  name: z.string().optional(),
+  sponsor: z.string().optional(),
+  linkUrl: z.string().optional(),
+  description: z.string().optional(),
+  isActive: z.union([z.boolean(), z.string()]).optional(),
+  targetUserType: z.string().optional(),
+  rotationDuration: z.union([z.string(), z.number()]).optional(),
+  rotationMode: z.string().optional(),
+  sortOrder: z.union([z.string(), z.number()]).optional(),
+  startDate: z.string().nullable().optional(),
+  endDate: z.string().nullable().optional(),
+  placement: z.string().optional(),
+  imageUrl: z.string().nullable().optional(),
+}).passthrough();
+export type AdsUpdateInput = z.infer<typeof adsUpdateSchema>;
+
+// ── Admin — bulk delete ads ───────────────────────────────────────────────────
+
+export const adsBulkDeleteSchema = z.object({
+  ids: z.array(z.string()).min(1, "Array di ID campagne obbligatorio"),
+});
+export type AdsBulkDeleteInput = z.infer<typeof adsBulkDeleteSchema>;
+
+// ── Admin — ads group update ──────────────────────────────────────────────────
+
+export const adsGroupUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  linkUrl: z.string().optional(),
+  isActive: z.boolean().optional(),
+}).passthrough();
+export type AdsGroupUpdateInput = z.infer<typeof adsGroupUpdateSchema>;
+
+// ── Admin — stregatti (fake users) ───────────────────────────────────────────
+
+export const stregattaSchema = z.object({
+  nickname: z.string().min(1, "Nickname obbligatorio"),
+  userType: z.string().min(1, "Tipo utente obbligatorio"),
+  sex: z.string().optional(),
+  coupleSexConfig: z.string().optional(),
+  birthYear: z.union([z.number().int(), z.string()]).optional(),
+  region: z.string().optional(),
+  country: z.string().default("IT"),
+  bio: z.string().optional(),
+  moto: z.unknown().optional(),
+  wishlistDescription: z.string().optional(),
+  wishlistMotos: z.array(z.unknown()).optional(),
+}).passthrough();
+export type StregattaInput = z.infer<typeof stregattaSchema>;
+
+export const stregattaToggleSchema = z.object({
+  enabled: z.boolean({ required_error: "Il campo 'enabled' deve essere un booleano" }),
+  adminPassword: z.string().min(1, "Password admin richiesta"),
+});
+export type StregattaToggleInput = z.infer<typeof stregattaToggleSchema>;
+
+// ── Admin — motoclub request reject ──────────────────────────────────────────
+
+export const rejectNoteSchema = z.object({
+  note: z.string().optional(),
+}).passthrough();
+export type RejectNoteInput = z.infer<typeof rejectNoteSchema>;
+
+// ── Admin — simulate activity ─────────────────────────────────────────────────
+
+export const simulateActivitySchema = z.object({
+  message: z.string().optional(),
+  count: z.number().int().min(1).default(1),
+}).passthrough();
+export type SimulateActivityInput = z.infer<typeof simulateActivitySchema>;
+
+// ── Admin — update invitation code ───────────────────────────────────────────
+
+export const updateInvitationCodeAdminSchema = z.object({
+  label: z.string().optional(),
+  giftMessage: z.string().optional(),
+  maxUses: z.union([z.number().int().min(1), z.string()]).optional(),
+  isActive: z.union([z.boolean(), z.string()]).optional(),
+  expiresAt: z.string().optional(),
+}).passthrough();
+export type UpdateInvitationCodeAdminInput = z.infer<typeof updateInvitationCodeAdminSchema>;
+
+// ── Admin — generic enabled toggle ───────────────────────────────────────────
+
+export const enabledSchema = z.object({
+  enabled: z.boolean({ required_error: "enabled deve essere un booleano" }),
+});
+export type EnabledInput = z.infer<typeof enabledSchema>;
+
+// ── Admin — backup frequency ──────────────────────────────────────────────────
+
+export const backupFrequencySchema = z.object({
+  dbHours: z.union([z.number().min(1), z.string()]).optional(),
+  mediaHours: z.union([z.number().min(1), z.string()]).optional(),
+}).passthrough();
+export type BackupFrequencyInput = z.infer<typeof backupFrequencySchema>;
+
+// ── Admin — reconcile club invites ───────────────────────────────────────────
+
+export const reconcileClubInvitesSchema = z.object({
+  userId: z.string().optional(),
+}).passthrough();
+export type ReconcileClubInvitesInput = z.infer<typeof reconcileClubInvitesSchema>;
+
+// ── Admin — translations ──────────────────────────────────────────────────────
+
+export const translationKeySchema = z.object({
+  key: z.string().min(1, "key mancante"),
+  lang: z.string().min(1, "lang non valido"),
+  value: z.string().min(1, "value mancante o vuoto"),
+});
+export type TranslationKeyInput = z.infer<typeof translationKeySchema>;
+
+// ── Admin — coordinate history settings ──────────────────────────────────────
+
+export const coordinateHistorySettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  interval: z.union([z.number().int().min(5), z.string()]).optional(),
+  maxRecords: z.union([z.number().int().min(1), z.string()]).optional(),
+  mode: z.enum(["all", "selected"]).optional(),
+  selectedUsers: z.array(z.string()).optional(),
+}).passthrough();
+export type CoordinateHistorySettingsInput = z.infer<typeof coordinateHistorySettingsSchema>;
+
+// ── Admin — bg-location settings ─────────────────────────────────────────────
+
+export const bgLocationSettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  trigger: z.enum(["always", "tracking", "sos", "tracking_or_sos"]).optional(),
+  intervalSeconds: z.union([z.number().int().min(10).max(300), z.string()]).optional(),
+  notificationText: z.string().optional(),
+  ghostModeContinue: z.boolean().optional(),
+}).passthrough();
+export type BgLocationSettingsInput = z.infer<typeof bgLocationSettingsSchema>;
+
+// ── Admin — privacy rules ─────────────────────────────────────────────────────
+
+export const privacyRulesSchema = z.object({
+  showDistanceInCounter: z.boolean().optional(),
+  offlinePositionRandomize: z.boolean().optional(),
+  mapVisibilityFilter: z.enum(["all", "online_only", "available_only"]).optional(),
+}).passthrough();
+export type PrivacyRulesInput = z.infer<typeof privacyRulesSchema>;
+
+// ── Admin — native version ────────────────────────────────────────────────────
+
+const nativeVersionPlatformSchema = z.object({
+  latestVersion: z.string().min(1),
+  minVersion: z.string().min(1),
+  storeUrl: z.string().min(1),
+});
+export const nativeVersionSchema = z.object({
+  android: nativeVersionPlatformSchema,
+  ios: nativeVersionPlatformSchema,
+});
+export type NativeVersionInput = z.infer<typeof nativeVersionSchema>;
+
+// ── Admin — match preferences admin update ────────────────────────────────────
+
+export const matchPreferencesAdminUpdateSchema = z.record(z.boolean()).and(z.object({}).passthrough());
+export type MatchPreferencesAdminUpdateInput = z.infer<typeof matchPreferencesAdminUpdateSchema>;
+
+// ── Admin — OTA device assignment ────────────────────────────────────────────
+
+export const otaAssignDeviceSchema = z.object({
+  deviceId: z.string().min(1, "deviceId obbligatorio"),
+  slot: z.string().min(1, "slot obbligatorio"),
+  expiresAt: z.string().optional(),
+});
+export type OtaAssignDeviceInput = z.infer<typeof otaAssignDeviceSchema>;
+
+// ── Admin — OTA promote / mark-broken ────────────────────────────────────────
+
+export const otaPromoteSchema = z.object({
+  fromSlot: z.string().min(1, "fromSlot obbligatorio"),
+});
+export type OtaPromoteInput = z.infer<typeof otaPromoteSchema>;
+
+export const otaMarkBrokenSchema = z.object({
+  releaseId: z.string().min(1, "releaseId obbligatorio"),
+});
+export type OtaMarkBrokenInput = z.infer<typeof otaMarkBrokenSchema>;
+
+// ── Admin — URL settings ──────────────────────────────────────────────────────
+
+export const urlSettingSchema = z.object({
+  url: z.string().optional(),
+}).passthrough();
+export type UrlSettingInput = z.infer<typeof urlSettingSchema>;
+
+// ── Admin — maintenance settings ─────────────────────────────────────────────
+
+export const maintenanceSettingsSchema = z.object({
+  enabled: z.union([z.boolean(), z.string()]).optional(),
+  message: z.string().optional(),
+}).passthrough();
+export type MaintenanceSettingsInput = z.infer<typeof maintenanceSettingsSchema>;
+
+// ── Admin — curvy score weights ───────────────────────────────────────────────
+
+export const curvyScoreWeightsSchema = z.object({
+  weight_lean: z.number().gt(0).max(1).optional(),
+  weight_gforce: z.number().gt(0).max(1).optional(),
+  min_samples: z.number().int().min(1).optional(),
+}).passthrough();
+export type CurvyScoreWeightsInput = z.infer<typeof curvyScoreWeightsSchema>;
+
+// ── Admin — telemetry target km ───────────────────────────────────────────────
+
+export const telemetryTargetKmSchema = z.object({
+  target_km: z.union([z.number().int().min(10).max(100000), z.string()]),
+});
+export type TelemetryTargetKmInput = z.infer<typeof telemetryTargetKmSchema>;

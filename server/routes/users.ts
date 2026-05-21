@@ -8,7 +8,7 @@ import { isProtectedUser } from "../constants";
 import { isSystemAccount, systemAccountConditions } from "../lib/system-account-filter";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
-import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos, gpsRejectionStats, users as usersTable, updateUserSchema, updateDynamicProfileSchema, pushTokenSchema } from "@shared/schema";
+import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos, gpsRejectionStats, users as usersTable, updateUserMeSchema, updateLocationSchema, updateProfileDynamicSchema, pushTokenSchema, ghostModeSchema, availabilitySchema, privacySettingsSchema, userReportSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
 import { sendAdminGpsAlertPush } from "../push-notifications";
@@ -263,11 +263,10 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
 
-    const parsed = updateUserSchema.safeParse(req.body ?? {});
+    const parsed = updateUserMeSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Dati non validi" });
+      return res.status(400).json({ message: parsed.error.errors[0].message });
     }
-
     const b = parsed.data;
     const userUpdate: Record<string, unknown> = {};
     if (b.nickname !== undefined) userUpdate.nickname = b.nickname;
@@ -394,13 +393,9 @@ router.get("/profile", requireAuth, async (req: Request, res: Response) => {
 router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-
-    const parsed = updateDynamicProfileSchema.safeParse(req.body ?? {});
-    if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Dati non validi" });
-    }
-
-    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications, notificationPreferences, pushNotificationsEnabled } = parsed.data;
+    const parsedDyn = updateProfileDynamicSchema.safeParse(req.body);
+    if (!parsedDyn.success) return res.status(400).json({ message: parsedDyn.error.errors[0].message });
+    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications, notificationPreferences, pushNotificationsEnabled } = parsedDyn.data;
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
@@ -497,13 +492,9 @@ router.put("/me/match-seen", requireAuth, async (req: Request, res: Response) =>
 router.put("/me/push-token", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-
-    const parsed = pushTokenSchema.safeParse(req.body ?? {});
-    if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Token non valido" });
-    }
-
-    const { token } = parsed.data;
+    const parsedPt = pushTokenSchema.safeParse(req.body ?? {});
+    if (!parsedPt.success) return res.status(400).json({ message: parsedPt.error.errors[0].message });
+    const { token } = parsedPt.data;
     if (token === null || token === undefined || token === "") {
       await storage.updateUser(userId, { expoPushToken: null });
       return res.json({ ok: true, cleared: true });
@@ -524,10 +515,9 @@ router.put("/me/push-token", requireAuth, async (req: Request, res: Response) =>
 router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { enabled } = req.body;
-    if (typeof enabled !== "boolean") {
-      return res.status(400).json({ message: "enabled deve essere un booleano" });
-    }
+    const parsedGm = ghostModeSchema.safeParse(req.body);
+    if (!parsedGm.success) return res.status(400).json({ message: parsedGm.error.errors[0].message });
+    const { enabled } = parsedGm.data;
     const ghostModeSetting = await storage.getAppSetting("ghost_mode_enabled");
     if (ghostModeSetting?.value !== "true") {
       return res.status(403).json({ message: "Ghost Mode non attivo su questa piattaforma" });
@@ -556,13 +546,15 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
 router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
+    const parsedPriv = privacySettingsSchema.safeParse(req.body);
+    if (!parsedPriv.success) return res.status(400).json({ message: parsedPriv.error.errors[0].message });
     const {
       hideFromMap, positionFuzz, positionFuzzKm,
       fakeHomeEnabled, homeLatitude, homeLongitude, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius,
       gpsPrecision, offlinePositionRandomize,
       fakeWorkEnabled, workLatitude, workLongitude, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius,
       fakeWhateverEnabled, whateverLatitude, whateverLongitude, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius,
-    } = req.body;
+    } = parsedPriv.data;
     const updateData: Record<string, unknown> = {};
     if (typeof hideFromMap === "boolean") updateData.hideFromMap = hideFromMap;
     if (typeof positionFuzz === "boolean") updateData.positionFuzz = positionFuzz;
@@ -704,67 +696,70 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
 router.put("/location", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    let { latitude, longitude } = req.body;
-    if (latitude === undefined || longitude === undefined) {
-      return res.status(400).json({ message: "Latitudine e longitudine richieste" });
-    }
-    if (
-      typeof latitude !== "number" || !isFinite(latitude) ||
-      typeof longitude !== "number" || !isFinite(longitude)
-    ) {
-      const payload = JSON.stringify({ latitude, longitude });
-      console.warn(
-        `[users/location] Coordinate non valide rifiutate — userId=${userId} payload=${payload}`
+    const parsedLoc = updateLocationSchema.safeParse(req.body);
+    if (!parsedLoc.success) {
+      const { latitude: rawLat, longitude: rawLng } = req.body;
+      const coordsPresent = rawLat !== undefined && rawLng !== undefined;
+      const coordsInvalid = coordsPresent && (
+        typeof rawLat !== "number" || !isFinite(rawLat as number) ||
+        typeof rawLng !== "number" || !isFinite(rawLng as number)
       );
-      const rawDeviceId =
-        (req.headers["expo-device-id"] as string | undefined) ||
-        (req.headers["expo-installation-id"] as string | undefined) ||
-        "unknown";
-      const deviceId = rawDeviceId.substring(0, 128);
-      const platform = (req.headers["expo-platform"] as string | undefined)?.substring(0, 20) ?? null;
-      (async () => {
-        try {
-          const returned = await db.insert(gpsRejectionStats)
-            .values({
-              userId,
-              deviceId,
-              platform,
-              rejectionCount: 1,
-              lastRejectedPayload: payload.slice(0, 2000),
-              lastRejectedAt: new Date(),
-              lastSource: "location",
-            })
-            .onConflictDoUpdate({
-              target: [gpsRejectionStats.userId, gpsRejectionStats.deviceId],
-              set: {
-                rejectionCount: drizzleSql`${gpsRejectionStats.rejectionCount} + 1`,
+      if (coordsInvalid) {
+        const payload = JSON.stringify({ latitude: rawLat, longitude: rawLng });
+        console.warn(
+          `[users/location] Coordinate non valide rifiutate — userId=${userId} payload=${payload}`
+        );
+        const rawDeviceId =
+          (req.headers["expo-device-id"] as string | undefined) ||
+          (req.headers["expo-installation-id"] as string | undefined) ||
+          "unknown";
+        const deviceId = rawDeviceId.substring(0, 128);
+        const platform = (req.headers["expo-platform"] as string | undefined)?.substring(0, 20) ?? null;
+        (async () => {
+          try {
+            const returned = await db.insert(gpsRejectionStats)
+              .values({
+                userId,
+                deviceId,
                 platform,
+                rejectionCount: 1,
                 lastRejectedPayload: payload.slice(0, 2000),
                 lastRejectedAt: new Date(),
                 lastSource: "location",
-              },
-            })
-            .returning({ rejectionCount: gpsRejectionStats.rejectionCount });
-          const newCount = returned[0]?.rejectionCount ?? 0;
-          if (newCount > 0) {
-            const thresholdSetting = await storage.getAppSetting("gps_rejection_alert_threshold");
-            const threshold = thresholdSetting?.value ? Number(thresholdSetting.value) : 100;
-            if (!Number.isNaN(threshold) && newCount - 1 < threshold && newCount >= threshold) {
-              const user = await storage.getUser(userId);
-              sendAdminGpsAlertPush({
-                userId,
-                nickname: user?.nickname ?? null,
-                deviceId,
-                rejectionCount: newCount,
-              }).catch(() => {});
+              })
+              .onConflictDoUpdate({
+                target: [gpsRejectionStats.userId, gpsRejectionStats.deviceId],
+                set: {
+                  rejectionCount: drizzleSql`${gpsRejectionStats.rejectionCount} + 1`,
+                  platform,
+                  lastRejectedPayload: payload.slice(0, 2000),
+                  lastRejectedAt: new Date(),
+                  lastSource: "location",
+                },
+              })
+              .returning({ rejectionCount: gpsRejectionStats.rejectionCount });
+            const newCount = returned[0]?.rejectionCount ?? 0;
+            if (newCount > 0) {
+              const thresholdSetting = await storage.getAppSetting("gps_rejection_alert_threshold");
+              const threshold = thresholdSetting?.value ? Number(thresholdSetting.value) : 100;
+              if (!Number.isNaN(threshold) && newCount - 1 < threshold && newCount >= threshold) {
+                const user = await storage.getUser(userId);
+                sendAdminGpsAlertPush({
+                  userId,
+                  nickname: user?.nickname ?? null,
+                  deviceId,
+                  rejectionCount: newCount,
+                }).catch(() => {});
+              }
             }
+          } catch (err) {
+            console.error("[users/location] gps_rejection_stats upsert error:", err);
           }
-        } catch (err) {
-          console.error("[users/location] gps_rejection_stats upsert error:", err);
-        }
-      })();
-      return res.status(400).json({ message: "Coordinate GPS non valide: latitudine e longitudine devono essere numeri finiti" });
+        })();
+      }
+      return res.status(400).json({ message: parsedLoc.error.errors[0].message });
     }
+    let { latitude, longitude } = parsedLoc.data;
     const existingProfile = await storage.getUserProfile(userId);
     const fakeResult = applyFakeZones(latitude, longitude, existingProfile);
     if (fakeResult.applied) {
@@ -791,11 +786,9 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
 router.put("/me/availability", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { isAvailable, latitude, longitude } = req.body;
-
-    if (typeof isAvailable !== "boolean") {
-      return res.status(400).json({ message: "isAvailable deve essere un booleano" });
-    }
+    const parsedAv = availabilitySchema.safeParse(req.body);
+    if (!parsedAv.success) return res.status(400).json({ message: parsedAv.error.errors[0].message });
+    const { isAvailable, latitude, longitude } = parsedAv.data;
 
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = { isAvailable };
@@ -1636,7 +1629,9 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
   try {
     const reporterId = req.session.userId!;
     const reportedUserId = req.params.id as string;
-    const { reason, description } = req.body;
+    const parsedRep = userReportSchema.safeParse(req.body);
+    if (!parsedRep.success) return res.status(400).json({ message: parsedRep.error.errors[0].message });
+    const { reason, description } = parsedRep.data;
 
     // Task #1125: throttle the legacy profile-report endpoint with the
     // SAME shared limiter as POST /api/reports. Without this, a script

@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { and, ne, eq } from "drizzle-orm";
 import { db } from "../db";
-import { userMotorcycles } from "../../shared/schema";
+import { userMotorcycles, createMotorcycleSchema, updateMotorcycleSchema, uploadPhotoSchema } from "../../shared/schema";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { sendMatchPushNotifications } from "../push-notifications";
@@ -50,27 +50,27 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Solo biker, coppie e admin possono aggiungere moto" });
     }
 
-    const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault, motoDescription } = req.body;
-
-    if (!brand || !model) {
-      return res.status(400).json({ message: "Marca e modello sono obbligatori" });
+    const parsed = createMotorcycleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
     }
+    const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault, motoDescription } = parsed.data;
 
-    const isDefaultBool = isDefault === true || isDefault === "true";
+    const isDefaultBool = isDefault === true;
 
     const motorcycle = await storage.createUserMotorcycle({
       userId,
       brand,
       model,
-      year: year || null,
-      displacement: displacement || null,
-      motorcycleType: motorcycleType || null,
-      ridingStyle: ridingStyle || null,
-      photoUrl: photoUrl || null,
+      year: year ?? null,
+      displacement: displacement ?? null,
+      motorcycleType: motorcycleType ?? null,
+      ridingStyle: ridingStyle ?? null,
+      photoUrl: photoUrl ?? null,
       isDefault: isDefaultBool,
-      isForSale: isForSale || false,
-      saleDescription: saleDescription || null,
-      motoDescription: motoDescription || null,
+      isForSale: isForSale ?? false,
+      saleDescription: saleDescription ?? null,
+      motoDescription: motoDescription ?? null,
     });
 
     if (isDefaultBool) {
@@ -139,7 +139,11 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const b = req.body;
+    const parsedUpdate = updateMotorcycleSchema.safeParse(req.body);
+    if (!parsedUpdate.success) {
+      return res.status(400).json({ message: parsedUpdate.error.errors[0].message });
+    }
+    const b = parsedUpdate.data;
     const updateData: Record<string, unknown> = {};
     if (b.brand !== undefined) updateData.brand = b.brand;
     if (b.model !== undefined) updateData.model = b.model;
@@ -152,10 +156,6 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
     if (b.saleDescription !== undefined) updateData.saleDescription = b.saleDescription;
     if (b.isDefault !== undefined) updateData.isDefault = b.isDefault;
     if (b.motoDescription !== undefined) updateData.motoDescription = b.motoDescription;
-
-    if (updateData.isDefault !== undefined) {
-      updateData.isDefault = updateData.isDefault === true || updateData.isDefault === "true";
-    }
 
     if (updateData.isDefault === true) {
       await db
@@ -235,10 +235,11 @@ router.post("/:id/photos", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Massimo 3 foto per moto" });
     }
 
-    const { imageBase64, filename } = req.body;
-    if (!imageBase64) {
-      return res.status(400).json({ message: "Nessuna immagine fornita" });
+    const parsedPhoto = uploadPhotoSchema.safeParse(req.body);
+    if (!parsedPhoto.success) {
+      return res.status(400).json({ message: parsedPhoto.error.errors[0].message });
     }
+    const { imageBase64 } = parsedPhoto.data;
 
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
     const rawBuffer = Buffer.from(base64Data, "base64");

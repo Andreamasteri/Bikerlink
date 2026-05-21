@@ -16,6 +16,9 @@ import {
   users,
   userProfiles,
   userMotorcycles,
+  createMotoClubSchema,
+  respondToInviteSchema,
+  proposeLocationSchema,
 } from "@shared/schema";
 import { eq, and, ilike, or, sql, desc, ne, count, notInArray } from "drizzle-orm";
 import { PROTECTED_NICKNAMES } from "../constants";
@@ -1083,11 +1086,11 @@ router.put("/invites/:id/respond", requireAuth, async (req: Request, res: Respon
   try {
     const userId = req.session.userId!;
     const inviteId = req.params.id;
-    const { response } = req.body as { response: "accepted" | "declined" };
-
-    if (!["accepted", "declined"].includes(response)) {
-      return res.status(400).json({ message: "Risposta non valida" });
+    const parsedInvite = respondToInviteSchema.safeParse(req.body);
+    if (!parsedInvite.success) {
+      return res.status(400).json({ message: parsedInvite.error.errors[0].message });
     }
+    const { response } = parsedInvite.data;
 
     const [invite] = await db.select().from(motoClubInvites)
       .where(and(eq(motoClubInvites.id, inviteId), eq(motoClubInvites.userId, userId)))
@@ -1136,19 +1139,17 @@ router.put("/invites/:id/respond", requireAuth, async (req: Request, res: Respon
 router.post("/request", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { name, clubType, brandName, modelName } = req.body;
-
-    if (!name || !clubType) return res.status(400).json({ message: "Nome e tipo obbligatori" });
-    if (!["brand", "model"].includes(clubType)) return res.status(400).json({ message: "Tipo non valido" });
-    if (clubType === "model" && (!brandName || !modelName)) {
-      return res.status(400).json({ message: "Marca e modello richiesti per club By Model" });
+    const parsedReq = createMotoClubSchema.safeParse(req.body);
+    if (!parsedReq.success) {
+      return res.status(400).json({ message: parsedReq.error.errors[0].message });
     }
+    const { name, clubType, brandName, modelName } = parsedReq.data;
 
     const [request] = await db.insert(motoClubRequests).values({
       name,
       clubType,
-      brandName: brandName || null,
-      modelName: modelName || null,
+      brandName: brandName ?? null,
+      modelName: modelName ?? null,
       requestedBy: userId,
       status: "pending",
     }).returning();
@@ -1185,7 +1186,11 @@ router.post("/creation-request", requireAuth, async (req: Request, res: Response
       return res.status(403).json({ message: "Creazione motoclub non abilitata" });
     }
 
-    const { name, parentClubId, latitude, longitude, inviteRadiusKm, inviteUserIds } = req.body as {
+    const parsedCreation = createMotoClubSchema.safeParse(req.body);
+    if (!parsedCreation.success) {
+      return res.status(400).json({ message: parsedCreation.error.errors[0].message });
+    }
+    const { name, parentClubId, latitude, longitude, inviteRadiusKm, inviteUserIds } = parsedCreation.data as {
       name: string;
       parentClubId?: string;
       latitude?: number;
@@ -1193,10 +1198,6 @@ router.post("/creation-request", requireAuth, async (req: Request, res: Response
       inviteRadiusKm?: number;
       inviteUserIds?: string[];
     };
-
-    if (!name || name.trim().length < 2) {
-      return res.status(400).json({ message: "Nome obbligatorio (min 2 caratteri)" });
-    }
 
     const user = await storage.getUser(userId);
 
@@ -1278,17 +1279,9 @@ router.post("/:id/propose-location", requireAuth, async (req: Request, res: Resp
   try {
     const userId = req.session.userId!;
     const clubId = req.params.id;
-    const { latitude, longitude, address } = req.body as { latitude?: number; longitude?: number; address?: string };
-
-    if (latitude == null || longitude == null) {
-      return res.status(400).json({ message: "Latitudine e longitudine obbligatorie" });
-    }
-    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
-      return res.status(400).json({ message: "Latitudine non valida" });
-    }
-    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
-      return res.status(400).json({ message: "Longitudine non valida" });
-    }
+    const parsedPl = proposeLocationSchema.safeParse(req.body);
+    if (!parsedPl.success) return res.status(400).json({ message: parsedPl.error.errors[0].message });
+    const { latitude, longitude, address } = parsedPl.data;
 
     const [club] = await db.select().from(motoClubs).where(and(eq(motoClubs.id, clubId), eq(motoClubs.isApproved, true))).limit(1);
     if (!club) return res.status(404).json({ message: "Club non trovato" });

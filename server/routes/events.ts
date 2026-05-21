@@ -14,6 +14,11 @@ import {
   users,
   type Event,
   type InsertEvent,
+  createEventSchema,
+  updateEventSchema,
+  eventParticipationSchema,
+  rejectEventSchema,
+  inviteUserToEventSchema,
 } from "@shared/schema";
 import {
   eq,
@@ -489,24 +494,16 @@ router.post("/", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
+    const parsedEvent = createEventSchema.safeParse(req.body);
+    if (!parsedEvent.success) {
+      return res.status(400).json({ message: parsedEvent.error.errors[0].message });
+    }
     const {
       title, description, eventType, locationName, latitude, longitude,
       eventDate, eventTime, isRecurring, recurrenceInfo, maxParticipants,
-      websiteUrl, selectedClubIds,
-    } = req.body as Record<string, string | boolean | number | string[] | undefined>;
-
-    if (!title || !(title as string).trim()) {
-      return res.status(400).json({ message: "Il titolo è obbligatorio" });
-    }
-    if (!eventDate) {
-      return res.status(400).json({ message: "La data è obbligatoria" });
-    }
-    if (!locationName || !(locationName as string).trim()) {
-      return res.status(400).json({ message: "Il luogo dell'evento è obbligatorio" });
-    }
-    if (websiteUrl && !/^https?:\/\/.+/.test(websiteUrl as string)) {
-      return res.status(400).json({ message: "URL sito web non valido (deve iniziare con http/https)" });
-    }
+      websiteUrl, autoInviteReason, autoInviteRegion, autoInviteBrand,
+    } = parsedEvent.data;
+    const selectedClubIds = Array.isArray(req.body?.selectedClubIds) ? req.body.selectedClubIds as string[] : [];
 
     // Rate limiting: max 5 eventi al giorno per utente
     const todayStart = new Date();
@@ -523,22 +520,22 @@ router.post("/", async (req: Request, res: Response) => {
     const creator = await storage.getUser(userId);
 
     const insertData: InsertEvent = {
-      title: (title as string).trim(),
-      description: description ? (description as string).trim() || null : null,
-      eventType: (eventType as string) || "raduno",
+      title: title.trim(),
+      description: description ? description.trim() || null : null,
+      eventType: eventType || "raduno",
       creatorId: userId,
-      locationName: (locationName as string).trim(),
-      latitude: latitude != null ? parseFloat(String(latitude)) : null,
-      longitude: longitude != null ? parseFloat(String(longitude)) : null,
-      eventDate: new Date(eventDate as string),
-      eventTime: eventTime ? (eventTime as string).trim() || null : null,
+      locationName: locationName.trim(),
+      latitude: latitude ?? null,
+      longitude: longitude ?? null,
+      eventDate: eventDate,
+      eventTime: eventTime ? eventTime.trim() || null : null,
       isRecurring: Boolean(isRecurring),
-      recurrenceInfo: recurrenceInfo ? (recurrenceInfo as string).trim() || null : null,
-      maxParticipants: maxParticipants ? parseInt(String(maxParticipants)) : null,
-      websiteUrl: websiteUrl ? (websiteUrl as string).trim() || null : null,
-      autoInviteReason: null,
-      autoInviteRegion: null,
-      autoInviteBrand: null,
+      recurrenceInfo: recurrenceInfo ? recurrenceInfo.trim() || null : null,
+      maxParticipants: maxParticipants ?? null,
+      websiteUrl: websiteUrl ? websiteUrl.trim() || null : null,
+      autoInviteReason: autoInviteReason ?? null,
+      autoInviteRegion: autoInviteRegion ?? null,
+      autoInviteBrand: autoInviteBrand ?? null,
       status: "approved",
       approvedAt: new Date(),
       approvedBy: userId,
@@ -669,32 +666,32 @@ router.put("/:id", async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non puoi modificare un evento rifiutato o cancellato" });
     }
 
+    const parsedUpdate = updateEventSchema.safeParse(req.body);
+    if (!parsedUpdate.success) {
+      return res.status(400).json({ message: parsedUpdate.error.errors[0].message });
+    }
     const {
       title, description, eventType, locationName, latitude, longitude,
       eventDate, eventTime, isRecurring, recurrenceInfo, maxParticipants,
       websiteUrl, autoInviteReason, autoInviteRegion, autoInviteBrand,
-    } = req.body as Record<string, string | boolean | number | undefined>;
-
-    if (websiteUrl && !/^https?:\/\/.+/.test(websiteUrl as string)) {
-      return res.status(400).json({ message: "URL sito web non valido" });
-    }
+    } = parsedUpdate.data;
 
     const updates: Partial<InsertEvent> = { updatedAt: new Date() };
-    if (title !== undefined) updates.title = (title as string).trim();
-    if (description !== undefined) updates.description = description ? (description as string).trim() : null;
-    if (eventType !== undefined) updates.eventType = eventType as string;
-    if (locationName !== undefined) updates.locationName = locationName ? (locationName as string).trim() : null;
-    if (latitude !== undefined) updates.latitude = latitude != null ? parseFloat(String(latitude)) : null;
-    if (longitude !== undefined) updates.longitude = longitude != null ? parseFloat(String(longitude)) : null;
-    if (eventDate !== undefined) updates.eventDate = new Date(eventDate as string);
-    if (eventTime !== undefined) updates.eventTime = eventTime ? (eventTime as string).trim() : null;
+    if (title !== undefined) updates.title = title.trim();
+    if (description !== undefined) updates.description = description ? description.trim() : null;
+    if (eventType !== undefined) updates.eventType = eventType;
+    if (locationName !== undefined) updates.locationName = locationName ? locationName.trim() : null;
+    if (latitude !== undefined) updates.latitude = latitude ?? null;
+    if (longitude !== undefined) updates.longitude = longitude ?? null;
+    if (eventDate !== undefined) updates.eventDate = eventDate;
+    if (eventTime !== undefined) updates.eventTime = eventTime ? eventTime.trim() : null;
     if (isRecurring !== undefined) updates.isRecurring = Boolean(isRecurring);
-    if (recurrenceInfo !== undefined) updates.recurrenceInfo = recurrenceInfo ? (recurrenceInfo as string).trim() : null;
-    if (maxParticipants !== undefined) updates.maxParticipants = maxParticipants ? parseInt(String(maxParticipants)) : null;
-    if (websiteUrl !== undefined) updates.websiteUrl = websiteUrl ? (websiteUrl as string).trim() : null;
-    if (autoInviteReason !== undefined) updates.autoInviteReason = autoInviteReason ? (autoInviteReason as string).trim() : null;
-    if (autoInviteRegion !== undefined) updates.autoInviteRegion = autoInviteRegion ? (autoInviteRegion as string).trim() : null;
-    if (autoInviteBrand !== undefined) updates.autoInviteBrand = autoInviteBrand ? (autoInviteBrand as string).trim() : null;
+    if (recurrenceInfo !== undefined) updates.recurrenceInfo = recurrenceInfo ? recurrenceInfo.trim() : null;
+    if (maxParticipants !== undefined) updates.maxParticipants = maxParticipants ?? null;
+    if (websiteUrl !== undefined) updates.websiteUrl = websiteUrl ? websiteUrl.trim() : null;
+    if (autoInviteReason !== undefined) updates.autoInviteReason = autoInviteReason ? autoInviteReason.trim() : null;
+    if (autoInviteRegion !== undefined) updates.autoInviteRegion = autoInviteRegion ? autoInviteRegion.trim() : null;
+    if (autoInviteBrand !== undefined) updates.autoInviteBrand = autoInviteBrand ? autoInviteBrand.trim() : null;
 
     const [updated] = await db.update(events).set(updates).where(eq(events.id, id)).returning();
 
@@ -766,11 +763,11 @@ router.post("/:id/join", async (req: Request, res: Response) => {
     if (!userId) return;
 
     const { id } = req.params;
-    const { status: participationStatus = "going" } = req.body as { status?: string };
-
-    if (!["going", "interested"].includes(participationStatus)) {
-      return res.status(400).json({ message: "Status non valido (going | interested)" });
+    const parsedParticipation = eventParticipationSchema.safeParse(req.body);
+    if (!parsedParticipation.success) {
+      return res.status(400).json({ message: parsedParticipation.error.errors[0].message });
     }
+    const { status: participationStatus } = parsedParticipation.data;
 
     const [evt] = await db.select().from(events).where(eq(events.id, id));
     if (!evt) return res.status(404).json({ message: "Evento non trovato" });
@@ -942,11 +939,9 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
     if (!userId) return;
 
     const { id } = req.params;
-    const { reason } = req.body as { reason?: string };
-
-    if (!reason?.trim()) {
-      return res.status(400).json({ message: "Il motivo del rifiuto è obbligatorio" });
-    }
+    const parsedRej = rejectEventSchema.safeParse(req.body);
+    if (!parsedRej.success) return res.status(400).json({ message: parsedRej.error.errors[0].message });
+    const { reason } = parsedRej.data;
 
     const [evt] = await db.select().from(events).where(eq(events.id, id));
     if (!evt) return res.status(404).json({ message: "Evento non trovato" });
@@ -1096,8 +1091,9 @@ router.post("/:id/invite-user", async (req: Request, res: Response) => {
     const requesterId = requireAuth(req, res);
     if (!requesterId) return;
     const eventId = req.params.id;
-    const { userId: targetUserId } = req.body as { userId?: string };
-    if (!targetUserId) return res.status(400).json({ message: "userId obbligatorio" });
+    const parsedIu = inviteUserToEventSchema.safeParse(req.body);
+    if (!parsedIu.success) return res.status(400).json({ message: parsedIu.error.errors[0].message });
+    const { userId: targetUserId } = parsedIu.data;
 
     const [event] = await db.select({
       id: events.id,

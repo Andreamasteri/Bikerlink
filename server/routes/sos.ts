@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { allLimited } from "../lib/concurrency";
+import { createSosSchema } from "@shared/schema";
 
 const router = Router();
 
@@ -16,15 +17,12 @@ router.use(requireAuth);
 router.post("/", async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { reason, latitude, longitude, radiusKm } = req.body;
-
-    if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
-      return res.status(400).json({ message: "Motivo richiesto" });
+    const parsed = createSosSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
     }
-    if (typeof latitude !== "number" || typeof longitude !== "number") {
-      return res.status(400).json({ message: "Posizione GPS richiesta" });
-    }
-    const radius = typeof radiusKm === "number" && radiusKm > 0 ? radiusKm : 10;
+    const { reason, latitude, longitude, radiusKm } = parsed.data;
+    const radius = radiusKm ?? 10;
 
     const sosEnabled = await storage.getAppSetting("sos_enabled");
     if (sosEnabled?.value === "false") {

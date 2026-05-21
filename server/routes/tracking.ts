@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
-import { gpsRejectionStats } from "@shared/schema";
+import { gpsRejectionStats, createRouteSchema, addRoutePointsSchema, stopRouteSchema, routeStatsSchema, updateRouteTitleSchema } from "@shared/schema";
 import { sql as drizzleSql } from "drizzle-orm";
 import { sendAdminGpsAlertPush } from "../push-notifications";
 import { haversineKm } from "../geo";
@@ -44,12 +44,16 @@ router.post("/", async (req: Request, res: Response) => {
       }
     }
 
-    const { title, trackingFrequency, isSprint } = req.body;
+    const parsed = createRouteSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
+    }
+    const { title, trackingFrequency, isSprint } = parsed.data;
 
     const route = await storage.createRoute({
       userId,
-      title: title || null,
-      trackingFrequency: trackingFrequency || 5,
+      title: title ?? null,
+      trackingFrequency: trackingFrequency ?? 5,
       status: "active",
       isSprint: isSprint === true,
       startedAt: new Date(),
@@ -80,74 +84,76 @@ router.post("/:id/points", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Il percorso non è attivo" });
     }
 
-    const { points } = req.body;
-    if (!Array.isArray(points) || points.length === 0) {
-      return res.status(400).json({ message: "Nessun punto GPS fornito" });
-    }
-
-    const invalidPoints = points.filter(
-      (p: any) =>
-        typeof p.latitude !== "number" || !isFinite(p.latitude) ||
-        typeof p.longitude !== "number" || !isFinite(p.longitude)
-    );
-    if (invalidPoints.length > 0) {
-      const payload = JSON.stringify(invalidPoints);
-      console.warn(
-        `[tracking] Coordinate non valide rifiutate — userId=${userId} routeId=${id} count=${invalidPoints.length} payload=${payload}`
+    const parsedPoints = addRoutePointsSchema.safeParse(req.body);
+    if (!parsedPoints.success) {
+      // Check for invalid coordinates specifically to log GPS rejections before returning 400
+      const rawPoints = Array.isArray(req.body?.points) ? req.body.points : [];
+      const invalidPoints = rawPoints.filter(
+        (p: any) =>
+          typeof p.latitude !== "number" || !isFinite(p.latitude) ||
+          typeof p.longitude !== "number" || !isFinite(p.longitude)
       );
-      const rawDeviceId =
-        (req.headers["expo-device-id"] as string | undefined) ||
-        (req.headers["expo-installation-id"] as string | undefined) ||
-        "unknown";
-      const deviceId = rawDeviceId.substring(0, 128);
-      const platform = (req.headers["expo-platform"] as string | undefined)?.substring(0, 20) ?? null;
-      (async () => {
-        try {
-          const returned = await db.insert(gpsRejectionStats)
-            .values({
-              userId,
-              deviceId,
-              platform,
-              rejectionCount: 1,
-              lastRejectedPayload: payload.slice(0, 2000),
-              lastRejectedAt: new Date(),
-              lastSource: "tracking",
-            })
-            .onConflictDoUpdate({
-              target: [gpsRejectionStats.userId, gpsRejectionStats.deviceId],
-              set: {
-                rejectionCount: drizzleSql`${gpsRejectionStats.rejectionCount} + 1`,
+      if (invalidPoints.length > 0) {
+        const payload = JSON.stringify(invalidPoints);
+        console.warn(
+          `[tracking] Coordinate non valide rifiutate — userId=${userId} routeId=${id} count=${invalidPoints.length} payload=${payload}`
+        );
+        const rawDeviceId =
+          (req.headers["expo-device-id"] as string | undefined) ||
+          (req.headers["expo-installation-id"] as string | undefined) ||
+          "unknown";
+        const deviceId = rawDeviceId.substring(0, 128);
+        const platform = (req.headers["expo-platform"] as string | undefined)?.substring(0, 20) ?? null;
+        (async () => {
+          try {
+            const returned = await db.insert(gpsRejectionStats)
+              .values({
+                userId,
+                deviceId,
                 platform,
+                rejectionCount: 1,
                 lastRejectedPayload: payload.slice(0, 2000),
                 lastRejectedAt: new Date(),
                 lastSource: "tracking",
-              },
-            })
-            .returning({ rejectionCount: gpsRejectionStats.rejectionCount });
-          const newCount = returned[0]?.rejectionCount ?? 0;
-          if (newCount > 0) {
-            const thresholdSetting = await storage.getAppSetting("gps_rejection_alert_threshold");
-            const threshold = thresholdSetting?.value ? Number(thresholdSetting.value) : 100;
-            if (!Number.isNaN(threshold) && newCount - 1 < threshold && newCount >= threshold) {
-              const user = await storage.getUser(userId);
-              sendAdminGpsAlertPush({
-                userId,
-                nickname: user?.nickname ?? null,
-                deviceId,
-                rejectionCount: newCount,
-              }).catch(() => {});
+              })
+              .onConflictDoUpdate({
+                target: [gpsRejectionStats.userId, gpsRejectionStats.deviceId],
+                set: {
+                  rejectionCount: drizzleSql`${gpsRejectionStats.rejectionCount} + 1`,
+                  platform,
+                  lastRejectedPayload: payload.slice(0, 2000),
+                  lastRejectedAt: new Date(),
+                  lastSource: "tracking",
+                },
+              })
+              .returning({ rejectionCount: gpsRejectionStats.rejectionCount });
+            const newCount = returned[0]?.rejectionCount ?? 0;
+            if (newCount > 0) {
+              const thresholdSetting = await storage.getAppSetting("gps_rejection_alert_threshold");
+              const threshold = thresholdSetting?.value ? Number(thresholdSetting.value) : 100;
+              if (!Number.isNaN(threshold) && newCount - 1 < threshold && newCount >= threshold) {
+                const user = await storage.getUser(userId);
+                sendAdminGpsAlertPush({
+                  userId,
+                  nickname: user?.nickname ?? null,
+                  deviceId,
+                  rejectionCount: newCount,
+                }).catch(() => {});
+              }
             }
+          } catch (err) {
+            console.error("[tracking] gps_rejection_stats upsert error:", err);
           }
-        } catch (err) {
-          console.error("[tracking] gps_rejection_stats upsert error:", err);
-        }
-      })();
-      return res.status(400).json({
-        message: "Coordinate GPS non valide: latitudine e longitudine devono essere numeri finiti",
-        invalidCount: invalidPoints.length,
-      });
+        })();
+        return res.status(400).json({
+          message: "Coordinate GPS non valide: latitudine e longitudine devono essere numeri finiti",
+          invalidCount: invalidPoints.length,
+        });
+      }
+      return res.status(400).json({ message: parsedPoints.error.errors[0].message });
     }
 
+    const { points } = parsedPoints.data;
     const routePoints = points.map((p: any) => ({
       routeId: id as string,
       latitude: p.latitude,
@@ -184,6 +190,10 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
 
     const stoppedAt = new Date();
 
+    const parsedStop = stopRouteSchema.safeParse(req.body);
+    if (!parsedStop.success) {
+      return res.status(400).json({ message: parsedStop.error.errors[0].message });
+    }
     const {
       totalDistanceKm: clientDistanceKm,
       maxSpeedKmh: clientMaxSpeed,
@@ -198,7 +208,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       sprint0to100Ms: clientSprint0to100Ms,
       gpsBlackoutCount: clientGpsBlackoutCount,
       gpsBlackoutSeconds: clientGpsBlackoutSeconds,
-    } = req.body;
+    } = parsedStop.data;
 
     let totalDistanceKm: number;
     let maxSpeedKmh: number;
@@ -384,7 +394,11 @@ router.patch("/:id/stats", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Il percorso non è attivo" });
     }
 
-    const { totalDistanceKm, maxSpeedKmh, avgSpeedKmh, maxAltitude, idleTimeSeconds } = req.body;
+    const parsedStats = routeStatsSchema.safeParse(req.body);
+    if (!parsedStats.success) {
+      return res.status(400).json({ message: parsedStats.error.errors[0].message });
+    }
+    const { totalDistanceKm, maxSpeedKmh, avgSpeedKmh, maxAltitude, idleTimeSeconds } = parsedStats.data;
     const updates: any = {};
     if (totalDistanceKm !== undefined) updates.totalDistanceKm = totalDistanceKm;
     if (maxSpeedKmh !== undefined) updates.maxSpeedKmh = maxSpeedKmh;
@@ -465,14 +479,11 @@ router.patch("/:id/title", async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const { title } = req.body;
-    if (!title || typeof title !== "string" || title.trim().length === 0) {
-      return res.status(400).json({ message: "Titolo non valido" });
+    const parsedTitle = updateRouteTitleSchema.safeParse(req.body);
+    if (!parsedTitle.success) {
+      return res.status(400).json({ message: parsedTitle.error.errors[0].message });
     }
-    if (title.trim().length > 200) {
-      return res.status(400).json({ message: "Titolo troppo lungo (max 200 caratteri)" });
-    }
-
+    const { title } = parsedTitle.data;
     const titleUpdate: Partial<import("../../shared/schema").InsertRoute> = { title: title.trim() };
     await storage.updateRoute(id, titleUpdate);
     return res.json({ ok: true });

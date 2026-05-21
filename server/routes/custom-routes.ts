@@ -2,6 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { allLimited } from "../lib/concurrency";
 import { haversineKm } from "../geo";
+import { createCustomRouteSchema, updateCustomRouteSchema, createWaypointSchema, updateWaypointSchema, gpxImportSchema } from "@shared/schema";
 
 const router = Router();
 
@@ -75,15 +76,11 @@ router.post("/api/custom-routes", async (req, res) => {
       return res.status(403).json({ error: "Funzione disattivata" });
     }
 
-    const { title, description, isPublic, visibility } = req.body;
-    if (!title || title.trim().length === 0) {
-      return res.status(400).json({ error: "Il titolo è obbligatorio" });
+    const parsedCr = createCustomRouteSchema.safeParse(req.body);
+    if (!parsedCr.success) {
+      return res.status(400).json({ error: parsedCr.error.errors[0].message });
     }
-
-    if (visibility !== undefined && !isValidVisibility(visibility)) {
-      return res.status(400).json({ error: "Valore visibility non valido. Usa: public, friends, private" });
-    }
-
+    const { title, description, isPublic, visibility } = parsedCr.data;
     const resolvedVis = resolveVisibility(visibility, isPublic);
 
     const route = await storage.createCustomRoute({
@@ -149,11 +146,11 @@ router.put("/api/custom-routes/:id", async (req, res) => {
     if (!route) return res.status(404).json({ error: "Percorso non trovato" });
     if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
 
-    const { title, description, isPublic, visibility, totalDistanceKm } = req.body;
-
-    if (visibility !== undefined && !isValidVisibility(visibility)) {
-      return res.status(400).json({ error: "Valore visibility non valido. Usa: public, friends, private" });
+    const parsedUpd = updateCustomRouteSchema.safeParse(req.body);
+    if (!parsedUpd.success) {
+      return res.status(400).json({ error: parsedUpd.error.errors[0].message });
     }
+    const { title, description, isPublic, visibility, totalDistanceKm } = parsedUpd.data;
 
     type UpdateFields = {
       title?: string;
@@ -222,10 +219,11 @@ router.post("/api/custom-routes/:id/waypoints", async (req, res) => {
     if (!route) return res.status(404).json({ error: "Percorso non trovato" });
     if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
 
-    const { name, description, latitude, longitude, waypointType, orderIndex } = req.body;
-    if (!name || latitude == null || longitude == null) {
-      return res.status(400).json({ error: "Nome e coordinate obbligatori" });
+    const parsedWp = createWaypointSchema.safeParse(req.body);
+    if (!parsedWp.success) {
+      return res.status(400).json({ error: parsedWp.error.errors[0].message });
     }
+    const { name, description, latitude, longitude, waypointType, orderIndex } = parsedWp.data;
 
     const waypoint = await storage.createCustomRouteWaypoint({
       routeId: route.id,
@@ -252,7 +250,11 @@ router.put("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) => {
     if (!route) return res.status(404).json({ error: "Percorso non trovato" });
     if (route.userId !== userId) return res.status(403).json({ error: "Non autorizzato" });
 
-    const { name, description, latitude, longitude, waypointType, orderIndex } = req.body;
+    const parsedWpUpd = updateWaypointSchema.safeParse(req.body);
+    if (!parsedWpUpd.success) {
+      return res.status(400).json({ error: parsedWpUpd.error.errors[0].message });
+    }
+    const { name, description, latitude, longitude, waypointType, orderIndex } = parsedWpUpd.data;
     const updated = await storage.updateCustomRouteWaypoint(req.params.waypointId, {
       ...(name !== undefined && { name: name.trim() }),
       ...(description !== undefined && { description: description?.trim() || null }),
@@ -362,11 +364,11 @@ router.post("/api/custom-routes/import-gpx", async (req, res) => {
       return res.status(403).json({ error: "Funzione disattivata" });
     }
 
-    const { gpxContent, title } = req.body as { gpxContent?: unknown; title?: unknown };
-
-    if (typeof gpxContent !== "string" || gpxContent.trim().length === 0) {
-      return res.status(400).json({ error: "gpxContent è obbligatorio" });
+    const parsedGpx = gpxImportSchema.safeParse(req.body);
+    if (!parsedGpx.success) {
+      return res.status(400).json({ error: parsedGpx.error.errors[0].message });
     }
+    const { gpxContent, title } = parsedGpx.data;
 
     const points = parseGpxServer(gpxContent);
     if (points.length === 0) {

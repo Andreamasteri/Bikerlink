@@ -4,6 +4,7 @@ import fs from "fs";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { sendMatchPushNotifications } from "../push-notifications";
+import { updateWishlistSchema, uploadPhotoSchema, addWishlistMotoSchema, updateWishlistMotoSchema } from "@shared/schema";
 
 const router = Router();
 
@@ -45,8 +46,12 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 router.put("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { description } = req.body;
-    const wishlist = await storage.createOrUpdateWishlist(userId, description || "");
+    const parsed = updateWishlistSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
+    }
+    const { description } = parsed.data;
+    const wishlist = await storage.createOrUpdateWishlist(userId, description ?? "");
     return res.json(wishlist);
   } catch (error) {
     console.error("Update wishlist error:", error);
@@ -67,13 +72,14 @@ router.post("/photos", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Massimo 3 foto permesse" });
     }
 
-    const { imageBase64, filename } = req.body;
-    if (!imageBase64) {
-      return res.status(400).json({ message: "Nessuna immagine fornita" });
+    const parsedPhoto = uploadPhotoSchema.safeParse(req.body);
+    if (!parsedPhoto.success) {
+      return res.status(400).json({ message: parsedPhoto.error.errors[0].message });
     }
+    const { imageBase64, filename } = parsedPhoto.data;
 
     const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, "");
-    const ext = (filename || "photo.jpg").split(".").pop() || "jpg";
+    const ext = (filename ?? "photo.jpg").split(".").pop() ?? "jpg";
     const uniqueName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${ext}`;
     const filePath = path.join(uploadsDir, uniqueName);
     fs.writeFileSync(filePath, Buffer.from(base64Data, "base64"));
@@ -116,17 +122,18 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Massimo 5 moto nella wishlist" });
     }
 
-    const { brand, model, ridingStyle, motorcycleType } = req.body;
-    if (!brand && !model && !motorcycleType) {
-      return res.status(400).json({ message: "Specifica marca e modello oppure tipo moto" });
+    const parsedMoto = addWishlistMotoSchema.safeParse(req.body);
+    if (!parsedMoto.success) {
+      return res.status(400).json({ message: parsedMoto.error.errors[0].message });
     }
+    const { brand, model, ridingStyle, motorcycleType } = parsedMoto.data;
 
     const moto = await storage.addWishlistMoto({
       wishlistId: wishlist.id,
-      brand: brand || null,
-      model: model || null,
-      motorcycleType: motorcycleType || null,
-      ridingStyle: ridingStyle || null,
+      brand: brand ?? null,
+      model: model ?? null,
+      motorcycleType: motorcycleType ?? null,
+      ridingStyle: ridingStyle ?? null,
     });
 
     let matches: any[] = [];
@@ -192,7 +199,11 @@ router.put("/motos/:motoId", requireAuth, async (req: Request, res: Response) =>
       return res.status(403).json({ message: "Non autorizzato" });
     }
 
-    const { brand, model, ridingStyle, motorcycleType } = req.body;
+    const parsedMotoUpdate = updateWishlistMotoSchema.safeParse(req.body);
+    if (!parsedMotoUpdate.success) {
+      return res.status(400).json({ message: parsedMotoUpdate.error.errors[0].message });
+    }
+    const { brand, model, ridingStyle, motorcycleType } = parsedMotoUpdate.data;
     const moto = await storage.updateWishlistMoto(motoId, { brand, model, ridingStyle, motorcycleType });
     return res.json(moto);
   } catch (error) {

@@ -2,6 +2,7 @@ import express, { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { sendEmail } from "../email";
 import { feedbackRateLimiter, getTrustedClientIp } from "../lib/abuse-rate-limit";
+import { createFeedbackSchema, updateFeedbackTicketSchema } from "@shared/schema";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 
@@ -72,33 +73,14 @@ router.post("/", feedbackJson, async (req: Request, res: Response) => {
       });
     }
 
-    const { ticketType, subject, message } = req.body ?? {};
-
-    // Task #1125: tight server-side type/length validation. The body
-    // parser already caps the request at 16 KB, but a single 4 KB
-    // message field is enough for a real bug report and small enough
-    // that storage and the rendered HTML email cannot be weaponised.
-    if (typeof subject !== "string" || typeof message !== "string") {
-      return res.status(400).json({ message: "Oggetto e messaggio sono obbligatori" });
+    const parsed = createFeedbackSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
     }
+    const { ticketType, subject, message } = parsed.data;
     const trimmedSubject = subject.trim();
     const trimmedMessage = message.trim();
-    if (!trimmedSubject || !trimmedMessage) {
-      return res.status(400).json({ message: "Oggetto e messaggio sono obbligatori" });
-    }
-    if (trimmedSubject.length > FEEDBACK_SUBJECT_MAX_LEN) {
-      return res.status(400).json({
-        message: `L'oggetto non può superare ${FEEDBACK_SUBJECT_MAX_LEN} caratteri`,
-      });
-    }
-    if (trimmedMessage.length > FEEDBACK_MESSAGE_MAX_LEN) {
-      return res.status(400).json({
-        message: `Il messaggio non può superare ${FEEDBACK_MESSAGE_MAX_LEN} caratteri`,
-      });
-    }
-    const safeTicketType = typeof ticketType === "string" && ALLOWED_TICKET_TYPES.has(ticketType)
-      ? ticketType
-      : "feedback";
+    const safeTicketType = ticketType ?? "feedback";
 
     const ticket = await storage.createFeedbackTicket({
       userId: req.session.userId,
@@ -154,7 +136,9 @@ router.patch("/:id", async (req: Request, res: Response) => {
     if (!user || (user.role !== "admin" && user.role !== "moderator")) {
       return res.status(403).json({ message: "Accesso negato" });
     }
-    const { status, internalNote } = req.body;
+    const parsedFbu = updateFeedbackTicketSchema.safeParse(req.body);
+    if (!parsedFbu.success) return res.status(400).json({ message: parsedFbu.error.errors[0].message });
+    const { status, internalNote } = parsedFbu.data;
     const updates: { status?: string; internalNote?: string } = {};
     if (status !== undefined) updates.status = status;
     if (internalNote !== undefined) updates.internalNote = internalNote;

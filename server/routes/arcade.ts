@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
-import { arcadeScores } from "@shared/schema";
+import { arcadeScores, arcadeScoreSchema } from "@shared/schema";
 import { eq, sql, max, and } from "drizzle-orm";
 
 const router = Router();
@@ -28,13 +28,14 @@ router.post("/score", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
 
-  const { game, score } = req.body as { game: string; score: number };
+  const parsed = arcadeScoreSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: parsed.error.errors[0].message });
+  }
+  const { game, score } = parsed.data;
 
   if (!VALID_GAMES.includes(game as GameId)) {
     return res.status(400).json({ message: "Gioco non valido" });
-  }
-  if (typeof score !== "number" || score < 0 || !Number.isInteger(score)) {
-    return res.status(400).json({ message: "Punteggio non valido" });
   }
   const validGame = game as GameId;
   if (score > SCORE_CAPS[validGame]) {

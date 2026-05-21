@@ -1,5 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
+import { generateInvitationSchema } from "@shared/schema";
 
 const router = Router();
 
@@ -14,15 +15,19 @@ router.post("/generate", async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Accesso negato" });
     }
 
-    const { maxUses, expiresAt } = req.body;
+    const parsed = generateInvitationSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0].message });
+    }
+    const { maxUses, expiresAt } = parsed.data;
 
     const code = "BL-" + Date.now().toString(36).toUpperCase() + "-" + Math.random().toString(36).substr(2, 5).toUpperCase();
 
     const invitation = await storage.createInvitationCode({
       code,
       createdBy: req.session.userId,
-      maxUses: maxUses || 100,
-      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      maxUses: maxUses ?? 100,
+      expiresAt: expiresAt ?? undefined,
     });
 
     return res.status(201).json(invitation);
