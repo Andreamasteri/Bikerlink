@@ -689,3 +689,110 @@ describe("GET /api/users/zavorrine-available-list — map_visibility_filter", ()
     expect(res.body).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// positionFuzz — distance must be null for fuzzed users (triangulation guard)
+// ---------------------------------------------------------------------------
+
+describe("positionFuzz — distance nulled to prevent triangulation", () => {
+  let app: express.Application;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    app = buildApp();
+    vi.mocked(storage.getBlockedUserIds).mockResolvedValue([]);
+    vi.mocked(storage.getUserMotorcycles).mockResolvedValue([]);
+  });
+
+  it("nearby: distance is null for a positionFuzz user viewed by another user", async () => {
+    vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
+      if (key === "map_visibility_filter") return filterSetting("all") as any;
+      return null;
+    });
+    vi.mocked(storage.getNearbyUsers).mockResolvedValue([
+      {
+        ...makeNearbyRow("fuzz-user", { lastLoginAt: new Date().toISOString() }, {
+          positionFuzz: true,
+          positionFuzzKm: 2,
+        }),
+        distance: 7.5,
+      } as any,
+    ]);
+
+    const res = await request(app).get("/api/users/nearby?lat=45&lng=9&radius=50");
+
+    expect(res.status).toBe(200);
+    const user = res.body.find((u: any) => u.id === "fuzz-user");
+    expect(user).toBeDefined();
+    expect(user.distance).toBeNull();
+  });
+
+  it("nearby: distance is present for a non-fuzzed user", async () => {
+    vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
+      if (key === "map_visibility_filter") return filterSetting("all") as any;
+      return null;
+    });
+    vi.mocked(storage.getNearbyUsers).mockResolvedValue([
+      {
+        ...makeNearbyRow("plain-user", { lastLoginAt: new Date().toISOString() }, {
+          positionFuzz: false,
+          positionFuzzKm: 0,
+        }),
+        distance: 7.5,
+      } as any,
+    ]);
+
+    const res = await request(app).get("/api/users/nearby?lat=45&lng=9&radius=50");
+
+    expect(res.status).toBe(200);
+    const user = res.body.find((u: any) => u.id === "plain-user");
+    expect(user).toBeDefined();
+    expect(user.distance).toBe(7.5);
+  });
+
+  it("biker-available-list: distance is null for a positionFuzz biker viewed by another user", async () => {
+    vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
+      if (key === "map_visibility_filter") return filterSetting("all") as any;
+      return null;
+    });
+    vi.mocked(onlineTracker.getAvailableBikerIds).mockReturnValue(["fuzz-biker"]);
+    vi.mocked(storage.getAvailableBikersList).mockResolvedValue([
+      makeAvailableRow("fuzz-biker", "biker", {
+        positionFuzz: true,
+        positionFuzzKm: 3,
+      }) as any,
+    ]);
+
+    const res = await request(app).get("/api/users/biker-available-list?lat=45&lng=9");
+
+    expect(res.status).toBe(200);
+    const user = res.body.find((u: any) => u.id === "fuzz-biker");
+    expect(user).toBeDefined();
+    expect(user.distance).toBeNull();
+  });
+
+  it("zavorrine-available-list: distance is null for a positionFuzz zavorrina viewed by another user", async () => {
+    vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
+      if (key === "map_visibility_filter") return filterSetting("all") as any;
+      return null;
+    });
+    vi.mocked(onlineTracker.getAvailableZavorrinaIds).mockReturnValue(["fuzz-zav"]);
+    vi.mocked(storage.getAvailableZavorrinaList).mockResolvedValue([
+      makeAvailableRow("fuzz-zav", "zavorrina", {
+        positionFuzz: true,
+        positionFuzzKm: 1,
+      }) as any,
+    ]);
+
+    const res = await request(app).get("/api/users/zavorrine-available-list?lat=45&lng=9");
+
+    expect(res.status).toBe(200);
+    const user = res.body.find((u: any) => u.id === "fuzz-zav");
+    expect(user).toBeDefined();
+    expect(user.distance).toBeNull();
+  });
+});

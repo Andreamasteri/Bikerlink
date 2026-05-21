@@ -111,6 +111,11 @@ function fuzzedCoordsForViewer(
   return { latitude: lat, longitude: lng };
 }
 
+function isPositionFuzzed(profile: any, isOwner: boolean): boolean {
+  if (isOwner) return false;
+  return !!(profile?.positionFuzz && (profile?.positionFuzzKm ?? 0) > 0);
+}
+
 
 function applyFakeHome(
   lat: number,
@@ -1003,7 +1008,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
           bio: item.profile?.bio || null,
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
-          distance: (!showDistanceInCounter || item.profile?.hideFromMap) ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance)) ? Math.round(item.distance * 10) / 10 : null,
+          distance: (!showDistanceInCounter || item.profile?.hideFromMap || isPositionFuzzed(item.profile, item.user.id === requesterId)) ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance)) ? Math.round(item.distance * 10) / 10 : null,
           ...(() => {
             if (item.profile?.hideFromMap) return { latitude: null, longitude: null };
             const fc = fuzzedCoordsForViewer(item.profile?.latitude, item.profile?.longitude, item.profile, item.user.id === requesterId);
@@ -1174,7 +1179,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
           bio: item.profile?.bio || null,
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
-          distance: item.profile?.hideFromMap ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null),
+          distance: (item.profile?.hideFromMap || isPositionFuzzed(item.profile, item.user.id === requesterId)) ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null),
           ...(() => {
             if (item.profile?.hideFromMap) return { latitude: null, longitude: null };
             const fc = fuzzedCoordsForViewer(item.profile?.latitude, item.profile?.longitude, item.profile, item.user.id === requesterId);
@@ -1272,7 +1277,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
           bio: item.profile?.bio || null,
           moto: firstMoto ? `${firstMoto.brand} ${firstMoto.model}` : null,
           ridingStyle: firstMoto?.ridingStyle || null,
-          distance: item.profile?.hideFromMap ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null),
+          distance: (item.profile?.hideFromMap || isPositionFuzzed(item.profile, item.user.id === requesterId)) ? null : (lat != null && lng != null && typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null),
           ...(() => {
             if (item.profile?.hideFromMap) return { latitude: null, longitude: null };
             const fc = fuzzedCoordsForViewer(item.profile?.latitude, item.profile?.longitude, item.profile, item.user.id === requesterId);
@@ -1323,8 +1328,9 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
         const hasFuzzedCoords = item.profile?.lastOfflineLat != null && item.profile?.lastOfflineLng != null;
         const servedLat = (useOfflineCoords && hasFuzzedCoords) ? item.profile!.lastOfflineLat : item.profile?.latitude;
         const servedLng = (useOfflineCoords && hasFuzzedCoords) ? item.profile!.lastOfflineLng : item.profile?.longitude;
-        // Distance was computed from real stored coords in SQL; null it for fuzzed users to avoid leaking position signal
-        const servedDistance = (useOfflineCoords && hasFuzzedCoords) ? null : (typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null);
+        // Distance was computed from real stored coords in SQL; null it for offline-fuzzed users and for
+        // positionFuzz users — both cases would allow triangulation of the real position via precise distance.
+        const servedDistance = ((useOfflineCoords && hasFuzzedCoords) || isPositionFuzzed(item.profile, item.user.id === requesterId)) ? null : (typeof item.distance === "number" && Number.isFinite(item.distance) ? Math.round(item.distance * 10) / 10 : null);
         return {
           id: item.user.id,
           nickname: item.user.nickname,
