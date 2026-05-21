@@ -59,6 +59,7 @@ export const users = pgTable("users", {
   firstLoginAt: timestamp("first_login_at"),
   firstLoginLat: doublePrecision("first_login_lat"),
   firstLoginLng: doublePrecision("first_login_lng"),
+  lastSeenMatchAt: timestamp("last_seen_match_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

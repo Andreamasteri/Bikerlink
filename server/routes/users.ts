@@ -472,6 +472,17 @@ router.post("/app-close", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.put("/me/match-seen", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    await storage.updateUser(userId, { lastSeenMatchAt: new Date() } as any);
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Match seen update error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.put("/me/push-token", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
