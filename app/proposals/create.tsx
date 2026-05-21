@@ -205,6 +205,23 @@ export default function CreateProposalScreen() {
   const motos = (motorcycles as any[]) || [];
   const wishlistMotos = (wishlistData as any)?.motos || [];
 
+  useEffect(() => {
+    if (selectedSearchTypes.length === 0) return;
+    const mapping: Record<string, string[]> = {
+      find_a_friend: ["biker"],
+      find_a_guest:  ["zavorrina"],
+      hitcher:       ["hitchhiker"],
+      hitchhiker:    ["hotcher"],
+      find_a_biker:  ["biker", "hotcher"],
+    };
+    const derived = Array.from(
+      new Set(selectedSearchTypes.flatMap((st) => mapping[st] ?? []))
+    );
+    if (derived.length > 0) {
+      setSelectedTargetUserTypes(derived);
+    }
+  }, [selectedSearchTypes]);
+
   const proposalType = useMemo(() => {
     const first = selectedSearchTypes[0];
     if (!first) return "";
