@@ -356,8 +356,11 @@ export async function triggerOtaCheck(
       const appIsActive = AppState.currentState === "active";
       if (options?.immediateReload || !appIsActive) {
         phase = "reload";
-        AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
         await Updates.reloadAsync();
+        // reloadAsync non ritorna in condizioni normali — l'app si riavvia.
+        // Se per qualche motivo ritorna, rimuoviamo la chiave ora.
+        // Se lancia, l'eccezione sale al catch esterno e la chiave rimane intatta.
+        AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
         const r: OtaManualResult = { ok: true, phase: "reload" };
         _emitOtaResult(r);
         return r;
@@ -383,9 +386,11 @@ export async function triggerOtaCheck(
     const appIsActive = AppState.currentState === "active";
     if (options?.immediateReload || !appIsActive) {
       phase = "reload";
-      AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
       await Updates.reloadAsync();
-      // reloadAsync non ritorna sotto normali condizioni — l'app si riavvia.
+      // reloadAsync non ritorna in condizioni normali — l'app si riavvia.
+      // Se per qualche motivo ritorna, rimuoviamo la chiave ora.
+      // Se lancia, l'eccezione sale al catch esterno e la chiave rimane intatta.
+      AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
       const r: OtaManualResult = { ok: true, phase: "reload" };
       _emitOtaResult(r);
       return r;

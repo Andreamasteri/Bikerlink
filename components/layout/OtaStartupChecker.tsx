@@ -23,8 +23,14 @@ export function OtaStartupChecker() {
         try {
           const pending = await AsyncStorage.getItem(OTA_PENDING_KEY);
           if (pending === "1" && mounted) {
-            await AsyncStorage.removeItem(OTA_PENDING_KEY);
-            Updates.reloadAsync().catch(() => {});
+            // Rimuoviamo la chiave solo DOPO che reloadAsync ha avuto successo.
+            // reloadAsync non ritorna in condizioni normali (l'app si riavvia).
+            // Se lancia un errore, la chiave rimane → il prossimo cold start riprova.
+            Updates.reloadAsync()
+              .then(() => {
+                AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
+              })
+              .catch(() => {});
             return; // non schedula il check normale
           }
         } catch {}
