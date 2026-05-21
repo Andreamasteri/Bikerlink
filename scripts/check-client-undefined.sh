@@ -42,7 +42,7 @@
 #   Example: @shared/schema → shared/schema.ts  (NOT shared/schema/index.ts)
 #            @shared/privacy-policy-it → shared/privacy-policy-it.ts
 #
-# SERVER_ONLY_PACKAGES (mirrors metro.config.js list):
+# SERVER_ONLY_PACKAGES (loaded dynamically from metro.config.js — single source):
 #   These packages are replaced with mocks/empty.js on iOS/Android by Metro.
 #   Any shared module that imports them risks the OTA-4 init-crash pattern.
 #
@@ -58,31 +58,20 @@ FAIL=0
 PASS=0
 
 # ---------------------------------------------------------------------------
-# SERVER_ONLY_PACKAGES — keep in sync with metro.config.js
+# SERVER_ONLY_PACKAGES — loaded dynamically from metro.config.js (single source)
 # ---------------------------------------------------------------------------
-SERVER_ONLY_PACKAGES=(
-  "pdfkit"
-  "sharp"
-  "docx"
-  "nodemailer"
-  "archiver"
-  "multer"
-  "express"
-  "pg"
-  "drizzle-orm"
-  "bcryptjs"
-  "connect-pg-simple"
-  "node-forge"
-  "undici"
-  "tsx"
-  "flatted"
-  "picomatch"
-  "http-proxy-middleware"
-  "express-session"
-  "express-rate-limit"
-  "@replit/connectors-sdk"
-  "@replit/object-storage"
+# metro.config.js is the authoritative list. Do NOT add packages here manually.
+# To add a new server-only package, edit the SERVER_ONLY_PACKAGES array in
+# metro.config.js — this script will pick it up automatically.
+mapfile -t SERVER_ONLY_PACKAGES < <(
+  node -e "require('./metro.config.js').SERVER_ONLY_PACKAGES.forEach(p => console.log(p))" 2>/dev/null
 )
+
+if [ ${#SERVER_ONLY_PACKAGES[@]} -eq 0 ]; then
+  echo "ERROR: Failed to load SERVER_ONLY_PACKAGES from metro.config.js"
+  echo "  Ensure metro.config.js exports SERVER_ONLY_PACKAGES and Node.js is available."
+  exit 1
+fi
 
 echo ""
 echo "=============================================="

@@ -155,4 +155,10 @@ config.transformer = {
   }),
 };
 
+// SERVER_ONLY_PACKAGES is the single source of truth for which packages are
+// mocked on iOS/Android. scripts/check-client-undefined.sh reads this list
+// dynamically via `node -e` — do NOT duplicate it there.
+// To add a new server-only package: add it to the array above. The check
+// script picks it up automatically on the next run.
 module.exports = config;
+module.exports.SERVER_ONLY_PACKAGES = SERVER_ONLY_PACKAGES;
