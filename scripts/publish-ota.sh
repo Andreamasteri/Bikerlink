@@ -888,6 +888,55 @@ do_publish() {
     echo "   ⚠ Generazione PDF fallita (non bloccante — OTA già attiva)"
   fi
 
+  # ─── Step M: Aggiornamento skill bikerlink-ota-publish ────
+  echo "[M] Aggiornamento skill bikerlink-ota-publish con OTA-$NEXT_OTA..."
+  local SKILL_FILE=".agents/skills/bikerlink-ota-publish/SKILL.md"
+  if [ -f "$SKILL_FILE" ]; then
+    OTA_NEXT_VAR="$NEXT_OTA" \
+    OTA_VERSION_VAR="$VERSION" \
+    OTA_RELEASE_ID_VAR="$RELEASE_ID" \
+    OTA_RUNTIME_VERSION_VAR="$RUNTIME_VERSION" \
+    OTA_RELEASE_MSG_VAR="$RELEASE_MESSAGE" \
+    SKILL_FILE_PATH="$SKILL_FILE" \
+    node -e "
+      const fs = require('fs');
+      const path = process.env.SKILL_FILE_PATH;
+      const nextOta = parseInt(process.env.OTA_NEXT_VAR, 10);
+      const version = process.env.OTA_VERSION_VAR;
+      const releaseId = process.env.OTA_RELEASE_ID_VAR;
+      const msg = process.env.OTA_RELEASE_MSG_VAR;
+      const shortId = releaseId.substring(0, 8);
+      let content = fs.readFileSync(path, 'utf8');
+
+      // 1. Aggiorna la riga 'OTA corrente' nella sezione Contesto fisso
+      content = content.replace(
+        /- \*\*OTA corrente\*\*: OTA-\d+[^\n]*/,
+        \`- **OTA corrente**: OTA-\${nextOta} (ciclo 10.x)\`
+      );
+
+      // 2. Aggiorna CURRENT_OTA_NUMBER nella sezione Ciclo 10.x
+      content = content.replace(
+        /  - CURRENT_OTA_NUMBER=\d+[^\n]*/,
+        \`  - CURRENT_OTA_NUMBER=\${nextOta}, __OTA_BUILD_TAG__=\"BL-OTA-\${nextOta}-cycle10\"\`
+      );
+
+      // 3. Aggiunge entry OTA nella sezione Ciclo 10.x dopo l'ultima riga '  - OTA-'
+      const newEntry = \`  - OTA-\${nextOta} (v\${version}): \${msg}, releaseId: \\\`\${shortId}\\\`\`;
+      const lastOtaIdx = content.lastIndexOf('\n  - OTA-');
+      if (lastOtaIdx !== -1) {
+        const endOfLine = content.indexOf('\n', lastOtaIdx + 1);
+        const insertPos = endOfLine !== -1 ? endOfLine : content.length;
+        content = content.slice(0, insertPos) + '\n' + newEntry + content.slice(insertPos);
+      }
+
+      fs.writeFileSync(path, content, 'utf8');
+      process.stdout.write('OK');
+    " 2>/dev/null && echo "   ✔ Skill aggiornata: OTA-$NEXT_OTA in $SKILL_FILE" \
+      || echo "   ⚠ Aggiornamento skill fallito (non bloccante — OTA già attiva)"
+  else
+    echo "   ⚠ Skill file non trovato: $SKILL_FILE (non bloccante)"
+  fi
+
   echo ""
   echo "╔══════════════════════════════════════════════════════════════════╗"
   echo "║  ✅ OTA-$NEXT_OTA pubblicata con successo!"
