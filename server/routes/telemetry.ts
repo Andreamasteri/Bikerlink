@@ -145,12 +145,47 @@ router.get("/stats", async (req: Request, res: Response) => {
     const kmCollected = Math.round(parseFloat(kmRow?.km_collected ?? "0") * 10) / 10;
     const progressPct = Math.min(100, Math.round((kmCollected / TARGET_KM) * 100));
 
+    const trackKmResult = await db.execute(sql`
+      WITH ordered AS (
+        SELECT
+          session_id,
+          lat,
+          lon,
+          ts,
+          LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
+          LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
+        FROM ride_telemetry
+        WHERE user_id = ${userId}
+          AND session_type = 'ideal_lap'
+      ),
+      distances AS (
+        SELECT
+          2 * 6371 * ASIN(
+            SQRT(
+              POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
+              + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
+              * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
+            )
+          ) AS dist_km
+        FROM ordered
+        WHERE prev_lat IS NOT NULL AND prev_lon IS NOT NULL
+          AND ABS(lat - prev_lat) < 0.5
+          AND ABS(lon - prev_lon) < 0.5
+      )
+      SELECT COALESCE(SUM(dist_km), 0) AS track_km
+      FROM distances
+    `);
+
+    const trackKmRow = trackKmResult.rows[0] as { track_km: string } | undefined;
+    const trackKm = Math.round(parseFloat(trackKmRow?.track_km ?? "0") * 10) / 10;
+
     return res.json({
       km_collected: kmCollected,
       sample_count: sampleCount,
       session_count: sessionCount,
       progress_pct: progressPct,
       target_km: TARGET_KM,
+      track_km: trackKm,
     });
   } catch (err) {
     console.error("[telemetry/stats] error:", err);

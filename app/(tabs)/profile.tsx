@@ -843,6 +843,7 @@ export default function ProfileScreen() {
     session_count: number;
     progress_pct: number;
     target_km: number;
+    track_km: number;
   }>({
     queryKey: ["/api/telemetry/stats"],
     enabled: !!user,
@@ -1050,6 +1051,15 @@ export default function ProfileScreen() {
                 {telemetryStats.session_count} {telemetryStats.session_count === 1 ? "sessione" : "sessioni"}
               </Text>
             </View>
+            {telemetryStats.track_km > 0 && (
+              <View style={styles.trackKmRow}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                  <Ionicons name="flag-outline" size={13} color="#e67e22" />
+                  <Text style={styles.trackKmLabel}>Km in pista</Text>
+                </View>
+                <Text style={styles.trackKmValue}>{telemetryStats.track_km.toFixed(1)} km</Text>
+              </View>
+            )}
             {telemetryExpanded && (
               <View style={styles.telemetryExpanded}>
                 <View style={styles.telemetryExpandedHeader}>
@@ -2198,6 +2208,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#e74c3c44",
     backgroundColor: "#e74c3c11",
+  },
+  trackKmRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  trackKmLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#e67e22",
+  },
+  trackKmValue: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#e67e22",
   },
   telemetryResetBtnText: {
     fontSize: 11,

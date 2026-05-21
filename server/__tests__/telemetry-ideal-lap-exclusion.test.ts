@@ -39,7 +39,8 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
 
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "0", session_count: "0" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "0" }] } as any);
+      .mockResolvedValueOnce({ rows: [{ km_collected: "0" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as any);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -47,6 +48,7 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
     expect(res.body.km_collected).toBe(0);
     expect(res.body.session_count).toBe(0);
     expect(res.body.progress_pct).toBe(0);
+    expect(res.body.track_km).toBe(0);
   });
 
   it("progress_pct and session_count reflect only non-ideal_lap data from DB", async () => {
@@ -54,7 +56,8 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
 
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "200", session_count: "3" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "150.5" }] } as any);
+      .mockResolvedValueOnce({ rows: [{ km_collected: "150.5" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as any);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -63,6 +66,7 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
     expect(res.body.km_collected).toBe(150.5);
     expect(res.body.progress_pct).toBe(15);
     expect(res.body.target_km).toBe(1000);
+    expect(res.body.track_km).toBe(0);
   });
 
   it("adding more km (simulating a non-ideal ride) increases progress_pct", async () => {
@@ -70,12 +74,30 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
 
     dbExecute
       .mockResolvedValueOnce({ rows: [{ sample_count: "500", session_count: "5" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "300" }] } as any);
+      .mockResolvedValueOnce({ rows: [{ km_collected: "300" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as any);
 
     const res = await request(app).get("/api/telemetry/stats");
 
     expect(res.status).toBe(200);
     expect(res.body.progress_pct).toBe(30);
     expect(res.body.km_collected).toBe(300);
+    expect(res.body.track_km).toBe(0);
+  });
+
+  it("track_km is populated from ideal_lap sessions only", async () => {
+    const dbExecute = vi.mocked(db.execute);
+
+    dbExecute
+      .mockResolvedValueOnce({ rows: [{ sample_count: "300", session_count: "4" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "200" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ track_km: "12.5" }] } as any);
+
+    const res = await request(app).get("/api/telemetry/stats");
+
+    expect(res.status).toBe(200);
+    expect(res.body.km_collected).toBe(200);
+    expect(res.body.track_km).toBe(12.5);
+    expect(res.body.progress_pct).toBe(20);
   });
 });
