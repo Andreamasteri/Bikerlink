@@ -470,10 +470,18 @@ export default function MapScreen() {
     setLastSmallMapCenter({ latitude: u.latitude, longitude: u.longitude });
     const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
     setTimeout(() => {
-      activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude });
+      activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude, userId: u.id });
       handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: u.latitude, longitude: u.longitude });
+      if (u.nickname) {
+        setFocusToast(`Vista centrata su ${u.nickname}`);
+        Animated.sequence([
+          Animated.timing(focusToastAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
+          Animated.delay(2200),
+          Animated.timing(focusToastAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+        ]).start(() => setFocusToast(null));
+      }
     }, 300);
-  }, [mapFullscreen, handleUserPress]);
+  }, [mapFullscreen, handleUserPress, focusToastAnim]);
 
   if (authLoading || locationLoading) {
     return (
