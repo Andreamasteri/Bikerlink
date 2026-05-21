@@ -2242,6 +2242,8 @@ export const createOtaReleaseSchema = z.object({
 export type CreateOtaReleaseInput = z.infer<typeof createOtaReleaseSchema>;
 
 export const publishOtaReleaseSchema = z.object({
+  version: z.string().min(1, "version è obbligatorio"),
+  runtimeVersion: z.string().min(1, "runtimeVersion è obbligatorio"),
   bundlePath: z.string().min(1, "bundlePath è obbligatorio"),
   releaseNotes: z.string().max(5000).optional().nullable(),
   slot: z.enum(["stable", "beta", "canary", "archived"]).optional(),
