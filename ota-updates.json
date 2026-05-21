@@ -1288,7 +1288,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-21T04:25:03.738Z"
+  },
+  {
+    "updateNumber": 2,
+    "version": "48.2.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-2 rv10.0.0: OTA-2 rv10.0.0: pianificazione percorsi curvy, stile selezionabile, badge mappa, distanza/tempo, GraphHopper car fallback, hero landing admin, auto-migrazioni DB",
+    "note": "CURRENT_OTA_NUMBER=2. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "bdffccc3-1b8d-4941-82b2-82769e256d06",
+    "bundleUrl": "private/ota/ota-48.2.10-1779370940257.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "3ef83eab70e578752b8a6f7137f81eddbf3dcd46",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-21T13:42:25.033Z"
   }
 ]
