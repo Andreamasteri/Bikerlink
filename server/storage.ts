@@ -435,6 +435,7 @@ export interface IStorage {
 
   // Proposal-Profile Matches
   createProposalProfileMatch(data: InsertProposalProfileMatch): Promise<ProposalProfileMatch | null>;
+  getProposalProfileMatchById(id: string): Promise<ProposalProfileMatch | undefined>;
   getProposalProfileMatchesForUser(userId: string): Promise<ProposalProfileMatch[]>;
   getProposalProfileMatchesForProposal(proposalId: string): Promise<ProposalProfileMatch[]>;
   getAllExistingProposalProfileMatchKeys(): Promise<Set<string>>;
@@ -2530,6 +2531,11 @@ export class DatabaseStorage implements IStorage {
   async createProposalProfileMatch(data: InsertProposalProfileMatch): Promise<ProposalProfileMatch | null> {
     const [match] = await db.insert(proposalProfileMatches).values(data).onConflictDoNothing().returning();
     return match ?? null;
+  }
+
+  async getProposalProfileMatchById(id: string): Promise<ProposalProfileMatch | undefined> {
+    const [match] = await db.select().from(proposalProfileMatches).where(eq(proposalProfileMatches.id, id));
+    return match;
   }
 
   async getProposalProfileMatchesForUser(userId: string): Promise<ProposalProfileMatch[]> {

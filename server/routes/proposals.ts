@@ -421,6 +421,26 @@ router.post("/proposal-profile-matches/:id/reject", requireAuth, async (req: Req
   }
 });
 
+router.patch("/proposal-profile-matches/:id/reconsider", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const matchId = req.params.id as string;
+    const match = await storage.getProposalProfileMatchById(matchId);
+    if (!match) return res.status(404).json({ message: "Match non trovato" });
+    if (match.bikerId !== userId) {
+      return res.status(403).json({ message: "Solo il biker può riconsiderare un match rifiutato" });
+    }
+    if (match.status !== "rejected") {
+      return res.status(400).json({ message: "Solo i match rifiutati possono essere riconsiderati" });
+    }
+    const updated = await storage.updateProposalProfileMatch(matchId, { status: "new" });
+    return res.json(updated);
+  } catch (error) {
+    console.error("Reconsider proposal-profile match error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
 router.delete("/proposal-profile-matches/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
