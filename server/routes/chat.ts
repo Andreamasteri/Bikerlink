@@ -587,7 +587,7 @@ router.post("/conversations", async (req: Request, res: Response) => {
 
     const parsedConv = createConversationSchema.safeParse(req.body);
     if (!parsedConv.success) {
-      return res.status(400).json({ message: parsedConv.error.errors[0].message });
+      return res.status(400).json({ message: parsedConv.error.issues[0].message });
     }
     const { conversationType, title, proposalId, participantIds } = parsedConv.data;
 
@@ -852,7 +852,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     const id = req.params.id as string;
     const parsedMsg = sendMessageSchema.safeParse(req.body);
     if (!parsedMsg.success) {
-      return res.status(400).json({ message: parsedMsg.error.errors[0].message });
+      return res.status(400).json({ message: parsedMsg.error.issues[0].message });
     }
     const { messageType, content, imageUrl, latitude, longitude } = parsedMsg.data;
 

@@ -265,7 +265,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
 
     const parsed = updateUserMeSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+      return res.status(400).json({ message: parsed.error.issues[0].message });
     }
     const b = parsed.data;
     const userUpdate: Record<string, unknown> = {};
@@ -394,7 +394,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
   try {
     const userId = req.session.userId!;
     const parsedDyn = updateProfileDynamicSchema.safeParse(req.body);
-    if (!parsedDyn.success) return res.status(400).json({ message: parsedDyn.error.errors[0].message });
+    if (!parsedDyn.success) return res.status(400).json({ message: parsedDyn.error.issues[0].message });
     const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications, notificationPreferences, pushNotificationsEnabled } = parsedDyn.data;
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = {};
@@ -493,7 +493,7 @@ router.put("/me/push-token", requireAuth, async (req: Request, res: Response) =>
   try {
     const userId = req.session.userId!;
     const parsedPt = pushTokenSchema.safeParse(req.body ?? {});
-    if (!parsedPt.success) return res.status(400).json({ message: parsedPt.error.errors[0].message });
+    if (!parsedPt.success) return res.status(400).json({ message: parsedPt.error.issues[0].message });
     const { token } = parsedPt.data;
     if (token === null || token === undefined || token === "") {
       await storage.updateUser(userId, { expoPushToken: null });
@@ -516,7 +516,7 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
   try {
     const userId = req.session.userId!;
     const parsedGm = ghostModeSchema.safeParse(req.body);
-    if (!parsedGm.success) return res.status(400).json({ message: parsedGm.error.errors[0].message });
+    if (!parsedGm.success) return res.status(400).json({ message: parsedGm.error.issues[0].message });
     const { enabled } = parsedGm.data;
     const ghostModeSetting = await storage.getAppSetting("ghost_mode_enabled");
     if (ghostModeSetting?.value !== "true") {
@@ -547,7 +547,7 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     const parsedPriv = privacySettingsSchema.safeParse(req.body);
-    if (!parsedPriv.success) return res.status(400).json({ message: parsedPriv.error.errors[0].message });
+    if (!parsedPriv.success) return res.status(400).json({ message: parsedPriv.error.issues[0].message });
     const {
       hideFromMap, positionFuzz, positionFuzzKm,
       fakeHomeEnabled, homeLatitude, homeLongitude, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius,
@@ -757,7 +757,7 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
           }
         })();
       }
-      return res.status(400).json({ message: parsedLoc.error.errors[0].message });
+      return res.status(400).json({ message: parsedLoc.error.issues[0].message });
     }
     let { latitude, longitude } = parsedLoc.data;
     const existingProfile = await storage.getUserProfile(userId);
@@ -787,7 +787,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
   try {
     const userId = req.session.userId!;
     const parsedAv = availabilitySchema.safeParse(req.body);
-    if (!parsedAv.success) return res.status(400).json({ message: parsedAv.error.errors[0].message });
+    if (!parsedAv.success) return res.status(400).json({ message: parsedAv.error.issues[0].message });
     const { isAvailable, latitude, longitude } = parsedAv.data;
 
     const existingProfile = await storage.getUserProfile(userId);
@@ -1630,7 +1630,7 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
     const reporterId = req.session.userId!;
     const reportedUserId = req.params.id as string;
     const parsedRep = userReportSchema.safeParse(req.body);
-    if (!parsedRep.success) return res.status(400).json({ message: parsedRep.error.errors[0].message });
+    if (!parsedRep.success) return res.status(400).json({ message: parsedRep.error.issues[0].message });
     const { reason, description } = parsedRep.data;
 
     // Task #1125: throttle the legacy profile-report endpoint with the

@@ -30,7 +30,7 @@ router.post("/score", async (req: Request, res: Response) => {
 
   const parsed = arcadeScoreSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ message: parsed.error.errors[0].message });
+    return res.status(400).json({ message: parsed.error.issues[0].message });
   }
   const { game, score } = parsed.data;
 

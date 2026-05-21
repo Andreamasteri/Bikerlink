@@ -52,7 +52,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
     const parsed = createMotorcycleSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+      return res.status(400).json({ message: parsed.error.issues[0].message });
     }
     const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault, motoDescription } = parsed.data;
 
@@ -141,7 +141,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 
     const parsedUpdate = updateMotorcycleSchema.safeParse(req.body);
     if (!parsedUpdate.success) {
-      return res.status(400).json({ message: parsedUpdate.error.errors[0].message });
+      return res.status(400).json({ message: parsedUpdate.error.issues[0].message });
     }
     const b = parsedUpdate.data;
     const updateData: Record<string, unknown> = {};
@@ -237,7 +237,7 @@ router.post("/:id/photos", requireAuth, async (req: Request, res: Response) => {
 
     const parsedPhoto = uploadPhotoSchema.safeParse(req.body);
     if (!parsedPhoto.success) {
-      return res.status(400).json({ message: parsedPhoto.error.errors[0].message });
+      return res.status(400).json({ message: parsedPhoto.error.issues[0].message });
     }
     const { imageBase64 } = parsedPhoto.data;
 

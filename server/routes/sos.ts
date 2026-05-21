@@ -19,7 +19,7 @@ router.post("/", async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsed = createSosSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+      return res.status(400).json({ message: parsed.error.issues[0].message });
     }
     const { reason, latitude, longitude, radiusKm } = parsed.data;
     const radius = radiusKm ?? 10;

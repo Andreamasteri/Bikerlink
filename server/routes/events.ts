@@ -496,7 +496,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const parsedEvent = createEventSchema.safeParse(req.body);
     if (!parsedEvent.success) {
-      return res.status(400).json({ message: parsedEvent.error.errors[0].message });
+      return res.status(400).json({ message: parsedEvent.error.issues[0].message });
     }
     const {
       title, description, eventType, locationName, latitude, longitude,
@@ -668,7 +668,7 @@ router.put("/:id", async (req: Request, res: Response) => {
 
     const parsedUpdate = updateEventSchema.safeParse(req.body);
     if (!parsedUpdate.success) {
-      return res.status(400).json({ message: parsedUpdate.error.errors[0].message });
+      return res.status(400).json({ message: parsedUpdate.error.issues[0].message });
     }
     const {
       title, description, eventType, locationName, latitude, longitude,
@@ -765,7 +765,7 @@ router.post("/:id/join", async (req: Request, res: Response) => {
     const { id } = req.params;
     const parsedParticipation = eventParticipationSchema.safeParse(req.body);
     if (!parsedParticipation.success) {
-      return res.status(400).json({ message: parsedParticipation.error.errors[0].message });
+      return res.status(400).json({ message: parsedParticipation.error.issues[0].message });
     }
     const { status: participationStatus } = parsedParticipation.data;
 
@@ -940,7 +940,7 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
 
     const { id } = req.params;
     const parsedRej = rejectEventSchema.safeParse(req.body);
-    if (!parsedRej.success) return res.status(400).json({ message: parsedRej.error.errors[0].message });
+    if (!parsedRej.success) return res.status(400).json({ message: parsedRej.error.issues[0].message });
     const { reason } = parsedRej.data;
 
     const [evt] = await db.select().from(events).where(eq(events.id, id));
@@ -1092,7 +1092,7 @@ router.post("/:id/invite-user", async (req: Request, res: Response) => {
     if (!requesterId) return;
     const eventId = req.params.id;
     const parsedIu = inviteUserToEventSchema.safeParse(req.body);
-    if (!parsedIu.success) return res.status(400).json({ message: parsedIu.error.errors[0].message });
+    if (!parsedIu.success) return res.status(400).json({ message: parsedIu.error.issues[0].message });
     const { userId: targetUserId } = parsedIu.data;
 
     const [event] = await db.select({

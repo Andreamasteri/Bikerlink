@@ -238,7 +238,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedAi = aiPromptSchema.safeParse(req.body);
-  if (!parsedAi.success) return res.status(400).json({ message: parsedAi.error.errors[0].message });
+  if (!parsedAi.success) return res.status(400).json({ message: parsedAi.error.issues[0].message });
   const { prompt } = parsedAi.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -278,7 +278,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedAiStream = aiPromptSchema.safeParse(req.body);
-  if (!parsedAiStream.success) return res.status(400).json({ message: parsedAiStream.error.errors[0].message });
+  if (!parsedAiStream.success) return res.status(400).json({ message: parsedAiStream.error.issues[0].message });
   const { prompt } = parsedAiStream.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -447,7 +447,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
 
   const parsedCalc = calculateRouteRequestSchema.safeParse(req.body);
   if (!parsedCalc.success) {
-    return res.status(400).json({ message: parsedCalc.error.errors[0].message });
+    return res.status(400).json({ message: parsedCalc.error.issues[0].message });
   }
   const {
     waypoints,
@@ -787,7 +787,7 @@ router.post("/weather", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedWw = weatherWaypointsSchema.safeParse(req.body);
-  if (!parsedWw.success) return res.status(400).json({ message: parsedWw.error.errors[0].message });
+  if (!parsedWw.success) return res.status(400).json({ message: parsedWw.error.issues[0].message });
   const { waypoints, departureTime } = parsedWw.data;
 
   try {
@@ -832,7 +832,7 @@ router.post("/poi/:id/photos", async (req: Request, res: Response) => {
   const poiId = req.params["id"] as string;
 
   const parsedPph = poiPhotoSchema.safeParse(req.body);
-  if (!parsedPph.success) return res.status(400).json({ message: parsedPph.error.errors[0].message });
+  if (!parsedPph.success) return res.status(400).json({ message: parsedPph.error.issues[0].message });
   const { photoBase64, mimeType = "image/jpeg", caption } = parsedPph.data;
 
   try {
@@ -895,7 +895,7 @@ router.post("/poi", async (req: Request, res: Response) => {
 
   const parsedPoi = poiRequestSchema.safeParse(req.body);
   if (!parsedPoi.success) {
-    return res.status(400).json({ message: parsedPoi.error.errors[0].message });
+    return res.status(400).json({ message: parsedPoi.error.issues[0].message });
   }
   const { bbox, types = ["fuel", "rest", "viewpoint", "hotel"] } = parsedPoi.data;
 
@@ -958,7 +958,7 @@ router.post("/hotels", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedHot = hotelsSchema.safeParse(req.body);
-  if (!parsedHot.success) return res.status(400).json({ message: parsedHot.error.errors[0].message });
+  if (!parsedHot.success) return res.status(400).json({ message: parsedHot.error.issues[0].message });
   const { dayEndPoints, checkIn, nights = 1 } = parsedHot.data;
 
   try {
@@ -1004,7 +1004,7 @@ router.post("/segment-multiday", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedSmd = segmentMultidaySchema.safeParse(req.body);
-  if (!parsedSmd.success) return res.status(400).json({ message: parsedSmd.error.errors[0].message });
+  if (!parsedSmd.success) return res.status(400).json({ message: parsedSmd.error.issues[0].message });
   const { waypoints, distanceKm, durationMinutes, daysCount = 2, maxHoursPerDay = 6 } = parsedSmd.data;
 
   try {
@@ -1145,7 +1145,7 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
 
   const parsedGpxImport = plannedGpxImportSchema.safeParse(req.body);
   if (!parsedGpxImport.success) {
-    return res.status(400).json({ message: parsedGpxImport.error.errors[0].message });
+    return res.status(400).json({ message: parsedGpxImport.error.issues[0].message });
   }
   const { gpxContent, title: titleOverride, visibility = "public" } = parsedGpxImport.data;
 
@@ -1237,7 +1237,7 @@ router.post("/", async (req: Request, res: Response) => {
 
   const parsedRoute = savePlannedRouteSchema.safeParse(req.body);
   if (!parsedRoute.success) {
-    return res.status(400).json({ message: parsedRoute.error.errors[0].message });
+    return res.status(400).json({ message: parsedRoute.error.issues[0].message });
   }
   const body = parsedRoute.data;
 
@@ -1312,7 +1312,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
     if (existing.userId !== userId) return res.status(403).json({ message: "Non autorizzato" });
 
     const parsedUpd = updatePlannedRouteBodySchema.safeParse(req.body);
-    if (!parsedUpd.success) return res.status(400).json({ message: parsedUpd.error.errors[0].message });
+    if (!parsedUpd.success) return res.status(400).json({ message: parsedUpd.error.issues[0].message });
     const updated = await storage.updatePlannedRoute(id, parsedUpd.data);
     return res.json(updated);
   } catch (err) {

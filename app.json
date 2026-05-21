@@ -7,11 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
     "userInterfaceStyle": "automatic",
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1A1A2E"
-    },
     "ios": {
       "supportsTablet": false,
       "buildNumber": "34",
@@ -63,6 +58,14 @@
         "expo-router",
         {
           "origin": "https://replit.com/"
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#1A1A2E"
         }
       ],
       [

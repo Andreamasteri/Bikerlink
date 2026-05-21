@@ -46,7 +46,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const parsed = createRouteSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+      return res.status(400).json({ message: parsed.error.issues[0].message });
     }
     const { title, trackingFrequency, isSprint } = parsed.data;
 
@@ -150,7 +150,7 @@ router.post("/:id/points", async (req: Request, res: Response) => {
           invalidCount: invalidPoints.length,
         });
       }
-      return res.status(400).json({ message: parsedPoints.error.errors[0].message });
+      return res.status(400).json({ message: parsedPoints.error.issues[0].message });
     }
 
     const { points } = parsedPoints.data;
@@ -192,7 +192,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
 
     const parsedStop = stopRouteSchema.safeParse(req.body);
     if (!parsedStop.success) {
-      return res.status(400).json({ message: parsedStop.error.errors[0].message });
+      return res.status(400).json({ message: parsedStop.error.issues[0].message });
     }
     const {
       totalDistanceKm: clientDistanceKm,
@@ -396,7 +396,7 @@ router.patch("/:id/stats", async (req: Request, res: Response) => {
 
     const parsedStats = routeStatsSchema.safeParse(req.body);
     if (!parsedStats.success) {
-      return res.status(400).json({ message: parsedStats.error.errors[0].message });
+      return res.status(400).json({ message: parsedStats.error.issues[0].message });
     }
     const { totalDistanceKm, maxSpeedKmh, avgSpeedKmh, maxAltitude, idleTimeSeconds } = parsedStats.data;
     const updates: any = {};
@@ -481,7 +481,7 @@ router.patch("/:id/title", async (req: Request, res: Response) => {
 
     const parsedTitle = updateRouteTitleSchema.safeParse(req.body);
     if (!parsedTitle.success) {
-      return res.status(400).json({ message: parsedTitle.error.errors[0].message });
+      return res.status(400).json({ message: parsedTitle.error.issues[0].message });
     }
     const { title } = parsedTitle.data;
     const titleUpdate: Partial<import("../../shared/schema").InsertRoute> = { title: title.trim() };

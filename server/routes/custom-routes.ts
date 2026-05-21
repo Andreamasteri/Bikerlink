@@ -78,7 +78,7 @@ router.post("/api/custom-routes", async (req, res) => {
 
     const parsedCr = createCustomRouteSchema.safeParse(req.body);
     if (!parsedCr.success) {
-      return res.status(400).json({ error: parsedCr.error.errors[0].message });
+      return res.status(400).json({ error: parsedCr.error.issues[0].message });
     }
     const { title, description, isPublic, visibility } = parsedCr.data;
     const resolvedVis = resolveVisibility(visibility, isPublic);
@@ -148,7 +148,7 @@ router.put("/api/custom-routes/:id", async (req, res) => {
 
     const parsedUpd = updateCustomRouteSchema.safeParse(req.body);
     if (!parsedUpd.success) {
-      return res.status(400).json({ error: parsedUpd.error.errors[0].message });
+      return res.status(400).json({ error: parsedUpd.error.issues[0].message });
     }
     const { title, description, isPublic, visibility, totalDistanceKm } = parsedUpd.data;
 
@@ -221,7 +221,7 @@ router.post("/api/custom-routes/:id/waypoints", async (req, res) => {
 
     const parsedWp = createWaypointSchema.safeParse(req.body);
     if (!parsedWp.success) {
-      return res.status(400).json({ error: parsedWp.error.errors[0].message });
+      return res.status(400).json({ error: parsedWp.error.issues[0].message });
     }
     const { name, description, latitude, longitude, waypointType, orderIndex } = parsedWp.data;
 
@@ -252,7 +252,7 @@ router.put("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) => {
 
     const parsedWpUpd = updateWaypointSchema.safeParse(req.body);
     if (!parsedWpUpd.success) {
-      return res.status(400).json({ error: parsedWpUpd.error.errors[0].message });
+      return res.status(400).json({ error: parsedWpUpd.error.issues[0].message });
     }
     const { name, description, latitude, longitude, waypointType, orderIndex } = parsedWpUpd.data;
     const updated = await storage.updateCustomRouteWaypoint(req.params.waypointId, {
@@ -366,7 +366,7 @@ router.post("/api/custom-routes/import-gpx", async (req, res) => {
 
     const parsedGpx = gpxImportSchema.safeParse(req.body);
     if (!parsedGpx.success) {
-      return res.status(400).json({ error: parsedGpx.error.errors[0].message });
+      return res.status(400).json({ error: parsedGpx.error.issues[0].message });
     }
     const { gpxContent, title } = parsedGpx.data;
 

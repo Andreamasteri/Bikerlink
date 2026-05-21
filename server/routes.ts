@@ -926,7 +926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { otaStuckEventSchema } = await import("@shared/schema");
       const bodyParsed = otaStuckEventSchema.safeParse(req.body ?? {});
       if (!bodyParsed.success) {
-        return res.status(400).json({ message: bodyParsed.error.errors[0]?.message ?? "Payload non valido" });
+        return res.status(400).json({ message: bodyParsed.error.issues[0]?.message ?? "Payload non valido" });
       }
       const { deviceId, rollbackCount, stuckSessions, runtimeVersion } = bodyParsed.data;
       const stripNull = (s: string) => s.replace(/\x00/g, "");
@@ -2068,7 +2068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { clientErrorReportSchema } = await import("@shared/schema");
       const bodyParsed = clientErrorReportSchema.safeParse(req.body ?? {});
       if (!bodyParsed.success) {
-        return res.status(400).json({ message: bodyParsed.error.errors[0]?.message ?? "Payload non valido" });
+        return res.status(400).json({ message: bodyParsed.error.issues[0]?.message ?? "Payload non valido" });
       }
       const { message, stack, componentStack, platform, appVersion } = bodyParsed.data;
       console.error("[CLIENT-ERROR]", JSON.stringify({

@@ -56,7 +56,7 @@ publicRouter.post("/", (req: Request, res: Response): void => {
 
   const parsed = crashLogsSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: parsed.error.errors[0].message });
+    res.status(400).json({ message: parsed.error.issues[0].message });
     return;
   }
 

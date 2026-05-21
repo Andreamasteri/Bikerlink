@@ -1947,7 +1947,7 @@ export const updateUserMeSchema = z.object({
     speedUnit: z.enum(["kmh", "mph", "knots"]),
     distanceUnit: z.enum(["km_m", "mi_ft", "mi_yd", "nmi_ftm"]),
   }).nullable().optional(),
-  mapFilters: z.record(z.boolean()).nullable().optional(),
+  mapFilters: z.record(z.string(), z.boolean()).nullable().optional(),
 });
 export type UpdateUserMeInput = z.infer<typeof updateUserMeSchema>;
 
@@ -2138,7 +2138,7 @@ export const savePlannedRouteSchema = z.object({
   maxHoursPerDay: z.number().min(1).optional().nullable(),
   totalDistanceKm: z.number().optional().nullable(),
   bikerScore: z.number().optional().nullable(),
-  metadata: z.record(z.unknown()).optional().nullable(),
+  metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 });
 export type SavePlannedRouteInput = z.infer<typeof savePlannedRouteSchema>;
 
@@ -2299,7 +2299,7 @@ export type UpsertSettingInput = z.infer<typeof upsertSettingSchema>;
 
 export const createEventSchema = z.object({
   title: z.string().min(1, "Titolo obbligatorio").max(200),
-  eventDate: z.coerce.date({ required_error: "Data evento obbligatoria" }),
+  eventDate: z.coerce.date({ message: "Data evento obbligatoria" }),
   locationName: z.string().min(1, "Luogo obbligatorio").max(300),
   description: z.string().max(5000).optional().nullable(),
   eventType: z.string().optional(),
@@ -2429,7 +2429,7 @@ export type PublishWithSlotInput = z.infer<typeof publishWithSlotSchema>;
 // ── Admin — Boolean setting value ─────────────────────────────────────────
 
 export const booleanSettingValueSchema = z.object({
-  value: z.enum(["true", "false"], { required_error: "value è obbligatorio", invalid_type_error: "Valore non valido: usare 'true' o 'false'" }),
+  value: z.enum(["true", "false"], { message: "Valore non valido: usare 'true' o 'false'" }),
 });
 export type BooleanSettingValueInput = z.infer<typeof booleanSettingValueSchema>;
 
@@ -2439,7 +2439,7 @@ export const stringSettingValueSchema = z.object({
 export type StringSettingValueInput = z.infer<typeof stringSettingValueSchema>;
 
 export const mapsProviderSchema = z.object({
-  value: z.enum(["carto_light", "carto_dark", "esri_gray"], { required_error: "value è obbligatorio", invalid_type_error: "Provider non valido" }),
+  value: z.enum(["carto_light", "carto_dark", "esri_gray"], { message: "Provider non valido" }),
 });
 export type MapsProviderInput = z.infer<typeof mapsProviderSchema>;
 
@@ -2452,18 +2452,18 @@ export const updateProfileDynamicSchema = z.object({
   searchPreference: z.string().optional(),
   preferredMapStyle: z.string().optional(),
   emailChatNotifications: z.boolean().optional(),
-  notificationPreferences: z.record(z.unknown()).optional(),
+  notificationPreferences: z.record(z.string(), z.unknown()).optional(),
   pushNotificationsEnabled: z.boolean().optional(),
 }).passthrough();
 export type UpdateProfileDynamicInput = z.infer<typeof updateProfileDynamicSchema>;
 
 export const ghostModeSchema = z.object({
-  enabled: z.boolean({ required_error: "enabled è obbligatorio", invalid_type_error: "enabled deve essere un booleano" }),
+  enabled: z.boolean({ message: "enabled deve essere un booleano" }),
 });
 export type GhostModeInput = z.infer<typeof ghostModeSchema>;
 
 export const availabilitySchema = z.object({
-  isAvailable: z.boolean({ required_error: "isAvailable è obbligatorio", invalid_type_error: "isAvailable deve essere un booleano" }),
+  isAvailable: z.boolean({ message: "isAvailable deve essere un booleano" }),
   latitude: z.number().finite().nullable().optional(),
   longitude: z.number().finite().nullable().optional(),
 });
@@ -2583,7 +2583,7 @@ export const updatePlannedRouteBodySchema = z.object({
   isPublic: z.boolean().optional(),
   tags: z.array(z.string()).optional(),
   waypoints: z.array(z.unknown()).optional(),
-  routeData: z.record(z.unknown()).optional(),
+  routeData: z.record(z.string(), z.unknown()).optional(),
 }).passthrough();
 export type UpdatePlannedRouteBodyInput = z.infer<typeof updatePlannedRouteBodySchema>;
 
@@ -2615,12 +2615,12 @@ export const verifyPasswordSchema = z.object({
 export type VerifyPasswordInput = z.infer<typeof verifyPasswordSchema>;
 
 export const userStatusSchema = z.object({
-  status: z.enum(["active", "suspended", "blocked"], { required_error: "Stato non valido", invalid_type_error: "Stato non valido" }),
+  status: z.enum(["active", "suspended", "blocked"], { message: "Stato non valido" }),
 });
 export type UserStatusInput = z.infer<typeof userStatusSchema>;
 
 export const userRoleSchema = z.object({
-  role: z.enum(["user", "moderator", "admin"], { required_error: "Ruolo non valido", invalid_type_error: "Ruolo non valido" }),
+  role: z.enum(["user", "moderator", "admin"], { message: "Ruolo non valido" }),
 });
 export type UserRoleInput = z.infer<typeof userRoleSchema>;
 
@@ -2663,7 +2663,7 @@ export type EasterEggBatchInput = z.infer<typeof easterEggBatchSchema>;
 // ── Admin — reports / email ───────────────────────────────────────────────────
 
 export const reportResolveSchema = z.object({
-  status: z.enum(["resolved", "dismissed"], { required_error: "Stato non valido", invalid_type_error: "Stato non valido" }),
+  status: z.enum(["resolved", "dismissed"], { message: "Stato non valido" }),
 });
 export type ReportResolveInput = z.infer<typeof reportResolveSchema>;
 
@@ -2673,7 +2673,7 @@ export const emailTestSchema = z.object({
 export type EmailTestInput = z.infer<typeof emailTestSchema>;
 
 export const emailRateLimitResetSchema = z.object({
-  scope: z.enum(["verify", "resend", "user-lockouts", "all"], { required_error: "Parametro 'scope' richiesto", invalid_type_error: "Scope non valido. Usa: verify | resend | user-lockouts | all" }),
+  scope: z.enum(["verify", "resend", "user-lockouts", "all"], { message: "Scope non valido. Usa: verify | resend | user-lockouts | all" }),
   ip: z.string().optional(),
   userId: z.string().optional(),
 });
@@ -2689,7 +2689,7 @@ export const musicProviderSchema = z.object({
 }));
 
 export const themeDefaultSchema = z.object({
-  value: z.enum(["attuale", "asfalto", "velocita", "rotta"], { required_error: "Tema non valido", invalid_type_error: "Tema non valido" }),
+  value: z.enum(["attuale", "asfalto", "velocita", "rotta"], { message: "Tema non valido" }),
 });
 export type ThemeDefaultInput = z.infer<typeof themeDefaultSchema>;
 
@@ -2789,7 +2789,7 @@ export const stregattaSchema = z.object({
 export type StregattaInput = z.infer<typeof stregattaSchema>;
 
 export const stregattaToggleSchema = z.object({
-  enabled: z.boolean({ required_error: "Il campo 'enabled' deve essere un booleano" }),
+  enabled: z.boolean({ message: "Il campo 'enabled' deve essere un booleano" }),
   adminPassword: z.string().min(1, "Password admin richiesta"),
 });
 export type StregattaToggleInput = z.infer<typeof stregattaToggleSchema>;
@@ -2823,7 +2823,7 @@ export type UpdateInvitationCodeAdminInput = z.infer<typeof updateInvitationCode
 // ── Admin — generic enabled toggle ───────────────────────────────────────────
 
 export const enabledSchema = z.object({
-  enabled: z.boolean({ required_error: "enabled deve essere un booleano" }),
+  enabled: z.boolean({ message: "enabled deve essere un booleano" }),
 });
 export type EnabledInput = z.infer<typeof enabledSchema>;
 
@@ -2897,7 +2897,7 @@ export type NativeVersionInput = z.infer<typeof nativeVersionSchema>;
 
 // ── Admin — match preferences admin update ────────────────────────────────────
 
-export const matchPreferencesAdminUpdateSchema = z.record(z.boolean()).and(z.object({}).passthrough());
+export const matchPreferencesAdminUpdateSchema = z.record(z.string(), z.boolean()).and(z.object({}).passthrough());
 export type MatchPreferencesAdminUpdateInput = z.infer<typeof matchPreferencesAdminUpdateSchema>;
 
 // ── Admin — OTA device assignment ────────────────────────────────────────────

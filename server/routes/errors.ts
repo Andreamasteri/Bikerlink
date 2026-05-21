@@ -100,7 +100,7 @@ router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Respon
   try {
     const bodyParsed = gpsErrorSchema.safeParse(req.body ?? {});
     if (!bodyParsed.success) {
-      return res.status(400).json({ message: bodyParsed.error.errors[0]?.message ?? "Payload non valido" });
+      return res.status(400).json({ message: bodyParsed.error.issues[0]?.message ?? "Payload non valido" });
     }
     const body = bodyParsed.data;
     const errorMessage = truncate(body.errorMessage, MAX_STRING_LEN);

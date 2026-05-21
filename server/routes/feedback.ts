@@ -75,7 +75,7 @@ router.post("/", feedbackJson, async (req: Request, res: Response) => {
 
     const parsed = createFeedbackSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+      return res.status(400).json({ message: parsed.error.issues[0].message });
     }
     const { ticketType, subject, message } = parsed.data;
     const trimmedSubject = subject.trim();
@@ -137,7 +137,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
       return res.status(403).json({ message: "Accesso negato" });
     }
     const parsedFbu = updateFeedbackTicketSchema.safeParse(req.body);
-    if (!parsedFbu.success) return res.status(400).json({ message: parsedFbu.error.errors[0].message });
+    if (!parsedFbu.success) return res.status(400).json({ message: parsedFbu.error.issues[0].message });
     const { status, internalNote } = parsedFbu.data;
     const updates: { status?: string; internalNote?: string } = {};
     if (status !== undefined) updates.status = status;

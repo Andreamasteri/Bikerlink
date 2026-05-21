@@ -86,7 +86,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const parsed = createReportSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+      return res.status(400).json({ message: parsed.error.issues[0].message });
     }
 
     const { reportedUserId, reason, description } = parsed.data;

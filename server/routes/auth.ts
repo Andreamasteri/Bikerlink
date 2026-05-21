@@ -140,7 +140,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
   try {
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+      return res.status(400).json({ message: parsed.error.issues[0].message });
     }
 
     const data = parsed.data;
@@ -328,7 +328,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+      return res.status(400).json({ message: parsed.error.issues[0].message });
     }
 
     const { identifier: rawIdentifier, password, latitude: loginLat, longitude: loginLng, platform: loginPlatform } = parsed.data;

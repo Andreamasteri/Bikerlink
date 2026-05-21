@@ -48,7 +48,7 @@ router.put("/", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsed = updateWishlistSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.errors[0].message });
+      return res.status(400).json({ message: parsed.error.issues[0].message });
     }
     const { description } = parsed.data;
     const wishlist = await storage.createOrUpdateWishlist(userId, description ?? "");
@@ -74,7 +74,7 @@ router.post("/photos", requireAuth, async (req: Request, res: Response) => {
 
     const parsedPhoto = uploadPhotoSchema.safeParse(req.body);
     if (!parsedPhoto.success) {
-      return res.status(400).json({ message: parsedPhoto.error.errors[0].message });
+      return res.status(400).json({ message: parsedPhoto.error.issues[0].message });
     }
     const { imageBase64, filename } = parsedPhoto.data;
 
@@ -124,7 +124,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
 
     const parsedMoto = addWishlistMotoSchema.safeParse(req.body);
     if (!parsedMoto.success) {
-      return res.status(400).json({ message: parsedMoto.error.errors[0].message });
+      return res.status(400).json({ message: parsedMoto.error.issues[0].message });
     }
     const { brand, model, ridingStyle, motorcycleType } = parsedMoto.data;
 
@@ -201,7 +201,7 @@ router.put("/motos/:motoId", requireAuth, async (req: Request, res: Response) =>
 
     const parsedMotoUpdate = updateWishlistMotoSchema.safeParse(req.body);
     if (!parsedMotoUpdate.success) {
-      return res.status(400).json({ message: parsedMotoUpdate.error.errors[0].message });
+      return res.status(400).json({ message: parsedMotoUpdate.error.issues[0].message });
     }
     const { brand, model, ridingStyle, motorcycleType } = parsedMotoUpdate.data;
     const moto = await storage.updateWishlistMoto(motoId, { brand, model, ridingStyle, motorcycleType });

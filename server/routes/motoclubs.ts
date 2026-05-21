@@ -1088,7 +1088,7 @@ router.put("/invites/:id/respond", requireAuth, async (req: Request, res: Respon
     const inviteId = req.params.id;
     const parsedInvite = respondToInviteSchema.safeParse(req.body);
     if (!parsedInvite.success) {
-      return res.status(400).json({ message: parsedInvite.error.errors[0].message });
+      return res.status(400).json({ message: parsedInvite.error.issues[0].message });
     }
     const { response } = parsedInvite.data;
 
@@ -1141,7 +1141,7 @@ router.post("/request", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsedReq = createMotoClubSchema.safeParse(req.body);
     if (!parsedReq.success) {
-      return res.status(400).json({ message: parsedReq.error.errors[0].message });
+      return res.status(400).json({ message: parsedReq.error.issues[0].message });
     }
     const { name, clubType, brandName, modelName } = parsedReq.data;
 
@@ -1188,7 +1188,7 @@ router.post("/creation-request", requireAuth, async (req: Request, res: Response
 
     const parsedCreation = createMotoClubSchema.safeParse(req.body);
     if (!parsedCreation.success) {
-      return res.status(400).json({ message: parsedCreation.error.errors[0].message });
+      return res.status(400).json({ message: parsedCreation.error.issues[0].message });
     }
     const { name, parentClubId, latitude, longitude, inviteRadiusKm, inviteUserIds } = parsedCreation.data as {
       name: string;
@@ -1280,7 +1280,7 @@ router.post("/:id/propose-location", requireAuth, async (req: Request, res: Resp
     const userId = req.session.userId!;
     const clubId = req.params.id;
     const parsedPl = proposeLocationSchema.safeParse(req.body);
-    if (!parsedPl.success) return res.status(400).json({ message: parsedPl.error.errors[0].message });
+    if (!parsedPl.success) return res.status(400).json({ message: parsedPl.error.issues[0].message });
     const { latitude, longitude, address } = parsedPl.data;
 
     const [club] = await db.select().from(motoClubs).where(and(eq(motoClubs.id, clubId), eq(motoClubs.isApproved, true))).limit(1);
