@@ -164,6 +164,19 @@ interface OtaStuckEventsResponse {
   filter: { runtimeVersion: string | null };
 }
 
+// Task #1886: DB release con stato approvazione
+interface OtaDbRelease {
+  id: string;
+  version: string;
+  runtime_version: string | null;
+  status: string;
+  slot: string | null;
+  approved: boolean;
+  approved_at: string | null;
+  approved_by: string | null;
+  published_at: string | null;
+}
+
 const ROME_TZ = "Europe/Rome";
 
 function formatTimestamp(iso: string): string {
@@ -221,6 +234,20 @@ export default function OtaHistoryScreen() {
     queryKey: ["/api/admin/ota-adoption"],
     staleTime: 5 * 60 * 1000,
   });
+
+  // Task #1886: DB releases con stato approvazione (per badge nei card)
+  const { data: dbReleasesData } = useQuery<OtaDbRelease[]>({
+    queryKey: ["/api/admin/ota/releases"],
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+  const dbReleaseByVersion = useMemo(() => {
+    const map = new Map<string, OtaDbRelease>();
+    if (dbReleasesData) {
+      for (const r of dbReleasesData) map.set(r.version, r);
+    }
+    return map;
+  }, [dbReleasesData]);
 
   const { data: otaStats } = useQuery<OtaStatsResponse>({
     queryKey: ["/api/admin/ota-stats"],
@@ -409,6 +436,10 @@ export default function OtaHistoryScreen() {
         const deviceCount = u.releaseId
           ? adoptionByRelease.get(u.releaseId as string)
           : undefined;
+        // Task #1886: match DB release by version to get approval status
+        const dbRel = u.releaseId
+          ? Array.from(dbReleaseByVersion.values()).find((r) => r.id === u.releaseId)
+          : dbReleaseByVersion.get(u.updateNumber?.toString() ?? "") ?? undefined;
         return (
           <View key={u.updateNumber} style={styles.releaseCard}>
             <View style={styles.releaseHeader}>
@@ -445,6 +476,25 @@ export default function OtaHistoryScreen() {
             </View>
 
             <Text style={styles.releaseMessage}>{u.message || "—"}</Text>
+
+            {/* Task #1886: approval status badge */}
+            {dbRel != null && (
+              <View style={styles.approvalBadge}>
+                {dbRel.approved ? (
+                  <>
+                    <Ionicons name="checkmark-circle" size={12} color="#34C759" />
+                    <Text style={[styles.approvalText, { color: "#34C759" }]}>
+                      Approvata{dbRel.approved_by ? ` da ${dbRel.approved_by}` : ""}{dbRel.approved_at ? ` · ${formatOtaDate(dbRel.approved_at)}` : ""}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="time-outline" size={12} color="#FF9500" />
+                    <Text style={[styles.approvalText, { color: "#FF9500" }]}>In attesa di approvazione</Text>
+                  </>
+                )}
+              </View>
+            )}
 
             <View style={styles.releaseMeta}>
               <Text style={styles.releaseMetaText}>{formatOtaDate(u.publishedAt)}</Text>
@@ -1502,6 +1552,17 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
     paddingTop: 6,
+  },
+  approvalBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 6,
+  },
+  approvalText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    flexShrink: 1,
   },
   card: {
     backgroundColor: Colors.surface,

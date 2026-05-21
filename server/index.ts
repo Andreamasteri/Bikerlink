@@ -1460,6 +1460,21 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] ota_releases slot columns:", e);
         }
 
+        // Task #1886: OTA approval gate — colonne approved/approved_at/approved_by.
+        // Lo slot stable serve SOLO release con approved=true. Le release pubblicate
+        // restano in pending-approval finché l'admin non approva dal profilo.
+        try {
+          await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT false`);
+          await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP`);
+          await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS approved_by TEXT`);
+          // Le release già in slot=stable (produzione esistente) vengono auto-approvate
+          // in modo da non bloccare la distribuzione attiva.
+          await db.execute(sql`UPDATE ota_releases SET approved = true, approved_at = COALESCE(published_at, NOW()), approved_by = 'auto-migrated' WHERE slot = 'stable' AND approved = false`);
+          console.log("[MIGRATION] ota_releases approval columns ensured (existing stable releases auto-approved)");
+        } catch (e) {
+          console.warn("[MIGRATION] ota_releases approval columns:", e);
+        }
+
         try {
           await db.execute(sql`
             CREATE TABLE IF NOT EXISTS device_ota_assignments (

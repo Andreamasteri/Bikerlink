@@ -792,46 +792,32 @@ do_publish() {
   echo "   ✔ Release pubblicata (status: active)"
 
   # ─── Step I+: Promozione slot=stable ──────────────────────
-  # I client leggono solo dallo slot stable. Senza questa chiamata
-  # la release resta archived e nessun dispositivo la riceve.
-  echo "[I+] Promozione slot=stable..."
-  local SLOT_RESPONSE SLOT_OK
-  SLOT_RESPONSE=$(auth_curl -X POST "$BACKEND_URL/api/admin/ota/assign-slot" \
-    -H "Content-Type: application/json" \
-    -d "{\"releaseId\":\"$RELEASE_ID\",\"slot\":\"stable\"}")
-  SLOT_OK=$(echo "$SLOT_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { const j=JSON.parse(d); process.stdout.write(j.ok ? '1' : ''); } catch { process.stdout.write(''); } })" 2>/dev/null || true)
-  if [ "$SLOT_OK" != "1" ]; then
-    echo "   ERRORE promozione slot: $SLOT_RESPONSE"
-    exit 1
-  fi
-  echo "   ✔ Release promossa a slot=stable (precedente → archived)"
+  # Task #1886: la promozione a slot=stable NON avviene più automaticamente.
+  # La release rimane in stato 'active' con slot='archived' (pending-approval).
+  # L'admin deve approvare manualmente dal Profilo nell'app prima che i client
+  # ricevano l'aggiornamento.
+  echo "[I+] ⏳ OTA-$NEXT_OTA pubblicata. In attesa di approvazione admin → apri il Profilo sull'app"
 
-  # ─── Step J: Verifica live con backoff ────────────────────
-  echo "[J] Verifica live su produzione (backoff max 30s)..."
+  # ─── Step J: Verifica live — backend raggiungibile ────────
+  # Task #1886: la release è in pending-approval (slot=archived, approved=false).
+  # Il backend risponderà 204/noUpdateAvailable per questa rv — è corretto.
+  # Qui verifichiamo solo che il backend risponda (200 o 204 o 304 sono tutti ok).
+  echo "[J] Verifica raggiungibilità backend (backoff max 30s)..."
   local MAX_WAIT=30 WAIT_INTERVAL=5 ELAPSED=0 VERIFIED=0
   while [ $ELAPSED -le $MAX_WAIT ]; do
-    local HTTP_RESPONSE HTTP_BODY HTTP_CODE
-    HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" \
+    local HTTP_RESPONSE HTTP_CODE
+    HTTP_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
       -H "expo-runtime-version: $RUNTIME_VERSION" \
       -H "expo-platform: android" \
       -H "expo-protocol-version: 1" \
       --max-time 10 \
-      "$BACKEND_URL/api/expo-updates" 2>/dev/null || echo -e "\nCURL_FAILED")
-    HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
-    HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -1)
+      "$BACKEND_URL/api/expo-updates" 2>/dev/null || echo "CURL_FAILED")
+    HTTP_CODE="$HTTP_RESPONSE"
 
-    if [ "$HTTP_CODE" = "200" ]; then
-      local SERVED_RELEASE_ID
-      SERVED_RELEASE_ID=$(echo "$HTTP_BODY" | grep -oP '"id"\s*:\s*"\K[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1 || echo "")
-      if [ "$SERVED_RELEASE_ID" = "$RELEASE_ID" ]; then
-        echo "   ✔ Produzione serve OTA-$NEXT_OTA (releaseId=$RELEASE_ID) — ${ELAPSED}s"
-        VERIFIED=1
-        break
-      else
-        echo "   ⟳ Produzione serve releaseId=$SERVED_RELEASE_ID (atteso $RELEASE_ID) — retry in ${WAIT_INTERVAL}s..."
-      fi
-    elif [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "304" ]; then
-      echo "   ⟳ Produzione risponde $HTTP_CODE (cache) — retry in ${WAIT_INTERVAL}s..."
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "304" ]; then
+      echo "   ✔ Backend raggiungibile (HTTP $HTTP_CODE) — release in pending-approval"
+      VERIFIED=1
+      break
     else
       echo "   ⚠ Produzione risponde HTTP $HTTP_CODE — retry in ${WAIT_INTERVAL}s..."
     fi
@@ -842,9 +828,8 @@ do_publish() {
   if [ "$VERIFIED" != "1" ]; then
     echo ""
     echo "   ╔════════════════════════════════════════════════════════╗"
-    echo "   ║  ❌ PUBBLICAZIONE BLOCCATA — verifica live fallita    ║"
-    echo "   ║  La produzione non serve OTA-$NEXT_OTA dopo ${MAX_WAIT}s.             "
-    echo "   ║  La release è nel DB ma NON attiva in produzione.     ║"
+    echo "   ║  ❌ PUBBLICAZIONE BLOCCATA — backend non raggiungibile ║"
+    echo "   ║  La release è nel DB ma il backend non risponde.      ║"
     echo "   ║  Verifica: bash scripts/validate-ota.sh               ║"
     echo "   ╚════════════════════════════════════════════════════════╝"
     exit 1

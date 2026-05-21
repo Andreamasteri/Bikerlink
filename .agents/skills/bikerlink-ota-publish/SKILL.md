@@ -114,13 +114,23 @@ BIKERLINK_ADMIN_PASSWORD="$BIKERLINK_ADMIN_PASSWORD" \
 bash scripts/publish-ota.sh publish
 ```
 Legge lo state file e completa: upload bundle, login admin, creazione release draft,
-pubblicazione (`/publish`), **promozione a slot=stable** (`/assign-slot`), verifica live
-con backoff 30s, finalizzazione `ota-updates.json` (status=published). Al successo cancella
-state file, backup e `dist-ota/`.
+pubblicazione (`/publish`), verifica backend 200, finalizzazione `ota-updates.json`
+(status=published). Al successo cancella state file, backup e `dist-ota/`.
 
-> ⚠️ **Promozione slot=stable obbligatoria**: i client leggono solo dallo slot `stable`.
-> Lo stage 2 chiama `/api/admin/ota/assign-slot` con `slot:"stable"` dopo `/publish` —
-> senza questa chiamata la release resta `archived` e nessun dispositivo la riceve.
+> ⚠️ **Task #1886 — Gate di approvazione admin**: dopo `publish` la release è in stato
+> `active` con `slot=archived` (**pending-approval**). I client non ricevono ancora
+> l'aggiornamento. L'admin deve approvare dal **Profilo → widget OTA in attesa**
+> nell'app. Solo dopo l'approvazione la release viene promossa a `slot=stable` e
+> distribuita agli utenti.
+
+### Stage 3 — Approvazione admin (via app)
+1. Apri l'app BikerLink → scheda **Profilo**
+2. Trovi il widget arancio **"N OTA in attesa"** con il pulsante **"Distribuisci"**
+3. Premi **"Distribuisci"** per approvare la release
+4. La release viene promossa a `slot=stable` — i client iniziano a riceverla
+
+> In alternativa il widget è visibile anche nel pannello **Admin → OTA History** con
+> il badge **"⏳ In attesa di approvazione"**.
 
 ### Rollback dell'export (prima di pubblicare)
 Se dopo `export` decidi di non procedere:

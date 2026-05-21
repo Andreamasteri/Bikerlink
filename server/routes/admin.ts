@@ -7089,13 +7089,99 @@ router.post("/matches/recalculate-all", async (_req: Request, res: Response) => 
 // Task #1355: Sistema OTA Modulare — endpoint admin per slot + heartbeat + revert
 // ─────────────────────────────────────────────────────────────────────────────
 
+// GET /api/admin/ota/pending — Task #1886: release pubblicate in attesa di approvazione admin.
+// Usato dal widget nel profilo per sapere se mostrare il pulsante di approvazione.
+router.get("/ota/pending", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT id, version, runtime_version, status, slot, published_at, created_at
+      FROM ota_releases
+      WHERE approved = false AND status = 'active'
+      ORDER BY published_at DESC
+      LIMIT 10
+    `);
+    return res.json(result.rows);
+  } catch (err) {
+    console.error("[ADMIN ota/pending] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// POST /api/admin/ota/:id/approve — Task #1886: approva una release e la promuove a slot=stable.
+// Solo admin autenticati. Setta approved=true, approved_at, approved_by (email admin).
+// Poi riutilizza la logica di assign-slot per promuovere la release a slot stable.
+router.post("/ota/:id/approve", async (req: Request, res: Response) => {
+  try {
+    const releaseId = paramStr(req.params.id);
+    if (!releaseId) return res.status(400).json({ message: "id release non valido" });
+
+    const adminUser = (req as any).currentUser;
+    const approvedBy = adminUser?.email ?? adminUser?.nickname ?? req.session.userId ?? "unknown-admin";
+    const now = new Date();
+
+    let approvedRow: Record<string, unknown> | null = null;
+    try {
+      approvedRow = await db.transaction(async (tx) => {
+        // Mark approved
+        const approveResult = await tx.execute(sql`
+          UPDATE ota_releases
+          SET approved = true, approved_at = ${now}, approved_by = ${approvedBy}, updated_at = NOW()
+          WHERE id = ${releaseId} AND status = 'active'
+          RETURNING id, version, runtime_version, slot, status, approved, approved_at, approved_by
+        `);
+        if (!approveResult.rows.length) {
+          const err = new Error("Release non trovata o non in stato active");
+          (err as NodeJS.ErrnoException).code = "NOT_FOUND";
+          throw err;
+        }
+        const row = approveResult.rows[0] as Record<string, unknown>;
+        // Promote to slot=stable (evict previous stable occupant → archived)
+        await tx.execute(sql`UPDATE ota_releases SET slot = 'archived', status = 'archived', updated_at = NOW() WHERE slot = 'stable' AND id != ${releaseId}`);
+        await tx.execute(sql`UPDATE ota_releases SET slot = 'stable', published_at = COALESCE(published_at, NOW()), updated_at = NOW() WHERE id = ${releaseId}`);
+        return row;
+      });
+    } catch (txErr: unknown) {
+      if (txErr instanceof Error && (txErr as NodeJS.ErrnoException).code === "NOT_FOUND") {
+        return res.status(404).json({ message: "Release non trovata o non in stato active" });
+      }
+      throw txErr;
+    }
+
+    // Log evento (best-effort)
+    try {
+      await db.insert(otaEvents).values({
+        phase: "admin-approve",
+        source: "admin",
+        platform: "android",
+        releaseId: String(releaseId).substring(0, 64),
+        error: `ok:approved slot=stable by=${approvedBy}`,
+        failCount: 0,
+      });
+    } catch { /* best-effort */ }
+
+    // Invalida cache manifest
+    try {
+      const inv = req.app.locals.invalidateExpoUpdateHash;
+      if (typeof inv === "function") inv();
+    } catch { /* best-effort */ }
+
+    console.log(`[ADMIN ota/approve] release=${releaseId} approved_by=${approvedBy} promoted_to=stable`);
+    return res.json({ ok: true, release: approvedRow });
+  } catch (err) {
+    console.error("[ADMIN ota/approve] error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
 // GET /api/admin/ota/releases — lista OTA con slot, stato, successCount, ultimo heartbeat
+// Task #1886: include approved/approved_at/approved_by
 router.get("/ota/releases", async (_req: Request, res: Response) => {
   try {
     const result = await db.execute(sql`
       SELECT
         r.id, r.version, r.runtime_version, r.bundle_path, r.release_notes,
         r.status, r.slot, r.promoted_at, r.promoted_by, r.success_count,
+        r.approved, r.approved_at, r.approved_by,
         r.published_at, r.created_at, r.updated_at,
         (
           SELECT e.created_at FROM ota_events e

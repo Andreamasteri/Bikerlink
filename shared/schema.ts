@@ -1238,6 +1238,9 @@ export const otaReleases = pgTable("ota_releases", {
   promotedAt: timestamp("promoted_at"),
   promotedBy: varchar("promoted_by", { length: 100 }),
   successCount: integer("success_count").notNull().default(0),
+  approved: boolean("approved").notNull().default(false),
+  approvedAt: timestamp("approved_at"),
+  approvedBy: text("approved_by"),
   createdBy: varchar("created_by", { length: 36 })
     .references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

@@ -866,6 +866,52 @@ export default function ProfileScreen() {
     staleTime: 30_000,
   });
 
+  const isAdmin = profile?.role === "admin" || (user as any)?.role === "admin";
+
+  // Task #1886: OTA pending-approval polling (solo admin, ogni 30s)
+  interface PendingOtaRelease {
+    id: string;
+    version: string;
+    runtime_version: string | null;
+    status: string;
+    slot: string | null;
+    published_at: string | null;
+  }
+  const { data: pendingOtaData, refetch: refetchPendingOta } = useQuery<PendingOtaRelease[]>({
+    queryKey: ["/api/admin/ota/pending"],
+    enabled: isAdmin,
+    refetchInterval: 30_000,
+    staleTime: 20_000,
+  });
+  const pendingOtaReleases = pendingOtaData ?? [];
+  const [approvingOtaId, setApprovingOtaId] = useState<string | null>(null);
+
+  const handleApproveOta = useCallback(async (releaseId: string, version: string) => {
+    Alert.alert(
+      "Approva OTA",
+      `Distribuisci la versione ${version} a tutti gli utenti?`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Sì, distribuisci",
+          style: "default",
+          onPress: async () => {
+            setApprovingOtaId(releaseId);
+            try {
+              await apiRequest("POST", `/api/admin/ota/${releaseId}/approve`);
+              await refetchPendingOta();
+              Alert.alert("✓ Approvata", `OTA ${version} ora in distribuzione su slot stable.`);
+            } catch (err: unknown) {
+              Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile approvare la release.");
+            } finally {
+              setApprovingOtaId(null);
+            }
+          },
+        },
+      ],
+    );
+  }, [refetchPendingOta]);
+
   const isBikerOrCoppia = currentUserType === "biker" || currentUserType === "coppia";
 
   const pickCoordFromGPS = async (target: "home" | "fake") => {
@@ -1857,8 +1903,41 @@ export default function ProfileScreen() {
         <MenuItem icon="bug" label={t("profile.reportBug")} onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
         <MenuItem icon="bulb" label={t("profile.requestFeature")} onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />
 
-        {(profile?.role === "admin" || (user as any)?.role === "admin") && (
+        {isAdmin && (
           <MenuItem icon="shield" label="Pannello Admin" onPress={() => router.push("/admin" as any)} color={Colors.accent} />
+        )}
+
+        {/* Task #1886: OTA approval widget — visibile solo all'admin quando ci sono release pending */}
+        {isAdmin && pendingOtaReleases.length > 0 && (
+          <View style={styles.otaApprovalWidget}>
+            <View style={styles.otaApprovalHeader}>
+              <Ionicons name="cloud-upload-outline" size={18} color="#FF9500" />
+              <Text style={styles.otaApprovalTitle}>
+                {pendingOtaReleases.length === 1 ? "1 OTA in attesa" : `${pendingOtaReleases.length} OTA in attesa`}
+              </Text>
+            </View>
+            {pendingOtaReleases.map((rel) => (
+              <View key={rel.id} style={styles.otaApprovalRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.otaApprovalVersion}>v{rel.version}</Text>
+                  {rel.runtime_version ? (
+                    <Text style={styles.otaApprovalMeta}>rv {rel.runtime_version}</Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity
+                  style={[styles.otaApprovalBtn, approvingOtaId === rel.id && { opacity: 0.6 }]}
+                  onPress={() => handleApproveOta(rel.id, rel.version)}
+                  disabled={approvingOtaId !== null}
+                >
+                  {approvingOtaId === rel.id ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.otaApprovalBtnText}>Distribuisci</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
         )}
         {((profile?.role === "moderator" || (user as any)?.role === "moderator") || (profile?.role === "admin" || (user as any)?.role === "admin")) && (
           <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as any)} color={Colors.warning} />
@@ -2016,6 +2095,57 @@ const screenWidth = Dimensions.get("window").width;
 const photoSize = (screenWidth - 32 - 16) / 3;
 
 const styles = StyleSheet.create({
+  // Task #1886: OTA approval widget styles
+  otaApprovalWidget: {
+    marginHorizontal: 0,
+    marginVertical: 8,
+    backgroundColor: "rgba(255,149,0,0.10)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,149,0,0.35)",
+    padding: 12,
+    gap: 8,
+  },
+  otaApprovalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  otaApprovalTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#FF9500",
+  },
+  otaApprovalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  otaApprovalVersion: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  otaApprovalMeta: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  otaApprovalBtn: {
+    backgroundColor: Colors.accent,
+    borderRadius: 8,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    minWidth: 100,
+    alignItems: "center",
+  },
+  otaApprovalBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  // end OTA approval widget styles
   container: {
     flex: 1,
     backgroundColor: Colors.background,

@@ -686,8 +686,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let release: Record<string, unknown> | null = null;
 
       if (hasSlotAssignment && assignedSlot) {
-        // Path A: strict slot routing — no legacy fallback
-        const slotResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = ${assignedSlot} AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
+        // Path A: strict slot routing — no legacy fallback.
+        // For non-stable slots (test-N) no approval gate is applied.
+        // For stable slot, Task #1886: serve only approved releases.
+        const slotApprovedFilter = assignedSlot === "stable" ? sql` AND approved = true` : sql``;
+        const slotResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = ${assignedSlot} AND status = 'active' AND runtime_version = ${effectiveRv}${slotApprovedFilter} ORDER BY published_at DESC LIMIT 1`);
         if (slotResult.rows.length > 0) {
           release = slotResult.rows[0] as Record<string, unknown>;
           // Note: `serving_broken_ota` telemetry is intentionally omitted here because
@@ -696,10 +699,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // which logs `fallback_to_stable` when the assigned slot has no active release.
         } else {
           // Assigned slot has no active OTA (either empty or all releases are broken/archived)
-          // → fall back to stable (never to legacy)
+          // → fall back to stable (never to legacy). Task #1886: require approved=true on stable.
           const reason = `slot=${assignedSlot} no active OTA`;
           await logEvent("fallback_to_stable", null, reason);
-          const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
+          const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND approved = true AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
           if (stableResult.rows.length > 0) {
             release = stableResult.rows[0] as Record<string, unknown>;
           } else {
@@ -708,8 +711,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       } else {
-        // Path B: no assignment — try stable slot first
-        const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
+        // Path B: no assignment — try stable slot first.
+        // Task #1886: serve only approved releases on slot=stable.
+        const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND approved = true AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
         if (stableResult.rows.length > 0) {
           release = stableResult.rows[0] as Record<string, unknown>;
         } else {
