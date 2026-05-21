@@ -87,6 +87,7 @@ export default function MapScreen() {
   const [showHomeMessage, setShowHomeMessage] = useState(false);
   const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const [pendingFocusCoords, setPendingFocusCoords] = useState<{ lat: number; lng: number; userId?: string; nickname?: string } | null>(null);
+  const [pendingHighlight, setPendingHighlight] = useState<{ lat: number; lng: number; userId: string } | null>(null);
   const [focusToast, setFocusToast] = useState<string | null>(null);
   const focusToastAnim = useRef(new Animated.Value(0)).current;
   const [showLocationNudge, setShowLocationNudge] = useState(false);
@@ -195,6 +196,9 @@ export default function MapScreen() {
     setPendingFocusCoords(null);
     const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
     activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId });
+    if (!mapFullscreen && userId) {
+      setPendingHighlight({ lat, lng, userId });
+    }
     if (nickname) {
       setFocusToast(`Vista centrata su ${nickname}`);
       Animated.sequence([
@@ -211,8 +215,22 @@ export default function MapScreen() {
       return () => clearTimeout(timer);
     } else {
       setMapFullscreenReady(false);
+      setPendingHighlight(null);
     }
   }, [mapFullscreen]);
+
+  const handleFullscreenMapReady = useCallback(() => {
+    setPendingHighlight((ph) => {
+      if (ph) {
+        fullscreenMapRef.current?.focusOnCoordinate({
+          latitude: ph.lat,
+          longitude: ph.lng,
+          userId: ph.userId,
+        });
+      }
+      return null;
+    });
+  }, []);
 
   useEffect(() => {
     if (Platform.OS !== "web") return;
@@ -798,6 +816,7 @@ export default function MapScreen() {
         onShowAreaModal={() => setShowAreaModal(true)}
         areaLabel={areaLabel}
         onRegionChangeComplete={undefined}
+        onMapReady={handleFullscreenMapReady}
         searchText={searchText}
         onSearch={handleSearch}
         onClearSearch={() => { setSearchText(""); setSearchResults([]); setShowSearchResults(false); }}
