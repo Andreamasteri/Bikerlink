@@ -65,6 +65,10 @@ args = "Clean Metro"
 task = "workflow.run"
 args = "Publish OTA"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ota-token-safety"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -181,6 +185,17 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/publish-ota.sh setup-token && bash scripts/publish-ota.sh publish"
+
+[[workflows.workflow]]
+name = "ota-token-safety"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-ota-token-safety.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
