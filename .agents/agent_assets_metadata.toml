@@ -360,6 +360,18 @@ uri = "file://attached_assets/generated_images/hero-handlebar.png"
 type = "image"
 title = "motorcycle POV mountain sunset hero"
 
+[[generated]]
+id = "jyXa4S2VilwqNkHLw_JUG"
+uri = "file://server/public/assets/images/hero-forest.png"
+type = "image"
+title = "generated_image"
+
+[[generated]]
+id = "1M9jjvuA0ImakOxLxqAcX"
+uri = "file://server/public/assets/images/hero-community.png"
+type = "image"
+title = "generated_image"
+
 [[outputs]]
 id = "4Y78ngKHwO0VLy8lAIKVp"
 uri = "file://manuale-utente-bikerlink.docx"

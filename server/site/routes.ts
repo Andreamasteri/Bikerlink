@@ -6,8 +6,10 @@ import { users } from "@shared/schema";
 import { sql } from "drizzle-orm";
 import { renderPage, getBaseUrl } from "./render";
 import { ensureVisitorId, recordVisit } from "../lib/visitor-tracking";
+import { storage } from "../storage";
 import {
   buildHome,
+  type LandingImages,
   buildFeatures,
   buildSos,
   buildMotoclub,
@@ -17,6 +19,40 @@ import {
   buildFaq,
   buildContact,
 } from "./pages";
+
+// Cache for landing images (recomputed every 5 min so changes propagate quickly).
+let landingImagesCache: { ts: number; images: LandingImages } | null = null;
+const LANDING_IMAGES_TTL_MS = 5 * 60 * 1000;
+
+async function getLandingImages(): Promise<LandingImages> {
+  const now = Date.now();
+  if (landingImagesCache && now - landingImagesCache.ts < LANDING_IMAGES_TTL_MS) {
+    return landingImagesCache.images;
+  }
+  const KEYS: (keyof LandingImages)[] = [
+    "hero_main_url",
+    "hero_main_sm_url",
+    "hero_community_url",
+    "hero_community_sm_url",
+  ];
+  try {
+    const settings = await Promise.all(KEYS.map((k) => storage.getAppSetting(k)));
+    const images: LandingImages = {};
+    KEYS.forEach((k, i) => {
+      const val = settings[i]?.value?.trim();
+      if (val) images[k] = val;
+    });
+    landingImagesCache = { ts: now, images };
+    return images;
+  } catch {
+    return {};
+  }
+}
+
+// Exported so admin routes can bust the cache after a save.
+export function bustLandingImagesCache() {
+  landingImagesCache = null;
+}
 
 type Builder = (baseUrl: string) => {
   meta: ReturnType<typeof buildHome>["meta"];
@@ -174,7 +210,7 @@ export function registerSiteRoutes(app: Express) {
 
   // Site pages.
   for (const { route, build } of PAGES) {
-    app.get(route, (req: Request, res: Response, next) => {
+    app.get(route, async (req: Request, res: Response, next) => {
       // The root "/" is special: when an Expo platform header is present,
       // earlier middleware (configureExpoAndLanding) serves the manifest.
       // By the time we reach here, we know it's a regular browser request
@@ -182,8 +218,14 @@ export function registerSiteRoutes(app: Express) {
       if (route === "/" && req.method !== "GET") return next();
       try {
         const baseUrl = getBaseUrl(req);
-        const { meta, body } = build(baseUrl);
-        const html = renderPage(meta, body, baseUrl);
+        let pageResult: { meta: ReturnType<typeof buildHome>["meta"]; body: string };
+        if (route === "/") {
+          const images = await getLandingImages();
+          pageResult = (buildHome as (b: string, i?: LandingImages) => typeof pageResult)(baseUrl, images);
+        } else {
+          pageResult = build(baseUrl);
+        }
+        const html = renderPage(pageResult.meta, pageResult.body, baseUrl);
         res.setHeader("Content-Type", "text/html; charset=utf-8");
         res.setHeader("Cache-Control", "public, max-age=300");
         res.status(200).send(html);

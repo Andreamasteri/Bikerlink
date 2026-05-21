@@ -37,6 +37,7 @@ import { downloadBuffer } from "../objectStorage";
 import { revokeAllUserSessions } from "../session-utils";
 import { cacheAdImage } from "./ads";
 import { allSettledLimited } from "../lib/concurrency";
+import { bustLandingImagesCache } from "../site/routes";
 
 const router = Router();
 
@@ -7569,6 +7570,92 @@ router.put("/settings/maintenance", async (req: Request, res: Response) => {
     return res.status(500).json({ message: "Errore interno" });
   }
 });
+
+// ── GET /api/admin/settings/landing-images ────────────────────────────────
+// Restituisce le URL correnti delle immagini della landing (DB o default).
+const LANDING_IMAGE_DEFAULTS: Record<string, string> = {
+  hero_main_url: "/assets/images/hero-forest.webp",
+  hero_main_sm_url: "/assets/images/hero-forest-sm.webp",
+  hero_community_url: "/assets/images/hero-community.webp",
+  hero_community_sm_url: "/assets/images/hero-community-sm.webp",
+};
+
+router.get("/settings/landing-images", async (_req: Request, res: Response) => {
+  try {
+    const keys = Object.keys(LANDING_IMAGE_DEFAULTS);
+    const settings = await Promise.all(keys.map((k) => storage.getAppSetting(k)));
+    const result: Record<string, string> = {};
+    keys.forEach((k, i) => {
+      result[k] = settings[i]?.value?.trim() || LANDING_IMAGE_DEFAULTS[k];
+    });
+    return res.json(result);
+  } catch (err) {
+    console.error("[ADMIN landing-images] get error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── POST /api/admin/settings/landing-images ───────────────────────────────
+// Salva URL immagini landing nel DB.
+router.post("/settings/landing-images", async (req: Request, res: Response) => {
+  try {
+    const body = req.body ?? {};
+    const allowed = Object.keys(LANDING_IMAGE_DEFAULTS);
+    const updates: Promise<unknown>[] = [];
+    for (const key of allowed) {
+      if (typeof body[key] === "string") {
+        const trimmed = body[key].trim();
+        if (trimmed && trimmed.length > 2048) {
+          return res.status(400).json({ message: `URL troppo lungo per ${key}` });
+        }
+        updates.push(storage.upsertAppSetting(key, trimmed, undefined));
+      }
+    }
+    await Promise.all(updates);
+    bustLandingImagesCache();
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[ADMIN landing-images] post error:", err);
+    return res.status(500).json({ message: "Errore interno" });
+  }
+});
+
+// ── POST /api/admin/settings/landing-images/upload ───────────────────────
+// Upload diretto di un file immagine. Salva in server/public/assets/images/,
+// restituisce l'URL relativo.
+const landingImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (/^image\//i.test(file.mimetype)) return cb(null, true);
+    cb(new Error("Solo file immagine (jpeg/png/webp)"));
+  },
+});
+
+router.post(
+  "/settings/landing-images/upload",
+  landingImageUpload.single("file"),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "Nessun file allegato" });
+      const slot = typeof req.body?.slot === "string" ? req.body.slot.trim() : "";
+      if (!Object.keys(LANDING_IMAGE_DEFAULTS).includes(slot)) {
+        return res.status(400).json({ message: "Slot non valido" });
+      }
+      const ext = req.file.originalname.split(".").pop()?.toLowerCase() || "webp";
+      const filename = `landing-${slot.replace(/_/g, "-")}-${Date.now()}.${ext}`;
+      const destPath = path.resolve(process.cwd(), "assets", "images", filename);
+      fs.writeFileSync(destPath, req.file.buffer);
+      const url = `/assets/images/${filename}`;
+      await storage.upsertAppSetting(slot, url, undefined);
+      bustLandingImagesCache();
+      return res.json({ ok: true, url });
+    } catch (err) {
+      console.error("[ADMIN landing-images/upload] error:", err);
+      return res.status(500).json({ message: "Errore durante l'upload" });
+    }
+  },
+);
 
 // ── SITE VISITS (Counter Visitatori Sito — Task #1524) ─────────────────────
 // Endpoint admin-only (protetti da router.use(requireAdmin) sopra).

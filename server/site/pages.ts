@@ -230,13 +230,28 @@ const COMP_SECTION = `
 </section>`;
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
-export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
+export interface LandingImages {
+  hero_main_url?: string;
+  hero_main_sm_url?: string;
+  hero_community_url?: string;
+  hero_community_sm_url?: string;
+}
+
+const DEFAULT_LANDING_IMAGES: Required<LandingImages> = {
+  hero_main_url: "/assets/images/hero-forest.webp",
+  hero_main_sm_url: "/assets/images/hero-forest-sm.webp",
+  hero_community_url: "/assets/images/hero-community.webp",
+  hero_community_sm_url: "/assets/images/hero-community-sm.webp",
+};
+
+export function buildHome(baseUrl: string, images?: LandingImages): { meta: PageMeta; body: string } {
+  const img = { ...DEFAULT_LANDING_IMAGES, ...images };
   const meta: PageMeta = {
     path: "/",
     title: "BikerLink — App per motociclisti: GPS, Community, SOS",
     description:
       "App verticale per motociclisti: mappa biker live, MotoClub, SOS emergenza, contest foto. Gratis, italiana, in continua evoluzione.",
-    ogImage: `${baseUrl}/assets/images/hero-biker.webp`,
+    ogImage: `${baseUrl}${img.hero_main_url}`,
     headExtras: HOME_CSS,
     jsonld: [
       organizationJsonLd(baseUrl),
@@ -250,7 +265,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
         description:
           "App social verticale per motociclisti: community, GPS live, MotoClub, SOS biker.",
         url: baseUrl,
-        image: `${baseUrl}/assets/images/hero-biker.webp`,
+        image: `${baseUrl}${img.hero_main_url}`,
       },
     ],
   };
@@ -260,7 +275,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
   const body = `
 <!-- ── HERO ── -->
 <section class="home-hero" aria-label="Hero BikerLink">
-  <img class="home-hero-bg" src="/assets/images/hero-handlebar.webp" srcset="/assets/images/hero-handlebar-sm.webp 800w, /assets/images/hero-handlebar.webp 1600w" sizes="100vw" alt="Motociclista in sella — visuale dal manubrio sulla strada" width="1600" height="900" fetchpriority="high" />
+  <img class="home-hero-bg" src="${img.hero_main_url}" srcset="${img.hero_main_sm_url} 800w, ${img.hero_main_url} 1600w" sizes="100vw" alt="Motociclista su strada forestale — luce filtrata tra gli alberi" width="1600" height="900" fetchpriority="high" />
   <div class="home-hero-overlay" aria-hidden="true"></div>
   <div class="home-hero-inner">
     <div class="home-hero-eyebrow">La community italiana dei biker</div>
@@ -326,7 +341,7 @@ export function buildHome(baseUrl: string): { meta: PageMeta; body: string } {
     </div>
   </div>
   <div class="home-split-photo">
-    <img src="/assets/images/hero-mountain-rider.webp" srcset="/assets/images/hero-mountain-rider-sm.webp 512w, /assets/images/hero-mountain-rider.webp 1024w" sizes="(max-width: 860px) 100vw, 50vw" alt="Motociclista su strada di montagna" width="1024" height="1024" loading="lazy" />
+    <img src="${img.hero_community_url}" srcset="${img.hero_community_sm_url} 800w, ${img.hero_community_url} 1600w" sizes="(max-width: 860px) 100vw, 50vw" alt="Moto parcheggiate in un bosco — raduno biker" width="1600" height="900" loading="lazy" />
   </div>
 </section>
 

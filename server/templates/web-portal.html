@@ -1782,6 +1782,54 @@ async function renderAdminSettings() {
         </div>
       </div>
 
+      <!-- ── Immagini Landing ── -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:28px;margin-top:16px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:20px">
+          Immagini Landing Page
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:20px">
+          Sostituisci le immagini hero e community della landing page. I cambiamenti si riflettono entro 5 minuti senza deploy.
+        </div>
+
+        <!-- Hero Principale -->
+        <div class="form-group" style="margin-bottom:28px;padding-bottom:24px;border-bottom:1px solid var(--border)">
+          <label class="form-label" style="font-size:13px">Hero principale (1600×900)</label>
+          <div id="landing-hero-preview" style="margin-bottom:10px;border-radius:4px;overflow:hidden;max-height:140px;background:var(--surface2)"></div>
+          <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px">
+            <input class="form-input" id="landing-hero-url" type="text"
+              placeholder="/assets/images/hero-forest.webp o https://..."
+              autocomplete="off" style="flex:1;font-size:13px;font-family:monospace"/>
+            <button class="btn btn-primary btn-sm" onclick="saveLandingImage('hero_main_url','landing-hero-url','landing-hero-preview')" style="white-space:nowrap;padding:0 18px">
+              Salva URL
+            </button>
+          </div>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:8px 18px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Carica file
+            <input type="file" accept="image/*" style="display:none" onchange="uploadLandingImage(this,'hero_main_url','landing-hero-url','landing-hero-preview')"/>
+          </label>
+        </div>
+
+        <!-- Community Section -->
+        <div class="form-group">
+          <label class="form-label" style="font-size:13px">Immagine sezione community (1600×900)</label>
+          <div id="landing-community-preview" style="margin-bottom:10px;border-radius:4px;overflow:hidden;max-height:140px;background:var(--surface2)"></div>
+          <div style="display:flex;gap:8px;align-items:stretch;margin-bottom:8px">
+            <input class="form-input" id="landing-community-url" type="text"
+              placeholder="/assets/images/hero-community.webp o https://..."
+              autocomplete="off" style="flex:1;font-size:13px;font-family:monospace"/>
+            <button class="btn btn-primary btn-sm" onclick="saveLandingImage('hero_community_url','landing-community-url','landing-community-preview')" style="white-space:nowrap;padding:0 18px">
+              Salva URL
+            </button>
+          </div>
+          <label class="btn btn-ghost btn-sm" style="cursor:pointer;display:inline-flex;align-items:center;gap:8px;padding:8px 18px">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Carica file
+            <input type="file" accept="image/*" style="display:none" onchange="uploadLandingImage(this,'hero_community_url','landing-community-url','landing-community-preview')"/>
+          </label>
+        </div>
+      </div>
+
       <div style="margin-top:16px">
         <button class="btn btn-ghost btn-sm" onclick="navigate('/admin/media')">← Torna al pannello media</button>
       </div>
@@ -1794,6 +1842,7 @@ async function renderAdminSettings() {
     loadPlayStoreUrlSetting(),
     loadWebsiteUrlSetting(),
     loadMaintenanceSetting(),
+    loadLandingImagesSetting(),
   ]);
 }
 
@@ -1954,6 +2003,82 @@ function onMaintenanceToggle() {
     statusText.textContent = toggle.checked ? 'Attiva' : 'Disattivata';
     statusText.style.color = toggle.checked ? 'var(--error)' : 'var(--text2)';
   }
+}
+
+async function loadLandingImagesSetting() {
+  try {
+    const res = await fetch('/api/admin/settings/landing-images', { credentials: 'include' });
+    if (!res.ok) return;
+    const data = await res.json();
+    const heroInput = document.getElementById('landing-hero-url');
+    const commInput = document.getElementById('landing-community-url');
+    if (heroInput && data.hero_main_url) {
+      heroInput.value = data.hero_main_url;
+      updateLandingPreview('landing-hero-preview', data.hero_main_url);
+    }
+    if (commInput && data.hero_community_url) {
+      commInput.value = data.hero_community_url;
+      updateLandingPreview('landing-community-preview', data.hero_community_url);
+    }
+  } catch { /* silent */ }
+}
+
+function updateLandingPreview(previewId, url) {
+  const el = document.getElementById(previewId);
+  if (!el || !url) return;
+  el.innerHTML = url
+    ? `<img src="${esc(url)}" style="width:100%;height:140px;object-fit:cover;display:block" onerror="this.style.display='none'" />`
+    : '';
+}
+
+async function saveLandingImage(key, inputId, previewId) {
+  const input = document.getElementById(inputId);
+  const url = input ? input.value.trim() : '';
+  try {
+    const res = await fetch('/api/admin/settings/landing-images', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: url }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('settings-alert', data.message || 'Errore durante il salvataggio');
+    } else {
+      showAlert('settings-alert', 'Immagine salvata. La landing è già aggiornata.', 'success');
+      updateLandingPreview(previewId, url);
+    }
+  } catch {
+    showAlert('settings-alert', 'Errore di rete. Riprova.');
+  }
+}
+
+async function uploadLandingImage(input, slot, urlInputId, previewId) {
+  const file = input.files && input.files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('slot', slot);
+  showAlert('settings-alert', 'Caricamento in corso…');
+  try {
+    const res = await fetch('/api/admin/settings/landing-images/upload', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('settings-alert', data.message || 'Errore durante l\'upload');
+    } else {
+      showAlert('settings-alert', 'File caricato e salvato. La landing è già aggiornata.', 'success');
+      const urlInput = document.getElementById(urlInputId);
+      if (urlInput) urlInput.value = data.url;
+      updateLandingPreview(previewId, data.url);
+    }
+  } catch {
+    showAlert('settings-alert', 'Errore di rete durante l\'upload.');
+  }
+  input.value = '';
 }
 
 async function saveMaintenance() {
