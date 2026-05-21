@@ -3,86 +3,63 @@ import { sendStartupBeacon } from "@/lib/startup-beacon";
 import {
   View,
   Text,
-  StyleSheet,
   Pressable,
   ActivityIndicator,
-
   ScrollView,
-  Modal,
-  Alert,
-  Linking,
-  Image,
-  TextInput,
   TouchableOpacity,
-  FlatList,
-  SectionList,
+  Linking,
+  Platform,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { queryClient, apiRequest, getApiUrl } from "@/lib/query-client";
-import { Ionicons, MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
+import { queryClient, apiRequest } from "@/lib/query-client";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { useColors } from "@/hooks/useColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as Location from "expo-location";
 import { useSynecoVisible } from "@/lib/syneco-context";
 import { useSetting } from "@/lib/settings-context";
 import { useLocationGate } from "@/lib/location-context";
-import InteractiveMap, { type ClubMapPin, type InteractiveMapHandle } from "@/components/InteractiveMap";
-import { getRegionCoordinates } from "@/constants/regions";
-import { getCountryFlag, getCountryName, getCountryByCode, EUROPEAN_COUNTRIES, CONTINENT_MAP, getCountriesForContinent, getContinentForCountry, type CountryData, type RegionData } from "@/lib/countries-regions";
-import { useT, useLocale } from "@/lib/language-context";
+import InteractiveMap, { type InteractiveMapHandle } from "@/components/InteractiveMap";
+import { CONTINENT_MAP, getCountryByCode } from "@/lib/countries-regions";
+import { useT } from "@/lib/language-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Image } from "react-native";
+import { Alert } from "react-native";
 import type { User } from "@shared/schema";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
-import FavoriteStar from "@/components/FavoriteStar";
 
-type MapFiltersPrefs = {
-  biker?: boolean;
-  zavorrina?: boolean;
-  clubs?: boolean;
-  events?: boolean;
-};
+import { useMapFilters } from "@/hooks/useMapFilters";
+import { useMapLocation } from "@/hooks/useMapLocation";
+import { useMapData } from "@/hooks/useMapData";
+import { getUserColor, getUserTypeLabel, getUserIcon } from "@/lib/mapUserUtils";
+import MapSearchBar from "@/components/map/MapSearchBar";
+import UserListSheet from "@/components/map/UserListSheet";
+import UserDetailSheet from "@/components/map/UserDetailSheet";
+import SosSheet from "@/components/map/SosSheet";
+import AreaSelectorModal from "@/components/map/AreaSelectorModal";
+import FullscreenMapModal from "@/components/map/FullscreenMapModal";
+import AdBanner from "@/components/map/AdBanner";
+import EasterEggSheet from "@/components/map/EasterEggSheet";
+import PhotoLightbox from "@/components/map/PhotoLightbox";
+import HomeMessageModal from "@/components/map/HomeMessageModal";
+import styles from "@/components/map/mapScreenStyles";
 
 type UserWithProfileCoords = Omit<User, "password"> & {
   profileLatitude?: number | null;
   profileLongitude?: number | null;
-  mapFilters?: MapFiltersPrefs | null;
 };
-
-function formatLastSeen(dateStr: string | null | undefined): string {
-  if (!dateStr) return "";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const yy = String(d.getFullYear()).slice(-2);
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  return `${dd}/${mo}/'${yy} - ${hh}.${mm}`;
-}
 
 export default function MapScreen() {
   const router = useRouter();
   const { focusLat: focusLatParam, focusLng: focusLngParam } = useLocalSearchParams<{ focusLat?: string; focusLng?: string }>();
-  const colors = useColors();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const t = useT();
-  const locale = useLocale();
   const insets = useSafeAreaInsets();
-  const baseUrl = getApiUrl();
   const synecoVisible = useSynecoVisible();
-  const { positionReady: contextPositionReady, requestPermission, webResolvedPosition, locationPermissionDenied, locationPermissionPrompt } = useLocationGate();
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationLoading, setLocationLoading] = useState(true);
+  const { positionReady: contextPositionReady, requestPermission, locationPermissionDenied, locationPermissionPrompt } = useLocationGate();
+
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [mapFullscreenReady, setMapFullscreenReady] = useState(false);
-  const [filterBiker, setFilterBiker] = useState(true);
-  const [filterZavorrina, setFilterZavorrina] = useState(true);
-  const [filterClubs, setFilterClubs] = useState(false);
-  const [filterEvents, setFilterEvents] = useState(true);
-  const [filtersLoaded, setFiltersLoaded] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
   const [selectedMapPhoto, setSelectedMapPhoto] = useState<string | null>(null);
@@ -97,8 +74,6 @@ export default function MapScreen() {
   const [showBikerList, setShowBikerList] = useState(false);
   const [showZavorrinaList, setShowZavorrinaList] = useState(false);
   const [adIndex, setAdIndex] = useState(0);
-  const [adImageError, setAdImageError] = useState<string | null>(null);
-  const [adImageRetried, setAdImageRetried] = useState<Set<string>>(new Set());
   const [showOfflineOnline, setShowOfflineOnline] = useState(false);
   const [showSosDetail, setShowSosDetail] = useState(false);
   const [offlineCountdown, setOfflineCountdown] = useState<{ online: number }>({ online: 0 });
@@ -109,16 +84,78 @@ export default function MapScreen() {
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [countriesLoaded, setCountriesLoaded] = useState(false);
-  const [expandedContinents, setExpandedContinents] = useState<Set<string>>(new Set());
-  const [expandedCountries, setExpandedCountries] = useState<Set<string>>(new Set());
   const [showHomeMessage, setShowHomeMessage] = useState(false);
-  const [showInviteEventModal, setShowInviteEventModal] = useState(false);
-  const [inviteSending, setInviteSending] = useState(false);
   const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const lastFocusParamRef = useRef<string | null>(null);
   const [showLocationNudge, setShowLocationNudge] = useState(false);
-  const [webMobilePosition, setWebMobilePosition] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [webPhonePositionStatus, setWebPhonePositionStatus] = useState<"live" | "stale" | null>(null);
+  const locationNudgeCheckedRef = useRef(false);
+
+  const {
+    filterBiker,
+    filterZavorrina,
+    filterClubs,
+    filterEvents,
+    filtersLoaded,
+    toggleFilterBiker,
+    toggleFilterZavorrina,
+    toggleFilterClubs,
+    toggleFilterEvents,
+  } = useMapFilters({ user, isAuthenticated });
+
+  const typedUser = user as UserWithProfileCoords | null | undefined;
+
+  const { location, locationLoading, webMobilePosition, webPhonePositionStatus, setLocation } = useMapLocation({
+    userRegion: user?.region,
+    userCountry: user?.country,
+    profileLat: typedUser?.profileLatitude,
+    profileLng: typedUser?.profileLongitude,
+  });
+
+  const countriesQueryParam = useMemo(() => {
+    if (!countriesLoaded || selectedCountries.length === 0) return "";
+    return selectedCountries.join(",");
+  }, [selectedCountries, countriesLoaded]);
+
+  const {
+    nearbyUsersQuery,
+    nearbyLoaded,
+    onlineCountQuery,
+    bikerCountQuery,
+    zavCountQuery,
+    workshopsQuery,
+    easterEggsQuery,
+    adsGloballyEnabled,
+    myAdsQuery,
+    homeMessageQuery,
+    profileQuery,
+    onlineListQuery,
+    bikerListQuery,
+    zavListQuery,
+    activeSosQuery,
+    acceptSosMutation,
+    myProposalsQuery,
+    clubPinsQuery,
+    myOrganizedEventsQuery,
+    targetUserEventIdsQuery,
+    collectEggMutation,
+    invalidateCountryQueries,
+  } = useMapData({
+    location,
+    isAuthenticated,
+    mapReady,
+    countriesLoaded,
+    countriesQueryParam,
+    showOnlineList,
+    showBikerList,
+    showZavorrinaList,
+    showOfflineOnline,
+    selectedUserId: selectedUser?.id,
+    mapFullscreen,
+    sosEnabled,
+    setShowSosDetail,
+    setSelectedEgg,
+    t,
+  });
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -128,8 +165,8 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (mapReady) return;
-    const t = setTimeout(() => setMapReady(true), 5000);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setMapReady(true), 5000);
+    return () => clearTimeout(timer);
   }, [mapReady]);
 
   useEffect(() => {
@@ -147,12 +184,28 @@ export default function MapScreen() {
 
   useEffect(() => {
     if (mapFullscreen) {
-      const t = setTimeout(() => setMapFullscreenReady(true), 400);
-      return () => clearTimeout(t);
+      const timer = setTimeout(() => setMapFullscreenReady(true), 400);
+      return () => clearTimeout(timer);
     } else {
       setMapFullscreenReady(false);
     }
   }, [mapFullscreen]);
+
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    if (locationNudgeCheckedRef.current) return;
+    if (locationLoading) return;
+    locationNudgeCheckedRef.current = true;
+    (async () => {
+      try {
+        const dismissed = await AsyncStorage.getItem("location_nudge_dismissed");
+        if (dismissed === "1") return;
+        if (!location && webPhonePositionStatus !== "live") {
+          setShowLocationNudge(true);
+        }
+      } catch {}
+    })();
+  }, [locationLoading, location, webPhonePositionStatus]);
 
   useEffect(() => {
     (async () => {
@@ -167,144 +220,21 @@ export default function MapScreen() {
           }
         }
       } catch {}
-
       setSelectedCountries(["IT"]);
       try { await AsyncStorage.setItem("map_area_countries", JSON.stringify(["IT"])); } catch {}
       setCountriesLoaded(true);
     })();
   }, []);
 
-  // Server preferences override device defaults exactly once per session, the
-  // first time the authenticated user object becomes available. We never write
-  // to the server in a "background" effect — only explicit user toggles (see
-  // updateMapFilter below) sync upstream, so we cannot clobber cloud prefs
-  // with device defaults before they load.
-  const serverFiltersAppliedRef = useRef(false);
-  const lastAppliedUserIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    // Reset the "server prefs applied" flag whenever the authenticated user
-    // identity changes (e.g. account switch without remount), so the new
-    // user's cloud prefs are picked up instead of being short-circuited.
-    const currentId = user?.id ?? null;
-    if (lastAppliedUserIdRef.current !== currentId) {
-      lastAppliedUserIdRef.current = currentId;
-      serverFiltersAppliedRef.current = false;
-    }
-  }, [user?.id]);
-  useEffect(() => {
-    (async () => {
-      try {
-        const stored = await AsyncStorage.getItem("map_filters");
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (typeof parsed.biker === "boolean") setFilterBiker(parsed.biker);
-          if (typeof parsed.zavorrina === "boolean") setFilterZavorrina(parsed.zavorrina);
-          if (typeof parsed.clubs === "boolean") setFilterClubs(parsed.clubs);
-          if (typeof parsed.events === "boolean") setFilterEvents(parsed.events);
-        }
-      } catch {}
-      setFiltersLoaded(true);
-    })();
-  }, []);
-
-  useEffect(() => {
-    if (!filtersLoaded) return;
-    if (serverFiltersAppliedRef.current) return;
-    if (!user) return;
-    const typed = user as UserWithProfileCoords;
-    // `mapFilters` is now always present in /api/auth/me and /api/auth/login
-    // responses — `null` means "user has no saved cloud prefs yet". Either way
-    // we mark the override as applied so subsequent user toggles can sync.
-    if (!("mapFilters" in typed)) return;
-    serverFiltersAppliedRef.current = true;
-    const serverFilters = typed.mapFilters;
-    if (serverFilters && typeof serverFilters === "object") {
-      const nextBiker = typeof serverFilters.biker === "boolean" ? serverFilters.biker : filterBiker;
-      const nextZav = typeof serverFilters.zavorrina === "boolean" ? serverFilters.zavorrina : filterZavorrina;
-      const nextClubs = typeof serverFilters.clubs === "boolean" ? serverFilters.clubs : filterClubs;
-      const nextEvents = typeof serverFilters.events === "boolean" ? serverFilters.events : filterEvents;
-      setFilterBiker(nextBiker);
-      setFilterZavorrina(nextZav);
-      setFilterClubs(nextClubs);
-      setFilterEvents(nextEvents);
-      AsyncStorage.setItem(
-        "map_filters",
-        JSON.stringify({ biker: nextBiker, zavorrina: nextZav, clubs: nextClubs, events: nextEvents })
-      ).catch(() => {});
-    }
-  }, [filtersLoaded, user]);
-
-  const persistMapFilters = useCallback(
-    (payload: { biker: boolean; zavorrina: boolean; clubs: boolean; events: boolean }) => {
-      // Local cache first — graceful fallback if the server is unreachable.
-      AsyncStorage.setItem("map_filters", JSON.stringify(payload)).catch(() => {});
-      // Mark server prefs as applied: any further server-side load attempts in
-      // this session must not overwrite what the user just chose.
-      serverFiltersAppliedRef.current = true;
-      if (!isAuthenticated) return;
-      apiRequest("PUT", "/api/users/me", { mapFilters: payload }).catch(() => {});
-    },
-    [isAuthenticated]
-  );
-
-  const toggleFilterBiker = useCallback(() => {
-    setFilterBiker((prev) => {
-      const next = !prev;
-      persistMapFilters({ biker: next, zavorrina: filterZavorrina, clubs: filterClubs, events: filterEvents });
-      return next;
-    });
-  }, [persistMapFilters, filterZavorrina, filterClubs, filterEvents]);
-
-  const toggleFilterZavorrina = useCallback(() => {
-    setFilterZavorrina((prev) => {
-      const next = !prev;
-      persistMapFilters({ biker: filterBiker, zavorrina: next, clubs: filterClubs, events: filterEvents });
-      return next;
-    });
-  }, [persistMapFilters, filterBiker, filterClubs, filterEvents]);
-
-  const toggleFilterClubs = useCallback(() => {
-    setFilterClubs((prev) => {
-      const next = !prev;
-      persistMapFilters({ biker: filterBiker, zavorrina: filterZavorrina, clubs: next, events: filterEvents });
-      return next;
-    });
-  }, [persistMapFilters, filterBiker, filterZavorrina, filterEvents]);
-
-  const toggleFilterEvents = useCallback(() => {
-    setFilterEvents((prev) => {
-      const next = !prev;
-      persistMapFilters({ biker: filterBiker, zavorrina: filterZavorrina, clubs: filterClubs, events: next });
-      return next;
-    });
-  }, [persistMapFilters, filterBiker, filterZavorrina, filterClubs]);
-
-  const countriesQueryParam = useMemo(() => {
-    if (!countriesLoaded || selectedCountries.length === 0) return "";
-    return selectedCountries.join(",");
-  }, [selectedCountries, countriesLoaded]);
-
   const saveCountries = useCallback(async (countries: string[]) => {
     setSelectedCountries(countries);
-    try {
-      await AsyncStorage.setItem("map_area_countries", JSON.stringify(countries));
-    } catch {}
-    queryClient.invalidateQueries({ queryKey: ["/api/users/nearby"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-list"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-list"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/users/online-count"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/users/biker-available-count"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-count"] });
-  }, []);
+    try { await AsyncStorage.setItem("map_area_countries", JSON.stringify(countries)); } catch {}
+    invalidateCountryQueries();
+  }, [invalidateCountryQueries]);
 
   const toggleCountryInModal = useCallback((code: string) => {
-    setSelectedCountries((prev) => {
-      if (prev.includes(code)) {
-        return prev.filter((c) => c !== code);
-      }
-      return [...prev, code];
-    });
+    if (code === "__world__") { setSelectedCountries([]); return; }
+    setSelectedCountries((prev) => prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]);
   }, []);
 
   const toggleContinentInModal = useCallback((continentKey: string) => {
@@ -313,11 +243,8 @@ export default function MapScreen() {
     const codes = continent.countryCodes;
     setSelectedCountries((prev) => {
       const allSelected = codes.every((code) => prev.includes(code));
-      if (allSelected) {
-        return prev.filter((c) => !codes.includes(c));
-      }
-      const toAdd = codes.filter((c) => !prev.includes(c));
-      return [...prev, ...toAdd];
+      if (allSelected) return prev.filter((c) => !codes.includes(c));
+      return [...prev, ...codes.filter((c) => !prev.includes(c))];
     });
   }, []);
 
@@ -326,9 +253,7 @@ export default function MapScreen() {
     for (const continent of CONTINENT_MAP) {
       const allInContinent = continent.countryCodes.every((c) => selectedCountries.includes(c));
       const onlyContinent = selectedCountries.every((c) => continent.countryCodes.includes(c));
-      if (allInContinent && onlyContinent && selectedCountries.length === continent.countryCodes.length) {
-        return `${continent.label}`;
-      }
+      if (allInContinent && onlyContinent && selectedCountries.length === continent.countryCodes.length) return `${continent.label}`;
     }
     if (selectedCountries.length === 1) {
       const country = getCountryByCode(selectedCountries[0]);
@@ -337,158 +262,7 @@ export default function MapScreen() {
     return `${selectedCountries.length} paesi`;
   }, [selectedCountries]);
 
-  const getRegionFallback = useCallback((): { latitude: number; longitude: number } | null => {
-    if (user?.region) {
-      return getRegionCoordinates(user.region, user?.country);
-    }
-    return null;
-  }, [user?.region, user?.country]);
-
-  const fetchGPSLocation = useCallback(async (): Promise<{ latitude: number; longitude: number } | null> => {
-    try {
-      let coords: { latitude: number; longitude: number } | null = null;
-
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      sendStartupBeacon("gps_permission_result", { status });
-      if (status !== "granted") return null;
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-      coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-
-      if (coords) {
-        try {
-          await AsyncStorage.setItem("map_last_gps", JSON.stringify({ latitude: coords.latitude, longitude: coords.longitude }));
-        } catch {}
-        try {
-          await apiRequest("PUT", "/api/users/location", {
-            latitude: coords.latitude,
-            longitude: coords.longitude,
-          });
-        } catch (e) {}
-      }
-      return coords;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const typedUser = user as UserWithProfileCoords | null | undefined;
-  const profileLat = typedUser?.profileLatitude;
-  const profileLng = typedUser?.profileLongitude;
-
-  useEffect(() => {
-    let cancelled = false;
-    async function initMapLocation() {
-      try {
-        // Leggi subito l'ultima posizione GPS salvata localmente (zero delay di rete)
-        try {
-          const cachedGps = await AsyncStorage.getItem("map_last_gps");
-          if (cachedGps) {
-            const parsed = JSON.parse(cachedGps);
-            if (parsed && typeof parsed.latitude === "number" && typeof parsed.longitude === "number") {
-              if (!cancelled) {
-                setLocation({ latitude: parsed.latitude, longitude: parsed.longitude });
-                setLocationLoading(false);
-              }
-            }
-          }
-        } catch {}
-
-        sendStartupBeacon("fetch_gps_start");
-
-        if (Platform.OS !== "web") {
-          if (user?.region) {
-            if (!cancelled) setLocation((prev) => prev ?? getRegionCoordinates(user.region, user.country));
-            if (!cancelled) setLocationLoading(false);
-            const gps = await fetchGPSLocation();
-            if (gps && !cancelled) setLocation(gps);
-            return;
-          }
-
-          if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
-            if (!cancelled) setLocation((prev) => prev ?? { latitude: Number(profileLat), longitude: Number(profileLng) });
-            if (!cancelled) setLocationLoading(false);
-            const gps = await fetchGPSLocation();
-            if (gps && !cancelled) setLocation(gps);
-            return;
-          }
-        }
-
-        // On web, fetch saved mobile position BEFORE calling fetchGPSLocation
-        // (fetchGPSLocation does PUT /api/users/location which would mark browser
-        // GPS as "live", making a subsequent check indistinguishable from mobile GPS).
-        if (Platform.OS === "web") {
-          let savedMobilePos: { latitude: number; longitude: number; source: string | null } | null = null;
-          try {
-            const res = await apiRequest("GET", "/api/user/position");
-            const data = await res.json();
-            if (data?.latitude != null && data?.longitude != null) {
-              savedMobilePos = { latitude: data.latitude, longitude: data.longitude, source: data.source ?? null };
-              if (!cancelled) setWebMobilePosition({ latitude: data.latitude, longitude: data.longitude });
-            }
-          } catch {}
-
-          try {
-            const lastPosRes = await apiRequest("GET", "/api/users/my-last-position");
-            const lastPosData = await lastPosRes.json();
-            if (!cancelled) {
-              setWebPhonePositionStatus(lastPosData?.available ? "live" : "stale");
-            }
-          } catch {}
-
-          if (savedMobilePos?.source === "live") {
-            // Mobile position is fresh — use it as the primary map center
-            if (!cancelled) {
-              setLocation({ latitude: savedMobilePos.latitude, longitude: savedMobilePos.longitude });
-              setLocationLoading(false);
-            }
-            return;
-          }
-
-          // Mobile position is stale or absent — fall through to browser GPS
-          const gps = await fetchGPSLocation();
-          if (cancelled) return;
-          if (gps) {
-            setLocation(gps);
-          } else if (savedMobilePos) {
-            setLocation((prev) => prev ?? { latitude: savedMobilePos!.latitude, longitude: savedMobilePos!.longitude });
-          }
-          setLocationLoading(false);
-          return;
-        }
-
-        const gps = await fetchGPSLocation();
-        if (cancelled) return;
-        if (gps) {
-          setLocation(gps);
-          setLocationLoading(false);
-        } else {
-          const fallback = getRegionFallback();
-          if (fallback) setLocation((prev) => prev ?? fallback);
-          setLocationLoading(false);
-        }
-      } catch (err) {
-        console.warn("[index] initMapLocation fallita:", err);
-        if (!cancelled) setLocationLoading(false);
-      }
-    }
-    initMapLocation();
-    return () => { cancelled = true; };
-  }, [fetchGPSLocation, getRegionFallback, user?.region, user?.country, profileLat, profileLng]);
-
-  const handleCenterPosition = useCallback(async () => {
-    const gps = await fetchGPSLocation();
-    if (gps) {
-      setLocation(gps);
-    } else {
-      const fallback = getRegionFallback();
-      if (fallback) setLocation(fallback);
-    }
-  }, [fetchGPSLocation, getRegionFallback]);
-
-  const startOfflineTimer = useCallback(() => {
-    setOfflineCountdown({ online: 30 });
-  }, []);
-
+  const startOfflineTimer = useCallback(() => { setOfflineCountdown({ online: 30 }); }, []);
   const hasActiveCountdown = offlineCountdown.online > 0;
 
   useEffect(() => {
@@ -496,328 +270,41 @@ export default function MapScreen() {
     const interval = setInterval(() => {
       setOfflineCountdown((prev) => {
         const next = { ...prev };
-        if (next.online > 0) {
-          next.online -= 1;
-          if (next.online === 0) setShowOfflineOnline(false);
-        }
+        if (next.online > 0) { next.online -= 1; if (next.online === 0) setShowOfflineOnline(false); }
         return next;
       });
     }, 1000);
     return () => clearInterval(interval);
   }, [hasActiveCountdown]);
 
-  // --- LIVELLO 2: si attivano dopo che la mappa è pronta ---
-  const nearbyUsersQuery = useQuery<any[]>({
-    queryKey: ["/api/users/nearby", location?.latitude, location?.longitude, countriesQueryParam],
-    queryFn: async () => {
-      if (!location) return [];
-      const url = new URL("/api/users/nearby", baseUrl);
-      url.searchParams.set("lat", String(location.latitude));
-      url.searchParams.set("lng", String(location.longitude));
-      if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
-      const res = await apiRequest("GET", url.pathname + url.search);
-      return res.json();
-    },
-    retry: false,
-    staleTime: 30000,
-    refetchInterval: 30000,
-    refetchOnWindowFocus: true,
-    enabled: isAuthenticated && !!location && mapReady && countriesLoaded,
-  });
-
-  const nearbyLoaded = nearbyUsersQuery.isFetched || nearbyUsersQuery.isError;
-
-  // --- LIVELLO 2: contatori (dopo mappa pronta, refresh 30s) ---
-  const onlineCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/online-count", countriesQueryParam],
-    queryFn: () => apiRequest("GET", `/api/users/online-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`).then(r => r.json()),
-    staleTime: 30000,
-    refetchInterval: 30000,
-    refetchOnWindowFocus: true,
-    enabled: isAuthenticated && mapReady && countriesLoaded,
-  });
-
-  const bikerCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/biker-available-count", countriesQueryParam],
-    queryFn: () => apiRequest("GET", `/api/users/biker-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`).then(r => r.json()),
-    staleTime: 30000,
-    refetchInterval: 30000,
-    refetchOnWindowFocus: true,
-    enabled: isAuthenticated && mapReady && countriesLoaded,
-  });
-
-  const zavCountQuery = useQuery<{ count: number }>({
-    queryKey: ["/api/users/zavorrine-available-count", countriesQueryParam],
-    queryFn: () => apiRequest("GET", `/api/users/zavorrine-available-count${countriesQueryParam ? `?countries=${countriesQueryParam}` : ""}`).then(r => r.json()),
-    staleTime: 30000,
-    refetchInterval: 30000,
-    refetchOnWindowFocus: true,
-    enabled: isAuthenticated && mapReady && countriesLoaded,
-  });
-
-  // --- LIVELLO 3: dati secondari (dopo utenti vicini caricati) ---
-  const workshopsQuery = useQuery<any[]>({
-    queryKey: ["/api/workshops"],
-    retry: false,
-    staleTime: 60000,
-    enabled: isAuthenticated && nearbyLoaded,
-  });
-
-  const easterEggsQuery = useQuery<any[]>({
-    queryKey: ["/api/easter-eggs/nearby", location?.latitude, location?.longitude],
-    queryFn: async () => {
-      if (!location) return [];
-      const res = await apiRequest("GET", `/api/easter-eggs/nearby?lat=${location.latitude}&lng=${location.longitude}`);
-      return res.json();
-    },
-    retry: false,
-    staleTime: 60000,
-    refetchInterval: 60000,
-    enabled: isAuthenticated && !!location && nearbyLoaded,
-  });
-
-  const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/ads-enabled"],
-    staleTime: 30000,
-    enabled: isAuthenticated && mapReady,
-  });
-  const adsGloballyEnabled = adsEnabledData?.enabled !== false;
-
-  const myAdsQuery = useQuery<any[]>({
-    queryKey: ["/api/ads/my-ads"],
-    staleTime: 60000,
-    refetchInterval: 5 * 60 * 1000,
-    enabled: isAuthenticated && adsGloballyEnabled && mapReady,
-  });
-
-  const { data: homeMessageData, refetch: refetchHomeMessage } = useQuery<{ enabled: boolean; text: string }>({
-    queryKey: ["/api/settings/home-message"],
-    staleTime: 0,
-    refetchInterval: 60000,
-    enabled: isAuthenticated,
-  });
-
-  const profileQuery = useQuery({
-    queryKey: ["/api/users/profile"],
-    enabled: isAuthenticated,
-  });
   const isAvailable = (profileQuery.data as any)?.isAvailable || false;
   const isGhostMode = (profileQuery.data as any)?.ghostMode || false;
   const fakeHomeEnabled = (profileQuery.data as any)?.fakeHomeEnabled || false;
   const fakeHomeLat = (profileQuery.data as any)?.fakeHomeLatitude ?? null;
   const fakeHomeLng = (profileQuery.data as any)?.fakeHomeLongitude ?? null;
-  const realMeMarker =
-    fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null && location != null
-      ? { latitude: location.latitude, longitude: location.longitude }
-      : null;
-  const fakeMeMarker =
-    fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null
-      ? { latitude: Number(fakeHomeLat), longitude: Number(fakeHomeLng) }
-      : null;
+  const realMeMarker = fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null && location != null
+    ? { latitude: location.latitude, longitude: location.longitude } : null;
+  const fakeMeMarker = fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null
+    ? { latitude: Number(fakeHomeLat), longitude: Number(fakeHomeLng) } : null;
 
-  const onlineListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/online-list", location?.latitude, location?.longitude, showOfflineOnline, countriesQueryParam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (location) {
-        params.set("lat", String(location.latitude));
-        params.set("lng", String(location.longitude));
-      }
-      if (showOfflineOnline) params.set("includeOffline", "true");
-      if (countriesQueryParam) params.set("countries", countriesQueryParam);
-      const qs = params.toString();
-      const res = await apiRequest("GET", `/api/users/online-list${qs ? `?${qs}` : ""}`);
-      return res.json();
-    },
-    staleTime: 15000,
-    enabled: isAuthenticated && showOnlineList,
-  });
-
-  const bikerListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/biker-available-list", location?.latitude, location?.longitude, countriesQueryParam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (location) {
-        params.set("lat", String(location.latitude));
-        params.set("lng", String(location.longitude));
-      }
-      if (countriesQueryParam) params.set("countries", countriesQueryParam);
-      const qs = params.toString();
-      const res = await apiRequest("GET", `/api/users/biker-available-list${qs ? `?${qs}` : ""}`);
-      return res.json();
-    },
-    staleTime: 15000,
-    enabled: isAuthenticated && showBikerList,
-  });
-
-  const zavListQuery = useQuery<any[]>({
-    queryKey: ["/api/users/zavorrine-available-list", location?.latitude, location?.longitude, countriesQueryParam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (location) {
-        params.set("lat", String(location.latitude));
-        params.set("lng", String(location.longitude));
-      }
-      if (countriesQueryParam) params.set("countries", countriesQueryParam);
-      const qs = params.toString();
-      const res = await apiRequest("GET", `/api/users/zavorrine-available-list${qs ? `?${qs}` : ""}`);
-      return res.json();
-    },
-    staleTime: 15000,
-    enabled: isAuthenticated && showZavorrinaList,
-  });
-
-  const activeSosQuery = useQuery<any[]>({
-    queryKey: ["/api/sos/active"],
-    staleTime: 15000,
-    refetchInterval: 15000,
-    enabled: isAuthenticated && sosEnabled && nearbyLoaded,
-  });
-
-  const acceptSosMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiRequest("PUT", `/api/sos/${id}/accept`);
-      return res.json();
-    },
-    onSuccess: (d: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/sos/active"] });
-      setShowSosDetail(false);
-      if (d.conversationId) {
-        router.push(`/chat/${d.conversationId}` as any);
-      }
-    },
-    onError: (error: Error) => {
-      Alert.alert(t("common.error"), error.message);
-    },
-  });
-
-  const myProposalsQuery = useQuery<any[]>({
-    queryKey: ["/api/proposals?status=active"],
-    staleTime: 60000,
-    enabled: isAuthenticated && nearbyLoaded,
-  });
-
-  const clubPinsQuery = useQuery<ClubMapPin[]>({
-    queryKey: ["/api/motoclubs/map"],
-    staleTime: 120000,
-    enabled: isAuthenticated && mapFullscreen,
-  });
-
-  const myOrganizedEventsQuery = useQuery<any[]>({
-    queryKey: ["/api/events/my"],
-    enabled: isAuthenticated,
-    staleTime: 60000,
-    select: (data: any[]) => {
-      const todayStr = new Date().toISOString().substring(0, 10);
-      return (data || []).filter(
-        (ev: any) => ev.status === "approved" && (ev.eventDate ?? "").substring(0, 10) >= todayStr
-      );
-    },
-  });
-
-  const targetUserEventIdsQuery = useQuery<string[]>({
-    queryKey: ["/api/events/user-events", selectedUser?.id],
-    enabled: !!selectedUser?.id && showInviteEventModal,
-    staleTime: 30000,
-  });
-
-  const mySearchRadius = useMemo(() => {
-    const myActive = (myProposalsQuery.data || []).filter(
-      (p: any) => p.userId === user?.id && p.status === "active" && p.searchRadius
-    );
-    if (myActive.length === 0) return 0;
-    return Math.max(...myActive.map((p: any) => p.searchRadius || 0));
-  }, [myProposalsQuery.data, user?.id]);
-
-  const autoCollectingRef = React.useRef<Set<string>>(new Set());
-
-  const collectEggMutation = useMutation({
-    mutationFn: async (eggId: string) => {
-      const res = await apiRequest("POST", `/api/easter-eggs/${eggId}/collect`);
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      if (data.prizeUnlocked) {
-        Alert.alert(t("home.easterEggPrize"), data.message || t("home.easterEgg10Msg"));
-      } else {
-        Alert.alert(t("home.easterEggTitle"), data.message || t("home.easterEggCongrats"));
-      }
-      queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
-      setSelectedEgg(null);
-    },
-    onError: (err: any) => {
-      Alert.alert(t("common.error"), err.message || t("home.cannotCollect"));
-    },
-  });
-
-  useEffect(() => {
-    const nearbyEggs = easterEggsQuery.data || [];
-    const uncollected = nearbyEggs.filter((e: any) => !e.collected && !autoCollectingRef.current.has(e.id));
-    if (uncollected.length > 0) {
-      uncollected.forEach((egg: any) => {
-        autoCollectingRef.current.add(egg.id);
-        apiRequest("POST", `/api/easter-eggs/${egg.id}/collect`)
-          .then((res) => res.json())
-          .then((data: any) => {
-            if (data.prizeUnlocked) {
-              Alert.alert(t("home.easterEggPrize"), data.message || t("home.easterEgg10Msg"));
-            } else {
-              Alert.alert(t("home.easterEggTitle"), data.message || t("home.easterEggCongrats"));
-            }
-            queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
-          })
-          .catch(() => {})
-          .finally(() => {
-            autoCollectingRef.current.delete(egg.id);
-          });
-      });
-    }
-  }, [easterEggsQuery.data]);
-
-  const handleUserPress = useCallback(async (mapUser: any) => {
-    setSelectedUser(mapUser);
-    setDetailLoading(true);
-    setSelectedUserDetail(null);
-    setSelectedUserProposals([]);
-    try {
-      const [detailRes, proposalsRes] = await Promise.all([
-        apiRequest("GET", `/api/users/${mapUser.id}/public`),
-        apiRequest("GET", "/api/proposals"),
-      ]);
-      setSelectedUserDetail(await detailRes.json());
-      const allProposals = await proposalsRes.json();
-      const userProposals = (Array.isArray(allProposals) ? allProposals : []).filter(
-        (p: any) => p.userId === mapUser.id && p.status === "active"
-      );
-      setSelectedUserProposals(userProposals);
-    } catch (e) {}
-    setDetailLoading(false);
-  }, []);
-
-  const handleEasterEggPress = useCallback((egg: any) => {
-    setSelectedEgg(egg);
-  }, []);
+  const myAds = myAdsQuery.data || [];
+  const onlineCount = onlineCountQuery.data?.count ?? 0;
+  const bikerCount = bikerCountQuery.data?.count ?? 0;
+  const zavCount = zavCountQuery.data?.count ?? 0;
 
   const nearbyUsers = (nearbyUsersQuery.data as any) || [];
-  const workshops = (workshopsQuery.data as any) || [];
-  const myAds = myAdsQuery.data || [];
 
   const usersWithSelf = useMemo(() => {
     const rawList: any[] = Array.isArray(nearbyUsers) ? nearbyUsers : [];
     if (!user || !location) return rawList;
     const alreadyPresent = rawList.some((u: any) => u.id === user.id);
     if (alreadyPresent) return rawList;
-    const selfMarker = {
-      id: user.id,
-      nickname: user.nickname ?? "",
+    return [{
+      id: user.id, nickname: user.nickname ?? "",
       userType: (user.userType ?? "biker") as "biker" | "zavorrina" | "coppia",
-      sex: user.sex ?? null,
-      country: user.country ?? null,
-      region: user.region ?? null,
-      latitude: location.latitude,
-      longitude: location.longitude,
-    };
-    return [selfMarker, ...rawList];
+      sex: user.sex ?? null, country: user.country ?? null, region: user.region ?? null,
+      latitude: location.latitude, longitude: location.longitude,
+    }, ...rawList];
   }, [nearbyUsers, user, location]);
 
   const smallMapInitialCenter = useMemo(() => {
@@ -839,20 +326,40 @@ export default function MapScreen() {
     const profileData = profileQuery.data as any;
     const savedLat = profileData?.latitude;
     const savedLng = profileData?.longitude;
-    if (
-      savedLat != null &&
-      savedLng != null &&
-      !isNaN(Number(savedLat)) &&
-      !isNaN(Number(savedLng))
-    ) {
+    if (savedLat != null && savedLng != null && !isNaN(Number(savedLat)) && !isNaN(Number(savedLng))) {
       return { latitude: Number(savedLat), longitude: Number(savedLng) };
     }
     return null;
   }, [filterBiker, filterZavorrina, usersWithSelf, user?.id, profileQuery.data]);
 
-  const onlineCount = onlineCountQuery.data?.count ?? 0;
-  const bikerCount = bikerCountQuery.data?.count ?? 0;
-  const zavCount = zavCountQuery.data?.count ?? 0;
+  const mySearchRadius = useMemo(() => {
+    const myActive = (myProposalsQuery.data || []).filter(
+      (p: any) => p.userId === user?.id && p.status === "active" && p.searchRadius
+    );
+    if (myActive.length === 0) return 0;
+    return Math.max(...myActive.map((p: any) => p.searchRadius || 0));
+  }, [myProposalsQuery.data, user?.id]);
+
+  const autoCollectingRef = React.useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    const nearbyEggs = easterEggsQuery.data || [];
+    const uncollected = nearbyEggs.filter((e: any) => !e.collected && !autoCollectingRef.current.has(e.id));
+    if (uncollected.length > 0) {
+      uncollected.forEach((egg: any) => {
+        autoCollectingRef.current.add(egg.id);
+        apiRequest("POST", `/api/easter-eggs/${egg.id}/collect`)
+          .then((res) => res.json())
+          .then((data: any) => {
+            if (data.prizeUnlocked) Alert.alert(t("home.easterEggPrize"), data.message || t("home.easterEgg10Msg"));
+            else Alert.alert(t("home.easterEggTitle"), data.message || t("home.easterEggCongrats"));
+            queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
+          })
+          .catch(() => {})
+          .finally(() => { autoCollectingRef.current.delete(egg.id); });
+      });
+    }
+  }, [easterEggsQuery.data]);
 
   useEffect(() => {
     if (myAds.length <= 1) return;
@@ -860,43 +367,51 @@ export default function MapScreen() {
     const duration = (firstAd?.rotationDuration || 10) * 1000;
     const mode = firstAd?.rotationMode || "sequential";
     const timer = setInterval(() => {
-      setAdIndex((prev) => {
-        if (mode === "random") return Math.floor(Math.random() * myAds.length);
-        return (prev + 1) % myAds.length;
-      });
+      setAdIndex((prev) => mode === "random" ? Math.floor(Math.random() * myAds.length) : (prev + 1) % myAds.length);
     }, duration);
     return () => clearInterval(timer);
   }, [myAds]);
 
-  const handleAdClick = useCallback(async (ad: any) => {
+  const handleUserPress = useCallback(async (mapUser: any) => {
+    setSelectedUser(mapUser);
+    setDetailLoading(true);
+    setSelectedUserDetail(null);
+    setSelectedUserProposals([]);
     try {
-      await apiRequest("POST", `/api/ads/${ad.id}/click`);
-    } catch (e) {}
+      const [detailRes, proposalsRes] = await Promise.all([
+        apiRequest("GET", `/api/users/${mapUser.id}/public`),
+        apiRequest("GET", "/api/proposals"),
+      ]);
+      setSelectedUserDetail(await detailRes.json());
+      const allProposals = await proposalsRes.json();
+      setSelectedUserProposals((Array.isArray(allProposals) ? allProposals : []).filter(
+        (p: any) => p.userId === mapUser.id && p.status === "active"
+      ));
+    } catch {}
+    setDetailLoading(false);
+  }, []);
+
+  const handleEasterEggPress = useCallback((egg: any) => { setSelectedEgg(egg); }, []);
+
+  const handleAdClick = useCallback(async (ad: any) => {
+    try { await apiRequest("POST", `/api/ads/${ad.id}/click`); } catch {}
     if (ad.linkUrl) {
       let url = ad.linkUrl.trim();
-      if (!/^https?:\/\//i.test(url)) {
-        url = "https://" + url;
-      }
-      try {
-        await Linking.openURL(url);
-      } catch (e) {}
+      if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+      try { await Linking.openURL(url); } catch {}
     }
   }, []);
 
   const handleSearch = useCallback(async (text: string) => {
     setSearchText(text);
-    if (text.trim().length < 2) {
-      setSearchResults([]);
-      setShowSearchResults(false);
-      return;
-    }
+    if (text.trim().length < 2) { setSearchResults([]); setShowSearchResults(false); return; }
     setSearchLoading(true);
     setShowSearchResults(true);
     try {
       const res = await apiRequest("GET", `/api/users/search?q=${encodeURIComponent(text.trim())}`);
       const data = await res.json();
       setSearchResults(data.filter((u: any) => u.id !== user?.id));
-    } catch { }
+    } catch {}
     setSearchLoading(false);
   }, [user?.id]);
 
@@ -906,6 +421,18 @@ export default function MapScreen() {
     setSearchResults([]);
     router.push(`/profile/${u.id}` as any);
   }, [router]);
+
+  const handleLocateUser = useCallback((u: any) => {
+    setShowOnlineList(false);
+    setShowBikerList(false);
+    setShowZavorrinaList(false);
+    setLastSmallMapCenter({ latitude: u.latitude, longitude: u.longitude });
+    const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
+    setTimeout(() => {
+      activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude });
+      handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: u.latitude, longitude: u.longitude });
+    }, 300);
+  }, [mapFullscreen, handleUserPress]);
 
   if (authLoading || locationLoading) {
     return (
@@ -920,25 +447,11 @@ export default function MapScreen() {
     if (locationPermissionDenied) {
       return (
         <View style={styles.loading}>
-          <Ionicons name="location-off" size={56} color={Colors.error ?? "#e53935"} style={{ marginBottom: 20 }} />
-          <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "600", marginBottom: 8 }]}>
-            {t("map.locationDeniedTitle")}
-          </Text>
-          <Text style={[styles.loadingText, { fontSize: 14, opacity: 0.7, marginBottom: 28, textAlign: "center", paddingHorizontal: 32 }]}>
-            {t("map.locationDeniedDesc")}
-          </Text>
-          <TouchableOpacity
-            onPress={() => Linking.openURL("https://support.google.com/chrome/answer/142065")}
-            style={{
-              backgroundColor: Colors.accent,
-              paddingHorizontal: 28,
-              paddingVertical: 12,
-              borderRadius: 24,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
-              {t("map.openSettings")}
-            </Text>
+          <Ionicons name="location" size={56} color={Colors.error ?? "#e53935"} style={{ marginBottom: 20 }} />
+          <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "600", marginBottom: 8 }]}>{t("map.locationDeniedTitle")}</Text>
+          <Text style={[styles.loadingText, { fontSize: 14, opacity: 0.7, marginBottom: 28, textAlign: "center", paddingHorizontal: 32 }]}>{t("map.locationDeniedDesc")}</Text>
+          <TouchableOpacity onPress={() => Linking.openURL("https://support.google.com/chrome/answer/142065")} style={{ backgroundColor: Colors.accent, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 24 }}>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{t("map.openSettings")}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -947,24 +460,10 @@ export default function MapScreen() {
       return (
         <View style={styles.loading}>
           <Ionicons name="location-outline" size={56} color={Colors.accent} style={{ marginBottom: 20 }} />
-          <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "600", marginBottom: 8 }]}>
-            {t("map.waitingLocationTitle")}
-          </Text>
-          <Text style={[styles.loadingText, { fontSize: 14, opacity: 0.7, marginBottom: 28, textAlign: "center", paddingHorizontal: 32 }]}>
-            {t("map.waitingLocationDesc")}
-          </Text>
-          <TouchableOpacity
-            onPress={requestPermission}
-            style={{
-              backgroundColor: Colors.accent,
-              paddingHorizontal: 28,
-              paddingVertical: 12,
-              borderRadius: 24,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>
-              {t("map.allowLocation")}
-            </Text>
+          <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "600", marginBottom: 8 }]}>{t("map.waitingLocationTitle")}</Text>
+          <Text style={[styles.loadingText, { fontSize: 14, opacity: 0.7, marginBottom: 28, textAlign: "center", paddingHorizontal: 32 }]}>{t("map.waitingLocationDesc")}</Text>
+          <TouchableOpacity onPress={requestPermission} style={{ backgroundColor: Colors.accent, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 24 }}>
+            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{t("map.allowLocation")}</Text>
           </TouchableOpacity>
         </View>
       );
@@ -977,45 +476,22 @@ export default function MapScreen() {
     );
   }
 
-  const getUserColor = (u: any) => {
-    if (u.userType === "coppia") return Colors.accent;
-    if (u.sex === "F") return Colors.femaleIcon;
-    if (u.sex === "M") return Colors.maleIcon;
-    if (u.userType?.startsWith("zavorrina")) return Colors.femaleIcon;
-    if (u.userType?.startsWith("biker")) return Colors.maleIcon;
-    return Colors.accent;
-  };
-
-  const getUserTypeLabel = (u: any) => {
-    if (u.userType?.startsWith("biker")) return t("profile.bikerType");
-    if (u.userType?.startsWith("zavorrina")) return t("profile.zavorrinaType");
-    return t("profile.coupleType");
-  };
-
-  const getUserIcon = (u: any): keyof typeof Ionicons.glyphMap => {
-    if (u.userType === "coppia") return "people";
-    if (u.userType?.startsWith("zavorrina")) return "person";
-    return "bicycle";
-  };
-
-  const nearbyUsersList = Array.isArray(nearbyUsers) ? nearbyUsers : [];
-  const workshopsList = Array.isArray(workshops) ? workshops : [];
+  const currentAd = myAds[adIndex % myAds.length] as any;
 
   return (
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: Colors.background }]}
       contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 16 }}
     >
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.titleRow}
           onPress={async () => {
-            const { data } = await refetchHomeMessage();
-            if (data?.enabled) {
-              setShowHomeMessage(true);
-            }
+            const { data } = await homeMessageQuery.refetch();
+            if (data?.enabled) setShowHomeMessage(true);
           }}
-          activeOpacity={homeMessageData?.enabled ? 0.7 : 1}
+          activeOpacity={homeMessageQuery.data?.enabled ? 0.7 : 1}
         >
           <Text style={styles.title}>BikerLink</Text>
           <Image source={require("@/assets/images/helmet-logo.png")} style={styles.helmetLogo} resizeMode="contain" />
@@ -1030,50 +506,19 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      <View style={styles.searchContainer}>
-        <View style={styles.searchInputRow}>
-          <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t("home.searchPlaceholder")}
-            placeholderTextColor={Colors.textSecondary}
-            value={searchText}
-            onChangeText={handleSearch}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchText.length > 0 && (
-            <TouchableOpacity onPress={() => { setSearchText(""); setSearchResults([]); setShowSearchResults(false); }}>
-              <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-        </View>
-        {showSearchResults && (
-          <View style={styles.searchResultsContainer}>
-            {searchLoading ? (
-              <ActivityIndicator size="small" color={Colors.accent} style={{ padding: 12 }} />
-            ) : searchResults.length === 0 ? (
-              <Text style={styles.searchNoResults}>{t("common.noResults")}</Text>
-            ) : (
-              <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
-                {searchResults.map((u: any) => (
-                  <TouchableOpacity key={u.id} style={styles.searchResultItem} onPress={() => handleSearchResultPress(u)}>
-                    <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                        <Text style={styles.searchResultName}>{u.nickname}</Text>
-                        {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
-                      </View>
-                      <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? ` · ${t("home.locationUnavailable")}` : ""}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-          </View>
-        )}
-      </View>
+      {/* Search Bar */}
+      <MapSearchBar
+        searchText={searchText}
+        onChangeText={handleSearch}
+        onClear={() => { setSearchText(""); setSearchResults([]); setShowSearchResults(false); }}
+        searchResults={searchResults}
+        searchLoading={searchLoading}
+        showSearchResults={showSearchResults}
+        onResultPress={handleSearchResultPress}
+        currentUserId={user?.id}
+      />
 
+      {/* Small Map */}
       <Pressable style={styles.mapContainer} onPress={() => setMapFullscreen(true)}>
         {!mapFullscreen ? (
           <InteractiveMap
@@ -1111,6 +556,7 @@ export default function MapScreen() {
         </View>
       </Pressable>
 
+      {/* Web location nudges */}
       {Platform.OS === "web" && showLocationNudge && (
         <View style={styles.locationNudge}>
           <View style={styles.locationNudgeContent}>
@@ -1118,33 +564,17 @@ export default function MapScreen() {
             <Text style={styles.locationNudgeText}>{t("home.locationNudge")}</Text>
           </View>
           <View style={styles.locationNudgeActions}>
-            <TouchableOpacity
-              style={styles.locationNudgeHowBtn}
-              onPress={() => Linking.openURL("https://support.google.com/chrome/answer/142065")}
-            >
+            <TouchableOpacity style={styles.locationNudgeHowBtn} onPress={() => Linking.openURL("https://support.google.com/chrome/answer/142065")}>
               <Text style={styles.locationNudgeHowText}>{t("home.locationNudgeHow")}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.locationNudgeDismissBtn}
-              onPress={async () => {
-                setShowLocationNudge(false);
-                await AsyncStorage.setItem("location_nudge_dismissed", "1").catch(() => {});
-              }}
-            >
+            <TouchableOpacity style={styles.locationNudgeDismissBtn} onPress={async () => { setShowLocationNudge(false); await AsyncStorage.setItem("location_nudge_dismissed", "1").catch(() => {}); }}>
               <Ionicons name="close" size={18} color={Colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
       )}
-
       {Platform.OS === "web" && webMobilePosition != null && webPhonePositionStatus === "live" && (
-        <TouchableOpacity
-          style={styles.webMobilePositionBtn}
-          onPress={() => {
-            setLocation(webMobilePosition);
-            mapRef.current?.focusOnCoordinate(webMobilePosition);
-          }}
-        >
+        <TouchableOpacity style={styles.webMobilePositionBtn} onPress={() => { setLocation(webMobilePosition); mapRef.current?.focusOnCoordinate(webMobilePosition); }}>
           <Text style={styles.webMobilePositionBtnText}>📍 Dal telefono</Text>
         </TouchableOpacity>
       )}
@@ -1154,113 +584,7 @@ export default function MapScreen() {
         </View>
       )}
 
-      <Modal visible={mapFullscreen} animationType="fade" onRequestClose={() => setMapFullscreen(false)}>
-        <View style={styles.fullscreenContainer}>
-          {mapFullscreenReady ? (
-          <InteractiveMap
-            ref={fullscreenMapRef}
-            users={usersWithSelf.filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
-            workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
-            easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
-            activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
-            isAvailable={isAvailable}
-            ghostMode={isGhostMode}
-            searchRadiusKm={mySearchRadius}
-            filterBiker={filterBiker}
-            filterZavorrina={filterZavorrina}
-            filterBarTopOffset={insets.top}
-            onToggleFilterBiker={toggleFilterBiker}
-            onToggleFilterZavorrina={toggleFilterZavorrina}
-            onUserPress={handleUserPress}
-            onEasterEggPress={handleEasterEggPress}
-            onEventPress={(id) => { setMapFullscreen(false); router.push({ pathname: "/evento/[id]" as const, params: { id } }); }}
-            currentUserId={user?.id ?? null}
-            realMeMarker={realMeMarker}
-            fakeMeMarker={fakeMeMarker}
-            clubPins={clubPinsQuery.data ?? []}
-            filterClubs={filterClubs}
-            onToggleFilterClubs={toggleFilterClubs}
-            filterEvents={filterEvents}
-            onToggleFilterEvents={toggleFilterEvents}
-            onClubPress={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
-            onProposeClubLocation={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
-            initialCenterOverride={lastSmallMapCenter}
-          />
-          ) : (
-            <View style={styles.mapPlaceholder}>
-              <ActivityIndicator size="large" color={Colors.accent} />
-            </View>
-          )}
-          <Pressable style={[styles.closeBtn, { top: insets.top + 32 }]} onPress={() => setMapFullscreen(false)}>
-            <Ionicons name="close" size={28} color="#fff" />
-          </Pressable>
-          <Pressable
-            style={[styles.defineAreaBtn, { bottom: insets.bottom + 11 }]}
-            onPress={() => setShowAreaModal(true)}
-          >
-            <Ionicons name="globe-outline" size={16} color={Colors.text} />
-            <Text style={styles.defineAreaBtnText} numberOfLines={1}>{areaLabel}</Text>
-          </Pressable>
-          <View style={[styles.fullscreenBottomStats, { bottom: insets.bottom + 16 }]}>
-            <View style={styles.statsChip}>
-              <Ionicons name="radio-button-on" size={12} color={Colors.success} />
-              <Text style={styles.statsChipText}>{onlineCount}</Text>
-            </View>
-            <View style={styles.statsChip}>
-              <MaterialCommunityIcons name="motorbike" size={14} color={Colors.maleIcon} />
-              <Text style={styles.statsChipText}>{bikerCount}</Text>
-            </View>
-            <View style={styles.statsChip}>
-              <MaterialCommunityIcons name="seat-passenger" size={14} color={Colors.femaleIcon} />
-              <Text style={styles.statsChipText}>{zavCount}</Text>
-            </View>
-          </View>
-          <View style={[styles.fullscreenSearchContainer, { top: insets.top + 40 }]}>
-            <View style={styles.fullscreenSearchRow}>
-              <Ionicons name="search" size={18} color={Colors.textSecondary} style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder={t("home.searchPlaceholder")}
-                placeholderTextColor={Colors.textSecondary}
-                value={searchText}
-                onChangeText={handleSearch}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              {searchText.length > 0 && (
-                <TouchableOpacity onPress={() => { setSearchText(""); setSearchResults([]); setShowSearchResults(false); }}>
-                  <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
-                </TouchableOpacity>
-              )}
-            </View>
-            {showSearchResults && (
-              <View style={styles.searchResultsContainer}>
-                {searchLoading ? (
-                  <ActivityIndicator size="small" color={Colors.accent} style={{ padding: 12 }} />
-                ) : searchResults.length === 0 ? (
-                  <Text style={styles.searchNoResults}>{t("common.noResults")}</Text>
-                ) : (
-                  <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
-                    {searchResults.map((u: any) => (
-                      <TouchableOpacity key={u.id} style={styles.searchResultItem} onPress={() => { setMapFullscreen(false); handleSearchResultPress(u); }}>
-                        <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                            <Text style={styles.searchResultName}>{u.nickname}</Text>
-                            {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
-                          </View>
-                          <Text style={styles.searchResultDetail}>{getUserTypeLabel(u)}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}{!u.latitude ? ` · ${t("home.locationUnavailable")}` : ""}</Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                )}
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
-
+      {/* Stats Row */}
       <View style={styles.statsRow}>
         <Pressable style={styles.statCard} onPress={() => setShowOnlineList(true)}>
           <View style={styles.statTopRow}>
@@ -1285,1593 +609,168 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-
-
-      <Modal visible={showOnlineList} transparent animationType="slide" onRequestClose={() => setShowOnlineList(false)}>
-        <Pressable style={styles.detailOverlay} onPress={() => setShowOnlineList(false)}>
-          <Pressable style={[styles.listSheet, { paddingBottom: insets.bottom || 16 }]} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.detailHandle} />
-            <View style={styles.listSheetHeader}>
-              <Ionicons name="radio-button-on" size={20} color={Colors.success} />
-              <Text style={styles.listSheetTitle}>Utenti Online</Text>
-              <Pressable onPress={() => setShowOnlineList(false)}>
-                <Ionicons name="close" size={24} color={Colors.textSecondary} />
-              </Pressable>
-            </View>
-            <Pressable
-              style={[styles.offlineToggle, showOfflineOnline && styles.offlineToggleActive]}
-              onPress={() => {
-                const next = !showOfflineOnline;
-                setShowOfflineOnline(next);
-                if (next) {
-                  startOfflineTimer();
-                  queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] });
-                } else {
-                  setOfflineCountdown({ online: 0 });
-                }
-              }}
-            >
-              <Ionicons name={showOfflineOnline ? "eye" : "eye-off"} size={16} color={showOfflineOnline ? Colors.accent : Colors.textSecondary} />
-              <Text style={[styles.offlineToggleText, showOfflineOnline && { color: Colors.accent }]}>
-                {showOfflineOnline ? `${t("home.alsoOffline")} (${offlineCountdown.online}s)` : t("home.showOffline")}
-              </Text>
-            </Pressable>
-            {onlineListQuery.isLoading ? (
-              <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
-            ) : (onlineListQuery.data || []).length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="people-outline" size={32} color={Colors.textSecondary} />
-                <Text style={styles.emptyText}>{t("home.noUsersOnline")}</Text>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-                {(onlineListQuery.data || []).map((u: any) => (
-                  <Pressable key={u.id} style={[styles.userListCard, u.isOnline === false && showOfflineOnline && { opacity: 0.5 }]} onPress={() => { setShowOnlineList(false); router.push(`/profile/${u.id}` as any); }}>
-                    <View style={styles.userListLeft}>
-                      <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
-                      {u.isAvailable ? <View style={styles.availableDot} /> : showOfflineOnline ? <View style={[styles.availableDot, { backgroundColor: "#666" }]} /> : null}
-                    </View>
-                    <View style={styles.userListInfo}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                        <Text style={styles.userListName}>{u.nickname}</Text>
-                        {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
-                      </View>
-                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
-                      {!!u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
-                      {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
-                      {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
-                    </View>
-                    {u.latitude != null && u.longitude != null && u.id !== user?.id && (
-                      <Pressable
-                        style={styles.locateButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          setShowOnlineList(false);
-                          setLastSmallMapCenter({ latitude: u.latitude, longitude: u.longitude });
-                          const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
-                          setTimeout(() => {
-                            activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude });
-                            handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: u.latitude, longitude: u.longitude });
-                          }, 300);
-                        }}
-                      >
-                        <Ionicons name="navigate" size={18} color={Colors.accent} />
-                      </Pressable>
-                    )}
-                    {u.distance != null && u.id !== user?.id && (
-                      <View style={styles.userListDistance}>
-                        <Text style={styles.distanceText}>{u.distance} km</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={showBikerList} transparent animationType="slide" onRequestClose={() => setShowBikerList(false)}>
-        <Pressable style={styles.detailOverlay} onPress={() => setShowBikerList(false)}>
-          <Pressable style={[styles.listSheet, { paddingBottom: insets.bottom || 16 }]} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.detailHandle} />
-            <View style={styles.listSheetHeader}>
-              <Ionicons name="hand-left" size={20} color={Colors.accent} />
-              <Text style={styles.listSheetTitle}>{t("profile.bikerType")} {t("home.available")}</Text>
-              <Pressable onPress={() => setShowBikerList(false)}>
-                <Ionicons name="close" size={24} color={Colors.textSecondary} />
-              </Pressable>
-            </View>
-            {bikerListQuery.isLoading ? (
-              <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
-            ) : (bikerListQuery.data || []).length === 0 ? (
-              <View style={styles.emptyState}>
-                <Ionicons name="bicycle" size={32} color={Colors.textSecondary} />
-                <Text style={styles.emptyText}>{t("map.noBikerAvailable")}</Text>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-                {(bikerListQuery.data || []).map((u: any) => (
-                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowBikerList(false); router.push(`/profile/${u.id}` as any); }}>
-                    <View style={styles.userListLeft}>
-                      <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
-                      {u.isAvailable ? <View style={styles.availableDot} /> : null}
-                    </View>
-                    <View style={styles.userListInfo}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                        <Text style={styles.userListName}>{u.nickname}</Text>
-                        {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
-                      </View>
-                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
-                      {!!u.moto && <Text style={styles.userListDetail}>{u.moto}{u.ridingStyle ? ` · ${u.ridingStyle}` : ""}</Text>}
-                      {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
-                      {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
-                    </View>
-                    {u.latitude != null && u.longitude != null && u.id !== user?.id && (
-                      <Pressable
-                        style={styles.locateButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          setShowBikerList(false);
-                          setLastSmallMapCenter({ latitude: u.latitude, longitude: u.longitude });
-                          const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
-                          setTimeout(() => {
-                            activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude });
-                            handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: u.latitude, longitude: u.longitude });
-                          }, 300);
-                        }}
-                      >
-                        <Ionicons name="navigate" size={18} color={Colors.accent} />
-                      </Pressable>
-                    )}
-                    {u.distance != null && u.id !== user?.id && (
-                      <View style={styles.userListDistance}>
-                        <Text style={styles.distanceText}>{u.distance} km</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={showZavorrinaList} transparent animationType="slide" onRequestClose={() => setShowZavorrinaList(false)}>
-        <Pressable style={styles.detailOverlay} onPress={() => setShowZavorrinaList(false)}>
-          <Pressable style={[styles.listSheet, { paddingBottom: insets.bottom || 16 }]} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.detailHandle} />
-            <View style={styles.listSheetHeader}>
-              <MaterialCommunityIcons name="seat-passenger" size={20} color={Colors.femaleIcon} />
-              <Text style={styles.listSheetTitle}>{t("profile.zavorrinaType")} {t("home.available")}</Text>
-              <Pressable onPress={() => setShowZavorrinaList(false)}>
-                <Ionicons name="close" size={24} color={Colors.textSecondary} />
-              </Pressable>
-            </View>
-            {zavListQuery.isLoading ? (
-              <ActivityIndicator size="large" color={Colors.femaleIcon} style={{ marginVertical: 40 }} />
-            ) : (zavListQuery.data || []).length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialCommunityIcons name="seat-passenger" size={32} color={Colors.textSecondary} />
-                <Text style={styles.emptyText}>{t("match.noPassenger")}</Text>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 500 }}>
-                {(zavListQuery.data || []).map((u: any) => (
-                  <Pressable key={u.id} style={styles.userListCard} onPress={() => { setShowZavorrinaList(false); router.push(`/profile/${u.id}` as any); }}>
-                    <View style={styles.userListLeft}>
-                      <Ionicons name={getUserIcon(u)} size={28} color={getUserColor(u)} />
-                      {u.isAvailable ? <View style={styles.availableDot} /> : null}
-                    </View>
-                    <View style={styles.userListInfo}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                        <Text style={styles.userListName}>{u.nickname}</Text>
-                        {u.id !== user?.id && <FavoriteStar targetUserId={u.id} size={14} />}
-                      </View>
-                      <Text style={styles.userListDetail}>{getUserTypeLabel(u)}{u.sex ? ` · ${u.sex === "M" ? "M" : "F"}` : ""}{u.country ? ` · ${getCountryFlag(u.country)} ${getCountryName(u.country)}` : ""}{u.region ? ` · ${u.region}` : ""}</Text>
-                      {!!u.bio && <Text style={styles.userListBio} numberOfLines={1}>{u.bio}</Text>}
-                      {!!u.birthYear && <Text style={styles.userListDetail}>Anno: {u.birthYear}</Text>}
-                    </View>
-                    {u.latitude != null && u.longitude != null && u.id !== user?.id && (
-                      <Pressable
-                        style={styles.locateButton}
-                        onPress={(e) => {
-                          e.stopPropagation();
-                          setShowZavorrinaList(false);
-                          setLastSmallMapCenter({ latitude: u.latitude, longitude: u.longitude });
-                          const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
-                          setTimeout(() => {
-                            activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude });
-                            handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: u.latitude, longitude: u.longitude });
-                          }, 300);
-                        }}
-                      >
-                        <Ionicons name="navigate" size={18} color={Colors.accent} />
-                      </Pressable>
-                    )}
-                    {u.distance != null && u.id !== user?.id && (
-                      <View style={styles.userListDistance}>
-                        <Text style={styles.distanceText}>{u.distance} km</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                ))}
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {adsGloballyEnabled && myAds.length > 0 && (
-        <View style={styles.adWrapper}>
-          <Pressable style={styles.adBanner} onPress={() => handleAdClick(myAds[adIndex % myAds.length])}>
-            {(myAds[adIndex % myAds.length] as any)?.imageUrl && adImageError !== (myAds[adIndex % myAds.length] as any)?.id ? (
-              <Image
-                source={{ uri: (() => { const ad = myAds[adIndex % myAds.length] as any; const v = ad.imageVersion ?? 0; const rawUrl: string = ad.imageUrl; if (!rawUrl.startsWith("/api/ads/images/")) return ""; const base = `${getApiUrl().replace(/\/$/, "")}${rawUrl}`; return `${base}${base.includes("?") ? "&" : "?"}v=${v}`; })() }}
-                style={styles.adImage}
-                resizeMode="cover"
-                onError={() => {
-                  const ad = myAds[adIndex % myAds.length] as any;
-                  const id = ad?.id;
-                  if (!id) return;
-                  setAdImageError(id);
-                  if (!adImageRetried.has(id)) {
-                    setTimeout(() => {
-                      setAdImageRetried((prev) => new Set([...prev, id]));
-                      setAdImageError(null);
-                    }, 3000);
-                  }
-                }}
-              />
-            ) : (
-              <View style={styles.adPlaceholder}>
-                <MaterialIcons name="broken-image" size={28} color={Colors.textSecondary} />
-                <Text style={styles.adText}>{(myAds[adIndex % myAds.length] as any)?.name}</Text>
-                {(myAds[adIndex % myAds.length] as any)?.description && (
-                  <Text style={styles.adSubText}>{(myAds[adIndex % myAds.length] as any).description}</Text>
-                )}
-              </View>
-            )}
-          </Pressable>
-        </View>
+      {/* Ad Banner */}
+      {adsGloballyEnabled && myAds.length > 0 && currentAd && (
+        <AdBanner key={currentAd.id} ad={currentAd} onPress={handleAdClick} />
       )}
 
       <InlineMiniPlayer />
 
-      {(activeSosQuery.data || []).length > 0 && (
-        <Pressable style={styles.sosFloatingIndicator} onPress={() => setShowSosDetail(true)}>
-          <View style={styles.sosWarningContainer}>
-            <View style={styles.sosTriangleBorder} />
-            <View style={styles.sosTriangleFill} />
-            <Text style={styles.sosExclamation}>!</Text>
-          </View>
-          <Text style={styles.sosOverlayLabel}>{t("home.sosActive")}</Text>
-        </Pressable>
-      )}
+      {/* SOS Indicator */}
+      <SosSheet
+        activeSosRequests={activeSosQuery.data ?? []}
+        currentUserId={user?.id}
+        showDetail={showSosDetail}
+        onOpenDetail={() => setShowSosDetail(true)}
+        onCloseDetail={() => setShowSosDetail(false)}
+        onAccept={(id) => acceptSosMutation.mutate(id)}
+        accepting={acceptSosMutation.isPending}
+      />
 
-      <Modal visible={showSosDetail} transparent animationType="slide" onRequestClose={() => setShowSosDetail(false)}>
-        <Pressable style={styles.detailOverlay} onPress={() => setShowSosDetail(false)}>
-          <Pressable style={styles.sosDetailSheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.detailHandle} />
-            <Pressable style={styles.sosDetailClose} onPress={() => setShowSosDetail(false)}>
-              <Ionicons name="close" size={24} color={Colors.textSecondary} />
-            </Pressable>
-            <View style={{ alignItems: "center", marginBottom: 20 }}>
-              <Image source={require("@/assets/images/sos-accept-icon.png")} style={styles.sosDetailIcon} resizeMode="contain" />
-              <Text style={styles.sosDetailTitle}>Richiesta di Soccorso</Text>
-            </View>
-            {(activeSosQuery.data || []).filter((r: any) => r.requesterId !== user?.id).length > 0 ? (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
-                {(activeSosQuery.data || []).filter((r: any) => r.requesterId !== user?.id).map((r: any) => (
-                  <View key={r.id} style={styles.sosDetailCard}>
-                    <View style={styles.sosDetailRow}>
-                      <Ionicons name="person" size={18} color="#003399" />
-                      <Text style={styles.sosDetailName}>{r.requesterNickname}</Text>
-                    </View>
-                    <View style={styles.sosDetailRow}>
-                      <Ionicons name="alert-circle" size={18} color="#CC0000" />
-                      <Text style={styles.sosDetailReason}>{r.reason}</Text>
-                    </View>
-                    <View style={styles.sosDetailRow}>
-                      <Ionicons name="time" size={18} color={Colors.textSecondary} />
-                      <Text style={styles.sosDetailTime}>
-                        {new Date(r.createdAt).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
-                        {r.radiusKm ? `  •  ${t("home.radius")}: ${r.radiusKm} km` : ""}
-                      </Text>
-                    </View>
-                    <Pressable
-                      style={[styles.sosDetailAcceptBtn, acceptSosMutation.isPending && { opacity: 0.5 }]}
-                      onPress={() => acceptSosMutation.mutate(r.id)}
-                      disabled={acceptSosMutation.isPending}
-                    >
-                      {acceptSosMutation.isPending ? (
-                        <ActivityIndicator color="#FFFFFF" size="small" />
-                      ) : (
-                        <Text style={styles.sosDetailAcceptText}>{t("home.acceptSos")}</Text>
-                      )}
-                    </Pressable>
-                  </View>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={{ alignItems: "center", padding: 24 }}>
-                <Ionicons name="checkmark-circle-outline" size={40} color={Colors.textSecondary} />
-                <Text style={{ fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 8 }}>
-                  {t("home.noRescueRequests")}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* User List Sheets */}
+      <UserListSheet
+        visible={showOnlineList}
+        onClose={() => setShowOnlineList(false)}
+        title="Utenti Online"
+        icon={<Ionicons name="radio-button-on" size={20} color={Colors.success} />}
+        data={onlineListQuery.data}
+        isLoading={onlineListQuery.isLoading}
+        emptyIcon={<Ionicons name="people-outline" size={32} color={Colors.textSecondary} />}
+        emptyText={t("home.noUsersOnline")}
+        currentUserId={user?.id}
+        onLocateUser={handleLocateUser}
+        showMoto={true}
+        showOfflineToggle={true}
+        showOffline={showOfflineOnline}
+        offlineCountdown={offlineCountdown.online}
+        onToggleOffline={() => {
+          const next = !showOfflineOnline;
+          setShowOfflineOnline(next);
+          if (next) { startOfflineTimer(); queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] }); }
+          else setOfflineCountdown({ online: 0 });
+        }}
+      />
 
-      <Modal visible={!!selectedUser} transparent animationType="slide" onRequestClose={() => { setSelectedUser(null); setShowInviteEventModal(false); }}>
-        <Pressable style={styles.detailOverlay} onPress={() => setSelectedUser(null)}>
-          <Pressable style={[styles.detailSheet, { paddingBottom: (insets.bottom || 16) }]} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.detailHandle} />
-            {detailLoading ? (
-              <ActivityIndicator size="large" color={Colors.accent} style={{ marginVertical: 40 }} />
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
-                <View style={styles.detailHeader}>
-                  <Ionicons
-                    name={getUserIcon(selectedUser || {})}
-                    size={32}
-                    color={getUserColor(selectedUser || {})}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.detailName}>{selectedUser?.nickname}</Text>
-                    <Text style={styles.detailType}>{getUserTypeLabel(selectedUser || {})}</Text>
-                    {(selectedUser?.country || selectedUser?.region) && (
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 }}>
-                        <Ionicons name="location-outline" size={12} color={Colors.textSecondary} />
-                        <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular" }}>
-                          {[
-                            selectedUser?.region || null,
-                            selectedUser?.country ? `${getCountryFlag(selectedUser.country)} ${getCountryName(selectedUser.country)}` : null,
-                          ].filter(Boolean).join(", ")}
-                        </Text>
-                      </View>
-                    )}
-                    {selectedUserDetail && (
-                      <View style={{ flexDirection: "row", gap: 6, marginTop: 4 }}>
-                        <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isOnline ? "#4CAF5022" : "#66666622" }]}>
-                          <View style={[styles.statusDot, { backgroundColor: selectedUserDetail.isOnline ? Colors.success : "#888" }]} />
-                          <Text style={[styles.statusBadgeText, { color: selectedUserDetail.isOnline ? Colors.success : "#888" }]}>
-                            {selectedUserDetail.isOnline ? t("map.online") : t("map.offline")}
-                          </Text>
-                        </View>
-                        <View style={[styles.statusBadge, { backgroundColor: selectedUserDetail.isAvailable ? "#4CAF5022" : "#66666622" }]}>
-                          <View style={[styles.statusDot, { backgroundColor: selectedUserDetail.isAvailable ? Colors.success : "#888" }]} />
-                          <Text style={[styles.statusBadgeText, { color: selectedUserDetail.isAvailable ? Colors.success : "#888" }]}>
-                            {selectedUserDetail.isAvailable ? t("home.userAvailable") : t("map.unavailable")}
-                          </Text>
-                        </View>
-                      </View>
-                    )}
-                    {selectedUserDetail && !selectedUserDetail.isOnline && selectedUserDetail.lastLoginAt && (
-                      <Text style={styles.lastSeenText}>{"Last seen: " + formatLastSeen(selectedUserDetail.lastLoginAt)}</Text>
-                    )}
-                  </View>
-                  <Pressable onPress={() => setSelectedUser(null)}>
-                    <Ionicons name="close" size={24} color={Colors.textSecondary} />
-                  </Pressable>
-                </View>
+      <UserListSheet
+        visible={showBikerList}
+        onClose={() => setShowBikerList(false)}
+        title={`${t("profile.bikerType")} ${t("home.available")}`}
+        icon={<Ionicons name="hand-left" size={20} color={Colors.accent} />}
+        data={bikerListQuery.data}
+        isLoading={bikerListQuery.isLoading}
+        emptyIcon={<Ionicons name="bicycle" size={32} color={Colors.textSecondary} />}
+        emptyText={t("map.noBikerAvailable")}
+        currentUserId={user?.id}
+        onLocateUser={handleLocateUser}
+        showMoto={true}
+      />
 
-                {selectedUserDetail?.bio && (
-                  <Text style={styles.detailBio}>{selectedUserDetail.bio}</Text>
-                )}
+      <UserListSheet
+        visible={showZavorrinaList}
+        onClose={() => setShowZavorrinaList(false)}
+        title={`${t("profile.zavorrinaType")} ${t("home.available")}`}
+        icon={<MaterialCommunityIcons name="seat-passenger" size={20} color={Colors.femaleIcon} />}
+        data={zavListQuery.data}
+        isLoading={zavListQuery.isLoading}
+        emptyIcon={<MaterialCommunityIcons name="seat-passenger" size={32} color={Colors.textSecondary} />}
+        emptyText={t("match.noPassenger")}
+        currentUserId={user?.id}
+        onLocateUser={handleLocateUser}
+      />
 
-                {(selectedUserDetail?.primaryClubName || selectedUserDetail?.topTrackName) && (
-                  <View style={styles.detailSection}>
-                    {selectedUserDetail?.primaryClubName && (
-                      <Pressable
-                        style={styles.detailMotoCard}
-                        onPress={() => { setSelectedUser(null); router.push({ pathname: "/motoclub/[id]" as const, params: { id: selectedUserDetail.primaryClubId } }); }}
-                      >
-                        <MaterialCommunityIcons name="shield-star" size={16} color="#2979FF" />
-                        <Text style={[styles.detailMotoText, { color: "#2979FF" }]}>{selectedUserDetail.primaryClubName}</Text>
-                      </Pressable>
-                    )}
-                    {selectedUserDetail?.topTrackName && (
-                      <View style={styles.detailMotoCard}>
-                        <MaterialCommunityIcons name="music-note" size={16} color={Colors.accent} />
-                        <Text style={styles.detailMotoText} numberOfLines={1}>
-                          {selectedUserDetail.topTrackName}
-                          {selectedUserDetail.topArtistName ? ` — ${selectedUserDetail.topArtistName}` : ""}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                )}
+      {/* User Detail Sheet */}
+      <UserDetailSheet
+        selectedUser={selectedUser}
+        selectedUserDetail={selectedUserDetail}
+        selectedUserProposals={selectedUserProposals}
+        detailLoading={detailLoading}
+        onClose={() => setSelectedUser(null)}
+        onPhotoPress={(uri) => setSelectedMapPhoto(uri)}
+        myOrganizedEvents={myOrganizedEventsQuery.data ?? []}
+        targetUserEventIds={targetUserEventIdsQuery.data ?? []}
+        currentUserId={user?.id}
+      />
 
-                {selectedUserDetail?.photos && selectedUserDetail.photos.length > 0 && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>Foto</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-                      {selectedUserDetail.photos.map((p: any) => {
-                        const pUri = p.photoUrl?.startsWith("http") ? p.photoUrl : `${baseUrl}${p.photoUrl}`;
-                        return (
-                          <TouchableOpacity key={p.id} onPress={() => setSelectedMapPhoto(pUri)} activeOpacity={0.8}>
-                            <Image source={{ uri: pUri }} style={{ width: 80, height: 80, borderRadius: 10, marginRight: 8 }} />
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </ScrollView>
-                  </View>
-                )}
+      {/* Easter Egg Sheet */}
+      <EasterEggSheet
+        egg={selectedEgg}
+        onClose={() => setSelectedEgg(null)}
+        onCollect={(id) => collectEggMutation.mutate(id)}
+        collecting={collectEggMutation.isPending}
+      />
 
-                {selectedUserDetail?.motorcycles && selectedUserDetail.motorcycles.length > 0 && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>{t("home.garage")}</Text>
-                    {selectedUserDetail.motorcycles.map((m: any) => (
-                      <View key={m.id} style={styles.detailMotoCard}>
-                        <Ionicons name="bicycle" size={18} color={Colors.accent} />
-                        <Text style={styles.detailMotoText}>
-                          {m.brand} {m.model}
-                          {m.motorcycleType ? ` · ${m.motorcycleType}` : ""}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                )}
+      {/* Photo Lightbox */}
+      <PhotoLightbox photoUri={selectedMapPhoto} onClose={() => setSelectedMapPhoto(null)} />
 
-                {selectedUserProposals.length > 0 && (
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>{t("home.rideProposals")}</Text>
-                    {selectedUserProposals.map((p: any) => (
-                      <Pressable
-                        key={p.id}
-                        style={styles.detailProposalCard}
-                        onPress={() => { setSelectedUser(null); router.push(`/proposals/${p.id}` as any); }}
-                      >
-                        <Ionicons name="navigate" size={16} color={Colors.accent} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.detailProposalTitle}>{p.title}</Text>
-                          {p.location && <Text style={styles.detailProposalSub}>{p.location}</Text>}
-                        </View>
-                        <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
-                      </Pressable>
-                    ))}
-                  </View>
-                )}
+      {/* Home Message */}
+      <HomeMessageModal
+        visible={showHomeMessage}
+        text={homeMessageQuery.data?.text || ""}
+        onClose={() => setShowHomeMessage(false)}
+      />
 
-                {selectedUserProposals.length === 0 && !detailLoading && (
-                  <View style={{ alignItems: "center", paddingVertical: 12 }}>
-                    <Text style={styles.detailType}>{t("home.noActiveProposals")}</Text>
-                  </View>
-                )}
+      {/* Area Selector */}
+      <AreaSelectorModal
+        visible={showAreaModal}
+        selectedCountries={selectedCountries}
+        onToggleCountry={toggleCountryInModal}
+        onToggleContinent={toggleContinentInModal}
+        onSave={() => saveCountries(selectedCountries)}
+        onClose={() => setShowAreaModal(false)}
+      />
 
-                <View style={styles.detailBtnRow}>
-                  <Pressable
-                    style={styles.detailChatBtn}
-                    onPress={async () => {
-                      try {
-                        const res = await apiRequest("POST", "/api/chat/conversations", {
-                          conversationType: "private",
-                          participantIds: [selectedUser?.id],
-                        });
-                        const conv = await res.json();
-                        setSelectedUser(null);
-                        router.push(`/chat/${conv.id}` as any);
-                      } catch (e: any) {
-                        Alert.alert(t("common.error"), e.message || t("home.cannotOpenChat"));
-                      }
-                    }}
-                  >
-                    <Ionicons name="chatbubble" size={20} color={Colors.background} />
-                    <Text style={styles.detailChatBtnText}>Messaggio</Text>
-                  </Pressable>
-                  {(myOrganizedEventsQuery.data ?? []).length > 0 && (
-                    <Pressable
-                      style={[styles.detailProfileBtn, { backgroundColor: "#F57C00" }]}
-                      onPress={() => setShowInviteEventModal(true)}
-                    >
-                      <MaterialCommunityIcons name="calendar-star" size={16} color="#fff" />
-                      <Text style={[styles.detailProfileBtnText, { color: "#fff" }]}>{t("home.inviteBtn")}</Text>
-                    </Pressable>
-                  )}
-                  <Pressable
-                    style={styles.detailProfileBtn}
-                    onPress={() => { setSelectedUser(null); router.push(`/profile/${selectedUser?.id}` as any); }}
-                  >
-                    <Text style={styles.detailProfileBtnText}>{t("home.goToProfile")}</Text>
-                  </Pressable>
-                </View>
-              </ScrollView>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={showInviteEventModal} transparent animationType="slide" onRequestClose={() => setShowInviteEventModal(false)}>
-        <Pressable style={styles.detailOverlay} onPress={() => setShowInviteEventModal(false)}>
-          <Pressable style={[styles.homeMessageSheet, { maxHeight: "70%" }]} onPress={(e) => e.stopPropagation()}>
-            <View style={[styles.homeMessageHeader, { marginBottom: 4 }]}>
-              <MaterialCommunityIcons name="calendar-star" size={24} color="#F57C00" />
-              <Text style={styles.homeMessageTitle}>{t("home.inviteToRally")}</Text>
-            </View>
-            <Text style={[styles.homeMessageText, { fontSize: 13, marginBottom: 8 }]}>
-              {t("home.inviteModalDesc1")} {selectedUser?.nickname ?? t("home.fallbackUserLower")} {t("home.inviteModalDesc2")}
-            </Text>
-            <FlatList
-              data={(myOrganizedEventsQuery.data ?? []).filter(
-                (ev: any) => !(targetUserEventIdsQuery.data ?? []).includes(ev.id)
-              )}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <Pressable
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 12,
-                    paddingHorizontal: 4,
-                    borderBottomWidth: 1,
-                    borderBottomColor: Colors.border,
-                    gap: 10,
-                    opacity: inviteSending ? 0.6 : 1,
-                  }}
-                  disabled={inviteSending}
-                  onPress={async () => {
-                    if (!selectedUser?.id) return;
-                    setInviteSending(true);
-                    try {
-                      const res = await apiRequest("POST", `/api/events/${item.id}/invite-user`, { userId: selectedUser.id });
-                      if (!res.ok) {
-                        const err = await res.json().catch(() => ({}));
-                        Alert.alert(t("common.error"), (err as any).message || t("home.inviteError"));
-                      } else {
-                        Alert.alert(t("home.inviteSent"), `${selectedUser.nickname} ${t("home.inviteBodyPart")} "${item.title}".`);
-                        setShowInviteEventModal(false);
-                      }
-                    } catch {
-                      Alert.alert(t("common.error"), t("home.inviteError"));
-                    } finally {
-                      setInviteSending(false);
-                    }
-                  }}
-                >
-                  <MaterialCommunityIcons name="flag-checkered" size={20} color="#F57C00" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text }} numberOfLines={1}>{item.title}</Text>
-                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary }}>
-                      {item.eventDate ? new Date(item.eventDate).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" }) : ""}
-                      {item.locationName ? `  ·  ${item.locationName}` : ""}
-                    </Text>
-                  </View>
-                  {inviteSending ? (
-                    <ActivityIndicator size="small" color="#F57C00" />
-                  ) : (
-                    <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
-                  )}
-                </Pressable>
-              )}
-              ListEmptyComponent={
-                <Text style={{ textAlign: "center", color: Colors.textSecondary, paddingVertical: 16 }}>
-                  {(myOrganizedEventsQuery.data ?? []).length === 0
-                    ? t("home.noRally")
-                    : `${selectedUser?.nickname ?? t("home.fallbackUser")} ${t("home.alreadyJoinedAll")}`}
-                </Text>
-              }
-            />
-            <Pressable style={[styles.homeMessageCloseBtn, { marginTop: 8 }]} onPress={() => setShowInviteEventModal(false)}>
-              <Text style={styles.homeMessageCloseBtnText}>{t("common.cancel")}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={showHomeMessage} transparent animationType="fade" onRequestClose={() => setShowHomeMessage(false)}>
-        <Pressable style={styles.detailOverlay} onPress={() => setShowHomeMessage(false)}>
-          <Pressable style={styles.homeMessageSheet} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.homeMessageHeader}>
-              <Image source={require("@/assets/images/helmet-logo.png")} style={{ width: 40, height: 40 }} resizeMode="contain" />
-              <Text style={styles.homeMessageTitle}>BikerLink</Text>
-            </View>
-            <Text style={styles.homeMessageText}>{homeMessageData?.text || ""}</Text>
-            <Pressable style={styles.homeMessageCloseBtn} onPress={() => setShowHomeMessage(false)}>
-              <Text style={styles.homeMessageCloseBtnText}>{t("tracking.close")}</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={showAreaModal} transparent animationType="slide" onRequestClose={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}>
-        <Pressable style={styles.detailOverlay} onPress={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}>
-          <Pressable style={[styles.areaSheet, { paddingBottom: insets.bottom || 16 }]} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.detailHandle} />
-            <View style={styles.listSheetHeader}>
-              <Ionicons name="globe-outline" size={20} color={Colors.accent} />
-              <Text style={styles.listSheetTitle}>{t("home.defineArea")}</Text>
-              <Pressable onPress={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}>
-                <Ionicons name="close" size={24} color={Colors.textSecondary} />
-              </Pressable>
-            </View>
-            <Text style={styles.areaSubtitle}>{t("home.defineAreaDesc")}</Text>
-            <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={false}>
-              {/* Mondo */}
-              <Pressable
-                style={[styles.continentRow, selectedCountries.length === 0 && styles.continentRowSelected]}
-                onPress={() => { setSelectedCountries([]); }}
-              >
-                <Text style={styles.countryFlag}>🌍</Text>
-                <Text style={[styles.continentLabel, selectedCountries.length === 0 && { color: Colors.accent }]}>Tutto il mondo</Text>
-                <Ionicons
-                  name={selectedCountries.length === 0 ? "radio-button-on" : "radio-button-off"}
-                  size={20}
-                  color={selectedCountries.length === 0 ? Colors.accent : Colors.textSecondary}
-                />
-              </Pressable>
-
-              {CONTINENT_MAP.map((continent) => {
-                const isContinentExpanded = expandedContinents.has(continent.key);
-                const continentCountries = getCountriesForContinent(continent.key);
-                const selectedInContinent = continent.countryCodes.filter((c) => selectedCountries.includes(c));
-                const allSelected = selectedInContinent.length === continent.countryCodes.length;
-                const partialSelected = selectedInContinent.length > 0 && !allSelected;
-
-                return (
-                  <View key={continent.key}>
-                    {/* Continent header */}
-                    <View style={[styles.continentRow, allSelected && styles.continentRowSelected]}>
-                      <Pressable
-                        style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 10 }}
-                        onPress={() => {
-                          setExpandedContinents((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(continent.key)) next.delete(continent.key);
-                            else next.add(continent.key);
-                            return next;
-                          });
-                        }}
-                      >
-                        <Ionicons
-                          name={isContinentExpanded ? "chevron-down" : "chevron-forward"}
-                          size={16}
-                          color={Colors.textSecondary}
-                        />
-                        <Text style={[styles.continentLabel, (allSelected || partialSelected) && { color: Colors.accent }]}>
-                          {continent.label}
-                        </Text>
-                        {partialSelected && (
-                          <View style={styles.partialBadge}>
-                            <Text style={styles.partialBadgeText}>{selectedInContinent.length}</Text>
-                          </View>
-                        )}
-                      </Pressable>
-                      <Pressable onPress={() => toggleContinentInModal(continent.key)} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Text style={styles.continentSelectAllText}>
-                          {allSelected ? "Deseleziona tutti" : "Seleziona tutti"}
-                        </Text>
-                        <Ionicons
-                          name={allSelected ? "checkbox" : partialSelected ? "remove-circle" : "square-outline"}
-                          size={22}
-                          color={allSelected || partialSelected ? Colors.accent : Colors.textSecondary}
-                        />
-                      </Pressable>
-                    </View>
-
-                    {/* Countries within continent */}
-                    {isContinentExpanded && continentCountries.map((country) => {
-                      const isSelected = selectedCountries.includes(country.code);
-                      const isCountryExpanded = expandedCountries.has(country.code);
-                      const hasSubLevel = country.regions.length > 0;
-                      const hasCities = country.regions.some((r) => r.cities && r.cities.length > 0);
-
-                      return (
-                        <View key={country.code}>
-                          <View style={[styles.countryRow, { paddingLeft: 32 }, isSelected && styles.countryRowSelected]}>
-                            {hasSubLevel ? (
-                              <Pressable
-                                onPress={() => {
-                                  setExpandedCountries((prev) => {
-                                    const next = new Set(prev);
-                                    if (next.has(country.code)) next.delete(country.code);
-                                    else next.add(country.code);
-                                    return next;
-                                  });
-                                }}
-                                style={{ paddingRight: 4 }}
-                              >
-                                <Ionicons
-                                  name={isCountryExpanded ? "chevron-down" : "chevron-forward"}
-                                  size={14}
-                                  color={Colors.textSecondary}
-                                />
-                              </Pressable>
-                            ) : (
-                              <View style={{ width: 18 }} />
-                            )}
-                            <Text style={styles.countryFlag}>{country.flag}</Text>
-                            <Pressable style={{ flex: 1 }} onPress={() => toggleCountryInModal(country.code)}>
-                              <Text style={[styles.countryName, isSelected && { color: Colors.accent }]}>{country.name}</Text>
-                            </Pressable>
-                            <Pressable onPress={() => toggleCountryInModal(country.code)}>
-                              <Ionicons
-                                name={isSelected ? "checkbox" : "square-outline"}
-                                size={20}
-                                color={isSelected ? Colors.accent : Colors.textSecondary}
-                              />
-                            </Pressable>
-                          </View>
-
-                          {/* Regions / Cities (3rd level) */}
-                          {isCountryExpanded && country.regions.map((region) => (
-                            <View key={region.name}>
-                              <View style={[styles.regionRow, { paddingLeft: hasCities ? 56 : 56 }]}>
-                                {hasCities && region.cities && region.cities.length > 0 ? (
-                                  <Pressable
-                                    onPress={() => {
-                                      const key = `${country.code}:${region.name}`;
-                                      setExpandedCountries((prev) => {
-                                        const next = new Set(prev);
-                                        if (next.has(key)) next.delete(key);
-                                        else next.add(key);
-                                        return next;
-                                      });
-                                    }}
-                                    style={{ paddingRight: 4 }}
-                                  >
-                                    <Ionicons
-                                      name={expandedCountries.has(`${country.code}:${region.name}`) ? "chevron-down" : "chevron-forward"}
-                                      size={12}
-                                      color={Colors.textSecondary}
-                                    />
-                                  </Pressable>
-                                ) : (
-                                  <View style={styles.regionDot} />
-                                )}
-                                <Text style={styles.regionName}>{region.name}</Text>
-                              </View>
-                              {/* Cities (4th level for US/CA) */}
-                              {hasCities && region.cities && expandedCountries.has(`${country.code}:${region.name}`) &&
-                                region.cities.map((city) => (
-                                  <View key={city.name} style={[styles.regionRow, { paddingLeft: 76 }]}>
-                                    <View style={[styles.regionDot, { backgroundColor: Colors.textSecondary + "60" }]} />
-                                    <Text style={[styles.regionName, { fontSize: 12, color: Colors.textSecondary }]}>{city.name}</Text>
-                                  </View>
-                                ))
-                              }
-                            </View>
-                          ))}
-                        </View>
-                      );
-                    })}
-                  </View>
-                );
-              })}
-            </ScrollView>
-
-            <Pressable
-              style={styles.areaSaveBtn}
-              onPress={() => { saveCountries(selectedCountries); setShowAreaModal(false); }}
-            >
-              <Text style={styles.areaSaveBtnText}>
-                {selectedCountries.length === 0
-                  ? `${t("common.confirm")} — Tutto il mondo`
-                  : `${t("common.confirm")} (${selectedCountries.length})`}
-              </Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={!!selectedEgg} transparent animationType="fade" onRequestClose={() => setSelectedEgg(null)}>
-        <Pressable style={styles.detailOverlay} onPress={() => setSelectedEgg(null)}>
-          <Pressable style={styles.eggSheet} onPress={(e) => e.stopPropagation()}>
-            <Ionicons name="gift" size={48} color="#FFD700" style={{ alignSelf: "center" }} />
-            <Text style={styles.eggTitle}>{selectedEgg?.name}</Text>
-            {selectedEgg?.description && (
-              <Text style={styles.eggDescription}>{selectedEgg.description}</Text>
-            )}
-            {!!selectedEgg?.points && (
-              <Text style={styles.eggPoints}>{selectedEgg.points} punti</Text>
-            )}
-            {selectedEgg?.collected ? (
-              <View style={styles.eggCollectedBadge}>
-                <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
-                <Text style={[styles.eggPoints, { color: Colors.success }]}>{t("map.alreadyCollected")}</Text>
-              </View>
-            ) : (
-              <Pressable
-                style={styles.eggCollectBtn}
-                onPress={() => selectedEgg && collectEggMutation.mutate(selectedEgg.id)}
-                disabled={collectEggMutation.isPending}
-              >
-                {collectEggMutation.isPending ? (
-                  <ActivityIndicator color={Colors.background} />
-                ) : (
-                  <Text style={styles.eggCollectBtnText}>Raccogli!</Text>
-                )}
-              </Pressable>
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      <Modal visible={!!selectedMapPhoto} transparent animationType="fade" onRequestClose={() => setSelectedMapPhoto(null)}>
-        <Pressable
-          style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.92)", alignItems: "center", justifyContent: "center" }}
-          onPress={() => setSelectedMapPhoto(null)}
-        >
-          {selectedMapPhoto && (
-            <Image source={{ uri: selectedMapPhoto }} style={{ width: "100%", height: "80%" }} resizeMode="contain" />
-          )}
-          <TouchableOpacity
-            style={{ position: "absolute", top: 48, right: 20, backgroundColor: "rgba(0,0,0,0.5)", borderRadius: 20, padding: 6 }}
-            onPress={() => setSelectedMapPhoto(null)}
-          >
-            <Ionicons name="close" size={28} color="#FFFFFF" />
-          </TouchableOpacity>
-        </Pressable>
-      </Modal>
+      {/* Fullscreen Map */}
+      <FullscreenMapModal
+        visible={mapFullscreen}
+        onClose={() => setMapFullscreen(false)}
+        mapRef={fullscreenMapRef}
+        users={usersWithSelf.filter((u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude))}
+        workshops={(workshopsQuery.data ?? []).filter((w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude))}
+        easterEggs={(easterEggsQuery.data ?? []).filter((e: any) => e.latitude != null && e.longitude != null && !isNaN(e.latitude) && !isNaN(e.longitude))}
+        activeSosRequests={(activeSosQuery.data ?? []).filter((s: any) => s.latitude != null && s.longitude != null)}
+        isAvailable={isAvailable}
+        ghostMode={isGhostMode}
+        searchRadiusKm={mySearchRadius}
+        filterBiker={filterBiker}
+        filterZavorrina={filterZavorrina}
+        filterClubs={filterClubs}
+        filterEvents={filterEvents}
+        onToggleFilterBiker={toggleFilterBiker}
+        onToggleFilterZavorrina={toggleFilterZavorrina}
+        onToggleFilterClubs={toggleFilterClubs}
+        onToggleFilterEvents={toggleFilterEvents}
+        onUserPress={handleUserPress}
+        onEasterEggPress={handleEasterEggPress}
+        onEventPress={(id) => { setMapFullscreen(false); router.push({ pathname: "/evento/[id]" as const, params: { id } }); }}
+        onClubPress={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
+        onProposeClubLocation={(club) => { setMapFullscreen(false); router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } }); }}
+        currentUserId={user?.id ?? null}
+        realMeMarker={realMeMarker}
+        fakeMeMarker={fakeMeMarker}
+        clubPins={clubPinsQuery.data ?? []}
+        initialCenterOverride={lastSmallMapCenter}
+        filterBarTopOffset={insets.top}
+        onShowAreaModal={() => setShowAreaModal(true)}
+        areaLabel={areaLabel}
+        onRegionChangeComplete={undefined}
+        searchText={searchText}
+        onSearch={handleSearch}
+        onClearSearch={() => { setSearchText(""); setSearchResults([]); setShowSearchResults(false); }}
+        searchResults={searchResults}
+        searchLoading={searchLoading}
+        showSearchResults={showSearchResults}
+        onSearchResultPress={handleSearchResultPress}
+        currentUserFullId={user?.id}
+        onlineCount={onlineCount}
+        bikerCount={bikerCount}
+        zavCount={zavCount}
+        insetsTop={insets.top}
+        insetsBottom={insets.bottom}
+        isReady={mapFullscreenReady}
+        getUserIcon={getUserIcon}
+        getUserColor={getUserColor}
+        getUserTypeLabel={(u) => getUserTypeLabel(u, t)}
+      />
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  loading: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: Colors.background },
-  loadingText: { color: Colors.textSecondary, marginTop: 12, fontFamily: "Inter_400Regular" },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  titleRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-  },
-  title: { fontSize: 24, fontFamily: "Inter_700Bold", color: Colors.accent },
-  helmetLogo: {
-    width: 32,
-    height: 32,
-    tintColor: Colors.accent,
-  },
-  searchContainer: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    zIndex: 10,
-  },
-  fullscreenSearchContainer: {
-    position: "absolute" as const,
-    left: 56,
-    right: 56,
-    zIndex: 20,
-  },
-  fullscreenSearchRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    backgroundColor: "rgba(30,30,30,0.92)",
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-  },
-  searchInputRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
-    padding: 0,
-  },
-  searchResultsContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden" as const,
-  },
-  searchNoResults: {
-    padding: 12,
-    textAlign: "center" as const,
-    color: Colors.textSecondary,
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-  },
-  searchResultItem: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: Colors.border,
-  },
-  searchResultName: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  searchResultDetail: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    marginTop: 1,
-  },
-  mapContainer: {
-    height: 253,
-    marginHorizontal: 16,
-    borderRadius: 12,
-    overflow: "hidden",
-    position: "relative",
-  },
-  mapPlaceholder: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  expandHint: {
-    position: "absolute",
-    bottom: 10,
-    right: 10,
-    backgroundColor: Colors.surface + "CC",
-    borderRadius: 8,
-    padding: 6,
-  },
-  fullscreenContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  closeBtn: {
-    position: "absolute",
-    right: 8,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-  fullscreenOverlay: {
-    position: "absolute",
-    left: 56,
-    right: 56,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-    zIndex: 20,
-  },
-  fullscreenBottomStats: {
-    position: "absolute",
-    left: 16,
-    flexDirection: "row",
-    gap: 8,
-    zIndex: 20,
-  },
-  statsChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: Colors.surface + "E6",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  statsChipText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  statsRow: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginTop: 8 },
-  statCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
-    alignItems: "center",
-    gap: 2,
-  },
-  statTopRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-  },
-  statNumber: { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.text },
-  statLabel: { fontSize: 9, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center" as const, lineHeight: 12 },
-  emptyState: { alignItems: "center", padding: 24, gap: 8 },
-  emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  listSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    maxHeight: "80%",
-  },
-  listSheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-  },
-  listSheetTitle: { flex: 1, fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text },
-  userListCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 6,
-    gap: 12,
-  },
-  offlineToggle: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: 8,
-    borderRadius: 8,
-    backgroundColor: Colors.surfaceLight,
-  },
-  offlineToggleActive: {
-    backgroundColor: Colors.accent + "20",
-    borderWidth: 1,
-    borderColor: Colors.accent + "40",
-  },
-  offlineToggleText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-  },
-  userListLeft: { position: "relative" as const },
-  availableDot: {
-    position: "absolute" as const,
-    bottom: -2,
-    right: -2,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.success,
-    borderWidth: 2,
-    borderColor: Colors.background,
-  },
-  userListInfo: { flex: 1, gap: 2 },
-  userListName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  userListDetail: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  userListBio: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, fontStyle: "italic" as const },
-  locateButton: {
-    padding: 8,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-  },
-  userListDistance: {
-    backgroundColor: Colors.accent + "20",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  distanceText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.accent },
-  adWrapper: {
-    marginHorizontal: 16,
-    marginTop: 4,
-    position: "relative" as const,
-  },
-  adBanner: {
-    borderRadius: 10,
-    overflow: "hidden",
-    backgroundColor: Colors.surface,
-  },
-  adImage: {
-    width: "100%",
-    height: 240,
-    borderRadius: 10,
-  },
-  adPlaceholder: {
-    backgroundColor: Colors.surfaceLight,
-    padding: 16,
-    height: 240,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  adText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.accent },
-  adSubText: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 4 },
-  detailOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-  },
-  detailSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: "70%",
-  },
-  detailHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  detailHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 16,
-  },
-  detailName: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text },
-  detailType: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  detailBio: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginBottom: 12 },
-  detailSection: { marginBottom: 12 },
-  detailSectionTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.accent, marginBottom: 8 },
-  detailMotoCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: Colors.background,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 6,
-  },
-  detailMotoText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text },
-  detailProposalCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: Colors.background,
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 6,
-  },
-  detailProposalTitle: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text },
-  detailProposalSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-  detailBtnRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  detailChatBtn: {
-    flex: 1,
-    backgroundColor: Colors.accent,
-    padding: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-  },
-  detailChatBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.background },
-  detailProfileBtn: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    padding: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  detailProfileBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text },
-  eggSheet: {
-    backgroundColor: Colors.surface,
-    marginHorizontal: 32,
-    borderRadius: 20,
-    padding: 24,
-    alignSelf: "center",
-    width: "85%",
-    maxWidth: 340,
-    position: "absolute",
-    top: "30%",
-  },
-  eggTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text, textAlign: "center", marginTop: 12 },
-  eggDescription: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", marginTop: 8 },
-  eggPoints: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.accent, textAlign: "center", marginTop: 8 },
-  eggCollectedBadge: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 12 },
-  eggCollectBtn: {
-    backgroundColor: "#FFD700",
-    padding: 14,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 16,
-  },
-  eggCollectBtnText: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.background },
-  sosOverlay: {
-    position: "absolute" as const,
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderRadius: 12,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: 10,
-    zIndex: 10,
-  },
-  sosFloatingIndicator: {
-    position: "absolute" as const,
-    bottom: 16,
-    alignSelf: "center" as const,
-    backgroundColor: "rgba(0,0,0,0.72)",
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    alignItems: "center" as const,
-    flexDirection: "row" as const,
-    gap: 10,
-    zIndex: 20,
-  },
-  sosWarningContainer: {
-    width: 100,
-    height: 90,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-  },
-  sosTriangleBorder: {
-    position: "absolute" as const,
-    top: 0,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 52,
-    borderRightWidth: 52,
-    borderBottomWidth: 92,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderBottomColor: "#FFFFFF",
-  },
-  sosTriangleFill: {
-    position: "absolute" as const,
-    top: 10,
-    width: 0,
-    height: 0,
-    borderLeftWidth: 44,
-    borderRightWidth: 44,
-    borderBottomWidth: 78,
-    borderLeftColor: "transparent",
-    borderRightColor: "transparent",
-    borderBottomColor: "#FF3300",
-  },
-  sosExclamation: {
-    position: "absolute" as const,
-    bottom: 6,
-    fontSize: 40,
-    fontFamily: "Inter_700Bold",
-    color: "#FFFFFF",
-  },
-  sosOverlayLabel: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: "#FFFFFF",
-  },
-  sosDetailSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 32,
-    maxHeight: "85%",
-  },
-  sosDetailClose: {
-    position: "absolute" as const,
-    top: 16,
-    right: 16,
-    zIndex: 10,
-    padding: 4,
-  },
-  sosDetailIcon: {
-    width: 80,
-    height: 80,
-    tintColor: "#003399",
-    marginBottom: 8,
-  },
-  sosDetailTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: "#003399",
-  },
-  sosDetailCard: {
-    backgroundColor: Colors.background,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: "#003399",
-    gap: 10,
-  },
-  sosDetailRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 10,
-  },
-  sosDetailName: {
-    fontSize: 17,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  sosDetailReason: {
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: "#CC0000",
-    flex: 1,
-  },
-  sosDetailTime: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
-  sosDetailAcceptBtn: {
-    backgroundColor: "#003399",
-    padding: 14,
-    borderRadius: 12,
-    alignItems: "center" as const,
-    marginTop: 6,
-  },
-  sosDetailAcceptText: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: "#FFFFFF",
-  },
-  defineAreaBtn: {
-    position: "absolute" as const,
-    right: 16,
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-    backgroundColor: Colors.surface + "E6",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    zIndex: 20,
-  },
-  defineAreaBtnText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  defineAreaBtnInline: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 5,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.accent + "30",
-    maxWidth: 140,
-  },
-  defineAreaBtnInlineText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.accent,
-    flexShrink: 1,
-  },
-  areaSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: "80%",
-  },
-  areaSubtitle: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    marginBottom: 12,
-  },
-  continentRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    paddingVertical: 11,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 1,
-    gap: 8,
-  },
-  continentRowSelected: {
-    backgroundColor: Colors.accent + "15",
-  },
-  continentLabel: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  continentSelectAllText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.accent,
-  },
-  partialBadge: {
-    backgroundColor: Colors.accent + "30",
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  partialBadgeText: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.accent,
-  },
-  countryRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 1,
-    gap: 8,
-  },
-  countryRowSelected: {
-    backgroundColor: Colors.accent + "10",
-  },
-  countryFlag: {
-    fontSize: 18,
-  },
-  countryName: {
-    flex: 1,
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: Colors.text,
-  },
-  regionRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    gap: 8,
-  },
-  regionDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: Colors.textSecondary + "80",
-  },
-  regionName: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    flex: 1,
-  },
-  areaSaveBtn: {
-    backgroundColor: Colors.accent,
-    padding: 14,
-    borderRadius: 12,
-    alignItems: "center" as const,
-    marginTop: 12,
-  },
-  areaSaveBtnText: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: Colors.background,
-  },
-  homeMessageSheet: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 24,
-    marginHorizontal: 24,
-    maxWidth: 420,
-    width: "90%",
-    alignSelf: "center",
-  },
-  homeMessageHeader: {
-    flexDirection: "row" as const,
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 16,
-  },
-  homeMessageTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-  },
-  homeMessageText: {
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  homeMessageCloseBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: "center" as const,
-  },
-  homeMessageCloseBtnText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.background,
-  },
-  statusBadge: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-  },
-  lastSeenText: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  locationNudge: {
-    marginHorizontal: 16,
-    marginTop: 8,
-    backgroundColor: "#1C1A12",
-    borderWidth: 1,
-    borderColor: "#F59E0B44",
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  locationNudgeContent: {
-    flexDirection: "row" as const,
-    alignItems: "flex-start" as const,
-    gap: 8,
-  },
-  locationNudgeText: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
-    lineHeight: 18,
-  },
-  locationNudgeActions: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "flex-end" as const,
-    gap: 8,
-  },
-  locationNudgeHowBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: "#F59E0B22",
-  },
-  locationNudgeHowText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: "#F59E0B",
-  },
-  locationNudgeDismissBtn: {
-    padding: 4,
-  },
-  webMobilePositionBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignSelf: "flex-start" as const,
-  },
-  webMobilePositionBtnText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.accent,
-  },
-});
