@@ -81,10 +81,12 @@ function _scheduleReloadOnBackground() {
       _bgListenerSub.remove();
       _bgListenerSub = null;
     }
-    // Cancella il flag persistente: se reloadAsync() riesce, al prossimo
-    // cold start non serve un secondo reload.
-    AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
-    Updates.reloadAsync().catch(() => {});
+    // Cancella il flag persistente solo se reloadAsync() ha successo.
+    // Se il reload fallisce silenziosamente nel background listener (comune
+    // su Android), il flag rimane e OtaStartupChecker lo applica al cold start.
+    Updates.reloadAsync()
+      .then(() => AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {}))
+      .catch(() => {});
   };
 
   _bgListenerSub = AppState.addEventListener("change", (nextState) => {
