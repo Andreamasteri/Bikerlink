@@ -162,6 +162,22 @@ async function parseAI(prompt: string): Promise<any> {
   return resp.json();
 }
 
+function clientFallbackAiParse(prompt: string) {
+  const lower = prompt.toLowerCase();
+  return {
+    title: "Giro in moto",
+    startLocation: "", endLocation: "", waypoints: [] as string[],
+    style: lower.includes("veloce") || lower.includes("autostrada") ? "fast"
+      : lower.includes("curve") || lower.includes("curvy") || lower.includes("panoramic") ? "curvy" : "balanced",
+    isRoundTrip: lower.includes("ritorno") || lower.includes("andata e ritorno"),
+    isMultiDay: lower.includes("giorni") || lower.includes("settimana") || lower.includes("weekend"),
+    daysEstimate: lower.includes("settimana") ? 7 : lower.includes("weekend") ? 2 : 1,
+    maxHoursPerDay: 6,
+    avoidHighways: lower.includes("senza autostrada") || lower.includes("evit"),
+    notes: prompt,
+  };
+}
+
 async function fetchWeatherPreview(waypoints: Waypoint[]): Promise<WeatherWaypoint[]> {
   const url = new URL("/api/planned-routes/weather", getApiUrl());
   const resp = await fetch(url.toString(), {
@@ -248,6 +264,7 @@ export default function GiriCreateScreen() {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
+  const [aiFallbackBanner, setAiFallbackBanner] = useState(false);
 
   const [title, setTitle] = useState("Giro in moto");
   const [style, setStyle] = useState<Style>("curvy");
@@ -424,7 +441,15 @@ export default function GiriCreateScreen() {
         });
       });
     } catch (err: any) {
-      Alert.alert("Errore AI", err?.message ?? "Servizio AI non disponibile");
+      console.warn("[AI parse] fallback attivato:", err?.message);
+      const fallback = clientFallbackAiParse(aiPrompt);
+      setTitle(fallback.title);
+      setStyle(fallback.style as Style);
+      setIsRoundTrip(fallback.isRoundTrip);
+      setIsMultiDay(fallback.isMultiDay);
+      setDaysCount(fallback.daysEstimate);
+      setAvoidHighways(fallback.avoidHighways);
+      setAiFallbackBanner(true);
       setMode("manual");
     } finally {
       setAiLoading(false);
@@ -895,6 +920,17 @@ export default function GiriCreateScreen() {
         {/* ── MANUAL mode ───────────────────────────────────────────────────── */}
         {mode === "manual" && (
           <>
+            {/* AI fallback banner */}
+            {aiFallbackBanner && (
+              <View style={s.aiFallbackBanner}>
+                <Ionicons name="information-circle-outline" size={16} color="#b45309" />
+                <Text style={s.aiFallbackBannerText}>AI non disponibile, compilazione manuale</Text>
+                <Pressable onPress={() => setAiFallbackBanner(false)} hitSlop={8}>
+                  <Ionicons name="close-outline" size={16} color="#b45309" />
+                </Pressable>
+              </View>
+            )}
+
             {/* Title */}
             <View style={s.section}>
               <Text style={s.sectionLabel}>Titolo</Text>
@@ -1403,6 +1439,8 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   secondaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 14, paddingVertical: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
   secondaryBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.textSecondary },
   hint: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, textAlign: "center" },
+  aiFallbackBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fef3c7", borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#fcd34d" },
+  aiFallbackBannerText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 13, color: "#b45309" },
   previewHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   previewHeaderText: { fontFamily: "Inter_700Bold", fontSize: 16, color: colors.text },
   previewHint: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginBottom: 16 },

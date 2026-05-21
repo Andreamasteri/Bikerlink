@@ -210,7 +210,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
 
   try {
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -222,7 +222,11 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
       }
     );
     clearTimeout(timeout);
-    if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
+    if (!resp.ok) {
+      const errBody = await resp.text().catch(() => "");
+      console.error(`[AI parse] Gemini HTTP ${resp.status}:`, errBody);
+      throw new Error(`Gemini ${resp.status}`);
+    }
     const data = await resp.json() as any;
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
@@ -265,7 +269,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
 
   try {
     const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
