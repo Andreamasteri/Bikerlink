@@ -1316,7 +1316,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-21T13:42:25.033Z"
+  },
+  {
+    "updateNumber": 3,
+    "version": "48.3.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-3 rv10.0.0: Fix crash login: mock drizzle-orm callable proxy, pgTable non più undefined",
+    "note": "CURRENT_OTA_NUMBER=3. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "93c41a67-689d-4b01-8a4c-cd5e64097a31",
+    "bundleUrl": "private/ota/ota-48.3.10-1779372819945.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "570cbaf46402fa227f2ffc337cc818a375737317",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-21T14:13:44.521Z"
   }
 ]
