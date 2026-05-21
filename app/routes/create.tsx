@@ -10,6 +10,8 @@ import {
   Alert,
   ActivityIndicator,
   BackHandler,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import WebView from "react-native-webview";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -86,6 +88,8 @@ export default function CreateRouteScreen() {
   const [createdRouteId, setCreatedRouteId] = useState<string | null>(null);
   const [isSettingVisibility, setIsSettingVisibility] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [routePolylinePts, setRoutePolylinePts] = useState<Array<{ lat: number; lng: number }>>([]);
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
 
   // Edit mode: load existing route
   const { data: existingRoute, isLoading: isLoadingExisting } = useQuery({
@@ -163,8 +167,8 @@ export default function CreateRouteScreen() {
           await apiRequest("POST", `/api/custom-routes/${editId}/waypoints`, {
             name: wp.name,
             description: wp.description || null,
-            latitude: wp.latitude,
-            longitude: wp.longitude,
+            latitude: parseFloat(String(wp.latitude)),
+            longitude: parseFloat(String(wp.longitude)),
             waypointType: wp.waypointType,
             orderIndex: i,
           });
@@ -177,15 +181,16 @@ export default function CreateRouteScreen() {
           description: description.trim() || null,
           isPublic: false,
         });
-        const route = await routeRes.json();
+        const route = await routeRes.json() as { id: string };
+        if (!route.id) throw new Error("Risposta inattesa dal server");
 
         for (let i = 0; i < waypoints.length; i++) {
           const wp = waypoints[i];
           await apiRequest("POST", `/api/custom-routes/${route.id}/waypoints`, {
             name: wp.name,
             description: wp.description || null,
-            latitude: wp.latitude,
-            longitude: wp.longitude,
+            latitude: parseFloat(String(wp.latitude)),
+            longitude: parseFloat(String(wp.longitude)),
             waypointType: wp.waypointType,
             orderIndex: i,
           });
@@ -293,23 +298,51 @@ export default function CreateRouteScreen() {
   const waypointsRef = useRef<LocalWaypoint[]>(waypoints);
   waypointsRef.current = waypoints;
 
-  const injectWaypoints = useCallback((wps: LocalWaypoint[]) => {
+  const routePolylinePtsRef = useRef<Array<{ lat: number; lng: number }>>([]);
+  routePolylinePtsRef.current = routePolylinePts;
+
+  const injectWaypoints = useCallback((wps: LocalWaypoint[], polylinePts?: Array<{ lat: number; lng: number }>) => {
     if (!webviewRef.current || wps.length < 2) return;
-    const pts = JSON.stringify(wps.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })));
+    const pts = polylinePts && polylinePts.length > 1 ? polylinePts : wps.map((wp) => ({ lat: wp.latitude, lng: wp.longitude }));
+    const ptsJson = JSON.stringify(pts);
     const wpsJson = JSON.stringify(wps.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })));
-    const js = `(function(){ if(typeof window.updateWaypoints==='function'){ window.updateWaypoints(${wpsJson}, ${pts}); } })(); true;`;
+    const js = `(function(){ if(typeof window.updateWaypoints==='function'){ window.updateWaypoints(${wpsJson}, ${ptsJson}); } })(); true;`;
     webviewRef.current.injectJavaScript(js);
   }, []);
+
+  const calculateRealRoute = useCallback(async (wps: LocalWaypoint[]) => {
+    if (wps.length < 2) {
+      setRoutePolylinePts([]);
+      return;
+    }
+    setIsCalculatingRoute(true);
+    try {
+      const res = await apiRequest("POST", "/api/planned-routes/calculate", {
+        waypoints: wps.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })),
+        style: "balanced",
+      });
+      const data = await res.json() as { rawPoints?: Array<{ lat: number; lng: number }> };
+      const pts = data.rawPoints && data.rawPoints.length > 1 ? data.rawPoints : [];
+      setRoutePolylinePts(pts);
+      injectWaypoints(wps, pts.length > 1 ? pts : undefined);
+    } catch {
+      setRoutePolylinePts([]);
+      injectWaypoints(wps);
+    } finally {
+      setIsCalculatingRoute(false);
+    }
+  }, [injectWaypoints]);
 
   // When the WebView finishes loading (initial load or any reload), sync current
   // waypoints so fitBounds is always called with up-to-date coordinates.
   const handleMapLoaded = useCallback(() => {
-    injectWaypoints(waypointsRef.current);
+    injectWaypoints(waypointsRef.current, routePolylinePtsRef.current.length > 1 ? routePolylinePtsRef.current : undefined);
   }, [injectWaypoints]);
 
   useEffect(() => {
     if (waypoints.length < 2) {
       curvatureMapMountedRef.current = false;
+      setRoutePolylinePts([]);
       return;
     }
 
@@ -329,9 +362,12 @@ export default function CreateRouteScreen() {
     } else {
       // Already mounted: update markers, polyline and re-fit via JS injection
       // (no reload/flicker). Covers add, remove AND reorder.
-      injectWaypoints(waypoints);
+      injectWaypoints(waypoints, routePolylinePtsRef.current.length > 1 ? routePolylinePtsRef.current : undefined);
     }
-  }, [waypoints, tileConfig, injectWaypoints]);
+
+    // Trigger real road routing (fallback to straight lines on error)
+    calculateRealRoute(waypoints);
+  }, [waypoints, tileConfig, injectWaypoints, calculateRealRoute]);
 
   return (
     <View style={[styles.container]}>
@@ -387,6 +423,11 @@ export default function CreateRouteScreen() {
                 originWhitelist={["*"]}
                 onLoadEnd={handleMapLoaded}
               />
+              {isCalculatingRoute && (
+                <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center" }}>
+                  <ActivityIndicator size="small" color="#fff" />
+                </View>
+              )}
             </View>
           </View>
         )}
@@ -522,73 +563,81 @@ export default function CreateRouteScreen() {
       )}
 
       <Modal visible={showWaypointForm} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>Dettagli Tappa</Text>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={0}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>Dettagli Tappa</Text>
 
-            <Text style={styles.fieldLabel}>Nome *</Text>
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Es. Ristorante da Mario"
-              placeholderTextColor={Colors.textSecondary}
-              value={waypointName}
-              onChangeText={setWaypointName}
-              maxLength={200}
-              autoFocus
-            />
+              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <Text style={styles.fieldLabel}>Nome *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  placeholder="Es. Ristorante da Mario"
+                  placeholderTextColor={Colors.textSecondary}
+                  value={waypointName}
+                  onChangeText={setWaypointName}
+                  maxLength={200}
+                  autoFocus
+                />
 
-            <Text style={styles.fieldLabel}>Descrizione</Text>
-            <TextInput
-              style={[styles.modalInput, { height: 60 }]}
-              placeholder="Opzionale"
-              placeholderTextColor={Colors.textSecondary}
-              value={waypointDesc}
-              onChangeText={setWaypointDesc}
-              multiline
-            />
+                <Text style={styles.fieldLabel}>Descrizione</Text>
+                <TextInput
+                  style={[styles.modalInput, { height: 60 }]}
+                  placeholder="Opzionale"
+                  placeholderTextColor={Colors.textSecondary}
+                  value={waypointDesc}
+                  onChangeText={setWaypointDesc}
+                  multiline
+                />
 
-            <Text style={styles.fieldLabel}>Tipo</Text>
-            <View style={styles.typeRow}>
-              {WAYPOINT_TYPES.map((wt) => (
-                <TouchableOpacity
-                  key={wt.value}
-                  style={[
-                    styles.typeChip,
-                    waypointType === wt.value && { backgroundColor: wt.color + "33", borderColor: wt.color },
-                  ]}
-                  onPress={() => setWaypointType(wt.value)}
-                >
-                  <MaterialCommunityIcons name={wt.icon} size={16} color={wt.color} />
-                  <Text style={[styles.typeChipText, waypointType === wt.value && { color: wt.color }]}>
-                    {wt.label}
+                <Text style={styles.fieldLabel}>Tipo</Text>
+                <View style={styles.typeRow}>
+                  {WAYPOINT_TYPES.map((wt) => (
+                    <TouchableOpacity
+                      key={wt.value}
+                      style={[
+                        styles.typeChip,
+                        waypointType === wt.value && { backgroundColor: wt.color + "33", borderColor: wt.color },
+                      ]}
+                      onPress={() => setWaypointType(wt.value)}
+                    >
+                      <MaterialCommunityIcons name={wt.icon} size={16} color={wt.color} />
+                      <Text style={[styles.typeChipText, waypointType === wt.value && { color: wt.color }]}>
+                        {wt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                {pendingCoord && (
+                  <Text style={styles.coordPreview}>
+                    {pendingCoord.latitude.toFixed(6)}, {pendingCoord.longitude.toFixed(6)}
                   </Text>
+                )}
+              </ScrollView>
+
+              <View style={styles.modalActions}>
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => {
+                    setShowWaypointForm(false);
+                    setPendingCoord(null);
+                  }}
+                >
+                  <Ionicons name="close" size={22} color={Colors.textSecondary} />
                 </TouchableOpacity>
-              ))}
-            </View>
-
-            {pendingCoord && (
-              <Text style={styles.coordPreview}>
-                {pendingCoord.latitude.toFixed(6)}, {pendingCoord.longitude.toFixed(6)}
-              </Text>
-            )}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => {
-                  setShowWaypointForm(false);
-                  setPendingCoord(null);
-                }}
-              >
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalSaveBtn} onPress={handleWaypointFormSave}>
-                <Ionicons name="checkmark" size={22} color="#fff" />
-                <Text style={styles.modalSaveBtnText}>Aggiungi</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={styles.modalSaveBtn} onPress={handleWaypointFormSave}>
+                  <Ionicons name="checkmark" size={22} color="#fff" />
+                  <Text style={styles.modalSaveBtnText}>Aggiungi</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Publish dialog after save */}
@@ -794,6 +843,7 @@ const styles = StyleSheet.create({
     padding: 20,
     width: "100%",
     maxWidth: 420,
+    maxHeight: "85%",
   },
   modalTitle: { fontSize: 18, fontWeight: "700" as const, color: Colors.text, marginBottom: 16 },
   fieldLabel: {
