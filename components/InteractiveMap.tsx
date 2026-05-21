@@ -20,7 +20,7 @@ import { getTileConfig, type MapProvider } from "@/lib/map-tiles";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { LEAFLET_MAP_HTML } from "@/lib/leaflet-map-html";
 
-interface MapUser {
+export interface MapUser {
   id: string;
   nickname: string;
   userType: "biker" | "zavorrina" | "coppia";
@@ -31,7 +31,7 @@ interface MapUser {
   longitude: number;
 }
 
-interface MapWorkshop {
+export interface MapWorkshop {
   id: string;
   name: string;
   latitude: number;
@@ -39,14 +39,14 @@ interface MapWorkshop {
   isSynecoPartner: boolean;
 }
 
-interface MapEasterEgg {
+export interface MapEasterEgg {
   id: string;
   name: string;
   latitude: number;
   longitude: number;
 }
 
-interface MapSosRequest {
+export interface MapSosRequest {
   id: string;
   requesterNickname?: string;
   reason: string;

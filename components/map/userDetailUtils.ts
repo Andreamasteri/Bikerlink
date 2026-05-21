@@ -1,4 +1,5 @@
 import Colors from "@/constants/colors";
+import type { UserSummary } from "@/components/map/userDetailTypes";
 
 export function formatLastSeen(dateStr: string | null | undefined): string {
   if (!dateStr) return "";
@@ -12,7 +13,7 @@ export function formatLastSeen(dateStr: string | null | undefined): string {
   return `${dd}/${mo}/'${yy} - ${hh}.${mm}`;
 }
 
-export function getUserColor(u: any): string {
+export function getUserColor(u: UserSummary): string {
   if (u?.userType === "coppia") return Colors.accent;
   if (u?.sex === "F") return Colors.femaleIcon;
   if (u?.sex === "M") return Colors.maleIcon;
@@ -21,13 +22,13 @@ export function getUserColor(u: any): string {
   return Colors.accent;
 }
 
-export function getUserIcon(u: any): "people" | "person" | "bicycle" {
+export function getUserIcon(u: UserSummary): "people" | "person" | "bicycle" {
   if (u?.userType === "coppia") return "people";
   if (u?.userType?.startsWith("zavorrina")) return "person";
   return "bicycle";
 }
 
-export function getUserTypeLabel(u: any, t: (k: string) => string): string {
+export function getUserTypeLabel(u: UserSummary, t: (k: string) => string): string {
   if (u?.userType?.startsWith("biker")) return t("profile.bikerType");
   if (u?.userType?.startsWith("zavorrina")) return t("profile.zavorrinaType");
   return t("profile.coupleType");

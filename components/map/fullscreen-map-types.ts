@@ -1,14 +1,14 @@
 import type React from "react";
-import type { InteractiveMapHandle, ClubMapPin } from "@/components/InteractiveMap";
+import type { InteractiveMapHandle, ClubMapPin, MapUser, MapWorkshop, MapEasterEgg, MapSosRequest } from "@/components/InteractiveMap";
 
 export type FullscreenMapModalProps = {
   visible: boolean;
   onClose: () => void;
   mapRef: React.RefObject<InteractiveMapHandle | null>;
-  users: any[];
-  workshops: any[];
-  easterEggs: any[];
-  activeSosRequests: any[];
+  users: MapUser[];
+  workshops: MapWorkshop[];
+  easterEggs: MapEasterEgg[];
+  activeSosRequests: MapSosRequest[];
   isAvailable: boolean;
   ghostMode: boolean;
   searchRadiusKm: number;
@@ -20,11 +20,11 @@ export type FullscreenMapModalProps = {
   onToggleFilterZavorrina: () => void;
   onToggleFilterClubs: () => void;
   onToggleFilterEvents: () => void;
-  onUserPress: (u: any) => void;
-  onEasterEggPress: (egg: any) => void;
+  onUserPress: (u: MapUser) => void;
+  onEasterEggPress: (egg: MapEasterEgg) => void;
   onEventPress: (id: string) => void;
-  onClubPress: (club: any) => void;
-  onProposeClubLocation: (club: any) => void;
+  onClubPress: (club: ClubMapPin) => void;
+  onProposeClubLocation: (club: ClubMapPin) => void;
   currentUserId: string | null | undefined;
   realMeMarker: { latitude: number; longitude: number } | null;
   fakeMeMarker: { latitude: number; longitude: number } | null;
@@ -38,10 +38,10 @@ export type FullscreenMapModalProps = {
   searchText: string;
   onSearch: (text: string) => void;
   onClearSearch: () => void;
-  searchResults: any[];
+  searchResults: MapUser[];
   searchLoading: boolean;
   showSearchResults: boolean;
-  onSearchResultPress: (u: any) => void;
+  onSearchResultPress: (u: MapUser) => void;
   currentUserFullId: string | null | undefined;
   onlineCount: number;
   bikerCount: number;
@@ -49,7 +49,7 @@ export type FullscreenMapModalProps = {
   insetsTop: number;
   insetsBottom: number;
   isReady: boolean;
-  getUserIcon: (u: any) => any;
-  getUserColor: (u: any) => string;
-  getUserTypeLabel: (u: any) => string;
+  getUserIcon: (u: MapUser) => "people" | "person" | "bicycle";
+  getUserColor: (u: MapUser) => string;
+  getUserTypeLabel: (u: MapUser) => string;
 };
