@@ -196,6 +196,45 @@ Analizza la richiesta e restituisci SOLO un oggetto JSON con:
 - avoidHighways: boolean
 - notes: string`;
 
+const AI_TIMEOUT_MS = parseInt(process.env.GEMINI_TIMEOUT_MS ?? "30000", 10) || 30000;
+const AI_MAX_RETRIES = 2;
+function getRetryDelayMs() { return parseInt(process.env.GEMINI_RETRY_DELAY_MS ?? "1500", 10); }
+
+function isRateLimitError(err: any): boolean {
+  const msg = (err?.message ?? "").toLowerCase();
+  const status = err?.status ?? err?.statusCode ?? err?.code;
+  return status === 429 || msg.includes("429") || msg.includes("quota") || msg.includes("rate limit") || msg.includes("resource_exhausted");
+}
+
+function isTransientError(err: any): boolean {
+  if (isRateLimitError(err)) return true;
+  const msg = (err?.message ?? "").toLowerCase();
+  const status = err?.status ?? err?.statusCode ?? err?.code;
+  return status === 503 || msg.includes("503") || msg.includes("unavailable") || msg.includes("overloaded");
+}
+
+function geminiErrorMessage(err: any): { httpStatus: number; message: string } {
+  if (err.name === "AbortError") {
+    return { httpStatus: 504, message: "Il servizio AI ha impiegato troppo tempo, riprova tra qualche secondo" };
+  }
+  if (isRateLimitError(err)) {
+    return { httpStatus: 429, message: "Troppe richieste AI: limite di utilizzo raggiunto, riprova tra qualche minuto" };
+  }
+  if (isTransientError(err)) {
+    return { httpStatus: 503, message: "Servizio AI temporaneamente non disponibile, riprova tra qualche secondo" };
+  }
+  return { httpStatus: 503, message: "Errore durante l'elaborazione della richiesta AI" };
+}
+
+function parseGeminiText(text: string): any {
+  const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
+  const first = stripped.indexOf("{");
+  const last = stripped.lastIndexOf("}");
+  if (first === -1 || last <= first) throw new Error("No JSON in response");
+  try { return JSON.parse(stripped.slice(first, last + 1)); }
+  catch { return JSON.parse(stripped); }
+}
+
 router.post("/ai-parse", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
@@ -206,36 +245,38 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
-  req.on("close", () => { controller.abort(); clearTimeout(timeout); });
+  const genai = new GoogleGenAI({ apiKey });
+  let lastErr: any;
 
-  try {
-    const genai = new GoogleGenAI({ apiKey });
-    const result = await genai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
-      config: { temperature: 0.1, maxOutputTokens: 512 },
-      abortSignal: controller.signal,
-    });
-    clearTimeout(timeout);
-    const text = result.text ?? "";
-    const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
-    const first = stripped.indexOf("{");
-    const last = stripped.lastIndexOf("}");
-    if (first === -1 || last <= first) throw new Error("No JSON in response");
-    let parsed: any;
-    try { parsed = JSON.parse(stripped.slice(first, last + 1)); }
-    catch { try { parsed = JSON.parse(stripped); } catch { throw new Error("Unparsable JSON"); } }
-    return res.json(parsed);
-  } catch (err: any) {
-    clearTimeout(timeout);
-    console.error("[AI parse] error:", err);
-    if (err.name === "AbortError") {
-      return res.status(504).json({ message: "Il servizio AI ha impiegato troppo tempo, riprova" });
+  for (let attempt = 1; attempt <= AI_MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+    const onClose = () => { controller.abort(); clearTimeout(timeout); };
+    req.on("close", onClose);
+
+    try {
+      const result = await genai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
+        config: { temperature: 0.1, maxOutputTokens: 512 },
+        abortSignal: controller.signal,
+      });
+      clearTimeout(timeout);
+      req.off("close", onClose);
+      const parsed = parseGeminiText(result.text ?? "");
+      return res.json(parsed);
+    } catch (err: any) {
+      clearTimeout(timeout);
+      req.off("close", onClose);
+      lastErr = err;
+      console.error(`[AI parse] attempt ${attempt}/${AI_MAX_RETRIES} error:`, err?.message ?? err);
+      if (err.name === "AbortError" || !isTransientError(err) || attempt === AI_MAX_RETRIES) break;
+      await new Promise(r => setTimeout(r, getRetryDelayMs() * attempt));
     }
-    return res.status(503).json({ message: "Servizio AI non disponibile: errore durante l'elaborazione della richiesta" });
   }
+
+  const { httpStatus, message } = geminiErrorMessage(lastErr);
+  return res.status(httpStatus).json({ message });
 });
 
 router.post("/ai-stream", async (req: Request, res: Response) => {
@@ -254,49 +295,54 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders();
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20000);
-  req.on("close", () => { controller.abort(); clearTimeout(timeout); });
+  const genai = new GoogleGenAI({ apiKey });
+  let lastErr: any;
 
-  try {
-    const genai = new GoogleGenAI({ apiKey });
-    const stream = await genai.models.generateContentStream({
-      model: "gemini-2.5-flash",
-      contents: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
-      config: { temperature: 0.1, maxOutputTokens: 512 },
-      abortSignal: controller.signal,
-    });
+  for (let attempt = 1; attempt <= AI_MAX_RETRIES; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
+    const onClose = () => { controller.abort(); clearTimeout(timeout); };
+    req.on("close", onClose);
 
-    let fullText = "";
-    for await (const chunk of stream) {
-      const text = chunk.text ?? "";
-      if (text) {
-        fullText += text;
-        res.write(`data: ${JSON.stringify({ text })}\n\n`);
+    try {
+      const stream = await genai.models.generateContentStream({
+        model: "gemini-2.5-flash",
+        contents: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
+        config: { temperature: 0.1, maxOutputTokens: 512 },
+        abortSignal: controller.signal,
+      });
+
+      let fullText = "";
+      for await (const chunk of stream) {
+        const text = chunk.text ?? "";
+        if (text) {
+          fullText += text;
+          res.write(`data: ${JSON.stringify({ text })}\n\n`);
+        }
       }
+
+      clearTimeout(timeout);
+      req.off("close", onClose);
+
+      let parsed: any = null;
+      try { parsed = parseGeminiText(fullText); } catch { /* keep null */ }
+      res.write(`event: done\ndata: ${JSON.stringify({ parsed })}\n\n`);
+      res.end();
+      return;
+    } catch (err: any) {
+      clearTimeout(timeout);
+      req.off("close", onClose);
+      lastErr = err;
+      console.error(`[AI stream] attempt ${attempt}/${AI_MAX_RETRIES} error:`, err?.message ?? err);
+      if (err.name === "AbortError" || !isTransientError(err) || attempt === AI_MAX_RETRIES) break;
+      res.write(`data: ${JSON.stringify({ retry: attempt, message: "Nuovo tentativo in corso..." })}\n\n`);
+      await new Promise(r => setTimeout(r, getRetryDelayMs() * attempt));
     }
-
-    clearTimeout(timeout);
-
-    const stripped = fullText.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
-    const first = stripped.indexOf("{");
-    const last = stripped.lastIndexOf("}");
-    let parsed: any = null;
-    if (first !== -1 && last > first) {
-      try { parsed = JSON.parse(stripped.slice(first, last + 1)); } catch { /* ignore */ }
-    }
-
-    res.write(`event: done\ndata: ${JSON.stringify({ parsed })}\n\n`);
-    res.end();
-  } catch (err: any) {
-    clearTimeout(timeout);
-    console.error("[AI stream] error:", err);
-    const msg = err.name === "AbortError"
-      ? "Il servizio AI ha impiegato troppo tempo, riprova"
-      : "Errore durante l'elaborazione AI";
-    res.write(`event: error\ndata: ${JSON.stringify({ message: msg })}\n\n`);
-    res.end();
   }
+
+  const { message } = geminiErrorMessage(lastErr);
+  res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
+  res.end();
 });
 
 export function fallbackAiParse(prompt: string) {

@@ -291,6 +291,7 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
 
   beforeEach(() => {
     process.env.GEMINI_API_KEY = "test-key-integration";
+    process.env.GEMINI_RETRY_DELAY_MS = "0";
     app = buildApp();
     genaiMocks.generateContent.mockReset();
     genaiMocks.generateContentStream.mockReset();
@@ -298,6 +299,7 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
 
   afterEach(() => {
     delete process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_RETRY_DELAY_MS;
   });
 
   it("returns 503 with message body when Gemini responds with HTTP 500", async () => {
@@ -313,15 +315,17 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
     expect(res.body.message.length).toBeGreaterThan(0);
   });
 
-  it("returns 503 with message body when Gemini responds with HTTP 429 (rate limit)", async () => {
-    genaiMocks.generateContent.mockRejectedValue(new Error("Gemini 429"));
+  it("returns 429 with rate-limit message when Gemini responds with HTTP 429", async () => {
+    const err = new Error("Gemini 429 quota exceeded");
+    genaiMocks.generateContent.mockRejectedValue(err);
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
       .send({ prompt: "Giro in moto" });
 
-    expect(res.status).toBe(503);
+    expect(res.status).toBe(429);
     expect(res.body).toHaveProperty("message");
+    expect(res.body.message).toMatch(/limit|quota|richieste/i);
   });
 
   it("returns 503 with message body when Gemini responds with HTTP 503", async () => {
