@@ -1297,7 +1297,7 @@
     "cycle": "10.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-2 rv10.0.0: OTA-2 rv10.0.0: pianificazione percorsi curvy, stile selezionabile, badge mappa, distanza/tempo, GraphHopper car fallback, hero landing admin, auto-migrazioni DB",
+    "message": "OTA-2 rv10.0.0: pianificazione percorsi curvy, stile selezionabile, badge mappa, distanza/tempo, GraphHopper car fallback, hero landing admin, auto-migrazioni DB",
     "note": "CURRENT_OTA_NUMBER=2. Pubblicato da publish-ota.sh (2-stage).",
     "runtimeVersion": "10.0.0",
     "jsEngine": "hermes",
