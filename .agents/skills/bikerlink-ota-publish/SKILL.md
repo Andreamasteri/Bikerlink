@@ -56,10 +56,10 @@ bash scripts/build-apk.sh production   # AAB Play Store
 
 ## Contesto fisso
 - **Piattaforma**: Android only (iOS non supportato per OTA)
-- **Runtime Version**: `9.0.0` (ciclo corrente, APK v46) ← CICLO 9.x
-- **APK corrente**: versionCode **46**, versionName **46.29.9**
-- **APK precedente (STABILE distribuita)**: versionCode 45, versionName 3.4.0 (buildId: `91cfde53-66e7-45fc-83f0-d7f72a98fcde`, APK: https://expo.dev/artifacts/eas/j1jsjGMxKaYvKA7u75Mkay.apk)
-- **OTA corrente**: OTA-11 (ciclo 9.x attivo, rv 9.0.0, v47.11.9, releaseId: `ff9b0c47-ab10-4fbf-9da3-f433b8992c6b`, slot: stable)
+- **Runtime Version**: `9.0.0` (ciclo corrente, APK v47) ← CICLO 9.x
+- **APK corrente**: versionCode **47**, versionName **47.2.9**
+- **APK precedente (STABILE distribuita)**: versionCode 46, versionName 46.29.9 (buildId: `e03f51d8-9f2b-496f-bba2-e0fe90b69fb7`, APK: https://expo.dev/artifacts/eas/tG5zT8yATySZWJVk7VLbLF.apk)
+- **OTA corrente**: OTA-13 (ciclo 9.x attivo, rv 9.0.0, v47.13.9, releaseId: `4dde7100-d204-4622-8000-0618aad21282`, slot: stable)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`

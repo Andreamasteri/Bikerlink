@@ -1988,17 +1988,6 @@ export default function ProfileScreen() {
       <View style={{ height: 40 }} />
     </ScrollView>
 
-    <Text style={{
-      position: "absolute",
-      bottom: insets.bottom + 12,
-      right: 16,
-      color: "red",
-      fontSize: 14,
-      fontFamily: "Inter_700Bold",
-      zIndex: 999,
-      pointerEvents: "none",
-    }}>CIAOOTA</Text>
-
     </View>
   );
 }

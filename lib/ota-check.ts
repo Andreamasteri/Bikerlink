@@ -204,12 +204,23 @@ async function runProbe(currentUpdateId: string, runtimeVersion: string): Promis
   }
 }
 
-// Stub: `expo-network` NON è installato in package.json. Un dynamic import con
-// stringa letterale verrebbe risolto comunque da Metro al bundle time e farebbe
-// fallire la build. Per ora ritorna sempre "unknown"; basta installare
-// `expo-network` e riscrivere questa funzione per popolarla davvero.
 async function getNetworkInfo(): Promise<string> {
-  return "unknown";
+  if (Platform.OS === "web") return "unknown";
+  try {
+    const Network = await import("expo-network");
+    const state = await Network.getNetworkStateAsync();
+    if (!state.isConnected) return "none";
+    switch (state.type) {
+      case Network.NetworkStateType.WIFI:
+        return "wifi";
+      case Network.NetworkStateType.CELLULAR:
+        return "cellular";
+      default:
+        return "unknown";
+    }
+  } catch {
+    return "unknown";
+  }
 }
 
 interface ReportPayload {
@@ -308,12 +319,11 @@ export async function triggerOtaCheck(
       consecutiveFailures = 0;
       // Siamo aggiornati: cancella l'eventuale flag residuo di sessioni precedenti.
       AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
-      reportOtaEvent({ phase: "no-update", source, currentUpdateId, runtimeVersion });
+      const networkInfo = await networkInfoPromise.catch(() => "unknown");
+      reportOtaEvent({ phase: "no-update", source, currentUpdateId, runtimeVersion, networkInfo });
       const r: OtaManualResult = { ok: true, phase: "no-update" };
       _emitOtaResult(r);
-      // Lasciamo che probe/network completino in background per non sprecare la chiamata.
       probePromise.catch(() => {});
-      networkInfoPromise.catch(() => {});
       return r;
     }
 
@@ -340,9 +350,9 @@ export async function triggerOtaCheck(
       // non è mai stato chiamato (es. app chiusa di forza prima del backgrounding).
       // Il bundle è pronto: lo applichiamo adesso con la stessa logica del ramo normale.
       consecutiveFailures = 0;
+      const networkInfoFetchNotNew = await networkInfoPromise.catch(() => "unknown");
       probePromise.catch(() => {});
-      networkInfoPromise.catch(() => {});
-      reportOtaEvent({ phase: "fetch-not-new", source, currentUpdateId, runtimeVersion });
+      reportOtaEvent({ phase: "fetch-not-new", source, currentUpdateId, runtimeVersion, networkInfo: networkInfoFetchNotNew });
       const appIsActive = AppState.currentState === "active";
       if (options?.immediateReload || !appIsActive) {
         phase = "reload";
@@ -363,9 +373,9 @@ export async function triggerOtaCheck(
     }
 
     consecutiveFailures = 0;
-    reportOtaEvent({ phase: "fetched", source, currentUpdateId, runtimeVersion });
+    const networkInfoFetched = await networkInfoPromise.catch(() => "unknown");
+    reportOtaEvent({ phase: "fetched", source, currentUpdateId, runtimeVersion, networkInfo: networkInfoFetched });
     probePromise.catch(() => {});
-    networkInfoPromise.catch(() => {});
 
     // Task #1164: riavvio differito al backgrounding.
     // Se il check è manuale (admin) o l'app è già in background, riavviamo subito.

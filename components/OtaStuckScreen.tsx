@@ -28,9 +28,11 @@ const PRODUCTION_FALLBACK_URL =
 
 function getApkUrl(): string {
   if (Array.isArray(otaUpdates) && otaUpdates.length > 0) {
-    const last = otaUpdates[otaUpdates.length - 1] as { apkUrl?: string | null };
-    if (last.apkUrl && typeof last.apkUrl === "string") {
-      return last.apkUrl;
+    for (let i = otaUpdates.length - 1; i >= 0; i--) {
+      const entry = otaUpdates[i] as { apkUrl?: string | null };
+      if (entry.apkUrl && typeof entry.apkUrl === "string") {
+        return entry.apkUrl;
+      }
     }
   }
   return PRODUCTION_FALLBACK_URL;
