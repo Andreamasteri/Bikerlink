@@ -1301,6 +1301,13 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`DELETE FROM app_settings WHERE key = 'maps_user_choice_enabled'`);
+          console.log("[MIGRATION] Removed stale maps_user_choice_enabled rows from app_settings");
+        } catch (e) {
+          console.warn("[MIGRATION] maps_user_choice_enabled cleanup:", e);
+        }
+
+        try {
           await db.execute(sql`
             CREATE TABLE IF NOT EXISTS sprint_results (
               id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid(),
