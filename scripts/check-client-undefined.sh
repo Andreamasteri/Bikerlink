@@ -22,11 +22,29 @@
 #   init crash. The mock MUST remain a Proxy — never downgrade it to `{}`.
 #
 # WHAT THIS SCRIPT CHECKS:
-#   (a) No file under app/, components/, lib/, hooks/ imports directly from
+#   (A) No file under app/, components/, lib/, hooks/ imports directly from
 #       server/ paths (absolute or relative).
-#   (b) Every named value imported client-side from @shared/schema is
-#       actually exported by shared/schema.ts (the file Metro resolves to).
-#   (c) mocks/empty.js is still a Proxy (not a plain empty object).
+#   (B) Every named value imported client-side from ANY @shared/* module is
+#       actually exported by the resolved shared file.
+#       Also verifies the resolved file does NOT import any SERVER_ONLY_PACKAGES.
+#       Modules currently scanned: all @shared/* paths found in client code.
+#   (C) mocks/empty.js is still a Proxy (not a plain empty object).
+#   (D) ALL shared/*.ts modules (not just client-imported ones) are free of
+#       top-level imports from SERVER_ONLY_PACKAGES — catches future OTA-4
+#       risks before a module is ever imported client-side.
+#   (E) Self-test — verify Check B export-grep correctly rejects a nonexistent
+#       symbol (regression guard for the grep pattern itself).
+#
+# MODULE RESOLUTION (mirrors Metro's behaviour):
+#   For @shared/X the resolver tries in order:
+#     1. shared/X.ts       — file wins when both file and directory exist
+#     2. shared/X/index.ts — fallback when only a directory exists
+#   Example: @shared/schema → shared/schema.ts  (NOT shared/schema/index.ts)
+#            @shared/privacy-policy-it → shared/privacy-policy-it.ts
+#
+# SERVER_ONLY_PACKAGES (mirrors metro.config.js list):
+#   These packages are replaced with mocks/empty.js on iOS/Android by Metro.
+#   Any shared module that imports them risks the OTA-4 init-crash pattern.
 #
 # Usage:
 #   bash scripts/check-client-undefined.sh
@@ -38,6 +56,33 @@ set -uo pipefail
 
 FAIL=0
 PASS=0
+
+# ---------------------------------------------------------------------------
+# SERVER_ONLY_PACKAGES — keep in sync with metro.config.js
+# ---------------------------------------------------------------------------
+SERVER_ONLY_PACKAGES=(
+  "pdfkit"
+  "sharp"
+  "docx"
+  "nodemailer"
+  "archiver"
+  "multer"
+  "express"
+  "pg"
+  "drizzle-orm"
+  "bcryptjs"
+  "connect-pg-simple"
+  "node-forge"
+  "undici"
+  "tsx"
+  "flatted"
+  "picomatch"
+  "http-proxy-middleware"
+  "express-session"
+  "express-rate-limit"
+  "@replit/connectors-sdk"
+  "@replit/object-storage"
+)
 
 echo ""
 echo "=============================================="
@@ -78,77 +123,159 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# CHECK B: named @shared/schema imports exist in shared/schema.ts
+# CHECK B: named @shared/* imports exist in their resolved shared files,
+#          and those files do NOT import any SERVER_ONLY_PACKAGES.
 #
-# Metro module resolution: when both shared/schema.ts (file) and
-# shared/schema/ (directory) exist, the FILE wins. So @shared/schema always
-# resolves to shared/schema.ts on the client — never to the barrel index.
+# Covers ALL @shared/* sub-paths used by client code — not just @shared/schema.
+# The set of modules is discovered dynamically from the codebase, so new
+# @shared/X additions are automatically included without editing this script.
 #
-# The barrel (shared/schema/index.ts) is therefore irrelevant for client
-# bundle resolution and must NOT be used for this check. Using it would
-# silently pass any symbol because it contains "export * from ..." lines
-# that would match regardless of whether the specific symbol exists.
+# Metro module resolution — file wins over directory:
+#   @shared/schema            → shared/schema.ts   (file, not shared/schema/index.ts)
+#   @shared/privacy-policy-it → shared/privacy-policy-it.ts
+#   @shared/event-types       → shared/event-types.ts
+#   @shared/X                 → shared/X.ts  (preferred) or shared/X/index.ts
 #
-# This check greps shared/schema.ts directly for each named import.
+# The barrel (shared/schema/index.ts) is irrelevant for client bundle resolution
+# because the FILE always wins when both file and directory exist (Metro rule).
+# Using the barrel for this check would silently pass any symbol because it
+# contains "export * from ..." lines that match everything.
+#
 # Type-only imports are skipped (erased at compile time, safe at runtime).
 # ---------------------------------------------------------------------------
-echo "[B] Checking named @shared/schema imports exist in shared/schema.ts..."
+echo "[B] Checking ALL @shared/* named imports exist in their resolved shared files..."
+echo "    (Also verifies each resolved file is free of SERVER_ONLY_PACKAGES imports)"
+echo ""
 
-SCHEMA_FILE="shared/schema.ts"
+# Helper: resolve @shared/SUFFIX to its actual file path (mirrors Metro logic)
+resolve_shared_module() {
+  local suffix="$1"
+  local ts_file="shared/${suffix}.ts"
+  local idx_file="shared/${suffix}/index.ts"
+  if [ -f "$ts_file" ]; then
+    echo "$ts_file"
+  elif [ -f "$idx_file" ]; then
+    echo "$idx_file"
+  else
+    echo ""
+  fi
+}
 
-if [ ! -f "$SCHEMA_FILE" ]; then
-  echo "  ✗ shared/schema.ts not found — Metro has no file to resolve @shared/schema"
-  FAIL=$((FAIL + 1))
-else
-  missing_exports=""
+# Collect all unique @shared/* suffixes imported in client code
+declare -A seen_modules
 
+for dir in $CLIENT_DIRS; do
+  [ -d "$dir" ] || continue
+  while IFS= read -r match_line; do
+    content=$(echo "$match_line" | cut -d: -f3-)
+    # Skip type-only imports — erased at compile time
+    echo "$content" | grep -qE "import type " && continue
+    suffix=$(echo "$content" | grep -oE "@shared/[a-zA-Z0-9_/-]+" | head -1 | sed 's|@shared/||')
+    [ -n "$suffix" ] && seen_modules["$suffix"]=1
+  done < <(grep -rn --include="*.ts" --include="*.tsx" \
+    -E "from ['\"]@shared/" "$dir" 2>/dev/null || true)
+done
+
+b_has_fail=0
+all_b_missing=""
+WARN=0
+
+for module_suffix in "${!seen_modules[@]}"; do
+  resolved_file=$(resolve_shared_module "$module_suffix")
+  echo "  Module: @shared/${module_suffix}"
+
+  if [ -z "$resolved_file" ]; then
+    echo "    ✗ Cannot resolve: no shared/${module_suffix}.ts or shared/${module_suffix}/index.ts"
+    all_b_missing="${all_b_missing}    @shared/${module_suffix}: source file not found"$'\n'
+    b_has_fail=1
+    echo ""
+    continue
+  fi
+
+  echo "    Resolved → ${resolved_file}"
+
+  # Sub-check B1: every named import from this module exists in the resolved file
+  module_missing=""
   for dir in $CLIENT_DIRS; do
-    if [ ! -d "$dir" ]; then continue; fi
-
+    [ -d "$dir" ] || continue
     while IFS= read -r line; do
-      # Skip type-only imports — they are erased at compile time
-      if echo "$line" | grep -qE "import type "; then
-        continue
-      fi
+      echo "$line" | grep -qE "import type " && continue
 
       file=$(echo "$line" | cut -d: -f1)
       lineno=$(echo "$line" | cut -d: -f2)
       content=$(echo "$line" | cut -d: -f3-)
 
-      # Extract names from "import { A, B, C } from ..."
       names=$(echo "$content" | grep -oE '\{[^}]+\}' | tr -d '{}' | tr ',' '\n' \
         | sed 's/^[[:space:]]*//' | sed 's/[[:space:]]*$//' | grep -v '^$' || true)
 
       for name in $names; do
-        # Strip "as Alias" alias syntax
         clean_name=$(echo "$name" | sed 's/ as .*//' | tr -d ' ')
         [ -z "$clean_name" ] && continue
 
-        # Check shared/schema.ts for a concrete export of this symbol.
+        # Check the resolved file for a concrete export of this symbol.
         # Matches: export const|function|class|type|interface|enum <name>
         # or:      export { ..., <name>, ... }
         # Does NOT match "export *" — that would bypass the check.
         if ! grep -qE \
           "^export (const|function|class|type|interface|enum|abstract class) ${clean_name}[ <({=]|^export \{[^}]*\b${clean_name}\b[^}]*\}" \
-          "$SCHEMA_FILE" 2>/dev/null; then
-          missing_exports="${missing_exports}    ${file}:${lineno} — '${clean_name}' not exported from shared/schema.ts"$'\n'
+          "$resolved_file" 2>/dev/null; then
+          module_missing="${module_missing}      ${file}:${lineno} — '${clean_name}' not exported from ${resolved_file}"$'\n'
         fi
       done
     done < <(grep -rn --include="*.ts" --include="*.tsx" \
-      -E "from ['\"]@shared/schema['\"]" "$dir" 2>/dev/null || true)
+      -E "from ['\"]@shared/${module_suffix}['\"]" "$dir" 2>/dev/null || true)
   done
 
-  if [ -z "$missing_exports" ]; then
-    echo "  ✓ All @shared/schema named imports found in shared/schema.ts"
-    PASS=$((PASS + 1))
+  if [ -z "$module_missing" ]; then
+    echo "    ✓ All named imports exist in ${resolved_file}"
   else
-    echo "  ✗ Missing exports detected — these will be undefined at runtime:"
-    echo ""
-    echo "$missing_exports"
-    echo "  Fix: add the missing export to shared/schema.ts or the appropriate"
-    echo "       shared/schema/*.ts sub-file (ensure shared/schema.ts re-exports it)."
-    FAIL=$((FAIL + 1))
+    echo "    ✗ Missing exports (will be undefined at runtime):"
+    echo "$module_missing"
+    all_b_missing="${all_b_missing}${module_missing}"
+    b_has_fail=1
   fi
+
+  # Sub-check B2: resolved file does NOT import any SERVER_ONLY_PACKAGES.
+  #
+  # This is a WARNING (not a failure). shared/schema.ts intentionally imports
+  # drizzle-orm/pg-core to define the DB schema — this is the known OTA-4
+  # pattern, already mitigated by the Proxy mock (Check C). The warning keeps
+  # developers aware that the Proxy mock is load-bearing for this module.
+  # A true failure would permanently break this check for the current schema.
+  file_server_hits=""
+  for pkg in "${SERVER_ONLY_PACKAGES[@]}"; do
+    hits=$(grep -nE "from ['\"]${pkg}['\"]|from ['\"]${pkg}/|require\(['\"]${pkg}['\"]|require\(['\"]${pkg}/" \
+      "$resolved_file" 2>/dev/null || true)
+    if [ -n "$hits" ]; then
+      file_server_hits="${file_server_hits}      [${pkg}] ${hits}"$'\n'
+    fi
+  done
+
+  if [ -z "$file_server_hits" ]; then
+    echo "    ✓ No SERVER_ONLY_PACKAGES imports in ${resolved_file}"
+  else
+    echo "    ⚠ SERVER_ONLY_PACKAGES found in ${resolved_file} — protected by Proxy mock:"
+    echo "$file_server_hits"
+    echo "      → Proxy mock (mocks/empty.js) mitigates this at runtime (Check C)."
+    echo "      → If this is NOT a schema file, consider moving logic to server/."
+    WARN=$((WARN + 1))
+  fi
+
+  echo ""
+done
+
+if [ ${#seen_modules[@]} -eq 0 ]; then
+  echo "  (no @shared/* imports found in client code)"
+  PASS=$((PASS + 1))
+elif [ "$b_has_fail" -eq 0 ]; then
+  echo "  ✓ All @shared/* modules: named imports valid"
+  PASS=$((PASS + 1))
+else
+  if [ -n "$all_b_missing" ]; then
+    echo "  Fix (missing exports): add the missing export to the appropriate shared file."
+    echo "       For @shared/schema, ensure shared/schema.ts re-exports the symbol."
+  fi
+  FAIL=$((FAIL + 1))
 fi
 echo ""
 
@@ -182,18 +309,72 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
-# CHECK D: self-test — verify Check B actually catches missing symbols
+# CHECK D: scan ALL shared/*.ts modules (not just client-imported ones) for
+#          top-level imports of SERVER_ONLY_PACKAGES.
 #
-# This smoke test confirms that the export-existence check (Check B) is not
-# silently broken (e.g. by a regex that always matches). It runs Check B's
-# core grep against a symbol that definitely does NOT exist in shared/schema.ts
-# and asserts that grep returns non-zero (i.e. not found).
+# Rationale: a shared module that imports server-only packages today may be
+# imported client-side in a future commit, silently reintroducing OTA-4.
+# Catching it at the source (before client adoption) is cheaper than
+# catching it post-deploy. This check is authoritative — it covers modules
+# that Check B skips because they are not yet used by client code.
+#
+# This is a WARNING (not a failure). The known case — shared/schema.ts and
+# shared/schema/*.ts importing drizzle-orm/pg-core — is intentional (DB
+# schema definitions) and is already mitigated by the Proxy mock (Check C).
+# The warning surfaces any NEW unexpected server-only imports that might
+# appear in shared modules not yet covered by the Proxy mock mitigation.
+#
+# Files scanned: all shared/**/*.ts (top-level and sub-directories).
+# Packages checked: SERVER_ONLY_PACKAGES array defined above (mirrors metro.config.js).
+# ---------------------------------------------------------------------------
+echo "[D] Scanning ALL shared/**/*.ts for SERVER_ONLY_PACKAGES imports..."
+echo "    (Warns about future OTA-4 risks before any client imports the module)"
+echo ""
+
+d_warned=0
+
+while IFS= read -r shared_file; do
+  file_hits=""
+  for pkg in "${SERVER_ONLY_PACKAGES[@]}"; do
+    hits=$(grep -nE "from ['\"]${pkg}['\"]|from ['\"]${pkg}/|require\(['\"]${pkg}['\"]|require\(['\"]${pkg}/" \
+      "$shared_file" 2>/dev/null || true)
+    if [ -n "$hits" ]; then
+      file_hits="${file_hits}      [${pkg}] ${hits}"$'\n'
+    fi
+  done
+
+  if [ -n "$file_hits" ]; then
+    echo "  ⚠ ${shared_file} imports SERVER_ONLY_PACKAGES:"
+    echo "$file_hits"
+    echo "    → If this file is imported client-side, the Proxy mock (mocks/empty.js)"
+    echo "      must remain active (Check C) to prevent OTA-4 style crashes."
+    echo "    → If this is NOT a schema/DB file, consider moving the import to server/."
+    echo ""
+    d_warned=1
+    WARN=$((WARN + 1))
+  fi
+done < <(find shared -name "*.ts" -not -path "*/node_modules/*" 2>/dev/null | sort)
+
+if [ "$d_warned" -eq 0 ]; then
+  echo "  ✓ No shared/**/*.ts file imports SERVER_ONLY_PACKAGES at the top level"
+  PASS=$((PASS + 1))
+else
+  echo "  Note: warnings above are informational. The Proxy mock (Check C) mitigates"
+  echo "  runtime risk for known schema files. New warnings should be reviewed."
+  PASS=$((PASS + 1))
+fi
+echo ""
+
+# ---------------------------------------------------------------------------
+# CHECK E: self-test — verify Check B export-grep correctly rejects a
+#          nonexistent symbol (regression guard for the grep pattern itself).
 #
 # If this test fails it means Check B's grep logic has regressed to always-true
 # and would silently pass missing-symbol bugs.
 # ---------------------------------------------------------------------------
-echo "[D] Self-test: verifying Check B grep correctly rejects a nonexistent symbol..."
+echo "[E] Self-test: verifying Check B grep correctly rejects a nonexistent symbol..."
 
+SCHEMA_FILE="shared/schema.ts"
 SENTINEL="__DOES_NOT_EXIST_OTA4_SENTINEL__"
 if [ -f "$SCHEMA_FILE" ]; then
   if grep -qE \
@@ -216,7 +397,7 @@ echo ""
 # Summary
 # ---------------------------------------------------------------------------
 echo "=============================================="
-echo "  Results: ${PASS} passed, ${FAIL} failed"
+echo "  Results: ${PASS} passed, ${FAIL} failed, ${WARN} warned"
 echo "=============================================="
 
 if [ "$FAIL" -gt 0 ]; then
@@ -228,5 +409,9 @@ if [ "$FAIL" -gt 0 ]; then
 fi
 
 echo ""
-echo "All client-safety checks passed."
+if [ "$WARN" -gt 0 ]; then
+  echo "All client-safety checks passed (${WARN} warning(s) above are informational)."
+else
+  echo "All client-safety checks passed."
+fi
 exit 0
