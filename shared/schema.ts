@@ -1059,6 +1059,7 @@ export const updateDynamicProfileSchema = z.object({
 export const pushTokenSchema = z.object({
   token: z.string().max(256).nullable().optional(),
 });
+export type PushTokenInput = z.infer<typeof pushTokenSchema>;
 
 export const otaStuckEventSchema = z.object({
   deviceId: z.string().max(64).optional(),
@@ -2454,11 +2455,6 @@ export const updateProfileDynamicSchema = z.object({
   pushNotificationsEnabled: z.boolean().optional(),
 }).passthrough();
 export type UpdateProfileDynamicInput = z.infer<typeof updateProfileDynamicSchema>;
-
-export const pushTokenSchema = z.object({
-  token: z.string().nullable().optional(),
-});
-export type PushTokenInput = z.infer<typeof pushTokenSchema>;
 
 export const ghostModeSchema = z.object({
   enabled: z.boolean({ required_error: "enabled è obbligatorio", invalid_type_error: "enabled deve essere un booleano" }),
