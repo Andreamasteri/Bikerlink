@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTaskbarStyle } from "@/lib/taskbar-style-context";
 import { useT } from "@/lib/language-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
-import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>>[0];
 import { registerHandsOffCallback, registerSprintMeasuringCallback, registerTrackingActiveCallback } from "@/lib/tracking-active";
 
 const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";

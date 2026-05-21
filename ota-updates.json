@@ -1242,7 +1242,7 @@
     "message": "APK v48 ciclo 10: runtimeVersion 10.0.0, SDK 56, versionCode 48, versionName 48.13.10",
     "runtimeVersion": "10.0.0",
     "jsEngine": "hermes",
-    "note": "Task #1860: apertura ciclo 10.0.0 — versionCode 48, versionName 48.13.10, runtimeVersion 10.0.0. Migrazione da SDK 56 (task #1801). CURRENT_OTA_NUMBER=0, __OTA_BUILD_TAG__=BL-OTA-0-cycle10. Build EAS da avviare.",
+    "note": "Task #1864: nuova build EAS SDK 56 rv10.0.0 — fix import @react-navigation eliminati da _layout.tsx (type inline Parameters<>), expo aggiornato a 56.0.2, expo-router a 56.2.4, expo-camera 56.0.6, expo-image 56.0.7, expo-doctor 18/18. Build precedente a5c14e8f fallita (import @react-navigation/native bloccato da SDK 56). CURRENT_OTA_NUMBER=0, __OTA_BUILD_TAG__=BL-OTA-0-cycle10.",
     "platforms": [
       "android"
     ],
@@ -1251,16 +1251,16 @@
     "updateGroupId": null,
     "androidUpdateId": null,
     "iosUpdateId": null,
-    "commitBase": null,
-    "easDashboard": null,
-    "apkBuildId": "a5c14e8f-d110-49e5-95c7-f0a241afe9ad",
-    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/a5c14e8f-d110-49e5-95c7-f0a241afe9ad",
+    "commitBase": "59cfcf26",
+    "easDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/5c395ca5-2a1e-478e-9442-bd293c501acb",
+    "apkBuildId": "5c395ca5-2a1e-478e-9442-bd293c501acb",
+    "apkBuildDashboard": "https://expo.dev/accounts/andreamasteri/projects/bikerlink/builds/5c395ca5-2a1e-478e-9442-bd293c501acb",
     "apkVersionCode": 48,
     "apkVersionName": "48.13.10",
     "apkUrl": null,
     "apkCompletedAt": null,
     "deviceTestStatus": "pending",
-    "deviceTestNote": "APK v48 (versionCode 48, versionName 48.13.10, rv 10.0.0, ciclo 10) — build EAS inviata 2026-05-21T04:09Z (buildId: a5c14e8f). Dopo completamento EAS: scaricare APK, aggiornare apkUrl + apkCompletedAt, verificare su Android (no crash al boot, login funzionante, mappe visibili), impostare deviceTestStatus=verified.",
+    "deviceTestNote": "APK v48 (versionCode 48, versionName 48.13.10, rv 10.0.0, ciclo 10) — build EAS inviata 2026-05-21T11:18Z (buildId: 5c395ca5, task #1864). Dopo completamento EAS (~15-30 min): aggiornare apkUrl + apkCompletedAt, verificare su Android (no crash al boot, login funzionante, mappe visibili), impostare deviceTestStatus=verified.",
     "status": "building"
   },
   {

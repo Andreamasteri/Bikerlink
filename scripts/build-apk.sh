@@ -139,7 +139,7 @@ echo "  ✔  versionName sincronizzato e verificato: $VERSION_NAME (app.json →
 # Se app.json e build.gradle non sono committati, EAS compila con i valori vecchi
 # (problema riscontrato nella build v43: APK mostrava v41/3.1.0 invece di v43/3.2.0).
 GIT_COMMITTED="no"
-if git diff --quiet HEAD -- app.json android/app/build.gradle 2>/dev/null; then
+if git --no-optional-locks diff --quiet HEAD -- app.json android/app/build.gradle 2>/dev/null; then
   echo "  ℹ  Nessun commit necessario (app.json e build.gradle già allineati con git)"
 else
   COMMIT_MSG="chore: bump version to $VERSION_NAME (versionCode $VERSION_CODE) [build-apk]"
@@ -233,7 +233,7 @@ echo "  ✔  New Architecture verificata: newArchEnabled=true (gradle.properties
 # ── 4. Log dell'evento ───────────────────────────────────────────────────────
 mkdir -p logs
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+COMMIT=$(git --no-optional-locks rev-parse --short HEAD 2>/dev/null || echo "unknown")
 AUTHORIZED_BY=$(whoami 2>/dev/null || echo "unknown")
 echo "$TIMESTAMP  APK BUILD AVVIATA — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY versionName=$VERSION_NAME versionCode=$VERSION_CODE committed=$GIT_COMMITTED" >> "$LOG_FILE"
 echo "  ✔  Evento loggato in $LOG_FILE"
