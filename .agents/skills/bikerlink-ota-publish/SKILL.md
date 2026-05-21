@@ -70,14 +70,109 @@ bash scripts/build-apk.sh production   # AAB Play Store
 ⛔ **MAI** modificare manualmente `lib/ota.ts` o `ota-updates.json` prima dello script.
 ✅ Usare **sempre** `bash scripts/publish-ota.sh` — tutto è automatico.
 
-## ⚠ Bug noto produzione: OTA CREATE restituisce 500
-Il deploy di produzione (`https://biker-link.replit.app`) ha un bug nel server_dist compilato:
-l'endpoint `POST /api/admin/ota` genera SQL `VALUES (, , $1, $2, 'draft', $3)` dove `version`
-e `runtime_version` risultano `undefined` nel template Drizzle. Il codice sorgente locale è
-corretto — il bug è nella versione compilata in produzione (server_dist obsoleto).
-**Fix**: eseguire un nuovo deploy del progetto (aggiorna il server_dist in produzione).
-Finché non viene eseguito il deploy, usare `BIKERLINK_BACKEND_URL=http://localhost:5000`
-per pubblicare OTA verso il backend locale (funziona per test/dev, non serve utenti reali).
+## ⚠ Bug noto produzione: OTA CREATE restituisce 404/500
+
+### Causa più comune — server_dist obsoleto in produzione
+Il deploy di produzione usa un `server_dist` compilato da codice precedente.
+Se l'endpoint `POST /api/admin/ota` restituisce 404 o 500 in produzione, il server_dist
+non è aggiornato con le ultime modifiche al codice TypeScript.
+
+**Workaround** (usato per OTA-4): pubblicare via `BIKERLINK_BACKEND_URL=http://localhost:5000`.
+Dev e produzione condividono lo **stesso database** (`DATABASE_URL`), quindi la release
+creata via localhost è immediatamente visibile al server di produzione. L'endpoint
+`/api/expo-updates` (user-facing) funziona correttamente su produzione anche se il
+server_dist è obsoleto — solo le rotte admin sono rotte.
+
+```bash
+BIKERLINK_BACKEND_URL=http://localhost:5000 \
+bash scripts/publish-ota.sh export "..."   # Stage 1
+
+BIKERLINK_BACKEND_URL=http://localhost:5000 \
+bash scripts/publish-ota.sh publish        # Stage 2
+```
+
+**Approvazione via localhost** (se produzione non raggiunge la rotta approve):
+```bash
+curl -X POST http://localhost:5000/api/admin/ota/<RELEASE_ID>/approve \
+  -H "Authorization: Bearer $(cat .local/ota-token)" \
+  -H "Content-Type: application/json"
+```
+Risposta attesa: `{"slot":"stable","approved":true,"status":"active",...}`
+
+---
+
+### Regressione da file-split: doppio prefisso `/ota/ota`
+**Sintomo**: `Cannot POST /api/admin/ota` (404) anche in locale dopo un task di file-split.
+
+**Causa**: quando `server/routes/admin/ota.ts` viene estratto come sub-router, il mount
+in `server/routes/admin.ts` potrebbe usare `router.use('/ota', otaRouter)`. Ma tutti i
+route handler dentro `admin/ota.ts` hanno già il prefisso `/ota` (es. `router.post("/ota", ...)`),
+creando il path doppio `/api/admin/ota/ota`.
+
+**Fix**: cambiare il mount in `server/routes/admin.ts` da:
+```ts
+router.use('/ota', otaRouter);  // ❌ crea /api/admin/ota/ota/...
+```
+a:
+```ts
+router.use('/', otaRouter);     // ✅ i path dentro admin/ota.ts già hanno /ota
+```
+
+**Verifica**:
+```bash
+curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:5000/api/admin/ota \
+  -H "Content-Type: application/json" -d '{"test":1}'
+# Deve rispondere 400 (validazione), non 404
+```
+
+---
+
+### Storage methods OTA inesistenti
+`storage.createOtaRelease`, `storage.getOtaRelease`, `storage.updateOtaRelease`,
+`storage.getAllOtaReleases` **non esistono** nell'interfaccia `IStorage`. Se un task
+di refactor li introduce come chiamate nel route handler, il server crasha con 500.
+
+**Fix**: usare query Drizzle dirette sulla tabella `otaReleases` da `@shared/schema`.
+I campi corretti della tabella sono:
+- `version` (required, notNull)
+- `runtimeVersion`
+- `bundlePath`
+- `releaseNotes`
+- `status` (default `'draft'`)
+- `slot` (default `'archived'`)
+- `approved` (default `false`)
+- `approvedAt`, `approvedBy`
+- `publishedAt`
+
+Schema validazione (`publishOtaReleaseSchema`) usa: `version`, `runtimeVersion`, `bundlePath`,
+`releaseNotes`, `slot` — **non** `platform`, `channel`, `updateId`, `fileUrl`, `fileHash`.
+
+```ts
+import { otaReleases } from "@shared/schema";
+import { db } from "../../db";
+import { eq, desc } from "drizzle-orm";
+
+// Crea release draft
+const [release] = await db.insert(otaReleases).values({
+  version, runtimeVersion, bundlePath, releaseNotes,
+  slot: slot ?? "archived", status: "draft", approved: false,
+  createdBy: req.session.userId ?? null,
+}).returning();
+
+// Pubblica (status=active)
+const [updated] = await db.update(otaReleases)
+  .set({ status: "active", publishedAt: new Date(), updatedAt: new Date() })
+  .where(eq(otaReleases.id, id)).returning();
+
+// Approva (slot=stable)
+const [approved] = await db.update(otaReleases)
+  .set({ approved: true, slot: "stable", approvedAt: new Date(),
+         approvedBy: req.session.userId ?? null, updatedAt: new Date() })
+  .where(eq(otaReleases.id, id)).returning();
+
+// Lista release
+const releases = await db.select().from(otaReleases).orderBy(desc(otaReleases.createdAt));
+```
 
 ## File chiave
 - `lib/ota.ts` — contiene `CURRENT_OTA_NUMBER` (aggiornato dallo script)
