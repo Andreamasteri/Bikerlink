@@ -273,6 +273,90 @@ if [ $BUILD_EXIT -eq 0 ]; then
   bash scripts/save-build-snapshot.sh "" "" 2>/dev/null || true
   echo "  ⚠  Ricorda: dopo che EAS completa la build, aggiorna lo snapshot con:"
   echo "     bash scripts/save-build-snapshot.sh <BUILD_ID> <APK_URL>"
+
+  # ── Step M: Aggiornamento skill bikerlink-versioning ────────────────────────
+  echo ""
+  echo "  Aggiornamento skill bikerlink-versioning..."
+  VERSIONING_SKILL=".agents/skills/bikerlink-versioning/SKILL.md"
+  if [ -f "$VERSIONING_SKILL" ]; then
+    BUILD_VERSION_CODE="$VERSION_CODE" \
+    BUILD_VERSION_NAME="$VERSION_NAME" \
+    BUILD_PROFILE="$PROFILE" \
+    SKILL_PATH="$VERSIONING_SKILL" \
+    node -e "
+      const fs = require('fs');
+      const path = process.env.SKILL_PATH;
+      const versionCode = process.env.BUILD_VERSION_CODE;
+      const versionName = process.env.BUILD_VERSION_NAME;
+
+      // Leggi runtimeVersion da app.json
+      let runtimeVersion = 'unknown';
+      try {
+        const appJson = JSON.parse(fs.readFileSync('app.json', 'utf8'));
+        runtimeVersion = appJson.expo.runtimeVersion || 'unknown';
+      } catch (e) {}
+
+      // Estrai il numero di ciclo (es. '10.0.0' → '10')
+      const cycleNum = runtimeVersion.split('.')[0] || '?';
+
+      let content = fs.readFileSync(path, 'utf8');
+
+      // 1. Aggiorna tabella 'Consistenza tra file'
+      // expo.version
+      content = content.replace(
+        /(\| \`app\.json\` \| \`expo\.version\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + versionName + '\$2'
+      );
+      // expo.android.versionCode
+      content = content.replace(
+        /(\| \`app\.json\` \| \`expo\.android\.versionCode\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + versionCode + '\$2'
+      );
+      // expo.runtimeVersion
+      content = content.replace(
+        /(\| \`app\.json\` \| \`expo\.runtimeVersion\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + runtimeVersion + '\$2'
+      );
+      // build.gradle versionCode
+      content = content.replace(
+        /(\| \`android\/app\/build\.gradle\` \| \`versionCode\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + versionCode + '\$2'
+      );
+      // build.gradle versionName
+      content = content.replace(
+        /(\| \`android\/app\/build\.gradle\` \| \`versionName\` \| \`\")[^\`]*(\"\` \|)/,
+        '\$1' + versionName + '\$2'
+      );
+      // strings.xml expo_runtime_version
+      content = content.replace(
+        /(\| \`android\/app\/src\/main\/res\/values\/strings\.xml\` \| \`expo_runtime_version\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + runtimeVersion + '\$2'
+      );
+
+      // 2. Aggiorna 'Tabella storica dei cicli':
+      //    - Rimuovi '**Corrente**' dall'ultima riga che ce l'ha
+      //    - Aggiungi una nuova riga come Corrente
+      content = content.replace(/(\*\*Corrente\*\*[^\n]*)/, (match) => {
+        return match.replace('**Corrente** — ', '');
+      });
+
+      // Inserisci la nuova riga dopo l'ultima riga della tabella (prima del '>')
+      const newRow = '| v' + versionCode + ' | ' + versionCode + ' | ' + versionName + ' | ' + runtimeVersion + ' | ' + cycleNum + '.x | — | **Corrente** |';
+      // Trova l'ultima riga della tabella (l'ultima '| v...' prima del blocco '>')
+      const lastRowIdx = content.lastIndexOf('\n| v');
+      if (lastRowIdx !== -1) {
+        const endOfLastRow = content.indexOf('\n', lastRowIdx + 1);
+        const insertPos = endOfLastRow !== -1 ? endOfLastRow : content.length;
+        content = content.slice(0, insertPos) + '\n' + newRow + content.slice(insertPos);
+      }
+
+      fs.writeFileSync(path, content, 'utf8');
+      process.stdout.write('OK');
+    " 2>/dev/null && echo "  ✔  Skill bikerlink-versioning aggiornata (v$VERSION_CODE / $VERSION_NAME)" \
+      || echo "  ⚠  Aggiornamento skill versioning fallito (non bloccante — build già avviata)"
+  else
+    echo "  ⚠  Skill file non trovato: $VERSIONING_SKILL (non bloccante)"
+  fi
 else
   echo "$TIMESTAMP  APK BUILD FALLITA (exit=$BUILD_EXIT) — profilo=$PROFILE commit=$COMMIT utente=$AUTHORIZED_BY" >> "$LOG_FILE"
   echo ""
