@@ -783,6 +783,12 @@ function setupErrorHandler(app: express.Application) {
         }
 
         try {
+          await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen_match_at TIMESTAMP`);
+        } catch (e) {
+          console.warn("[MIGRATION] users.last_seen_match_at:", e);
+        }
+
+        try {
           await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS region VARCHAR(100)`);
           await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS country VARCHAR(2)`);
           await db.execute(sql`ALTER TABLE moto_clubs ADD COLUMN IF NOT EXISTS is_featured BOOLEAN NOT NULL DEFAULT false`);
@@ -1654,6 +1660,32 @@ function setupErrorHandler(app: express.Application) {
           console.log("[MIGRATION] ota_publish_tokens table ensured");
         } catch (e) {
           console.warn("[MIGRATION] ota_publish_tokens:", e);
+        }
+
+        try {
+          await db.execute(sql`
+            CREATE TABLE IF NOT EXISTS site_visits (
+              id          VARCHAR(36)  PRIMARY KEY DEFAULT gen_random_uuid(),
+              visitor_id  VARCHAR(64)  NOT NULL,
+              user_id     VARCHAR(36)  REFERENCES users(id) ON DELETE SET NULL,
+              event       VARCHAR(20)  NOT NULL DEFAULT 'view',
+              path        TEXT         NOT NULL,
+              referrer    TEXT,
+              user_agent  TEXT,
+              ip_hash     VARCHAR(64),
+              ip_prefix   VARCHAR(48),
+              lang        VARCHAR(10),
+              country     VARCHAR(2),
+              created_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+            )
+          `);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS site_visits_created_at_idx ON site_visits (created_at)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS site_visits_visitor_id_idx ON site_visits (visitor_id)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS site_visits_event_idx ON site_visits (event)`);
+          await db.execute(sql`CREATE INDEX IF NOT EXISTS site_visits_user_id_idx ON site_visits (user_id)`);
+          console.log("[MIGRATION] site_visits table ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] site_visits:", e);
         }
 
         console.log("[INIT] Phase 1 migrations done — starting sequential heavy tasks");
