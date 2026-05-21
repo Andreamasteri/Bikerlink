@@ -265,6 +265,8 @@ export default function GiriCreateScreen() {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
   const [aiFallbackBanner, setAiFallbackBanner] = useState(false);
+  const [aiSuccessBanner, setAiSuccessBanner] = useState(false);
+  const aiSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [title, setTitle] = useState("Giro in moto");
   const [style, setStyle] = useState<Style>("curvy");
@@ -332,6 +334,10 @@ export default function GiriCreateScreen() {
     const js = `(function(){ if(typeof window.updateCompassDirection==='function'){ window.updateCompassDirection(${JSON.stringify(compassDirLabel)}); } })(); true;`;
     webviewRef.current?.injectJavaScript(js);
   }, [compassDirLabel]);
+
+  useEffect(() => {
+    return () => { if (aiSuccessTimer.current) clearTimeout(aiSuccessTimer.current); };
+  }, []);
 
   const handleMapTap = async (lat: number, lng: number) => {
     try {
@@ -416,6 +422,9 @@ export default function GiriCreateScreen() {
       };
       setAiPreview(preview);
       setMode("ai-preview");
+      if (aiSuccessTimer.current) clearTimeout(aiSuccessTimer.current);
+      setAiSuccessBanner(true);
+      aiSuccessTimer.current = setTimeout(() => setAiSuccessBanner(false), 3000);
 
       initialItems.forEach((item, idx) => {
         if (!item.name) return;
@@ -794,6 +803,15 @@ export default function GiriCreateScreen() {
               <Ionicons name="sparkles" size={18} color={colors.accent} />
               <Text style={s.previewHeaderText}>Anteprima giro generata dall'AI</Text>
             </View>
+            {aiSuccessBanner && (
+              <View style={s.aiSuccessBanner}>
+                <Ionicons name="checkmark-circle-outline" size={16} color="#15803d" />
+                <Text style={s.aiSuccessBannerText}>Giro pianificato dall'AI ✓</Text>
+                <Pressable onPress={() => { if (aiSuccessTimer.current) clearTimeout(aiSuccessTimer.current); setAiSuccessBanner(false); }} hitSlop={8}>
+                  <Ionicons name="close-outline" size={16} color="#15803d" />
+                </Pressable>
+              </View>
+            )}
             <Text style={s.previewHint}>Tocca un pill per modificarlo, poi conferma per calcolare il percorso</Text>
 
             <View style={s.pillSection}>
@@ -1441,6 +1459,8 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   hint: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, textAlign: "center" },
   aiFallbackBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#fef3c7", borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#fcd34d" },
   aiFallbackBannerText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 13, color: "#b45309" },
+  aiSuccessBanner: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#dcfce7", borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: "#86efac" },
+  aiSuccessBannerText: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 13, color: "#15803d" },
   previewHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
   previewHeaderText: { fontFamily: "Inter_700Bold", fontSize: 16, color: colors.text },
   previewHint: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginBottom: 16 },
