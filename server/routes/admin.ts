@@ -6312,7 +6312,7 @@ router.post("/cache/cleanup", async (_req: Request, res: Response) => {
 
 router.get("/db/table-sizes", async (_req: Request, res: Response) => {
   try {
-    const { VACUUM_TABLES, isVacuumRunning, VACUUM_LAST_RUN_SETTING_KEY } = await import("../vacuum-service");
+    const { VACUUM_TABLES, isVacuumRunning, VACUUM_LAST_RUN_SETTING_KEY, VACUUM_DETAIL_SETTING_KEY } = await import("../vacuum-service");
     const valuesClause = sql.join(VACUUM_TABLES.map((t) => sql`(${t})`), sql`, `);
     const result = await db.execute(sql`
       SELECT
@@ -6327,11 +6327,23 @@ router.get("/db/table-sizes", async (_req: Request, res: Response) => {
       totalSizeBytes: typeof r.total_size === "number" ? r.total_size : parseInt(String(r.total_size ?? "0"), 10),
     }));
     const orderedRows = VACUUM_TABLES.map((t) => rows.find((r) => r.name === t) ?? { name: t, sizeBytes: 0, totalSizeBytes: 0 });
-    const lastVacuumSetting = await storage.getAppSetting(VACUUM_LAST_RUN_SETTING_KEY);
+    const [lastVacuumSetting, detailSetting] = await Promise.all([
+      storage.getAppSetting(VACUUM_LAST_RUN_SETTING_KEY),
+      storage.getAppSetting(VACUUM_DETAIL_SETTING_KEY),
+    ]);
+    let lastVacuumDetail: { table: string; bytesBefore: number; bytesAfter: number }[] | null = null;
+    if (detailSetting?.value) {
+      try {
+        lastVacuumDetail = JSON.parse(detailSetting.value);
+      } catch {
+        lastVacuumDetail = null;
+      }
+    }
     return res.json({
       tables: orderedRows,
       isRunning: isVacuumRunning(),
       lastVacuum: lastVacuumSetting?.value ?? null,
+      lastVacuumDetail,
     });
   } catch (error) {
     console.error("Admin db/table-sizes error:", error);

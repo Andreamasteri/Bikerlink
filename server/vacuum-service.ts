@@ -2,8 +2,10 @@ import { pool } from "./db";
 import { storage } from "./storage";
 
 const VACUUM_LAST_RUN_KEY = "db_vacuum_full_v3";
+const VACUUM_DETAIL_KEY = "db_vacuum_full_v3_detail";
 
 export const VACUUM_LAST_RUN_SETTING_KEY = VACUUM_LAST_RUN_KEY;
+export const VACUUM_DETAIL_SETTING_KEY = VACUUM_DETAIL_KEY;
 
 export const VACUUM_TABLES = [
   "conversation_participants",
@@ -37,6 +39,8 @@ export async function runVacuumFullAll(): Promise<"executed" | "skipped"> {
   const startTotal = Date.now();
   console.log("[VACUUM] Avvio VACUUM FULL ANALYZE su tutte le tabelle principali...");
   let client: import("pg").PoolClient | null = null;
+  type TableDetail = { table: string; bytesBefore: number; bytesAfter: number };
+  const tableDetails: TableDetail[] = [];
   try {
     client = await pool.connect();
     for (const table of VACUUM_TABLES) {
@@ -63,6 +67,7 @@ export async function runVacuumFullAll(): Promise<"executed" | "skipped"> {
       } catch {
         sizeAfter = 0;
       }
+      tableDetails.push({ table, bytesBefore: sizeBefore, bytesAfter: sizeAfter });
       const savedMB = ((sizeBefore - sizeAfter) / 1024 / 1024).toFixed(2);
       const beforeMB = (sizeBefore / 1024 / 1024).toFixed(2);
       const afterMB = (sizeAfter / 1024 / 1024).toFixed(2);
@@ -76,6 +81,11 @@ export async function runVacuumFullAll(): Promise<"executed" | "skipped"> {
       await storage.upsertAppSetting(VACUUM_LAST_RUN_KEY, new Date().toISOString());
     } catch (err) {
       console.warn("[VACUUM] Impossibile salvare il timestamp dell'ultimo VACUUM:", err);
+    }
+    try {
+      await storage.upsertAppSetting(VACUUM_DETAIL_KEY, JSON.stringify(tableDetails));
+    } catch (err) {
+      console.warn("[VACUUM] Impossibile salvare il dettaglio per-tabella:", err);
     }
     return "executed";
   } catch (err) {

@@ -21,10 +21,17 @@ interface TableSizeRow {
   totalSizeBytes: number;
 }
 
+interface VacuumTableDetail {
+  table: string;
+  bytesBefore: number;
+  bytesAfter: number;
+}
+
 interface TableSizesData {
   tables: TableSizeRow[];
   isRunning: boolean;
   lastVacuum: string | null;
+  lastVacuumDetail: VacuumTableDetail[] | null;
 }
 
 function formatBytes(bytes: number): string {
@@ -32,6 +39,12 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function formatSaved(bytesBefore: number, bytesAfter: number): string {
+  const saved = bytesBefore - bytesAfter;
+  if (saved <= 0) return "—";
+  return `−${formatBytes(saved)}`;
 }
 
 function formatDateIT(iso: string | null): string {
@@ -116,6 +129,17 @@ export default function DbTablesScreen() {
 
   const tables = data?.tables ?? [];
   const totalBytes = tables.reduce((sum, t) => sum + t.totalSizeBytes, 0);
+  const detailMap = new Map<string, VacuumTableDetail>(
+    (data?.lastVacuumDetail ?? []).map((d) => [d.table, d]),
+  );
+  const hasDetail = detailMap.size > 0;
+
+  const totalSavedBytes = hasDetail
+    ? (data?.lastVacuumDetail ?? []).reduce(
+        (sum, d) => sum + Math.max(0, d.bytesBefore - d.bytesAfter),
+        0,
+      )
+    : 0;
 
   return (
     <ScrollView
@@ -178,6 +202,22 @@ export default function DbTablesScreen() {
             </Text>
           </Text>
         </View>
+
+        {hasDetail && totalSavedBytes > 0 && (
+          <View style={styles.savedBanner}>
+            <MaterialCommunityIcons
+              name="leaf"
+              size={14}
+              color={colors.success ?? "#22c55e"}
+            />
+            <Text style={styles.savedBannerText}>
+              Spazio liberato nell'ultimo VACUUM:{" "}
+              <Text style={styles.savedBannerValue}>
+                {formatBytes(totalSavedBytes)}
+              </Text>
+            </Text>
+          </View>
+        )}
       </View>
 
       {isLoading && (
@@ -203,29 +243,52 @@ export default function DbTablesScreen() {
             <Text style={[styles.colLabel, { flex: 2 }]}>Tabella</Text>
             <Text style={[styles.colLabel, styles.colRight]}>Dati</Text>
             <Text style={[styles.colLabel, styles.colRight]}>Totale</Text>
+            {hasDetail && (
+              <Text style={[styles.colLabel, styles.colRight, styles.colSaved]}>
+                Risparmio
+              </Text>
+            )}
           </View>
           {tables
             .slice()
             .sort((a, b) => b.totalSizeBytes - a.totalSizeBytes)
-            .map((row, idx) => (
-              <View
-                key={row.name}
-                style={[
-                  styles.tableRow,
-                  idx % 2 === 1 && { backgroundColor: colors.surface + "88" },
-                ]}
-              >
-                <Text style={[styles.tableName, { flex: 2 }]} numberOfLines={1}>
-                  {row.name}
-                </Text>
-                <Text style={[styles.tableSize, styles.colRight]}>
-                  {formatBytes(row.sizeBytes)}
-                </Text>
-                <Text style={[styles.tableSize, styles.colRight, styles.totalSize]}>
-                  {formatBytes(row.totalSizeBytes)}
-                </Text>
-              </View>
-            ))}
+            .map((row, idx) => {
+              const detail = detailMap.get(row.name);
+              return (
+                <View
+                  key={row.name}
+                  style={[
+                    styles.tableRow,
+                    idx % 2 === 1 && { backgroundColor: colors.surface + "88" },
+                  ]}
+                >
+                  <Text style={[styles.tableName, { flex: 2 }]} numberOfLines={1}>
+                    {row.name}
+                  </Text>
+                  <Text style={[styles.tableSize, styles.colRight]}>
+                    {formatBytes(row.sizeBytes)}
+                  </Text>
+                  <Text style={[styles.tableSize, styles.colRight, styles.totalSize]}>
+                    {formatBytes(row.totalSizeBytes)}
+                  </Text>
+                  {hasDetail && (
+                    <Text
+                      style={[
+                        styles.tableSize,
+                        styles.colRight,
+                        detail && detail.bytesBefore > detail.bytesAfter
+                          ? styles.savedPositive
+                          : styles.savedNeutral,
+                      ]}
+                    >
+                      {detail
+                        ? formatSaved(detail.bytesBefore, detail.bytesAfter)
+                        : "—"}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
         </View>
       )}
     </ScrollView>
@@ -309,6 +372,26 @@ function makeStyles(colors: ReturnType<typeof import("@/hooks/useColors").useCol
       fontFamily: "Inter_600SemiBold",
       color: colors.text,
     },
+    savedBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 10,
+      backgroundColor: (colors.success ?? "#22c55e") + "1A",
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    savedBannerText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontFamily: "Inter_400Regular",
+      flex: 1,
+    },
+    savedBannerValue: {
+      fontFamily: "Inter_700Bold",
+      color: colors.success ?? "#22c55e",
+    },
     tableSection: {
       marginHorizontal: 16,
       marginBottom: 16,
@@ -335,6 +418,9 @@ function makeStyles(colors: ReturnType<typeof import("@/hooks/useColors").useCol
       width: 72,
       textAlign: "right",
     },
+    colSaved: {
+      color: colors.success ?? "#22c55e",
+    },
     tableRow: {
       flexDirection: "row",
       paddingHorizontal: 14,
@@ -358,6 +444,13 @@ function makeStyles(colors: ReturnType<typeof import("@/hooks/useColors").useCol
     totalSize: {
       color: colors.text,
       fontFamily: "Inter_700Bold",
+    },
+    savedPositive: {
+      color: colors.success ?? "#22c55e",
+      fontFamily: "Inter_600SemiBold",
+    },
+    savedNeutral: {
+      color: colors.textSecondary,
     },
     errorBox: {
       alignItems: "center",
