@@ -2,9 +2,10 @@ import React from "react";
 import { View, Text, ScrollView, Image, TouchableOpacity, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
+import type { Photo } from "@/components/map/userDetailTypes";
 
 type Props = {
-  photos: any[];
+  photos: Photo[];
   onPhotoPress: (uri: string) => void;
 };
 
@@ -17,7 +18,7 @@ export default function UserPhotoStrip({ photos, onPhotoPress }: Props) {
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Foto</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-        {photos.map((p: any) => {
+        {photos.map((p) => {
           const uri = p.photoUrl?.startsWith("http") ? p.photoUrl : `${baseUrl}${p.photoUrl}`;
           return (
             <TouchableOpacity key={p.id} onPress={() => onPhotoPress(uri)} activeOpacity={0.8}>

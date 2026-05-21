@@ -11,15 +11,16 @@ import UserPhotoStrip from "@/components/map/UserPhotoStrip";
 import UserGarage from "@/components/map/UserGarage";
 import UserProposals from "@/components/map/UserProposals";
 import UserActionRow from "@/components/map/UserActionRow";
+import type { UserSummary, UserDetail, Proposal, OrganizedEvent } from "@/components/map/userDetailTypes";
 
 type Props = {
-  selectedUser: any;
-  selectedUserDetail: any;
-  selectedUserProposals: any[];
+  selectedUser: UserSummary;
+  selectedUserDetail: UserDetail | null;
+  selectedUserProposals: Proposal[];
   detailLoading: boolean;
   onClose: () => void;
   onPhotoPress: (uri: string) => void;
-  myOrganizedEvents: any[];
+  myOrganizedEvents: OrganizedEvent[];
   onInvitePress: () => void;
 };
 

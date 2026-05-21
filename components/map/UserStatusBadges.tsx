@@ -3,9 +3,10 @@ import { View, Text, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 import { formatLastSeen } from "@/components/map/userDetailUtils";
+import type { UserDetail } from "@/components/map/userDetailTypes";
 
 type Props = {
-  userDetail: any;
+  userDetail: UserDetail | null | undefined;
 };
 
 export default function UserStatusBadges({ userDetail }: Props) {

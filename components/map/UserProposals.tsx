@@ -4,9 +4,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
+import type { Proposal } from "@/components/map/userDetailTypes";
 
 type Props = {
-  proposals: any[];
+  proposals: Proposal[];
   detailLoading: boolean;
   onClose: () => void;
 };
@@ -19,7 +20,7 @@ export default function UserProposals({ proposals, detailLoading, onClose }: Pro
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t("home.rideProposals")}</Text>
-        {proposals.map((p: any) => (
+        {proposals.map((p) => (
           <Pressable
             key={p.id}
             style={styles.proposalCard}

@@ -3,9 +3,10 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
+import type { Motorcycle } from "@/components/map/userDetailTypes";
 
 type Props = {
-  motorcycles: any[];
+  motorcycles: Motorcycle[];
 };
 
 export default function UserGarage({ motorcycles }: Props) {
@@ -16,7 +17,7 @@ export default function UserGarage({ motorcycles }: Props) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>{t("home.garage")}</Text>
-      {motorcycles.map((m: any) => (
+      {motorcycles.map((m) => (
         <View key={m.id} style={styles.infoCard}>
           <Ionicons name="bicycle" size={18} color={Colors.accent} />
           <Text style={styles.infoCardText}>

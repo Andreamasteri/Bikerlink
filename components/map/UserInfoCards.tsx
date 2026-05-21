@@ -3,9 +3,10 @@ import { View, Text, Pressable, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
+import type { UserDetail } from "@/components/map/userDetailTypes";
 
 type Props = {
-  userDetail: any;
+  userDetail: UserDetail | null | undefined;
   onClose: () => void;
 };
 

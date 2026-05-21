@@ -5,10 +5,11 @@ import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 import { apiRequest } from "@/lib/query-client";
+import type { UserSummary, OrganizedEvent } from "@/components/map/userDetailTypes";
 
 type Props = {
-  selectedUser: any;
-  myOrganizedEvents: any[];
+  selectedUser: UserSummary | null | undefined;
+  myOrganizedEvents: OrganizedEvent[];
   onClose: () => void;
   onInvitePress: () => void;
 };
