@@ -1,4 +1,5 @@
 import { Router, Request, Response } from "express";
+import { GoogleGenAI } from "@google/genai";
 import { storage } from "../storage";
 import type { InsertPlannedRoute } from "@shared/schema";
 import { haversineKm } from "../geo";
@@ -207,28 +208,18 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 20000);
+  req.on("close", () => { controller.abort(); clearTimeout(timeout); });
 
   try {
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}` }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
-        }),
-        signal: controller.signal,
-      }
-    );
+    const genai = new GoogleGenAI({ apiKey });
+    const result = await genai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
+      config: { temperature: 0.1, maxOutputTokens: 512 },
+      abortSignal: controller.signal,
+    });
     clearTimeout(timeout);
-    if (!resp.ok) {
-      const errBody = await resp.text().catch(() => "");
-      console.error(`[AI parse] Gemini HTTP ${resp.status}:`, errBody);
-      throw new Error(`Gemini ${resp.status}`);
-    }
-    const data = await resp.json() as any;
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    const text = result.text ?? "";
     const stripped = text.replace(/```(?:json)?\s*/g, "").replace(/```\s*/g, "").trim();
     const first = stripped.indexOf("{");
     const last = stripped.lastIndexOf("}");
@@ -268,41 +259,20 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   req.on("close", () => { controller.abort(); clearTimeout(timeout); });
 
   try {
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?key=${apiKey}&alt=sse`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}` }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
-        }),
-        signal: controller.signal,
-      }
-    );
-
-    if (!resp.ok) throw new Error(`Gemini ${resp.status}`);
+    const genai = new GoogleGenAI({ apiKey });
+    const stream = await genai.models.generateContentStream({
+      model: "gemini-2.5-flash",
+      contents: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
+      config: { temperature: 0.1, maxOutputTokens: 512 },
+      abortSignal: controller.signal,
+    });
 
     let fullText = "";
-    const reader = (resp.body as any).getReader();
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          try {
-            const json = JSON.parse(line.slice(6));
-            const text = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-            if (text) {
-              fullText += text;
-              res.write(`data: ${JSON.stringify({ text })}\n\n`);
-            }
-          } catch { /* partial line, skip */ }
-        }
+    for await (const chunk of stream) {
+      const text = chunk.text ?? "";
+      if (text) {
+        fullText += text;
+        res.write(`data: ${JSON.stringify({ text })}\n\n`);
       }
     }
 

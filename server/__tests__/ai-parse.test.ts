@@ -26,6 +26,18 @@ vi.mock("../graphhopper-client", () => ({
   isSelfHosted: false,
 }));
 
+// Create stable mock references via vi.hoisted so they exist when vi.mock factory runs
+const genaiMocks = vi.hoisted(() => ({
+  generateContent: vi.fn(),
+  generateContentStream: vi.fn(),
+}));
+
+vi.mock("@google/genai", () => ({
+  GoogleGenAI: class MockGoogleGenAI {
+    models = genaiMocks;
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Import router and the exported utility after mocks are in place
 // ---------------------------------------------------------------------------
@@ -48,16 +60,6 @@ function buildApp(): express.Application {
   });
   app.use("/api/planned-routes", plannedRoutesRouter);
   return app;
-}
-
-// ---------------------------------------------------------------------------
-// Helper: build a minimal Gemini success response wrapping arbitrary text
-// ---------------------------------------------------------------------------
-
-function geminiResponse(text: string) {
-  return {
-    candidates: [{ content: { parts: [{ text }] } }],
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -183,26 +185,20 @@ describe("fallbackAiParse — field detection from natural language", () => {
 
 describe("POST /api/planned-routes/ai-parse — JSON parsing from Gemini text", () => {
   let app: express.Application;
-  let fetchSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     process.env.GEMINI_API_KEY = "test-key-unit";
     app = buildApp();
-    fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    genaiMocks.generateContent.mockReset();
+    genaiMocks.generateContentStream.mockReset();
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     delete process.env.GEMINI_API_KEY;
   });
 
   function mockGeminiOk(text: string) {
-    fetchSpy.mockResolvedValue({
-      ok: true,
-      json: async () => geminiResponse(text),
-      text: async () => "",
-    });
+    genaiMocks.generateContent.mockResolvedValue({ text });
   }
 
   it("parses clean JSON response without code fence", async () => {
@@ -287,31 +283,25 @@ describe("POST /api/planned-routes/ai-parse — JSON parsing from Gemini text", 
 });
 
 // ---------------------------------------------------------------------------
-// 3. Integration tests — Gemini HTTP errors → 503
+// 3. Integration tests — Gemini errors → 503
 // ---------------------------------------------------------------------------
 
 describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () => {
   let app: express.Application;
-  let fetchSpy: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     process.env.GEMINI_API_KEY = "test-key-integration";
     app = buildApp();
-    fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
+    genaiMocks.generateContent.mockReset();
+    genaiMocks.generateContentStream.mockReset();
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
     delete process.env.GEMINI_API_KEY;
   });
 
   it("returns 503 with message body when Gemini responds with HTTP 500", async () => {
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: async () => "Internal Server Error",
-    });
+    genaiMocks.generateContent.mockRejectedValue(new Error("Gemini 500"));
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -324,11 +314,7 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
   });
 
   it("returns 503 with message body when Gemini responds with HTTP 429 (rate limit)", async () => {
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 429,
-      text: async () => "Too Many Requests",
-    });
+    genaiMocks.generateContent.mockRejectedValue(new Error("Gemini 429"));
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -339,11 +325,7 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
   });
 
   it("returns 503 with message body when Gemini responds with HTTP 503", async () => {
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 503,
-      text: async () => "Service Unavailable",
-    });
+    genaiMocks.generateContent.mockRejectedValue(new Error("Gemini 503"));
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -353,10 +335,10 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
     expect(res.body).toHaveProperty("message");
   });
 
-  it("returns 504 with message body when fetch times out (AbortError)", async () => {
+  it("returns 504 with message body when SDK throws AbortError", async () => {
     const abortErr = new Error("The operation was aborted");
     abortErr.name = "AbortError";
-    fetchSpy.mockRejectedValue(abortErr);
+    genaiMocks.generateContent.mockRejectedValue(abortErr);
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")
@@ -367,8 +349,8 @@ describe("POST /api/planned-routes/ai-parse — Gemini HTTP error handling", () 
     expect(res.body.message).toMatch(/troppo tempo/i);
   });
 
-  it("returns 503 with message body when fetch throws a generic network error", async () => {
-    fetchSpy.mockRejectedValue(new Error("ECONNREFUSED"));
+  it("returns 503 with message body when SDK throws a generic network error", async () => {
+    genaiMocks.generateContent.mockRejectedValue(new Error("ECONNREFUSED"));
 
     const res = await request(app)
       .post("/api/planned-routes/ai-parse")

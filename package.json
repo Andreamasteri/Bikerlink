@@ -23,6 +23,7 @@
     "@emnapi/runtime": "^1.8.1",
     "@expo-google-fonts/inter": "^0.4.0",
     "@expo/vector-icons": "^15.1.1",
+    "@google/genai": "^2.5.0",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/slider": "^5.2.0",
     "@replit/connectors-sdk": "^0.3.0",
