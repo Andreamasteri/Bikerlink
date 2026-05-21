@@ -329,7 +329,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   }
 });
 
-function fallbackAiParse(prompt: string) {
+export function fallbackAiParse(prompt: string) {
   const lower = prompt.toLowerCase();
   return {
     title: "Giro in moto",
