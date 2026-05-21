@@ -5,19 +5,13 @@ import { gpsRejectionStats, addRoutePointsSchema } from "@shared/schema";
 import { sql as drizzleSql } from "drizzle-orm";
 import { sendAdminGpsAlertPush } from "../../push-notifications";
 
-const router = Router();
+import { requireUserId } from "../../lib/auth-middleware";
 
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
+const router = Router();
 
 router.post("/:id/points", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;

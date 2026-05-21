@@ -50,15 +50,9 @@ function buildReportEmailHtml(
   `;
 }
 
-const router = Router();
+import { requireUserId } from "../lib/auth-middleware";
 
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
+const router = Router();
 
 // Task #1125: rate-limit state lives in server/lib/abuse-rate-limit.ts so
 // the legacy /api/users/:id/report endpoint shares the SAME counters as
@@ -74,7 +68,7 @@ const createReportSchema = z.object({
 
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     // Task #1126: derive the rate-limit IP via the centralized helper so all
@@ -129,7 +123,7 @@ router.post("/", async (req: Request, res: Response) => {
 
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const user = await storage.getUser(userId);

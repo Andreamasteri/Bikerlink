@@ -3,20 +3,13 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { notifications } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { requireUserId } from "../lib/auth-middleware";
 
 const router = Router();
 
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
-
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const notificationsList = await storage.getNotifications(userId);
@@ -29,7 +22,7 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.delete("/all", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const deleted = await db
@@ -46,7 +39,7 @@ router.delete("/all", async (req: Request, res: Response) => {
 
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;
@@ -67,7 +60,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
 
 router.put("/:id/read", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;

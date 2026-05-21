@@ -2,22 +2,14 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { rideTelemetry } from "@shared/schema";
+import { requireUserId } from "../lib/auth-middleware";
 
 const router = Router();
 
 const TARGET_KM = parseFloat(process.env.TELEMETRY_TARGET_KM ?? "1000");
 
-function requireAuth(req: Request, res: Response): string | null {
-  const userId = req.session?.userId;
-  if (!userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return userId;
-}
-
 router.post("/batch", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
+  const userId = requireUserId(req, res);
   if (!userId) return;
 
   try {
@@ -93,7 +85,7 @@ router.post("/batch", async (req: Request, res: Response) => {
 });
 
 router.get("/stats", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
+  const userId = requireUserId(req, res);
   if (!userId) return;
 
   try {
@@ -194,7 +186,7 @@ router.get("/stats", async (req: Request, res: Response) => {
 });
 
 router.get("/ideal-laps", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
+  const userId = requireUserId(req, res);
   if (!userId) return;
 
   try {
@@ -246,7 +238,7 @@ router.get("/ideal-laps", async (req: Request, res: Response) => {
 });
 
 router.delete("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
+  const userId = requireUserId(req, res);
   if (!userId) return;
 
   const { sessionId } = req.params;
@@ -267,7 +259,7 @@ router.delete("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
 });
 
 router.delete("/reset", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
+  const userId = requireUserId(req, res);
   if (!userId) return;
 
   try {

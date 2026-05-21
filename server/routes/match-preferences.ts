@@ -3,15 +3,9 @@ import { db } from "../db";
 import { matchPreferences } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { storage } from "../storage";
+import { requireAuth } from "../lib/auth-middleware";
 
 const router = Router();
-
-function requireAuth(req: Request, res: Response, next: () => void) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
-}
 
 export const DEFAULT_PREFS = {
   bikerBikerBrand: true,

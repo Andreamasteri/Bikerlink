@@ -11,6 +11,8 @@ import { reportRateLimiter, getTrustedClientIp } from "../../lib/abuse-rate-limi
 import { isProtectedUser } from "../../constants";
 import type { InsertReport } from "@shared/schema";
 
+import { requireAuth } from "../../lib/auth-middleware";
+
 const router = Router();
 
 const upload = multer({
@@ -32,13 +34,6 @@ const upload = multer({
     }
   },
 });
-
-function requireAuth(req: Request, res: Response, next: () => void) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
-}
 
 router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
   const multerError = await new Promise<MulterError | Error | null>((resolve) => {

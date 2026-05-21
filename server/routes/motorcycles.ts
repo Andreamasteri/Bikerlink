@@ -8,18 +8,13 @@ import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { sendMatchPushNotifications } from "../push-notifications";
 
+import { requireAuth } from "../lib/auth-middleware";
+
 const router = Router();
 
 const uploadsDir = path.join(process.cwd(), "uploads", "motorcycles");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-function requireAuth(req: Request, res: Response, next: () => void) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
 }
 
 router.get("/", requireAuth, async (req: Request, res: Response) => {

@@ -14,16 +14,11 @@ import {
 } from "drizzle-orm";
 import { systemAccountConditions } from "../lib/system-account-filter";
 
-export function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
+import { requireUserId } from "../lib/auth-middleware";
+export { requireUserId as requireAuth } from "../lib/auth-middleware";
 
 export async function requireAdminOrMod(req: Request, res: Response): Promise<string | null> {
-  const userId = requireAuth(req, res);
+  const userId = requireUserId(req, res);
   if (!userId) return null;
   const user = await storage.getUser(userId);
   if (!user || (user.role !== "admin" && user.role !== "moderator")) {

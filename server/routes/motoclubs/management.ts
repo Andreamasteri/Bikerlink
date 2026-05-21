@@ -5,14 +5,9 @@ import { motoClubs, motoClubMembers, proposeLocationSchema } from "@shared/schem
 import { eq, and, desc, sql } from "drizzle-orm";
 import { allLimited } from "../../lib/concurrency";
 
-const router = Router();
+import { requireAuth } from "../../lib/auth-middleware";
 
-function requireAuth(req: Request, res: Response, next: () => void) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
-}
+const router = Router();
 
 router.get("/map/pending-locations", requireAuth, async (req: Request, res: Response) => {
   try {

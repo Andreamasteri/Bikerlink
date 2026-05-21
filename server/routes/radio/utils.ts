@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+export { requireAuth } from "../../lib/auth-middleware";
 import dnsPromises from "dns/promises";
 import net from "net";
 import { Agent } from "undici";
@@ -28,12 +29,6 @@ export function previewPlaylistRateLimiter(req: Request, res: Response, next: Ne
   return next();
 }
 
-export function requireAuth(req: Request, res: Response, next: () => void) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
-}
 
 export const CURATED_GENRES = [
   { id: "rock", label: "Rock", icon: "🎸" },

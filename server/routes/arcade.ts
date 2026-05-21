@@ -3,6 +3,8 @@ import { db } from "../db";
 import { arcadeScores, arcadeScoreSchema } from "@shared/schema";
 import { eq, sql, max, and } from "drizzle-orm";
 
+import { requireUserId } from "../lib/auth-middleware";
+
 const router = Router();
 
 const VALID_GAMES = ["endless_biker", "traffic_racer", "wheelie", "tetris", "space_invaders"] as const;
@@ -16,16 +18,8 @@ const SCORE_CAPS: Record<GameId, number> = {
   space_invaders: 500_000,
 };
 
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
-
 router.post("/score", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
+  const userId = requireUserId(req, res);
   if (!userId) return;
 
   const parsed = arcadeScoreSchema.safeParse(req.body);
@@ -176,7 +170,7 @@ router.get("/hall-of-fame", async (_req: Request, res: Response) => {
 });
 
 router.get("/my-scores", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
+  const userId = requireUserId(req, res);
   if (!userId) return;
 
   try {

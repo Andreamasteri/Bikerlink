@@ -2,20 +2,13 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { routeStatsSchema, stopRouteSchema, updateRouteTitleSchema } from "@shared/schema";
 import { haversineKm } from "../../geo";
+import { requireUserId } from "../../lib/auth-middleware";
 
 const router = Router();
 
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
-
 router.put("/:id/stop", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;
@@ -218,7 +211,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
 
 router.patch("/:id/stats", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;
@@ -259,7 +252,7 @@ router.patch("/:id/stats", async (req: Request, res: Response) => {
 
 router.patch("/:id/title", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;

@@ -11,14 +11,9 @@ import {
 } from "@shared/schema";
 import { and, eq, or } from "drizzle-orm";
 
-const router = Router();
+import { requireAuth } from "../lib/auth-middleware";
 
-function requireAuth(req: Request, res: Response, next: () => void) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
-}
+const router = Router();
 
 async function isFriendsWith(userId: string, otherId: string): Promise<boolean> {
   const bzMatch = await db

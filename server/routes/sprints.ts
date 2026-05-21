@@ -2,20 +2,13 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../db";
 import { sprintResults, users, userMotorcycles, createSprintSchema } from "@shared/schema";
 import { eq, asc, and, gte, lte, sql } from "drizzle-orm";
+import { requireUserId } from "../lib/auth-middleware";
 
 const router = Router();
 
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
-
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const parsed = createSprintSchema.safeParse(req.body);
@@ -48,7 +41,7 @@ router.post("/", async (req: Request, res: Response) => {
 
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const sprints = await db
@@ -67,7 +60,7 @@ router.get("/", async (req: Request, res: Response) => {
 
 router.get("/leaderboard", async (req: Request, res: Response) => {
   try {
-    const currentUserId = requireAuth(req, res);
+    const currentUserId = requireUserId(req, res);
     if (!currentUserId) return;
 
     const limitRaw = parseInt(String(req.query.limit ?? "100"), 10);
@@ -225,7 +218,7 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
 
 router.get("/leaderboard/rank/:userId", async (req: Request, res: Response) => {
   try {
-    const requesterId = requireAuth(req, res);
+    const requesterId = requireUserId(req, res);
     if (!requesterId) return;
 
     const { userId } = req.params;

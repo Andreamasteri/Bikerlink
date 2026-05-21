@@ -1,21 +1,14 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { createRouteSchema } from "@shared/schema";
+import { requireUserId } from "../../lib/auth-middleware";
 
 const router = Router();
-
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
 
 // Create new session
 router.post("/", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
@@ -66,7 +59,7 @@ router.post("/", async (req: Request, res: Response) => {
 // List user sessions
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const userRoutes = await storage.getRoutes(userId);

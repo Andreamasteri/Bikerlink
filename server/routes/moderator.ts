@@ -5,19 +5,12 @@ import * as fs from "fs";
 import { storage } from "../storage";
 import { uploadBuffer, deleteObject } from "../objectStorage";
 import { cacheAdImage } from "./ads";
+import { requireUserId } from "../lib/auth-middleware";
 
 const router = Router();
 
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
-
 async function requireModerator(req: Request, res: Response): Promise<string | null> {
-  const userId = requireAuth(req, res);
+  const userId = requireUserId(req, res);
   if (!userId) return null;
 
   const user = await storage.getUser(userId);

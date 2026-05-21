@@ -1,15 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
+import { requireUserId } from "../../lib/auth-middleware";
 
 const router = Router();
-
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
 
 type RawPoint = { latitude: number; longitude: number; [key: string]: any };
 
@@ -64,7 +57,7 @@ function decimateRoutePoints(points: RawPoint[], maxPoints: number): RawPoint[] 
 
 router.get("/:id", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;
@@ -89,7 +82,7 @@ router.get("/:id", async (req: Request, res: Response) => {
 
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;
@@ -112,7 +105,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
 
 router.post("/:id/like", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;
@@ -135,7 +128,7 @@ router.post("/:id/like", async (req: Request, res: Response) => {
 
 router.get("/:id/export.gpx", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const id = req.params.id as string;

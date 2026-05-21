@@ -1,13 +1,4 @@
-import { Request, Response } from "express";
-
-export function requireAuth(req: Request, res: Response): string | null {
-  const userId = (req.session as any)?.userId as string | undefined;
-  if (!userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return userId;
-}
+export { requireUserId as requireAuth } from "../../lib/auth-middleware";
 
 export function decodePolyline(encoded: string): [number, number][] {
   const points: [number, number][] = [];

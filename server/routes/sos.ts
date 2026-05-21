@@ -2,15 +2,9 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { allLimited } from "../lib/concurrency";
 import { createSosSchema } from "@shared/schema";
+import { requireAuth } from "../lib/auth-middleware";
 
 const router = Router();
-
-function requireAuth(req: Request, res: Response, next: Function) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
-}
 
 router.use(requireAuth);
 

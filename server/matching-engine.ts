@@ -1666,3 +1666,11 @@ export function startMatchingEngine(): void {
   }, 60 * 60 * 1000));
   console.log("[Matching] Cleanup orario proposte scadute avviato");
 }
+
+export function stopMatchingEngine(): void {
+  for (const timer of _engineTimers) {
+    clearInterval(timer);
+  }
+  _engineTimers.length = 0;
+  console.log("[Matching] Engine fermato");
+}

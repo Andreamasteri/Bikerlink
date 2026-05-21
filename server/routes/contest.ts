@@ -8,6 +8,8 @@ import { db } from "../db";
 import { photoContestEntries } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
+import { requireUserId } from "../lib/auth-middleware";
+
 const router = Router();
 
 const upload = multer({
@@ -24,14 +26,6 @@ const upload = multer({
   },
 });
 
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
-
 function getWeekNumber(date: Date): number {
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
   const dayNum = d.getUTCDay() || 7;
@@ -42,7 +36,7 @@ function getWeekNumber(date: Date): number {
 
 router.post("/entries", upload.single("photo"), async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const caption = req.body.caption || null;
@@ -90,7 +84,7 @@ router.post("/entries", upload.single("photo"), async (req: Request, res: Respon
 
 router.get("/entries", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const now = new Date();
@@ -129,7 +123,7 @@ router.get("/entries", async (req: Request, res: Response) => {
 
 router.post("/entries/:id/vote", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const { id } = req.params;
@@ -183,7 +177,7 @@ router.post("/entries/:id/vote", async (req: Request, res: Response) => {
 
 router.delete("/entries/:id", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const { id } = req.params;
@@ -215,7 +209,7 @@ router.delete("/entries/:id", async (req: Request, res: Response) => {
 router.get("/photos/:filename", async (req: Request, res: Response) => {
   try {
     // Require authentication — URLs must not be accessible to logged-out third parties
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const filename = req.params.filename;
@@ -260,7 +254,7 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
 
 router.get("/winners", async (req: Request, res: Response) => {
   try {
-    const userId = requireAuth(req, res);
+    const userId = requireUserId(req, res);
     if (!userId) return;
 
     const winners = await storage.getPhotoWinners();

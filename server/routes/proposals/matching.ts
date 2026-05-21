@@ -9,14 +9,9 @@ import { runMatchingForUser, runProposalMatchingForUser } from "../../matching-e
 import { allLimited, matchEnrichmentSemaphore, SemaphoreQueueFullError } from "../../lib/concurrency";
 import { sendZoneMatchedPushNotifications } from "../../push-notifications";
 
-const router = Router();
+import { requireAuth } from "../../lib/auth-middleware";
 
-function requireAuth(req: Request, res: Response, next: () => void) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
-}
+const router = Router();
 
 async function getCoordinatesMaxAgeSec(): Promise<number> {
   const setting = await storage.getAppSetting("coordinates_max_age_seconds");

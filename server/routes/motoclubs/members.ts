@@ -6,14 +6,9 @@ import { eq, and, sql } from "drizzle-orm";
 import { systemAccountConditions } from "../../lib/system-account-filter";
 import { createClubConversation, addMemberToConversation, removeMemberFromConversation, notifyTopMembersOfNewJoin } from "./utils";
 
-const router = Router();
+import { requireAuth } from "../../lib/auth-middleware";
 
-function requireAuth(req: Request, res: Response, next: () => void) {
-  if (!req.session.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
-  }
-  next();
-}
+const router = Router();
 
 router.get("/me/clubs", requireAuth, async (req: Request, res: Response) => {
   try {
