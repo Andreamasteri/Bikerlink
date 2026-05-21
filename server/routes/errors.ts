@@ -2,6 +2,7 @@ import express, { Router, type Request, type Response, type NextFunction } from 
 import { sendEmail } from "../email";
 import { storage } from "../storage";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
+import { gpsErrorSchema } from "@shared/schema";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 const router = Router();
@@ -97,7 +98,11 @@ function buildErrorEmailHtml(payload: {
 // over-limit requests are rejected before any body parsing occurs.
 router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Response) => {
   try {
-    const body = req.body ?? {};
+    const bodyParsed = gpsErrorSchema.safeParse(req.body ?? {});
+    if (!bodyParsed.success) {
+      return res.status(400).json({ message: bodyParsed.error.errors[0]?.message ?? "Payload non valido" });
+    }
+    const body = bodyParsed.data;
     const errorMessage = truncate(body.errorMessage, MAX_STRING_LEN);
     const stackTrace = body.stackTrace ? truncate(body.stackTrace, MAX_STACK_LEN) : null;
     const otaNumber = Number.isFinite(Number(body.otaNumber)) ? Number(body.otaNumber) : "?";
@@ -106,10 +111,6 @@ router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Respon
     const deviceName = body.deviceName ? truncate(body.deviceName, 100) : null;
     const osVersion = body.osVersion ? truncate(body.osVersion, 40) : null;
     const context = body.context ? truncate(body.context, 100) : "watchPositionAsync";
-
-    if (!errorMessage) {
-      return res.status(400).json({ message: "errorMessage è obbligatorio" });
-    }
 
     const userId = req.session?.userId ?? "unauthenticated";
 

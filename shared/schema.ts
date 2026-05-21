@@ -1012,6 +1012,99 @@ export const loginSchema = z.object({
   platform: z.string().optional(),
 });
 
+export const updateUserSchema = z.object({
+  nickname: z.string().min(3, "Il nickname deve avere almeno 3 caratteri").max(50).optional(),
+  phone: z.string().max(30).nullable().optional(),
+  sex: z.enum(["M", "F"]).nullable().optional(),
+  coupleSexConfig: z.enum(["M+M", "M+F", "F+F"]).nullable().optional(),
+  birthYear: z.number().int().min(1930).max(2010).nullable().optional(),
+  region: z.string().max(100).nullable().optional(),
+  country: z.string().max(2).nullable().optional(),
+  avatarUrl: z.string().nullable().optional(),
+  floatingWidgetEnabled: z.boolean().optional(),
+  bio: z.string().max(1000).nullable().optional(),
+  maxPickupDistance: z.number().int().min(1).max(500).optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  unitsPreference: z.object({
+    timeFormat: z.enum(["12h", "24h"]),
+    speedUnit: z.enum(["kmh", "mph", "knots"]),
+    distanceUnit: z.enum(["km_m", "mi_ft", "mi_yd", "nmi_ftm"]),
+  }).nullable().optional(),
+  mapFilters: z.object({
+    biker: z.boolean().optional(),
+    zavorrina: z.boolean().optional(),
+    clubs: z.boolean().optional(),
+    events: z.boolean().optional(),
+  }).nullable().optional(),
+});
+
+export const updateDynamicProfileSchema = z.object({
+  isAvailable: z.boolean().optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  searchPreference: z.string().max(20).optional(),
+  preferredMapStyle: z.enum(["carto_light", "carto_dark", "esri_gray"]).nullable().optional(),
+  emailChatNotifications: z.boolean().optional(),
+  pushNotificationsEnabled: z.boolean().optional(),
+  notificationPreferences: z.object({
+    matches: z.boolean().optional(),
+    zoneProposals: z.boolean().optional(),
+    chat: z.boolean().optional(),
+    motoclub: z.boolean().optional(),
+    eventi: z.boolean().optional(),
+  }).optional(),
+});
+
+export const pushTokenSchema = z.object({
+  token: z.string().max(256).nullable().optional(),
+});
+
+export const otaStuckEventSchema = z.object({
+  deviceId: z.string().max(64).optional(),
+  rollbackCount: z.number().int().min(0).max(1000).optional(),
+  stuckSessions: z.number().int().min(0).optional(),
+  runtimeVersion: z
+    .string()
+    .max(32)
+    .regex(/^\d+\.\d+\.\d+$/, "runtimeVersion deve essere semver (es. 8.0.0)")
+    .optional(),
+});
+
+export const clientErrorReportSchema = z.object({
+  message: z.string().max(2000).optional(),
+  stack: z.string().max(5000).optional(),
+  componentStack: z.string().max(2000).optional(),
+  platform: z.string().max(50).optional(),
+  appVersion: z.string().max(50).optional(),
+});
+
+export const gpsErrorSchema = z.object({
+  errorMessage: z.string().min(1, "errorMessage è obbligatorio").max(2000),
+  stackTrace: z.string().max(5000).nullable().optional(),
+  otaNumber: z.number().optional(),
+  timestamp: z.string().max(40).optional(),
+  platform: z.string().max(20).optional(),
+  deviceName: z.string().max(100).nullable().optional(),
+  osVersion: z.string().max(40).nullable().optional(),
+  context: z.string().max(100).optional(),
+  routeId: z.string().max(36).nullable().optional(),
+  speedKmh: z.number().nullable().optional(),
+});
+
+export const motorcycleSchema = z.object({
+  brand: z.string().min(1, "Marca obbligatoria").max(100),
+  model: z.string().min(1, "Modello obbligatorio").max(100),
+  year: z.number().int().min(1900).max(2030).nullable().optional(),
+  displacement: z.number().int().min(1).max(10000).nullable().optional(),
+  motorcycleType: z.string().max(50).optional(),
+  ridingStyle: z.string().max(50).optional(),
+  isDefault: z.boolean().optional(),
+  isForSale: z.boolean().optional(),
+  saleDescription: z.string().max(1000).nullable().optional(),
+  motoDescription: z.string().max(1000).nullable().optional(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type UserPhoto = typeof userPhotos.$inferSelect;
@@ -1115,6 +1208,9 @@ export type InsertUserBlock = typeof userBlocks.$inferInsert;
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+export type UpdateDynamicProfileInput = z.infer<typeof updateDynamicProfileSchema>;
+export type MotorcycleInput = z.infer<typeof motorcycleSchema>;
 
 export const serverRestarts = pgTable("server_restarts", {
   id: varchar("id", { length: 36 })

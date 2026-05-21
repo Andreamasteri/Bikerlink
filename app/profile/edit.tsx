@@ -27,6 +27,7 @@ import { EUROPEAN_COUNTRIES, getRegionsForCountry, findCountryByRegion } from "@
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import { useUnits } from "@/lib/units-context";
 import { useT } from "@/lib/language-context";
+import { updateUserSchema } from "@shared/schema";
 
 interface ProfileData {
   id: string;
@@ -289,7 +290,13 @@ export default function EditProfileScreen() {
       router.back();
       return;
     }
-    updateProfileMutation.mutate(data);
+
+    const parsed = updateUserSchema.safeParse(data);
+    if (!parsed.success) {
+      Alert.alert(t("common.error"), parsed.error.errors[0]?.message ?? "Dati non validi");
+      return;
+    }
+    updateProfileMutation.mutate(parsed.data as Record<string, unknown>);
   };
 
   const handleAddMoto = () => {

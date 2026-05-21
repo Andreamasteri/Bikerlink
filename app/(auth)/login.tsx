@@ -19,6 +19,7 @@ import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
 import * as Location from "expo-location";
+import { loginSchema } from "@shared/schema";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -32,8 +33,9 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     setError("");
-    if (!identifier.trim() || !password.trim()) {
-      setError(t("auth.enterCredentials"));
+    const preCheck = loginSchema.safeParse({ identifier: identifier.trim(), password });
+    if (!preCheck.success) {
+      setError(preCheck.error.errors[0]?.message ?? t("auth.enterCredentials"));
       return;
     }
     setIsSubmitting(true);

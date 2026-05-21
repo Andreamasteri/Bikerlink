@@ -24,6 +24,7 @@ import { useT } from "@/lib/language-context";
 import MotoPicker from "@/components/MotoPicker";
 import { MOTORCYCLE_BRANDS, getModelsForBrand, BRAND_NOTES } from "@/lib/motorcycle-data";
 import { useRouter } from "expo-router";
+import { motorcycleSchema } from "@shared/schema";
 
 const MOTO_TYPES = [
   { value: "sportiva" },
@@ -471,8 +472,12 @@ function GarageContent() {
   };
 
   const handleSave = () => {
-    if (!form.brand || !form.model || !form.motorcycleType || !form.ridingStyle) {
-      Alert.alert(t("common.error"), t("garage.fillRequired"));
+    const parsed = motorcycleSchema.safeParse({
+      ...form,
+      displacement: form.displacement ? parseInt(form.displacement, 10) : undefined,
+    });
+    if (!parsed.success) {
+      Alert.alert(t("common.error"), parsed.error.errors[0]?.message ?? t("garage.fillRequired"));
       return;
     }
     saveMutation.mutate(form);

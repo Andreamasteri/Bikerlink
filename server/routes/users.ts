@@ -8,7 +8,7 @@ import { isProtectedUser } from "../constants";
 import { isSystemAccount, systemAccountConditions } from "../lib/system-account-filter";
 import { createRegionalClubInvite } from "./motoclubs";
 import type { InsertReport } from "@shared/schema";
-import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos, gpsRejectionStats, users as usersTable } from "@shared/schema";
+import { userLastfmSessions, userMusicTracks, motoClubMembers, motoClubs, userPhotos, gpsRejectionStats, users as usersTable, updateUserSchema, updateDynamicProfileSchema, pushTokenSchema } from "@shared/schema";
 import { db } from "../db";
 import { eq, and, desc, sql as drizzleSql } from "drizzle-orm";
 import { sendAdminGpsAlertPush } from "../push-notifications";
@@ -263,7 +263,12 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
 
-    const b = req.body;
+    const parsed = updateUserSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Dati non validi" });
+    }
+
+    const b = parsed.data;
     const userUpdate: Record<string, unknown> = {};
     if (b.nickname !== undefined) userUpdate.nickname = b.nickname;
     if (b.phone !== undefined) userUpdate.phone = b.phone;
@@ -288,7 +293,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
       }
       await storage.updateUser(userId, userUpdate as any);
 
-      if (req.body.region !== undefined && typeof userUpdate.region === "string" && userUpdate.region.trim()) {
+      if (b.region !== undefined && typeof userUpdate.region === "string" && userUpdate.region.trim()) {
         createRegionalClubInvite(userId, userUpdate.region).catch((e) => console.error("[auto-join region error]", e));
       }
     }
@@ -389,7 +394,13 @@ router.get("/profile", requireAuth, async (req: Request, res: Response) => {
 router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications, notificationPreferences, pushNotificationsEnabled } = req.body;
+
+    const parsed = updateDynamicProfileSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Dati non validi" });
+    }
+
+    const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications, notificationPreferences, pushNotificationsEnabled } = parsed.data;
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
@@ -486,7 +497,13 @@ router.put("/me/match-seen", requireAuth, async (req: Request, res: Response) =>
 router.put("/me/push-token", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const { token } = (req.body ?? {}) as { token?: string | null };
+
+    const parsed = pushTokenSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Token non valido" });
+    }
+
+    const { token } = parsed.data;
     if (token === null || token === undefined || token === "") {
       await storage.updateUser(userId, { expoPushToken: null });
       return res.json({ ok: true, cleared: true });

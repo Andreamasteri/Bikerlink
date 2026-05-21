@@ -923,17 +923,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Persists the event in ota_stuck_events for admin visibility.
   app.post("/api/ota/stuck-event", async (req: Request, res: Response) => {
     try {
-      const { deviceId, rollbackCount, stuckSessions, runtimeVersion } = req.body ?? {};
-      // Validate runtimeVersion format — must be semver (X.Y.Z). Reject and return 400
-      // for payloads that are not valid semver to prevent injection / dirty data in ota_stuck_events.
-      if (runtimeVersion !== undefined && runtimeVersion !== null && !(/^\d+\.\d+\.\d+$/).test(String(runtimeVersion))) {
-        return res.status(400).json({ message: "runtime_version non valida (formato atteso: X.Y.Z)" });
+      const { otaStuckEventSchema } = await import("@shared/schema");
+      const bodyParsed = otaStuckEventSchema.safeParse(req.body ?? {});
+      if (!bodyParsed.success) {
+        return res.status(400).json({ message: bodyParsed.error.errors[0]?.message ?? "Payload non valido" });
       }
+      const { deviceId, rollbackCount, stuckSessions, runtimeVersion } = bodyParsed.data;
       const stripNull = (s: string) => s.replace(/\x00/g, "");
       const safeDeviceId = deviceId ? stripNull(String(deviceId)).substring(0, 64) : "unknown";
-      const safeRv = runtimeVersion ? stripNull(String(runtimeVersion)).substring(0, 32) : null;
-      const safeRollback = Number.isFinite(Number(rollbackCount)) ? Number(rollbackCount) : 0;
-      const safeStuck = Number.isFinite(Number(stuckSessions)) ? Number(stuckSessions) : 0;
+      const safeRv = runtimeVersion ? stripNull(runtimeVersion).substring(0, 32) : null;
+      const safeRollback = rollbackCount ?? 0;
+      const safeStuck = stuckSessions ?? 0;
 
       await db.execute(sql`
         INSERT INTO ota_stuck_events (device_id, rollback_count, stuck_sessions, runtime_version, created_at)
@@ -2065,7 +2065,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/admin/client-error", async (req, res) => {
     try {
-      const { message, stack, componentStack, platform, appVersion } = req.body || {};
+      const { clientErrorReportSchema } = await import("@shared/schema");
+      const bodyParsed = clientErrorReportSchema.safeParse(req.body ?? {});
+      if (!bodyParsed.success) {
+        return res.status(400).json({ message: bodyParsed.error.errors[0]?.message ?? "Payload non valido" });
+      }
+      const { message, stack, componentStack, platform, appVersion } = bodyParsed.data;
       console.error("[CLIENT-ERROR]", JSON.stringify({
         message: message || "unknown",
         stack: (stack || "").substring(0, 2000),
@@ -2074,7 +2079,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         appVersion: appVersion || "unknown",
         timestamp: new Date().toISOString(),
       }));
-      res.json({ received: true });
+      return res.json({ received: true });
     } catch {
       res.status(200).json({ received: true });
     }
