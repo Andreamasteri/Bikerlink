@@ -55,6 +55,29 @@ config.resolver.blockList = [
 
 config.resolver.platforms = ["ios", "android", "web"];
 
+// =============================================================================
+// OTA-4 POST-MORTEM — "TypeError: undefined is not a function" in handleLogin
+// =============================================================================
+//
+// Root cause (May 2026):
+//   1. shared/schema.ts imports drizzle-orm/pg-core at the top level.
+//   2. Metro replaces those packages with mocks/empty.js for iOS/Android.
+//   3. The old mock was `module.exports = {}` — so pgTable, sql, etc. were
+//      all `undefined`.
+//   4. shared/schema.ts calls pgTable("users", {...}) at module init time.
+//      With pgTable === undefined, this throws immediately.
+//   5. A module that throws during evaluation exports NOTHING — all named
+//      exports, including loginSchema (a pure Zod schema), become undefined.
+//   6. login.tsx called loginSchema.safeParse() → crash.
+//
+// Fix: mocks/empty.js is now a universal no-op Proxy that survives any call
+//   or property access without throwing. This lets shared/schema.ts fully
+//   evaluate and export its Zod schemas even though drizzle-orm is mocked.
+//
+// INVARIANT: mocks/empty.js MUST remain a Proxy. Never revert it to `{}`.
+//   The automated check scripts/check-client-undefined.sh enforces this.
+//   It runs as the last step of scripts/typecheck.sh.
+// =============================================================================
 const SERVER_ONLY_PACKAGES = [
   "pdfkit",
   "sharp",

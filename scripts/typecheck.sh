@@ -87,4 +87,11 @@ fi
 
 echo ""
 echo "All import checks passed."
-exit 0
+
+# ---------------------------------------------------------------------------
+# Run client-undefined safety check (guards against OTA-4 pattern)
+# ---------------------------------------------------------------------------
+echo ""
+echo "Running client-undefined safety check..."
+bash "$(dirname "$0")/check-client-undefined.sh"
+exit $?
