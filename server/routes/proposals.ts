@@ -366,6 +366,8 @@ router.get("/proposal-profile-matches", requireAuth, async (req: Request, res: R
         if (isSystemAccount(biker ?? {})) return null;
         if (isSystemAccount(zavorrina ?? {})) return null;
 
+        if (!proposal || proposal.status !== "active") return null;
+
         return {
           ...match,
           matchType: "proposal_profile" as const,

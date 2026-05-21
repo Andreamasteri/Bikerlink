@@ -5,6 +5,7 @@ import {
   motoClubs,
   motoClubMembers,
   proposalZoneNotifications,
+  proposalProfileMatches,
   proposals,
   userProfiles,
   users,
@@ -1832,6 +1833,32 @@ async function runCleanup(): Promise<number> {
   }
 }
 
+async function pruneStaleProposalProfileMatches(): Promise<number> {
+  try {
+    const activeProposalIds = await db
+      .select({ id: proposals.id })
+      .from(proposals)
+      .where(eq(proposals.status, "active"));
+    const activeIds = activeProposalIds.map((r) => r.id);
+    if (activeIds.length === 0) {
+      const result = await db
+        .delete(proposalProfileMatches)
+        .returning({ id: proposalProfileMatches.id });
+      return result.length;
+    }
+    const result = await db
+      .delete(proposalProfileMatches)
+      .where(
+        sql`${proposalProfileMatches.proposalId} NOT IN (${sql.join(activeIds.map((id) => sql`${id}`), sql`, `)})`
+      )
+      .returning({ id: proposalProfileMatches.id });
+    return result.length;
+  } catch (error) {
+    console.error("[Cleanup] Errore pulizia proposal_profile_matches stale:", error);
+    return 0;
+  }
+}
+
 async function pruneOldZoneNotifications(): Promise<number> {
   try {
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
@@ -2027,6 +2054,8 @@ export function startMatchingEngine(): void {
       if (deleted > 0) console.log(`[Cleanup] Eliminate ${deleted} proposte scadute`);
       const prunedZoneNotifs = await pruneOldZoneNotifications();
       if (prunedZoneNotifs > 0) console.log(`[Cleanup] Eliminate ${prunedZoneNotifs} zone notifications più vecchie di 30 giorni`);
+      const prunedStaleMatches = await pruneStaleProposalProfileMatches();
+      if (prunedStaleMatches > 0) console.log(`[Cleanup] Eliminate ${prunedStaleMatches} proposal-profile matches di proposte non attive`);
     } catch (err) {
       console.error("[Cleanup] Errore pulizia oraria:", err);
     }
