@@ -280,6 +280,9 @@ export default function GiriCreateScreen() {
   const suggestionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCalcTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const webviewRef = useRef<WebView | null>(null);
+  // Tracks the waypoint-set signature for which we last called fitBounds.
+  // fitMap=true only fires on the first successful route for a new waypoint set.
+  const lastFittedWaypointSig = useRef<string>("");
 
   // BikerScore animation
   const bikerScoreAnim = useRef(new Animated.Value(0)).current;
@@ -589,11 +592,23 @@ export default function GiriCreateScreen() {
       pts = routeResult.rawPoints.map(({ lat, lng }) => ({ lat, lng }));
     }
     if (pts.length < 2) return;
+
+    // Build a stable signature from the current resolved waypoints.
+    // fitMap=true only on the first successful route for a given waypoint set;
+    // style-only recalculations reuse the same waypoints → no re-pan.
+    const resolvedWps = waypoints.filter((w) => w.lat !== 0 || w.lng !== 0);
+    const wpSig = resolvedWps.map((w) => `${w.lat.toFixed(5)},${w.lng.toFixed(5)}`).join("|");
+    const shouldFit = wpSig !== lastFittedWaypointSig.current;
+    if (shouldFit) {
+      lastFittedWaypointSig.current = wpSig;
+    }
+
     const ptsJson = JSON.stringify(pts);
-    // fitMap=false: avoid jarring re-pan on every live update
-    const js = `(function(){ if(typeof window.updateRouteWithCurvature==='function'){ window.updateRouteWithCurvature(${ptsJson}, false); } })(); true;`;
+    const js = `(function(){ if(typeof window.updateRouteWithCurvature==='function'){ window.updateRouteWithCurvature(${ptsJson}, ${shouldFit}); } })(); true;`;
     webviewRef.current.injectJavaScript(js);
-  }, [routeResult?.encoded, routeResult?.rawPoints]);
+  // waypoints is intentionally included so the signature reflects the current set
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeResult?.encoded, routeResult?.rawPoints, waypoints]);
 
   // ── Debounced auto-recalculate when resolved waypoints change ─────────────
   useEffect(() => {
