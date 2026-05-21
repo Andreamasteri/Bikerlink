@@ -147,16 +147,37 @@ function useRegisterMutation() {
 function useLogoutMutation() {
   return useMutation({
     mutationFn: async () => {
-      apiRequest("POST", "/api/auth/logout").catch(() => {});
+      // Await server-side session destruction first
+      await apiRequest("POST", "/api/auth/logout").catch(() => {});
+      // Clear Bearer token and had-session marker from AsyncStorage BEFORE
+      // resolving — this way, if the app is killed immediately after the user
+      // taps "Esci", the tokens are already gone and the session won't be
+      // restored on the next launch.
+      await Promise.allSettled([
+        clearSessionToken(),
+        AsyncStorage.removeItem(HAD_SESSION_KEY),
+      ]);
+      // On Android, flush the connect.sid cookie from the native cookie jar
+      // so a stale server-side cookie can't re-authenticate the user.
+      if (Platform.OS === "android") {
+        fetch(new URL("/api/auth/clear-session-cookie", getApiUrl()).toString(), {
+          method: "POST",
+          credentials: "include",
+        }).catch(() => {});
+      }
     },
     onSuccess: () => {
+      // Tokens already wiped in mutationFn; just reset the in-memory cache.
       queryClient.setQueryData(["/api/auth/me"], null);
-      AsyncStorage.removeItem(HAD_SESSION_KEY).catch(() => {});
-      clearSessionToken().catch(() => {});
     },
     onError: () => {
-      // Even on error, clear local token so the app stops sending stale Bearer
-      clearSessionToken().catch(() => {});
+      // Server call failed but we must still clear local credentials so the
+      // app never sends a stale Bearer on subsequent requests.
+      Promise.allSettled([
+        clearSessionToken(),
+        AsyncStorage.removeItem(HAD_SESSION_KEY),
+      ]).catch(() => {});
+      queryClient.setQueryData(["/api/auth/me"], null);
     },
   });
 }
