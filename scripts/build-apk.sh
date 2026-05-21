@@ -274,9 +274,14 @@ if [ $BUILD_EXIT -eq 0 ]; then
   echo "  ⚠  Ricorda: dopo che EAS completa la build, aggiorna lo snapshot con:"
   echo "     bash scripts/save-build-snapshot.sh <BUILD_ID> <APK_URL>"
 
-  # ── Step M: Aggiornamento skill bikerlink-versioning ────────────────────────
+  # ── Step M: Aggiornamento PROVVISORIO skill bikerlink-versioning ────────────
+  # ⚠  Questo aggiornamento è provvisorio: la build è stata *inviata* a EAS con
+  #    --no-wait, ma non ancora confermata come riuscita. Se EAS la rifiuta subito
+  #    (credenziali invalide, quota superata, ecc.) la skill resta aggiornata con
+  #    dati sbagliati. Il dato confermato viene scritto da save-build-snapshot.sh
+  #    quando viene chiamato con il BUILD_ID reale (dopo che EAS completa la build).
   echo ""
-  echo "  Aggiornamento skill bikerlink-versioning..."
+  echo "  Aggiornamento PROVVISORIO skill bikerlink-versioning (confermato da save-build-snapshot.sh)..."
   VERSIONING_SKILL=".agents/skills/bikerlink-versioning/SKILL.md"
   if [ -f "$VERSIONING_SKILL" ]; then
     BUILD_VERSION_CODE="$VERSION_CODE" \

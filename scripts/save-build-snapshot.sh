@@ -66,6 +66,7 @@ DOCTOR_TOTAL=$(echo "$DOCTOR_RESULT" | grep -oP '(?<=\d/)\d+' | head -1 || echo 
 SDK_VERSION=$(node -e "try{process.stdout.write(require('./node_modules/expo/package.json').version)}catch(e){process.stdout.write('?')}" 2>/dev/null || echo "?")
 RUNTIME_VERSION=$(node -e "process.stdout.write(require('./app.json').expo.runtimeVersion||'?')" 2>/dev/null || echo "?")
 VERSION_CODE=$(node -e "process.stdout.write(String(require('./app.json').expo.android?.versionCode||'?'))" 2>/dev/null || echo "?")
+VERSION_NAME=$(node -e "process.stdout.write(require('./app.json').expo.version||'?')" 2>/dev/null || echo "?")
 EAS_CLI_VERSION=$(npx eas-cli@18 --version 2>/dev/null | head -1 | grep -oP '[\d.]+' | head -1 || echo "?")
 NODE_VERSION=$(node --version 2>/dev/null || echo "?")
 COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
@@ -120,3 +121,87 @@ echo "  • Patches    : ${PATCHES_LIST:-nessuna}"
 echo ""
 echo -e "  La prossima build confronterà automaticamente con questo stato."
 echo ""
+
+# ── Step M-confirmed: Aggiornamento CONFERMATO skill bikerlink-versioning ────
+# Viene eseguito SOLO quando BUILD_ID è non vuoto, cioè quando questa funzione
+# viene chiamata con un BUILD_ID reale restituito da EAS dopo che la build è
+# effettivamente riuscita. Sovrascrive l'aggiornamento provvisorio fatto da
+# build-apk.sh al momento dell'invio (--no-wait).
+if [ -n "$BUILD_ID" ]; then
+  VERSIONING_SKILL=".agents/skills/bikerlink-versioning/SKILL.md"
+  echo ""
+  echo "  BUILD_ID fornito — aggiornamento CONFERMATO skill bikerlink-versioning..."
+  if [ -f "$VERSIONING_SKILL" ]; then
+    BUILD_VERSION_CODE="$VERSION_CODE" \
+    BUILD_VERSION_NAME="$VERSION_NAME" \
+    BUILD_RUNTIME_VERSION="$RUNTIME_VERSION" \
+    SKILL_PATH="$VERSIONING_SKILL" \
+    node -e "
+      const fs = require('fs');
+      const path = process.env.SKILL_PATH;
+      const versionCode = process.env.BUILD_VERSION_CODE;
+      const versionName = process.env.BUILD_VERSION_NAME;
+      const runtimeVersion = process.env.BUILD_RUNTIME_VERSION || 'unknown';
+
+      // Estrai il numero di ciclo (es. '10.0.0' → '10')
+      const cycleNum = runtimeVersion.split('.')[0] || '?';
+
+      let content = fs.readFileSync(path, 'utf8');
+
+      // 1. Aggiorna tabella 'Consistenza tra file'
+      content = content.replace(
+        /(\| \`app\.json\` \| \`expo\.version\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + versionName + '\$2'
+      );
+      content = content.replace(
+        /(\| \`app\.json\` \| \`expo\.android\.versionCode\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + versionCode + '\$2'
+      );
+      content = content.replace(
+        /(\| \`app\.json\` \| \`expo\.runtimeVersion\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + runtimeVersion + '\$2'
+      );
+      content = content.replace(
+        /(\| \`android\/app\/build\.gradle\` \| \`versionCode\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + versionCode + '\$2'
+      );
+      content = content.replace(
+        /(\| \`android\/app\/build\.gradle\` \| \`versionName\` \| \`\")[^\`]*(\"\` \|)/,
+        '\$1' + versionName + '\$2'
+      );
+      content = content.replace(
+        /(\| \`android\/app\/src\/main\/res\/values\/strings\.xml\` \| \`expo_runtime_version\` \| \`)[^\`]*(\` \|)/,
+        '\$1' + runtimeVersion + '\$2'
+      );
+
+      // 2. Aggiorna 'Tabella storica dei cicli':
+      //    - Rimuovi '**Corrente**' dall'ultima riga che ce l'ha
+      //    - Aggiungi una nuova riga come Corrente (solo se non esiste già per questo versionCode)
+      const existingRow = new RegExp('\\| v' + versionCode + ' \\|');
+      if (!existingRow.test(content)) {
+        content = content.replace(/(\*\*Corrente\*\*[^\n]*)/, (match) => {
+          return match.replace('**Corrente** — ', '');
+        });
+        const newRow = '| v' + versionCode + ' | ' + versionCode + ' | ' + versionName + ' | ' + runtimeVersion + ' | ' + cycleNum + '.x | — | **Corrente** |';
+        const lastRowIdx = content.lastIndexOf('\n| v');
+        if (lastRowIdx !== -1) {
+          const endOfLastRow = content.indexOf('\n', lastRowIdx + 1);
+          const insertPos = endOfLastRow !== -1 ? endOfLastRow : content.length;
+          content = content.slice(0, insertPos) + '\n' + newRow + content.slice(insertPos);
+        }
+      } else {
+        // La riga esiste già (aggiornamento provvisorio da build-apk.sh) — non duplicare
+        process.stderr.write('Riga v' + versionCode + ' già presente — skip inserimento\n');
+      }
+
+      fs.writeFileSync(path, content, 'utf8');
+      process.stdout.write('OK');
+    " 2>/dev/null \
+      && echo "  ✔  Skill bikerlink-versioning aggiornata con BUILD_ID confermato (v$VERSION_CODE / $VERSION_NAME)" \
+      || echo "  ⚠  Aggiornamento skill versioning fallito (non bloccante)"
+  else
+    echo "  ⚠  Skill file non trovato: $VERSIONING_SKILL (non bloccante)"
+  fi
+else
+  echo "  ℹ  BUILD_ID vuoto — skip aggiornamento skill versioning (aggiornamento provvisorio già fatto da build-apk.sh)"
+fi
