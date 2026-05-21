@@ -4,23 +4,25 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Linking,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import RouteDetailMap from "@/components/RouteDetailMap";
+
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
-import { getCurrentLocale } from "@/lib/i18n";
 import { t } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
-import ElevationProfile from "@/components/ElevationProfile";
+
+import RouteDetailHeader from "@/components/routes/detail/RouteDetailHeader";
+import RouteDetailMap from "@/components/routes/detail/RouteDetailMap";
+import RouteDetailStats from "@/components/routes/detail/RouteDetailStats";
+import RouteDetailActions from "@/components/routes/detail/RouteDetailActions";
+import RouteDetailWaypoints from "@/components/routes/detail/RouteDetailWaypoints";
 
 interface Waypoint {
   id: string;
@@ -175,274 +177,55 @@ export default function CustomRouteDetailScreen() {
   const waypoints = (route.waypoints || []).sort(
     (a, b) => a.orderIndex - b.orderIndex
   );
-  const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString(getCurrentLocale(), {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
   return (
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
     >
-      <View style={styles.mapContainer}>
-        <RouteDetailMap
-          waypoints={waypoints}
-          waypointTypeLabels={WAYPOINT_TYPE_LABELS}
-          waypointTypeColors={WAYPOINT_TYPE_COLORS}
-        />
-      </View>
+      <RouteDetailMap
+        waypoints={waypoints}
+        waypointTypeLabels={WAYPOINT_TYPE_LABELS}
+        waypointTypeColors={WAYPOINT_TYPE_COLORS}
+      />
 
-      {waypoints.length >= 2 && (
-        <TouchableOpacity
-          style={styles.googleMapsBtn}
-          onPress={() => {
-            const coords = waypoints.map((wp) => `${wp.latitude},${wp.longitude}`).join("/");
-            const url = `https://www.google.com/maps/dir/${coords}`;
-            Linking.openURL(url);
-          }}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="google-maps" size={20} color="#fff" />
-          <Text style={styles.googleMapsBtnText}>Apri in Google Maps</Text>
-        </TouchableOpacity>
-      )}
+      <RouteDetailHeader
+        title={route.title}
+        description={route.description}
+        creatorNickname={route.creatorNickname}
+        createdAt={route.createdAt}
+        totalDistanceKm={route.totalDistanceKm}
+        visibility={route.visibility}
+        isPublic={route.isPublic}
+      />
 
-      <View style={styles.header}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title}>{route.title}</Text>
-          {(() => {
-            const vis: Visibility = route.visibility ?? (route.isPublic ? "public" : "private");
-            if (vis === "public") return (
-              <View style={[styles.badge, { backgroundColor: Colors.success }]}>
-                <MaterialCommunityIcons name="earth" size={12} color="#fff" />
-                <Text style={styles.badgeText}>Pubblico</Text>
-              </View>
-            );
-            if (vis === "friends") return (
-              <View style={[styles.badge, { backgroundColor: "#7C83FD" }]}>
-                <MaterialCommunityIcons name="account-group" size={12} color="#fff" />
-                <Text style={styles.badgeText}>Amici</Text>
-              </View>
-            );
-            return (
-              <View style={[styles.badge, { backgroundColor: Colors.surfaceLight }]}>
-                <MaterialCommunityIcons name="lock" size={12} color={Colors.textSecondary} />
-                <Text style={[styles.badgeText, { color: Colors.textSecondary }]}>Privato</Text>
-              </View>
-            );
-          })()}
-        </View>
+      <RouteDetailActions
+        isMine={route.isMine}
+        visibility={route.visibility}
+        isPublic={route.isPublic}
+        isTogglingVisibility={isTogglingVisibility}
+        onCycleVisibility={handleCycleVisibility}
+        onEdit={() => router.push(`/routes/create?editId=${route.id}`)}
+        onDelete={handleDelete}
+        isDeleting={deleteMutation.isPending}
+      />
 
-        {route.description ? (
-          <Text style={styles.description}>{route.description}</Text>
-        ) : null}
+      <RouteDetailStats
+        elevation={elevation}
+        elevationLoading={elevationLoading}
+        elevationError={elevationError}
+        onLoadElevation={handleLoadElevation}
+      />
 
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <MaterialCommunityIcons name="account" size={16} color={Colors.textSecondary} />
-            <Text style={styles.metaText}>{route.creatorNickname}</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <MaterialCommunityIcons name="calendar" size={16} color={Colors.textSecondary} />
-            <Text style={styles.metaText}>{formatDate(route.createdAt)}</Text>
-          </View>
-          {(route.totalDistanceKm ?? 0) > 0 && (
-            <View style={styles.metaItem}>
-              <MaterialCommunityIcons name="road-variant" size={16} color={Colors.textSecondary} />
-              <Text style={styles.metaText}>
-                ~{(route.totalDistanceKm ?? 0).toFixed(1)} km
-              </Text>
-            </View>
-          )}
-        </View>
-      </View>
-
-      {route.isMine && (
-        <View style={styles.ownerActions}>
-          {(() => {
-            const vis: Visibility = route.visibility ?? (route.isPublic ? "public" : "private");
-            const btnStyle = vis === "public"
-              ? styles.visibilityPublicButton
-              : vis === "friends"
-              ? styles.visibilityFriendsButton
-              : styles.visibilityPrivateButton;
-            const iconName = (
-              vis === "public" ? "earth" : vis === "friends" ? "account-group" : "lock"
-            ) as React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-            const iconColor = vis === "public" ? Colors.success : vis === "friends" ? "#7C83FD" : Colors.textSecondary;
-            const textStyle = vis === "public"
-              ? styles.visibilityPublicText
-              : vis === "friends"
-              ? styles.visibilityFriendsText
-              : styles.visibilityPrivateText;
-            const label = vis === "public" ? "Pubblico" : vis === "friends" ? "Amici" : "Privato";
-            return (
-              <TouchableOpacity
-                style={[styles.visibilityButton, btnStyle]}
-                onPress={handleCycleVisibility}
-                disabled={isTogglingVisibility}
-                activeOpacity={0.7}
-              >
-                {isTogglingVisibility ? (
-                  <ActivityIndicator size="small" color={iconColor} />
-                ) : (
-                  <>
-                    <MaterialCommunityIcons name={iconName} size={18} color={iconColor} />
-                    <Text style={[styles.visibilityButtonText, textStyle]}>{label}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            );
-          })()}
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => router.push(`/routes/create?editId=${route.id}`)}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons name="pencil" size={20} color={Colors.accent} />
-            <Text style={styles.editButtonText}>Modifica</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={handleDelete}
-            disabled={deleteMutation.isPending}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons
-              name="trash-can-outline"
-              size={20}
-              color={Colors.accentRed}
-            />
-            <Text style={styles.deleteButtonText}>Elimina</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Elevation profile */}
-      <View style={styles.elevationSection}>
-        <View style={styles.elevationHeader}>
-          <MaterialCommunityIcons name="elevation-rise" size={18} color={Colors.accent} />
-          <Text style={styles.sectionTitle}>Profilo altimetrico</Text>
-        </View>
-
-        {!elevation && !elevationLoading && !elevationError && (
-          <TouchableOpacity
-            style={styles.elevationButton}
-            onPress={handleLoadElevation}
-            activeOpacity={0.7}
-          >
-            <MaterialCommunityIcons name="chart-bell-curve" size={18} color={Colors.accent} />
-            <Text style={styles.elevationButtonText}>Mostra profilo altimetrico</Text>
-          </TouchableOpacity>
-        )}
-
-        {elevationLoading && (
-          <View style={styles.elevationLoading}>
-            <ActivityIndicator color={Colors.accent} size="small" />
-            <Text style={styles.elevationLoadingText}>Caricamento dati altimetrici…</Text>
-          </View>
-        )}
-
-        {elevationError && !elevationLoading && (
-          <View style={styles.elevationError}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={18} color={Colors.textSecondary} />
-            <Text style={styles.elevationErrorText}>Dati non disponibili al momento</Text>
-            <TouchableOpacity onPress={handleLoadElevation} activeOpacity={0.7}>
-              <Text style={styles.elevationRetry}>Riprova</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {elevation && !elevationLoading && (() => {
-          const profile = (elevation.elevations as number[]).map((alt: number, i: number) => ({
-            distanceKm: elevation.distanceKm[i] ?? 0,
-            altitudeM: alt,
-          }));
-          return (
-            <ElevationProfile
-              profile={profile}
-              gainM={elevation.totalGain}
-              lossM={elevation.totalLoss}
-              minM={elevation.minEle}
-              maxM={elevation.maxEle}
-              height={140}
-            />
-          );
-        })()}
-      </View>
-
-      <View style={styles.waypointsSection}>
-        <Text style={styles.sectionTitle}>
-          Tappe ({waypoints.length})
-        </Text>
-        {waypoints.length === 0 ? (
-          <View style={styles.emptyWaypoints}>
-            <MaterialCommunityIcons
-              name="map-marker-plus"
-              size={40}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.emptyWaypointsText}>
-              Nessuna tappa aggiunta
-            </Text>
-          </View>
-        ) : (
-          waypoints.map((wp, index) => (
-            <WaypointCard
-              key={wp.id}
-              waypoint={wp}
-              index={index}
-              isLast={index === waypoints.length - 1}
-            />
-          ))
-        )}
-      </View>
+      <RouteDetailWaypoints
+        waypoints={waypoints}
+        waypointTypeLabels={WAYPOINT_TYPE_LABELS}
+        waypointTypeIcons={WAYPOINT_TYPE_ICONS}
+        waypointTypeColors={WAYPOINT_TYPE_COLORS}
+      />
     </ScrollView>
   );
 }
-
-function WaypointCard({
-  waypoint,
-  index,
-  isLast,
-}: {
-  waypoint: Waypoint;
-  index: number;
-  isLast: boolean;
-}) {
-  const color = WAYPOINT_TYPE_COLORS[waypoint.waypointType] || Colors.accent;
-  const iconName = (WAYPOINT_TYPE_ICONS[waypoint.waypointType] || "map-marker") as React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-  const typeLabel = WAYPOINT_TYPE_LABELS[waypoint.waypointType] || waypoint.waypointType;
-
-  return (
-    <View style={styles.waypointRow}>
-      <View style={styles.waypointTimeline}>
-        <View style={[styles.waypointDot, { backgroundColor: color }]}>
-          <MaterialCommunityIcons name={iconName} size={14} color="#fff" />
-        </View>
-        {!isLast && <View style={styles.waypointLine} />}
-      </View>
-      <View style={styles.waypointContent}>
-        <View style={styles.waypointHeader}>
-          <Text style={styles.waypointName}>{waypoint.name}</Text>
-          <Text style={[styles.waypointType, { color }]}>{typeLabel}</Text>
-        </View>
-        {waypoint.description ? (
-          <Text style={styles.waypointDescription}>{waypoint.description}</Text>
-        ) : null}
-        <Text style={styles.waypointCoords}>
-          {waypoint.latitude.toFixed(4)}, {waypoint.longitude.toFixed(4)}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 
 const styles = StyleSheet.create({
   container: {
@@ -459,287 +242,5 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 16,
     marginTop: 12,
-  },
-  googleMapsBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    backgroundColor: "#1a73e8",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    marginHorizontal: 20,
-    marginTop: 12,
-    borderRadius: 12,
-    gap: 8,
-  },
-  googleMapsBtnText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "600" as const,
-  },
-  mapContainer: {
-    height: 280,
-    overflow: "hidden",
-  },
-  map: {
-    flex: 1,
-  },
-  header: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flexWrap: "wrap",
-  },
-  title: {
-    color: Colors.text,
-    fontSize: 22,
-    fontWeight: "700" as const,
-    flex: 1,
-  },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "600" as const,
-  },
-  description: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 10,
-  },
-  metaRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 16,
-    marginTop: 14,
-  },
-  metaItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-  metaText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-  },
-  ownerActions: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-  },
-  editButtonText: {
-    color: Colors.accent,
-    fontSize: 14,
-    fontWeight: "600" as const,
-  },
-  deleteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.accentRed,
-  },
-  deleteButtonText: {
-    color: Colors.accentRed,
-    fontSize: 14,
-    fontWeight: "600" as const,
-  },
-  visibilityButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    minWidth: 100,
-    justifyContent: "center",
-  },
-  visibilityPublicButton: {
-    borderColor: Colors.success,
-    backgroundColor: "rgba(76, 175, 80, 0.08)",
-  },
-  visibilityFriendsButton: {
-    borderColor: "#7C83FD",
-    backgroundColor: "rgba(124, 131, 253, 0.08)",
-  },
-  visibilityPrivateButton: {
-    borderColor: Colors.border,
-  },
-  visibilityButtonText: {
-    fontSize: 14,
-    fontWeight: "600" as const,
-  },
-  visibilityPublicText: {
-    color: Colors.success,
-  },
-  visibilityFriendsText: {
-    color: "#7C83FD",
-  },
-  visibilityPrivateText: {
-    color: Colors.textSecondary,
-  },
-  elevationSection: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  elevationHeader: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-    marginBottom: 12,
-  },
-  elevationButton: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: 8,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  elevationButtonText: {
-    color: Colors.accent,
-    fontSize: 14,
-    fontWeight: "600" as const,
-  },
-  elevationLoading: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 10,
-    paddingVertical: 12,
-  },
-  elevationLoadingText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-  },
-  elevationError: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-    paddingVertical: 8,
-    flexWrap: "wrap" as const,
-  },
-  elevationErrorText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    flex: 1,
-  },
-  elevationRetry: {
-    color: Colors.accent,
-    fontSize: 13,
-    fontWeight: "600" as const,
-  },
-  waypointsSection: {
-    padding: 20,
-  },
-  sectionTitle: {
-    color: Colors.text,
-    fontSize: 18,
-    fontWeight: "700" as const,
-    marginBottom: 16,
-  },
-  emptyWaypoints: {
-    alignItems: "center",
-    paddingVertical: 30,
-  },
-  emptyWaypointsText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    marginTop: 8,
-  },
-  waypointRow: {
-    flexDirection: "row",
-    marginBottom: 4,
-  },
-  waypointTimeline: {
-    width: 36,
-    alignItems: "center",
-  },
-  waypointDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  waypointLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: Colors.border,
-    marginVertical: 2,
-  },
-  waypointContent: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginLeft: 8,
-    marginBottom: 8,
-  },
-  waypointHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  waypointName: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: "600" as const,
-    flex: 1,
-  },
-  waypointType: {
-    fontSize: 11,
-    fontWeight: "600" as const,
-    marginLeft: 8,
-  },
-  waypointDescription: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  waypointCoords: {
-    color: Colors.textSecondary,
-    fontSize: 11,
-    marginTop: 6,
-    opacity: 0.7,
   },
 });

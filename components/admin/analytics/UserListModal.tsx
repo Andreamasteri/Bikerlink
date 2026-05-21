@@ -1,0 +1,101 @@
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
+import Colors from "@/constants/colors";
+
+interface UserItem {
+  id: string;
+  nickname: string;
+  userType: string;
+  region: string;
+  sex: string;
+  createdAt: string;
+}
+
+interface UserListModalProps {
+  users: UserItem[];
+  onUserPress: (userId: string) => void;
+  formatDate: (date: string) => string;
+  getUserBadge: (createdAt: string) => { label: string; color: string } | null;
+}
+
+export const UserListModal: React.FC<UserListModalProps> = ({
+  users,
+  onUserPress,
+  formatDate,
+  getUserBadge,
+}) => {
+  return (
+    <FlatList
+      data={users}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={styles.modalList}
+      renderItem={({ item }) => {
+        const badge = getUserBadge(item.createdAt);
+        return (
+          <TouchableOpacity
+            style={styles.listItem}
+            onPress={() => onUserPress(item.id)}
+            activeOpacity={0.7}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.listItemTitle}>{item.nickname}</Text>
+              <Text style={styles.listItemSub}>
+                {item.userType} - {item.region || "N/A"} - {item.sex || "N/A"}
+              </Text>
+              <Text style={styles.listItemDate}>{formatDate(item.createdAt)}</Text>
+            </View>
+            {badge && (
+              <View
+                style={[
+                  styles.badge,
+                  { backgroundColor: badge.color + "22", borderColor: badge.color },
+                ]}
+              >
+                <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
+              </View>
+            )}
+            <MaterialIcons name="chevron-right" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        );
+      }}
+      ListEmptyComponent={<Text style={styles.emptyText}>Nessun utente</Text>}
+    />
+  );
+};
+
+const styles = StyleSheet.create({
+  modalList: { paddingHorizontal: 16, paddingVertical: 8 },
+  listItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  listItemTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  listItemSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  listItemDate: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 4,
+  },
+  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
+  badgeText: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
+  emptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginTop: 40,
+  },
+});

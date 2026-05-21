@@ -1,10 +1,17 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Modal, FlatList } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Modal } from "react-native";
 import { useQuery } from "@tanstack/react-query";
-import { MaterialIcons, Ionicons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
+import { AnalyticsMetricCard } from "@/components/admin/analytics/AnalyticsMetricCard";
+import { AnalyticsExport } from "@/components/admin/analytics/AnalyticsExport";
+import { UserListModal } from "@/components/admin/analytics/UserListModal";
+import { ActiveUsersModal } from "@/components/admin/analytics/ActiveUsersModal";
+import { AdClicksModal } from "@/components/admin/analytics/AdClicksModal";
+import { PendingReportsModal } from "@/components/admin/analytics/PendingReportsModal";
+import { UserStatsContent } from "@/components/admin/analytics/UserStatsContent";
 
 interface Analytics {
   totalUsers: number;
@@ -79,7 +86,7 @@ interface UserStatsData {
   moderatorLogs: { action: string; createdAt: string; moderatorNickname: string }[];
 }
 
-type ModalType = "users" | "active30" | "active7" | "adClicks" | "pendingReports" | null;
+type ModalType = "users" | "onlineNow" | "active7" | "adClicks" | "pendingReports" | null;
 
 function formatDateIT(dateStr: string | null): string {
   if (!dateStr) return "Mai";
@@ -204,255 +211,6 @@ export default function AdminAnalytics() {
     { label: "Segnalazioni pendenti", value: data?.pendingReports ?? 0, icon: "flag" as const, color: Colors.error },
   ];
 
-  function renderUsersModal() {
-    const users = usersQuery.data ?? [];
-    return (
-      <FlatList
-        data={users}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.modalList}
-        renderItem={({ item }) => {
-          const badge = getUserBadge(item.createdAt);
-          return (
-            <TouchableOpacity style={styles.listItem} onPress={() => handleUserPress(item.id)} activeOpacity={0.7}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.listItemTitle}>{item.nickname}</Text>
-                <Text style={styles.listItemSub}>{item.userType} - {item.region || "N/A"} - {item.sex || "N/A"}</Text>
-                <Text style={styles.listItemDate}>{formatDateIT(item.createdAt)}</Text>
-              </View>
-              {badge && (
-                <View style={[styles.badge, { backgroundColor: badge.color + "22", borderColor: badge.color }]}>
-                  <Text style={[styles.badgeText, { color: badge.color }]}>{badge.label}</Text>
-                </View>
-              )}
-              <MaterialIcons name="chevron-right" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          );
-        }}
-        ListEmptyComponent={<Text style={styles.emptyText}>Nessun utente</Text>}
-      />
-    );
-  }
-
-  function renderActiveUsersModal(type: "onlineNow" | "7") {
-    const activeData = type === "onlineNow" ? onlineNowQuery.data : active7Query.data;
-    const users = activeData ?? [];
-    return (
-      <FlatList
-        data={users}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.modalList}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.listItem} onPress={() => handleUserPress(item.id)} activeOpacity={0.7}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.listItemTitle}>{item.nickname}</Text>
-              <Text style={styles.listItemSub}>{item.userType}</Text>
-              <Text style={styles.listItemDate}>Ultimo accesso: {formatDateIT(item.lastLoginAt)}</Text>
-            </View>
-            <MaterialIcons name="chevron-right" size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={<Text style={styles.emptyText}>Nessun utente attivo</Text>}
-      />
-    );
-  }
-
-  function renderAdClicksModal() {
-    const clicks = adClicksQuery.data ?? [];
-    const bikerCount = clicks.filter((c) => c.userType === "biker").length;
-    const zavarrinaCount = clicks.filter((c) => c.userType === "zavorrina").length;
-    return (
-      <View style={{ flex: 1 }}>
-        <View style={styles.adSummary}>
-          <Text style={styles.adSummaryText}>Totale click: {clicks.length}</Text>
-          <Text style={styles.adSummaryText}>Biker: {bikerCount} | Zavorrina: {zavarrinaCount}</Text>
-        </View>
-        <FlatList
-          data={clicks}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.modalList}
-          renderItem={({ item }) => (
-            <TouchableOpacity style={styles.listItem} onPress={() => handleUserPress(item.userId)} activeOpacity={0.7}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.listItemTitle}>{item.nickname || "Anonimo"}</Text>
-                <Text style={styles.listItemSub}>{item.userType} - {item.adTitle || "N/A"}</Text>
-                <Text style={styles.listItemDate}>{formatDateIT(item.clickedAt)}</Text>
-              </View>
-              <MaterialIcons name="chevron-right" size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={<Text style={styles.emptyText}>Nessun click registrato</Text>}
-        />
-      </View>
-    );
-  }
-
-  function renderPendingReportsModal() {
-    const reports = pendingReportsQuery.data ?? [];
-    return (
-      <FlatList
-        data={reports}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.modalList}
-        renderItem={({ item }) => (
-          <View style={styles.listItem}>
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                <View style={[styles.typeBadge, { backgroundColor: item.type === "bug" ? Colors.error + "22" : Colors.accent + "22" }]}>
-                  <Text style={[styles.typeBadgeText, { color: item.type === "bug" ? Colors.error : Colors.accent }]}>
-                    {item.type === "bug" ? "Bug" : "Feature"}
-                  </Text>
-                </View>
-                <Text style={styles.listItemTitle} numberOfLines={1}>{item.title}</Text>
-              </View>
-              <Text style={styles.listItemSub} numberOfLines={2}>{item.description}</Text>
-              <Text style={styles.listItemDate}>Da: {item.submittedBy || "Anonimo"} - {formatDateIT(item.createdAt)}</Text>
-            </View>
-          </View>
-        )}
-        ListEmptyComponent={<Text style={styles.emptyText}>Nessuna segnalazione pendente</Text>}
-      />
-    );
-  }
-
-  function renderUserStatsContent() {
-    const s = statsQuery.data;
-    if (!s) return null;
-
-    const u = s.user;
-    const daysSinceRegistration = Math.floor((Date.now() - new Date(u.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-
-    return (
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 40 }}>
-        <View style={sStyles.section}>
-          <Text style={sStyles.sectionTitle}>Informazioni</Text>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Nickname</Text>
-            <Text style={sStyles.value}>{u.nickname}</Text>
-          </View>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Email</Text>
-            <Text style={sStyles.value}>{u.email}</Text>
-          </View>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Tipo</Text>
-            <Text style={sStyles.value}>{u.userType}</Text>
-          </View>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Ruolo</Text>
-            <Text style={[sStyles.value, { color: getRoleColor(u.role) }]}>{u.role}</Text>
-          </View>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Stato</Text>
-            <Text style={[sStyles.value, { color: getStatusColor(u.status) }]}>{u.status}</Text>
-          </View>
-          {u.bio && (
-            <View style={sStyles.row}>
-              <Text style={sStyles.label}>Bio</Text>
-              <Text style={[sStyles.value, { flex: 1, textAlign: "right" as const }]} numberOfLines={3}>{u.bio}</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={sStyles.section}>
-          <Text style={sStyles.sectionTitle}>Connessione</Text>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Ultimo accesso</Text>
-            <Text style={sStyles.value}>{timeAgo(u.lastLoginAt)}</Text>
-          </View>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Data ultimo accesso</Text>
-            <Text style={sStyles.value}>{formatDateIT(u.lastLoginAt)}</Text>
-          </View>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Registrazione</Text>
-            <Text style={sStyles.value}>{formatDateIT(u.createdAt)}</Text>
-          </View>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Giorni dall'iscrizione</Text>
-            <Text style={sStyles.value}>{daysSinceRegistration}</Text>
-          </View>
-          <View style={sStyles.row}>
-            <Text style={sStyles.label}>Disponibile</Text>
-            <MaterialIcons name={u.isAvailable ? "check-circle" : "cancel"} size={18} color={u.isAvailable ? Colors.success : Colors.error} />
-          </View>
-        </View>
-
-        <View style={sStyles.section}>
-          <Text style={sStyles.sectionTitle}>Attivit&agrave;</Text>
-          <View style={sStyles.statsGrid}>
-            <View style={sStyles.statBox}>
-              <Text style={sStyles.statNumber}>{s.stats.proposalsCreated}</Text>
-              <Text style={sStyles.statLabel}>Proposte</Text>
-            </View>
-            <View style={sStyles.statBox}>
-              <Text style={sStyles.statNumber}>{s.stats.conversationsCount}</Text>
-              <Text style={sStyles.statLabel}>Conversazioni</Text>
-            </View>
-            <View style={sStyles.statBox}>
-              <Text style={sStyles.statNumber}>{s.stats.messagesSent}</Text>
-              <Text style={sStyles.statLabel}>Messaggi</Text>
-            </View>
-            <View style={sStyles.statBox}>
-              <Text style={sStyles.statNumber}>{s.stats.reportsFiled}</Text>
-              <Text style={sStyles.statLabel}>Segnalazioni fatte</Text>
-            </View>
-            <View style={sStyles.statBox}>
-              <Text style={sStyles.statNumber}>{s.stats.reportsReceived}</Text>
-              <Text style={sStyles.statLabel}>Segnalazioni ricevute</Text>
-            </View>
-            <View style={sStyles.statBox}>
-              <Text style={sStyles.statNumber}>{u.totalRides ?? 0}</Text>
-              <Text style={sStyles.statLabel}>Percorsi</Text>
-            </View>
-          </View>
-          {(u.totalKm ?? 0) > 0 && (
-            <View style={sStyles.row}>
-              <Text style={sStyles.label}>Km totali</Text>
-              <Text style={sStyles.value}>{u.totalKm} km</Text>
-            </View>
-          )}
-        </View>
-
-        {s.motorcycles.length > 0 && (
-          <View style={sStyles.section}>
-            <Text style={sStyles.sectionTitle}>Moto</Text>
-            {s.motorcycles.map((m, i) => (
-              <View key={i} style={sStyles.motoCard}>
-                <Text style={sStyles.motoTitle}>{m.brand} {m.model}</Text>
-                <Text style={sStyles.motoSub}>{m.year} - {m.displacement}cc - {m.motorcycleType} - {m.ridingStyle}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {s.adClicks.length > 0 && (
-          <View style={sStyles.section}>
-            <Text style={sStyles.sectionTitle}>Click Ads ({s.adClicks.length})</Text>
-            {s.adClicks.map((click) => (
-              <View key={click.id} style={sStyles.logItem}>
-                <Text style={sStyles.logText}>{click.adTitle || "N/A"}</Text>
-                <Text style={sStyles.logDate}>{formatDateIT(click.clickedAt)}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {s.moderatorLogs.length > 0 && (
-          <View style={sStyles.section}>
-            <Text style={sStyles.sectionTitle}>Log moderazione</Text>
-            {s.moderatorLogs.map((log, i) => (
-              <View key={i} style={sStyles.logItem}>
-                <Text style={sStyles.logText}>{log.action} (da {log.moderatorNickname || "sistema"})</Text>
-                <Text style={sStyles.logDate}>{formatDateIT(log.createdAt)}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </ScrollView>
-    );
-  }
-
   function getModalTitle(): string {
     switch (activeModal) {
       case "users": return "Utenti totali";
@@ -466,11 +224,46 @@ export default function AdminAnalytics() {
 
   function renderModalContent() {
     switch (activeModal) {
-      case "users": return renderUsersModal();
-      case "onlineNow": return renderActiveUsersModal("onlineNow");
-      case "active7": return renderActiveUsersModal("7");
-      case "adClicks": return renderAdClicksModal();
-      case "pendingReports": return renderPendingReportsModal();
+      case "users":
+        return (
+          <UserListModal
+            users={usersQuery.data ?? []}
+            onUserPress={handleUserPress}
+            formatDate={formatDateIT}
+            getUserBadge={getUserBadge}
+          />
+        );
+      case "onlineNow":
+        return (
+          <ActiveUsersModal
+            users={onlineNowQuery.data ?? []}
+            onUserPress={handleUserPress}
+            formatDate={formatDateIT}
+          />
+        );
+      case "active7":
+        return (
+          <ActiveUsersModal
+            users={active7Query.data ?? []}
+            onUserPress={handleUserPress}
+            formatDate={formatDateIT}
+          />
+        );
+      case "adClicks":
+        return (
+          <AdClicksModal
+            clicks={adClicksQuery.data ?? []}
+            onUserPress={handleUserPress}
+            formatDate={formatDateIT}
+          />
+        );
+      case "pendingReports":
+        return (
+          <PendingReportsModal
+            reports={pendingReportsQuery.data ?? []}
+            formatDate={formatDateIT}
+          />
+        );
       default: return null;
     }
   }
@@ -492,32 +285,20 @@ export default function AdminAnalytics() {
       ) : (
         <>
           <View style={styles.grid}>
-            {stats.map((stat) => {
-              const isTappable = tappableLabels.includes(stat.label);
-              const CardWrapper = isTappable ? TouchableOpacity : View;
-              return (
-                <CardWrapper
-                  key={stat.label}
-                  style={styles.statCard}
-                  {...(isTappable ? { onPress: () => handleCardPress(stat.label), activeOpacity: 0.7 } : {})}
-                >
-                  <View style={[styles.statIcon, { backgroundColor: stat.color + "22" }]}>
-                    <MaterialIcons name={stat.icon} size={24} color={stat.color} />
-                  </View>
-                  <Text style={styles.statValue}>{stat.value}</Text>
-                  <Text style={styles.statLabel}>{stat.label}</Text>
-                  {isTappable && (
-                    <MaterialIcons name="chevron-right" size={16} color={Colors.textSecondary} style={{ position: "absolute", top: 16, right: 12 }} />
-                  )}
-                </CardWrapper>
-              );
-            })}
+            {stats.map((stat) => (
+              <AnalyticsMetricCard
+                key={stat.label}
+                label={stat.label}
+                value={stat.value}
+                icon={stat.icon}
+                color={stat.color}
+                isTappable={tappableLabels.includes(stat.label)}
+                onPress={() => handleCardPress(stat.label)}
+              />
+            ))}
           </View>
 
-          <TouchableOpacity style={styles.exportBtn} onPress={handleExportCSV}>
-            <MaterialIcons name="file-download" size={20} color={Colors.background} />
-            <Text style={styles.exportBtnText}>Esporta CSV</Text>
-          </TouchableOpacity>
+          <AnalyticsExport onExport={handleExportCSV} />
         </>
       )}
 
@@ -541,7 +322,7 @@ export default function AdminAnalytics() {
 
       <Modal visible={!!selectedUserId} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={[sStyles.modalContainer, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}>
+          <View style={[styles.modalContainer, { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 10 }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{statsQuery.data?.user?.nickname || "Dettaglio utente"}</Text>
               <TouchableOpacity onPress={() => setSelectedUserId(null)}>
@@ -552,9 +333,15 @@ export default function AdminAnalytics() {
               <Text style={styles.loadingText}>Caricamento statistiche...</Text>
             ) : statsQuery.isError ? (
               <Text style={styles.loadingText}>Errore nel caricamento</Text>
-            ) : (
-              renderUserStatsContent()
-            )}
+            ) : statsQuery.data ? (
+              <UserStatsContent
+                stats={statsQuery.data}
+                formatDate={formatDateIT}
+                timeAgo={timeAgo}
+                getRoleColor={getRoleColor}
+                getStatusColor={getStatusColor}
+              />
+            ) : null}
           </View>
         </View>
       </Modal>
@@ -562,127 +349,11 @@ export default function AdminAnalytics() {
   );
 }
 
-const sStyles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    marginTop: 40,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  section: {
-    marginTop: 20,
-  },
-  sectionTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
-    color: Colors.accent,
-    marginBottom: 10,
-    textTransform: "uppercase" as const,
-    letterSpacing: 1,
-  },
-  row: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border + "44",
-  },
-  label: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  value: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: Colors.text,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  statBox: {
-    width: "31%",
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  statNumber: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 22,
-    color: Colors.text,
-  },
-  statLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    marginTop: 4,
-  },
-  motoCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  motoTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  motoSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  logItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border + "44",
-  },
-  logText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.text,
-    flex: 1,
-  },
-  logDate: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginLeft: 8,
-  },
-});
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16 },
   loadingText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
-  statCard: {
-    width: "47%", backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  statIcon: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center", marginBottom: 12 },
-  statValue: { fontFamily: "Inter_700Bold", fontSize: 28, color: Colors.text },
-  statLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 4 },
-  exportBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: Colors.accent, borderRadius: 12, padding: 16, marginTop: 24,
-  },
-  exportBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: Colors.background },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.7)" },
   modalContainer: { flex: 1, backgroundColor: Colors.background, marginTop: 40, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
   modalHeader: {
@@ -690,21 +361,4 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   modalTitle: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.text },
-  modalList: { paddingHorizontal: 16, paddingVertical: 8 },
-  listItem: {
-    flexDirection: "row", alignItems: "center", backgroundColor: Colors.surface,
-    borderRadius: 12, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.border,
-  },
-  listItemTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
-  listItemSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  listItemDate: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 4 },
-  badge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, borderWidth: 1 },
-  badgeText: { fontFamily: "Inter_600SemiBold", fontSize: 10 },
-  typeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
-  typeBadgeText: { fontFamily: "Inter_500Medium", fontSize: 10 },
-  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
-  adSummary: {
-    paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  adSummaryText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text, marginBottom: 4 },
 });

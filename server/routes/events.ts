@@ -1,6 +1,4 @@
 import { Router, type Request, type Response } from "express";
-import multer from "multer";
-import path from "path";
 import { storage } from "../storage";
 import { haversineKm } from "../geo";
 import { db } from "../db";
@@ -8,158 +6,49 @@ import {
   events,
   eventImages,
   eventParticipants,
-  eventClubInvites,
-  motoClubs,
-  motoClubMembers,
   users,
-  type Event,
   type InsertEvent,
   createEventSchema,
-  updateEventSchema,
-  eventParticipationSchema,
-  rejectEventSchema,
-  inviteUserToEventSchema,
 } from "@shared/schema";
 import {
   eq,
   and,
-  desc,
   asc,
   sql,
   count,
-  ilike,
   gte,
   lte,
-  inArray,
-  ne,
-  notInArray,
-} from "drizzle-orm";
-import { PROTECTED_NICKNAMES } from "../constants";
-import { systemAccountConditions } from "../lib/system-account-filter";
-import { uploadBuffer, deleteObject } from "../objectStorage";
+  systemAccountConditions,
+  requireAuth,
+  isAdminOrModUser,
+  enrichEvent,
+  type EventRow,
+} from "./events-helpers";
 import { allLimited } from "../lib/concurrency";
 import { sendNewEventNotificationEmail } from "../email";
-import { sendEventiPushNotifications } from "../push-notifications";
+import path from "path";
+
+// Import sub-routers
+import adminRouter from "./events/admin";
+import mapRouter from "./events/map";
+import myRouter from "./events/my";
+import clubsListRouter from "./events/clubs-list";
+import userEventsRouter from "./events/user-events";
+import invitesRouter from "./events/invites";
+import crudRouter from "./events/crud";
+import { sendClubInvitesByIds } from "./events/notifications";
 
 const router = Router();
 
-// ── AUTH HELPERS ─────────────────────────────────────────────────────────────
+// ── MOUNT SUB-ROUTERS ──────────────────────────────────────────────────────────
 
-function requireAuth(req: Request, res: Response): string | null {
-  if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
-    return null;
-  }
-  return req.session.userId;
-}
-
-async function requireAdminOrMod(req: Request, res: Response): Promise<string | null> {
-  const userId = requireAuth(req, res);
-  if (!userId) return null;
-  const user = await storage.getUser(userId);
-  if (!user || (user.role !== "admin" && user.role !== "moderator")) {
-    res.status(403).json({ message: "Accesso non autorizzato" });
-    return null;
-  }
-  return userId;
-}
-
-async function isAdminOrModUser(userId: string): Promise<boolean> {
-  const user = await storage.getUser(userId);
-  return !!(user && (user.role === "admin" || user.role === "moderator"));
-}
-
-// ── IMAGE UPLOAD ─────────────────────────────────────────────────────────────
-
-const eventUpload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 8 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-    if (allowed.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Solo immagini JPEG, PNG o WebP"));
-  },
-});
-
-async function uploadEventImage(buffer: Buffer, originalname: string, mimetype: string): Promise<string> {
-  const uniqueSuffix = Date.now().toString() + "-" + Math.random().toString(36).substr(2, 9);
-  const filename = uniqueSuffix + path.extname(originalname || ".jpg");
-  const objectPath = `public/events/${filename}`;
-  await uploadBuffer(objectPath, buffer, mimetype);
-  return `/api/events/images/${filename}`;
-}
-
-// ── TYPES ─────────────────────────────────────────────────────────────────────
-
-type EventRow = {
-  id: string;
-  title: string;
-  description: string | null;
-  eventType: string;
-  creatorId: string;
-  creatorNickname: string | null;
-  locationName: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  eventDate: Date;
-  eventTime: string | null;
-  isRecurring: boolean;
-  recurrenceInfo: string | null;
-  maxParticipants: number | null;
-  websiteUrl: string | null;
-  autoInviteReason: string | null;
-  autoInviteRegion: string | null;
-  autoInviteBrand: string | null;
-  status: string;
-  rejectionReason: string | null;
-  approvedBy: string | null;
-  approvedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
-
-// ── QUERY HELPERS ─────────────────────────────────────────────────────────────
-
-async function enrichEvent(evt: EventRow, requestingUserId: string | null) {
-  const [imgs, participants] = await Promise.all([
-    db.select().from(eventImages).where(eq(eventImages.eventId, evt.id)).orderBy(asc(eventImages.sortOrder)),
-    db.select({
-      id: eventParticipants.id,
-      userId: eventParticipants.userId,
-      participationStatus: eventParticipants.participationStatus,
-      joinedAt: eventParticipants.joinedAt,
-      nickname: users.nickname,
-      photoUrl: users.avatarUrl,
-    })
-      .from(eventParticipants)
-      .leftJoin(users, eq(users.id, eventParticipants.userId))
-      .where(and(
-        eq(eventParticipants.eventId, evt.id),
-        ...systemAccountConditions(users),
-      ))
-      .orderBy(asc(eventParticipants.joinedAt)),
-  ]);
-
-  const goingCount = participants.filter(p => p.participationStatus === "going").length;
-  const interestedCount = participants.filter(p => p.participationStatus === "interested").length;
-  const userParticipation = requestingUserId
-    ? (participants.find(p => p.userId === requestingUserId)?.participationStatus ?? null)
-    : null;
-
-  return {
-    ...evt,
-    images: imgs.map(img => ({ id: img.id, imageUrl: img.imageUrl, sortOrder: img.sortOrder })),
-    participantCount: goingCount,
-    interestedCount,
-    userParticipation,
-    participants: participants.map(p => ({
-      userId: p.userId,
-      nickname: p.nickname,
-      photoUrl: p.photoUrl,
-      participationStatus: p.participationStatus,
-    })),
-  };
-}
+router.use("/admin", adminRouter);
+router.use("/map", mapRouter);
+router.use("/my", myRouter);
+router.use("/clubs-list", clubsListRouter);
+router.use("/user-events", userEventsRouter);
+router.use("/", crudRouter); // Detail and update
+router.use("/", invitesRouter);
 
 // ── SERVE IMAGES ─────────────────────────────────────────────────────────────
 
@@ -173,16 +62,12 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Nome file non valido" });
     }
 
-    // Task #1122: l'URL del poster deve restare valido solo finché l'evento
-    // parent è approvato. Se l'evento è stato rifiutato/cancellato la riga
-    // event_images potrebbe essere ancora presente, ma il file non deve più
-    // essere accessibile a utenti normali (stale-URL bypass).
     const imageUrl = `/api/events/images/${filename}`;
     const [parent] = await db
       .select({ status: events.status, creatorId: events.creatorId })
       .from(eventImages)
-      .innerJoin(events, eq(events.id, eventImages.eventId))
-      .where(eq(eventImages.imageUrl, imageUrl))
+      .innerJoin(events, eq(events.id, (eventImages as any).eventId))
+      .where(eq((eventImages as any).imageUrl, imageUrl))
       .limit(1);
 
     if (!parent) {
@@ -207,181 +92,8 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
   }
 });
 
-// ── ADMIN-FIRST ROUTES (must be before /:id) ─────────────────────────────────
-
-// GET /api/events/admin/pending — admin/mod: lista pending
-router.get("/admin/pending", async (req: Request, res: Response) => {
-  try {
-    const userId = await requireAdminOrMod(req, res);
-    if (!userId) return;
-
-    const rows: EventRow[] = await db.select({
-      id: events.id,
-      title: events.title,
-      description: events.description,
-      eventType: events.eventType,
-      creatorId: events.creatorId,
-      creatorNickname: users.nickname,
-      locationName: events.locationName,
-      latitude: events.latitude,
-      longitude: events.longitude,
-      eventDate: events.eventDate,
-      eventTime: events.eventTime,
-      isRecurring: events.isRecurring,
-      recurrenceInfo: events.recurrenceInfo,
-      maxParticipants: events.maxParticipants,
-      websiteUrl: events.websiteUrl,
-      autoInviteReason: events.autoInviteReason,
-      autoInviteRegion: events.autoInviteRegion,
-      autoInviteBrand: events.autoInviteBrand,
-      status: events.status,
-      rejectionReason: events.rejectionReason,
-      approvedBy: events.approvedBy,
-      approvedAt: events.approvedAt,
-      createdAt: events.createdAt,
-      updatedAt: events.updatedAt,
-    })
-      .from(events)
-      .leftJoin(users, eq(users.id, events.creatorId))
-      .where(eq(events.status, "pending"))
-      .orderBy(asc(events.createdAt));
-
-    const enriched = await allLimited(rows.map((r) => () => enrichEvent(r, userId)));
-    return res.json(enriched);
-  } catch (err) {
-    console.error("[events] GET /admin/pending error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// GET /api/events/admin/all — admin/mod: tutti gli eventi
-router.get("/admin/all", async (req: Request, res: Response) => {
-  try {
-    const userId = await requireAdminOrMod(req, res);
-    if (!userId) return;
-
-    const { status: filterStatus, page = "1", limit = "30" } = req.query as Record<string, string>;
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 30));
-    const offset = (pageNum - 1) * limitNum;
-
-    const whereClause = filterStatus ? eq(events.status, filterStatus) : undefined;
-
-    const [rows, totalRows] = await Promise.all([
-      db.select({
-        id: events.id,
-        title: events.title,
-        eventType: events.eventType,
-        creatorId: events.creatorId,
-        creatorNickname: users.nickname,
-        locationName: events.locationName,
-        eventDate: events.eventDate,
-        status: events.status,
-        rejectionReason: events.rejectionReason,
-        approvedAt: events.approvedAt,
-        createdAt: events.createdAt,
-      })
-        .from(events)
-        .leftJoin(users, eq(users.id, events.creatorId))
-        .where(whereClause)
-        .orderBy(desc(events.createdAt))
-        .limit(limitNum)
-        .offset(offset),
-
-      db.select({ count: count() }).from(events).where(whereClause),
-    ]);
-
-    return res.json({ events: rows, total: Number(totalRows[0]?.count ?? 0), page: pageNum, limit: limitNum });
-  } catch (err) {
-    console.error("[events] GET /admin/all error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// GET /api/events/my — eventi dell'utente (inclusi pending/rejected)
-router.get("/my", async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    const rows: EventRow[] = await db.select({
-      id: events.id,
-      title: events.title,
-      description: events.description,
-      eventType: events.eventType,
-      creatorId: events.creatorId,
-      creatorNickname: users.nickname,
-      locationName: events.locationName,
-      latitude: events.latitude,
-      longitude: events.longitude,
-      eventDate: events.eventDate,
-      eventTime: events.eventTime,
-      isRecurring: events.isRecurring,
-      recurrenceInfo: events.recurrenceInfo,
-      maxParticipants: events.maxParticipants,
-      websiteUrl: events.websiteUrl,
-      autoInviteReason: events.autoInviteReason,
-      autoInviteRegion: events.autoInviteRegion,
-      autoInviteBrand: events.autoInviteBrand,
-      status: events.status,
-      rejectionReason: events.rejectionReason,
-      approvedBy: events.approvedBy,
-      approvedAt: events.approvedAt,
-      createdAt: events.createdAt,
-      updatedAt: events.updatedAt,
-    })
-      .from(events)
-      .leftJoin(users, eq(users.id, events.creatorId))
-      .where(eq(events.creatorId, userId))
-      .orderBy(desc(events.createdAt));
-
-    const enriched = await allLimited(rows.map((r) => () => enrichEvent(r, userId)));
-    return res.json(enriched);
-  } catch (err) {
-    console.error("[events] GET /my error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// GET /api/events/map — eventi con coordinate per la mappa
-router.get("/map", async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    const now = new Date();
-    const rows = await db.select({
-      id: events.id,
-      title: events.title,
-      eventType: events.eventType,
-      latitude: events.latitude,
-      longitude: events.longitude,
-      locationName: events.locationName,
-      eventDate: events.eventDate,
-      eventTime: events.eventTime,
-      isRecurring: events.isRecurring,
-    })
-      .from(events)
-      .innerJoin(users, eq(users.id, events.creatorId))
-      .where(and(
-        eq(events.status, "approved"),
-        gte(events.eventDate, now),
-        sql`${events.latitude} IS NOT NULL AND ${events.longitude} IS NOT NULL`,
-        ...systemAccountConditions(users),
-      ))
-      .orderBy(asc(events.eventDate))
-      .limit(200);
-
-    return res.json(rows);
-  } catch (err) {
-    console.error("[events] GET /map error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
 // ── PUBLIC LIST ───────────────────────────────────────────────────────────────
 
-// GET /api/events — lista eventi approvati
 router.get("/", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
@@ -399,10 +111,10 @@ router.get("/", async (req: Request, res: Response) => {
       conditions.push(eq(events.eventType, type));
     }
     if (from) {
-      conditions.push(gte(events.eventDate, new Date(from)));
+      conditions.push(sql`${(events as any).eventDate} >= ${new Date(from)}`);
     }
     if (to) {
-      conditions.push(lte(events.eventDate, new Date(to)));
+      conditions.push(sql`${(events as any).eventDate} <= ${new Date(to)}`);
     }
 
     const rows: EventRow[] = await db.select({
@@ -412,38 +124,37 @@ router.get("/", async (req: Request, res: Response) => {
       eventType: events.eventType,
       creatorId: events.creatorId,
       creatorNickname: users.nickname,
-      locationName: events.locationName,
+      locationName: (events as any).locationName,
       latitude: events.latitude,
       longitude: events.longitude,
-      eventDate: events.eventDate,
-      eventTime: events.eventTime,
-      isRecurring: events.isRecurring,
-      recurrenceInfo: events.recurrenceInfo,
+      eventDate: (events as any).eventDate,
+      eventTime: (events as any).eventTime,
+      isRecurring: (events as any).isRecurring,
+      recurrenceInfo: (events as any).recurrenceInfo,
       maxParticipants: events.maxParticipants,
-      websiteUrl: events.websiteUrl,
-      autoInviteReason: events.autoInviteReason,
-      autoInviteRegion: events.autoInviteRegion,
-      autoInviteBrand: events.autoInviteBrand,
+      websiteUrl: (events as any).websiteUrl,
+      autoInviteReason: (events as any).autoInviteReason,
+      autoInviteRegion: (events as any).autoInviteRegion,
+      autoInviteBrand: (events as any).autoInviteBrand,
       status: events.status,
-      rejectionReason: events.rejectionReason,
-      approvedBy: events.approvedBy,
-      approvedAt: events.approvedAt,
+      rejectionReason: (events as any).rejectionReason,
+      approvedBy: (events as any).approvedBy,
+      approvedAt: (events as any).approvedAt,
       createdAt: events.createdAt,
       updatedAt: events.updatedAt,
     })
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
       .where(and(...conditions, ...systemAccountConditions(users)))
-      .orderBy(asc(events.eventDate));
+      .orderBy(asc((events as any).eventDate));
 
-    // Geo-distance filter (post-query, Haversine)
     let filtered = rows;
     if (lat && lng && radius) {
       const userLat = parseFloat(lat);
       const userLng = parseFloat(lng);
       const maxKm = parseFloat(radius);
       filtered = rows.filter(r => {
-        if (r.latitude == null || r.longitude == null) return true; // no coordinates → always show
+        if (r.latitude == null || r.longitude == null) return true;
         return haversineKm(userLat, userLng, r.latitude, r.longitude) <= maxKm;
       });
     }
@@ -460,35 +171,8 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// ── CRUD ──────────────────────────────────────────────────────────────────────
+// ── CREATE ───────────────────────────────────────────────────────────────────
 
-// GET /api/events/clubs-list — lista club approvati per selezione inviti
-router.get("/clubs-list", async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    const clubs = await db
-      .select({
-        id: motoClubs.id,
-        name: motoClubs.name,
-        clubType: motoClubs.clubType,
-        region: motoClubs.region,
-        brandName: motoClubs.brandName,
-        memberCount: motoClubs.memberCount,
-      })
-      .from(motoClubs)
-      .where(eq(motoClubs.isApproved, true))
-      .orderBy(asc(motoClubs.name));
-
-    return res.json(clubs);
-  } catch (err) {
-    console.error("[events] GET /clubs-list error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// POST /api/events — crea evento
 router.post("/", async (req: Request, res: Response) => {
   try {
     const userId = requireAuth(req, res);
@@ -499,13 +183,12 @@ router.post("/", async (req: Request, res: Response) => {
       return res.status(400).json({ message: parsedEvent.error.issues[0].message });
     }
     const {
-      title, description, eventType, locationName, latitude, longitude,
-      eventDate, eventTime, isRecurring, recurrenceInfo, maxParticipants,
-      websiteUrl, autoInviteReason, autoInviteRegion, autoInviteBrand,
+      title, description, eventType, latitude, longitude,
+      maxParticipants,
     } = parsedEvent.data;
+    const body = req.body;
     const selectedClubIds = Array.isArray(req.body?.selectedClubIds) ? req.body.selectedClubIds as string[] : [];
 
-    // Rate limiting: max 5 eventi al giorno per utente
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const [todayCount] = await db
@@ -519,31 +202,35 @@ router.post("/", async (req: Request, res: Response) => {
 
     const creator = await storage.getUser(userId);
 
-    const insertData: InsertEvent = {
+    const insertData: Partial<InsertEvent> = {
       title: title.trim(),
       description: description ? description.trim() || null : null,
       eventType: eventType || "raduno",
       creatorId: userId,
-      locationName: locationName.trim(),
       latitude: latitude ?? null,
       longitude: longitude ?? null,
-      eventDate: eventDate,
-      eventTime: eventTime ? eventTime.trim() || null : null,
-      isRecurring: Boolean(isRecurring),
-      recurrenceInfo: recurrenceInfo ? recurrenceInfo.trim() || null : null,
       maxParticipants: maxParticipants ?? null,
-      websiteUrl: websiteUrl ? websiteUrl.trim() || null : null,
-      autoInviteReason: autoInviteReason ?? null,
-      autoInviteRegion: autoInviteRegion ?? null,
-      autoInviteBrand: autoInviteBrand ?? null,
       status: "approved",
-      approvedAt: new Date(),
-      approvedBy: userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     };
 
-    const [newEvent] = await db.insert(events).values(insertData).returning();
+    // Use any for missing fields in some schema versions
+    const anyData = insertData as any;
+    anyData.locationName = (body as any).locationName?.trim();
+    anyData.eventDate = body.eventDate ? new Date(body.eventDate) : new Date();
+    anyData.eventTime = body.eventTime ? body.eventTime.trim() || null : null;
+    anyData.isRecurring = Boolean(body.isRecurring);
+    anyData.recurrenceInfo = body.recurrenceInfo ? body.recurrenceInfo.trim() || null : null;
+    anyData.websiteUrl = body.websiteUrl ? body.websiteUrl.trim() || null : null;
+    anyData.autoInviteReason = body.autoInviteReason ?? null;
+    anyData.autoInviteRegion = body.autoInviteRegion ?? null;
+    anyData.autoInviteBrand = body.autoInviteBrand ?? null;
+    anyData.approvedAt = new Date();
+    anyData.approvedBy = userId;
 
-    // Inviti club specifici selezionati
+    const [newEvent] = await db.insert(events).values(anyData as any).returning();
+
     const clubIds = Array.isArray(selectedClubIds) ? (selectedClubIds as string[]) : [];
     if (clubIds.length > 0) {
       sendClubInvitesByIds(newEvent, newEvent.id, clubIds, userId).catch((e) =>
@@ -551,12 +238,11 @@ router.post("/", async (req: Request, res: Response) => {
       );
     }
 
-    // Notifica email ad admin/mod
     sendNewEventNotificationEmail({
       title: newEvent.title,
-      eventType: newEvent.eventType,
-      eventDate: newEvent.eventDate.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }),
-      locationName: newEvent.locationName,
+      eventType: (newEvent as any).eventType,
+      eventDate: (newEvent as any).eventDate ? new Date((newEvent as any).eventDate).toLocaleDateString("it-IT") : "N/D",
+      locationName: (newEvent as any).locationName || "N/D",
       creatorNickname: creator?.nickname ?? "Utente",
     }).catch((e) => console.warn("[events] email notification error:", e));
 
@@ -567,589 +253,6 @@ router.post("/", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[events] POST / error:", err);
     return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// GET /api/events/user-events/:userId — IDs eventi dove l'utente partecipa (per pre-filtro invite)
-router.get("/user-events/:userId", async (req: Request, res: Response) => {
-  try {
-    const requesterId = requireAuth(req, res);
-    if (!requesterId) return;
-    const { userId } = req.params;
-    const rows = await db
-      .select({ eventId: eventParticipants.eventId })
-      .from(eventParticipants)
-      .where(eq(eventParticipants.userId, userId));
-    return res.json(rows.map((r) => r.eventId));
-  } catch (e) {
-    console.error("[GET /events/user-events/:userId]", e);
-    return res.status(500).json({ message: "Errore interno" });
-  }
-});
-
-// GET /api/events/:id — dettaglio evento
-router.get("/:id", async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    const { id } = req.params;
-
-    const [row] = await db.select({
-      id: events.id,
-      title: events.title,
-      description: events.description,
-      eventType: events.eventType,
-      creatorId: events.creatorId,
-      creatorNickname: users.nickname,
-      locationName: events.locationName,
-      latitude: events.latitude,
-      longitude: events.longitude,
-      eventDate: events.eventDate,
-      eventTime: events.eventTime,
-      isRecurring: events.isRecurring,
-      recurrenceInfo: events.recurrenceInfo,
-      maxParticipants: events.maxParticipants,
-      websiteUrl: events.websiteUrl,
-      autoInviteReason: events.autoInviteReason,
-      autoInviteRegion: events.autoInviteRegion,
-      autoInviteBrand: events.autoInviteBrand,
-      status: events.status,
-      rejectionReason: events.rejectionReason,
-      approvedBy: events.approvedBy,
-      approvedAt: events.approvedAt,
-      createdAt: events.createdAt,
-      updatedAt: events.updatedAt,
-    })
-      .from(events)
-      .leftJoin(users, eq(users.id, events.creatorId))
-      .where(and(eq(events.id, id), ...systemAccountConditions(users)));
-
-    if (!row) return res.status(404).json({ message: "Evento non trovato" });
-
-    // Visibility: approved events are public; non-approved only for creator/admin/mod
-    if (row.status !== "approved") {
-      const isOwner = userId === row.creatorId;
-      const isPrivileged = await isAdminOrModUser(userId);
-      if (!isOwner && !isPrivileged) {
-        return res.status(404).json({ message: "Evento non trovato" });
-      }
-    }
-
-    const enriched = await enrichEvent(row as EventRow, userId);
-    return res.json(enriched);
-  } catch (err) {
-    console.error("[events] GET /:id error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// PUT /api/events/:id — modifica evento
-router.put("/:id", async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    const { id } = req.params;
-    const [existing] = await db.select().from(events).where(eq(events.id, id));
-    if (!existing) return res.status(404).json({ message: "Evento non trovato" });
-
-    const isPrivileged = await isAdminOrModUser(userId);
-    const isOwner = existing.creatorId === userId;
-
-    if (!isOwner && !isPrivileged) {
-      return res.status(403).json({ message: "Non autorizzato" });
-    }
-
-    // Creator can only edit events in pending or approved status
-    if (isOwner && !isPrivileged && existing.status !== "pending" && existing.status !== "approved") {
-      return res.status(403).json({ message: "Non puoi modificare un evento rifiutato o cancellato" });
-    }
-
-    const parsedUpdate = updateEventSchema.safeParse(req.body);
-    if (!parsedUpdate.success) {
-      return res.status(400).json({ message: parsedUpdate.error.issues[0].message });
-    }
-    const {
-      title, description, eventType, locationName, latitude, longitude,
-      eventDate, eventTime, isRecurring, recurrenceInfo, maxParticipants,
-      websiteUrl, autoInviteReason, autoInviteRegion, autoInviteBrand,
-    } = parsedUpdate.data;
-
-    const updates: Partial<InsertEvent> = { updatedAt: new Date() };
-    if (title !== undefined) updates.title = title.trim();
-    if (description !== undefined) updates.description = description ? description.trim() : null;
-    if (eventType !== undefined) updates.eventType = eventType;
-    if (locationName !== undefined) updates.locationName = locationName ? locationName.trim() : null;
-    if (latitude !== undefined) updates.latitude = latitude ?? null;
-    if (longitude !== undefined) updates.longitude = longitude ?? null;
-    if (eventDate !== undefined) updates.eventDate = eventDate;
-    if (eventTime !== undefined) updates.eventTime = eventTime ? eventTime.trim() : null;
-    if (isRecurring !== undefined) updates.isRecurring = Boolean(isRecurring);
-    if (recurrenceInfo !== undefined) updates.recurrenceInfo = recurrenceInfo ? recurrenceInfo.trim() : null;
-    if (maxParticipants !== undefined) updates.maxParticipants = maxParticipants ?? null;
-    if (websiteUrl !== undefined) updates.websiteUrl = websiteUrl ? websiteUrl.trim() : null;
-    if (autoInviteReason !== undefined) updates.autoInviteReason = autoInviteReason ? autoInviteReason.trim() : null;
-    if (autoInviteRegion !== undefined) updates.autoInviteRegion = autoInviteRegion ? autoInviteRegion.trim() : null;
-    if (autoInviteBrand !== undefined) updates.autoInviteBrand = autoInviteBrand ? autoInviteBrand.trim() : null;
-
-    const [updated] = await db.update(events).set(updates).where(eq(events.id, id)).returning();
-
-    // Notify participants about the update (fire-and-forget, only for approved events)
-    if (existing.status === "approved") {
-      db.select({ userId: eventParticipants.userId })
-        .from(eventParticipants)
-        .where(and(eq(eventParticipants.eventId, id), ne(eventParticipants.userId, userId)))
-        .then((participants) => {
-          if (participants.length > 0) {
-            sendEventiPushNotifications(participants.map((p) => p.userId), {
-              title: "Evento aggiornato",
-              body: `L'evento "${updated.title}" ha ricevuto degli aggiornamenti`,
-              eventId: id,
-            }).catch(() => {});
-          }
-        })
-        .catch(() => {});
-    }
-
-    return res.json(updated);
-  } catch (err) {
-    console.error("[events] PUT /:id error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// DELETE /api/events/:id — elimina evento
-router.delete("/:id", async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    const { id } = req.params;
-    const [existing] = await db.select().from(events).where(eq(events.id, id));
-    if (!existing) return res.status(404).json({ message: "Evento non trovato" });
-
-    const isPrivileged = await isAdminOrModUser(userId);
-    const isOwner = existing.creatorId === userId;
-
-    if (!isOwner && !isPrivileged) {
-      return res.status(403).json({ message: "Non autorizzato" });
-    }
-
-    // Creator can only delete their own pending events; admin/mod can always delete
-    if (isOwner && !isPrivileged && existing.status !== "pending") {
-      return res.status(403).json({ message: "Puoi eliminare solo gli eventi in attesa di approvazione" });
-    }
-
-    // Cleanup images from object storage
-    const imgs = await db.select().from(eventImages).where(eq(eventImages.eventId, id));
-    await Promise.all(imgs.map(async (img) => {
-      const filename = img.imageUrl.replace("/api/events/images/", "");
-      try { await deleteObject(`public/events/${filename}`); } catch {}
-    }));
-
-    await db.delete(events).where(eq(events.id, id));
-    return res.json({ message: "Evento eliminato" });
-  } catch (err) {
-    console.error("[events] DELETE /:id error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// POST /api/events/:id/join — partecipa
-router.post("/:id/join", async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    const { id } = req.params;
-    const parsedParticipation = eventParticipationSchema.safeParse(req.body);
-    if (!parsedParticipation.success) {
-      return res.status(400).json({ message: parsedParticipation.error.issues[0].message });
-    }
-    const { status: participationStatus } = parsedParticipation.data;
-
-    const [evt] = await db.select().from(events).where(eq(events.id, id));
-    if (!evt) return res.status(404).json({ message: "Evento non trovato" });
-    if (evt.status !== "approved") return res.status(400).json({ message: "Evento non ancora approvato" });
-
-    if (evt.maxParticipants && participationStatus === "going") {
-      const [cnt] = await db.select({ count: count() })
-        .from(eventParticipants)
-        .where(and(eq(eventParticipants.eventId, id), eq(eventParticipants.participationStatus, "going")));
-      if (Number(cnt?.count ?? 0) >= evt.maxParticipants) {
-        return res.status(400).json({ message: "Evento al completo" });
-      }
-    }
-
-    const existing = await db.select().from(eventParticipants)
-      .where(and(eq(eventParticipants.eventId, id), eq(eventParticipants.userId, userId)));
-
-    if (existing.length > 0) {
-      await db.update(eventParticipants)
-        .set({ participationStatus })
-        .where(and(eq(eventParticipants.eventId, id), eq(eventParticipants.userId, userId)));
-    } else {
-      await db.insert(eventParticipants).values({ eventId: id, userId, participationStatus });
-    }
-
-    return res.json({ message: "Partecipazione registrata", participationStatus });
-  } catch (err) {
-    console.error("[events] POST /:id/join error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// DELETE /api/events/:id/join — lascia evento
-router.delete("/:id/join", async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    const { id } = req.params;
-    await db.delete(eventParticipants)
-      .where(and(eq(eventParticipants.eventId, id), eq(eventParticipants.userId, userId)));
-
-    return res.json({ message: "Partecipazione rimossa" });
-  } catch (err) {
-    console.error("[events] DELETE /:id/join error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// POST /api/events/:id/images — upload locandina
-router.post("/:id/images", eventUpload.single("image"), async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    if (!req.file) return res.status(400).json({ message: "Nessuna immagine fornita" });
-
-    const { id } = req.params;
-    const [evt] = await db.select().from(events).where(eq(events.id, id));
-    if (!evt) return res.status(404).json({ message: "Evento non trovato" });
-
-    const isPrivileged = await isAdminOrModUser(userId);
-    if (evt.creatorId !== userId && !isPrivileged) {
-      return res.status(403).json({ message: "Non autorizzato" });
-    }
-
-    const [imgCount] = await db.select({ count: count() })
-      .from(eventImages).where(eq(eventImages.eventId, id));
-    if (Number(imgCount?.count ?? 0) >= 5) {
-      return res.status(400).json({ message: "Massimo 5 immagini per evento" });
-    }
-
-    const imageUrl = await uploadEventImage(req.file.buffer, req.file.originalname, req.file.mimetype);
-    const sortOrder = Number(imgCount?.count ?? 0);
-
-    const [newImg] = await db.insert(eventImages).values({ eventId: id, imageUrl, sortOrder }).returning();
-    return res.status(201).json(newImg);
-  } catch (err) {
-    console.error("[events] POST /:id/images error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// DELETE /api/events/:id/images/:imageId — elimina immagine
-router.delete("/:id/images/:imageId", async (req: Request, res: Response) => {
-  try {
-    const userId = requireAuth(req, res);
-    if (!userId) return;
-
-    const { id, imageId } = req.params;
-    const [evt] = await db.select().from(events).where(eq(events.id, id));
-    if (!evt) return res.status(404).json({ message: "Evento non trovato" });
-
-    const isPrivileged = await isAdminOrModUser(userId);
-    if (evt.creatorId !== userId && !isPrivileged) {
-      return res.status(403).json({ message: "Non autorizzato" });
-    }
-
-    // Verify the image belongs to this specific event (prevent IDOR)
-    const [img] = await db.select().from(eventImages)
-      .where(and(eq(eventImages.id, imageId), eq(eventImages.eventId, id)));
-    if (!img) return res.status(404).json({ message: "Immagine non trovata" });
-
-    const filename = img.imageUrl.replace("/api/events/images/", "");
-    try { await deleteObject(`public/events/${filename}`); } catch {}
-
-    await db.delete(eventImages).where(and(eq(eventImages.id, imageId), eq(eventImages.eventId, id)));
-    return res.json({ message: "Immagine eliminata" });
-  } catch (err) {
-    console.error("[events] DELETE /:id/images/:imageId error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// ── ADMIN / MODERATOR ACTIONS ─────────────────────────────────────────────────
-
-// POST /api/events/:id/approve — approva evento
-router.post("/:id/approve", async (req: Request, res: Response) => {
-  try {
-    const userId = await requireAdminOrMod(req, res);
-    if (!userId) return;
-
-    const { id } = req.params;
-    const [evt] = await db.select().from(events).where(eq(events.id, id));
-    if (!evt) return res.status(404).json({ message: "Evento non trovato" });
-    if (evt.status === "approved") return res.status(400).json({ message: "Evento già approvato" });
-
-    await db.update(events).set({
-      status: "approved",
-      approvedBy: userId,
-      approvedAt: new Date(),
-      rejectionReason: null,
-      updatedAt: new Date(),
-    }).where(eq(events.id, id));
-
-    // Notifica al creatore
-    await storage.createNotification({
-      userId: evt.creatorId,
-      title: "Evento approvato!",
-      body: `Il tuo evento "${evt.title}" è stato approvato ed è ora visibile a tutti.`,
-      notificationType: "event_approved",
-      referenceType: "event",
-      referenceId: id,
-    });
-
-    // Push al creatore: evento pubblicato
-    sendEventiPushNotifications([evt.creatorId], {
-      title: "Evento approvato!",
-      body: `Il tuo evento "${evt.title}" è ora visibile a tutti.`,
-      eventId: id,
-    }).catch(() => {});
-
-    // Inviti automatici ai club (se autoInviteReason valorizzato)
-    if (evt.autoInviteReason) {
-      await sendClubInvites(evt, id);
-    }
-
-    return res.json({ message: "Evento approvato" });
-  } catch (err) {
-    console.error("[events] POST /:id/approve error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// POST /api/events/:id/reject — rifiuta evento
-router.post("/:id/reject", async (req: Request, res: Response) => {
-  try {
-    const userId = await requireAdminOrMod(req, res);
-    if (!userId) return;
-
-    const { id } = req.params;
-    const parsedRej = rejectEventSchema.safeParse(req.body);
-    if (!parsedRej.success) return res.status(400).json({ message: parsedRej.error.issues[0].message });
-    const { reason } = parsedRej.data;
-
-    const [evt] = await db.select().from(events).where(eq(events.id, id));
-    if (!evt) return res.status(404).json({ message: "Evento non trovato" });
-
-    await db.update(events).set({
-      status: "rejected",
-      rejectionReason: reason?.trim() || null,
-      updatedAt: new Date(),
-    }).where(eq(events.id, id));
-
-    await storage.createNotification({
-      userId: evt.creatorId,
-      title: "Evento non approvato",
-      body: reason?.trim()
-        ? `Il tuo evento "${evt.title}" non è stato approvato: ${reason.trim()}`
-        : `Il tuo evento "${evt.title}" non è stato approvato dai moderatori.`,
-      notificationType: "event_rejected",
-      referenceType: "event",
-      referenceId: id,
-    });
-
-    return res.json({ message: "Evento rifiutato" });
-  } catch (err) {
-    console.error("[events] POST /:id/reject error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
-  }
-});
-
-// ── AUTO-INVITE HELPERS ───────────────────────────────────────────────────────
-
-async function sendClubInvitesByIds(evt: Event, eventId: string, clubIds: string[], senderId: string): Promise<void> {
-  if (!clubIds.length) return;
-  try {
-    const clubs = await db
-      .select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId })
-      .from(motoClubs)
-      .where(and(inArray(motoClubs.id, clubIds), eq(motoClubs.isApproved, true)));
-
-    for (const club of clubs) {
-      try {
-        await db.insert(eventClubInvites).values({ eventId, clubId: club.id }).onConflictDoNothing();
-
-        const members = await db.select({ userId: motoClubMembers.userId })
-          .from(motoClubMembers)
-          .where(and(eq(motoClubMembers.clubId, club.id), eq(motoClubMembers.status, "active")));
-
-        // Messaggio nella chat del club
-        if (club.conversationId) {
-          try {
-            await storage.createMessage({
-              conversationId: club.conversationId,
-              senderId,
-              messageType: "text",
-              content: `📅 Il vostro club è stato invitato all'evento "${evt.title}"! Controllatelo nella sezione Events.`,
-            });
-          } catch {}
-        }
-
-        // Notifiche ai singoli membri
-        const notifiedMemberIds: string[] = [];
-        await allLimited(members.map((member) => async () => {
-          if (member.userId === evt.creatorId) return;
-          try {
-            await storage.createNotification({
-              userId: member.userId,
-              title: "Evento per il tuo club!",
-              body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}".`,
-              notificationType: "event_invite",
-              referenceType: "event",
-              referenceId: eventId,
-            });
-            notifiedMemberIds.push(member.userId);
-          } catch {}
-        }));
-
-        if (notifiedMemberIds.length > 0) {
-          sendEventiPushNotifications(notifiedMemberIds, {
-            title: "Evento per il tuo club!",
-            body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}".`,
-            eventId,
-          }).catch(() => {});
-        }
-      } catch {}
-    }
-  } catch (err) {
-    console.error("[events] sendClubInvitesByIds error:", err);
-  }
-}
-
-async function sendClubInvites(evt: Event, approvedEventId: string): Promise<void> {
-  try {
-    const conditions: ReturnType<typeof ilike>[] = [];
-    if (evt.autoInviteRegion) {
-      conditions.push(ilike(motoClubs.region, `%${evt.autoInviteRegion}%`));
-    }
-    if (evt.autoInviteBrand) {
-      conditions.push(ilike(motoClubs.brandName, `%${evt.autoInviteBrand}%`));
-    }
-
-    const clubs = conditions.length > 0
-      ? await db.select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId })
-          .from(motoClubs)
-          .where(and(...conditions))
-      : await db.select({ id: motoClubs.id, name: motoClubs.name, conversationId: motoClubs.conversationId }).from(motoClubs);
-
-    for (const club of clubs) {
-      try {
-        await db.insert(eventClubInvites).values({ eventId: approvedEventId, clubId: club.id })
-          .onConflictDoNothing();
-
-        const members = await db.select({ userId: motoClubMembers.userId })
-          .from(motoClubMembers)
-          .where(eq(motoClubMembers.clubId, club.id));
-
-        const notifiedMemberIds: string[] = [];
-        await allLimited(members.map((member) => async () => {
-          if (member.userId === evt.creatorId) return;
-          try {
-            await storage.createNotification({
-              userId: member.userId,
-              title: "Evento per il tuo club!",
-              body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}". ${evt.autoInviteReason ?? ""}`.trim(),
-              notificationType: "event_invite",
-              referenceType: "event",
-              referenceId: approvedEventId,
-            });
-            notifiedMemberIds.push(member.userId);
-          } catch {}
-        }));
-
-        if (notifiedMemberIds.length > 0) {
-          sendEventiPushNotifications(notifiedMemberIds, {
-            title: "Evento per il tuo club!",
-            body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}".`,
-            eventId: approvedEventId,
-          }).catch(() => {});
-        }
-      } catch {}
-    }
-  } catch (err) {
-    console.error("[events] sendClubInvites error:", err);
-  }
-}
-
-router.post("/:id/invite-user", async (req: Request, res: Response) => {
-  try {
-    const requesterId = requireAuth(req, res);
-    if (!requesterId) return;
-    const eventId = req.params.id;
-    const parsedIu = inviteUserToEventSchema.safeParse(req.body);
-    if (!parsedIu.success) return res.status(400).json({ message: parsedIu.error.issues[0].message });
-    const { userId: targetUserId } = parsedIu.data;
-
-    const [event] = await db.select({
-      id: events.id,
-      title: events.title,
-      organizerId: events.organizerId,
-      status: events.status,
-      eventDate: events.eventDate,
-    }).from(events).where(eq(events.id, eventId)).limit(1);
-    if (!event) return res.status(404).json({ message: "Evento non trovato" });
-
-    if (event.status !== "approved") {
-      return res.status(403).json({ message: "Solo gli eventi approvati accettano inviti" });
-    }
-    const todayStr = new Date().toISOString().substring(0, 10);
-    if (!event.eventDate || String(event.eventDate).substring(0, 10) < todayStr) {
-      return res.status(403).json({ message: "Non puoi invitare a un evento già passato" });
-    }
-
-    const requester = await storage.getUser(requesterId);
-    if (!requester) return res.status(404).json({ message: "Utente non trovato" });
-
-    const isOrganizerOrAdmin =
-      event.organizerId === requesterId ||
-      requester.role === "admin" ||
-      requester.role === "moderator";
-    if (!isOrganizerOrAdmin) {
-      return res.status(403).json({ message: "Solo l'organizzatore o un admin può invitare utenti" });
-    }
-
-    const targetUser = await storage.getUser(targetUserId);
-    if (!targetUser) return res.status(404).json({ message: "Utente destinatario non trovato" });
-
-    const isBlocked = await storage.hasBlockedUser(targetUserId, requesterId);
-    if (isBlocked) return res.status(403).json({ message: "Non puoi contattare questo utente" });
-
-    const [existing] = await db.select({ id: eventParticipants.id })
-      .from(eventParticipants)
-      .where(and(eq(eventParticipants.eventId, eventId), eq(eventParticipants.userId, targetUserId)))
-      .limit(1);
-    if (existing) {
-      return res.status(409).json({ message: "L'utente partecipa già a questo evento" });
-    }
-
-    await storage.createNotification({
-      userId: targetUserId,
-      title: "Invito a un raduno!",
-      body: `${requester.nickname} ti ha invitato al raduno: "${event.title}"`,
-      notificationType: "event_invite",
-      referenceType: "event",
-      referenceId: eventId,
-    });
-
-    return res.json({ success: true });
-  } catch (e) {
-    console.error("[POST /events/:id/invite-user]", e);
-    return res.status(500).json({ message: "Errore interno" });
   }
 });
 

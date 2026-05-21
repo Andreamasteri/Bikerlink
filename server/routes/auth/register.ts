@@ -1,0 +1,355 @@
+import { Router, type Request, type Response } from "express";
+import crypto from "crypto";
+import rateLimit, { MemoryStore } from "express-rate-limit";
+import { registerSchema } from "@shared/schema";
+import { storage } from "../../storage";
+import { sendVerificationEmail, sendInvitationGiftEmail, sendNewUserNotificationEmail } from "../../email";
+import { createRegionalClubInvite } from "../motoclubs";
+import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
+// @ts-ignore
+import signature from "cookie-signature";
+
+function buildSessionToken(sessionID: string): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) return "";
+  return "s:" + signature.sign(sessionID, secret);
+}
+
+const router = Router();
+
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: { message: "Troppi tentativi. Riprova più tardi." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+export const verifyEmailStore = new MemoryStore();
+export const resendVerificationStore = new MemoryStore();
+export const VERIFY_EMAIL_WINDOW_MS = 15 * 60 * 1000;
+export const VERIFY_EMAIL_MAX = 10;
+export const RESEND_VERIFICATION_WINDOW_MS = 60 * 60 * 1000;
+export const RESEND_VERIFICATION_MAX = 5;
+
+const verifyEmailLimiter = rateLimit({
+  windowMs: VERIFY_EMAIL_WINDOW_MS,
+  max: VERIFY_EMAIL_MAX,
+  message: { message: "Troppi tentativi. Riprova più tardi." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: verifyEmailStore,
+});
+
+const resendVerificationLimiter = rateLimit({
+  windowMs: RESEND_VERIFICATION_WINDOW_MS,
+  max: RESEND_VERIFICATION_MAX,
+  message: { message: "Troppi tentativi. Riprova più tardi." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: resendVerificationStore,
+});
+
+export const VERIFY_MAX_ATTEMPTS = 5;
+export const VERIFY_ATTEMPT_WINDOW_MS = 30 * 60 * 1000;
+export const verifyAttempts = new Map<string, { count: number; firstAt: number }>();
+
+function recordVerifyFailure(userId: string): number {
+  const now = Date.now();
+  const entry = verifyAttempts.get(userId);
+  if (!entry || now - entry.firstAt > VERIFY_ATTEMPT_WINDOW_MS) {
+    verifyAttempts.set(userId, { count: 1, firstAt: now });
+    return 1;
+  }
+  entry.count += 1;
+  return entry.count;
+}
+
+export function clearVerifyAttempts(userId: string): void {
+  verifyAttempts.delete(userId);
+}
+
+function isVerifyLockedOut(userId: string): boolean {
+  const entry = verifyAttempts.get(userId);
+  if (!entry) return false;
+  if (Date.now() - entry.firstAt > VERIFY_ATTEMPT_WINDOW_MS) {
+    verifyAttempts.delete(userId);
+    return false;
+  }
+  return entry.count >= VERIFY_MAX_ATTEMPTS;
+}
+
+const VERIFY_TOKEN_RE = /^[A-F0-9]{8}$/;
+
+import bcrypt from "bcryptjs";
+
+router.post("/register", registerLimiter, async (req: Request, res: Response) => {
+  try {
+    const parsed = registerSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ message: parsed.error.issues[0].message });
+    }
+
+    const data = parsed.data;
+
+    if (data.birthYear) {
+      const currentYear = new Date().getFullYear();
+      const age = currentYear - data.birthYear;
+      if (age < 18) {
+        return res.status(400).json({ message: "Devi avere almeno 18 anni per registrarti" });
+      }
+    }
+
+    data.email = data.email.trim().toLowerCase();
+
+    const existingEmail = await storage.getUserByEmail(data.email);
+    if (existingEmail) {
+      return res.status(409).json({ message: "Email già registrata" });
+    }
+
+    const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
+    if (reservedNicknames.includes(data.nickname.toLowerCase())) {
+      return res.status(400).json({ message: "Nickname non disponibile" });
+    }
+
+    const existingNickname = await storage.getUserByNickname(data.nickname);
+    if (existingNickname) {
+      return res.status(409).json({ message: "Nickname già in uso" });
+    }
+
+    let invitationGiftMessage: string | null = null;
+    let invitationImageUrl: string | null = null;
+    let invitationCodeStr: string | null = null;
+    if (data.invitationCode) {
+      const invitation = await storage.getInvitationCode(data.invitationCode);
+      if (!invitation || !invitation.isActive || invitation.currentUses >= invitation.maxUses) {
+        return res.status(400).json({ message: "Codice invito non valido" });
+      }
+      if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
+        return res.status(400).json({ message: "Codice invito scaduto" });
+      }
+      await storage.incrementInvitationCodeUses(invitation.id);
+      invitationGiftMessage = invitation.giftMessage ?? null;
+      invitationImageUrl = invitation.imageUrl ?? null;
+      invitationCodeStr = invitation.code;
+    }
+
+    const hashedPassword = await bcrypt.hash(data.password, 12);
+
+    const primalSetting = await storage.getAppSetting("primal_user_enabled");
+    const isPrimal = primalSetting?.value === "true";
+
+    const user = await storage.createUser({
+      nickname: data.nickname,
+      email: data.email,
+      phone: data.phone,
+      password: hashedPassword,
+      userType: data.userType,
+      sex: data.sex,
+      coupleSexConfig: data.coupleSexConfig,
+      birthYear: data.birthYear,
+      region: data.region,
+      country: data.country,
+      eulaAccepted: true,
+      privacyAccepted: true,
+      consentAcceptedAt: new Date(),
+      invitationCode: data.invitationCode,
+      isPrimal,
+    });
+
+    await storage.createUserProfile({ userId: user.id });
+
+    storage.getUserByNickname("admin").then(async (adminUser) => {
+      if (!adminUser) return;
+      const conv = await storage.createConversation({ conversationType: "private" });
+      await storage.addConversationParticipant({ conversationId: conv.id, userId: adminUser.id });
+      await storage.addConversationParticipant({ conversationId: conv.id, userId: user.id });
+      await storage.createMessage({
+        conversationId: conv.id,
+        senderId: adminUser.id,
+        messageType: "text",
+        content: "Ricordati di aggiungere le tue moto al garage, nel tab profilo",
+      });
+      await storage.updateConversationTimestamp(conv.id);
+    }).catch((e) => console.warn("[WELCOME] Messaggio admin non inviato:", e));
+
+    sendNewUserNotificationEmail(
+      {
+        nickname: user.nickname,
+        email: user.email,
+        phone: user.phone,
+        userType: user.userType,
+        sex: user.sex,
+        birthYear: user.birthYear,
+        region: user.region,
+        country: user.country,
+      },
+      invitationCodeStr ?? null
+    ).catch((e) => console.warn("[EMAIL] Admin notification failed (non-blocking):", e));
+
+    if (data.region) {
+      createRegionalClubInvite(user.id, data.region).catch(() => {});
+    }
+
+    if (invitationCodeStr) {
+      try {
+        const registrationDate = new Date();
+        const expiryDate = new Date(registrationDate.getTime() + 5 * 24 * 60 * 60 * 1000);
+        await sendInvitationGiftEmail(user.email, invitationCodeStr, invitationImageUrl, invitationGiftMessage, expiryDate);
+      } catch (e) {
+        console.warn("[EMAIL] Errore invio gift email (non bloccante):", e);
+      }
+    }
+
+    const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
+    const emailVerificationEnabled = emailVerifSetting?.value === "true";
+
+    if (emailVerificationEnabled && !isPrimal) {
+      const token = crypto.randomBytes(4).toString("hex").toUpperCase();
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+      await storage.createEmailVerificationToken(user.id, token, expiresAt);
+      const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
+      if (emailSent) {
+        console.log(`[EMAIL VERIFICATION] Email inviata a utente ${user.id}`);
+      } else {
+        console.warn(`[EMAIL VERIFICATION] Email NON inviata a utente ${user.id} - fallback notifica admin`);
+      }
+
+      let emailStatusMsg = " (email inviata)";
+      if (!emailSent) {
+        const errCode = (await storage.getAppSetting("email_last_send_error_code").catch(() => undefined))?.value || "other";
+        const errMsg = (await storage.getAppSetting("email_last_send_error").catch(() => undefined))?.value || "errore sconosciuto";
+        const codeLabel: Record<string, string> = {
+          "no-credentials": "credenziali Gmail non configurate",
+          "auth": "autenticazione Gmail rifiutata (App Password revocata o errata)",
+          "network": "errore di rete verso Gmail",
+          "other": "errore SMTP",
+        };
+        emailStatusMsg = ` (email NON inviata — ${codeLabel[errCode] ?? errCode}: ${errMsg.substring(0, 200)})`;
+      }
+
+      try {
+        const adminUser = await storage.getUserByNickname("admin");
+        if (adminUser) {
+          await storage.createNotification({
+            userId: adminUser.id,
+            title: "Nuova registrazione - Verifica Email",
+            body: `L'utente ${user.nickname} (ID: ${user.id}) si è registrato. Codice verifica: ${token}${emailStatusMsg}`,
+            notificationType: "system",
+            referenceType: "user",
+            referenceId: user.id,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to notify admin about email verification:", e);
+      }
+
+      const { password: _, ...safeUser } = user;
+      return res.status(201).json({ ...safeUser, requiresEmailVerification: true, giftMessage: invitationGiftMessage });
+    }
+
+    if (isPrimal) {
+      await storage.markUserEmailVerified(user.id);
+    }
+
+    req.session.userId = user.id;
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => { if (err) reject(err); else resolve(); });
+    });
+
+    try {
+      const vid = parseVisitorCookie(req);
+      if (vid) recordVisit({ req, visitorId: vid, event: "register", userId: user.id, path: "/api/auth/register" });
+    } catch {}
+
+    const { password: _, ...safeUser } = user;
+    return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage, sessionToken: buildSessionToken(req.sessionID) });
+  } catch (error) {
+    console.error("Register error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Response) => {
+  try {
+    const { email, token } = req.body;
+    if (!email || !token) {
+      return res.status(400).json({ message: "Email e codice richiesti" });
+    }
+    const normalizedToken = String(token).trim().toUpperCase();
+    if (!VERIFY_TOKEN_RE.test(normalizedToken)) {
+      return res.status(400).json({ message: "Codice non valido" });
+    }
+
+    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    if (!user) {
+      return res.status(400).json({ message: "Codice non valido" });
+    }
+
+    if (isVerifyLockedOut(user.id)) {
+      await storage.deleteEmailVerificationTokens(user.id).catch(() => {});
+      return res.status(429).json({ message: "Troppi tentativi. Richiedi un nuovo codice." });
+    }
+
+    const verif = await storage.getEmailVerificationToken(normalizedToken);
+    if (!verif || verif.userId !== user.id) {
+      const attempts = recordVerifyFailure(user.id);
+      if (attempts >= VERIFY_MAX_ATTEMPTS) {
+        await storage.deleteEmailVerificationTokens(user.id).catch(() => {});
+      }
+      return res.status(400).json({ message: "Codice non valido" });
+    }
+
+    if (new Date(verif.expiresAt) < new Date()) {
+      recordVerifyFailure(user.id);
+      return res.status(400).json({ message: "Codice scaduto. Richiedi un nuovo codice." });
+    }
+
+    await storage.markUserEmailVerified(user.id);
+    await storage.deleteEmailVerificationTokens(user.id);
+    clearVerifyAttempts(user.id);
+
+    req.session.userId = user.id;
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((err) => { if (err) reject(err); else resolve(); });
+    });
+    const { password: _, ...safeUser } = user;
+    return res.json({ ...safeUser, emailVerified: true, sessionToken: buildSessionToken(req.sessionID) });
+  } catch (error) {
+    console.error("Verify email error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+router.post("/resend-verification", resendVerificationLimiter, async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email richiesta" });
+    }
+
+    const genericResponse = { message: "Se l'email è registrata e in attesa di verifica, riceverai un nuovo codice." };
+
+    const user = await storage.getUserByEmail(email.trim().toLowerCase());
+    if (!user || user.emailVerified) {
+      return res.json(genericResponse);
+    }
+
+    await storage.deleteEmailVerificationTokens(user.id);
+    clearVerifyAttempts(user.id);
+    const token = crypto.randomBytes(4).toString("hex").toUpperCase();
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+    await storage.createEmailVerificationToken(user.id, token, expiresAt);
+    const emailSent = await sendVerificationEmail(user.email, user.nickname, token);
+    if (!emailSent) {
+      console.warn(`[EMAIL VERIFICATION] Resend: email NON inviata a utente ${user.id}`);
+    }
+
+    return res.json(genericResponse);
+  } catch (error) {
+    console.error("Resend verification error:", error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+export default router;

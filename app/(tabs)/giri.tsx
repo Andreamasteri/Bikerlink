@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  Pressable,
   StyleSheet,
   RefreshControl,
   Alert,
@@ -12,144 +11,17 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest } from "@/lib/query-client";
 import { loadIndex } from "@/lib/offline-tiles";
-
-interface TelemetryStats {
-  km_collected: number;
-  progress_pct: number;
-  target_km: number;
-}
-
-function TelemetryProgressBanner({ colors }: { colors: ReturnType<typeof useColors> }) {
-  const [expanded, setExpanded] = useState(false);
-  const { data: stats } = useQuery<TelemetryStats>({
-    queryKey: ["/api/rides/me/telemetry-stats"],
-    queryFn: () => apiRequest("GET", "/api/rides/me/telemetry-stats").then((r) => r.json()),
-    staleTime: 60_000,
-  });
-
-  if (!stats) return null;
-
-  const pct = stats.progress_pct;
-  const kmLeft = Math.max(0, stats.target_km - stats.km_collected);
-  const isDone = pct >= 100;
-
-  return (
-    <Pressable
-      onPress={() => setExpanded((v) => !v)}
-      style={[
-        bannerStyles.chip,
-        {
-          backgroundColor: colors.surface,
-          borderColor: isDone ? "#22c55e" : colors.accent + "55",
-          marginHorizontal: 16,
-          marginBottom: 10,
-        },
-      ]}
-      testID="telemetry-banner"
-    >
-      <View style={bannerStyles.chipRow}>
-        <MaterialCommunityIcons
-          name={isDone ? "check-circle" : "chart-line"}
-          size={15}
-          color={isDone ? "#22c55e" : colors.accent}
-        />
-        <Text style={[bannerStyles.chipLabel, { color: isDone ? "#22c55e" : colors.text }]}>
-          {isDone ? "Stile guida pronto" : `${pct}% — ${stats.km_collected.toFixed(0)} km raccolti`}
-        </Text>
-        <Ionicons
-          name={expanded ? "chevron-up" : "chevron-down"}
-          size={13}
-          color={colors.textSecondary}
-        />
-      </View>
-
-      {expanded && (
-        <View style={bannerStyles.panel}>
-          <View style={[bannerStyles.barBg, { backgroundColor: colors.border }]}>
-            <View
-              style={[
-                bannerStyles.barFill,
-                {
-                  width: `${Math.min(pct, 100)}%` as `${number}%`,
-                  backgroundColor: isDone ? "#22c55e" : colors.accent,
-                },
-              ]}
-            />
-          </View>
-          <Text style={[bannerStyles.detail, { color: colors.textSecondary }]}>
-            {isDone
-              ? "Dati sufficienti per pianificare percorsi basati sul tuo stile di guida reale."
-              : `Quando raggiungerà il 100%, potrai pianificare percorsi in base al tuo stile di guida reale. Mancano ancora ${kmLeft.toFixed(0)} km (obiettivo: ${stats.target_km} km).`}
-          </Text>
-        </View>
-      )}
-    </Pressable>
-  );
-}
-
-const bannerStyles = StyleSheet.create({
-  chip: {
-    borderRadius: 10,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  chipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 7,
-  },
-  chipLabel: {
-    flex: 1,
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-  },
-  panel: {
-    marginTop: 10,
-    gap: 8,
-  },
-  barBg: {
-    height: 6,
-    borderRadius: 3,
-    overflow: "hidden",
-  },
-  barFill: {
-    height: "100%",
-    borderRadius: 3,
-  },
-  detail: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    lineHeight: 18,
-  },
-});
-
-interface PlannedRoute {
-  id: string;
-  title: string;
-  description?: string | null;
-  distanceKm: number;
-  durationMinutes: number;
-  bikerScore: number;
-  style: "curvy" | "balanced" | "fast";
-  visibility: "public" | "private";
-  isMultiDay: boolean;
-  waypoints: Array<{ lat: number; lng: number; name?: string }>;
-  createdAt: string;
-  metadata?: {
-    weatherSummary?: { icon: string; avgTemp: number; hasRain: boolean };
-    bikerCount?: number;
-    realCurvatureScore?: number;
-  } | null;
-}
-
-type FilterTab = "mine" | "public";
+import { TelemetryProgressBanner } from "@/components/giri/list/TelemetryProgressBanner";
+import { GiriListHeader } from "@/components/giri/list/GiriListHeader";
+import { GiriListFilters, FilterTab } from "@/components/giri/list/GiriListFilters";
+import { GiriListCard, PlannedRoute } from "@/components/giri/list/GiriListCard";
+import { GiriEmptyState } from "@/components/giri/list/GiriEmptyState";
 
 export default function GiriScreen() {
   const colors = useColors();
@@ -175,31 +47,6 @@ export default function GiriScreen() {
     mutationFn: (id: string) => apiRequest("DELETE", `/api/planned-routes/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/planned-routes"] }); },
   });
-
-  const styleIcon = (style: string) => {
-    if (style === "curvy") return "road-variant";
-    if (style === "fast") return "rocket-launch-outline";
-    return "scale-balance";
-  };
-
-  const styleLabel = (style: string) => {
-    if (style === "curvy") return "Curve";
-    if (style === "fast") return "Veloce";
-    return "Bilanciato";
-  };
-
-  const formatDuration = (mins: number) => {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    if (h === 0) return `${m}min`;
-    return m > 0 ? `${h}h ${m}min` : `${h}h`;
-  };
-
-  const bikerScoreColor = (score: number) => {
-    if (score >= 0.7) return "#22c55e";
-    if (score >= 0.4) return colors.accent;
-    return colors.textSecondary;
-  };
 
   const [offlineRouteIds, setOfflineRouteIds] = useState<Set<string>>(new Set());
   const offlineCheckScheduled = useRef(false);
@@ -273,50 +120,18 @@ export default function GiriScreen() {
 
   return (
     <View style={[s.container, { paddingTop: topPad }]}>
-      <View style={s.header}>
-        <View>
-          <Text style={s.headerTitle}>Giri</Text>
-          <Text style={s.headerSub}>I tuoi percorsi in moto</Text>
-        </View>
-        <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-          <Pressable
-            style={s.importBtn}
-            onPress={handleImportGpx}
-            disabled={isImporting}
-            testID="import-gpx-btn"
-          >
-            {isImporting ? (
-              <ActivityIndicator size="small" color={colors.text} />
-            ) : (
-              <MaterialCommunityIcons name="file-upload-outline" size={18} color={colors.text} />
-            )}
-            <Text style={s.importBtnText}>Importa GPX</Text>
-          </Pressable>
-          <Pressable
-            style={s.planBtn}
-            onPress={() => router.push("/giri/create" as any)}
-          >
-            <MaterialCommunityIcons name="map-marker-plus" size={20} color="#000" />
-            <Text style={s.planBtnText}>Pianifica</Text>
-          </Pressable>
-        </View>
-      </View>
+      <GiriListHeader
+        isImporting={isImporting}
+        onImportGpx={handleImportGpx}
+        onPlan={() => router.push("/giri/create" as any)}
+      />
 
-      <TelemetryProgressBanner colors={colors} />
+      <TelemetryProgressBanner />
 
-      <View style={s.filterRow}>
-        {(["mine", "public"] as FilterTab[]).map((f) => (
-          <Pressable
-            key={f}
-            style={[s.filterChip, filter === f && { backgroundColor: colors.accent }]}
-            onPress={() => setFilter(f)}
-          >
-            <Text style={[s.filterChipText, filter === f && { color: "#000" }]}>
-              {f === "mine" ? "I miei" : "Pubblici"}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
+      <GiriListFilters
+        filter={filter}
+        onFilterChange={setFilter}
+      />
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: botPad + 80, paddingHorizontal: 16 }}
@@ -324,137 +139,25 @@ export default function GiriScreen() {
         showsVerticalScrollIndicator={false}
       >
         {isLoading ? (
-          <View style={s.emptyState}>
-            <MaterialCommunityIcons name="loading" size={40} color={colors.textSecondary} />
-            <Text style={s.emptyText}>Caricamento...</Text>
+          <View style={s.loadingState}>
+            <ActivityIndicator size="large" color={colors.accent} />
+            <Text style={s.loadingText}>Caricamento...</Text>
           </View>
         ) : routes.length === 0 ? (
-          <View style={s.emptyState}>
-            <MaterialCommunityIcons name="map-marker-path" size={60} color={colors.textSecondary} />
-            <Text style={s.emptyTitle}>
-              {filter === "mine" ? "Nessun giro pianificato" : "Nessun giro pubblico"}
-            </Text>
-            <Text style={s.emptyText}>
-              {filter === "mine"
-                ? "Premi \"Pianifica\" per creare il tuo primo giro in moto"
-                : "Non ci sono ancora giri condivisi dalla community"}
-            </Text>
-            {filter === "mine" && (
-              <Pressable
-                style={[s.planBtn, { marginTop: 16 }]}
-                onPress={() => router.push("/giri/create" as any)}
-              >
-                <MaterialCommunityIcons name="map-marker-plus" size={18} color="#000" />
-                <Text style={s.planBtnText}>Pianifica ora</Text>
-              </Pressable>
-            )}
-          </View>
+          <GiriEmptyState 
+            filter={filter} 
+            onPlan={() => router.push("/giri/create" as any)} 
+          />
         ) : (
           routes.map((route) => (
-            <Pressable
+            <GiriListCard
               key={route.id}
-              style={s.card}
+              route={route}
+              isOffline={offlineRouteIds.has(route.id)}
+              isMine={filter === "mine"}
               onPress={() => router.push(`/giri/${route.id}` as any)}
-            >
-              <View style={s.cardHeader}>
-                <View style={s.cardTitleRow}>
-                  <MaterialCommunityIcons
-                    name={styleIcon(route.style) as any}
-                    size={16}
-                    color={colors.accent}
-                  />
-                  <Text style={s.cardTitle} numberOfLines={1}>{route.title}</Text>
-                  {route.isMultiDay && (
-                    <View style={s.multiDayBadge}>
-                      <Text style={s.multiDayText}>Multi-giorno</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                  {offlineRouteIds.has(route.id) && (
-                    <MaterialCommunityIcons
-                      name="cloud-check-outline"
-                      size={18}
-                      color="#22c55e"
-                      testID={`offline-badge-${route.id}`}
-                    />
-                  )}
-                  {filter === "mine" && (
-                    <Pressable
-                      onPress={() => deleteMutation.mutate(route.id)}
-                      hitSlop={12}
-                      style={{ padding: 4 }}
-                    >
-                      <Ionicons name="trash-outline" size={18} color={colors.accentRed} />
-                    </Pressable>
-                  )}
-                </View>
-              </View>
-
-              <View style={s.statsRow}>
-                <View style={s.stat}>
-                  <Ionicons name="navigate-outline" size={14} color={colors.textSecondary} />
-                  <Text style={s.statText}>{route.distanceKm} km</Text>
-                </View>
-                <View style={s.stat}>
-                  <Ionicons name="time-outline" size={14} color={colors.textSecondary} />
-                  <Text style={s.statText}>{formatDuration(route.durationMinutes)}</Text>
-                </View>
-                <View style={s.stat}>
-                  <MaterialCommunityIcons name="steering" size={14} color={colors.textSecondary} />
-                  <Text style={s.statText}>{styleLabel(route.style)}</Text>
-                </View>
-              </View>
-
-              <View style={s.bikerScoreRow}>
-                <Text style={s.bikerScoreLabel}>BikerScore</Text>
-                <View style={s.bikerScoreBar}>
-                  <View
-                    style={[
-                      s.bikerScoreFill,
-                      {
-                        width: `${Math.round(route.bikerScore * 100)}%`,
-                        backgroundColor: bikerScoreColor(route.bikerScore),
-                      },
-                    ]}
-                  />
-                </View>
-                <Text style={[s.bikerScoreValue, { color: bikerScoreColor(route.bikerScore) }]}>
-                  {Math.round(route.bikerScore * 100)}
-                </Text>
-              </View>
-
-              {route.waypoints && route.waypoints.length > 0 && (
-                <Text style={s.waypointsText} numberOfLines={1}>
-                  {route.waypoints.map((wp, i) => wp.name ?? `Tappa ${i + 1}`).join(" → ")}
-                </Text>
-              )}
-
-              {(route.metadata?.weatherSummary || (route.metadata?.bikerCount != null && route.metadata.bikerCount > 0)) && (
-                <View style={s.cardMetaRow}>
-                  {route.metadata?.weatherSummary && (
-                    <View style={s.cardMetaBadge}>
-                      <Ionicons
-                        name={route.metadata.weatherSummary.icon === "rainy" ? "rainy-outline" : route.metadata.weatherSummary.icon === "cloudy" ? "cloudy-outline" : "sunny-outline"}
-                        size={12}
-                        color={route.metadata.weatherSummary.hasRain ? colors.accentRed : "#f59e0b"}
-                      />
-                      <Text style={[s.cardMetaText, route.metadata.weatherSummary.hasRain && { color: colors.accentRed }]}>
-                        {route.metadata.weatherSummary.avgTemp}°C
-                      </Text>
-                    </View>
-                  )}
-                  {route.metadata?.bikerCount != null && route.metadata.bikerCount > 0 && (
-                    <View style={s.cardMetaBadge}>
-                      <MaterialCommunityIcons name="account-group-outline" size={12} color={colors.accent} />
-                      <Text style={[s.cardMetaText, { color: colors.accent }]}>
-                        {route.metadata.bikerCount} biker{route.metadata.bikerCount !== 1 ? "s" : ""}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </Pressable>
+              onDelete={() => deleteMutation.mutate(route.id)}
+            />
           ))
         )}
       </ScrollView>
@@ -465,188 +168,16 @@ export default function GiriScreen() {
 const styles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 16,
-      paddingBottom: 12,
-    },
-    headerTitle: {
-      fontFamily: "Inter_700Bold",
-      fontSize: 26,
-      color: colors.text,
-    },
-    headerSub: {
-      fontFamily: "Inter_400Regular",
-      fontSize: 13,
-      color: colors.textSecondary,
-    },
-    planBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      backgroundColor: colors.accent,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      borderRadius: 20,
-    },
-    planBtnText: {
-      fontFamily: "Inter_600SemiBold",
-      fontSize: 14,
-      color: "#000",
-    },
-    importBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      borderRadius: 20,
-    },
-    importBtnText: {
-      fontFamily: "Inter_600SemiBold",
-      fontSize: 13,
-      color: colors.text,
-    },
-    filterRow: {
-      flexDirection: "row",
-      gap: 8,
-      paddingHorizontal: 16,
-      marginBottom: 14,
-    },
-    filterChip: {
-      paddingHorizontal: 16,
-      paddingVertical: 7,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
-    },
-    filterChipText: {
-      fontFamily: "Inter_500Medium",
-      fontSize: 13,
-      color: colors.text,
-    },
-    emptyState: {
+    loadingState: {
       alignItems: "center",
       paddingTop: 60,
-      paddingHorizontal: 32,
       gap: 12,
     },
-    emptyTitle: {
-      fontFamily: "Inter_600SemiBold",
-      fontSize: 18,
-      color: colors.text,
-      textAlign: "center",
-    },
-    emptyText: {
+    loadingText: {
       fontFamily: "Inter_400Regular",
       fontSize: 14,
-      color: colors.textSecondary,
-      textAlign: "center",
-      lineHeight: 20,
-    },
-    card: {
-      backgroundColor: colors.surface,
-      borderRadius: 14,
-      padding: 14,
-      marginBottom: 12,
-      gap: 8,
-    },
-    cardHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-    },
-    cardTitleRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 6,
-      flex: 1,
-    },
-    cardTitle: {
-      fontFamily: "Inter_600SemiBold",
-      fontSize: 15,
-      color: colors.text,
-      flex: 1,
-    },
-    multiDayBadge: {
-      backgroundColor: "#7c3aed22",
-      borderRadius: 8,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-    },
-    multiDayText: {
-      fontFamily: "Inter_500Medium",
-      fontSize: 11,
-      color: "#a78bfa",
-    },
-    statsRow: {
-      flexDirection: "row",
-      gap: 16,
-    },
-    stat: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-    },
-    statText: {
-      fontFamily: "Inter_400Regular",
-      fontSize: 13,
-      color: colors.textSecondary,
-    },
-    bikerScoreRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-    },
-    bikerScoreLabel: {
-      fontFamily: "Inter_500Medium",
-      fontSize: 12,
-      color: colors.textSecondary,
-      width: 72,
-    },
-    bikerScoreBar: {
-      flex: 1,
-      height: 6,
-      backgroundColor: colors.border,
-      borderRadius: 3,
-      overflow: "hidden",
-    },
-    bikerScoreFill: {
-      height: "100%",
-      borderRadius: 3,
-    },
-    bikerScoreValue: {
-      fontFamily: "Inter_700Bold",
-      fontSize: 13,
-      width: 28,
-      textAlign: "right",
-    },
-    waypointsText: {
-      fontFamily: "Inter_400Regular",
-      fontSize: 12,
-      color: colors.textSecondary,
-    },
-    cardMetaRow: {
-      flexDirection: "row",
-      gap: 8,
-      flexWrap: "wrap",
-    },
-    cardMetaBadge: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-      backgroundColor: colors.background,
-      borderRadius: 8,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-    },
-    cardMetaText: {
-      fontFamily: "Inter_500Medium",
-      fontSize: 11,
       color: colors.textSecondary,
     },
   });
+
+

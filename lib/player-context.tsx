@@ -21,67 +21,14 @@ type AudioPlayerInstance = ExpoAudioPlayer & {
   ) => { remove: () => void };
 };
 import { getApiUrl } from "@/lib/query-client";
-
-export type PlayerSource = "radio" | "library" | "file" | "preview";
-export type RepeatMode = "off" | "track" | "queue";
-
-export interface PlayerTrack {
-  id: string;
-  url: string;
-  title: string;
-  artist: string;
-  album?: string;
-  artwork?: string;
-  duration?: number;
-  source: PlayerSource;
-}
-
-export interface RadioStation {
-  id: string;
-  name: string;
-  streamUrl: string;
-  favicon?: string;
-  country?: string;
-  votes?: number;
-  bitrate?: number;
-  tags?: string;
-}
-
-interface PlayerState {
-  isPlaying: boolean;
-  currentTrack: PlayerTrack | null;
-  queue: PlayerTrack[];
-  queueIndex: number;
-  position: number;
-  duration: number;
-  isBuffering: boolean;
-  source: PlayerSource;
-  isAvailable: boolean;
-  sleepTimer: number | null;
-  sleepTimerEnd: number | null;
-  favoriteStationIds: string[];
-  selectedGenre: string | null;
-  isShuffled: boolean;
-  repeatMode: RepeatMode;
-}
-
-interface PlayerContextType extends PlayerState {
-  play: () => void;
-  pause: () => void;
-  stop: () => void;
-  togglePlay: () => void;
-  playTrack: (track: PlayerTrack) => void;
-  playQueue: (tracks: PlayerTrack[], startIndex?: number) => void;
-  playRadioStation: (station: RadioStation, genreId?: string) => void;
-  next: () => void;
-  prev: () => void;
-  seekTo: (position: number) => void;
-  setSleepTimer: (minutes: number | null) => void;
-  toggleFavorite: (stationId: string) => void;
-  toggleShuffle: () => void;
-  toggleRepeat: () => void;
-  setSelectedGenre: (genre: string | null) => void;
-}
+import {
+  PlayerTrack,
+  RadioStation,
+  PlayerSource,
+  RepeatMode,
+  PlayerContextType,
+} from "./player-context-types";
+import { usePlayerRefs } from "./use-player-refs";
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
 
@@ -123,31 +70,24 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [isShuffled, setIsShuffled] = useState(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>("off");
 
+  const {
+    queueRef,
+    queueIndexRef,
+    repeatModeRef,
+    isPlayingRef,
+    isShuffledRef,
+  } = usePlayerRefs(queue, queueIndex, repeatMode, isPlaying, isShuffled);
+
   const playerRef = useRef<AudioPlayerInstance | null>(null);
   const listenerRef = useRef<{ remove: () => void } | null>(null);
-  const queueRef = useRef<PlayerTrack[]>([]);
-  const queueIndexRef = useRef(0);
-  const repeatModeRef = useRef<RepeatMode>("off");
-  const isPlayingRef = useRef(false);
-  const isShuffledRef = useRef(false);
   const shuffleHistoryRef = useRef<Set<number>>(new Set());
   const userPausedRef = useRef(false);
-  // Set by onPlaybackStatus when it detects an OS-caused pause (not user, not track-end).
-  // Cleared on play(), loadAndPlay(), and stop(). Used by the AppState recovery handler.
   const wasInterruptedRef = useRef(false);
   const prevPlayingRef = useRef(false);
-  // One-shot delayed recovery for foreground-only interruptions (Bluetooth
-  // disconnect while app stays in foreground — no AppState change fires).
   const recoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const radioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenRef = useRef(0);
-
-  useEffect(() => { queueRef.current = queue; }, [queue]);
-  useEffect(() => { queueIndexRef.current = queueIndex; }, [queueIndex]);
-  useEffect(() => { repeatModeRef.current = repeatMode; }, [repeatMode]);
-  useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
-  useEffect(() => { isShuffledRef.current = isShuffled; }, [isShuffled]);
 
   useEffect(() => {
     let mounted = true;
@@ -177,7 +117,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
           const saved = JSON.parse(v);
           if (saved === true) {
             setIsShuffled(true);
-            isShuffledRef.current = true;
           }
         } catch (err) {
           console.warn("[Player] shuffle parse error:", err);
@@ -185,12 +124,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // Interruption recovery: when the app returns to the foreground after a
-    // permanent audio focus loss (AUDIOFOCUS_LOSS / phone call), re-request
-    // audio focus and resume only if:
-    //   • playerRef exists (active player, not stopped)
-    //   • wasInterruptedRef is true (pause was OS-caused, detected in onPlaybackStatus)
-    //   • player is still paused (not resumed by native transient-focus handling)
     const appStateSub = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active" && playerRef.current && wasInterruptedRef.current && !isPlayingRef.current) {
         console.log("[Player] Recovering from audio interruption — re-requesting focus");
@@ -232,9 +165,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sleepTimerEnd]);
 
-  // Returns the next queue index, respecting shuffle mode.
-  // In shuffle mode it picks a random unplayed track; when all tracks have
-  // been played it resets the history and starts a new cycle.
   const getNextIndex = useCallback((q: PlayerTrack[], currentIdx: number): number => {
     if (!isShuffledRef.current) {
       return (currentIdx + 1) % q.length;
@@ -246,36 +176,23 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       if (!history.has(i)) unplayed.push(i);
     }
     if (unplayed.length === 0) {
-      // All tracks played — reset history and start a new cycle,
-      // but avoid replaying the track that just finished.
       shuffleHistoryRef.current = new Set([currentIdx]);
       const fresh: number[] = [];
       for (let i = 0; i < q.length; i++) {
         if (i !== currentIdx) fresh.push(i);
       }
-      if (fresh.length === 0) return currentIdx; // single-track edge case
+      if (fresh.length === 0) return currentIdx;
       return fresh[Math.floor(Math.random() * fresh.length)];
     }
     return unplayed[Math.floor(Math.random() * unplayed.length)];
-  }, []);
+  }, [isShuffledRef]);
 
   const onPlaybackStatus = useCallback((status: AudioStatus) => {
     if (!status.isLoaded) return;
 
-    // Detect OS-caused pause: playing transitioned true→false, track did not
-    // finish, and the user did not explicitly pause. This indicates an audio
-    // interruption (phone call, alarm, Bluetooth disconnect, etc.).
-    // Native expo-audio already handles AUDIOFOCUS_LOSS_TRANSIENT by auto-
-    // resuming — but AUDIOFOCUS_LOSS (permanent, e.g. phone call) does not
-    // auto-resume. We flag it here so the AppState listener can recover it.
     if (prevPlayingRef.current && !status.playing && !status.didJustFinish && !userPausedRef.current) {
       wasInterruptedRef.current = true;
       console.log("[Player] OS interruption detected — waiting to recover");
-      // Schedule a foreground recovery attempt for interruptions that never
-      // trigger an AppState change (e.g. Bluetooth disconnect while the app
-      // stays in foreground). Fires once after 5 s; if the player is still
-      // paused and the native AUDIOFOCUS_GAIN callback has not already resumed
-      // it, we re-request audio focus and call play().
       if (recoveryTimeoutRef.current) clearTimeout(recoveryTimeoutRef.current);
       recoveryTimeoutRef.current = setTimeout(() => {
         recoveryTimeoutRef.current = null;
@@ -292,7 +209,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       }, 5000);
     } else if (status.playing) {
-      // Playing resumed (either by user or by native AUDIOFOCUS_GAIN handling).
       wasInterruptedRef.current = false;
       if (recoveryTimeoutRef.current) {
         clearTimeout(recoveryTimeoutRef.current);
@@ -322,7 +238,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         setIsPlaying(false);
       }
     }
-  }, [getNextIndex]);
+  }, [getNextIndex, repeatModeRef, queueRef, queueIndexRef, isShuffledRef]);
 
   const destroyPlayer = useCallback(() => {
     if (radioTimeoutRef.current) {
@@ -344,7 +260,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const loadAndPlay = useCallback(async (track: PlayerTrack, trackIndex: number) => {
     const gen = ++loadGenRef.current;
-    userPausedRef.current = false; // new track load is always intentional play
+    userPausedRef.current = false;
     wasInterruptedRef.current = false;
     if (recoveryTimeoutRef.current) { clearTimeout(recoveryTimeoutRef.current); recoveryTimeoutRef.current = null; }
     try {
@@ -433,7 +349,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
 
   const togglePlay = useCallback(() => {
     if (isPlayingRef.current) pause(); else play();
-  }, [play, pause]);
+  }, [play, pause, isPlayingRef]);
 
   const stop = useCallback(() => {
     loadGenRef.current++;
@@ -453,24 +369,20 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setAudioModeAsync(AUDIO_MODE_INACTIVE).catch((err) => console.warn("[Player] audio mode reset error:", err));
     setCurrentTrack(null);
     setQueue([]);
-    queueRef.current = [];
     setIsPlaying(false);
-    isPlayingRef.current = false;
     setPosition(0);
     setDuration(0);
   }, [destroyPlayer]);
 
   const playTrack = useCallback(async (track: PlayerTrack) => {
     setQueue([track]);
-    queueRef.current = [track];
     await loadAndPlay(track, 0);
   }, [loadAndPlay]);
 
   const playQueue = useCallback(async (tracks: PlayerTrack[], startIndex = 0) => {
     if (tracks.length === 0) return;
-    shuffleHistoryRef.current = new Set(); // reset shuffle history for new queue
+    shuffleHistoryRef.current = new Set();
     setQueue(tracks);
-    queueRef.current = tracks;
     await loadAndPlay(tracks[startIndex], startIndex);
   }, [loadAndPlay]);
 
@@ -493,7 +405,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       source: "radio",
     };
     setQueue([track]);
-    queueRef.current = [track];
     await loadAndPlay(track, 0);
     if (genreId) setSelectedGenre(genreId);
   }, [loadAndPlay, toProxyUrl]);
@@ -504,7 +415,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (q.length <= 1) return;
     const nextIdx = getNextIndex(q, idx);
     await loadAndPlay(q[nextIdx], nextIdx);
-  }, [loadAndPlay, getNextIndex]);
+  }, [loadAndPlay, getNextIndex, queueRef, queueIndexRef]);
 
   const prev = useCallback(async () => {
     const q = queueRef.current;
@@ -516,7 +427,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (q.length <= 1) return;
     const prevIdx = idx === 0 ? q.length - 1 : idx - 1;
     await loadAndPlay(q[prevIdx], prevIdx);
-  }, [loadAndPlay, position]);
+  }, [loadAndPlay, position, queueRef, queueIndexRef]);
 
   const seekTo = useCallback(async (pos: number) => {
     try { await playerRef.current?.seekTo(pos); } catch (err) { console.warn("[Player] seekTo error:", err); }
@@ -545,8 +456,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const toggleShuffle = useCallback(() => {
     setIsShuffled((v) => {
       const next = !v;
-      isShuffledRef.current = next;
-      shuffleHistoryRef.current = new Set(); // reset history on every toggle
+      shuffleHistoryRef.current = new Set();
       AsyncStorage.setItem(SHUFFLE_KEY, JSON.stringify(next)).catch((err) => {
         console.warn("[Player] shuffle persist error:", err);
       });
@@ -558,7 +468,6 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     setRepeatMode((prev) => {
       const next: RepeatMode =
         prev === "off" ? "track" : prev === "track" ? "queue" : "off";
-      repeatModeRef.current = next;
       if (playerRef.current) {
         playerRef.current.loop = next === "track";
       }

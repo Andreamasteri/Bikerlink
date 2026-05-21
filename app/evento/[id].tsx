@@ -9,11 +9,8 @@ import {
   ActivityIndicator,
   Platform,
   Linking,
-  Dimensions,
 } from "react-native";
-import { Image } from "expo-image";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import LeafletMiniMap from "@/components/LeafletMiniMap";
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -21,11 +18,13 @@ import * as WebBrowser from "expo-web-browser";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
-import EventParticipants from "@/components/eventi/EventParticipants";
 import EventForm from "@/components/eventi/EventForm";
 import type { EventDTO } from "@/shared/event-types";
-import { EVENT_TYPE_LABELS, EVENT_TYPE_COLORS } from "@/shared/event-types";
 import { useT } from "@/lib/language-context";
+import EventDetailHeader from "@/components/evento/detail/EventDetailHeader";
+import EventDetailMap from "@/components/evento/detail/EventDetailMap";
+import EventDetailParticipants from "@/components/evento/detail/EventDetailParticipants";
+import EventDetailActions from "@/components/evento/detail/EventDetailActions";
 
 function formatFullDate(dateStr: string, timeStr: string | null): string {
   try {
@@ -41,48 +40,6 @@ function resolveImageUrl(imageUrl: string): string {
   if (imageUrl.startsWith("http")) return imageUrl;
   return `${getApiUrl()}${imageUrl}`;
 }
-
-function StatusBadge({ status, rejectionReason }: { status: string; rejectionReason?: string | null }) {
-  const t = useT();
-  if (status === "approved") return null;
-  const map: Record<string, { label: string; color: string }> = {
-    pending: { label: t("events.pendingApproval"), color: Colors.warning },
-    rejected: { label: t("events.rejected"), color: Colors.error },
-    cancelled: { label: t("events.cancelledStatus"), color: Colors.textSecondary },
-  };
-  const info = map[status];
-  if (!info) return null;
-  return (
-    <View>
-      <View style={[statusStyles.badge, { backgroundColor: info.color + "22", borderColor: info.color }]}>
-        <Text style={[statusStyles.label, { color: info.color }]}>{info.label}</Text>
-      </View>
-      {status === "rejected" && rejectionReason && (
-        <Text style={statusStyles.reason}>{t("events.reason")}: {rejectionReason}</Text>
-      )}
-    </View>
-  );
-}
-
-const statusStyles = StyleSheet.create({
-  badge: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    alignSelf: "flex-start",
-  },
-  label: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-  },
-  reason: {
-    marginTop: 4,
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.error,
-  },
-});
 
 export default function EventoDetail() {
   const t = useT();
@@ -189,9 +146,6 @@ export default function EventoDetail() {
     );
   }
 
-  const typeColor = EVENT_TYPE_COLORS[event.eventType] ?? Colors.accent;
-  const typeLabel = EVENT_TYPE_LABELS[event.eventType] ?? event.eventType;
-
   return (
     <View style={[styles.container, { paddingTop: topInset }]}>
       <View style={styles.navBar}>
@@ -220,203 +174,37 @@ export default function EventoDetail() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: bottomInset + 24 }}
       >
-        {event.images.length > 0 ? (
-          <View style={styles.carousel}>
-            <ScrollView
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              onMomentumScrollEnd={(e) => {
-                const idx = Math.round(e.nativeEvent.contentOffset.x / e.nativeEvent.layoutMeasurement.width);
-                setImgIndex(idx);
-              }}
-            >
-              {event.images.map((img) => (
-                <Image
-                  key={img.id}
-                  source={{ uri: resolveImageUrl(img.imageUrl) }}
-                  style={styles.carouselImage}
-                  contentFit="cover"
-                />
-              ))}
-            </ScrollView>
-            {event.images.length > 1 && (
-              <View style={styles.dots}>
-                {event.images.map((_, i) => (
-                  <View key={i} style={[styles.dot, i === imgIndex && styles.dotActive]} />
-                ))}
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={styles.imagePlaceholder}>
-            <MaterialCommunityIcons name="motorbike" size={56} color={Colors.textSecondary} />
+        <EventDetailHeader
+          event={event}
+          isAdmin={isAdmin}
+          isOwner={isOwner}
+          imgIndex={imgIndex}
+          setImgIndex={setImgIndex}
+          resolveImageUrl={resolveImageUrl}
+          formatFullDate={formatFullDate}
+          handleOpenMap={handleOpenMap}
+          handleOpenWebsite={handleOpenWebsite}
+        />
+
+        {event.latitude != null && event.longitude != null && (
+          <View style={{ paddingHorizontal: 16 }}>
+            <EventDetailMap
+              latitude={event.latitude}
+              longitude={event.longitude}
+              handleOpenMap={handleOpenMap}
+            />
           </View>
         )}
 
-        <View style={styles.content}>
-          <View style={styles.badgeRow}>
-            <View style={[styles.typeBadge, { backgroundColor: typeColor }]}>
-              <Text style={styles.typeBadgeText}>{typeLabel}</Text>
-            </View>
-            {event.isRecurring && (
-              <View style={styles.recurringBadge}>
-                <Ionicons name="repeat" size={11} color={Colors.textSecondary} />
-                <Text style={styles.recurringText}>Ricorrente</Text>
-              </View>
-            )}
-          </View>
+        <EventDetailActions
+          event={event}
+          joinMutationPending={joinMutation.isPending}
+          leaveMutationPending={leaveMutation.isPending}
+          onJoin={(status) => joinMutation.mutate(status)}
+          onLeave={() => leaveMutation.mutate()}
+        />
 
-          <Text style={styles.title}>{event.title}</Text>
-
-          {(isOwner || isAdmin) && event.status !== "approved" && (
-            <StatusBadge status={event.status} rejectionReason={event.rejectionReason} />
-          )}
-
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <Ionicons name="calendar" size={16} color={Colors.accent} />
-              <Text style={styles.infoText}>{formatFullDate(event.eventDate, event.eventTime)}</Text>
-            </View>
-
-            {event.isRecurring && event.recurrenceInfo && (
-              <View style={styles.infoRow}>
-                <Ionicons name="repeat" size={16} color={Colors.textSecondary} />
-                <Text style={styles.infoText}>{event.recurrenceInfo}</Text>
-              </View>
-            )}
-
-            {event.locationName && (
-              <Pressable style={styles.infoRow} onPress={handleOpenMap}>
-                <Ionicons name="location" size={16} color={Colors.accent} />
-                <Text style={[styles.infoText, { flex: 1 }]}>{event.locationName}</Text>
-                {(event.latitude && event.longitude) && (
-                  <Ionicons name="open-outline" size={14} color={Colors.textSecondary} />
-                )}
-              </Pressable>
-            )}
-
-            {event.latitude != null && event.longitude != null && (
-              <Pressable style={styles.miniMapWrapper} onPress={handleOpenMap}>
-                <LeafletMiniMap
-                  latitude={event.latitude}
-                  longitude={event.longitude}
-                  height={160}
-                />
-                <View style={styles.miniMapOverlay}>
-                  <Ionicons name="expand-outline" size={16} color="#fff" />
-                  <Text style={styles.miniMapOverlayText}>Apri mappa</Text>
-                </View>
-              </Pressable>
-            )}
-
-            {event.maxParticipants && event.maxParticipants > 0 && (
-              <View style={styles.infoRow}>
-                <Ionicons name="people" size={16} color={Colors.textSecondary} />
-                <Text style={styles.infoText}>
-                  Max {event.maxParticipants} partecipanti
-                </Text>
-              </View>
-            )}
-
-            {event.websiteUrl && (
-              <Pressable style={styles.infoRow} onPress={handleOpenWebsite}>
-                <Ionicons name="globe-outline" size={16} color={Colors.accent} />
-                <Text style={[styles.infoText, styles.link]} numberOfLines={1}>
-                  {event.websiteUrl}
-                </Text>
-                <Ionicons name="open-outline" size={14} color={Colors.accent} />
-              </Pressable>
-            )}
-          </View>
-
-          {event.description && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Descrizione</Text>
-              <Text style={styles.description}>{event.description}</Text>
-            </View>
-          )}
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Organizzatore</Text>
-            <Pressable
-              style={styles.creatorRow}
-              onPress={() => router.push(`/profile/${event.creatorId}` as const)}
-            >
-              <Ionicons name="person-circle-outline" size={28} color={Colors.textSecondary} />
-              <Text style={styles.creatorText}>@{event.creatorNickname ?? "Utente"}</Text>
-              <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />
-            </Pressable>
-          </View>
-
-          {event.status === "approved" && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Partecipazione</Text>
-              <View style={styles.joinBtns}>
-                <Pressable
-                  style={[
-                    styles.joinBtn,
-                    event.userParticipation === "going" && styles.joinBtnActive,
-                    (joinMutation.isPending || leaveMutation.isPending) && styles.joinBtnDisabled,
-                  ]}
-                  onPress={() => {
-                    if (event.userParticipation === "going") {
-                      leaveMutation.mutate();
-                    } else {
-                      joinMutation.mutate("going");
-                    }
-                  }}
-                  disabled={joinMutation.isPending || leaveMutation.isPending}
-                >
-                  <Ionicons
-                    name={event.userParticipation === "going" ? "checkmark-circle" : "checkmark-circle-outline"}
-                    size={20}
-                    color={event.userParticipation === "going" ? "#000" : Colors.success}
-                  />
-                  <Text style={[styles.joinBtnText, event.userParticipation === "going" && { color: "#000" }]}>
-                    Ci vado!
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.joinBtn,
-                    styles.joinBtnMaybe,
-                    event.userParticipation === "interested" && styles.joinBtnMaybeActive,
-                    (joinMutation.isPending || leaveMutation.isPending) && styles.joinBtnDisabled,
-                  ]}
-                  onPress={() => {
-                    if (event.userParticipation === "interested") {
-                      leaveMutation.mutate();
-                    } else {
-                      joinMutation.mutate("interested");
-                    }
-                  }}
-                  disabled={joinMutation.isPending || leaveMutation.isPending}
-                >
-                  <Ionicons
-                    name={event.userParticipation === "interested" ? "help-circle" : "help-circle-outline"}
-                    size={20}
-                    color={event.userParticipation === "interested" ? "#000" : Colors.warning}
-                  />
-                  <Text style={[styles.joinBtnText, event.userParticipation === "interested" && { color: "#000" }]}>
-                    Forse
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          )}
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Partecipanti</Text>
-            <EventParticipants
-              participants={event.participants}
-              participantCount={event.participantCount}
-              interestedCount={event.interestedCount}
-              onPress={(userId) => router.push(`/profile/${userId}` as const)}
-            />
-          </View>
-        </View>
+        <EventDetailParticipants event={event} />
       </ScrollView>
 
       <EventForm
@@ -427,8 +215,6 @@ export default function EventoDetail() {
     </View>
   );
 }
-
-const CAROUSEL_HEIGHT = 260;
 
 const styles = StyleSheet.create({
   container: {
@@ -473,196 +259,5 @@ const styles = StyleSheet.create({
   navRight: {
     flexDirection: "row",
     gap: 4,
-  },
-  carousel: {
-    height: CAROUSEL_HEIGHT,
-    backgroundColor: Colors.surfaceLight,
-  },
-  carouselImage: {
-    width: Dimensions.get("window").width,
-    height: CAROUSEL_HEIGHT,
-  },
-  dots: {
-    position: "absolute",
-    bottom: 10,
-    left: 0,
-    right: 0,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "rgba(255,255,255,0.5)",
-  },
-  dotActive: {
-    backgroundColor: "#fff",
-    width: 14,
-  },
-  imagePlaceholder: {
-    height: 160,
-    backgroundColor: Colors.surfaceLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  content: {
-    padding: 16,
-    gap: 16,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  typeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-  },
-  typeBadgeText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: "#fff",
-  },
-  recurringBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: Colors.surfaceLight,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  recurringText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  title: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 24,
-    color: Colors.text,
-    lineHeight: 30,
-  },
-  infoCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    gap: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  infoText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: Colors.text,
-    lineHeight: 20,
-  },
-  link: {
-    color: Colors.accent,
-    flex: 1,
-    textDecorationLine: "underline",
-  },
-  section: {
-    gap: 8,
-  },
-  sectionTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  description: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: Colors.text,
-    lineHeight: 22,
-  },
-  creatorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: Colors.surface,
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  creatorText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    color: Colors.text,
-    flex: 1,
-  },
-  joinBtns: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  joinBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: Colors.success,
-    backgroundColor: Colors.surface,
-  },
-  joinBtnActive: {
-    backgroundColor: Colors.success,
-    borderColor: Colors.success,
-  },
-  joinBtnMaybe: {
-    borderColor: Colors.warning,
-  },
-  joinBtnMaybeActive: {
-    backgroundColor: Colors.warning,
-    borderColor: Colors.warning,
-  },
-  joinBtnDisabled: {
-    opacity: 0.6,
-  },
-  joinBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  miniMapWrapper: {
-    marginTop: 8,
-    borderRadius: 12,
-    overflow: "hidden",
-    height: 160,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: Colors.border,
-  },
-  miniMap: {
-    flex: 1,
-  },
-  miniMapOverlay: {
-    position: "absolute",
-    bottom: 8,
-    right: 8,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  miniMapOverlayText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: "#fff",
   },
 });

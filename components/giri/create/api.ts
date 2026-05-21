@@ -1,0 +1,95 @@
+import { getApiUrl } from "@/lib/query-client";
+import { Ionicons } from "@expo/vector-icons";
+import { Waypoint, Style, DrivingProfile, RouteResult, WeatherWaypoint, AiPreviewItem } from "./types";
+
+export async function geocode(q: string): Promise<any[]> {
+  const url = new URL("/api/planned-routes/geocode", getApiUrl());
+  url.searchParams.set("q", q);
+  const resp = await fetch(url.toString(), { credentials: "include" });
+  if (!resp.ok) return [];
+  return resp.json();
+}
+
+export async function calcRoute(
+  waypoints: Waypoint[],
+  style: Style,
+  drivingProfile: DrivingProfile,
+  avoidHighways: boolean,
+  avoidTolls: boolean,
+  avoidFerries: boolean,
+  avoidUnpaved: boolean,
+  roundTripHours?: number,
+  isRoundTrip?: boolean,
+  headingDeg?: number | null,
+  language?: string,
+): Promise<RouteResult> {
+  const url = new URL("/api/planned-routes/calculate", getApiUrl());
+  const resp = await fetch(url.toString(), {
+    method: "POST", credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      waypoints, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved,
+      roundTripHours, isRoundTrip, language,
+      ...(headingDeg !== null && headingDeg !== undefined ? { headingDeg } : {}),
+    }),
+  });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}));
+    throw new Error(body.message ?? "Calcolo percorso fallito");
+  }
+  return resp.json();
+}
+
+export async function parseAI(prompt: string): Promise<any> {
+  const url = new URL("/api/planned-routes/ai-parse", getApiUrl());
+  const resp = await fetch(url.toString(), {
+    method: "POST", credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+  if (!resp.ok) {
+    const body = await resp.json().catch(() => ({}));
+    throw new Error(body.message ?? "Servizio AI non disponibile");
+  }
+  return resp.json();
+}
+
+export function clientFallbackAiParse(prompt: string) {
+  const lower = prompt.toLowerCase();
+  return {
+    title: "Giro in moto",
+    startLocation: "", endLocation: "", waypoints: [] as string[],
+    style: lower.includes("veloce") || lower.includes("autostrada") ? "fast"
+      : lower.includes("curve") || lower.includes("curvy") || lower.includes("panoramic") ? "curvy" : "balanced",
+    isRoundTrip: lower.includes("ritorno") || lower.includes("andata e ritorno"),
+    isMultiDay: lower.includes("giorni") || lower.includes("settimana") || lower.includes("weekend"),
+    daysEstimate: lower.includes("settimana") ? 7 : lower.includes("weekend") ? 2 : 1,
+    maxHoursPerDay: 6,
+    avoidHighways: lower.includes("senza autostrada") || lower.includes("evit"),
+    notes: prompt,
+  };
+}
+
+export async function fetchWeatherPreview(waypoints: Waypoint[]): Promise<WeatherWaypoint[]> {
+  const url = new URL("/api/planned-routes/weather", getApiUrl());
+  const resp = await fetch(url.toString(), {
+    method: "POST", credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      waypoints: waypoints.filter((w) => w.lat !== 0 || w.lng !== 0),
+      departureTime: new Date(Date.now() + 3600_000).toISOString(),
+    }),
+  });
+  if (!resp.ok) return [];
+  const data = await resp.json();
+  return (data.waypoints ?? []).filter(Boolean);
+}
+
+export function weatherIcon(code: number): keyof typeof Ionicons.glyphMap {
+  if (code === 0) return "sunny-outline";
+  if (code <= 3) return "partly-sunny-outline";
+  if (code <= 59) return "rainy-outline";
+  if (code <= 79) return "snow-outline";
+  if (code <= 99) return "thunderstorm-outline";
+  return "cloud-outline";
+}

@@ -5,8 +5,6 @@ import {
   StyleSheet,
   Pressable,
   Modal,
-  Switch,
-  TextInput,
   Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,6 +15,8 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
 import type { ProfileData } from "./types";
+import { PrivacySettingsSection } from "./privacy/PrivacySettingsSection";
+import { FakeHomeSection } from "./privacy/FakeHomeSection";
 
 interface Props {
   profileData: ProfileData | undefined;
@@ -188,164 +188,38 @@ export default function PrivacyPanel({ profileData }: Props) {
 
         {privacyExpanded && (
           <View style={{ paddingTop: 8 }}>
-            {/* Hide from map */}
-            <View style={styles.privacyRow}>
-              <View style={styles.privacyRowLeft}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.privacyLabel}>Nasconditi dalla mappa</Text>
-                  <Text style={styles.privacyDesc}>
-                    Il tuo pin non sarà visibile nella mappa pubblica.
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={hideFromMap}
-                onValueChange={(val) => {
-                  setHideFromMap(val);
-                  privacyMutation.mutate({ hideFromMap: val });
-                }}
-                trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor="#fff"
-              />
-            </View>
+            <PrivacySettingsSection
+              hideFromMap={hideFromMap}
+              onHideFromMapChange={(val) => {
+                setHideFromMap(val);
+                privacyMutation.mutate({ hideFromMap: val });
+              }}
+              positionFuzz={positionFuzz}
+              onPositionFuzzChange={(val) => {
+                setPositionFuzz(val);
+                privacyMutation.mutate({ positionFuzz: val });
+              }}
+              positionFuzzKm={positionFuzzKm}
+              onPositionFuzzKmChange={setPositionFuzzKm}
+              onPositionFuzzKmEndEditing={() => privacyMutation.mutate({ positionFuzzKm })}
+            />
 
-            {/* Position fuzz */}
-            <View style={styles.privacyRow}>
-              <View style={styles.privacyRowLeft}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.privacyLabel}>Posizione sfocata</Text>
-                  <Text style={styles.privacyDesc}>
-                    La tua posizione viene mostrata con un offset casuale per proteggere la privacy.
-                  </Text>
-                </View>
-              </View>
-              <Switch
-                value={positionFuzz}
-                onValueChange={(val) => {
-                  setPositionFuzz(val);
-                  privacyMutation.mutate({ positionFuzz: val });
-                }}
-                trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor="#fff"
-              />
-            </View>
-            {positionFuzz && (
-              <View style={styles.privacyKmRow}>
-                <Text style={styles.privacyKmLabel}>Raggio sfocatura (km):</Text>
-                <TextInput
-                  style={styles.privacyKmInput}
-                  keyboardType="decimal-pad"
-                  value={String(positionFuzzKm)}
-                  onChangeText={(t) => {
-                    const n = parseFloat(t);
-                    if (!isNaN(n) && n > 0) setPositionFuzzKm(n);
-                  }}
-                  onEndEditing={() => privacyMutation.mutate({ positionFuzzKm })}
-                />
-                <Text style={styles.privacyKmLabel}>km</Text>
-              </View>
-            )}
-
-            {/* Fake home */}
-            <View style={styles.privacyRow}>
-              <View style={styles.privacyRowLeft}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.privacyLabel}>Casa fittizia</Text>
-                  <Text style={styles.privacyDesc}>
-                    Mostra una posizione "casa" alternativa invece di quella reale.
-                  </Text>
-                  {fakeHomeEnabled && (
-                    <Text style={styles.privacyWarning}>
-                      ⚠ Aggiorna la tua posizione dopo aver attivato questa opzione.
-                    </Text>
-                  )}
-                </View>
-              </View>
-              <Switch
-                value={fakeHomeEnabled}
-                onValueChange={(val) => {
-                  setFakeHomeEnabled(val);
-                  privacyMutation.mutate({ fakeHomeEnabled: val });
-                }}
-                trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor="#fff"
-              />
-            </View>
-
-            {/* Home position picker */}
-            <View style={styles.fakeHomeCard}>
-              <View style={styles.fakeHomeSection}>
-                <Text style={styles.fakeHomeSectionLabel}>Posizione Casa</Text>
-                {homeLatitude != null && homeLongitude != null ? (
-                  <Text style={styles.fakeHomeCoords}>
-                    {homeLatitude.toFixed(5)}, {homeLongitude.toFixed(5)}
-                  </Text>
-                ) : (
-                  <Text style={styles.fakeHomeCoords}>Non impostata</Text>
-                )}
-                <View style={styles.fakeHomeBtnRow}>
-                  <Pressable
-                    style={styles.fakeHomeBtn}
-                    onPress={() => pickCoordFromGPS("home")}
-                  >
-                    <Ionicons name="locate" size={14} color={Colors.accent} />
-                    <Text style={styles.fakeHomeBtnLabel}>GPS</Text>
-                  </Pressable>
-                  <Pressable
-                    style={styles.fakeHomeBtn}
-                    onPress={() => openMapPicker("home")}
-                  >
-                    <Ionicons name="map" size={14} color={Colors.accent} />
-                    <Text style={styles.fakeHomeBtnLabel}>Mappa</Text>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-
-            {fakeHomeEnabled && (
-              <View style={[styles.fakeHomeCard, { marginTop: 8 }]}>
-                <View style={styles.fakeHomeSection}>
-                  <Text style={styles.fakeHomeSectionLabel}>Posizione Fittizia</Text>
-                  {fakeHomeLatitude != null && fakeHomeLongitude != null ? (
-                    <Text style={styles.fakeHomeCoords}>
-                      {fakeHomeLatitude.toFixed(5)}, {fakeHomeLongitude.toFixed(5)}
-                    </Text>
-                  ) : (
-                    <Text style={styles.fakeHomeCoords}>Non impostata</Text>
-                  )}
-                  <View style={styles.fakeHomeBtnRow}>
-                    <Pressable
-                      style={styles.fakeHomeBtn}
-                      onPress={() => pickCoordFromGPS("fake")}
-                    >
-                      <Ionicons name="locate" size={14} color={Colors.accent} />
-                      <Text style={styles.fakeHomeBtnLabel}>GPS</Text>
-                    </Pressable>
-                    <Pressable
-                      style={styles.fakeHomeBtn}
-                      onPress={() => openMapPicker("fake")}
-                    >
-                      <Ionicons name="map" size={14} color={Colors.accent} />
-                      <Text style={styles.fakeHomeBtnLabel}>Mappa</Text>
-                    </Pressable>
-                  </View>
-                  <View style={[styles.privacyKmRow, { paddingHorizontal: 0 }]}>
-                    <Text style={styles.privacyKmLabel}>Raggio (km):</Text>
-                    <TextInput
-                      style={styles.privacyKmInput}
-                      keyboardType="decimal-pad"
-                      value={String(fakeHomeRadius)}
-                      onChangeText={(t) => {
-                        const n = parseFloat(t);
-                        if (!isNaN(n) && n > 0) setFakeHomeRadius(n);
-                      }}
-                      onEndEditing={() => privacyMutation.mutate({ fakeHomeRadius })}
-                    />
-                    <Text style={styles.privacyKmLabel}>km</Text>
-                  </View>
-                </View>
-              </View>
-            )}
+            <FakeHomeSection
+              fakeHomeEnabled={fakeHomeEnabled}
+              onFakeHomeEnabledChange={(val) => {
+                setFakeHomeEnabled(val);
+                privacyMutation.mutate({ fakeHomeEnabled: val });
+              }}
+              homeLatitude={homeLatitude}
+              homeLongitude={homeLongitude}
+              fakeHomeLatitude={fakeHomeLatitude}
+              fakeHomeLongitude={fakeHomeLongitude}
+              fakeHomeRadius={fakeHomeRadius}
+              onFakeHomeRadiusChange={setFakeHomeRadius}
+              onFakeHomeRadiusEndEditing={() => privacyMutation.mutate({ fakeHomeRadius })}
+              onPickCoord={pickCoordFromGPS}
+              onOpenMapPicker={openMapPicker}
+            />
 
             {/* GPS Precision */}
             <View style={[styles.privacyRow, { borderBottomWidth: 0, marginTop: 8 }]}>
@@ -400,7 +274,6 @@ export default function PrivacyPanel({ profileData }: Props) {
         )}
       </View>
 
-      {/* Map Picker Modal */}
       <Modal
         visible={mapPickerVisible}
         transparent={false}
@@ -495,12 +368,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
-  privacyRowLeft: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginRight: 12,
-  },
   privacyLabel: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
@@ -512,87 +379,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     lineHeight: 16,
-  },
-  privacyWarning: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: "#F59E0B",
-    lineHeight: 17,
-    marginTop: 4,
-  },
-  privacyKmRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-  },
-  privacyKmLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-    marginRight: 6,
-  },
-  privacyKmInput: {
-    minWidth: 64,
-    height: 36,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    textAlign: "center",
-    textAlignVertical: "center",
-    includeFontPadding: false,
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-    backgroundColor: Colors.surface,
-    marginRight: 6,
-    paddingVertical: 0,
-  },
-  fakeHomeCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginHorizontal: 4,
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  fakeHomeSection: {
-    gap: 6,
-  },
-  fakeHomeSectionLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  fakeHomeCoords: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
-    opacity: 0.7,
-  },
-  fakeHomeBtnRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 2,
-  },
-  fakeHomeBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  fakeHomeBtnLabel: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.text,
   },
   gpsPrecisionOption: {
     flexDirection: "row",

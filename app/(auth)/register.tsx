@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
@@ -10,297 +9,34 @@ import {
   Platform,
   ScrollView,
   Modal,
-  FlatList,
   Alert,
-  Linking,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { t, getAppLanguage } from "@/lib/i18n";
+import { t } from "@/lib/i18n";
 import type { AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
 
-import { EUROPEAN_COUNTRIES, getRegionsForCountry, CONTINENT_MAP, getCountriesForContinent } from "@/lib/countries-regions";
-
-const PHONE_PREFIXES = [
-  { code: "+39", country: "Italia" },
-  { code: "+1", country: "USA/Canada" },
-  { code: "+44", country: "Regno Unito" },
-  { code: "+49", country: "Germania" },
-  { code: "+33", country: "Francia" },
-  { code: "+34", country: "Spagna" },
-  { code: "+41", country: "Svizzera" },
-  { code: "+43", country: "Austria" },
-  { code: "+32", country: "Belgio" },
-  { code: "+31", country: "Paesi Bassi" },
-  { code: "+351", country: "Portogallo" },
-  { code: "+48", country: "Polonia" },
-  { code: "+46", country: "Svezia" },
-  { code: "+47", country: "Norvegia" },
-  { code: "+45", country: "Danimarca" },
-  { code: "+358", country: "Finlandia" },
-  { code: "+30", country: "Grecia" },
-  { code: "+36", country: "Ungheria" },
-  { code: "+420", country: "Rep. Ceca" },
-  { code: "+40", country: "Romania" },
-  { code: "+385", country: "Croazia" },
-  { code: "+386", country: "Slovenia" },
-  { code: "+381", country: "Serbia" },
-  { code: "+355", country: "Albania" },
-  { code: "+90", country: "Turchia" },
-  { code: "+7", country: "Russia" },
-  { code: "+61", country: "Australia" },
-  { code: "+81", country: "Giappone" },
-  { code: "+86", country: "Cina" },
-  { code: "+55", country: "Brasile" },
-  { code: "+52", country: "Messico" },
-  { code: "+91", country: "India" },
-];
-
-const PHONE_PREFIX_TO_COUNTRY: Record<string, string> = {
-  "+39": "IT", "+1": "US", "+44": "GB", "+49": "DE",
-  "+33": "FR", "+34": "ES", "+41": "CH", "+43": "AT",
-  "+32": "BE", "+31": "NL", "+351": "PT", "+48": "PL",
-  "+46": "SE", "+47": "NO", "+45": "DK", "+358": "FI",
-  "+30": "GR", "+36": "HU", "+420": "CZ", "+40": "RO",
-  "+385": "HR", "+386": "SI", "+381": "RS", "+355": "AL",
-  "+90": "TR", "+7": "RU", "+61": "AU", "+81": "JP",
-  "+86": "CN", "+55": "BR", "+52": "MX", "+91": "IN",
-};
-
-const EULA_TEXTS: Record<AppLanguage, string> = {
-  it: `TERMINI E CONDIZIONI D'USO - BikerLink
-
-1. ACCETTAZIONE DEI TERMINI
-Utilizzando l'app BikerLink, accetti integralmente i presenti termini e condizioni.
-
-2. DESCRIZIONE DEL SERVIZIO
-BikerLink è una piattaforma che connette motociclisti (biker) e passeggeri (zavorrine) per condividere esperienze di viaggio in moto.
-
-3. REGISTRAZIONE E ACCOUNT
-- L'utente deve fornire informazioni veritiere durante la registrazione
-- È responsabile della sicurezza delle proprie credenziali
-- Deve avere almeno 18 anni per utilizzare il servizio
-
-4. COMPORTAMENTO DEGLI UTENTI
-- È vietato qualsiasi comportamento offensivo, molesto o discriminatorio
-- È vietato condividere contenuti inappropriati
-- Gli utenti devono rispettare il codice della strada
-
-5. PRIVACY E DATI PERSONALI
-- I dati personali sono trattati nel rispetto del GDPR
-- La posizione GPS viene utilizzata solo per le funzionalità dell'app
-- Le foto caricate sono soggette a moderazione
-
-6. RESPONSABILITÀ
-- BikerLink non è responsabile per incidenti durante i viaggi
-- Ogni utente è responsabile della propria sicurezza
-- L'uso di casco e protezioni è obbligatorio
-
-7. SPONSOR E PUBBLICITÀ
-- L'app contiene contenuti sponsorizzati da Syneco Lubrificanti
-- I contenuti pubblicitari sono chiaramente identificati
-
-8. MODIFICHE AI TERMINI
-BikerLink si riserva il diritto di modificare i presenti termini in qualsiasi momento.
-
-9. CONTATTI
-Per domande o segnalazioni: support@bikerlink.app`,
-
-  en: `TERMS AND CONDITIONS OF USE - BikerLink
-
-1. ACCEPTANCE OF TERMS
-By using the BikerLink app, you fully accept these terms and conditions.
-
-2. DESCRIPTION OF SERVICE
-BikerLink is a platform that connects motorcyclists (bikers) and passengers (pillion riders) to share motorcycle travel experiences.
-
-3. REGISTRATION AND ACCOUNT
-- The user must provide truthful information during registration
-- You are responsible for the security of your credentials
-- You must be at least 18 years old to use the service
-
-4. USER CONDUCT
-- Any offensive, harassing or discriminatory behaviour is prohibited
-- Sharing inappropriate content is prohibited
-- Users must comply with road traffic laws
-
-5. PRIVACY AND PERSONAL DATA
-- Personal data is processed in accordance with the GDPR
-- GPS location is used only for app features
-- Uploaded photos are subject to moderation
-
-6. LIABILITY
-- BikerLink is not responsible for accidents during rides
-- Each user is responsible for their own safety
-- The use of helmets and protective gear is mandatory
-
-7. SPONSORS AND ADVERTISING
-- The app contains content sponsored by Syneco Lubrificanti
-- Advertising content is clearly identified
-
-8. CHANGES TO TERMS
-BikerLink reserves the right to modify these terms at any time.
-
-9. CONTACT
-For questions or reports: support@bikerlink.app`,
-
-  de: `NUTZUNGSBEDINGUNGEN - BikerLink
-
-1. ANNAHME DER BEDINGUNGEN
-Durch die Nutzung der BikerLink-App akzeptierst du diese Nutzungsbedingungen vollständig.
-
-2. BESCHREIBUNG DES DIENSTES
-BikerLink ist eine Plattform, die Motorradfahrer (Biker) und Mitfahrer (Soziusfahrer) verbindet, um gemeinsame Motorradreisen zu erleben.
-
-3. REGISTRIERUNG UND KONTO
-- Der Nutzer muss bei der Registrierung wahrheitsgemäße Angaben machen
-- Du bist für die Sicherheit deiner Anmeldedaten verantwortlich
-- Du musst mindestens 18 Jahre alt sein, um den Dienst zu nutzen
-
-4. NUTZERVERHALTEN
-- Jegliches beleidigende, belästigende oder diskriminierende Verhalten ist verboten
-- Das Teilen unangemessener Inhalte ist verboten
-- Nutzer müssen die Straßenverkehrsordnung einhalten
-
-5. DATENSCHUTZ UND PERSONENBEZOGENE DATEN
-- Personenbezogene Daten werden gemäß der DSGVO verarbeitet
-- Der GPS-Standort wird nur für App-Funktionen verwendet
-- Hochgeladene Fotos unterliegen der Moderation
-
-6. HAFTUNG
-- BikerLink haftet nicht für Unfälle während der Fahrten
-- Jeder Nutzer ist für seine eigene Sicherheit verantwortlich
-- Das Tragen von Helm und Schutzausrüstung ist obligatorisch
-
-7. SPONSOREN UND WERBUNG
-- Die App enthält von Syneco Lubrificanti gesponserte Inhalte
-- Werbeinhalte sind klar gekennzeichnet
-
-8. ÄNDERUNGEN DER BEDINGUNGEN
-BikerLink behält sich das Recht vor, diese Bedingungen jederzeit zu ändern.
-
-9. KONTAKT
-Für Fragen oder Meldungen: support@bikerlink.app`,
-
-  es: `TÉRMINOS Y CONDICIONES DE USO - BikerLink
-
-1. ACEPTACIÓN DE LOS TÉRMINOS
-Al usar la app BikerLink, aceptas íntegramente estos términos y condiciones.
-
-2. DESCRIPCIÓN DEL SERVICIO
-BikerLink es una plataforma que conecta motociclistas (bikers) y pasajeros (pillion riders) para compartir experiencias de viaje en moto.
-
-3. REGISTRO Y CUENTA
-- El usuario debe proporcionar información veraz durante el registro
-- Eres responsable de la seguridad de tus credenciales
-- Debes tener al menos 18 años para usar el servicio
-
-4. COMPORTAMIENTO DE LOS USUARIOS
-- Está prohibido cualquier comportamiento ofensivo, acosador o discriminatorio
-- Está prohibido compartir contenidos inapropiados
-- Los usuarios deben respetar el código de tráfico
-
-5. PRIVACIDAD Y DATOS PERSONALES
-- Los datos personales se tratan de conformidad con el RGPD
-- La ubicación GPS se utiliza únicamente para las funcionalidades de la app
-- Las fotos cargadas están sujetas a moderación
-
-6. RESPONSABILIDAD
-- BikerLink no es responsable de los accidentes ocurridos durante los trayectos
-- Cada usuario es responsable de su propia seguridad
-- El uso de casco y equipo de protección es obligatorio
-
-7. PATROCINADORES Y PUBLICIDAD
-- La app contiene contenidos patrocinados por Syneco Lubrificanti
-- Los contenidos publicitarios están claramente identificados
-
-8. MODIFICACIONES DE LOS TÉRMINOS
-BikerLink se reserva el derecho de modificar estos términos en cualquier momento.
-
-9. CONTACTO
-Para preguntas o notificaciones: support@bikerlink.app`,
-
-  fr: `CONDITIONS GÉNÉRALES D'UTILISATION - BikerLink
-
-1. ACCEPTATION DES CONDITIONS
-En utilisant l'app BikerLink, vous acceptez intégralement les présentes conditions générales.
-
-2. DESCRIPTION DU SERVICE
-BikerLink est une plateforme qui connecte des motocyclistes (bikers) et des passagers (passagers en tandem) pour partager des expériences de voyage en moto.
-
-3. INSCRIPTION ET COMPTE
-- L'utilisateur doit fournir des informations exactes lors de l'inscription
-- Vous êtes responsable de la sécurité de vos identifiants
-- Vous devez avoir au moins 18 ans pour utiliser le service
-
-4. COMPORTEMENT DES UTILISATEURS
-- Tout comportement offensant, harcelant ou discriminatoire est interdit
-- Le partage de contenus inappropriés est interdit
-- Les utilisateurs doivent respecter le code de la route
-
-5. CONFIDENTIALITÉ ET DONNÉES PERSONNELLES
-- Les données personnelles sont traitées conformément au RGPD
-- La localisation GPS est utilisée uniquement pour les fonctionnalités de l'app
-- Les photos téléchargées sont soumises à modération
-
-6. RESPONSABILITÉ
-- BikerLink n'est pas responsable des accidents survenus lors des trajets
-- Chaque utilisateur est responsable de sa propre sécurité
-- Le port du casque et des équipements de protection est obligatoire
-
-7. SPONSORS ET PUBLICITÉ
-- L'app contient des contenus sponsorisés par Syneco Lubrificanti
-- Les contenus publicitaires sont clairement identifiés
-
-8. MODIFICATIONS DES CONDITIONS
-BikerLink se réserve le droit de modifier les présentes conditions à tout moment.
-
-9. CONTACT
-Pour toute question ou signalement : support@bikerlink.app`,
-
-  tr: `KULLANIM KOŞULLARI - BikerLink
-
-1. KOŞULLARIN KABULÜ
-BikerLink uygulamasını kullanarak bu kullanım koşullarını tam olarak kabul etmiş sayılırsınız.
-
-2. HİZMET TANIMI
-BikerLink, motosikletçileri (biker) ve yolcuları (zavorrina) motosiklet seyahat deneyimlerini paylaşmak için bir araya getiren bir platformdur.
-
-3. KAYIT VE HESAP
-- Kullanıcı, kayıt sırasında doğru bilgi sağlamalıdır
-- Hesap bilgilerinizin güvenliğinden siz sorumlusunuz
-- Hizmeti kullanmak için en az 18 yaşında olmanız gerekmektedir
-
-4. KULLANICI DAVRANIŞI
-- Hakaret edici, taciz edici veya ayrımcı davranışlar yasaktır
-- Uygunsuz içerik paylaşımı yasaktır
-- Kullanıcılar trafik kurallarına uymak zorundadır
-
-5. GİZLİLİK VE KİŞİSEL VERİLER
-- Kişisel veriler GDPR'a uygun olarak işlenmektedir
-- GPS konumu yalnızca uygulama özellikleri için kullanılmaktadır
-- Yüklenen fotoğraflar moderasyona tabidir
-
-6. SORUMLULUK
-- BikerLink, sürüşler sırasında meydana gelen kazalardan sorumlu değildir
-- Her kullanıcı kendi güvenliğinden sorumludur
-- Kask ve koruyucu ekipman kullanımı zorunludur
-
-7. SPONSORLAR VE REKLAMCILIK
-- Uygulama, Syneco Lubrificanti tarafından desteklenen içerikler barındırmaktadır
-- Reklam içerikleri açıkça belirtilmektedir
-
-8. KOŞULLARDA DEĞİŞİKLİK
-BikerLink, bu koşulları istediği zaman değiştirme hakkını saklı tutar.
-
-9. İLETİŞİM
-Sorular veya bildirimler için: support@bikerlink.app`,
-};
+import { StepUserType } from "@/components/register/StepUserType";
+import { StepGender } from "@/components/register/StepGender";
+import { StepBasicInfo } from "@/components/register/StepBasicInfo";
+import { StepLegal } from "@/components/register/StepLegal";
+import { PrivacyNoticeModal } from "@/components/register/PrivacyNoticeModal";
+import { EmailConfirmModal } from "@/components/register/EmailConfirmModal";
+import { GiftModal } from "@/components/register/GiftModal";
+import { StepIndicator } from "@/components/register/StepIndicator";
+import { ErrorBanner } from "@/components/register/ErrorBanner";
+import { NavigationButtons } from "@/components/register/NavigationButtons";
+import { LoginPrompt } from "@/components/register/LoginPrompt";
+import {
+  PHONE_PREFIXES,
+  PHONE_PREFIX_TO_COUNTRY,
+  EULA_TEXTS,
+} from "@/constants/register";
 
 export default function RegisterScreen() {
   const router = useRouter();
@@ -341,7 +77,6 @@ export default function RegisterScreen() {
   const [eulaAccepted, setEulaAccepted] = useState(false);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
 
-  const [passwordMismatch, setPasswordMismatch] = useState(false);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [privacyModalSeen, setPrivacyModalSeen] = useState(false);
   const [showEmailConfirm, setShowEmailConfirm] = useState(false);
@@ -528,534 +263,6 @@ export default function RegisterScreen() {
     });
   };
 
-  const renderStepIndicator = () => (
-    <View style={styles.stepIndicator}>
-      {Array.from({ length: totalSteps }, (_, i) => (
-        <View
-          key={i}
-          style={[
-            styles.stepDot,
-            i + 1 <= step ? styles.stepDotActive : null,
-          ]}
-        />
-      ))}
-    </View>
-  );
-
-  const renderStep1 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>{t("register.step1.title")}</Text>
-      <Text style={styles.stepSubtitle}>Seleziona il tuo profilo</Text>
-
-      <View style={styles.typeGrid}>
-        <TouchableOpacity
-          style={[styles.typeCard, userType === "biker" && styles.typeCardSelected]}
-          onPress={() => setUserType("biker")}
-          testID="type-biker"
-        >
-          <Ionicons
-            name="bicycle"
-            size={48}
-            color={userType === "biker" ? Colors.maleIcon : Colors.textSecondary}
-          />
-          <Text style={[styles.typeLabel, userType === "biker" && { color: Colors.maleIcon }]}>
-            {t("register.step1.biker")}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.typeCard, userType === "zavorrina" && styles.typeCardSelected]}
-          onPress={() => setUserType("zavorrina")}
-          testID="type-zavorrina"
-        >
-          <Ionicons
-            name="person"
-            size={48}
-            color={userType === "zavorrina" ? Colors.femaleIcon : Colors.textSecondary}
-          />
-          <Text style={[styles.typeLabel, userType === "zavorrina" && { color: Colors.femaleIcon }]}>
-            {t("register.step1.zavorrina")}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.typeCard, userType === "coppia" && styles.typeCardSelected]}
-          onPress={() => setUserType("coppia")}
-          testID="type-coppia"
-        >
-          <Ionicons
-            name="people"
-            size={48}
-            color={userType === "coppia" ? Colors.accent : Colors.textSecondary}
-          />
-          <Text style={[styles.typeLabel, userType === "coppia" && { color: Colors.accent }]}>
-            {t("register.step1.coppia")}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderStep2 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>{t("register.step2.title")}</Text>
-
-      {userType === "coppia" ? (
-        <>
-          <Text style={styles.stepSubtitle}>{t("register.step2.coupleConfig")}</Text>
-          <View style={styles.sexGrid}>
-            {(["M+M", "M+F", "F+F"] as const).map((config) => (
-              <TouchableOpacity
-                key={config}
-                style={[styles.sexCard, coupleSexConfig === config && styles.sexCardSelected]}
-                onPress={() => setCoupleSexConfig(config)}
-                testID={`couple-${config}`}
-              >
-                <View style={styles.coupleIcons}>
-                  <Ionicons
-                    name={config.startsWith("M") ? "male" : "female"}
-                    size={28}
-                    color={config.startsWith("M") ? Colors.maleIcon : Colors.femaleIcon}
-                  />
-                  <Text style={styles.plusSign}>+</Text>
-                  <Ionicons
-                    name={config.endsWith("M") ? "male" : "female"}
-                    size={28}
-                    color={config.endsWith("M") ? Colors.maleIcon : Colors.femaleIcon}
-                  />
-                </View>
-                <Text style={[styles.sexLabel, coupleSexConfig === config && styles.sexLabelSelected]}>
-                  {config}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </>
-      ) : (
-        <View style={styles.sexGrid}>
-          <TouchableOpacity
-            style={[styles.sexCard, styles.sexCardLarge, sex === "M" && styles.sexCardSelected]}
-            onPress={() => setSex("M")}
-            testID="sex-male"
-          >
-            <Ionicons name="male" size={48} color={sex === "M" ? Colors.maleIcon : Colors.textSecondary} />
-            <Text style={[styles.sexLabel, sex === "M" && { color: Colors.maleIcon }]}>
-              {t("register.step2.male")}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.sexCard, styles.sexCardLarge, sex === "F" && styles.sexCardSelected]}
-            onPress={() => setSex("F")}
-            testID="sex-female"
-          >
-            <Ionicons name="female" size={48} color={sex === "F" ? Colors.femaleIcon : Colors.textSecondary} />
-            <Text style={[styles.sexLabel, sex === "F" && { color: Colors.femaleIcon }]}>
-              {t("register.step2.female")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderStep3 = () => (
-    <View style={styles.stepContent}>
-
-      <View style={styles.inputWrapper}>
-        <Ionicons name="at" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder={t("auth.nickname")}
-          placeholderTextColor={Colors.textSecondary}
-          value={nickname}
-          onChangeText={setNickname}
-          autoCapitalize="none"
-          autoCorrect={false}
-          testID="reg-nickname"
-        />
-      </View>
-
-      <View style={styles.inputWrapper}>
-        <Ionicons name="mail-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder={t("auth.email")}
-          placeholderTextColor={Colors.textSecondary}
-          value={email}
-          onChangeText={(v) => { setEmail(v); setEmailConfirmed(false); }}
-          onBlur={() => {
-            if (email.trim() && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-              setShowEmailConfirm(true);
-            }
-          }}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          testID="reg-email"
-        />
-        {emailVerifEnabled && (
-          <TouchableOpacity
-            onPress={() => Alert.alert(t("auth.emailVerifyTitle"), t("auth.emailVerifyInfo"))}
-            style={{ paddingHorizontal: 8 }}
-          >
-            <Ionicons name="information-circle-outline" size={20} color={Colors.accent} />
-          </TouchableOpacity>
-        )}
-      </View>
-      {email.includes("@") && !email.includes("@gmail.") && !email.split("@")[1]?.includes(".") && (
-        <TouchableOpacity
-          style={styles.emailSuggestion}
-          onPress={() => { setEmail(email.split("@")[0] + "@gmail.com"); setEmailConfirmed(false); }}
-        >
-          <Ionicons name="mail" size={16} color={Colors.accent} />
-          <Text style={styles.emailSuggestionText}>{email.split("@")[0]}@gmail.com</Text>
-        </TouchableOpacity>
-      )}
-
-      {phoneFieldEnabled && (
-        <View style={styles.phoneRow}>
-          <TouchableOpacity
-            style={styles.prefixButton}
-            onPress={() => setShowPrefixModal(true)}
-            testID="reg-phone-prefix"
-          >
-            <Text style={styles.prefixText}>{phonePrefix}</Text>
-            <Ionicons name="chevron-down" size={14} color={Colors.textSecondary} />
-          </TouchableOpacity>
-          <View style={styles.phoneInputWrapper}>
-            <TextInput
-              style={styles.phoneInput}
-              placeholder={`${t("auth.phone")} (opzionale)`}
-              placeholderTextColor={Colors.textSecondary}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              testID="reg-phone"
-            />
-          </View>
-        </View>
-      )}
-
-      <Text style={styles.passwordHint}>
-        <Text style={styles.passwordHintItalic}>8 caratteri, con almeno una minuscola e </Text>
-        <Text style={[styles.passwordHintItalic, styles.passwordHintUpper]}>UNA MAIUSCOLA</Text>
-      </Text>
-
-      <View style={styles.inputWrapper}>
-        <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, styles.passwordInput]}
-          placeholder={t("auth.password")}
-          placeholderTextColor={Colors.textSecondary}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPassword}
-          autoCapitalize="none"
-          textContentType="newPassword"
-          autoComplete="new-password"
-          passwordRules="minlength: 8;"
-          testID="reg-password"
-        />
-        <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
-          <Ionicons
-            name={showPassword ? "eye-off-outline" : "eye-outline"}
-            size={22}
-            color={Colors.textSecondary}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {error ? (
-        <View style={styles.errorBanner}>
-          <Ionicons name="alert-circle" size={18} color={Colors.error} />
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      ) : null}
-
-      <View style={styles.inputWrapper}>
-        <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-        <TextInput
-          style={[styles.input, styles.passwordInput]}
-          placeholder={t("auth.confirmPassword")}
-          placeholderTextColor={Colors.textSecondary}
-          value={confirmPassword}
-          onChangeText={(v) => {
-            setConfirmPassword(v);
-            if (passwordMismatch && v === password) setPasswordMismatch(false);
-          }}
-          onBlur={() => {
-            if (confirmPassword && confirmPassword !== password) setPasswordMismatch(true);
-            else setPasswordMismatch(false);
-          }}
-          secureTextEntry={!showConfirmPassword}
-          autoCapitalize="none"
-          textContentType="newPassword"
-          autoComplete="new-password"
-          testID="reg-confirm-password"
-        />
-        <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.eyeButton}>
-          <Ionicons
-            name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
-            size={22}
-            color={Colors.textSecondary}
-          />
-        </TouchableOpacity>
-      </View>
-      {passwordMismatch && (
-        <Text style={styles.inlineError}>{t("validation.passwordMismatch")}</Text>
-      )}
-
-      <View style={styles.inputWrapper}>
-        <Ionicons name="calendar-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-        <TextInput
-          style={styles.input}
-          placeholder={`${t("auth.birthYear")} (opzionale)`}
-          placeholderTextColor={Colors.textSecondary}
-          value={birthYear}
-          onChangeText={setBirthYear}
-          keyboardType="number-pad"
-          maxLength={4}
-          testID="reg-birthyear"
-        />
-      </View>
-
-      <TouchableOpacity
-        style={[styles.inputWrapper, !country && styles.inputWrapperRequired]}
-        onPress={() => {
-          const opening = !showCountries;
-          setShowCountries(opening);
-          setShowRegions(false);
-          if (opening && country) {
-            const continentEntry = CONTINENT_MAP.find(c => c.countryCodes.includes(country));
-            if (continentEntry) setExpandedContinents(new Set([continentEntry.key]));
-          }
-        }}
-        testID="reg-country-toggle"
-      >
-        <Ionicons name="globe-outline" size={20} color={country ? Colors.accent : Colors.textSecondary} style={styles.inputIcon} />
-        <Text style={[styles.input, { lineHeight: 52 }, !country && { color: Colors.textSecondary }]}>
-          {country
-            ? `${EUROPEAN_COUNTRIES.find(c => c.code === country)?.flag} ${EUROPEAN_COUNTRIES.find(c => c.code === country)?.name}`
-            : "Paese *"}
-        </Text>
-        <Ionicons name={showCountries ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
-      </TouchableOpacity>
-
-      {showCountries && (
-        <View style={styles.regionList}>
-          <ScrollView style={styles.regionScroll} nestedScrollEnabled>
-            {[
-              { key: "EU", label: "🌍 Europa" },
-              { key: "NA", label: "🌎 Nord America" },
-              { key: "SA", label: "🌎 Sud America" },
-              { key: "AF", label: "🌍 Africa" },
-              { key: "AS", label: "🌏 Asia" },
-              { key: "OC", label: "🌏 Oceania" },
-            ].map(({ key, label }) => {
-              const continentCountries = getCountriesForContinent(key)
-                .sort((a, b) => a.name.localeCompare(b.name));
-              if (continentCountries.length === 0) return null;
-              const isExpanded = expandedContinents.has(key);
-              return (
-                <View key={key}>
-                  <TouchableOpacity
-                    style={styles.continentHeader}
-                    onPress={() => {
-                      setExpandedContinents(prev => {
-                        const next = new Set(prev);
-                        if (next.has(key)) next.delete(key); else next.add(key);
-                        return next;
-                      });
-                    }}
-                  >
-                    <Text style={styles.continentLabel}>{label}</Text>
-                    <Ionicons
-                      name={isExpanded ? "chevron-up" : "chevron-down"}
-                      size={14}
-                      color={Colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                  {isExpanded && continentCountries.map((c) => (
-                    <TouchableOpacity
-                      key={c.code}
-                      style={[styles.regionItem, styles.regionItemIndented, country === c.code && styles.regionItemSelected]}
-                      onPress={() => { setCountry(c.code); setRegion(""); setShowCountries(false); }}
-                    >
-                      <Text style={[styles.regionText, country === c.code && styles.regionTextSelected]}>{c.flag} {c.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              );
-            })}
-          </ScrollView>
-        </View>
-      )}
-
-      {country && (
-        <>
-          <TouchableOpacity
-            style={styles.inputWrapper}
-            onPress={() => { setShowRegions(!showRegions); setShowCountries(false); }}
-            testID="reg-region-toggle"
-          >
-            <Ionicons name="location-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-            <Text style={[styles.input, { lineHeight: 52 }, !region && { color: Colors.textSecondary }]}>
-              {region || `${t("auth.region")} (preferibile inserirla)`}
-            </Text>
-            <Ionicons name={showRegions ? "chevron-up" : "chevron-down"} size={20} color={Colors.textSecondary} />
-          </TouchableOpacity>
-
-          {showRegions && (
-            <View style={styles.regionList}>
-              <ScrollView style={styles.regionScroll} nestedScrollEnabled>
-                {[...getRegionsForCountry(country)].sort((a, b) => a.name.localeCompare(b.name)).map((r) => (
-                  <TouchableOpacity
-                    key={r.name}
-                    style={[styles.regionItem, region === r.name && styles.regionItemSelected]}
-                    onPress={() => { setRegion(r.name); setShowRegions(false); }}
-                  >
-                    <Text style={[styles.regionText, region === r.name && styles.regionTextSelected]}>{r.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-        </>
-      )}
-
-      <View style={styles.inviteSection}>
-        <View style={styles.inputWrapper}>
-          <Ionicons name="gift-outline" size={20} color={Colors.accent} style={styles.inputIcon} />
-          <TextInput
-            style={styles.input}
-            placeholder="Codice invito (opzionale)"
-            placeholderTextColor={Colors.textSecondary}
-            value={inviteCode}
-            onChangeText={(v) => setInviteCode(v.toUpperCase())}
-            autoCapitalize="characters"
-            autoCorrect={false}
-            testID="reg-invite-code"
-          />
-          {invitePreviewLoading && <ActivityIndicator size="small" color={Colors.accent} style={{ marginRight: 8 }} />}
-          {!invitePreviewLoading && inviteCode.trim().length > 0 && (
-            <Ionicons
-              name={invitePreview ? "checkmark-circle" : "close-circle"}
-              size={20}
-              color={invitePreview ? "#4CAF50" : Colors.textSecondary}
-              style={{ marginRight: 8 }}
-            />
-          )}
-        </View>
-
-        {invitePreview && (
-          <View style={styles.inviteBanner}>
-            <Ionicons name="gift" size={28} color={Colors.accent} />
-            <View style={styles.inviteBannerText}>
-              <Text style={styles.inviteBannerTitle}>Omaggio disponibile!</Text>
-              {invitePreview.label && <Text style={styles.inviteBannerLabel}>{invitePreview.label}</Text>}
-              {invitePreview.giftMessage && (
-                <Text style={styles.inviteBannerMessage} numberOfLines={3}>{invitePreview.giftMessage}</Text>
-              )}
-            </View>
-          </View>
-        )}
-      </View>
-
-      <Modal
-        visible={showPrefixModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowPrefixModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Prefisso internazionale</Text>
-              <TouchableOpacity onPress={() => setShowPrefixModal(false)}>
-                <Ionicons name="close" size={24} color={Colors.text} />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={PHONE_PREFIXES}
-              keyExtractor={(item) => item.code}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.prefixItem,
-                    phonePrefix === item.code && styles.prefixItemSelected,
-                  ]}
-                  onPress={() => {
-                    setPhonePrefix(item.code);
-                    setShowPrefixModal(false);
-                  }}
-                >
-                  <Text style={[styles.prefixItemCode, phonePrefix === item.code && styles.prefixItemCodeSelected]}>
-                    {item.code}
-                  </Text>
-                  <Text style={[styles.prefixItemCountry, phonePrefix === item.code && styles.prefixItemCountrySelected]}>
-                    {item.country}
-                  </Text>
-                  {phonePrefix === item.code && (
-                    <Ionicons name="checkmark" size={20} color={Colors.accent} />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-
-  const renderStep4 = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>{t("register.step4.title")}</Text>
-
-      <View style={styles.eulaContainer}>
-        <ScrollView style={styles.eulaScroll} nestedScrollEnabled>
-          <Text style={styles.eulaText}>{EULA_TEXTS[getAppLanguage()] ?? EULA_TEXTS.it}</Text>
-        </ScrollView>
-        <TouchableOpacity
-          onPress={() => Linking.openURL(new URL("/terms", getApiUrl()).toString())}
-          style={styles.termsLinkRow}
-        >
-          <Text style={styles.termsLinkText}>{t("register.step4.tosLink")}</Text>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        style={styles.checkboxRow}
-        onPress={() => setEulaAccepted(!eulaAccepted)}
-        testID="eula-checkbox"
-      >
-        <View style={[styles.checkbox, eulaAccepted && styles.checkboxChecked]}>
-          {eulaAccepted && <Ionicons name="checkmark" size={16} color={Colors.background} />}
-        </View>
-        <Text style={styles.checkboxLabel}>{t("register.step4.accept")}</Text>
-      </TouchableOpacity>
-
-      <View style={styles.checkboxRow}>
-        <TouchableOpacity
-          onPress={() => setPrivacyAccepted(!privacyAccepted)}
-          testID="privacy-checkbox"
-        >
-          <View style={[styles.checkbox, privacyAccepted && styles.checkboxChecked]}>
-            {privacyAccepted && <Ionicons name="checkmark" size={16} color={Colors.background} />}
-          </View>
-        </TouchableOpacity>
-        <View style={styles.privacyCheckboxLabel}>
-          <TouchableOpacity onPress={() => setPrivacyAccepted(!privacyAccepted)}>
-            <Text style={styles.checkboxLabel}>{t("register.step4.acceptPrivacy")} </Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push("/privacy-policy")}>
-            <Text style={styles.privacyLinkInline}>{t("register.step4.privacyLinkLabel")}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
-
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -1075,116 +282,111 @@ export default function RegisterScreen() {
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
         </TouchableOpacity>
 
-        {renderStepIndicator()}
+        <StepIndicator currentStep={step} totalSteps={totalSteps} />
 
-        {error && step !== 3 ? (
-          <View style={styles.errorBanner}>
-            <Ionicons name="alert-circle" size={18} color={Colors.error} />
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-
-        {step === 1 && renderStep1()}
-        {step === 2 && renderStep2()}
-        {step === 3 && renderStep3()}
-        {step === 4 && renderStep4()}
-
-        <TouchableOpacity
-          style={[styles.nextButton, registerMutation.isPending && styles.nextButtonDisabled]}
-          onPress={handleNext}
-          disabled={registerMutation.isPending}
-          testID="register-next"
-        >
-          {registerMutation.isPending ? (
-            <ActivityIndicator color={Colors.background} />
-          ) : (
-            <Text style={styles.nextButtonText}>
-              {step === totalSteps ? t("register.complete") : t("register.next")}
-            </Text>
-          )}
-        </TouchableOpacity>
+        {step !== 3 && <ErrorBanner error={error} />}
 
         {step === 1 && (
-          <View style={styles.loginRow}>
-            <Text style={styles.loginPrompt}>{t("auth.hasAccount")}</Text>
-            <TouchableOpacity onPress={() => router.back()} testID="go-login">
-              <Text style={styles.loginLink}>{t("auth.login")}</Text>
-            </TouchableOpacity>
-          </View>
+          <StepUserType
+            userType={userType}
+            setUserType={setUserType}
+          />
+        )}
+        {step === 2 && (
+          <StepGender
+            userType={userType}
+            sex={sex}
+            setSex={setSex}
+            coupleSexConfig={coupleSexConfig}
+            setCoupleSexConfig={setCoupleSexConfig}
+          />
+        )}
+        {step === 3 && (
+          <StepBasicInfo
+            nickname={nickname}
+            setNickname={setNickname}
+            email={email}
+            setEmail={setEmail}
+            password={password}
+            setPassword={setPassword}
+            confirmPassword={confirmPassword}
+            setConfirmPassword={setConfirmPassword}
+            showPassword={showPassword}
+            setShowPassword={setShowPassword}
+            showConfirmPassword={showConfirmPassword}
+            setShowConfirmPassword={setShowConfirmPassword}
+            phoneFieldEnabled={phoneFieldEnabled}
+            phonePrefix={phonePrefix}
+            setPhonePrefix={setPhonePrefix}
+            phone={phone}
+            setPhone={setPhone}
+            showPrefixModal={showPrefixModal}
+            setShowPrefixModal={setShowPrefixModal}
+            phonePrefixes={PHONE_PREFIXES}
+            birthYear={birthYear}
+            setBirthYear={setBirthYear}
+            country={country}
+            setCountry={setCountry}
+            showCountries={showCountries}
+            setShowCountries={setShowCountries}
+            region={region}
+            setRegion={setRegion}
+            showRegions={showRegions}
+            setShowRegions={setShowRegions}
+            expandedContinents={expandedContinents}
+            setExpandedContinents={setExpandedContinents}
+            inviteCode={inviteCode}
+            setInviteCode={setInviteCode}
+            invitePreview={invitePreview}
+            invitePreviewLoading={invitePreviewLoading}
+            error={error}
+            emailConfirmed={emailConfirmed}
+            setShowEmailConfirm={setShowEmailConfirm}
+          />
+        )}
+        {step === 4 && (
+          <StepLegal
+            eulaAccepted={eulaAccepted}
+            setEulaAccepted={setEulaAccepted}
+            privacyAccepted={privacyAccepted}
+            setPrivacyAccepted={setPrivacyAccepted}
+            eulaTexts={EULA_TEXTS}
+          />
+        )}
+
+        <NavigationButtons
+          step={step}
+          totalSteps={totalSteps}
+          isPending={registerMutation.isPending}
+          onNext={handleNext}
+        />
+
+        {step === 1 && (
+          <LoginPrompt onPress={() => router.back()} />
         )}
       </ScrollView>
 
-      {/* Privacy Modal — appare automaticamente al primo step 3 */}
-      <Modal
+      <PrivacyNoticeModal
         visible={showPrivacyModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowPrivacyModal(false)}
-      >
-        <View style={styles.privacyModalOverlay}>
-          <View style={styles.privacyModalCard}>
-            <Ionicons name="shield-checkmark" size={48} color={Colors.accent} style={{ marginBottom: 16 }} />
-            <Text style={styles.privacyModalTitle}>BikerLink</Text>
-            <Text style={styles.privacyModalBody}>{t("register.privacyNotice")}</Text>
-            <Text style={styles.privacyModalHighlight}>
-              <Text style={styles.privacyModalHighlightText}>App discreta. Privacy al primo posto.</Text>
-            </Text>
-            <TouchableOpacity style={styles.privacyModalButton} onPress={() => setShowPrivacyModal(false)}>
-              <Text style={styles.privacyModalButtonText}>Ho capito, prosegui</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowPrivacyModal(false)}
+      />
 
-      {/* Email Confirm Modal */}
-      <Modal
+      <EmailConfirmModal
         visible={showEmailConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowEmailConfirm(false)}
-      >
-        <View style={styles.privacyModalOverlay}>
-          <View style={styles.emailConfirmCard}>
-            <Ionicons name="mail" size={40} color={Colors.accent} style={{ marginBottom: 12 }} />
-            <Text style={styles.emailConfirmTitle}>Sei sicuro sia corretto?</Text>
-            <Text style={styles.emailConfirmEmail}>{email.trim()}</Text>
-            <TouchableOpacity
-              style={styles.privacyModalButton}
-              onPress={() => { setEmailConfirmed(true); setShowEmailConfirm(false); }}
-            >
-              <Text style={styles.privacyModalButtonText}>Sì, è questo ✓</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.emailConfirmEditBtn}
-              onPress={() => setShowEmailConfirm(false)}
-            >
-              <Text style={styles.emailConfirmEditText}>Correggi</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        email={email}
+        onConfirm={() => {
+          setEmailConfirmed(true);
+          setShowEmailConfirm(false);
+        }}
+        onEdit={() => setShowEmailConfirm(false)}
+      />
 
-      <Modal
+      <GiftModal
         visible={showGiftModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {}}
-      >
-        <View style={styles.giftModalOverlay}>
-          <View style={styles.giftModalCard}>
-            <Ionicons name="gift" size={56} color={Colors.accent} style={{ marginBottom: 16 }} />
-            <Text style={styles.giftModalTitle}>🎁 Omaggio sbloccato!</Text>
-            <Text style={styles.giftModalMessage}>{giftModalMessage}</Text>
-            <View style={styles.giftModalCodeBox}>
-              <Text style={styles.giftModalCodeLabel}>Il tuo codice</Text>
-              <Text style={styles.giftModalCode}>{giftModalCode}</Text>
-            </View>
-            <TouchableOpacity style={styles.giftModalButton} onPress={handleGiftModalClose}>
-              <Text style={styles.giftModalButtonText}>Ho capito!</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        message={giftModalMessage}
+        code={giftModalCode}
+        onClose={handleGiftModalClose}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -1203,643 +405,9 @@ const styles = StyleSheet.create({
     padding: 4,
     marginBottom: 8,
   },
-  stepIndicator: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 24,
-  },
-  stepDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.border,
-  },
-  stepDotActive: {
-    backgroundColor: Colors.accent,
-    width: 28,
-  },
-  stepContent: {
-    gap: 16,
-    marginBottom: 24,
-  },
-  stepTitle: {
-    fontSize: 26,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    textAlign: "center",
-  },
-  stepSubtitle: {
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "center",
-  },
-  typeGrid: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 14,
-    marginTop: 12,
-  },
-  typeCard: {
-    width: 100,
-    height: 120,
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    gap: 8,
-  },
-  typeCardSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.surfaceLight,
-  },
-  typeLabel: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.textSecondary,
-  },
-  sexGrid: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 14,
-    marginTop: 12,
-  },
-  sexCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: Colors.border,
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  sexCardLarge: {
-    width: 130,
-    height: 130,
-  },
-  sexCardSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.surfaceLight,
-  },
-  sexLabel: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.textSecondary,
-  },
-  sexLabelSelected: {
-    color: Colors.accent,
-  },
-  coupleIcons: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  plusSign: {
-    color: Colors.textSecondary,
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    height: 58,
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    color: Colors.text,
-    fontSize: 19,
-    fontFamily: "Inter_400Regular",
-    height: "100%",
-  },
-  passwordInput: {
-    paddingRight: 40,
-  },
-  eyeButton: {
-    position: "absolute",
-    right: 14,
-    height: "100%",
-    justifyContent: "center",
-  },
-  privacyNoticeCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.accent + "44",
-    padding: 14,
-    marginBottom: 16,
-  },
-  privacyNoticeText: {
-    flex: 1,
-    color: Colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  phoneRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  prefixButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
-    height: 58,
-    gap: 4,
-  },
-  prefixText: {
-    color: Colors.text,
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-  },
-  phoneInputWrapper: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 14,
-    height: 58,
-  },
-  phoneInput: {
-    flex: 1,
-    color: Colors.text,
-    fontSize: 17,
-    fontFamily: "Inter_400Regular",
-    height: "100%",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "60%",
-    paddingBottom: 0,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  prefixItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  prefixItemSelected: {
-    backgroundColor: Colors.surfaceLight,
-  },
-  prefixItemCode: {
-    width: 60,
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  prefixItemCodeSelected: {
-    color: Colors.accent,
-  },
-  prefixItemCountry: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
-  prefixItemCountrySelected: {
-    color: Colors.accent,
-  },
-  regionList: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    maxHeight: 200,
-    overflow: "hidden",
-  },
-  regionScroll: {
-    paddingVertical: 4,
-  },
-  regionItem: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  regionItemSelected: {
-    backgroundColor: Colors.surfaceLight,
-  },
-  regionText: {
-    color: Colors.text,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-  },
-  regionTextSelected: {
-    color: Colors.accent,
-    fontFamily: "Inter_600SemiBold",
-  },
-  eulaContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    height: 280,
-    overflow: "hidden",
-  },
-  eulaScroll: {
-    padding: 16,
-  },
-  eulaText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 20,
-  },
-  checkboxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 4,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxChecked: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
-  },
-  checkboxLabel: {
-    color: Colors.text,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    flex: 1,
-  },
-  errorBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(229, 57, 53, 0.15)",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 8,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: Colors.error,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    flex: 1,
-  },
-  nextButton: {
-    backgroundColor: Colors.accent,
-    borderRadius: 12,
-    height: 52,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  nextButtonDisabled: {
-    opacity: 0.7,
-  },
-  nextButtonText: {
-    color: Colors.background,
-    fontSize: 17,
-    fontFamily: "Inter_600SemiBold",
-    letterSpacing: 0.5,
-  },
-  loginRow: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 16,
-  },
-  loginPrompt: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-  },
   loginLink: {
     color: Colors.accent,
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
-  },
-  privacyLink: {
-    marginTop: 10,
-    fontSize: 12,
-    color: Colors.accent,
-    textAlign: "center" as const,
-    textDecorationLine: "underline" as const,
-  },
-  privacyLinkInline: {
-    fontSize: 14,
-    color: Colors.accent,
-    textDecorationLine: "underline" as const,
-    fontFamily: "Inter_500Medium",
-  },
-  privacyCheckboxLabel: {
-    flex: 1,
-    flexDirection: "row" as const,
-    flexWrap: "wrap" as const,
-    alignItems: "center" as const,
-  },
-  termsLinkRow: {
-    paddingVertical: 8,
-    alignItems: "flex-end" as const,
-    paddingRight: 4,
-  },
-  termsLinkText: {
-    fontSize: 12,
-    color: Colors.accent,
-    textDecorationLine: "underline" as const,
-    fontFamily: "Inter_500Medium",
-  },
-  inviteSection: {
-    marginTop: 8,
-    gap: 8,
-  },
-  inviteBanner: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    backgroundColor: "rgba(255, 152, 0, 0.12)",
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    borderRadius: 12,
-    padding: 14,
-    gap: 12,
-  },
-  inviteBannerText: {
-    flex: 1,
-    gap: 3,
-  },
-  inviteBannerTitle: {
-    color: Colors.accent,
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-  },
-  inviteBannerLabel: {
-    color: Colors.textSecondary,
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-  },
-  inviteBannerMessage: {
-    color: Colors.text,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    lineHeight: 18,
-  },
-  giftModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  giftModalCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 32,
-    alignItems: "center",
-    width: "100%",
-    maxWidth: 360,
-  },
-  giftModalTitle: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    marginBottom: 12,
-    textAlign: "center",
-  },
-  giftModalMessage: {
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 24,
-  },
-  giftModalCodeBox: {
-    backgroundColor: Colors.background,
-    borderRadius: 12,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    alignItems: "center",
-    marginBottom: 28,
-    width: "100%",
-    borderWidth: 1,
-    borderColor: Colors.accent,
-  },
-  giftModalCodeLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-    textTransform: "uppercase" as const,
-    letterSpacing: 1.5,
-    marginBottom: 6,
-  },
-  giftModalCode: {
-    fontSize: 36,
-    fontFamily: "Inter_700Bold",
-    color: Colors.accent,
-    letterSpacing: 4,
-  },
-  giftModalButton: {
-    backgroundColor: Colors.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-  },
-  giftModalButtonText: {
-    color: Colors.background,
-    fontSize: 17,
-    fontFamily: "Inter_600SemiBold",
-  },
-  passwordHint: {
-    paddingHorizontal: 4,
-    marginBottom: -4,
-  },
-  passwordHintItalic: {
-    color: Colors.accent,
-    fontSize: 14,
-    fontStyle: "italic" as const,
-    fontFamily: "Inter_400Regular",
-  },
-  passwordHintUpper: {
-    fontFamily: "Inter_700Bold",
-  },
-  emailSuggestion: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: Colors.accent + "55",
-    marginTop: -8,
-  },
-  emailSuggestionText: {
-    color: Colors.accent,
-    fontSize: 15,
-    fontFamily: "Inter_500Medium",
-  },
-  inputWrapperRequired: {
-    borderColor: Colors.accent + "88",
-  },
-  continentHeader: {
-    backgroundColor: Colors.background,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "space-between" as const,
-  },
-  continentLabel: {
-    color: Colors.textSecondary,
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
-    textTransform: "uppercase" as const,
-    letterSpacing: 1,
-  },
-  inlineError: {
-    color: Colors.error,
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    marginTop: -8,
-    marginLeft: 4,
-  },
-  regionItemIndented: {
-    paddingLeft: 24,
-  },
-  privacyModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    padding: 24,
-  },
-  privacyModalCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 36,
-    alignItems: "center" as const,
-    width: "100%",
-    maxWidth: 400,
-  },
-  privacyModalTitle: {
-    fontSize: 34,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    marginBottom: 16,
-    textAlign: "center" as const,
-  },
-  privacyModalBody: {
-    fontSize: 18,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "center" as const,
-    lineHeight: 28,
-    marginBottom: 20,
-  },
-  privacyModalHighlight: {
-    marginBottom: 28,
-  },
-  privacyModalHighlightText: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.accent,
-    fontStyle: "italic" as const,
-    textDecorationLine: "underline" as const,
-    textAlign: "center" as const,
-  },
-  privacyModalButton: {
-    backgroundColor: Colors.accent,
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    width: "100%",
-    alignItems: "center" as const,
-  },
-  privacyModalButtonText: {
-    color: Colors.background,
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-  },
-  emailConfirmCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 24,
-    padding: 32,
-    alignItems: "center" as const,
-    width: "100%",
-    maxWidth: 360,
-  },
-  emailConfirmTitle: {
-    fontSize: 24,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    textAlign: "center" as const,
-    marginBottom: 14,
-  },
-  emailConfirmEmail: {
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-    color: Colors.accent,
-    textAlign: "center" as const,
-    marginBottom: 28,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.background,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.accent,
-    width: "100%",
-    overflow: "hidden" as const,
-  },
-  emailConfirmEditBtn: {
-    marginTop: 14,
-    paddingVertical: 10,
-  },
-  emailConfirmEditText: {
-    color: Colors.textSecondary,
-    fontSize: 16,
-    fontFamily: "Inter_500Medium",
-    textDecorationLine: "underline" as const,
   },
 });

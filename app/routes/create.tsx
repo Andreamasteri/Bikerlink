@@ -1,22 +1,17 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   ScrollView,
-  Modal,
   Alert,
   ActivityIndicator,
   BackHandler,
-  KeyboardAvoidingView,
-  Platform,
+  Text,
 } from "react-native";
-import WebView from "react-native-webview";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
@@ -26,6 +21,14 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
 import { getTileConfig } from "@/lib/map-tiles";
+
+// Sub-components
+import { RouteOptionsPanel } from "@/components/routes/create/RouteOptionsPanel";
+import { RouteMapPreview } from "@/components/routes/create/RouteMapPreview";
+import { RouteWaypointsInput } from "@/components/routes/create/RouteWaypointsInput";
+import { WaypointFormModal } from "@/components/routes/create/WaypointFormModal";
+import { PublishRouteModal } from "@/components/routes/create/PublishRouteModal";
+import { RouteAiSection } from "@/components/routes/create/RouteAiSection";
 
 function getWaypointTypes(t: (key: string) => string) {
   return [
@@ -50,14 +53,9 @@ function generateId() {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
-
-function getWaypointMeta(type: string, types: ReturnType<typeof getWaypointTypes>) {
-  return types.find((w) => w.value === type) || types[1];
-}
-
 export default function CreateRouteScreen() {
   const t = useT();
-  const WAYPOINT_TYPES = getWaypointTypes(t);
+  const WAYPOINT_TYPES = useMemo(() => getWaypointTypes(t), [t]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
@@ -96,7 +94,7 @@ export default function CreateRouteScreen() {
   const [routeStyle, setRouteStyle] = useState<"curvy" | "balanced" | "fastest">("balanced");
 
   // Edit mode: load existing route
-  const { data: existingRoute, isLoading: isLoadingExisting } = useQuery({
+  const { data: existingRoute } = useQuery({
     queryKey: ["/api/custom-routes", editId],
     queryFn: async () => {
       if (!editId) return null;
@@ -159,12 +157,10 @@ export default function CreateRouteScreen() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (isEditMode && editId) {
-        // Update title/description
         await apiRequest("PUT", `/api/custom-routes/${editId}`, {
           title: title.trim(),
           description: description.trim() || null,
         });
-        // Delete old waypoints then re-create (simple approach)
         await apiRequest("DELETE", `/api/custom-routes/${editId}/waypoints`);
         for (let i = 0; i < waypoints.length; i++) {
           const wp = waypoints[i];
@@ -245,10 +241,7 @@ export default function CreateRouteScreen() {
     if (!pendingCoord) return;
     setMapOpen(false);
 
-    const autoType =
-      waypoints.length === 0
-        ? "start"
-        : "stop";
+    const autoType = waypoints.length === 0 ? "start" : "stop";
 
     setWaypointName("");
     setWaypointDesc("");
@@ -291,6 +284,10 @@ export default function CreateRouteScreen() {
     });
   }, []);
 
+  const getWaypointMeta = useCallback((type: string) => {
+    return WAYPOINT_TYPES.find((w) => w.value === type) || WAYPOINT_TYPES[1];
+  }, [WAYPOINT_TYPES]);
+
   const canSave = title.trim().length > 0 && waypoints.length >= 2;
 
   // Curvature map
@@ -298,7 +295,6 @@ export default function CreateRouteScreen() {
   const [curvatureMapHtml, setCurvatureMapHtml] = useState<string>("");
   const curvatureMapMountedRef = useRef(false);
 
-  // Always-current ref so onLoadEnd can read the latest waypoints without stale closures
   const waypointsRef = useRef<LocalWaypoint[]>(waypoints);
   waypointsRef.current = waypoints;
 
@@ -357,8 +353,6 @@ export default function CreateRouteScreen() {
     }
   }, [injectWaypoints]);
 
-  // When the WebView finishes loading (initial load or any reload), sync current
-  // waypoints so fitBounds is always called with up-to-date coordinates.
   const handleMapLoaded = useCallback(() => {
     injectWaypoints(waypointsRef.current, routePolylinePtsRef.current.length > 1 ? routePolylinePtsRef.current : undefined);
   }, [injectWaypoints]);
@@ -367,7 +361,6 @@ export default function CreateRouteScreen() {
     if (waypoints.length < 2) {
       curvatureMapMountedRef.current = false;
       setRoutePolylinePts([]);
-      // Cancel any in-flight request and pending debounce
       if (routeDebounceTimerRef.current !== null) {
         clearTimeout(routeDebounceTimerRef.current);
         routeDebounceTimerRef.current = null;
@@ -381,9 +374,6 @@ export default function CreateRouteScreen() {
     }
 
     if (!curvatureMapMountedRef.current) {
-      // First time the map becomes visible: bake current waypoints into the HTML.
-      // handleMapLoaded will fire once the WebView finishes loading and will
-      // call updateWaypoints (+ fitBounds) with the then-current waypoints.
       curvatureMapMountedRef.current = true;
       setCurvatureMapHtml(buildPlannerMapHtml(
         tileConfig.url,
@@ -394,13 +384,9 @@ export default function CreateRouteScreen() {
         null,
       ));
     } else {
-      // Already mounted: update markers, polyline and re-fit via JS injection
-      // (no reload/flicker). Covers add, remove AND reorder.
       injectWaypoints(waypoints, routePolylinePtsRef.current.length > 1 ? routePolylinePtsRef.current : undefined);
     }
 
-    // Debounce + abort: cancel any pending timer and previous in-flight request,
-    // then wait 600ms before firing a new route calculation.
     if (routeDebounceTimerRef.current !== null) {
       clearTimeout(routeDebounceTimerRef.current);
     }
@@ -436,207 +422,36 @@ export default function CreateRouteScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.betaWarning}>
-          <MaterialCommunityIcons name="alert" size={22} color="#FF6600" />
-          <Text style={styles.betaWarningText}>
-            {t("routes.betaWarning")}
-          </Text>
-        </View>
+        <RouteAiSection t={t} />
 
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Titolo *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Es. Giro del Lago di Garda"
-            placeholderTextColor={Colors.textSecondary}
-            value={title}
-            onChangeText={setTitle}
-            maxLength={200}
-          />
-        </View>
+        <RouteOptionsPanel
+          title={title}
+          setTitle={setTitle}
+          description={description}
+          setDescription={setDescription}
+        />
 
-        <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Descrizione</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Descrivi il percorso..."
-            placeholderTextColor={Colors.textSecondary}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-          />
-        </View>
+        <RouteMapPreview
+          waypoints={waypoints}
+          curvatureMapHtml={curvatureMapHtml}
+          webviewRef={webviewRef}
+          handleMapLoaded={handleMapLoaded}
+          routeStyle={routeStyle}
+          setRouteStyle={setRouteStyle}
+          isCalculatingRoute={isCalculatingRoute}
+          routeStats={routeStats}
+        />
 
-
-        {/* Route style selector — shown when there are at least 2 waypoints */}
-        {waypoints.length >= 2 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Stile percorso</Text>
-            <View style={styles.styleSelector}>
-              {(["curvy", "balanced", "fastest"] as const).map((s) => {
-                const isActive = routeStyle === s;
-                const meta = {
-                  curvy: { label: "Panoramico", icon: "terrain" as const, color: "#4CAF50" },
-                  balanced: { label: "Bilanciato", icon: "swap-horizontal" as const, color: Colors.accent },
-                  fastest: { label: "Veloce", icon: "flash" as const, color: "#FF9800" },
-                }[s];
-                return (
-                  <TouchableOpacity
-                    key={s}
-                    style={[styles.styleBtn, isActive && { borderColor: meta.color, backgroundColor: meta.color + "18" }]}
-                    onPress={() => setRouteStyle(s)}
-                    testID={`route-style-${s}`}
-                  >
-                    <Ionicons name={meta.icon} size={18} color={isActive ? meta.color : Colors.textSecondary} />
-                    <Text style={[styles.styleBtnText, isActive && { color: meta.color, fontWeight: "700" as const }]}>
-                      {meta.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        )}
-
-        {/* Curvature map — shown when there are at least 2 waypoints */}
-        {waypoints.length >= 2 && curvatureMapHtml !== "" && (
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Anteprima percorso (curvatura)</Text>
-            <View style={{ height: 200, borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: Colors.border }}>
-              <WebView
-                ref={webviewRef}
-                source={{ html: curvatureMapHtml, baseUrl: "" }}
-                style={{ flex: 1 }}
-                scrollEnabled={false}
-                javaScriptEnabled
-                originWhitelist={["*"]}
-                onLoadEnd={handleMapLoaded}
-              />
-              {/* Style badge overlay */}
-              {(() => {
-                const styleMeta = {
-                  curvy: { label: "Panoramico", icon: "terrain" as const, color: "#4CAF50" },
-                  balanced: { label: "Bilanciato", icon: "swap-horizontal" as const, color: Colors.accent },
-                  fastest: { label: "Veloce", icon: "flash" as const, color: "#FF9800" },
-                }[routeStyle];
-                return (
-                  <View style={[styles.styleBadge, { backgroundColor: styleMeta.color + "DD" }]}>
-                    <Ionicons name={styleMeta.icon} size={12} color="#fff" />
-                    <Text style={styles.styleBadgeText}>{styleMeta.label}</Text>
-                  </View>
-                );
-              })()}
-              {isCalculatingRoute && (
-                <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center" }}>
-                  <ActivityIndicator size="small" color="#fff" />
-                </View>
-              )}
-            </View>
-            {routeStats && !isCalculatingRoute && (
-              <View style={styles.routeStatsRow}>
-                <Ionicons name="navigate" size={14} color={Colors.accent} />
-                <Text style={styles.routeStatText}>{routeStats.distanceKm % 1 === 0 ? routeStats.distanceKm : routeStats.distanceKm.toFixed(1)} km</Text>
-                <Text style={styles.routeStatSep}>·</Text>
-                <Ionicons name="time-outline" size={14} color={Colors.accent} />
-                <Text style={styles.routeStatText}>
-                  {routeStats.durationMinutes >= 60
-                    ? `${Math.floor(routeStats.durationMinutes / 60)}h ${routeStats.durationMinutes % 60 > 0 ? `${routeStats.durationMinutes % 60} min` : ""}`.trim()
-                    : `${routeStats.durationMinutes} min`}
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        <View style={styles.waypointHeader}>
-          <Text style={styles.sectionTitle}>Tappe ({waypoints.length})</Text>
-          <View style={styles.waypointHeaderBtns}>
-            <TouchableOpacity
-              style={[styles.addBtn, styles.importBtn]}
-              onPress={handleImportGpx}
-              disabled={isImporting}
-            >
-              {isImporting ? (
-                <ActivityIndicator size="small" color="#FF6600" />
-              ) : (
-                <>
-                  <Ionicons name="cloud-upload-outline" size={18} color="#FF6600" />
-                  <Text style={styles.importBtnText}>Importa GPX</Text>
-                </>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.addBtn} onPress={openMapForNewWaypoint}>
-              <Ionicons name="add" size={20} color="#fff" />
-              <Text style={styles.addBtnText}>Aggiungi</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {waypoints.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons name="navigate-outline" size={36} color={Colors.textSecondary} />
-            <Text style={styles.emptyText}>
-              {t("routes.noStops")}
-            </Text>
-          </View>
-        )}
-
-        {waypoints.map((wp, index) => {
-          const meta = getWaypointMeta(wp.waypointType, WAYPOINT_TYPES);
-          return (
-            <View key={wp.localId} style={styles.waypointCard}>
-              <View style={styles.waypointCardLeft}>
-                <View style={[styles.waypointIconWrap, { backgroundColor: meta.color + "22" }]}>
-                  <MaterialCommunityIcons name={meta.icon} size={18} color={meta.color} />
-                </View>
-                <View style={styles.waypointInfo}>
-                  <Text style={styles.waypointName} numberOfLines={1}>{wp.name}</Text>
-                  <Text style={styles.waypointMeta}>
-                    {meta.label} - {wp.latitude.toFixed(4)}, {wp.longitude.toFixed(4)}
-                  </Text>
-                  {wp.description ? (
-                    <Text style={styles.waypointDescText} numberOfLines={1}>{wp.description}</Text>
-                  ) : null}
-                </View>
-              </View>
-              <View style={styles.waypointActions}>
-                <TouchableOpacity
-                  onPress={() => moveWaypoint(index, "up")}
-                  disabled={index === 0}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons
-                    name="chevron-up"
-                    size={20}
-                    color={index === 0 ? Colors.border : Colors.textSecondary}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => moveWaypoint(index, "down")}
-                  disabled={index === waypoints.length - 1}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons
-                    name="chevron-down"
-                    size={20}
-                    color={index === waypoints.length - 1 ? Colors.border : Colors.textSecondary}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => removeWaypoint(index)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Ionicons name="trash-outline" size={18} color={Colors.error} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })}
-
-        {waypoints.length > 0 && waypoints.length < 2 && (
-          <Text style={styles.hint}>Aggiungi almeno 2 tappe per salvare il percorso.</Text>
-        )}
+        <RouteWaypointsInput
+          waypoints={waypoints}
+          t={t}
+          handleImportGpx={handleImportGpx}
+          isImporting={isImporting}
+          openMapForNewWaypoint={openMapForNewWaypoint}
+          getWaypointMeta={getWaypointMeta}
+          moveWaypoint={moveWaypoint}
+          removeWaypoint={removeWaypoint}
+        />
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 16) }]}>
@@ -679,118 +494,29 @@ export default function CreateRouteScreen() {
         </View>
       )}
 
-      <Modal visible={showWaypointForm} transparent animationType="fade">
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={0}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Dettagli Tappa</Text>
+      <WaypointFormModal
+        visible={showWaypointForm}
+        waypointName={waypointName}
+        setWaypointName={setWaypointName}
+        waypointDesc={waypointDesc}
+        setWaypointDesc={setWaypointDesc}
+        waypointType={waypointType}
+        setWaypointType={setWaypointType}
+        waypointTypes={WAYPOINT_TYPES}
+        pendingCoord={pendingCoord}
+        onClose={() => {
+          setShowWaypointForm(false);
+          setPendingCoord(null);
+        }}
+        onSave={handleWaypointFormSave}
+      />
 
-              <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-                <Text style={styles.fieldLabel}>Nome *</Text>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="Es. Ristorante da Mario"
-                  placeholderTextColor={Colors.textSecondary}
-                  value={waypointName}
-                  onChangeText={setWaypointName}
-                  maxLength={200}
-                  autoFocus
-                />
-
-                <Text style={styles.fieldLabel}>Descrizione</Text>
-                <TextInput
-                  style={[styles.modalInput, { height: 60 }]}
-                  placeholder="Opzionale"
-                  placeholderTextColor={Colors.textSecondary}
-                  value={waypointDesc}
-                  onChangeText={setWaypointDesc}
-                  multiline
-                />
-
-                <Text style={styles.fieldLabel}>Tipo</Text>
-                <View style={styles.typeRow}>
-                  {WAYPOINT_TYPES.map((wt) => (
-                    <TouchableOpacity
-                      key={wt.value}
-                      style={[
-                        styles.typeChip,
-                        waypointType === wt.value && { backgroundColor: wt.color + "33", borderColor: wt.color },
-                      ]}
-                      onPress={() => setWaypointType(wt.value)}
-                    >
-                      <MaterialCommunityIcons name={wt.icon} size={16} color={wt.color} />
-                      <Text style={[styles.typeChipText, waypointType === wt.value && { color: wt.color }]}>
-                        {wt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {pendingCoord && (
-                  <Text style={styles.coordPreview}>
-                    {pendingCoord.latitude.toFixed(6)}, {pendingCoord.longitude.toFixed(6)}
-                  </Text>
-                )}
-              </ScrollView>
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.modalCancelBtn}
-                  onPress={() => {
-                    setShowWaypointForm(false);
-                    setPendingCoord(null);
-                  }}
-                >
-                  <Ionicons name="close" size={22} color={Colors.textSecondary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalSaveBtn} onPress={handleWaypointFormSave}>
-                  <Ionicons name="checkmark" size={22} color="#fff" />
-                  <Text style={styles.modalSaveBtnText}>Aggiungi</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Publish dialog after save */}
-      <Modal visible={showPublishDialog} transparent animationType="fade">
-        <View style={styles.dialogOverlay}>
-          <View style={styles.dialogBox}>
-            <MaterialCommunityIcons name="earth" size={40} color={Colors.accent} style={{ marginBottom: 12 }} />
-            <Text style={styles.dialogTitle}>Vuoi pubblicare il tuo percorso?</Text>
-            <Text style={styles.dialogSubtitle}>
-              I percorsi pubblici sono visibili a tutti gli utenti. Puoi cambiare questa impostazione in qualsiasi momento.
-            </Text>
-            {isSettingVisibility ? (
-              <ActivityIndicator size="large" color={Colors.accent} style={{ marginTop: 20 }} />
-            ) : (
-              <View style={styles.dialogActions}>
-                <TouchableOpacity
-                  style={styles.dialogBtnSecondary}
-                  onPress={() => handlePublishChoice(false)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="lock-closed-outline" size={18} color={Colors.textSecondary} />
-                  <Text style={styles.dialogBtnSecondaryText}>No, tienilo privato</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dialogBtnPrimary}
-                  onPress={() => handlePublishChoice(true)}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons name="globe-outline" size={18} color="#fff" />
-                  <Text style={styles.dialogBtnPrimaryText}>{t("routes.publishConfirm")}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </View>
-      </Modal>
+      <PublishRouteModal
+        visible={showPublishDialog}
+        isSettingVisibility={isSettingVisibility}
+        onChoice={handlePublishChoice}
+        t={t}
+      />
     </View>
   );
 }
@@ -820,111 +546,6 @@ const styles = StyleSheet.create({
     fontWeight: "700" as const,
     lineHeight: 18,
   },
-  section: { marginBottom: 16 },
-  sectionLabel: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 6,
-    fontWeight: "600" as const,
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
-  },
-  input: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 15,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  textArea: { height: 80, textAlignVertical: "top" as const },
-  switchRow: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    alignItems: "center" as const,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  switchLabelWrap: { flexDirection: "row" as const, alignItems: "center" as const, gap: 10 },
-  switchLabel: { fontSize: 15, color: Colors.text, fontWeight: "500" as const },
-  waypointHeader: {
-    flexDirection: "row" as const,
-    justifyContent: "space-between" as const,
-    alignItems: "center" as const,
-    marginBottom: 12,
-  },
-  sectionTitle: { fontSize: 17, fontWeight: "700" as const, color: Colors.text },
-  addBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    backgroundColor: Colors.accent,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 4,
-  },
-  addBtnText: { color: "#fff", fontSize: 14, fontWeight: "600" as const },
-  waypointHeaderBtns: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 8,
-  },
-  importBtn: {
-    backgroundColor: "transparent",
-    borderWidth: 1.5,
-    borderColor: "#FF6600",
-  },
-  importBtnText: { color: "#FF6600", fontSize: 14, fontWeight: "600" as const },
-  emptyState: {
-    alignItems: "center" as const,
-    padding: 32,
-    gap: 12,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: "center" as const,
-    lineHeight: 22,
-  },
-  waypointCard: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  waypointCardLeft: { flex: 1, flexDirection: "row" as const, alignItems: "center" as const, gap: 10 },
-  waypointIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-  },
-  waypointInfo: { flex: 1 },
-  waypointName: { fontSize: 15, fontWeight: "600" as const, color: Colors.text },
-  waypointMeta: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  waypointDescText: { fontSize: 12, color: Colors.textSecondary, marginTop: 1, fontStyle: "italic" as const },
-  waypointActions: {
-    flexDirection: "column" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    marginLeft: 8,
-  },
-  hint: {
-    fontSize: 13,
-    color: Colors.warning,
-    textAlign: "center" as const,
-    marginTop: 8,
-  },
   bottomBar: {
     position: "absolute" as const,
     bottom: 0,
@@ -947,198 +568,5 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" as const },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    padding: 20,
-  },
-  modalCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    width: "100%",
-    maxWidth: 420,
-    maxHeight: "85%",
-  },
-  modalTitle: { fontSize: 18, fontWeight: "700" as const, color: Colors.text, marginBottom: 16 },
-  fieldLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    fontWeight: "600" as const,
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
-    marginBottom: 4,
-    marginTop: 10,
-  },
-  modalInput: {
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    padding: 12,
-    fontSize: 15,
-    color: Colors.text,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  typeRow: { flexDirection: "row" as const, flexWrap: "wrap" as const, gap: 6, marginTop: 4 },
-  typeChip: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 4,
-  },
-  typeChipText: { fontSize: 12, color: Colors.textSecondary, fontWeight: "500" as const },
-  coordPreview: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    textAlign: "center" as const,
-    marginTop: 12,
-  },
-  modalActions: {
-    flexDirection: "row" as const,
-    justifyContent: "flex-end" as const,
-    gap: 12,
-    marginTop: 20,
-  },
-  modalCancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-  },
-  modalSaveBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    backgroundColor: Colors.accent,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    gap: 6,
-  },
-  modalSaveBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" as const },
-  dialogOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    justifyContent: "center" as const,
-    alignItems: "center" as const,
-    padding: 24,
-  },
-  dialogBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    padding: 28,
-    width: "100%",
-    alignItems: "center" as const,
-  },
-  dialogTitle: {
-    color: Colors.text,
-    fontSize: 20,
-    fontWeight: "700" as const,
-    textAlign: "center" as const,
-    marginBottom: 10,
-  },
-  dialogSubtitle: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    textAlign: "center" as const,
-    lineHeight: 20,
-    marginBottom: 4,
-  },
-  dialogActions: {
-    flexDirection: "column" as const,
-    gap: 12,
-    marginTop: 24,
-    width: "100%",
-  },
-  dialogBtnPrimary: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: 8,
-    backgroundColor: Colors.accent,
-    borderRadius: 14,
-    paddingVertical: 14,
-  },
-  dialogBtnPrimaryText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700" as const,
-  },
-  dialogBtnSecondary: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: 8,
-    backgroundColor: Colors.surfaceLight,
-    borderRadius: 14,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  dialogBtnSecondaryText: {
-    color: Colors.textSecondary,
-    fontSize: 15,
-    fontWeight: "600" as const,
-  },
-  styleSelector: {
-    flexDirection: "row" as const,
-    gap: 8,
-    marginTop: 4,
-  },
-  styleBtn: {
-    flex: 1,
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingVertical: 10,
-    backgroundColor: Colors.surfaceLight,
-  },
-  styleBtnText: {
-    fontSize: 13,
-    fontWeight: "500" as const,
-    color: Colors.textSecondary,
-  },
-  styleBadge: {
-    position: "absolute" as const,
-    bottom: 8,
-    left: 8,
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  styleBadgeText: {
-    fontSize: 11,
-    fontWeight: "700" as const,
-    color: "#fff",
-    letterSpacing: 0.3,
-  },
-  routeStatsRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-    marginTop: 8,
-    paddingHorizontal: 4,
-  },
-  routeStatText: {
-    fontSize: 13,
-    fontWeight: "600" as const,
-    color: Colors.text,
-  },
-  routeStatSep: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginHorizontal: 2,
-  },
 });
+

@@ -1,0 +1,387 @@
+import { sql } from "drizzle-orm";
+import {
+  pgTable,
+  text,
+  varchar,
+  integer,
+  boolean,
+  timestamp,
+  doublePrecision,
+  jsonb,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+import { z } from "zod";
+
+export const users = pgTable("users", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  nickname: varchar("nickname", { length: 50 }).notNull(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  phone: varchar("phone", { length: 30 }),
+  password: text("password").notNull(),
+  userType: varchar("user_type", { length: 20 }).notNull().default("biker"),
+  sex: varchar("sex", { length: 5 }),
+  coupleSexConfig: varchar("couple_sex_config", { length: 10 }),
+  role: varchar("role", { length: 20 }).notNull().default("user"),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  birthYear: integer("birth_year"),
+  region: varchar("region", { length: 100 }),
+  avatarUrl: text("avatar_url"),
+  emailVerified: boolean("email_verified").notNull().default(false),
+  eulaAccepted: boolean("eula_accepted").notNull().default(false),
+  privacyAccepted: boolean("privacy_accepted").notNull().default(false),
+  consentAcceptedAt: timestamp("consent_accepted_at"),
+  deletionRequestedAt: timestamp("deletion_requested_at"),
+  deletionScheduledFor: timestamp("deletion_scheduled_for"),
+  invitationCode: varchar("invitation_code", { length: 50 }),
+  isFake: boolean("is_fake").notNull().default(false),
+  isPrimal: boolean("is_primal").notNull().default(false),
+  country: varchar("country", { length: 2 }),
+  spokenLanguages: jsonb("spoken_languages").$type<string[]>().default([]),
+  autoJoinClubs: boolean("auto_join_clubs").notNull().default(true),
+  ghostMode: boolean("ghost_mode").notNull().default(false),
+  floatingWidgetEnabled: boolean("floating_widget_enabled").notNull().default(true),
+  lastLoginAt: timestamp("last_login_at"),
+  lastLogoutAt: timestamp("last_logout_at"),
+  lastAppCloseAt: timestamp("last_app_close_at"),
+  lastAppVersion: varchar("last_app_version", { length: 32 }),
+  lastOtaNumber: integer("last_ota_number"),
+  lastPlatform: varchar("last_platform", { length: 16 }),
+  expoPushToken: text("expo_push_token"),
+  firstLoginAt: timestamp("first_login_at"),
+  firstLoginLat: doublePrecision("first_login_lat"),
+  firstLoginLng: doublePrecision("first_login_lng"),
+  lastSeenMatchAt: timestamp("last_seen_match_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const userPhotos = pgTable("user_photos", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isApproved: boolean("is_approved").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_photos_user_id_idx").on(table.userId),
+]);
+
+export const userMotorcycles = pgTable("user_motorcycles", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  brand: varchar("brand", { length: 100 }).notNull(),
+  model: varchar("model", { length: 100 }).notNull(),
+  year: integer("year"),
+  displacement: integer("displacement"),
+  motorcycleType: varchar("motorcycle_type", { length: 50 }),
+  ridingStyle: varchar("riding_style", { length: 50 }),
+  photoUrl: text("photo_url"),
+  isDefault: boolean("is_default").notNull().default(false),
+  isForSale: boolean("is_for_sale").notNull().default(false),
+  saleDescription: text("sale_description"),
+  motoDescription: text("moto_description"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_motorcycles_user_id_idx").on(table.userId),
+]);
+
+export const userProfiles = pgTable("user_profiles", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  isAvailable: boolean("is_available").notNull().default(false),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  maxPickupDistance: integer("max_pickup_distance").default(50),
+  bio: text("bio"),
+  totalKm: doublePrecision("total_km").notNull().default(0),
+  totalRides: integer("total_rides").notNull().default(0),
+  easterEggsCollected: integer("easter_eggs_collected").notNull().default(0),
+  searchPreference: varchar("search_preference", { length: 20 }).notNull().default("both"),
+  preferredMapStyle: varchar("preferred_map_style", { length: 20 }),
+  emailChatNotifications: boolean("email_chat_notifications").notNull().default(false),
+  notificationPreferences: jsonb("notification_preferences")
+    .$type<{ matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean }>()
+    .notNull()
+    .default(sql`'{"matches":true,"zoneProposals":true,"chat":true,"motoclub":true,"eventi":true}'::jsonb`),
+  pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(true),
+  hideFromMap: boolean("hide_from_map").notNull().default(false),
+  positionFuzz: boolean("position_fuzz").notNull().default(false),
+  positionFuzzKm: integer("position_fuzz_km").notNull().default(1),
+  fakeHomeEnabled: boolean("fake_home_enabled").notNull().default(false),
+  homeLatitude: doublePrecision("home_latitude"),
+  homeLongitude: doublePrecision("home_longitude"),
+  fakeHomeLatitude: doublePrecision("fake_home_latitude"),
+  fakeHomeLongitude: doublePrecision("fake_home_longitude"),
+  fakeHomeRadius: integer("fake_home_radius").notNull().default(2),
+  offlinePositionRandomize: boolean("offline_position_randomize").notNull().default(true),
+  fakeWorkEnabled: boolean("fake_work_enabled").notNull().default(false),
+  workLatitude: doublePrecision("work_latitude"),
+  workLongitude: doublePrecision("work_longitude"),
+  fakeWorkLatitude: doublePrecision("fake_work_latitude"),
+  fakeWorkLongitude: doublePrecision("fake_work_longitude"),
+  fakeWorkRadius: integer("fake_work_radius").notNull().default(2),
+  fakeWhateverEnabled: boolean("fake_whatever_enabled").notNull().default(false),
+  whateverLatitude: doublePrecision("whatever_latitude"),
+  whateverLongitude: doublePrecision("whatever_longitude"),
+  fakeWhateverLatitude: doublePrecision("fake_whatever_latitude"),
+  fakeWhateverLongitude: doublePrecision("fake_whatever_longitude"),
+  fakeWhateverRadius: integer("fake_whatever_radius").notNull().default(2),
+  lastOfflineLat: doublePrecision("last_offline_lat"),
+  lastOfflineLng: doublePrecision("last_offline_lng"),
+  gpsPrecision: varchar("gps_precision", { length: 30 }).notNull().default("balanced"),
+  unitsPreference: jsonb("units_preference").$type<{ timeFormat: string; speedUnit: string; distanceUnit: string } | null>(),
+  mapFilters: jsonb("map_filters").$type<{ biker?: boolean; zavorrina?: boolean; clubs?: boolean; events?: boolean } | null>(),
+  coordinatesUpdatedAt: timestamp("coordinates_updated_at"),
+  adminOverrideUntil: timestamp("admin_override_until"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_profiles_user_id_idx").on(table.userId),
+  index("user_profiles_location_idx").on(table.latitude, table.longitude),
+]);
+
+export const motorcyclePhotos = pgTable("motorcycle_photos", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  motorcycleId: varchar("motorcycle_id", { length: 36 })
+    .notNull()
+    .references(() => userMotorcycles.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("motorcycle_photos_motorcycle_id_idx").on(table.motorcycleId),
+]);
+
+export type User = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
+export type UserPhoto = typeof userPhotos.$inferSelect;
+export type InsertUserPhoto = typeof userPhotos.$inferInsert;
+export type UserMotorcycle = typeof userMotorcycles.$inferSelect;
+export type InsertUserMotorcycle = typeof userMotorcycles.$inferInsert;
+export type UserProfile = typeof userProfiles.$inferSelect;
+export type InsertUserProfile = typeof userProfiles.$inferInsert;
+export type MotorcyclePhoto = typeof motorcyclePhotos.$inferSelect;
+export type InsertMotorcyclePhoto = typeof motorcyclePhotos.$inferInsert;
+
+export const updateUserSchema = z.object({
+  nickname: z.string().min(3, "Il nickname deve avere almeno 3 caratteri").max(50).optional(),
+  phone: z.string().max(30).nullable().optional(),
+  sex: z.enum(["M", "F"]).nullable().optional(),
+  coupleSexConfig: z.enum(["M+M", "M+F", "F+F"]).nullable().optional(),
+  birthYear: z.number().int().min(1930).max(2010).nullable().optional(),
+  region: z.string().max(100).nullable().optional(),
+  country: z.string().max(2).nullable().optional(),
+  avatarUrl: z.string().nullable().optional(),
+  floatingWidgetEnabled: z.boolean().optional(),
+  bio: z.string().max(1000).nullable().optional(),
+  maxPickupDistance: z.number().int().min(1).max(500).optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  unitsPreference: z.object({
+    timeFormat: z.enum(["12h", "24h"]),
+    speedUnit: z.enum(["kmh", "mph", "knots"]),
+    distanceUnit: z.enum(["km_m", "mi_ft", "mi_yd", "nmi_ftm"]),
+  }).nullable().optional(),
+  mapFilters: z.object({
+    biker: z.boolean().optional(),
+    zavorrina: z.boolean().optional(),
+    clubs: z.boolean().optional(),
+    events: z.boolean().optional(),
+  }).nullable().optional(),
+});
+export type UpdateUserInput = z.infer<typeof updateUserSchema>;
+
+export const updateDynamicProfileSchema = z.object({
+  isAvailable: z.boolean().optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  searchPreference: z.string().max(20).optional(),
+  preferredMapStyle: z.enum(["carto_light", "carto_dark", "esri_gray"]).nullable().optional(),
+  emailChatNotifications: z.boolean().optional(),
+  pushNotificationsEnabled: z.boolean().optional(),
+  notificationPreferences: z.object({
+    matches: z.boolean().optional(),
+    zoneProposals: z.boolean().optional(),
+    chat: z.boolean().optional(),
+    motoclub: z.boolean().optional(),
+    eventi: z.boolean().optional(),
+  }).optional(),
+});
+export type UpdateDynamicProfileInput = z.infer<typeof updateDynamicProfileSchema>;
+
+export const pushTokenSchema = z.object({
+  token: z.string().max(256).nullable().optional(),
+});
+export type PushTokenInput = z.infer<typeof pushTokenSchema>;
+
+export const motorcycleSchema = z.object({
+  brand: z.string().min(1, "Marca obbligatoria").max(100),
+  model: z.string().min(1, "Modello obbligatorio").max(100),
+  year: z.number().int().min(1900).max(2030).nullable().optional(),
+  displacement: z.number().int().min(1).max(10000).nullable().optional(),
+  motorcycleType: z.string().max(50).optional(),
+  ridingStyle: z.string().max(50).optional(),
+  isDefault: z.boolean().optional(),
+  isForSale: z.boolean().optional(),
+  saleDescription: z.string().max(1000).nullable().optional(),
+  motoDescription: z.string().max(1000).nullable().optional(),
+});
+export type MotorcycleInput = z.infer<typeof motorcycleSchema>;
+
+export const createMotorcycleSchema = z.object({
+  brand: z.string().min(1, "Marca obbligatoria"),
+  model: z.string().min(1, "Modello obbligatorio"),
+  year: z.number().int().min(1900).max(new Date().getFullYear() + 2).optional().nullable(),
+  displacement: z.number().int().min(1).optional().nullable(),
+  motorcycleType: z.string().optional().nullable(),
+  ridingStyle: z.string().optional().nullable(),
+  photoUrl: z.string().optional().nullable(),
+  isForSale: z.boolean().optional(),
+  saleDescription: z.string().max(2000).optional().nullable(),
+  isDefault: z.boolean().optional(),
+  motoDescription: z.string().max(2000).optional().nullable(),
+});
+export type CreateMotorcycleInput = z.infer<typeof createMotorcycleSchema>;
+
+export const updateMotorcycleSchema = createMotorcycleSchema.partial();
+export type UpdateMotorcycleInput = z.infer<typeof updateMotorcycleSchema>;
+
+export const uploadPhotoSchema = z.object({
+  imageBase64: z.string().min(1, "Immagine obbligatoria"),
+  filename: z.string().optional(),
+});
+export type UploadPhotoInput = z.infer<typeof uploadPhotoSchema>;
+
+export const updateUserMeSchema = z.object({
+  nickname: z.string().min(1).max(50).optional(),
+  phone: z.string().optional().nullable(),
+  sex: z.string().optional().nullable(),
+  coupleSexConfig: z.string().optional().nullable(),
+  birthYear: z.number().int().min(1900).max(new Date().getFullYear()).optional().nullable(),
+  region: z.string().optional().nullable(),
+  country: z.string().optional().nullable(),
+  avatarUrl: z.string().optional().nullable(),
+  floatingWidgetEnabled: z.boolean().optional(),
+  bio: z.string().max(2000).optional().nullable(),
+  maxPickupDistance: z.number().min(0).optional().nullable(),
+  latitude: z.number().finite().optional().nullable(),
+  longitude: z.number().finite().optional().nullable(),
+  unitsPreference: z.object({
+    timeFormat: z.enum(["12h", "24h"]),
+    speedUnit: z.enum(["kmh", "mph", "knots"]),
+    distanceUnit: z.enum(["km_m", "mi_ft", "mi_yd", "nmi_ftm"]),
+  }).nullable().optional(),
+  mapFilters: z.record(z.string(), z.boolean()).nullable().optional(),
+});
+export type UpdateUserMeInput = z.infer<typeof updateUserMeSchema>;
+
+export const updateLocationSchema = z.object({
+  latitude: z.number().finite("Latitudine non valida"),
+  longitude: z.number().finite("Longitudine non valida"),
+  isAvailable: z.boolean().optional(),
+});
+export type UpdateLocationInput = z.infer<typeof updateLocationSchema>;
+
+export const updateProfileDynamicSchema = z.object({
+  isAvailable: z.boolean().optional(),
+  latitude: z.number().finite().nullable().optional(),
+  longitude: z.number().finite().nullable().optional(),
+  searchPreference: z.string().optional(),
+  preferredMapStyle: z.string().optional(),
+  emailChatNotifications: z.boolean().optional(),
+  notificationPreferences: z.record(z.string(), z.unknown()).optional(),
+  pushNotificationsEnabled: z.boolean().optional(),
+}).passthrough();
+export type UpdateProfileDynamicInput = z.infer<typeof updateProfileDynamicSchema>;
+
+export const ghostModeSchema = z.object({
+  enabled: z.boolean({ message: "enabled deve essere un booleano" }),
+});
+export type GhostModeInput = z.infer<typeof ghostModeSchema>;
+
+export const availabilitySchema = z.object({
+  isAvailable: z.boolean({ message: "isAvailable deve essere un booleano" }),
+  latitude: z.number().finite().nullable().optional(),
+  longitude: z.number().finite().nullable().optional(),
+});
+export type AvailabilityInput = z.infer<typeof availabilitySchema>;
+
+export const privacySettingsSchema = z.object({
+  hideFromMap: z.boolean().optional(),
+  positionFuzz: z.boolean().optional(),
+  positionFuzzKm: z.number().int().min(1).max(50).optional(),
+  fakeHomeEnabled: z.boolean().optional(),
+  homeLatitude: z.number().finite().nullable().optional(),
+  homeLongitude: z.number().finite().nullable().optional(),
+  fakeHomeLatitude: z.number().finite().nullable().optional(),
+  fakeHomeLongitude: z.number().finite().nullable().optional(),
+  fakeHomeRadius: z.number().positive().nullable().optional(),
+  gpsPrecision: z.string().optional(),
+  offlinePositionRandomize: z.boolean().optional(),
+  fakeWorkEnabled: z.boolean().optional(),
+  workLatitude: z.number().finite().nullable().optional(),
+  workLongitude: z.number().finite().nullable().optional(),
+  fakeWorkLatitude: z.number().finite().nullable().optional(),
+  fakeWorkLongitude: z.number().finite().nullable().optional(),
+  fakeWorkRadius: z.number().positive().nullable().optional(),
+  fakeWhateverEnabled: z.boolean().optional(),
+  whateverLatitude: z.number().finite().nullable().optional(),
+  whateverLongitude: z.number().finite().nullable().optional(),
+  fakeWhateverLatitude: z.number().finite().nullable().optional(),
+  fakeWhateverLongitude: z.number().finite().nullable().optional(),
+  fakeWhateverRadius: z.number().positive().nullable().optional(),
+}).passthrough();
+export type PrivacySettingsInput = z.infer<typeof privacySettingsSchema>;
+
+export const userReportSchema = z.object({
+  reason: z.string().min(1, "Motivo obbligatorio"),
+  description: z.string().max(500).optional(),
+});
+export type UserReportInput = z.infer<typeof userReportSchema>;
+
+export const verifyPasswordSchema = z.object({
+  password: z.string().min(1, "Password mancante"),
+});
+export type VerifyPasswordInput = z.infer<typeof verifyPasswordSchema>;
+
+export const userStatusSchema = z.object({
+  status: z.enum(["active", "suspended", "blocked"], { message: "Stato non valido" }),
+});
+export type UserStatusInput = z.infer<typeof userStatusSchema>;
+
+export const userRoleSchema = z.object({
+  role: z.enum(["user", "moderator", "admin"], { message: "Ruolo non valido" }),
+});
+export type UserRoleInput = z.infer<typeof userRoleSchema>;
+
+export const userEmailAdminSchema = z.object({
+  email: z.string().email("Email non valida"),
+});
+export type UserEmailAdminInput = z.infer<typeof userEmailAdminSchema>;
+
+export const adminSetPasswordSchema = z.object({
+  password: z.string().min(6, "La password deve avere almeno 6 caratteri"),
+});
+export type AdminSetPasswordInput = z.infer<typeof adminSetPasswordSchema>;
+
+export const primalSchema = z.object({
+  isPrimal: z.boolean().optional(),
+});
+export type PrimalInput = z.infer<typeof primalSchema>;

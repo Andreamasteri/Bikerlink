@@ -4,57 +4,30 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  Image,
   Pressable,
-  Dimensions,
   ActivityIndicator,
-
   Alert,
-  TextInput,
   RefreshControl,
-  ScrollView,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 
 import Colors from "@/constants/colors";
-import { useT, useLocale } from "@/lib/language-context";
+import { useT } from "@/lib/language-context";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const COLUMN_COUNT = 2;
+import { ContestEntryCard, ContestEntry } from "@/components/contest/ContestCard";
+import { ContestLeaderboard } from "@/components/contest/ContestLeaderboard";
+import { ContestRules } from "@/components/contest/ContestRules";
+import { ContestHeader } from "@/components/contest/ContestHeader";
+import { ContestUpload } from "@/components/contest/ContestUpload";
+
 const GAP = 8;
-const CARD_WIDTH = (SCREEN_WIDTH - GAP * (COLUMN_COUNT + 1)) / COLUMN_COUNT;
-
-interface ContestEntry {
-  id: string;
-  userId: string;
-  photoUrl: string | null;
-  caption: string | null;
-  performanceData: string | null;
-  weekNumber: number;
-  year: number;
-  votesCount: number;
-  isApproved: boolean;
-  createdAt: string;
-  hasVoted: boolean;
-  isOwn: boolean;
-}
-
-interface PerformanceData {
-  totalDistanceKm: number;
-  maxSpeedKmh: number;
-  avgSpeedKmh: number;
-  maxAltitude: number;
-  durationSeconds: number;
-  idleTimeSeconds: number;
-  date: string;
-}
+const COLUMN_COUNT = 2;
 
 interface ContestResponse {
   entries: ContestEntry[];
@@ -64,249 +37,7 @@ interface ContestResponse {
   maxVotesPerDay: number;
 }
 
-function formatPerfTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
-}
-
-function PerformanceCard({ data }: { data: PerformanceData }) {
-  const locale = useLocale();
-  const dur = data.durationSeconds || 0;
-  const net = Math.max(dur - (data.idleTimeSeconds || 0), 0);
-
-  return (
-    <View style={styles.perfCard}>
-      <View style={styles.perfHeader}>
-        <Ionicons name="speedometer" size={16} color={Colors.accent} />
-        <Text style={styles.perfHeaderText}>Performance</Text>
-      </View>
-      <View style={styles.perfGrid}>
-        <View style={styles.perfItem}>
-          <Text style={styles.perfValue}>{data.totalDistanceKm.toFixed(1)}</Text>
-          <Text style={styles.perfLabel}>km</Text>
-        </View>
-        <View style={styles.perfItem}>
-          <Text style={styles.perfValue}>{data.maxSpeedKmh.toFixed(0)}</Text>
-          <Text style={styles.perfLabel}>km/h max</Text>
-        </View>
-        <View style={styles.perfItem}>
-          <Text style={styles.perfValue}>{data.maxAltitude.toFixed(0)}</Text>
-          <Text style={styles.perfLabel}>m quota</Text>
-        </View>
-        <View style={styles.perfItem}>
-          <Text style={styles.perfValue}>{formatPerfTime(net)}</Text>
-          <Text style={styles.perfLabel}>in moto</Text>
-        </View>
-      </View>
-      {data.date ? (
-        <Text style={styles.perfDate}>
-          {new Date(data.date).toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" })}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function resolvePhotoUrl(photoUrl: string | null): string | null {
-  if (!photoUrl) return null;
-  const base = getApiUrl().replace(/\/$/, "");
-
-  if (photoUrl.startsWith("file:///")) return null;
-
-  if (photoUrl.startsWith("https://storage.googleapis.com/")) {
-    const decoded = decodeURIComponent(photoUrl);
-    const filename = decoded.split("/").pop();
-    if (!filename) return null;
-    return `${base}/api/contest/photos/${filename}`;
-  }
-
-  if (photoUrl.startsWith("/uploads/contest/")) {
-    const filename = photoUrl.replace("/uploads/contest/", "");
-    return `${base}/api/contest/photos/${filename}`;
-  }
-
-  if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) return photoUrl;
-
-  return `${base}${photoUrl.startsWith("/") ? "" : "/"}${photoUrl}`;
-}
-
-function ContestEntryCard({
-  entry,
-  onVote,
-  onDelete,
-  votingDisabled,
-}: {
-  entry: ContestEntry;
-  onVote: (id: string) => void;
-  onDelete: (id: string) => void;
-  votingDisabled: boolean;
-}) {
-  let perfData: PerformanceData | null = null;
-  if (entry.performanceData) {
-    try {
-      perfData = JSON.parse(entry.performanceData);
-    } catch {}
-  }
-
-  const photoUri = resolvePhotoUrl(entry.photoUrl);
-
-  return (
-    <View style={styles.photoCard}>
-      {perfData ? (
-        <PerformanceCard data={perfData} />
-      ) : photoUri ? (
-        <Image source={{ uri: photoUri }} style={styles.cardImage} />
-      ) : (
-        <View style={[styles.cardImage, { justifyContent: "center", alignItems: "center" }]}>
-          <Ionicons name="image-outline" size={32} color={Colors.textSecondary} />
-        </View>
-      )}
-      {entry.isOwn ? (
-        <Pressable style={styles.deleteBtn} onPress={() => onDelete(entry.id)}>
-          <Ionicons name="trash" size={16} color="#FFF" />
-        </Pressable>
-      ) : null}
-      {entry.caption ? (
-        <Text style={styles.caption} numberOfLines={2}>
-          {entry.caption}
-        </Text>
-      ) : null}
-      <View style={styles.photoFooter}>
-        <Pressable
-          onPress={() => onVote(entry.id)}
-          disabled={entry.hasVoted || entry.isOwn || votingDisabled}
-          style={[
-            styles.voteBtn,
-            (entry.isOwn || votingDisabled) && !entry.hasVoted && styles.voteBtnDisabled,
-          ]}
-        >
-          <Ionicons
-            name={entry.hasVoted ? "heart" : "heart-outline"}
-            size={18}
-            color={entry.hasVoted || !entry.isOwn ? Colors.accentRed : Colors.textSecondary}
-          />
-          <Text style={[styles.voteCount, entry.isOwn && { color: Colors.textSecondary }]}>
-            {entry.votesCount}
-          </Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
-
-const GAME_INFO: Record<string, { title: string; emoji: string; scoreLabel: string }> = {
-  endless_biker: { title: "Endless Biker", emoji: "🏍️", scoreLabel: "m" },
-  traffic_racer: { title: "Traffic Racer", emoji: "🚦", scoreLabel: "pt" },
-  wheelie: { title: "Wheelie Challenge", emoji: "🤸", scoreLabel: "s" },
-  tetris: { title: "Tetris", emoji: "🧩", scoreLabel: "pt" },
-  space_invaders: { title: "Space Invaders", emoji: "👾", scoreLabel: "pt" },
-};
-
-const ARCADE_GAME_IDS = Object.keys(GAME_INFO) as Array<keyof typeof GAME_INFO>;
-
-function ArcadeChampionsSection() {
-  const t = useT();
-  const router = useRouter();
-  const { data: hofData } = useQuery<Record<string, {
-    game: string; userId: string; nickname: string; avatarUrl: string | null; score: number; date: string;
-  }>>({
-    queryKey: ["/api/arcade/hall-of-fame"],
-    refetchInterval: 120_000,
-  });
-
-  return (
-    <View style={arcadeStyles.section}>
-      <Text style={arcadeStyles.sectionTitle}>🕹️ Campioni Arcade</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-        {ARCADE_GAME_IDS.map((gameId) => {
-          const info = GAME_INFO[gameId];
-          const entry = hofData?.[gameId] ?? null;
-          return (
-            <Pressable
-              key={gameId}
-              style={arcadeStyles.card}
-              onPress={() => router.push({ pathname: "/(tabs)/arcade" as const, params: { tab: "leaderboard", game: gameId } })}
-            >
-              <Text style={arcadeStyles.cardEmoji}>{info.emoji}</Text>
-              <Text style={arcadeStyles.cardGame}>{info.title}</Text>
-              <View style={arcadeStyles.cardChampion}>
-                {entry ? (
-                  <>
-                    {entry.avatarUrl ? (
-                      <Image source={{ uri: entry.avatarUrl }} style={arcadeStyles.cardAvatar} />
-                    ) : (
-                      <View style={[arcadeStyles.cardAvatar, { backgroundColor: Colors.surfaceLight, alignItems: "center", justifyContent: "center" }]}>
-                        <Ionicons name="person" size={12} color={Colors.textSecondary} />
-                      </View>
-                    )}
-                    <Text style={arcadeStyles.cardNickname} numberOfLines={1}>{entry.nickname}</Text>
-                  </>
-                ) : (
-                  <>
-                    <View style={[arcadeStyles.cardAvatar, { backgroundColor: Colors.surfaceLight, alignItems: "center", justifyContent: "center" }]}>
-                      <Ionicons name="trophy-outline" size={12} color={Colors.textSecondary} />
-                    </View>
-                    <Text style={[arcadeStyles.cardNickname, { color: Colors.textSecondary }]}>—</Text>
-                  </>
-                )}
-              </View>
-              {entry ? (
-                <>
-                  <Text style={arcadeStyles.cardScore}>{entry.score} {info.scoreLabel}</Text>
-                  <Text style={arcadeStyles.cardDate}>
-                    {new Date(entry.date).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}
-                  </Text>
-                </>
-              ) : (
-                <Text style={[arcadeStyles.cardScore, { color: Colors.textSecondary, fontSize: 11 }]}>{t("contest.noRecord")}</Text>
-              )}
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
-const arcadeStyles = StyleSheet.create({
-  section: {
-    paddingTop: 16,
-    paddingBottom: 8,
-    paddingHorizontal: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: Colors.border,
-    marginTop: 8,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    marginBottom: 12,
-    paddingHorizontal: 8,
-  },
-  card: {
-    width: 130,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: Colors.border,
-    gap: 6,
-  },
-  cardEmoji: { fontSize: 28 },
-  cardGame: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.text, textAlign: "center" },
-  cardChampion: { flexDirection: "row", alignItems: "center", gap: 6, width: "100%" },
-  cardAvatar: { width: 20, height: 20, borderRadius: 10 },
-  cardNickname: { flex: 1, fontSize: 11, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
-  cardScore: { fontSize: 16, fontFamily: "Inter_700Bold", color: Colors.accent },
-  cardDate: { fontSize: 10, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
-});
-
 export default function ContestScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const t = useT();
   const [showUpload, setShowUpload] = useState(false);
@@ -399,7 +130,7 @@ export default function ContestScreen() {
         ]
       );
     },
-    [deleteMutation]
+    [deleteMutation, t]
   );
 
   const handleVote = useCallback(
@@ -452,86 +183,45 @@ export default function ContestScreen() {
     <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
       <View style={styles.container}>
         <InlineMiniPlayer />
-        <View style={styles.policyBar}>
-        <Ionicons name="information-circle" size={16} color={Colors.warning} />
-        <Text style={styles.policyText} numberOfLines={2}>
-          Carica le tue migliori foto in moto!
-        </Text>
-      </View>
+        <ContestRules />
+        <ContestHeader votesRemaining={votesRemaining} />
 
-      <View style={styles.votesBar}>
-        <Text style={styles.votesBarText}>
-          {t("contest.votesLeft")}: {votesRemaining}/10
-        </Text>
-        <Pressable
-          style={styles.winnersBtn}
-          onPress={() => router.push("/contest/winners" as any)}
-        >
-          <Ionicons name="trophy" size={16} color={Colors.accent} />
-          <Text style={styles.winnersText}>Hall of Fame</Text>
-        </Pressable>
-      </View>
+        <ContestUpload
+          selectedImage={selectedImage}
+          caption={caption}
+          setCaption={setCaption}
+          onCancel={() => {
+            setShowUpload(false);
+            setSelectedImage(null);
+            setCaption("");
+          }}
+          onUpload={handleUpload}
+          isUploading={uploadMutation.isPending}
+        />
 
-      {showUpload && selectedImage ? (
-        <View style={styles.uploadContainer}>
-          <Image source={{ uri: selectedImage }} style={styles.uploadPreview} />
-          <TextInput
-            style={styles.captionInput}
-            placeholder="Didascalia (opzionale)"
-            placeholderTextColor={Colors.textSecondary}
-            value={caption}
-            onChangeText={setCaption}
-            maxLength={200}
-          />
-          <View style={styles.uploadActions}>
-            <Pressable
-              onPress={() => {
-                setShowUpload(false);
-                setSelectedImage(null);
-                setCaption("");
-              }}
-              style={styles.cancelUploadBtn}
-            >
-              <Ionicons name="close" size={22} color={Colors.text} />
-            </Pressable>
-            <Pressable
-              onPress={handleUpload}
-              disabled={uploadMutation.isPending}
-              style={styles.confirmUploadBtn}
-            >
-              {uploadMutation.isPending ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <Ionicons name="checkmark" size={22} color="#FFF" />
-              )}
-            </Pressable>
-          </View>
-        </View>
-      ) : null}
-
-      <FlatList
-        data={data?.entries ?? []}
-        renderItem={renderEntry}
-        keyExtractor={(item) => item.id}
-        numColumns={COLUMN_COUNT}
-        contentContainerStyle={styles.list}
-        columnWrapperStyle={styles.columnWrapper}
-        showsVerticalScrollIndicator={false}
-        scrollEnabled={true}
-        refreshControl={
-          <RefreshControl refreshing={false} onRefresh={refetch} tintColor={Colors.accent} />
-        }
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Ionicons name="camera-outline" size={48} color={Colors.textSecondary} />
-            <Text style={styles.emptyText}>{t("common.noResults")}</Text>
-            <Text style={styles.emptySubtext}>
-              Carica la prima foto della settimana!
-            </Text>
-          </View>
-        }
-        ListFooterComponent={<ArcadeChampionsSection />}
-      />
+        <FlatList
+          data={data?.entries ?? []}
+          renderItem={renderEntry}
+          keyExtractor={(item) => item.id}
+          numColumns={COLUMN_COUNT}
+          contentContainerStyle={styles.list}
+          columnWrapperStyle={styles.columnWrapper}
+          showsVerticalScrollIndicator={false}
+          scrollEnabled={true}
+          refreshControl={
+            <RefreshControl refreshing={false} onRefresh={refetch} tintColor={Colors.accent} />
+          }
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons name="camera-outline" size={48} color={Colors.textSecondary} />
+              <Text style={styles.emptyText}>{t("common.noResults")}</Text>
+              <Text style={styles.emptySubtext}>
+                Carica la prima foto della settimana!
+              </Text>
+            </View>
+          }
+          ListFooterComponent={<ContestLeaderboard />}
+        />
 
         <Pressable
           style={[styles.fab, { bottom: 16 }]}
@@ -553,99 +243,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  policyBar: {
-    flexDirection: "row",
-    padding: 12,
-    paddingHorizontal: 16,
-    gap: 8,
-    backgroundColor: Colors.warning + "15",
-    alignItems: "center",
-  },
-  policyText: {
-    flex: 1,
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.warning,
-  },
-  votesBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  votesBarText: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textSecondary,
-  },
-  winnersBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  winnersText: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: Colors.accent,
-  },
   list: {
     padding: 8,
     paddingBottom: 80,
   },
   columnWrapper: {
     gap: GAP,
-  },
-  photoCard: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    overflow: "hidden",
-    marginBottom: 8,
-    position: "relative",
-  },
-  deleteBtn: {
-    position: "absolute",
-    top: 6,
-    right: 6,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    borderRadius: 14,
-    width: 28,
-    height: 28,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-  cardImage: {
-    width: "100%",
-    aspectRatio: 4 / 3,
-    backgroundColor: Colors.surfaceLight,
-  },
-  caption: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    paddingHorizontal: 8,
-    paddingTop: 4,
-  },
-  photoFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 8,
-  },
-  voteBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  voteBtnDisabled: {
-    opacity: 0.5,
-  },
-  voteCount: {
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.accentRed,
   },
   empty: {
     alignItems: "center",
@@ -673,90 +276,5 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     elevation: 4,
   },
-  uploadContainer: {
-    margin: 16,
-    borderRadius: 12,
-    overflow: "hidden",
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.accent,
-  },
-  uploadPreview: {
-    width: "100%",
-    height: 200,
-    backgroundColor: Colors.surfaceLight,
-  },
-  captionInput: {
-    padding: 12,
-    color: Colors.text,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  uploadActions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    padding: 10,
-    gap: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  cancelUploadBtn: {
-    padding: 8,
-  },
-  confirmUploadBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 20,
-    padding: 10,
-  },
-  perfCard: {
-    backgroundColor: Colors.background,
-    padding: 12,
-    aspectRatio: 4 / 3,
-    justifyContent: "center",
-  },
-  perfHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 10,
-    justifyContent: "center",
-  },
-  perfHeaderText: {
-    fontSize: 12,
-    fontFamily: "Inter_700Bold",
-    color: Colors.accent,
-    textTransform: "uppercase",
-    letterSpacing: 1,
-  },
-  perfGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 4,
-  },
-  perfItem: {
-    alignItems: "center",
-    width: "45%",
-    paddingVertical: 4,
-  },
-  perfValue: {
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-  },
-  perfLabel: {
-    fontSize: 9,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-  },
-  perfDate: {
-    fontSize: 10,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "center",
-    marginTop: 6,
-  },
 });
+

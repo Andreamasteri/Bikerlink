@@ -3,15 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   ScrollView,
   Pressable,
   Alert,
   ActivityIndicator,
-  Switch,
   Platform,
   Modal,
-  Image,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -20,7 +17,10 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import type { EventType, EventDTO } from "@/shared/event-types";
-import { EVENT_TYPE_LABELS } from "@/shared/event-types";
+import { EventBasicFields } from "./EventBasicFields";
+import { EventLocationFields } from "./EventLocationFields";
+import { EventPhotosSection } from "./EventPhotosSection";
+import { EventParticipantSettings } from "./EventParticipantSettings";
 
 let MapView: any = null;
 let Marker: any = null;
@@ -322,311 +322,48 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
           ]}
           keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.sectionTitle}>Informazioni principali</Text>
-
-          <Text style={styles.label}>Titolo *</Text>
-          <TextInput
-            style={styles.input}
-            value={form.title}
-            onChangeText={(v) => set("title", v)}
-            placeholder="Nome dell'evento"
-            placeholderTextColor={Colors.textSecondary}
-            maxLength={120}
+          <EventBasicFields
+            form={form}
+            set={set}
+            showTypePicker={showTypePicker}
+            setShowTypePicker={setShowTypePicker}
+            eventTypes={EVENT_TYPES}
           />
 
-          <Text style={styles.label}>Tipo di evento *</Text>
-          <Pressable style={styles.pickerBtn} onPress={() => setShowTypePicker(true)}>
-            <Text style={styles.pickerBtnText}>{EVENT_TYPE_LABELS[form.eventType]}</Text>
-            <Ionicons name="chevron-down" size={16} color={Colors.textSecondary} />
-          </Pressable>
-
-          <Modal visible={showTypePicker} transparent animationType="fade" onRequestClose={() => setShowTypePicker(false)}>
-            <Pressable style={styles.pickerOverlay} onPress={() => setShowTypePicker(false)}>
-              <View style={styles.pickerMenu}>
-                {EVENT_TYPES.map((t) => (
-                  <Pressable
-                    key={t}
-                    style={[styles.pickerOption, form.eventType === t && styles.pickerOptionActive]}
-                    onPress={() => { set("eventType", t); setShowTypePicker(false); }}
-                  >
-                    <Text style={[styles.pickerOptionText, form.eventType === t && { color: Colors.accent }]}>
-                      {EVENT_TYPE_LABELS[t]}
-                    </Text>
-                    {form.eventType === t && <Ionicons name="checkmark" size={16} color={Colors.accent} />}
-                  </Pressable>
-                ))}
-              </View>
-            </Pressable>
-          </Modal>
-
-          <Text style={styles.label}>Descrizione</Text>
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            value={form.description}
-            onChangeText={(v) => set("description", v)}
-            placeholder="Descrivi l'evento (opzionale)"
-            placeholderTextColor={Colors.textSecondary}
-            multiline
-            numberOfLines={4}
+          <EventLocationFields
+            form={form}
+            set={set}
+            showMapPicker={showMapPicker}
+            setShowMapPicker={setShowMapPicker}
+            mapRegion={mapRegion}
+            setMapRegion={setMapRegion}
+            tempCoords={tempCoords}
+            setTempCoords={setTempCoords}
+            confirmMapCoords={confirmMapCoords}
+            coordLabel={coordLabel}
+            MapView={MapView}
+            Marker={Marker}
+            insets={insets}
+            italyCenter={ITALY_CENTER}
           />
 
-          <Text style={styles.sectionTitle}>Data e luogo</Text>
-
-          <Text style={styles.label}>Data * (GG.MM.AAAA)</Text>
-          <TextInput
-            style={styles.input}
-            value={form.eventDate}
-            onChangeText={(v) => set("eventDate", v)}
-            placeholder="es. 12.07.2025"
-            placeholderTextColor={Colors.textSecondary}
-            keyboardType="numeric"
-            maxLength={10}
+          <EventParticipantSettings
+            form={form}
+            set={set}
+            inviteClubsEnabled={inviteClubsEnabled}
+            setInviteClubsEnabled={setInviteClubsEnabled}
+            selectedClubIds={selectedClubIds}
+            clubSearch={clubSearch}
+            setClubSearch={setClubSearch}
+            filteredClubs={filteredClubs}
+            toggleClub={toggleClub}
           />
 
-          <Text style={styles.label}>Orario (HH:MM, opzionale)</Text>
-          <TextInput
-            style={styles.input}
-            value={form.eventTime}
-            onChangeText={(v) => set("eventTime", v)}
-            placeholder="es. 10:00"
-            placeholderTextColor={Colors.textSecondary}
-            keyboardType="numbers-and-punctuation"
-            maxLength={5}
+          <EventPhotosSection
+            pendingImages={pendingImages}
+            handlePickImage={handlePickImage}
+            removeImage={removeImage}
           />
-
-          <Text style={styles.label}>Luogo dell'evento *</Text>
-          <TextInput
-            style={styles.input}
-            value={form.locationName}
-            onChangeText={(v) => set("locationName", v)}
-            placeholder="Nome del luogo o indirizzo"
-            placeholderTextColor={Colors.textSecondary}
-          />
-
-          <Text style={styles.label}>Coordinate GPS (opzionale)</Text>
-          {MapView ? (
-            <>
-              <Pressable style={styles.mapPickerBtn} onPress={() => {
-                if (form.latitude && form.longitude) {
-                  const lat = parseFloat(form.latitude);
-                  const lng = parseFloat(form.longitude);
-                  setMapRegion({ latitude: lat, longitude: lng, latitudeDelta: 0.05, longitudeDelta: 0.05 });
-                  setTempCoords({ latitude: lat, longitude: lng });
-                } else {
-                  setMapRegion(ITALY_CENTER);
-                  setTempCoords(null);
-                }
-                setShowMapPicker(true);
-              }}>
-                <Ionicons
-                  name={coordLabel ? "location" : "map-outline"}
-                  size={18}
-                  color={coordLabel ? Colors.accent : Colors.textSecondary}
-                />
-                <Text style={[styles.mapPickerText, coordLabel ? { color: Colors.accent } : {}]}>
-                  {coordLabel ? `📍 ${coordLabel}` : "Seleziona posizione sulla mappa"}
-                </Text>
-                {coordLabel && (
-                  <Pressable
-                    onPress={() => { set("latitude", ""); set("longitude", ""); }}
-                    hitSlop={8}
-                  >
-                    <Ionicons name="close-circle" size={18} color={Colors.textSecondary} />
-                  </Pressable>
-                )}
-              </Pressable>
-
-              <Modal visible={showMapPicker} animationType="slide" onRequestClose={() => setShowMapPicker(false)}>
-                <View style={[styles.mapModal, { paddingTop: Platform.OS === "ios" ? insets.top : 0 }]}>
-                  <View style={styles.mapHeader}>
-                    <Pressable onPress={() => setShowMapPicker(false)} style={styles.mapHeaderBtn}>
-                      <Text style={styles.mapHeaderBtnText}>Annulla</Text>
-                    </Pressable>
-                    <Text style={styles.mapHeaderTitle}>Tocca per posizionare il pin</Text>
-                    <Pressable onPress={confirmMapCoords} style={[styles.mapHeaderBtn, styles.mapConfirmBtn]}>
-                      <Text style={[styles.mapHeaderBtnText, { color: Colors.accent }]}>Conferma</Text>
-                    </Pressable>
-                  </View>
-                  <MapView
-                    style={{ flex: 1 }}
-                    googleMapsApiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
-                    region={mapRegion}
-                    onRegionChangeComplete={setMapRegion}
-                    onPress={(e: any) => {
-                      const { latitude, longitude } = e.nativeEvent.coordinate;
-                      setTempCoords({ latitude, longitude });
-                    }}
-                  >
-                    {tempCoords && <Marker coordinate={tempCoords} pinColor={Colors.accent} />}
-                  </MapView>
-                  {tempCoords && (
-                    <View style={styles.coordBanner}>
-                      <Text style={styles.coordBannerText}>
-                        {tempCoords.latitude.toFixed(5)}, {tempCoords.longitude.toFixed(5)}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </Modal>
-            </>
-          ) : (
-            <View style={styles.coordRow}>
-              <TextInput
-                style={[styles.input, styles.coordInput]}
-                value={form.latitude}
-                onChangeText={(v) => set("latitude", v)}
-                placeholder="Latitudine"
-                placeholderTextColor={Colors.textSecondary}
-                keyboardType="decimal-pad"
-              />
-              <TextInput
-                style={[styles.input, styles.coordInput]}
-                value={form.longitude}
-                onChangeText={(v) => set("longitude", v)}
-                placeholder="Longitudine"
-                placeholderTextColor={Colors.textSecondary}
-                keyboardType="decimal-pad"
-              />
-            </View>
-          )}
-
-          <Text style={styles.sectionTitle}>Dettagli evento</Text>
-
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleLeft}>
-              <Text style={styles.toggleLabel}>Evento ricorrente</Text>
-              <Text style={styles.toggleHint}>Es. ogni anno, ogni mese, ecc.</Text>
-            </View>
-            <Switch
-              value={form.isRecurring}
-              onValueChange={(v) => set("isRecurring", v)}
-              trackColor={{ true: Colors.accent, false: Colors.border }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          {form.isRecurring && (
-            <>
-              <Text style={styles.label}>Descrivi la ricorrenza</Text>
-              <TextInput
-                style={styles.input}
-                value={form.recurrenceInfo}
-                onChangeText={(v) => set("recurrenceInfo", v)}
-                placeholder="Es. ogni prima domenica del mese / ogni anno a luglio"
-                placeholderTextColor={Colors.textSecondary}
-              />
-            </>
-          )}
-
-          <Text style={styles.label}>Max partecipanti (0 = illimitato)</Text>
-          <TextInput
-            style={styles.input}
-            value={form.maxParticipants}
-            onChangeText={(v) => set("maxParticipants", v)}
-            placeholder="0"
-            placeholderTextColor={Colors.textSecondary}
-            keyboardType="numeric"
-          />
-
-          <Text style={styles.label}>Sito web (opzionale)</Text>
-          <TextInput
-            style={styles.input}
-            value={form.websiteUrl}
-            onChangeText={(v) => set("websiteUrl", v)}
-            placeholder="https://..."
-            placeholderTextColor={Colors.textSecondary}
-            keyboardType="url"
-            autoCapitalize="none"
-          />
-
-          <Text style={styles.sectionTitle}>Locandine</Text>
-          <Text style={styles.hint}>Carica fino a 5 immagini promozionali (JPG)</Text>
-
-          <View style={styles.imagesGrid}>
-            {pendingImages.map((uri, idx) => (
-              <View key={idx} style={styles.imageThumb}>
-                <Image source={{ uri }} style={styles.thumbImg} />
-                <Pressable style={styles.removeImg} onPress={() => removeImage(idx)}>
-                  <Ionicons name="close-circle" size={20} color={Colors.accentRed} />
-                </Pressable>
-              </View>
-            ))}
-            {pendingImages.length < 5 && (
-              <Pressable style={styles.addImageBtn} onPress={handlePickImage}>
-                <Ionicons name="add-circle-outline" size={32} color={Colors.accent} />
-                <Text style={styles.addImageText}>Aggiungi</Text>
-              </Pressable>
-            )}
-          </View>
-
-          <Text style={styles.sectionTitle}>Invita Motoclub</Text>
-
-          <View style={styles.toggleRow}>
-            <View style={styles.toggleLeft}>
-              <Text style={styles.toggleLabel}>Seleziona club da invitare</Text>
-              <Text style={styles.toggleHint}>
-                {inviteClubsEnabled && selectedClubIds.length > 0
-                  ? `${selectedClubIds.length} club selezionat${selectedClubIds.length === 1 ? "o" : "i"}`
-                  : "I club verranno notificati alla creazione"}
-              </Text>
-            </View>
-            <Switch
-              value={inviteClubsEnabled}
-              onValueChange={setInviteClubsEnabled}
-              trackColor={{ true: Colors.accent, false: Colors.border }}
-              thumbColor="#fff"
-            />
-          </View>
-
-          {inviteClubsEnabled && (
-            <View style={styles.clubPickerContainer}>
-              <View style={styles.clubSearchRow}>
-                <Ionicons name="search" size={16} color={Colors.textSecondary} style={{ marginRight: 8 }} />
-                <TextInput
-                  style={styles.clubSearchInput}
-                  value={clubSearch}
-                  onChangeText={setClubSearch}
-                  placeholder="Cerca club per nome o regione..."
-                  placeholderTextColor={Colors.textSecondary}
-                />
-                {clubSearch.length > 0 && (
-                  <Pressable onPress={() => setClubSearch("")} hitSlop={8}>
-                    <Ionicons name="close-circle" size={16} color={Colors.textSecondary} />
-                  </Pressable>
-                )}
-              </View>
-
-              {filteredClubs.length === 0 ? (
-                <Text style={styles.clubEmptyText}>Nessun club trovato</Text>
-              ) : (
-                filteredClubs.map((club) => {
-                  const isSelected = selectedClubIds.includes(club.id);
-                  const subtitle = club.brandName
-                    ? `Brand · ${club.brandName}`
-                    : club.region
-                    ? `Regione · ${club.region}`
-                    : club.clubType;
-                  return (
-                    <Pressable
-                      key={club.id}
-                      style={[styles.clubRow, isSelected && styles.clubRowSelected]}
-                      onPress={() => toggleClub(club.id)}
-                    >
-                      <View style={styles.clubRowLeft}>
-                        <Text style={[styles.clubName, isSelected && { color: Colors.accent }]}>
-                          {club.name}
-                        </Text>
-                        <Text style={styles.clubSubtitle}>{subtitle}</Text>
-                      </View>
-                      <View style={[styles.checkbox, isSelected && styles.checkboxSelected]}>
-                        {isSelected && <Ionicons name="checkmark" size={14} color="#000" />}
-                      </View>
-                    </Pressable>
-                  );
-                })
-              )}
-            </View>
-          )}
         </ScrollView>
       </View>
     </Modal>
@@ -679,292 +416,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 16,
     gap: 4,
-  },
-  sectionTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
-    color: Colors.accent,
-    marginTop: 16,
-    marginBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  label: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  input: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: Colors.text,
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-  },
-  textArea: {
-    height: 90,
-    textAlignVertical: "top",
-    paddingTop: 10,
-  },
-  pickerBtn: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  pickerBtnText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  pickerOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    paddingHorizontal: 32,
-  },
-  pickerMenu: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    overflow: "hidden",
-  },
-  pickerOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  pickerOptionActive: {
-    backgroundColor: Colors.surfaceLight,
-  },
-  pickerOptionText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    color: Colors.text,
-  },
-  mapPickerBtn: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  mapPickerText: {
-    flex: 1,
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  mapModal: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  mapHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  mapHeaderTitle: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  mapHeaderBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  mapConfirmBtn: {},
-  mapHeaderBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: Colors.textSecondary,
-  },
-  coordBanner: {
-    position: "absolute",
-    bottom: 40,
-    left: 16,
-    right: 16,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  coordBannerText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: "#fff",
-  },
-  coordRow: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  coordInput: {
-    flex: 1,
-  },
-  toggleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginTop: 10,
-  },
-  toggleLeft: {
-    flex: 1,
-    gap: 2,
-  },
-  toggleLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  toggleHint: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  hint: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  imagesGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 4,
-  },
-  imageThumb: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    overflow: "visible",
-    position: "relative",
-  },
-  thumbImg: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-  },
-  removeImg: {
-    position: "absolute",
-    top: -8,
-    right: -8,
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-  },
-  addImageBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.accent,
-    borderStyle: "dashed",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  addImageText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: Colors.accent,
-  },
-  clubPickerContainer: {
-    marginTop: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  clubSearchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  clubSearchInput: {
-    flex: 1,
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  clubEmptyText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    paddingVertical: 16,
-  },
-  clubRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  clubRowSelected: {
-    backgroundColor: Colors.surfaceLight,
-  },
-  clubRowLeft: {
-    flex: 1,
-    gap: 2,
-  },
-  clubName: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  clubSubtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 8,
-  },
-  checkboxSelected: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
   },
   successScreen: {
     flex: 1,

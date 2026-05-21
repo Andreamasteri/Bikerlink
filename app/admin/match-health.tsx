@@ -11,6 +11,8 @@ import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { MatchCountsSection } from "@/components/admin/match-health/MatchCountsSection";
+import { SchemaSection } from "@/components/admin/match-health/SchemaSection";
 
 interface MatchCount {
   id: number;
@@ -144,7 +146,6 @@ export default function MatchHealthScreen() {
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 20 }]}
     >
-      {/* Header card with overall status */}
       <View style={styles.overallCard}>
         <View style={styles.overallLeft}>
           <MaterialCommunityIcons name="heart-pulse" size={32} color={data ? statusColor(data.overallStatus) : Colors.textSecondary} />
@@ -197,7 +198,6 @@ export default function MatchHealthScreen() {
 
       {data && (
         <>
-          {/* Summary row */}
           <View style={styles.summaryRow}>
             <View style={styles.summaryItem}>
               <Text style={styles.summaryValue}>{data.summary.totalMatchTypes}</Text>
@@ -226,59 +226,14 @@ export default function MatchHealthScreen() {
             </View>
           </View>
 
-          {/* Match Counts */}
           <SectionCard title="17 Tipi di Match" status={data.checks.matchCounts.some(m => m.status === "WARN") ? "WARN" : "OK"}>
-            {data.checks.matchCounts.map((mc) => (
-              <View key={mc.key} style={styles.matchRow}>
-                <View style={styles.matchRowLeft}>
-                  {mc.status === "WARN" ? (
-                    <MaterialCommunityIcons name="alert" size={14} color={Colors.warning} style={{ marginRight: 6 }} />
-                  ) : (
-                    <MaterialCommunityIcons name="check-circle" size={14} color={Colors.success} style={{ marginRight: 6 }} />
-                  )}
-                  <Text style={styles.matchLabel} numberOfLines={1}>
-                    <Text style={styles.matchId}>{mc.id}. </Text>
-                    {mc.label}
-                  </Text>
-                </View>
-                <Text style={[styles.matchCount, mc.count === 0 ? { color: Colors.warning } : { color: Colors.success }]}>
-                  {mc.count.toLocaleString("it-IT")}
-                </Text>
-              </View>
-            ))}
+            <MatchCountsSection matchCounts={data.checks.matchCounts} />
           </SectionCard>
 
-          {/* Schema */}
           <SectionCard title="Schema DB" status={data.checks.schema.status}>
-            <Text style={styles.infoText}>{data.checks.schema.message}</Text>
-            {data.checks.schema.previousSnapshotAt && (
-              <Text style={styles.infoMuted}>Snapshot precedente: {formatDate(data.checks.schema.previousSnapshotAt)}</Text>
-            )}
-            {data.checks.schema.diff && (
-              <View style={styles.diffBox}>
-                {data.checks.schema.diff.addedTables.length > 0 && (
-                  <View style={styles.diffRow}>
-                    <Text style={[styles.diffLabel, { color: Colors.success }]}>+ Aggiunte</Text>
-                    <Text style={styles.diffValue}>{data.checks.schema.diff.addedTables.join(", ")}</Text>
-                  </View>
-                )}
-                {data.checks.schema.diff.removedTables.length > 0 && (
-                  <View style={styles.diffRow}>
-                    <Text style={[styles.diffLabel, { color: Colors.error }]}>− Rimosse</Text>
-                    <Text style={styles.diffValue}>{data.checks.schema.diff.removedTables.join(", ")}</Text>
-                  </View>
-                )}
-                {data.checks.schema.diff.modifiedTables.length > 0 && (
-                  <View style={styles.diffRow}>
-                    <Text style={[styles.diffLabel, { color: Colors.warning }]}>~ Modificate</Text>
-                    <Text style={styles.diffValue}>{data.checks.schema.diff.modifiedTables.join(", ")}</Text>
-                  </View>
-                )}
-              </View>
-            )}
+            <SchemaSection schema={data.checks.schema} formatDate={formatDate} />
           </SectionCard>
 
-          {/* Preferences alignment */}
           <SectionCard title="Preferenze Match" status={data.checks.preferences.status}>
             <Text style={styles.infoText}>{data.checks.preferences.message}</Text>
             {data.checks.preferences.missingFromDb.length > 0 && (
@@ -303,7 +258,6 @@ export default function MatchHealthScreen() {
             )}
           </SectionCard>
 
-          {/* Distance sample */}
           <SectionCard title="Campione Distanze GPS" status={data.checks.distanceSample.status}>
             <Text style={styles.infoText}>{data.checks.distanceSample.message}</Text>
             {data.checks.distanceSample.distancesKm.length > 0 && (
@@ -317,7 +271,6 @@ export default function MatchHealthScreen() {
             )}
           </SectionCard>
 
-          {/* Admin gate */}
           <SectionCard title="Admin Gate" status={data.checks.adminGate.status}>
             <Text style={styles.infoText}>{data.checks.adminGate.message}</Text>
             <View style={styles.gateRow}>
@@ -482,68 +435,10 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.5,
   },
-  matchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border + "55",
-  },
-  matchRowLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-    marginRight: 8,
-  },
-  matchId: {
-    color: Colors.textSecondary,
-    fontFamily: "Inter_400Regular",
-  },
-  matchLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.text,
-    flex: 1,
-  },
-  matchCount: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 14,
-    minWidth: 48,
-    textAlign: "right",
-  },
   infoText: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
     color: Colors.text,
-  },
-  infoMuted: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  diffBox: {
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    padding: 10,
-    gap: 6,
-    marginTop: 4,
-  },
-  diffRow: {
-    flexDirection: "row",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  diffLabel: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    minWidth: 70,
-  },
-  diffValue: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.text,
-    flex: 1,
   },
   chipRow: {
     flexDirection: "row",

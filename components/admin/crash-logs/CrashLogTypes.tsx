@@ -1,0 +1,108 @@
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+
+export type CrashType = "crash_system" | "crash_js";
+
+export function CrashTypeBadge({ type }: { type: CrashType }) {
+  const isJs = type === "crash_js";
+  const bg = isJs ? "#FF444422" : "#FF6B3522";
+  const color = isJs ? "#FF4444" : "#FF6B35";
+  return (
+    <View style={[badgeStyles.badge, { backgroundColor: bg }]}>
+      <MaterialCommunityIcons
+        name={isJs ? "code-braces" : "phone-alert"}
+        size={12}
+        color={color}
+      />
+      <Text style={[badgeStyles.text, { color }]}>
+        {isJs ? "JS Error" : "Sistema"}
+      </Text>
+    </View>
+  );
+}
+
+const badgeStyles = StyleSheet.create({
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    alignSelf: "flex-start",
+  },
+  text: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
+});
+
+export interface CrashLogRow {
+  id: string;
+  userId: string;
+  sessionId: string;
+  crashType: CrashType;
+  appVersion: string | null;
+  platform: string | null;
+  osVersion: string | null;
+  deviceModel: string | null;
+  errorMessage: string | null;
+  stackTrace: string | null;
+  sessionStartedAt: string | null;
+  sessionEndedAt: string | null;
+  reportedAt: string;
+  nickname: string | null;
+}
+
+export interface DeviceStat {
+  platform: string | null;
+  deviceModel: string | null;
+  total: number;
+}
+
+export interface CrashLogsResponse {
+  logs: CrashLogRow[];
+  total: number;
+  page: number;
+  limit: number;
+  deviceStats: DeviceStat[];
+}
+
+export interface VersionStat {
+  version: string;
+  crash_system: number;
+  crash_js: number;
+  total: number;
+}
+
+export interface DayTrend {
+  day: string;
+  crash_system: number;
+  crash_js: number;
+}
+
+export interface CrashStatsResponse {
+  byType: { crash_system: number; crash_js: number };
+  byVersion: VersionStat[];
+  dailyTrend: DayTrend[];
+}
+
+export function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return (
+    d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" }) +
+    " " +
+    d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
+  );
+}
+
+export function formatDuration(startIso: string | null, endIso: string | null): string | null {
+  if (!startIso) return null;
+  const start = new Date(startIso).getTime();
+  const end = endIso ? new Date(endIso).getTime() : null;
+  if (!end) return null;
+  const sec = Math.round((end - start) / 1000);
+  if (sec < 60) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  const rem = sec % 60;
+  if (min < 60) return `${min}m ${rem}s`;
+  return `${Math.floor(min / 60)}h ${min % 60}m`;
+}

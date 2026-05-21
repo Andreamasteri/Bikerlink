@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import TrackingMap from "@/components/TrackingMap";
@@ -20,6 +20,8 @@ import { t } from "@/lib/i18n";
 import { useTelemetry } from "@/hooks/useTelemetry";
 import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import DebugPanel from "@/components/DebugPanel";
+import { StatBox } from "@/components/route/tracking/StatBox";
+import { TrackingControls } from "@/components/route/tracking/TrackingControls";
 
 interface GpsPoint {
   latitude: number;
@@ -81,8 +83,6 @@ export default function TrackingScreen() {
   const pendingPointsRef = useRef<GpsPoint[]>([]);
   const lastSendRef = useRef<number>(0);
 
-  // Telemetry: collects GPS + accelerometer at 1 Hz and flushes batches to
-  // /api/telemetry/batch. Starts/stops automatically with isTracking.
   useTelemetry(isTracking);
 
   const startMutation = useMutation({
@@ -374,84 +374,21 @@ export default function TrackingScreen() {
           />
         </View>
 
-        {!isTracking && (
-          <View style={styles.frequencyRow}>
-            <Text style={styles.frequencyLabel}>{t("tracking.frequency")}:</Text>
-            {FREQUENCY_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.value}
-                style={[
-                  styles.freqChip,
-                  frequency === opt.value && styles.freqChipActive,
-                ]}
-                onPress={() => setFrequency(opt.value)}
-              >
-                <Text
-                  style={[
-                    styles.freqChipText,
-                    frequency === opt.value && styles.freqChipTextActive,
-                  ]}
-                >
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {isTracking && (
-          <View style={styles.liveRow}>
-            <View style={styles.liveDot} />
-            <Text style={styles.liveText}>
-              MAX: {stats.maxSpeed.toFixed(0)} km/h
-            </Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            isTracking ? styles.stopButton : styles.startButton,
-          ]}
-          onPress={isTracking ? stopTracking : startTracking}
-          disabled={startMutation.isPending || stopMutation.isPending}
-        >
-          <MaterialCommunityIcons
-            name={isTracking ? "stop-circle" : "play-circle"}
-            size={28}
-            color="#FFFFFF"
-          />
-          <Text style={styles.actionButtonText}>
-            {isTracking ? t("tracking.stop") : t("tracking.start")}
-          </Text>
-        </TouchableOpacity>
+        <TrackingControls
+          isTracking={isTracking}
+          frequency={frequency}
+          options={FREQUENCY_OPTIONS}
+          onFrequencyChange={setFrequency}
+          maxSpeed={stats.maxSpeed}
+          onActionPress={isTracking ? stopTracking : startTracking}
+          isPending={startMutation.isPending || stopMutation.isPending}
+          t={t}
+        />
 
         {debugVisible && (
           <DebugPanel logs={debugLogs} onClear={clearDebugLogs} />
         )}
       </View>
-    </View>
-  );
-}
-
-function StatBox({
-  icon,
-  label,
-  value,
-}: {
-  icon: string;
-  label: string;
-  value: string;
-}) {
-  return (
-    <View style={styles.statBox}>
-      <MaterialCommunityIcons
-        name={icon as any}
-        size={20}
-        color={Colors.accent}
-      />
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
     </View>
   );
 }
@@ -516,90 +453,5 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 12,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: Colors.background,
-    borderRadius: 12,
-    padding: 12,
-    marginHorizontal: 4,
-    alignItems: "center",
-  },
-  statLabel: {
-    color: Colors.textSecondary,
-    fontSize: 11,
-    marginTop: 4,
-  },
-  statValue: {
-    color: Colors.text,
-    fontSize: 18,
-    fontWeight: "700" as const,
-    marginTop: 2,
-  },
-  frequencyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-    marginTop: 4,
-  },
-  frequencyLabel: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    marginRight: 12,
-  },
-  freqChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: Colors.background,
-    marginRight: 8,
-  },
-  freqChipActive: {
-    backgroundColor: Colors.accent,
-  },
-  freqChipText: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    fontWeight: "600" as const,
-  },
-  freqChipTextActive: {
-    color: "#FFFFFF",
-  },
-  liveRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.error,
-    marginRight: 8,
-  },
-  liveText: {
-    color: Colors.textSecondary,
-    fontSize: 13,
-    fontWeight: "600" as const,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 16,
-    borderRadius: 16,
-    gap: 10,
-  },
-  startButton: {
-    backgroundColor: Colors.success,
-  },
-  stopButton: {
-    backgroundColor: Colors.error,
-  },
-  actionButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "700" as const,
   },
 });

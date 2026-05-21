@@ -3,11 +3,10 @@ import {
   View,
   Text,
   StyleSheet,
-  Pressable,
-  Platform,
   Alert,
   Linking,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import WebView from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,12 +17,15 @@ import * as Location from "expo-location";
 import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
-import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { apiRequest } from "@/lib/query-client";
 import { haversineM, closestPointIndexOnPolyline } from "@/lib/geo";
 import { buildNavigationMapHtml } from "@/lib/leaflet-navigation-html";
 import { getTileConfig } from "@/lib/map-tiles";
 import { useLocale, useT } from "@/lib/language-context";
 import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
+import { NavigationMap } from "@/components/navigate/NavigationMap";
+import { NavigationInstruction } from "@/components/navigate/NavigationInstruction";
+import { NavigationFinished } from "@/components/navigate/NavigationFinished";
 
 // ─── Route cache helpers ───────────────────────────────────────────────────────
 
@@ -443,27 +445,14 @@ export default function NavigateScreen() {
 
   if (isFinished) {
     return (
-      <View style={[s.container, { paddingTop: topPad, paddingBottom: bottomPad }]}>
-        <View style={s.finishedContainer}>
-          <MaterialCommunityIcons name="flag-checkered" size={72} color={colors.accent} />
-          <Text style={s.finishedTitle}>{t("nav.arrived")}</Text>
-          <Text style={s.finishedSub}>{route.title}</Text>
-          <Text style={s.finishedStats}>{route.distanceKm} km · {formatDuration(route.durationMinutes)}</Text>
-          <View style={s.finishedActions}>
-            <Pressable
-              style={[s.finishedBtn, { backgroundColor: colors.accent }]}
-              onPress={() => router.replace(`/route/tracking` as any)}
-            >
-              <MaterialCommunityIcons name="record-circle" size={18} color="#fff" />
-              <Text style={s.finishedBtnText}>{t("nav.save_ride")}</Text>
-            </Pressable>
-            <Pressable style={[s.finishedBtn, { backgroundColor: colors.surface }]} onPress={handleClose}>
-              <Ionicons name="close" size={18} color={colors.text} />
-              <Text style={[s.finishedBtnText, { color: colors.text }]}>{t("nav.close")}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
+      <NavigationFinished
+        route={route}
+        topPad={topPad}
+        bottomPad={bottomPad}
+        formatDuration={formatDuration}
+        onSave={() => router.replace(`/route/tracking` as any)}
+        onClose={handleClose}
+      />
     );
   }
 
@@ -472,48 +461,17 @@ export default function NavigateScreen() {
 
   return (
     <View style={s.container}>
-      {/* Map */}
-      <View style={s.mapContainer}>
-        {mapHtml ? (
-          <WebView
-            ref={webViewRef}
-            source={{ html: mapHtml, baseUrl: "" }}
-            style={s.map}
-            javaScriptEnabled
-            originWhitelist={["*"]}
-            onMessage={handleMapMessage}
-            scrollEnabled={false}
-          />
-        ) : (
-          <View style={[s.map, { justifyContent: "center", alignItems: "center", backgroundColor: colors.surface }]}>
-            <MaterialCommunityIcons name="map-outline" size={40} color={colors.border} />
-            <Text style={{ color: colors.textSecondary, marginTop: 8 }}>{t("nav.map_unavailable")}</Text>
-          </View>
-        )}
-
-        {/* Close button */}
-        <Pressable style={[s.closeBtn, { top: topPad + 8 }]} onPress={handleClose} hitSlop={12}>
-          <Ionicons name="close" size={20} color="#fff" />
-        </Pressable>
-
-        {/* Rerouting banner */}
-        {isRerouting && (
-          <View style={s.reroutingBanner}>
-            <ActivityIndicator size="small" color="#fff" />
-            <Text style={s.reroutingText}>{t("nav.rerouting")}</Text>
-          </View>
-        )}
-
-        {/* Remaining info badge */}
-        {remainingKm !== null && (
-          <View style={s.remainingBadge}>
-            <Text style={s.remainingKm}>{remainingKm.toFixed(1)} km</Text>
-            {remainingMin !== null && (
-              <Text style={s.remainingMin}>{formatDuration(remainingMin)}</Text>
-            )}
-          </View>
-        )}
-      </View>
+      <NavigationMap
+        mapHtml={mapHtml}
+        webViewRef={webViewRef}
+        handleMapMessage={handleMapMessage}
+        handleClose={handleClose}
+        isRerouting={isRerouting}
+        remainingKm={remainingKm}
+        remainingMin={remainingMin}
+        topPad={topPad}
+        formatDuration={formatDuration}
+      />
 
       {/* Progress bar */}
       <View style={s.progressBg}>
@@ -528,60 +486,17 @@ export default function NavigateScreen() {
         </View>
       )}
 
-      {/* Instruction panel */}
-      <View style={[s.panel, { paddingBottom: bottomPad + 8 }]}>
-        {step ? (
-          <>
-            <View style={s.stepRow}>
-              <View style={s.stepIcon}>
-                <Ionicons name={signToIcon(step.sign)} size={32} color={colors.accent} />
-              </View>
-              <View style={s.stepInfo}>
-                <Text style={s.stepText} numberOfLines={2}>{step.text}</Text>
-                {step.streetName ? (
-                  <Text style={s.stepStreet} numberOfLines={1}>{step.streetName}</Text>
-                ) : null}
-                {distanceToNext !== null && (
-                  <Text style={s.stepDistance}>{formatDistance(distanceToNext)}</Text>
-                )}
-              </View>
-            </View>
-
-            {/* Next step preview */}
-            {steps[currentStep + 1] && (
-              <View style={s.nextStepRow}>
-                <Ionicons name={signToIcon(steps[currentStep + 1].sign)} size={14} color={colors.textSecondary} />
-                <Text style={s.nextStepText} numberOfLines={1}>
-                  {t("nav.then")} {steps[currentStep + 1].text}
-                </Text>
-              </View>
-            )}
-          </>
-        ) : (
-          <View style={s.stepRow}>
-            <MaterialCommunityIcons name="navigation-outline" size={32} color={colors.accent} />
-            <Text style={s.stepText}>{t("nav.in_progress")}</Text>
-          </View>
-        )}
-
-        {/* Open in external apps */}
-        <View style={s.externalRow}>
-          <Pressable style={s.externalBtn} onPress={handleOpenInGoogleMaps}>
-            <MaterialCommunityIcons name="google-maps" size={16} color={colors.textSecondary} />
-            <Text style={s.externalLabel}>Google Maps</Text>
-          </Pressable>
-          <Pressable style={s.externalBtn} onPress={handleOpenInWaze}>
-            <MaterialCommunityIcons name="waze" size={16} color={colors.textSecondary} />
-            <Text style={s.externalLabel}>Waze</Text>
-          </Pressable>
-          {Platform.OS === "ios" && (
-            <Pressable style={s.externalBtn} onPress={handleOpenInAppleMaps}>
-              <Ionicons name="map-outline" size={16} color={colors.textSecondary} />
-              <Text style={s.externalLabel}>Apple Maps</Text>
-            </Pressable>
-          )}
-        </View>
-      </View>
+      <NavigationInstruction
+        step={step}
+        nextStep={steps[currentStep + 1] ?? null}
+        distanceToNext={distanceToNext}
+        bottomPad={bottomPad}
+        signToIcon={signToIcon}
+        formatDistance={formatDistance}
+        handleOpenInGoogleMaps={handleOpenInGoogleMaps}
+        handleOpenInWaze={handleOpenInWaze}
+        handleOpenInAppleMaps={handleOpenInAppleMaps}
+      />
     </View>
   );
 }
@@ -590,113 +505,8 @@ export default function NavigateScreen() {
 
 const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  mapContainer: { flex: 1, position: "relative" },
-  map: { flex: 1 },
-  closeBtn: {
-    position: "absolute",
-    left: 12,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(0,0,0,0.65)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  remainingBadge: {
-    position: "absolute",
-    top: 60,
-    right: 12,
-    backgroundColor: "rgba(0,0,0,0.75)",
-    borderRadius: 12,
-    padding: 10,
-    alignItems: "center",
-    minWidth: 70,
-  },
-  remainingKm: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
-  remainingMin: { fontFamily: "Inter_400Regular", fontSize: 12, color: "rgba(255,255,255,0.7)", marginTop: 2 },
-  reroutingBanner: {
-    position: "absolute",
-    bottom: 12,
-    alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(0,0,0,0.82)",
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-  },
-  reroutingText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
   progressBg: { height: 4, backgroundColor: colors.border },
   progressFill: { height: 4, backgroundColor: colors.accent, borderRadius: 2 },
-  panel: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 16,
-    paddingTop: 14,
-    gap: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-  stepRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  stepIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: colors.accent + "22",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  stepInfo: { flex: 1 },
-  stepText: { fontFamily: "Inter_700Bold", fontSize: 17, color: colors.text },
-  stepStreet: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  stepDistance: { fontFamily: "Inter_600SemiBold", fontSize: 20, color: colors.accent, marginTop: 4 },
-  nextStepRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingTop: 6,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  nextStepText: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, flex: 1 },
-  externalRow: { flexDirection: "row", gap: 8, paddingTop: 4 },
-  externalBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    justifyContent: "center",
-  },
-  externalLabel: { fontFamily: "Inter_500Medium", fontSize: 11, color: colors.textSecondary },
-  finishedContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 32,
-    gap: 12,
-  },
-  finishedTitle: { fontFamily: "Inter_700Bold", fontSize: 32, color: colors.text },
-  finishedSub: { fontFamily: "Inter_500Medium", fontSize: 16, color: colors.textSecondary, textAlign: "center" },
-  finishedStats: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.textSecondary },
-  finishedActions: { flexDirection: "row", gap: 12, marginTop: 16 },
-  finishedBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-  },
-  finishedBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: "#fff" },
   offlineBanner: {
     flexDirection: "row",
     alignItems: "center",

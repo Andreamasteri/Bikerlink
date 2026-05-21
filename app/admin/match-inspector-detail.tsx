@@ -5,16 +5,18 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   Alert,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { MatchUserCard } from "@/components/admin/match-inspector/MatchUserCard";
+import { PreferencesDiffCard } from "@/components/admin/match-inspector/PreferencesDiffCard";
+import { MatchTypeCard } from "@/components/admin/match-inspector/MatchTypeCard";
 
 interface MatchItem {
   id: string;
@@ -64,128 +66,6 @@ function statusColor(status: string): string {
     case "rejected": return Colors.error;
     default: return Colors.textSecondary;
   }
-}
-
-function PreferencesDiffCard({
-  sections,
-  userId,
-  nickname,
-}: {
-  sections: MatchTypeSection[];
-  userId: string;
-  nickname: string;
-}) {
-  const [expanded, setExpanded] = useState(false);
-  const router = useRouter();
-  const disabled = sections.filter((s) => s.disabled);
-  const hasCustom = disabled.length > 0;
-
-  const handleEditPress = () => {
-    router.push({
-      pathname: "/admin/match-preferences-edit",
-      params: { userId, nickname },
-    });
-  };
-
-  return (
-    <View style={styles.prefsCard}>
-      <TouchableOpacity
-        style={styles.prefsHeader}
-        onPress={() => setExpanded((v) => !v)}
-        activeOpacity={0.7}
-        testID="prefs-diff-header"
-      >
-        <View style={styles.prefsHeaderLeft}>
-          <View style={styles.prefsTitleRow}>
-            <MaterialCommunityIcons
-              name="tune-variant"
-              size={16}
-              color={hasCustom ? Colors.warning ?? "#FF9800" : Colors.success}
-            />
-            <Text style={styles.prefsTitle}>Preferenze</Text>
-            {hasCustom ? (
-              <View style={styles.prefsDiffBadge}>
-                <Text style={styles.prefsDiffBadgeText}>
-                  {disabled.length}/{sections.length} OFF
-                </Text>
-              </View>
-            ) : (
-              <View style={[styles.prefsDiffBadge, styles.prefsDiffBadgeOk]}>
-                <Text style={[styles.prefsDiffBadgeText, styles.prefsDiffBadgeTextOk]}>
-                  DEFAULT
-                </Text>
-              </View>
-            )}
-          </View>
-          {hasCustom ? (
-            <Text style={styles.prefsSubtitle}>
-              {disabled.map((s) => s.typeName).join(" · ")}
-            </Text>
-          ) : (
-            <Text style={styles.prefsSubtitle}>
-              Tutte le preferenze attive (default)
-            </Text>
-          )}
-        </View>
-        <Ionicons
-          name={expanded ? "chevron-up" : "chevron-down"}
-          size={18}
-          color={Colors.textSecondary}
-        />
-      </TouchableOpacity>
-
-      {expanded && (
-        <View style={styles.prefsList}>
-          {sections.map((s) => (
-            <View key={s.typeKey} style={styles.prefsRow}>
-              <Ionicons
-                name={s.disabled ? "close-circle" : "checkmark-circle"}
-                size={14}
-                color={s.disabled ? Colors.error : Colors.success}
-              />
-              <Text
-                style={[
-                  styles.prefsRowLabel,
-                  s.disabled && styles.prefsRowLabelOff,
-                ]}
-              >
-                {s.typeName}
-              </Text>
-              <Text
-                style={[
-                  styles.prefsRowState,
-                  { color: s.disabled ? Colors.error : Colors.success },
-                ]}
-              >
-                {s.disabled ? "OFF" : "ON"}
-              </Text>
-            </View>
-          ))}
-          <TouchableOpacity
-            style={styles.editPrefsBtn}
-            onPress={handleEditPress}
-            activeOpacity={0.7}
-            testID="edit-prefs-btn"
-          >
-            <Ionicons name="create-outline" size={14} color={Colors.accent} />
-            <Text style={styles.editPrefsBtnText}>Modifica preferenze</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {!expanded && (
-        <TouchableOpacity
-          style={styles.editPrefsBtnCollapsed}
-          onPress={handleEditPress}
-          activeOpacity={0.7}
-          testID="edit-prefs-btn-collapsed"
-        >
-          <Ionicons name="create-outline" size={13} color={Colors.accent} />
-          <Text style={styles.editPrefsBtnText}>Modifica</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
 }
 
 export default function MatchInspectorDetailScreen() {
@@ -258,27 +138,11 @@ export default function MatchInspectorDetailScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
     >
-      <View style={styles.userCard}>
-        {user.avatarUrl ? (
-          <Image source={{ uri: user.avatarUrl }} style={styles.avatar} />
-        ) : (
-          <View style={styles.avatarPlaceholder}>
-            <Text style={styles.avatarLetter}>{user.nickname.charAt(0).toUpperCase()}</Text>
-          </View>
-        )}
-        <View style={styles.userMeta}>
-          <Text style={styles.userNickname}>{user.nickname}</Text>
-          <Text style={styles.userType}>{user.userType} · {user.role}</Text>
-          <Text style={styles.gpsInfo}>
-            <MaterialCommunityIcons name="map-marker-path" size={12} color={Colors.textSecondary} />
-            {" "}{gpsRouteCount} percorsi GPS
-          </Text>
-        </View>
-        <View style={styles.totalBadge}>
-          <Text style={styles.totalNum}>{totalMatches}</Text>
-          <Text style={styles.totalLabel}>match totali</Text>
-        </View>
-      </View>
+      <MatchUserCard
+        user={user}
+        gpsRouteCount={gpsRouteCount}
+        totalMatches={totalMatches}
+      />
 
       <View style={styles.actionsRow}>
         <TouchableOpacity style={styles.refreshBtn} onPress={() => refetch()}>
@@ -303,91 +167,16 @@ export default function MatchInspectorDetailScreen() {
 
       <Text style={styles.sectionTitle}>17 Tipi di Match</Text>
 
-      {matchesByType.map((section) => {
-        const expanded = expandedTypes.has(section.typeKey);
-        const badgeColor = section.disabled
-          ? Colors.textSecondary
-          : section.insufficientData
-          ? "#2196F3"
-          : Colors.accent;
-
-        return (
-          <View key={section.typeKey} style={styles.typeCard}>
-            <TouchableOpacity
-              style={styles.typeHeader}
-              onPress={() => toggleType(section.typeKey)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.typeHeaderLeft}>
-                <Text style={styles.typeName}>{section.typeName}</Text>
-                <View style={styles.typeBadges}>
-                  <View style={[styles.countBadge, { backgroundColor: badgeColor + "22", borderColor: badgeColor }]}>
-                    <Text style={[styles.countBadgeText, { color: badgeColor }]}>{section.count}</Text>
-                  </View>
-                  {section.disabled && (
-                    <View style={styles.statusPill}>
-                      <Text style={styles.statusPillText}>DISABILITATO</Text>
-                    </View>
-                  )}
-                  {!section.disabled && section.insufficientData && (
-                    <View style={[styles.statusPill, { backgroundColor: "#2196F333" }]}>
-                      <Text style={[styles.statusPillText, { color: "#2196F3" }]}>DATI GPS MANCANTI</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-              <Ionicons
-                name={expanded ? "chevron-up" : "chevron-down"}
-                size={18}
-                color={Colors.textSecondary}
-              />
-            </TouchableOpacity>
-
-            {expanded && (
-              <View style={styles.matchList}>
-                {section.matches.length === 0 ? (
-                  <Text style={styles.emptyMatches}>Nessun match per questo tipo</Text>
-                ) : (
-                  section.matches.map((match) => (
-                    <View key={match.id} style={styles.matchRow}>
-                      {match.matchedAvatarUrl ? (
-                        <Image source={{ uri: match.matchedAvatarUrl }} style={styles.matchAvatar} />
-                      ) : (
-                        <View style={styles.matchAvatarPlaceholder}>
-                          <Text style={styles.matchAvatarLetter}>
-                            {match.matchedNickname.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                      <View style={styles.matchInfo}>
-                        <Text style={styles.matchNickname}>{match.matchedNickname}</Text>
-                        <View style={styles.matchMeta}>
-                          {match.distanceKm != null && (
-                            <Text style={styles.matchMetaText}>
-                              <Ionicons name="location-outline" size={11} color={Colors.textSecondary} />
-                              {" "}{match.distanceKm} km
-                            </Text>
-                          )}
-                          <Text style={styles.matchMetaText}>{formatDate(match.createdAt)}</Text>
-                          {match.isSupermatch && (
-                            <View style={styles.superBadge}>
-                              <Text style={styles.superText}>⭐</Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                      <View style={[styles.statusDot, { backgroundColor: statusColor(match.status) }]} />
-                    </View>
-                  ))
-                )}
-                {section.count > 50 && (
-                  <Text style={styles.truncNote}>Mostrati 50 di {section.count} match</Text>
-                )}
-              </View>
-            )}
-          </View>
-        );
-      })}
+      {matchesByType.map((section) => (
+        <MatchTypeCard
+          key={section.typeKey}
+          section={section}
+          expanded={expandedTypes.has(section.typeKey)}
+          onToggle={() => toggleType(section.typeKey)}
+          formatDate={formatDate}
+          statusColor={statusColor}
+        />
+      ))}
     </ScrollView>
   );
 }
@@ -396,34 +185,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   loadingContainer: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: Colors.background },
   errorText: { fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.textSecondary },
-  userCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    margin: 16,
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  avatar: { width: 56, height: 56, borderRadius: 28 },
-  avatarPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: Colors.accent + "33",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarLetter: { fontFamily: "Inter_700Bold", fontSize: 22, color: Colors.accent },
-  userMeta: { flex: 1, gap: 2 },
-  userNickname: { fontFamily: "Inter_700Bold", fontSize: 17, color: Colors.text },
-  userType: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary },
-  gpsInfo: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  totalBadge: { alignItems: "center" },
-  totalNum: { fontFamily: "Inter_700Bold", fontSize: 24, color: Colors.accent },
-  totalLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
   actionsRow: {
     flexDirection: "row",
     gap: 10,
@@ -454,63 +215,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   recalcText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
-  prefsCard: {
-    marginHorizontal: 12,
-    marginBottom: 16,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  prefsHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 8,
-  },
-  prefsHeaderLeft: { flex: 1, gap: 4 },
-  prefsTitleRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  prefsTitle: { fontFamily: "Inter_700Bold", fontSize: 14, color: Colors.text },
-  prefsDiffBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: (Colors.warning ?? "#FF9800") + "22",
-  },
-  prefsDiffBadgeOk: { backgroundColor: Colors.success + "22" },
-  prefsDiffBadgeText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    color: Colors.warning ?? "#FF9800",
-  },
-  prefsDiffBadgeTextOk: { color: Colors.success },
-  prefsSubtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  prefsList: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingVertical: 4,
-  },
-  prefsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    gap: 8,
-  },
-  prefsRowLabel: {
-    flex: 1,
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.text,
-  },
-  prefsRowLabelOff: { color: Colors.textSecondary },
-  prefsRowState: { fontFamily: "Inter_700Bold", fontSize: 10 },
   sectionTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: 13,
@@ -520,107 +224,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 8,
   },
-  typeCard: {
-    marginHorizontal: 12,
-    marginBottom: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden",
-  },
-  typeHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  typeHeaderLeft: { flex: 1, gap: 4 },
-  typeName: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
-  typeBadges: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  countBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  countBadgeText: { fontFamily: "Inter_700Bold", fontSize: 12 },
-  statusPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: Colors.textSecondary + "22",
-  },
-  statusPillText: { fontFamily: "Inter_600SemiBold", fontSize: 9, color: Colors.textSecondary },
-  matchList: {
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingVertical: 4,
-  },
-  emptyMatches: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    paddingVertical: 12,
-  },
-  matchRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    gap: 10,
-  },
-  matchAvatar: { width: 32, height: 32, borderRadius: 16 },
-  matchAvatarPlaceholder: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.surfaceLight,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  matchAvatarLetter: { fontFamily: "Inter_700Bold", fontSize: 13, color: Colors.textSecondary },
-  matchInfo: { flex: 1, gap: 2 },
-  matchNickname: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
-  matchMeta: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
-  matchMetaText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
-  superBadge: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
-    backgroundColor: "#FFD70022",
-  },
-  superText: { fontSize: 10 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  truncNote: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    textAlign: "center",
-    paddingBottom: 8,
-  },
-  editPrefsBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  editPrefsBtnCollapsed: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-  },
-  editPrefsBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: Colors.accent,
-  },
 });
+

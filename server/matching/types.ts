@@ -1,0 +1,16 @@
+import { 
+  type Proposal, 
+  matchPreferences 
+} from "@shared/schema";
+
+export type MatchPrefRow = typeof matchPreferences.$inferSelect;
+
+export interface MatchRule {
+  searchType1: string;
+  searchType2: string;
+}
+
+export interface MatchResult {
+  bikerBiker: number;
+  zavarrina: number;
+}

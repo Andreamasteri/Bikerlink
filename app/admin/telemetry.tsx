@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   Alert,
   ActivityIndicator,
 } from "react-native";
@@ -14,6 +13,10 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { TelemetryStats } from "@/components/admin/telemetry/TelemetryStats";
+import { TelemetryFilters } from "@/components/admin/telemetry/TelemetryFilters";
+import { MapMatchingSection } from "@/components/admin/telemetry/MapMatchingSection";
+import { CurvyScoreSection } from "@/components/admin/telemetry/CurvyScoreSection";
 
 interface TelemetryAdminStats {
   users_with_telemetry: number;
@@ -52,29 +55,6 @@ async function adminFetch(path: string): Promise<Response> {
   return res;
 }
 
-function StatCard({
-  label,
-  value,
-  icon,
-  color,
-}: {
-  label: string;
-  value: string | number;
-  icon: string;
-  color?: string;
-}) {
-  const c = color ?? Colors.accent;
-  return (
-    <View style={[styles.statCard, { borderLeftColor: c }]}>
-      <MaterialCommunityIcons name={icon as any} size={20} color={c} />
-      <View style={styles.statCardText}>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statLabel}>{label}</Text>
-      </View>
-    </View>
-  );
-}
-
 export default function AdminTelemetryScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
@@ -85,25 +65,26 @@ export default function AdminTelemetryScreen() {
 
   const { data: stats, isLoading, error, refetch } = useQuery<TelemetryAdminStats>({
     queryKey: ["/api/admin/telemetry-stats"],
-    queryFn: () => adminFetch("/api/admin/telemetry-stats").then((r) => r.json()),
-    staleTime: 30_000,
-    onSuccess: (d) => {
+    queryFn: async () => {
+      const d = await adminFetch("/api/admin/telemetry-stats").then((r) => r.json());
       if (!targetInput) setTargetInput(String(d.target_km));
+      return d;
     },
+    staleTime: 30_000,
   });
 
   const { data: mmStats, refetch: refetchMm } = useQuery<MapMatchingStats>({
     queryKey: ["/api/admin/map-matching-stats"],
     queryFn: () => adminFetch("/api/admin/map-matching-stats").then((r) => r.json()),
     staleTime: 15_000,
-    refetchInterval: (data) => (data?.isRunning ? 5_000 : 30_000),
+    refetchInterval: (query) => (query.state.data?.isRunning ? 5_000 : 30_000),
   });
 
   const { data: curvyStats, refetch: refetchCurvy } = useQuery<CurvyScoreStats>({
     queryKey: ["/api/admin/curvy-score-stats"],
     queryFn: () => adminFetch("/api/admin/curvy-score-stats").then((r) => r.json()),
     staleTime: 30_000,
-    refetchInterval: (data) => (data?.isRunning ? 5_000 : 60_000),
+    refetchInterval: (query) => (query.state.data?.isRunning ? 5_000 : 60_000),
   });
 
   const handleSaveTarget = async () => {
@@ -227,274 +208,31 @@ export default function AdminTelemetryScreen() {
 
       {stats && (
         <>
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Riepilogo globale</Text>
-            <View style={styles.statsGrid}>
-              <StatCard
-                label="Utenti con dati"
-                value={stats.users_with_telemetry}
-                icon="account-group"
-                color="#3b82f6"
-              />
-              <StatCard
-                label="Giri registrati"
-                value={stats.total_rides}
-                icon="map-marker-path"
-                color="#8b5cf6"
-              />
-              <StatCard
-                label="Campioni totali"
-                value={stats.total_samples.toLocaleString("it-IT")}
-                icon="crosshairs-gps"
-                color="#f59e0b"
-              />
-              <StatCard
-                label="Km totali raccolti"
-                value={`${stats.total_km.toLocaleString("it-IT", { maximumFractionDigits: 0 })} km`}
-                icon="road-variant"
-                color="#22c55e"
-              />
-              <StatCard
-                label="Media km / utente"
-                value={`${stats.avg_km_per_user.toFixed(1)} km`}
-                icon="account-arrow-right"
-                color="#06b6d4"
-              />
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Progresso collettivo</Text>
-            <Text style={styles.progressNote}>
-              {progressPct}% dell'obiettivo di {stats.target_km} km raggiunto a livello globale
-            </Text>
-            <View style={styles.progressBg}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${Math.min(progressPct, 100)}%` as `${number}%`,
-                    backgroundColor: progressPct >= 100 ? "#22c55e" : Colors.accent,
-                  },
-                ]}
-              />
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Configurazione soglia</Text>
-            <Text style={styles.settingDesc}>
-              Km necessari per sbloccare i percorsi personalizzati (attualmente:{" "}
-              <Text style={{ color: Colors.accent, fontFamily: "Inter_700Bold" }}>
-                {stats.target_km} km
-              </Text>
-              ).
-            </Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                value={targetInput}
-                onChangeText={setTargetInput}
-                keyboardType="numeric"
-                placeholder="es. 400"
-                placeholderTextColor={Colors.textSecondary}
-                returnKeyType="done"
-                onSubmitEditing={handleSaveTarget}
-              />
-              <Text style={styles.inputSuffix}>km</Text>
-              <TouchableOpacity
-                style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-                onPress={handleSaveTarget}
-                disabled={saving}
-                activeOpacity={0.8}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#000" />
-                ) : (
-                  <Ionicons name="checkmark" size={18} color="#000" />
-                )}
-                <Text style={styles.saveBtnText}>Salva</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <TelemetryStats stats={stats} />
+          <TelemetryFilters
+            target_km={stats.target_km}
+            targetInput={targetInput}
+            setTargetInput={setTargetInput}
+            onSaveTarget={handleSaveTarget}
+            saving={saving}
+            progressPct={progressPct}
+          />
         </>
       )}
 
-      {/* ── Map Matching section ── */}
-      <View style={styles.section}>
-        <View style={styles.mmHeader}>
-          <MaterialCommunityIcons name="map-marker-check" size={18} color="#f59e0b" />
-          <Text style={styles.sectionTitle}>Map Matching OSM</Text>
-        </View>
-        <Text style={styles.settingDesc}>
-          Pipeline notturna (02:00) che associa i punti GPS ai segmenti stradali OSM tramite GraphHopper.
-        </Text>
+      <MapMatchingSection
+        stats={mmStats}
+        onRunJob={handleRunMapMatching}
+        isRunning={runningJob}
+        formatLastRun={formatLastRun}
+      />
 
-        {mmStats && (
-          <View style={styles.statsGrid}>
-            <StatCard
-              label="Campioni in attesa"
-              value={mmStats.pending.toLocaleString("it-IT")}
-              icon="timer-sand"
-              color="#f59e0b"
-            />
-            <StatCard
-              label="Campioni matchati"
-              value={mmStats.matched.toLocaleString("it-IT")}
-              icon="check-circle"
-              color="#22c55e"
-            />
-            <StatCard
-              label="Segmenti OSM noti"
-              value={mmStats.segments.toLocaleString("it-IT")}
-              icon="road"
-              color="#3b82f6"
-            />
-          </View>
-        )}
-
-        <View style={styles.mmMeta}>
-          <View style={styles.mmMetaRow}>
-            <MaterialCommunityIcons
-              name="clock-outline"
-              size={14}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.mmMetaText}>
-              Ultima esecuzione: {formatLastRun(mmStats?.lastRun)}
-            </Text>
-          </View>
-          <View style={styles.mmMetaRow}>
-            <MaterialCommunityIcons
-              name={mmStats?.ghConfigured ? "check-circle-outline" : "alert-circle-outline"}
-              size={14}
-              color={mmStats?.ghConfigured ? "#22c55e" : "#ef4444"}
-            />
-            <Text style={[styles.mmMetaText, { color: mmStats?.ghConfigured ? "#22c55e" : "#ef4444" }]}>
-              {mmStats?.ghConfigured
-                ? "GraphHopper configurato"
-                : "GraphHopper non configurato (impostare GRAPHHOPPER_URL)"}
-            </Text>
-          </View>
-          {mmStats?.isRunning && (
-            <View style={styles.mmMetaRow}>
-              <ActivityIndicator size="small" color={Colors.accent} />
-              <Text style={[styles.mmMetaText, { color: Colors.accent }]}>
-                Job in esecuzione…
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.runJobBtn,
-            (runningJob || mmStats?.isRunning || !mmStats?.ghConfigured) && { opacity: 0.5 },
-          ]}
-          onPress={handleRunMapMatching}
-          disabled={runningJob || mmStats?.isRunning || !mmStats?.ghConfigured}
-          activeOpacity={0.8}
-        >
-          {runningJob ? (
-            <ActivityIndicator size="small" color="#000" />
-          ) : (
-            <MaterialCommunityIcons name="play-circle" size={18} color="#000" />
-          )}
-          <Text style={styles.runJobBtnText}>Esegui ora</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Curvy Score section ── */}
-      <View style={styles.section}>
-        <View style={styles.mmHeader}>
-          <MaterialCommunityIcons name="sine-wave" size={18} color="#8b5cf6" />
-          <Text style={styles.sectionTitle}>Curvy Score (Fase 3)</Text>
-        </View>
-        <Text style={styles.settingDesc}>
-          Job settimanale (domenica 03:00) che calcola il curvy_score di ogni segmento OSM
-          dalla telemetria di piega e G-force dei biker.
-        </Text>
-
-        {curvyStats && (
-          <>
-            <View style={styles.statsGrid}>
-              <StatCard
-                label="Segmenti con score"
-                value={curvyStats.withScore.toLocaleString("it-IT")}
-                icon="check-circle"
-                color="#22c55e"
-              />
-              <StatCard
-                label="Segmenti senza score"
-                value={curvyStats.withoutScore.toLocaleString("it-IT")}
-                icon="timer-sand"
-                color="#f59e0b"
-              />
-              <StatCard
-                label="Copertura"
-                value={`${curvyStats.coveragePct.toFixed(1)}%`}
-                icon="chart-pie"
-                color="#8b5cf6"
-              />
-              {curvyStats.avgScore !== null && (
-                <StatCard
-                  label="Score medio"
-                  value={curvyStats.avgScore.toFixed(2)}
-                  icon="sine-wave"
-                  color="#06b6d4"
-                />
-              )}
-            </View>
-
-            <View style={[styles.progressBg, { marginTop: 12 }]}>
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${Math.min(curvyStats.coveragePct, 100)}%` as `${number}%`,
-                    backgroundColor: curvyStats.coveragePct >= 80 ? "#22c55e" : "#8b5cf6",
-                  },
-                ]}
-              />
-            </View>
-          </>
-        )}
-
-        <View style={styles.mmMeta}>
-          <View style={styles.mmMetaRow}>
-            <MaterialCommunityIcons name="clock-outline" size={14} color={Colors.textSecondary} />
-            <Text style={styles.mmMetaText}>
-              Ultima esecuzione: {formatLastRun(curvyStats?.lastRun)}
-            </Text>
-          </View>
-          {curvyStats?.isRunning && (
-            <View style={styles.mmMetaRow}>
-              <ActivityIndicator size="small" color="#8b5cf6" />
-              <Text style={[styles.mmMetaText, { color: "#8b5cf6" }]}>
-                Job in esecuzione…
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <TouchableOpacity
-          style={[
-            styles.runJobBtn,
-            { backgroundColor: "#8b5cf6" },
-            (runningCurvyJob || curvyStats?.isRunning) && { opacity: 0.5 },
-          ]}
-          onPress={handleRunCurvyJob}
-          disabled={runningCurvyJob || curvyStats?.isRunning}
-          activeOpacity={0.8}
-        >
-          {runningCurvyJob ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <MaterialCommunityIcons name="play-circle" size={18} color="#fff" />
-          )}
-          <Text style={[styles.runJobBtnText, { color: "#fff" }]}>Esegui ora</Text>
-        </TouchableOpacity>
-      </View>
+      <CurvyScoreSection
+        stats={curvyStats}
+        onRunJob={handleRunCurvyJob}
+        isRunning={runningCurvyJob}
+        formatLastRun={formatLastRun}
+      />
 
       <TouchableOpacity
         style={styles.refreshBtn}
@@ -533,99 +271,6 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     lineHeight: 18,
   },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  statsGrid: {
-    gap: 10,
-  },
-  statCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    padding: 14,
-    borderLeftWidth: 4,
-  },
-  statCardText: {
-    flex: 1,
-  },
-  statValue: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    color: Colors.text,
-  },
-  statLabel: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  progressNote: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  progressBg: {
-    height: 10,
-    backgroundColor: Colors.border,
-    borderRadius: 5,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 5,
-  },
-  settingDesc: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 12,
-    lineHeight: 18,
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 12,
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: Colors.text,
-  },
-  inputSuffix: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  saveBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: Colors.accent,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  saveBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: "#000",
-  },
   refreshBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -643,41 +288,5 @@ const styles = StyleSheet.create({
     color: "#ef4444",
     textAlign: "center",
     marginTop: 32,
-  },
-  mmHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 6,
-  },
-  mmMeta: {
-    marginTop: 12,
-    gap: 6,
-  },
-  mmMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  mmMetaText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  runJobBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: Colors.accent,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginTop: 14,
-  },
-  runJobBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: "#000",
   },
 });

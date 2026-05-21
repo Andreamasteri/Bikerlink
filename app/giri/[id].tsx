@@ -3,40 +3,38 @@ import {
   View,
   Text,
   ScrollView,
-  Pressable,
   StyleSheet,
   Alert,
   ActivityIndicator,
   Linking,
-  Image,
-  FlatList,
+  Share,
 } from "react-native";
-import WebView from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import Svg, { Path, Defs, LinearGradient, Stop, Polygon } from "react-native-svg";
-import * as ImagePicker from "expo-image-picker";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { buildLeafletCurvatureGradientHtml } from "@/lib/leaflet-route-map-html";
 import { getTileConfig } from "@/lib/map-tiles";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
-import ElevationProfile from "@/components/ElevationProfile";
 import { decodePolyline } from "@/lib/polyline";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// Components
+import { GiriHeader } from "@/components/giri/detail/GiriHeader";
+import { GiriMap } from "@/components/giri/detail/GiriMap";
+import { GiriStats } from "@/components/giri/detail/GiriStats";
+import { GiriParticipants } from "@/components/giri/detail/GiriParticipants";
+import { GiriActions } from "@/components/giri/detail/GiriActions";
+import { GiriWaypoints } from "@/components/giri/detail/GiriWaypoints";
+import { GiriPOIs } from "@/components/giri/detail/GiriPOIs";
+import { GiriWeather } from "@/components/giri/detail/GiriWeather";
+import { GiriMultiDayInfo } from "@/components/giri/detail/GiriMultiDayInfo";
+import { GiriElevation } from "@/components/giri/detail/GiriElevation";
+import { GiriOfflineCard } from "@/components/giri/detail/GiriOfflineCard";
 
-interface ElevationProfile {
-  elevations: number[];
-  distanceKm: number[];
-  minEle: number;
-  maxEle: number;
-  totalGain: number;
-  totalLoss: number;
-}
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Waypoint { lat: number; lng: number; name?: string; }
 
@@ -50,11 +48,6 @@ interface WeatherWaypoint {
 interface POI {
   id: number; lat: number; lng: number; type: string;
   name: string | null; brand: string | null;
-}
-
-interface POIPhoto {
-  id: string; poiId: string; userId: string;
-  photoUrl: string; caption: string | null; createdAt: string;
 }
 
 interface CompatibleBiker {
@@ -89,13 +82,6 @@ function weatherIcon(code: number): keyof typeof Ionicons.glyphMap {
   return "cloud-outline";
 }
 
-function formatDuration(mins: number): string {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h === 0) return `${m}min`;
-  return m > 0 ? `${h}h ${m}min` : `${h}h`;
-}
-
 function bikerScoreColor(score: number, colors: any): string {
   if (score >= 0.7) return "#22c55e";
   if (score >= 0.4) return colors.accent;
@@ -127,115 +113,7 @@ function styleLabel(style: string): string {
   return map[style] ?? style;
 }
 
-
 const TILE_CONFIG = getTileConfig("carto_dark");
-
-// ─── POI Photo Gallery Component ──────────────────────────────────────────────
-
-function POIPhotoGallery({ poiId, colors }: { poiId: string; colors: any }) {
-  const [uploading, setUploading] = useState(false);
-  const qc = useQueryClient();
-
-  const { data: photos = [], isLoading } = useQuery<POIPhoto[]>({
-    queryKey: ["/api/planned-routes/poi", poiId, "photos"],
-    queryFn: async () => {
-      const url = new URL(`/api/planned-routes/poi/${poiId}/photos`, getApiUrl());
-      const resp = await fetch(url.toString(), { credentials: "include" });
-      if (!resp.ok) return [];
-      const data = await resp.json();
-      return data.photos ?? [];
-    },
-    staleTime: 60_000,
-  });
-
-  const handleUploadPhoto = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Permesso negato", "Per caricare foto è necessario l'accesso alla galleria.");
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      quality: 0.7,
-      base64: true,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
-
-    const asset = result.assets[0];
-    if (!asset.base64) { Alert.alert("Errore", "Impossibile leggere l'immagine."); return; }
-
-    setUploading(true);
-    try {
-      const url = new URL(`/api/planned-routes/poi/${poiId}/photos`, getApiUrl());
-      const resp = await fetch(url.toString(), {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ photoBase64: asset.base64, mimeType: asset.mimeType ?? "image/jpeg" }),
-      });
-      if (!resp.ok) throw new Error("Upload fallito");
-      qc.invalidateQueries({ queryKey: ["/api/planned-routes/poi", poiId, "photos"] });
-    } catch {
-      Alert.alert("Errore", "Impossibile caricare la foto.");
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <View style={{ marginTop: 8 }}>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-        <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary }}>
-          FOTO COMMUNITY ({photos.length})
-        </Text>
-        <Pressable
-          onPress={handleUploadPhoto}
-          disabled={uploading}
-          style={{ flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.accent + "22", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}
-        >
-          {uploading
-            ? <ActivityIndicator size="small" color={colors.accent} />
-            : <Ionicons name="camera-outline" size={14} color={colors.accent} />
-          }
-          <Text style={{ fontFamily: "Inter_500Medium", fontSize: 12, color: colors.accent }}>
-            {uploading ? "Caricamento..." : "Aggiungi foto"}
-          </Text>
-        </Pressable>
-      </View>
-      {isLoading && <ActivityIndicator color={colors.accent} size="small" />}
-      {!isLoading && photos.length === 0 && (
-        <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary }}>
-          Nessuna foto ancora. Sii il primo a condividerne una!
-        </Text>
-      )}
-      {photos.length > 0 && (
-        <FlatList
-          horizontal
-          data={photos}
-          keyExtractor={(item) => item.id}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <View style={{ marginRight: 8 }}>
-              <Image
-                source={{ uri: item.photoUrl }}
-                style={{ width: 90, height: 90, borderRadius: 10 }}
-                resizeMode="cover"
-              />
-              {item.caption && (
-                <Text
-                  style={{ fontFamily: "Inter_400Regular", fontSize: 10, color: colors.textSecondary, marginTop: 2, maxWidth: 90 }}
-                  numberOfLines={1}
-                >
-                  {item.caption}
-                </Text>
-              )}
-            </View>
-          )}
-        />
-      )}
-    </View>
-  );
-}
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -274,7 +152,6 @@ export default function GiriDetailScreen() {
     enabled: !!id,
   });
 
-  // Decode points for offline tiles hook
   const routePoints = useMemo(() => {
     if (!route) return [];
     if (route.polyline) return decodePolyline(route.polyline);
@@ -288,19 +165,17 @@ export default function GiriDetailScreen() {
     route?.title ?? "",
     routePoints
   );
-  // Auto-load compatible bikers when route loads (proactive matching)
+
   React.useEffect(() => {
     if (route && !matchBikers && !matchLoading) {
       handleFindBikers();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route?.id]);
 
   React.useEffect(() => {
     if (route?.isMultiDay && !hotels && !hotelsLoading) {
       handleLoadHotels();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route?.id, route?.isMultiDay]);
 
   const deleteMutation = useMutation({
@@ -343,8 +218,6 @@ export default function GiriDetailScreen() {
       };
     });
   }, [route]);
-
-  // ── Actions ────────────────────────────────────────────────────────────────
 
   const handleWebViewMessage = (event: any) => {
     try {
@@ -444,7 +317,6 @@ export default function GiriDetailScreen() {
         const endIdx = Math.min((i + 1) * wpPerDay, wps.length - 1);
         return { lat: wps[endIdx].lat, lng: wps[endIdx].lng, name: wps[endIdx].name ?? `Tappa ${i + 1}` };
       });
-      if (!dayEndPoints.length) { setHotelsLoading(false); return; }
       const url = new URL("/api/planned-routes/hotels", getApiUrl());
       const resp = await fetch(url.toString(), {
         method: "POST", credentials: "include",
@@ -516,6 +388,16 @@ export default function GiriDetailScreen() {
     ]);
   };
 
+  const handleShare = async () => {
+    if (!route) return;
+    try {
+      await Share.share({
+        message: `Guarda questo giro su BikerLink: ${route.title}\n${route.distanceKm}km, Score: ${Math.round(route.bikerScore * 100)}%`,
+        url: `${process.env.EXPO_PUBLIC_DOMAIN}/giri/${route.id}`,
+      });
+    } catch {}
+  };
+
   const s = styles(colors);
   const isOwner = user?.id === route?.userId;
   const scoreColor = route ? bikerScoreColor(route.bikerScore, colors) : colors.accent;
@@ -531,11 +413,12 @@ export default function GiriDetailScreen() {
   if (!route) {
     return (
       <View style={[s.container, { paddingTop: topPad }]}>
-        <View style={s.nav}>
-          <Pressable onPress={() => router.back()} style={s.backBtn}>
-            <Ionicons name="arrow-back" size={22} color={colors.text} />
-          </Pressable>
-        </View>
+        <GiriHeader
+          title="Percorso non trovato"
+          isOwner={false}
+          onBack={() => router.back()}
+          onDelete={() => {}}
+        />
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <Text style={s.emptyText}>Percorso non trovato</Text>
         </View>
@@ -545,532 +428,101 @@ export default function GiriDetailScreen() {
 
   return (
     <View style={[s.container, { paddingTop: topPad }]}>
-      {/* Nav */}
-      <View style={s.nav}>
-        <Pressable onPress={() => router.back()} style={s.backBtn} hitSlop={12}>
-          <Ionicons name="arrow-back" size={22} color={colors.text} />
-        </Pressable>
-        <Text style={s.navTitle} numberOfLines={1}>{route.title}</Text>
-        {isOwner && (
-          <Pressable onPress={handleDelete} hitSlop={12} style={{ padding: 4 }}>
-            <Ionicons name="trash-outline" size={20} color={colors.accentRed} />
-          </Pressable>
-        )}
-      </View>
+      <GiriHeader
+        title={route.title}
+        isOwner={isOwner}
+        onBack={() => router.back()}
+        onDelete={handleDelete}
+      />
 
       <ScrollView
         contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad + 24 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Map */}
-        {mapHtml ? (
-          <View style={s.mapContainer}>
-            <WebView
-              source={{ html: mapHtml, baseUrl: "" }}
-              style={s.map}
-              scrollEnabled={false}
-              javaScriptEnabled
-              originWhitelist={["*"]}
-              allowFileAccess
-              allowFileAccessFromFileURLs
-              allowUniversalAccessFromFileURLs
-              onMessage={handleWebViewMessage}
-            />
-            <View style={s.mapOverlayBadge}>
-              <MaterialCommunityIcons
-                name={route.style === "extra_curvy" || route.style === "curvy" ? "road-variant" : route.style === "fast" || route.style === "direct" ? "rocket-launch-outline" : "scale-balance"}
-                size={12} color="#fff"
-              />
-              <Text style={s.mapOverlayText}>{route.distanceKm} km</Text>
-            </View>
-            {offline.status === "available" && (
-              <View style={s.offlineBadge}>
-                <Ionicons name="cloud-offline-outline" size={12} color="#22c55e" />
-                <Text style={s.offlineBadgeText}>Offline</Text>
-              </View>
-            )}
-            {streetViewTip && (
-              <View style={s.streetViewTip}>
-                <Ionicons name="eye-outline" size={12} color="#fff" />
-                <Text style={s.streetViewTipText}>Tocca il percorso per Street View</Text>
-              </View>
-            )}
-          </View>
-        ) : (
-          <View style={s.mapPlaceholder}>
-            <MaterialCommunityIcons name="map-outline" size={40} color={colors.border} />
-            <Text style={s.mapPlaceholderText}>Mappa non disponibile</Text>
-          </View>
-        )}
+        <GiriMap
+          mapHtml={mapHtml}
+          style={route.style}
+          distanceKm={route.distanceKm}
+          offlineStatus={offline.status}
+          streetViewTip={streetViewTip}
+          onMessage={handleWebViewMessage}
+        />
 
-        {/* Elevation profile */}
-        {route.elevationProfile && route.elevationProfile.length > 2 && (
-          <View style={{ marginBottom: 14 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
-              <MaterialCommunityIcons name="elevation-rise" size={16} color={colors.accent} />
-              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text }}>Profilo altimetrico</Text>
-            </View>
-            <ElevationProfile
-              profile={route.elevationProfile}
-              gainM={route.elevationGainM}
-              minM={route.altitudeMinM}
-              maxM={route.altitudeMaxM}
-              height={120}
-            />
-          </View>
-        )}
+        <GiriStats
+          distanceKm={route.distanceKm}
+          durationMinutes={route.durationMinutes}
+          bikerScore={route.bikerScore}
+          scoreColor={scoreColor}
+          styleLabel={styleLabel(route.style)}
+          isMultiDay={route.isMultiDay}
+          elevationGainM={route.elevationGainM}
+          altitudeMinM={route.altitudeMinM}
+          altitudeMaxM={route.altitudeMaxM}
+          realCurvatureScore={route.realCurvatureScore}
+          onLoadElevation={handleLoadElevation}
+          elevationLoading={elevationLoading}
+        />
 
-        {/* Hero stats */}
-        <View style={s.heroCard}>
-          <View style={s.heroStats}>
-            {[
-              { value: String(route.distanceKm), unit: "km", label: "Distanza" },
-              { value: String(Math.floor(route.durationMinutes / 60)), unit: `h ${route.durationMinutes % 60}m`, label: "Durata" },
-              { value: String(Math.round(route.bikerScore * 100)), unit: "/100", label: "BikerScore", color: scoreColor },
-            ].map((stat, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && <View style={s.heroDivider} />}
-                <View style={s.heroStat}>
-                  <Text style={[s.heroValue, stat.color ? { color: stat.color } : {}]}>{stat.value}</Text>
-                  <Text style={s.heroUnit}>{stat.unit}</Text>
-                  <Text style={s.heroLabel}>{stat.label}</Text>
-                </View>
-              </React.Fragment>
-            ))}
-          </View>
+        <GiriActions
+          onNavigate={() => router.push(`/navigate/${id}` as any)}
+          onOpenGoogleMaps={handleOpenInGoogleMaps}
+          onOpenWaze={handleOpenInWaze}
+          onOpenAppleMaps={handleOpenInAppleMaps}
+          onExportGPX={handleExportGPX}
+          onShare={handleShare}
+        />
 
-          <View style={s.bsBarBg}>
-            <View style={[s.bsBarFill, { width: `${Math.round(route.bikerScore * 100)}%` as any, backgroundColor: scoreColor }]} />
-          </View>
+        <GiriOfflineCard
+          status={offline.status}
+          progress={offline.progress}
+          onDownload={offline.downloadTiles}
+          onCancel={offline.cancelDownload}
+          onDelete={offline.deleteTiles}
+        />
 
-          {route.realCurvatureScore != null && (
-            <View style={s.realScoreBadge}>
-              <MaterialCommunityIcons name="radar" size={13} color="#22c55e" />
-              <Text style={s.realScoreText}>
-                Score reale: {Math.round(route.realCurvatureScore * 100)}/100 — da dati GPS reali
-              </Text>
-            </View>
-          )}
+        <GiriElevation
+          elevation={elevation}
+          elevationLoading={elevationLoading}
+          elevationError={elevationError}
+          onLoadElevation={handleLoadElevation}
+        />
 
-          {/* Elevation summary badge */}
-          {route.elevationGainM != null && route.elevationGainM > 0 && (
-            <View style={s.elevationBadge}>
-              <MaterialCommunityIcons name="elevation-rise" size={13} color="#3b82f6" />
-              <Text style={s.elevationBadgeText}>
-                +{route.elevationGainM} m · {route.altitudeMinM ?? 0}–{route.altitudeMaxM ?? 0} m s.l.m.
-              </Text>
-            </View>
-          )}
-
-          <View style={s.metaRow}>
-            <View style={s.metaBadge}>
-              <MaterialCommunityIcons
-                name={route.style === "extra_curvy" || route.style === "curvy" ? "road-variant" : route.style === "fast" || route.style === "direct" ? "rocket-launch-outline" : "scale-balance"}
-                size={13} color={colors.accent}
-              />
-              <Text style={s.metaBadgeText}>{styleLabel(route.style)}</Text>
-            </View>
-            {route.isMultiDay && (
-              <View style={[s.metaBadge, { backgroundColor: "#7c3aed22" }]}>
-                <Ionicons name="calendar-outline" size={13} color="#a78bfa" />
-                <Text style={[s.metaBadgeText, { color: "#a78bfa" }]}>
-                  Multi-giorno{(route.metadata?.daysCount) ? ` · ${route.metadata.daysCount}gg` : ""}
-                </Text>
-              </View>
-            )}
-            <View style={s.metaBadge}>
-              <Ionicons name={route.visibility === "public" ? "globe-outline" : "lock-closed-outline"} size={13} color={colors.textSecondary} />
-              <Text style={s.metaBadgeText}>{route.visibility === "public" ? "Pubblico" : "Privato"}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Biker matching banner */}
-        {matchBikers && matchBikers.length > 0 && !matchBannerDismissed && (
-          <View style={s.matchBanner}>
-            <MaterialCommunityIcons name="account-group" size={20} color={colors.accent} />
-            <Text style={s.matchBannerText}>
-              {matchBikers.length === 1
-                ? "1 biker compatibile trovato vicino al percorso!"
-                : `${matchBikers.length} bikers compatibili trovati vicino al percorso!`}
-            </Text>
-            <Pressable onPress={() => setMatchBannerDismissed(true)} hitSlop={12}>
-              <Ionicons name="close" size={18} color={colors.textSecondary} />
-            </Pressable>
-          </View>
-        )}
-
-        {/* Multi-day timeline */}
-        {route.isMultiDay && multiDayDays && multiDayDays.length > 0 && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Tappe giornaliere</Text>
-            {multiDayDays.map((day, i) => (
-              <View key={i} style={s.dayCard}>
-                <View style={s.dayBadge}>
-                  <Text style={s.dayBadgeText}>Giorno {day.day}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={s.dayRoute}>
-                    <Ionicons name="ellipse" size={8} color="#22c55e" />
-                    <Text style={s.dayRouteText} numberOfLines={1}>{day.from}</Text>
-                  </View>
-                  <View style={s.dayRouteLine} />
-                  <View style={s.dayRoute}>
-                    <Ionicons name="ellipse" size={8} color={colors.accentRed} />
-                    <Text style={s.dayRouteText} numberOfLines={1}>{day.to}</Text>
-                  </View>
-                </View>
-                <View style={s.dayStats}>
-                  <Text style={s.dayStatValue}>{day.km} km</Text>
-                  <Text style={s.dayStatLabel}>{formatDuration(day.minutes)}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Waypoints */}
-        {route.waypoints?.length > 0 && !route.isMultiDay && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Tappe</Text>
-            {route.waypoints.map((wp, i) => (
-              <View key={i} style={s.wpRow}>
-                <View style={[s.wpDot, {
-                  backgroundColor: i === 0 ? "#22c55e" : i === route.waypoints.length - 1 ? colors.accentRed : colors.accent,
-                }]} />
-                <Text style={s.wpText}>{wp.name ?? `Tappa ${i + 1}`}</Text>
-                {i < route.waypoints.length - 1 && <View style={s.wpLine} />}
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Navigate button */}
-        <Pressable
-          style={s.navigateBtn}
-          onPress={() => router.push(`/navigate/${id}` as any)}
-        >
-          <MaterialCommunityIcons name="navigation" size={20} color="#fff" />
-          <Text style={s.navigateBtnText}>Naviga</Text>
-        </Pressable>
-
-        {/* Open in external apps */}
-        <View style={s.externalAppsRow}>
-          <Pressable style={s.externalAppBtn} onPress={handleOpenInGoogleMaps}>
-            <MaterialCommunityIcons name="google-maps" size={16} color={colors.textSecondary} />
-            <Text style={s.externalAppLabel}>Google Maps</Text>
+        {weather && <GiriWeather weather={weather} weatherIcon={weatherIcon} />}
+        {!weather && (
+          <Pressable style={s.loadMoreBtn} onPress={handleLoadWeather} disabled={weatherLoading}>
+            <Ionicons name="cloud-outline" size={16} color={colors.accent} />
+            <Text style={s.loadMoreText}>{weatherLoading ? "Caricamento meteo..." : "Carica previsioni lungo il percorso"}</Text>
           </Pressable>
-          <Pressable style={s.externalAppBtn} onPress={handleOpenInWaze}>
-            <MaterialCommunityIcons name="waze" size={16} color={colors.textSecondary} />
-            <Text style={s.externalAppLabel}>Waze</Text>
-          </Pressable>
-          {Platform.OS === "ios" && (
-            <Pressable style={s.externalAppBtn} onPress={handleOpenInAppleMaps}>
-              <Ionicons name="map-outline" size={16} color={colors.textSecondary} />
-              <Text style={s.externalAppLabel}>Apple Maps</Text>
-            </Pressable>
-          )}
-        </View>
-
-        {/* Action grid */}
-        <View style={s.actionsGrid}>
-          <Pressable style={s.actionCard} onPress={handleLoadWeather} disabled={weatherLoading}>
-            {weatherLoading ? <ActivityIndicator color={colors.accent} size="small" /> : <Ionicons name="cloud-outline" size={24} color={colors.accent} />}
-            <Text style={s.actionLabel}>Meteo</Text>
-          </Pressable>
-          <Pressable style={s.actionCard} onPress={handleLoadPOI} disabled={poisLoading}>
-            {poisLoading ? <ActivityIndicator color={colors.accent} size="small" /> : <MaterialCommunityIcons name="gas-station" size={24} color={colors.accent} />}
-            <Text style={s.actionLabel}>POI</Text>
-          </Pressable>
-          <Pressable style={s.actionCard} onPress={handleFindBikers} disabled={matchLoading}>
-            {matchLoading ? <ActivityIndicator color={colors.accent} size="small" /> : <MaterialCommunityIcons name="account-group" size={24} color={colors.accent} />}
-            <Text style={s.actionLabel}>Bikers</Text>
-          </Pressable>
-          <Pressable style={s.actionCard} onPress={handleExportGPX}>
-            <MaterialCommunityIcons name="download-outline" size={24} color={colors.accent} />
-            <Text style={s.actionLabel}>GPX</Text>
-          </Pressable>
-        </View>
-
-        {/* Offline map download card */}
-        {routePoints.length > 0 && (
-          <View style={s.offlineCard}>
-            <View style={s.offlineCardHeader}>
-              <Ionicons
-                name={offline.status === "available" ? "cloud-done-outline" : "cloud-offline-outline"}
-                size={20}
-                color={offline.status === "available" ? "#22c55e" : colors.accent}
-              />
-              <Text style={s.offlineCardTitle}>Mappa offline</Text>
-              {offline.status === "available" && (
-                <View style={s.offlineAvailableBadge}>
-                  <Text style={s.offlineAvailableText}>Disponibile</Text>
-                </View>
-              )}
-            </View>
-
-            {offline.status === "none" && offline.estimate && (
-              <Text style={s.offlineEstimate}>
-                ~{offline.estimate.tileCount} tile · {offline.estimate.estimatedMB.toFixed(1)} MB
-              </Text>
-            )}
-
-            {offline.status === "downloading" && (
-              <View style={s.offlineProgressArea}>
-                <View style={s.offlineProgressBg}>
-                  <View
-                    style={[
-                      s.offlineProgressFill,
-                      { width: `${offline.total > 0 ? Math.round((offline.progress / offline.total) * 100) : 0}%` as any },
-                    ]}
-                  />
-                </View>
-                <Text style={s.offlineProgressText}>
-                  {offline.progress} / {offline.total} tile
-                </Text>
-              </View>
-            )}
-
-            {offline.status === "available" && offline.entry && (
-              <Text style={s.offlineEstimate}>
-                {(offline.entry.bytesEstimated / 1_000_000).toFixed(1)} MB ·{" "}
-                {offline.entry.tileCount} tile
-              </Text>
-            )}
-
-            <View style={s.offlineActions}>
-              {offline.status === "none" && (
-                <Pressable style={s.offlineBtn} onPress={offline.startDownload}>
-                  <Ionicons name="download-outline" size={16} color="#fff" />
-                  <Text style={s.offlineBtnText}>Scarica mappa offline</Text>
-                </Pressable>
-              )}
-              {offline.status === "downloading" && (
-                <Pressable style={[s.offlineBtn, s.offlineBtnCancel]} onPress={offline.cancelDownload}>
-                  <Ionicons name="close-circle-outline" size={16} color={colors.accentRed} />
-                  <Text style={[s.offlineBtnText, { color: colors.accentRed }]}>Annulla</Text>
-                </Pressable>
-              )}
-              {offline.status === "available" && (
-                <Pressable
-                  style={[s.offlineBtn, s.offlineBtnDelete]}
-                  onPress={() =>
-                    Alert.alert(
-                      "Elimina mappa offline",
-                      "Rimuovere i tile scaricati per questo percorso?",
-                      [
-                        { text: "Annulla", style: "cancel" },
-                        { text: "Elimina", style: "destructive", onPress: offline.deleteOffline },
-                      ]
-                    )
-                  }
-                >
-                  <Ionicons name="trash-outline" size={16} color={colors.accentRed} />
-                  <Text style={[s.offlineBtnText, { color: colors.accentRed }]}>Rimuovi</Text>
-                </Pressable>
-              )}
-              {offline.status === "error" && (
-                <Pressable style={s.offlineBtn} onPress={offline.startDownload}>
-                  <Ionicons name="refresh-outline" size={16} color="#fff" />
-                  <Text style={s.offlineBtnText}>Riprova</Text>
-                </Pressable>
-              )}
-            </View>
-          </View>
         )}
 
-        {/* Weather */}
-        {weather && weather.length > 0 && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Meteo lungo il percorso</Text>
-            {!weather.every((w) => w.isSuitable) && (
-              <View style={s.weatherAlert}>
-                <Ionicons name="warning-outline" size={16} color={colors.accentRed} />
-                <Text style={s.weatherAlertText}>Condizioni non ideali in alcune tappe</Text>
-              </View>
-            )}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {weather.map((w, i) => (
-                <View key={i} style={[s.weatherCard, !w.isSuitable && s.weatherBad]}>
-                  <Text style={s.weatherName} numberOfLines={1}>{w.name || `Tappa ${i + 1}`}</Text>
-                  <Ionicons name={weatherIcon(w.weatherCode)} size={28} color={w.isSuitable ? colors.accent : colors.accentRed} />
-                  <Text style={s.weatherDesc}>{w.weatherDesc}</Text>
-                  {w.tempNow !== null && <Text style={s.weatherTemp}>{Math.round(w.tempNow)}°C</Text>}
-                  {w.precipProb > 0 && <Text style={s.weatherRain}>💧 {w.precipProb}%</Text>}
-                  {w.windSpeed !== null && <Text style={s.weatherWind}>💨 {Math.round(w.windSpeed)} km/h</Text>}
-                  <View style={[s.suitableDot, { backgroundColor: w.isSuitable ? "#22c55e" : colors.accentRed }]} />
-                  <Text style={[s.suitableText, { color: w.isSuitable ? "#22c55e" : colors.accentRed }]}>
-                    {w.isSuitable ? "OK moto" : "Attenzione"}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+        <GiriWaypoints waypoints={route.waypoints} />
 
-        {/* Fuel-stop timeline */}
-        {route.distanceKm > 0 && (() => {
-          const autonomyKm = 250;
-          const stopCount = Math.floor(route.distanceKm / autonomyKm);
-          if (stopCount === 0) return null;
-          const avgSpeedKmh = (route.style === "curvy" || route.style === "extra_curvy") ? 60 : (route.style === "fast" || route.style === "direct") ? 90 : 70;
-          const stops = Array.from({ length: stopCount }, (_, i) => {
-            const km = Math.round((i + 1) * autonomyKm);
-            const etaMin = Math.round((km / avgSpeedKmh) * 60);
-            const etaH = Math.floor(etaMin / 60);
-            const etaM = etaMin % 60;
-            return { km, etaLabel: etaM > 0 ? `${etaH}h ${etaM}m` : `${etaH}h` };
-          });
-          return (
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>Soste carburante ({stops.length})</Text>
-              <View style={{ gap: 0 }}>
-                {stops.map((stop, i) => (
-                  <View key={i} style={s.fuelStopRow}>
-                    <View style={s.fuelStopLeft}>
-                      <View style={s.fuelStopDot}>
-                        <MaterialCommunityIcons name="gas-station" size={11} color="#fff" />
-                      </View>
-                      {i < stops.length - 1 && <View style={s.fuelStopLine} />}
-                    </View>
-                    <View style={s.fuelStopContent}>
-                      <Text style={s.fuelStopLabel}>Tappa carburante {i + 1}</Text>
-                      <View style={s.fuelStopMeta}>
-                        <Text style={s.fuelStopKm}>{stop.km} km</Text>
-                        <Text style={s.fuelStopEta}>+{stop.etaLabel} dalla partenza</Text>
-                      </View>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            </View>
-          );
-        })()}
+        <GiriPOIs
+          pois={pois}
+          poisLoading={poisLoading}
+          onLoadPOIs={handleLoadPOI}
+          selectedPOI={selectedPOI}
+          onSelectPOI={setSelectedPOI}
+          poiTypeLabel={poiTypeLabel}
+          poiTypeIcon={poiTypeIcon}
+        />
 
-        {/* POI */}
-        {pois !== null && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Punti di interesse ({pois.length})</Text>
-            {pois.length === 0 ? (
-              <Text style={s.emptyText}>Nessun POI trovato nella zona</Text>
-            ) : (
-              <>
-                {["fuel", "restaurant", "cafe", "hotel", "viewpoint"].map((type) => {
-                  const group = pois.filter((p) => p.type === type);
-                  if (!group.length) return null;
-                  return (
-                    <View key={type} style={{ marginBottom: 8 }}>
-                      <View style={s.poiGroupHeader}>
-                        <Ionicons name={poiTypeIcon(type)} size={14} color={colors.accent} />
-                        <Text style={s.poiGroupLabel}>{poiTypeLabel(type)} ({group.length})</Text>
-                      </View>
-                      {group.slice(0, 5).map((poi, i) => (
-                        <Pressable
-                          key={i}
-                          style={[s.poiRow, selectedPOI?.id === poi.id && { backgroundColor: colors.accent + "11" }]}
-                          onPress={() => setSelectedPOI(selectedPOI?.id === poi.id ? null : poi)}
-                        >
-                          <View style={{ flex: 1 }}>
-                            <Text style={s.poiName}>{poi.name ?? poi.brand ?? poiTypeLabel(poi.type)}</Text>
-                            <Text style={s.poiCoords}>{poi.lat.toFixed(3)}, {poi.lng.toFixed(3)}</Text>
-                          </View>
-                          <Ionicons
-                            name={selectedPOI?.id === poi.id ? "chevron-up" : "chevron-down"}
-                            size={14} color={colors.textSecondary}
-                          />
-                        </Pressable>
-                      ))}
-                      {/* POI photo gallery for selected POI */}
-                      {selectedPOI && group.some((p) => p.id === selectedPOI.id) && (
-                        <View style={s.poiPhotoSection}>
-                          <POIPhotoGallery poiId={String(selectedPOI.id)} colors={colors} />
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-              </>
-            )}
-          </View>
-        )}
+        <GiriParticipants
+          matchBikers={matchBikers}
+          matchLoading={matchLoading}
+          matchBannerDismissed={matchBannerDismissed}
+          onDismissBanner={() => setMatchBannerDismissed(true)}
+          onFindBikers={handleFindBikers}
+          onPressBiker={(uid) => router.push(`/profile/${uid}` as any)}
+        />
 
-        {/* Compatible bikers */}
-        {matchBikers !== null && (
-          <View style={s.section}>
-            <Text style={s.sectionTitle}>Bikers nella zona ({matchBikers.length})</Text>
-            {matchBikers.length === 0 ? (
-              <View style={s.emptyState}>
-                <MaterialCommunityIcons name="motorbike-off" size={32} color={colors.border} />
-                <Text style={s.emptyText}>Nessun biker compatibile trovato vicino al percorso</Text>
-              </View>
-            ) : (
-              matchBikers.map((biker, i) => (
-                <Pressable
-                  key={i}
-                  style={s.bikerRow}
-                  onPress={() => router.push(`/profile/${biker.userId}` as any)}
-                >
-                  {biker.avatarUrl ? (
-                    <Image source={{ uri: biker.avatarUrl }} style={s.bikerAvatar} />
-                  ) : (
-                    <View style={s.bikerAvatarFallback}>
-                      <Text style={s.bikerAvatarText}>{biker.nickname.charAt(0).toUpperCase()}</Text>
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.bikerName}>{biker.nickname}</Text>
-                    {biker.ridingStyle && <Text style={s.bikerCity}>{biker.ridingStyle}</Text>}
-                  </View>
-                  {biker.distanceKm !== null && <Text style={s.bikerDist}>{biker.distanceKm} km</Text>}
-                  {biker.isAvailable && <View style={s.onlineDot} />}
-                </Pressable>
-              ))
-            )}
-          </View>
-        )}
-
-        {/* Hotel suggestions for multi-day routes */}
-        {route.isMultiDay && (
-          <View style={s.section}>
-            <View style={s.sectionHeader}>
-              <Text style={s.sectionTitle}>Hotel per le soste</Text>
-              {hotelsLoading && <ActivityIndicator size="small" color={colors.accent} />}
-            </View>
-            {!hotels && !hotelsLoading && (
-              <Pressable style={s.loadMoreBtn} onPress={handleLoadHotels}>
-                <Ionicons name="bed-outline" size={16} color={colors.accent} />
-                <Text style={s.loadMoreText}>Cerca hotel lungo il percorso</Text>
-              </Pressable>
-            )}
-            {hotels !== null && hotels.length === 0 && (
-              <Text style={s.emptyText}>Nessun hotel trovato per le soste</Text>
-            )}
-            {hotels !== null && hotels.map((day: any, di: number) => (
-              <View key={di} style={s.hotelDayBlock}>
-                <Text style={s.hotelDayTitle}>Sosta Giorno {di + 1} — {day.location ?? `Tappa ${di + 1}`}</Text>
-                {(day.hotels ?? []).slice(0, 3).map((h: any, hi: number) => (
-                  <Pressable
-                    key={hi}
-                    style={s.hotelCard}
-                    onPress={() => h.bookingUrl ? Linking.openURL(h.bookingUrl) : null}
-                  >
-                    <View style={s.hotelCardLeft}>
-                      <Ionicons name="bed-outline" size={20} color={colors.accent} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={s.hotelName} numberOfLines={1}>{h.name ?? "Hotel"}</Text>
-                      <Text style={s.hotelAddress} numberOfLines={1}>{h.address ?? `${(h.lat ?? 0).toFixed(3)}, ${(h.lng ?? 0).toFixed(3)}`}</Text>
-                    </View>
-                    {h.bookingUrl && (
-                      <View style={s.hotelBookBadge}>
-                        <Text style={s.hotelBookText}>Prenota</Text>
-                      </View>
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-            ))}
-          </View>
+        {multiDayDays && (
+          <GiriMultiDayInfo
+            days={multiDayDays}
+            hotels={hotels}
+            hotelsLoading={hotelsLoading}
+            onLoadHotels={handleLoadHotels}
+          />
         )}
 
         {Number(route.metadata?.fuelStopsNeeded ?? 0) > 0 && (
@@ -1087,159 +539,12 @@ export default function GiriDetailScreen() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
+const styles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingBottom: 10 },
-  backBtn: { width: 40, height: 40, justifyContent: "center" },
-  navTitle: { fontFamily: "Inter_700Bold", fontSize: 16, color: colors.text, flex: 1, textAlign: "center" },
-  mapContainer: { height: 200, borderRadius: 14, overflow: "hidden", marginBottom: 14, position: "relative" },
-  map: { flex: 1 },
-  mapOverlayBadge: { position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.7)", borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
-  mapOverlayText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#fff" },
-  streetViewTip: { position: "absolute", bottom: 8, left: 8, backgroundColor: "rgba(0,0,0,0.7)", borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
-  streetViewTipText: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#fff" },
-  mapPlaceholder: { height: 160, borderRadius: 14, backgroundColor: colors.surface, justifyContent: "center", alignItems: "center", marginBottom: 14, gap: 8 },
-  mapPlaceholderText: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary },
-  heroCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 16, gap: 12 },
-  heroStats: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
-  heroStat: { alignItems: "center" },
-  heroValue: { fontFamily: "Inter_700Bold", fontSize: 28, color: colors.text },
-  heroUnit: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, marginTop: -4 },
-  heroLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  heroDivider: { width: 1, height: 50, backgroundColor: colors.border },
-  bsBarBg: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" },
-  bsBarFill: { height: "100%" as any, borderRadius: 4 },
-  elevationBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#3b82f622", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  elevationBadgeText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#3b82f6", flex: 1 },
-  metaRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  metaBadge: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: colors.background, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  metaBadgeText: { fontFamily: "Inter_500Medium", fontSize: 12, color: colors.textSecondary },
-  section: { marginBottom: 20 },
-  sectionTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: colors.text, marginBottom: 12 },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
-  dayCard: { flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: 12, padding: 12, marginBottom: 8, gap: 12 },
-  dayBadge: { backgroundColor: colors.accent + "22", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, minWidth: 70, alignItems: "center" },
-  dayBadgeText: { fontFamily: "Inter_700Bold", fontSize: 12, color: colors.accent },
-  dayRoute: { flexDirection: "row", alignItems: "center", gap: 6 },
-  dayRouteText: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.text, flex: 1 },
-  dayRouteLine: { width: 2, height: 12, backgroundColor: colors.border, marginLeft: 3, marginVertical: 2 },
-  dayStats: { alignItems: "flex-end" },
-  dayStatValue: { fontFamily: "Inter_700Bold", fontSize: 14, color: colors.text },
-  dayStatLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
-  wpRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 4 },
-  wpDot: { width: 12, height: 12, borderRadius: 6, marginTop: 4 },
-  wpLine: { position: "absolute", left: 5, top: 16, width: 2, height: 20, backgroundColor: colors.border },
-  wpText: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.text, flex: 1 },
-  navigateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: colors.accent,
-    borderRadius: 14,
-    paddingVertical: 14,
-    marginBottom: 12,
-  },
-  navigateBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
-  externalAppsRow: { flexDirection: "row", gap: 8, marginBottom: 20 },
-  externalAppBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-  },
-  externalAppLabel: { fontFamily: "Inter_500Medium", fontSize: 11, color: colors.textSecondary },
-  actionsGrid: { flexDirection: "row", gap: 10, marginBottom: 20 },
-  actionCard: { flex: 1, backgroundColor: colors.surface, borderRadius: 12, paddingVertical: 14, alignItems: "center", gap: 6 },
-  actionLabel: { fontFamily: "Inter_500Medium", fontSize: 12, color: colors.text },
-  weatherAlert: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.accentRed + "22", borderRadius: 8, padding: 10, marginBottom: 10 },
-  weatherAlertText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.accentRed, flex: 1 },
-  weatherCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 12, marginRight: 10, width: 120, alignItems: "center", gap: 4 },
-  weatherBad: { borderWidth: 1, borderColor: colors.accentRed + "55" },
-  weatherName: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: colors.text, textAlign: "center" },
-  weatherDesc: { fontFamily: "Inter_400Regular", fontSize: 11, color: colors.textSecondary, textAlign: "center" },
-  weatherTemp: { fontFamily: "Inter_700Bold", fontSize: 18, color: colors.text },
-  weatherRain: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
-  weatherWind: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
-  suitableDot: { width: 8, height: 8, borderRadius: 4 },
-  suitableText: { fontFamily: "Inter_500Medium", fontSize: 11 },
-  poiGroupHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 },
-  poiGroupLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary },
-  poiRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border, paddingLeft: 20 },
-  poiName: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.text, flex: 1 },
-  poiCoords: { fontFamily: "Inter_400Regular", fontSize: 11, color: colors.textSecondary },
-  poiPhotoSection: { backgroundColor: colors.surface, borderRadius: 12, padding: 12, marginTop: 4, marginLeft: 20, marginBottom: 8 },
-  bikerRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border },
-  bikerAvatar: { width: 40, height: 40, borderRadius: 20 },
-  bikerAvatarFallback: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.accent + "33", justifyContent: "center", alignItems: "center" },
-  bikerAvatarText: { fontFamily: "Inter_700Bold", fontSize: 16, color: colors.accent },
-  bikerName: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text },
-  bikerCity: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
-  bikerDist: { fontFamily: "Inter_500Medium", fontSize: 12, color: colors.textSecondary },
-  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: "#22c55e" },
-  emptyState: { alignItems: "center", paddingVertical: 20, gap: 8 },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.textSecondary, textAlign: "center", paddingVertical: 8 },
+  loadMoreBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.border, marginBottom: 20 },
+  loadMoreText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.accent },
   infoCard: { flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginTop: 4 },
   infoTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text },
   infoDesc: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  realScoreBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#22c55e18", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  realScoreText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#22c55e", flex: 1 },
-  matchBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.accent + "22", borderRadius: 12, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.accent + "44" },
-  matchBannerText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.text, flex: 1 },
-  loadMoreBtn: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: colors.border },
-  loadMoreText: { fontFamily: "Inter_500Medium", fontSize: 14, color: colors.accent },
-  hotelDayBlock: { marginBottom: 16 },
-  hotelDayTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
-  hotelCard: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.surface, borderRadius: 12, padding: 12, marginBottom: 8 },
-  hotelCardLeft: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.accent + "22", justifyContent: "center", alignItems: "center" },
-  hotelName: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text },
-  hotelAddress: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  hotelBookBadge: { backgroundColor: colors.accent, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  hotelBookText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#fff" },
-  fuelStopRow: { flexDirection: "row", gap: 12, marginBottom: 0 },
-  fuelStopLeft: { alignItems: "center", width: 26 },
-  fuelStopDot: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.accent, justifyContent: "center", alignItems: "center" },
-  fuelStopLine: { width: 2, flex: 1, backgroundColor: colors.border, marginVertical: 2 },
-  fuelStopContent: { flex: 1, paddingBottom: 14, paddingTop: 4 },
-  fuelStopLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: colors.text },
-  fuelStopMeta: { flexDirection: "row", gap: 10, marginTop: 2 },
-  fuelStopKm: { fontFamily: "Inter_500Medium", fontSize: 12, color: colors.accent },
-  fuelStopEta: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
-  offlineBadge: { position: "absolute", bottom: 8, left: 8, flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: "rgba(0,0,0,0.75)", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  offlineBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#22c55e" },
-  offlineCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 20, gap: 10 },
-  offlineCardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  offlineCardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: colors.text, flex: 1 },
-  offlineAvailableBadge: { backgroundColor: "#22c55e22", borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  offlineAvailableText: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: "#22c55e" },
-  offlineEstimate: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary },
-  offlineProgressArea: { gap: 6 },
-  offlineProgressBg: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" },
-  offlineProgressFill: { height: "100%" as any, backgroundColor: colors.accent, borderRadius: 4 },
-  offlineProgressText: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
-  offlineActions: { flexDirection: "row", gap: 8 },
-  offlineBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
-  offlineBtnCancel: { backgroundColor: colors.accentRed + "18" },
-  offlineBtnDelete: { backgroundColor: colors.accentRed + "18" },
-  offlineBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
-  eleCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 14, marginBottom: 16, gap: 10 },
-  eleTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  eleTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: colors.text },
-  eleChartWrap: { borderRadius: 10, overflow: "hidden", gap: 4 },
-  eleAxisRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 2 },
-  eleAxisLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: colors.textSecondary },
-  eleStatsRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-around", backgroundColor: colors.background, borderRadius: 10, padding: 10 },
-  eleStat: { alignItems: "center", flex: 1 },
-  eleStatValue: { fontFamily: "Inter_700Bold", fontSize: 14, color: colors.text },
-  eleStatLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: colors.textSecondary, marginTop: 2 },
-  eleStatDivider: { width: 1, height: 32, backgroundColor: colors.border },
-  eleRetryRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 8 },
-  eleRetryText: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, flex: 1 },
 });

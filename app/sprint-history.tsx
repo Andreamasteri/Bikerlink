@@ -1,4 +1,4 @@
-import { useRef, useCallback, useState, useEffect } from "react";
+import { useRef, useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,23 +7,27 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
-  Modal,
-  Pressable,
-  TextInput,
   Alert,
-  Image,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import type { ComponentProps } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { useUnits } from "@/lib/units-context";
-import { formatDateTime } from "@/lib/units";
 import { getCurrentLocale } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
+
+function formatSprintTime(ms: number): string {
+  return (ms / 1000).toFixed(3) + "s";
+}
+
+import { SprintCard } from "@/components/sprint/SprintCard";
+import { SprintFilters } from "@/components/sprint/SprintFilters";
+import { SprintStats } from "@/components/sprint/SprintStats";
+import { SprintLeaderboard } from "@/components/sprint/SprintLeaderboard";
+import { PublishSprintModal } from "@/components/sprint/PublishSprintModal";
 
 interface SprintResult {
   id: string;
@@ -53,19 +57,6 @@ interface LeaderboardEntry {
 
 type Tab = "mine" | "leaderboard";
 
-function formatSprintTime(ms: number): string {
-  return (ms / 1000).toFixed(3) + "s";
-}
-
-type IoniconsName = ComponentProps<typeof Ionicons>["name"];
-
-function getMedalIcon(index: number): { name: IoniconsName; color: string } | null {
-  if (index === 0) return { name: "trophy", color: "#FFD700" };
-  if (index === 1) return { name: "medal-outline", color: "#C0C0C0" };
-  if (index === 2) return { name: "medal-outline", color: "#CD7F32" };
-  return null;
-}
-
 export default function SprintHistoryScreen() {
   const t = useT();
   const router = useRouter();
@@ -77,7 +68,6 @@ export default function SprintHistoryScreen() {
   const focusUserId = params.focusUserId ?? null;
   const [tab, setTab] = useState<Tab>(params.tab === "leaderboard" ? "leaderboard" : "mine");
 
-  const targetSpeed = speedUnit === "mph" ? 62 : 100;
   const targetLabel = speedUnit === "mph" ? "62 mph" : "100 km/h";
 
   const {
@@ -113,20 +103,6 @@ export default function SprintHistoryScreen() {
     enabled: tab === "leaderboard",
   });
 
-  const leaderboardListRef = useRef<FlatList>(null);
-  const focusIndexRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!focusUserId || !leaderboard || leaderboard.length === 0) return;
-    const idx = leaderboard.findIndex((e) => e.userId === focusUserId);
-    if (idx < 0) return;
-    focusIndexRef.current = idx;
-    const timer = setTimeout(() => {
-      leaderboardListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.4 });
-    }, 400);
-    return () => clearTimeout(timer);
-  }, [focusUserId, leaderboard]);
-
   const personalBest: SprintResult | null = sprints && sprints.length > 0 ? sprints[0] : null;
 
   const [publishSprint, setPublishSprint] = useState<SprintResult | null>(null);
@@ -160,151 +136,20 @@ export default function SprintHistoryScreen() {
   }, [publishSprint, publishCaption, publishMutation]);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: SprintResult; index: number }) => {
-      const isRecord = index === 0;
-      const medal = getMedalIcon(index);
-      const timeMs = item.sprint0to100Ms ?? 0;
-
-      return (
-        <View
-          style={[
-            styles.sprintItem,
-            isRecord && styles.sprintItemRecord,
-          ]}
-        >
-          <View style={styles.sprintRank}>
-            {medal ? (
-              <Ionicons name={medal.name} size={20} color={medal.color} />
-            ) : (
-              <Text style={styles.rankNumber}>#{index + 1}</Text>
-            )}
-          </View>
-
-          <View style={styles.sprintMain}>
-            <Text
-              style={[
-                styles.sprintTime,
-                isRecord && styles.sprintTimeRecord,
-              ]}
-            >
-              {formatSprintTime(timeMs)}
-            </Text>
-            <Text style={styles.sprintLabel}>0→{targetLabel}</Text>
-          </View>
-
-          <View style={styles.sprintStats}>
-            {(item.maxAccelerationG ?? 0) > 0 && (
-              <Text style={styles.statChip}>
-                <Ionicons name="pulse-outline" size={11} color={Colors.accentRed} />
-                {" "}{(item.maxAccelerationG ?? 0).toFixed(2)}G
-              </Text>
-            )}
-            {(item.maxTiltDeg ?? 0) > 0 && (
-              <Text style={styles.statChip}>
-                <Ionicons name="compass-outline" size={11} color={Colors.accent} />
-                {" "}{(item.maxTiltDeg ?? 0).toFixed(1)}°
-              </Text>
-            )}
-          </View>
-
-          <View style={styles.sprintDate}>
-            <Text style={styles.dateText} numberOfLines={2}>
-              {formatDateTime(item.createdAt, locale, timeFormat)}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.publishBtn}
-            onPress={() => {
-              setPublishCaption("");
-              setPublishSprint(item);
-            }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}
-            testID={`publish-sprint-${item.id}`}
-          >
-            <Ionicons name="share-outline" size={18} color={Colors.accent} />
-          </TouchableOpacity>
-        </View>
-      );
-    },
+    ({ item, index }: { item: SprintResult; index: number }) => (
+      <SprintCard
+        item={item}
+        index={index}
+        targetLabel={targetLabel}
+        locale={locale}
+        timeFormat={timeFormat}
+        onPublish={(sprint) => {
+          setPublishCaption("");
+          setPublishSprint(sprint);
+        }}
+      />
+    ),
     [targetLabel, locale, timeFormat]
-  );
-
-  const renderLeaderboardItem = useCallback(
-    ({ item, index }: { item: LeaderboardEntry; index: number }) => {
-      const isRecord = index === 0;
-      const medal = getMedalIcon(index);
-      const motoLabel = [item.motorcycleBrand, item.motorcycleModel].filter(Boolean).join(" ");
-      const isFocused = focusUserId != null && item.userId === focusUserId && !item.isCurrentUser;
-
-      return (
-        <View
-          style={[
-            styles.sprintItem,
-            isRecord && styles.sprintItemRecord,
-            item.isCurrentUser && styles.sprintItemMe,
-            isFocused && styles.sprintItemFocused,
-          ]}
-        >
-          <View style={styles.sprintRank}>
-            {medal ? (
-              <Ionicons name={medal.name} size={20} color={medal.color} />
-            ) : (
-              <Text style={styles.rankNumber}>#{item.rank}</Text>
-            )}
-          </View>
-
-          {item.avatarUrl ? (
-            <Image source={{ uri: item.avatarUrl }} style={styles.avatar} />
-          ) : (
-            <View style={[styles.avatar, styles.avatarFallback]}>
-              <Text style={styles.avatarInitial}>
-                {(item.nickname || "?").charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-
-          <View style={styles.lbMain}>
-            <Text style={styles.lbNickname} numberOfLines={1}>
-              {item.nickname}
-              {item.isCurrentUser ? " (tu)" : ""}
-            </Text>
-            <Text
-              style={[
-                styles.sprintTime,
-                styles.lbTime,
-                isRecord && styles.sprintTimeRecord,
-              ]}
-            >
-              {formatSprintTime(item.sprint0to100Ms)}
-            </Text>
-            {motoLabel.length > 0 && (
-              <Text style={styles.lbMoto} numberOfLines={1}>
-                {motoLabel}
-                {item.displacement ? ` · ${item.displacement}cc` : ""}
-              </Text>
-            )}
-          </View>
-
-          <View style={styles.sprintStats}>
-            {(item.maxAccelerationG ?? 0) > 0 && (
-              <Text style={styles.statChip}>
-                <Ionicons name="pulse-outline" size={11} color={Colors.accentRed} />
-                {" "}{(item.maxAccelerationG ?? 0).toFixed(2)}G
-              </Text>
-            )}
-            {(item.maxTiltDeg ?? 0) > 0 && (
-              <Text style={styles.statChip}>
-                <Ionicons name="compass-outline" size={11} color={Colors.accent} />
-                {" "}{(item.maxTiltDeg ?? 0).toFixed(1)}°
-              </Text>
-            )}
-          </View>
-        </View>
-      );
-    },
-    [focusUserId]
   );
 
   const topPadding = insets.top;
@@ -330,57 +175,12 @@ export default function SprintHistoryScreen() {
         <View style={styles.backBtn} />
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        <TouchableOpacity
-          style={[styles.tabBtn, isMineTab && styles.tabBtnActive]}
-          onPress={() => setTab("mine")}
-          testID="tab-mine"
-        >
-          <Ionicons
-            name="person-outline"
-            size={16}
-            color={isMineTab ? Colors.accentRed : Colors.textSecondary}
-          />
-          <Text style={[styles.tabLabel, isMineTab && styles.tabLabelActive]}>
-            I miei sprint
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabBtn, !isMineTab && styles.tabBtnActive]}
-          onPress={() => setTab("leaderboard")}
-          testID="tab-leaderboard"
-        >
-          <Ionicons
-            name="trophy-outline"
-            size={16}
-            color={!isMineTab ? Colors.accentRed : Colors.textSecondary}
-          />
-          <Text style={[styles.tabLabel, !isMineTab && styles.tabLabelActive]}>
-            Classifica
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <SprintFilters tab={tab} onTabChange={setTab} />
 
       {isMineTab ? (
         <>
-          {/* Personal best banner */}
-          {personalBest && (
-            <View style={styles.pbBanner}>
-              <Ionicons name="trophy" size={22} color="#FFD700" />
-              <View style={styles.pbInfo}>
-                <Text style={styles.pbLabel}>Record personale</Text>
-                <Text style={styles.pbTime}>
-                  {formatSprintTime(personalBest.sprint0to100Ms ?? 0)}
-                </Text>
-              </View>
-              <Text style={styles.pbSince}>
-                {formatDateTime(personalBest.createdAt, locale, timeFormat)}
-              </Text>
-            </View>
-          )}
+          <SprintStats personalBest={personalBest} locale={locale} timeFormat={timeFormat} />
 
-          {/* List */}
           {isLoading ? (
             <View style={styles.center}>
               <ActivityIndicator size="large" color={Colors.accent} />
@@ -389,9 +189,7 @@ export default function SprintHistoryScreen() {
             <View style={styles.center}>
               <Ionicons name="timer-outline" size={56} color={Colors.textSecondary} />
               <Text style={styles.emptyTitle}>Nessun sprint ancora</Text>
-              <Text style={styles.emptySubtitle}>
-                {t("sprint.enableHint")}
-              </Text>
+              <Text style={styles.emptySubtitle}>{t("sprint.enableHint")}</Text>
             </View>
           ) : (
             <FlatList
@@ -418,140 +216,25 @@ export default function SprintHistoryScreen() {
           )}
         </>
       ) : (
-        <>
-          {isLoadingLeaderboard ? (
-            <View style={styles.center}>
-              <ActivityIndicator size="large" color={Colors.accent} />
-            </View>
-          ) : !leaderboard || leaderboard.length === 0 ? (
-            <View style={styles.center}>
-              <Ionicons name="trophy-outline" size={56} color={Colors.textSecondary} />
-              <Text style={styles.emptyTitle}>Nessuno sprint registrato</Text>
-              <Text style={styles.emptySubtitle}>
-                Sii il primo a registrare uno sprint per apparire in classifica!
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              ref={leaderboardListRef}
-              data={leaderboard}
-              keyExtractor={(item) => item.userId}
-              renderItem={renderLeaderboardItem}
-              contentContainerStyle={{ paddingBottom: bottomPad + 16, paddingTop: 8 }}
-              showsVerticalScrollIndicator={false}
-              onScrollToIndexFailed={(info) => {
-                // First scroll to the highest measured index to force more items to render
-                leaderboardListRef.current?.scrollToIndex({
-                  index: info.highestMeasuredFrameIndex,
-                  animated: false,
-                });
-                // Then retry scrolling to the original target index after a short delay
-                const targetIndex = focusIndexRef.current ?? info.index;
-                setTimeout(() => {
-                  leaderboardListRef.current?.scrollToIndex({
-                    index: targetIndex,
-                    animated: true,
-                    viewPosition: 0.4,
-                  });
-                }, 350);
-              }}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefetchingLeaderboard}
-                  onRefresh={refetchLeaderboard}
-                  tintColor={Colors.accent}
-                  colors={[Colors.accent]}
-                />
-              }
-              ListHeaderComponent={
-                <Text style={styles.listHeader}>
-                  Top {leaderboard.length} — miglior tempo per pilota
-                </Text>
-              }
-            />
-          )}
-        </>
+        <SprintLeaderboard
+          leaderboard={leaderboard}
+          isLoading={isLoadingLeaderboard}
+          isRefetching={isRefetchingLeaderboard}
+          onRefresh={refetchLeaderboard}
+          focusUserId={focusUserId}
+          bottomPad={bottomPad}
+        />
       )}
 
-      {/* ── PUBLISH MODAL ────────────────────────────────────────────────── */}
-      <Modal
-        visible={!!publishSprint}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setPublishSprint(null)}
-      >
-        <Pressable style={styles.modalOverlay} onPress={() => setPublishSprint(null)}>
-          <Pressable style={styles.publishModal} onPress={() => {}}>
-            <Text style={styles.publishTitle}>{t("tracking.publish")}</Text>
-            <Text style={styles.publishSubtitle}>{t("tracking.publishDesc")}</Text>
-
-            {publishSprint && (
-              <View style={styles.publishSummary}>
-                <View style={styles.publishSummaryRow}>
-                  <Ionicons name="speedometer-outline" size={16} color={Colors.accentRed} />
-                  <Text style={styles.publishSummaryText}>
-                    0→{targetLabel}: {formatSprintTime(publishSprint.sprint0to100Ms ?? 0)}
-                  </Text>
-                </View>
-                {(publishSprint.maxAccelerationG ?? 0) > 0 && (
-                  <View style={styles.publishSummaryRow}>
-                    <Ionicons name="pulse-outline" size={16} color={Colors.accentRed} />
-                    <Text style={styles.publishSummaryText}>
-                      {(publishSprint.maxAccelerationG ?? 0).toFixed(2)}G
-                    </Text>
-                  </View>
-                )}
-                {(publishSprint.maxTiltDeg ?? 0) > 0 && (
-                  <View style={styles.publishSummaryRow}>
-                    <Ionicons name="compass-outline" size={16} color={Colors.accent} />
-                    <Text style={styles.publishSummaryText}>
-                      {(publishSprint.maxTiltDeg ?? 0).toFixed(1)}°
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-
-            <TextInput
-              style={styles.publishInput}
-              placeholder={t("tracking.publishPlaceholder")}
-              placeholderTextColor={Colors.textSecondary}
-              value={publishCaption}
-              onChangeText={setPublishCaption}
-              maxLength={200}
-              multiline
-            />
-            <View style={styles.publishActions}>
-              <TouchableOpacity
-                style={styles.publishCancelBtn}
-                onPress={() => setPublishSprint(null)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.publishCancelText}>{t("common.cancel")}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.publishConfirmBtn,
-                  publishMutation.isPending && { opacity: 0.5 },
-                ]}
-                onPress={handlePublish}
-                disabled={publishMutation.isPending}
-                activeOpacity={0.7}
-                testID="publish-sprint-confirm"
-              >
-                {publishMutation.isPending ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <>
-                    <Ionicons name="share-outline" size={16} color="#fff" />
-                    <Text style={styles.publishConfirmText}>{t("tracking.publishBtn")}</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <PublishSprintModal
+        publishSprint={publishSprint}
+        publishCaption={publishCaption}
+        setPublishCaption={setPublishCaption}
+        onClose={() => setPublishSprint(null)}
+        onPublish={handlePublish}
+        isPending={publishMutation.isPending}
+        targetLabel={targetLabel}
+      />
     </View>
   );
 }
@@ -586,68 +269,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: Colors.text,
   },
-  tabs: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    gap: 8,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: 10,
-    borderRadius: 10,
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: "transparent",
-  },
-  tabBtnActive: {
-    borderColor: Colors.accentRed + "80",
-  },
-  tabLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.textSecondary,
-  },
-  tabLabelActive: {
-    color: Colors.text,
-  },
-  pbBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 4,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: "#FFD700" + "50",
-    gap: 12,
-  },
-  pbInfo: {
-    flex: 1,
-  },
-  pbLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginBottom: 2,
-  },
-  pbTime: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: "#FFD700",
-    letterSpacing: -0.5,
-  },
-  pbSince: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    textAlign: "right",
-    maxWidth: 90,
-  },
   center: {
     flex: 1,
     alignItems: "center",
@@ -674,200 +295,5 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
     textAlign: "center",
-  },
-  sprintItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 16,
-    marginVertical: 4,
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    padding: 12,
-    gap: 10,
-  },
-  sprintItemRecord: {
-    borderWidth: 1,
-    borderColor: "#FFD700" + "60",
-    backgroundColor: Colors.surface,
-  },
-  sprintItemMe: {
-    borderWidth: 1,
-    borderColor: Colors.accentRed + "80",
-  },
-  sprintItemFocused: {
-    borderWidth: 1.5,
-    borderColor: Colors.accent + "90",
-    backgroundColor: Colors.accent + "12",
-  },
-  sprintRank: {
-    width: 28,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rankNumber: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: Colors.textSecondary,
-  },
-  sprintMain: {
-    flex: 1,
-    minWidth: 80,
-  },
-  sprintTime: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: Colors.text,
-    letterSpacing: -0.5,
-  },
-  sprintTimeRecord: {
-    color: "#FFD700",
-  },
-  sprintLabel: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 1,
-  },
-  sprintStats: {
-    alignItems: "flex-end",
-    gap: 3,
-  },
-  statChip: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  sprintDate: {
-    alignItems: "flex-end",
-    maxWidth: 80,
-  },
-  dateText: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    textAlign: "right",
-    lineHeight: 15,
-  },
-  publishBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.accent + "40",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  publishModal: {
-    width: "100%",
-    maxWidth: 400,
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    gap: 12,
-  },
-  publishTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.text,
-  },
-  publishSubtitle: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-  },
-  publishSummary: {
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    padding: 12,
-    gap: 8,
-  },
-  publishSummaryRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  publishSummaryText: {
-    fontSize: 14,
-    color: Colors.text,
-    fontWeight: "600",
-  },
-  publishInput: {
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    padding: 12,
-    color: Colors.text,
-    fontSize: 14,
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  publishActions: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 4,
-  },
-  publishCancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.background,
-  },
-  publishCancelText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.textSecondary,
-  },
-  publishConfirmBtn: {
-    flex: 1,
-    flexDirection: "row",
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.accent,
-    gap: 6,
-  },
-  publishConfirmText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "#fff",
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: Colors.background,
-  },
-  avatarFallback: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarInitial: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.text,
-  },
-  lbMain: {
-    flex: 1,
-    minWidth: 100,
-  },
-  lbNickname: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: Colors.text,
-    marginBottom: 2,
-  },
-  lbTime: {
-    fontSize: 20,
-  },
-  lbMoto: {
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 2,
   },
 });

@@ -13,9 +13,43 @@ import { useTaskbarStyle } from "@/lib/taskbar-style-context";
 import { useT } from "@/lib/language-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>>[0];
-import { registerHandsOffCallback, registerSprintMeasuringCallback, registerTrackingActiveCallback } from "@/lib/tracking-active";
+import { useTabBadges } from "@/hooks/useTabBadges";
+import { TabIcon } from "@/components/TabIcons";
+import { GpsBanner } from "@/components/layout/GpsBanner";
+import { SafetyOverlay } from "@/components/layout/SafetyOverlay";
+import { GarageReminderModal } from "@/components/layout/GarageReminderModal";
+import { FakeHomeIntroModal } from "@/components/layout/FakeHomeIntroModal";
+import {
+  registerHandsOffCallback,
+  registerSprintMeasuringCallback,
+  registerTrackingActiveCallback,
+} from "@/lib/tracking-active";
 
 const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";
+
+function useLayoutGating(user: any, meData: any) {
+  const [showFakeHomeGlobal, setShowFakeHomeGlobal] = useState(false);
+  const [fakeHomeDontShowGlobal, setFakeHomeDontShowGlobal] = useState(false);
+
+  useEffect(() => {
+    if (!meData || !user) return;
+    const p = (meData as any)?.profile;
+    if (!p) return;
+    const unconfigured = p.fakeHomeLatitude == null || p.fakeHomeLongitude == null;
+    if (unconfigured) {
+      AsyncStorage.getItem(FAKE_HOME_INTRO_KEY).then((val) => {
+        if (val !== "dismissed") setShowFakeHomeGlobal(true);
+      }).catch(() => {});
+    }
+  }, [meData, user]);
+
+  return {
+    showFakeHomeGlobal,
+    setShowFakeHomeGlobal,
+    fakeHomeDontShowGlobal,
+    setFakeHomeDontShowGlobal,
+  };
+}
 
 export default function TabLayout() {
   const t = useT();
@@ -26,6 +60,7 @@ export default function TabLayout() {
   const { user, isLoading } = useAuth();
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const { taskbarStyle } = useTaskbarStyle();
+  const { unreadCount, hasActiveMatches } = useTabBadges();
   const prevUnreadRef = useRef<number>(0);
 
   // ── Global Hands-Off overlay ────────────────────────────────────────────────
@@ -137,136 +172,22 @@ export default function TabLayout() {
     };
   }, [needsGarageReminder, garageIsEmpty]);
 
-  const { data: unreadData } = useQuery<{ count: number }>({
-    queryKey: ["/api/chat/unread-total"],
-    enabled: !!user,
-    refetchInterval: 6000,
-  });
-
-  const unreadCount = unreadData?.count ?? 0;
-
-  useEffect(() => {
-    if (unreadCount > prevUnreadRef.current && prevUnreadRef.current >= 0) {
-    }
-    prevUnreadRef.current = unreadCount;
-  }, [unreadCount]);
-
-  // ── Query proposte attive (per icona cromatica "Ride!") ──────────────────
-  const { data: proposalMatchesData } = useQuery<{ status: string }[]>({
-    queryKey: ["/api/proposals/matches"],
-    enabled: !!user,
-    refetchInterval: 30000,
-  });
-
-  const hasActiveMatches = (proposalMatchesData ?? []).some(
-    (m) => m.status === "pending" || m.status === "accepted"
-  );
-
-  // ── Fake Home first-access global gate (shown at login/startup) ──────────
-  const [showFakeHomeGlobal, setShowFakeHomeGlobal] = useState(false);
-  const [fakeHomeDontShowGlobal, setFakeHomeDontShowGlobal] = useState(false);
-
-  const { data: meData } = useQuery({
-    queryKey: ["/api/users/me"],
-    enabled: !!user,
-  });
-
-  useEffect(() => {
-    if (!meData || !user) return;
-    const p = (meData as any)?.profile;
-    if (!p) return;
-    const unconfigured = p.fakeHomeLatitude == null || p.fakeHomeLongitude == null;
-    if (unconfigured) {
-      AsyncStorage.getItem(FAKE_HOME_INTRO_KEY).then((val) => {
-        if (val !== "dismissed") setShowFakeHomeGlobal(true);
-      }).catch(() => {});
-    }
-  }, [meData, user]);
+  const {
+    showFakeHomeGlobal,
+    setShowFakeHomeGlobal,
+    fakeHomeDontShowGlobal,
+    setDontShowAgain: setFakeHomeDontShowGlobal,
+  } = useLayoutGating(user, meData);
 
   // ── Stato disponibilità (per icona cromatica "Status") ──────────────────
   const statusIsAvailable = profileData?.isAvailable || false;
 
   const tabBarHeight = 60 + insets.bottom;
-  const tabBarPaddingBottom = insets.bottom;
-
-  const gpsTabHref = isGpsGateActive ? null : undefined;
-
-  const HIDDEN_TAB_NAMES = new Set(["tracking", "garage", "giri", "ride"]);
-  if (isGpsGateActive) {
-    ["index", "proposals", "ready", "motoclub", "match", "music", "chat", "contest", "eventi", "arcade", "giri"].forEach(
-      (n) => HIDDEN_TAB_NAMES.add(n)
-    );
-  }
-
-  const renderCustomTabBar = (props: BottomTabBarProps) => {
-    const { state, descriptors, navigation } = props;
-
-    const tabs: TabItem[] = state.routes
-      .filter((route) => !HIDDEN_TAB_NAMES.has(route.name))
-      .map((route, _idx) => {
-        const descriptor = descriptors[route.key];
-        const options = descriptor.options;
-        const index = state.routes.findIndex((r) => r.key === route.key);
-        const isFocused = state.index === index;
-        const iconFn = options.tabBarIcon;
-
-        return {
-          name: route.name,
-          title:
-            typeof options.tabBarLabel === "string"
-              ? options.tabBarLabel
-              : (options.title ?? route.name),
-          isFocused,
-          icon: (color: string, size: number) => {
-            if (!iconFn) return null;
-            return iconFn({ focused: isFocused, color, size }) as React.ReactNode;
-          },
-          onPress: () => {
-            const event = navigation.emit({
-              type: "tabPress",
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
-            }
-          },
-        };
-      });
-
-    return (
-      <CustomTabBar
-        tabs={tabs}
-        style={taskbarStyle}
-        tabBarHeight={tabBarHeight}
-        tabBarPaddingBottom={tabBarPaddingBottom}
-      />
-    );
-  };
 
   return (
     <>
       {isGpsGateActive && (
-        <View style={[gpsBannerStyles.banner, { paddingTop: insets.top + 12 }]}>
-          <Ionicons name="navigate-outline" size={28} color="#fff" />
-          <Text style={gpsBannerStyles.title}>GPS non attivo</Text>
-          <Text style={gpsBannerStyles.text}>
-            BikerLink ha bisogno della posizione per funzionare.{"\n"}
-            Senza GPS puoi accedere solo al Profilo.
-          </Text>
-          <Pressable
-            style={gpsBannerStyles.btn}
-            onPress={async () => {
-              const granted = await requestPermission();
-              if (!granted) {
-                Linking.openSettings();
-              }
-            }}
-          >
-            <Ionicons name="location" size={18} color="#fff" />
-            <Text style={gpsBannerStyles.btnText}>Attiva posizione</Text>
-          </Pressable>
-        </View>
+        <GpsBanner requestPermission={requestPermission} />
       )}
       <Tabs
         tabBar={renderCustomTabBar}
@@ -294,8 +215,8 @@ export default function TabLayout() {
           name="index"
           options={{
             title: t("map.title"),
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="map" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="index" color={color} size={size} focused={focused} />
             ),
             headerShown: false,
             href: gpsTabHref,
@@ -305,15 +226,15 @@ export default function TabLayout() {
           name="proposals"
           options={{
             title: t("proposals.hub.tabTitle"),
-            tabBarIcon: () => (
-              <MaterialCommunityIcons
-                name="motorbike"
-                size={22}
-                color={
-                  globalTrackingActive || globalSprintMeasuring || hasActiveMatches
-                    ? "#f97316"
-                    : colors.text
-                }
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon
+                name="proposals"
+                color={color}
+                size={size}
+                focused={focused}
+                globalTrackingActive={globalTrackingActive}
+                globalSprintMeasuring={globalSprintMeasuring}
+                hasActiveMatches={hasActiveMatches}
               />
             ),
             headerTitle: t("proposals.hub.headerTitle"),
@@ -324,11 +245,13 @@ export default function TabLayout() {
           name="ready"
           options={{
             title: "Status",
-            tabBarIcon: () => (
-              <Ionicons
-                name="location"
-                size={22}
-                color={statusIsAvailable ? colors.success : colors.accentRed}
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon
+                name="ready"
+                color={color}
+                size={size}
+                focused={focused}
+                statusIsAvailable={statusIsAvailable}
               />
             ),
             headerShown: false,
@@ -339,8 +262,8 @@ export default function TabLayout() {
           name="motoclub"
           options={{
             title: "Clubs",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="shield" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="motoclub" color={color} size={size} focused={focused} />
             ),
             headerShown: false,
             href: gpsTabHref,
@@ -350,8 +273,8 @@ export default function TabLayout() {
           name="eventi"
           options={{
             title: t("events.tabTitle"),
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="calendar" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="eventi" color={color} size={size} focused={focused} />
             ),
             headerShown: false,
             href: gpsTabHref,
@@ -361,8 +284,8 @@ export default function TabLayout() {
           name="match"
           options={{
             title: "Match",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="flash" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="match" color={color} size={size} focused={focused} />
             ),
             headerShown: false,
             href: gpsTabHref,
@@ -372,8 +295,8 @@ export default function TabLayout() {
           name="music"
           options={{
             title: t("music.tabTitle"),
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="musical-notes-outline" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="music" color={color} size={size} focused={focused} />
             ),
             headerShown: false,
             href: gpsTabHref,
@@ -383,23 +306,14 @@ export default function TabLayout() {
           name="chat"
           options={{
             title: "Chat",
-            tabBarIcon: ({ color, size }) => (
-              <View>
-                <Ionicons name="chatbubbles" size={size} color={color} />
-                {unreadCount > 0 && (
-                  <View
-                    style={{
-                      position: "absolute",
-                      top: -2,
-                      right: -4,
-                      width: 10,
-                      height: 10,
-                      borderRadius: 5,
-                      backgroundColor: colors.accent,
-                    }}
-                  />
-                )}
-              </View>
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon
+                name="chat"
+                color={color}
+                size={size}
+                focused={focused}
+                unreadCount={unreadCount}
+              />
             ),
             headerShown: false,
             href: gpsTabHref,
@@ -409,8 +323,8 @@ export default function TabLayout() {
           name="contest"
           options={{
             title: "Pic!",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="camera" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="contest" color={color} size={size} focused={focused} />
             ),
             headerTitle: "Pic!",
             href: gpsTabHref,
@@ -420,8 +334,8 @@ export default function TabLayout() {
           name="arcade"
           options={{
             title: "Arcade",
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="game-controller" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="arcade" color={color} size={size} focused={focused} />
             ),
             headerTitle: "Arcade",
             href: gpsTabHref,
@@ -431,7 +345,9 @@ export default function TabLayout() {
           name="ride"
           options={{
             title: "Privacy & GPS",
-            tabBarIcon: () => null,
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="ride" color={color} size={size} focused={focused} />
+            ),
             headerTitle: "Privacy & GPS",
             href: null,
           }}
@@ -440,8 +356,8 @@ export default function TabLayout() {
           name="giri"
           options={{
             title: "Giri",
-            tabBarIcon: ({ color, size }) => (
-              <MaterialCommunityIcons name="map-marker-path" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="giri" color={color} size={size} focused={focused} />
             ),
             headerShown: false,
             href: null,
@@ -451,8 +367,8 @@ export default function TabLayout() {
           name="tracking"
           options={{
             title: t("tracking.tabTitle"),
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="navigate" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="tracking" color={color} size={size} focused={focused} />
             ),
             headerTitle: t("tracking.recordRide"),
             href: null,
@@ -467,12 +383,15 @@ export default function TabLayout() {
           name="garage"
           options={{
             title: isBikerOrCoppia ? t("garage.tabTitle") : t("garage.tabWishlist"),
-            tabBarIcon: ({ color, size }) =>
-              isBikerOrCoppia ? (
-                <MaterialCommunityIcons name="motorbike" size={size} color={color} />
-              ) : (
-                <Ionicons name="heart" size={size} color={color} />
-              ),
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon
+                name="garage"
+                color={color}
+                size={size}
+                focused={focused}
+                isBikerOrCoppia={isBikerOrCoppia}
+              />
+            ),
             headerTitle: isBikerOrCoppia ? t("garage.myGarage") : t("garage.myWishlist"),
             href: null,
           }}
@@ -481,8 +400,8 @@ export default function TabLayout() {
           name="profile"
           options={{
             title: t("profile.title"),
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="person" size={size} color={color} />
+            tabBarIcon: ({ color, size, focused }) => (
+              <TabIcon name="profile" color={color} size={size} focused={focused} />
             ),
             headerTitle: t("profile.myProfile"),
           }}
@@ -490,226 +409,43 @@ export default function TabLayout() {
       </Tabs>
 
       {globalSprintMeasuring && (
-        <View style={sprintLockOverlayStyles.overlay} pointerEvents="box-only">
-          <Text style={sprintLockOverlayStyles.icon}>🏁</Text>
-          <Text style={sprintLockOverlayStyles.title}>{t("common.measurement0100")}</Text>
-          <Text style={sprintLockOverlayStyles.msg}>{t("tracking.navigateCompleteRide")}</Text>
-        </View>
+        <SafetyOverlay
+          type="sprint"
+          icon="🏁"
+          title={t("common.measurement0100")}
+          message={t("tracking.navigateCompleteRide")}
+        />
       )}
 
       {globalHandsOffActive && (
-        <View
-          style={handsOffOverlayStyles.overlay}
-          pointerEvents="box-only"
-        >
-          <Animated.View style={{ opacity: handsOffBlinkAnim, alignItems: "center" }}>
-            <Text style={handsOffOverlayStyles.title}>⚠ ATTENZIONE!</Text>
-            <Text style={handsOffOverlayStyles.msg}>
-              SOPRA {handsOffThreshold} km/h — HANDS OFF
-            </Text>
-            <Text style={handsOffOverlayStyles.sub}>Rallenta per sbloccare i controlli</Text>
-          </Animated.View>
-        </View>
+        <SafetyOverlay
+          type="handsoff"
+          title="⚠ ATTENZIONE!"
+          message="HANDS OFF"
+          subMessage="Rallenta per sbloccare i controlli"
+          threshold={handsOffThreshold}
+          blinkAnim={handsOffBlinkAnim}
+        />
       )}
 
-      <Modal
+      <GarageReminderModal
         visible={showGarageReminder}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowGarageReminder(false)}
-      >
-        <View style={reminderStyles.overlay}>
-          <View style={[reminderStyles.card, { backgroundColor: colors.surface }]}>
-            <Ionicons
-              name={isBikerOrCoppia ? "build" : "heart"}
-              size={36}
-              color={colors.accent}
-              style={{ marginBottom: 12 }}
-            />
-            <Text style={[reminderStyles.text, { color: colors.text }]}>
-              {isBikerOrCoppia
-                ? t("profile.garageReminder")
-                : t("profile.wishlistReminder")}
-            </Text>
-            <Pressable
-              style={[reminderStyles.btn, { backgroundColor: colors.accent }]}
-              onPress={() => {
-                setShowGarageReminder(false);
-                router.push("/garage" as Href);
-              }}
-            >
-              <Text style={reminderStyles.btnText}>Ok</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowGarageReminder(false)}
+        isBikerOrCoppia={isBikerOrCoppia}
+        text={isBikerOrCoppia ? t("profile.garageReminder") : t("profile.wishlistReminder")}
+        buttonText="Ok"
+      />
 
-      <Modal visible={showFakeHomeGlobal} transparent animationType="fade" onRequestClose={() => setShowFakeHomeGlobal(false)}>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.5)", padding: 24 }}>
-          <View style={{ backgroundColor: colors.surface, borderRadius: 16, padding: 24, width: "100%" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 12 }}>
-              <Ionicons name="home" size={28} color={colors.accent} />
-              <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: colors.text, flex: 1 }}>Configura Fake Home</Text>
-            </View>
-            <Text style={{ fontSize: 14, fontFamily: "Inter_400Regular", color: colors.textSecondary, lineHeight: 20, marginBottom: 16 }}>
-              La zona Fake Home non è ancora configurata.{"\n\n"}Vai in Privacy & GPS per impostare la posizione reale di casa e quella fittizia: quando sei nel raggio, la tua posizione visibile verrà sostituita automaticamente.
-            </Text>
-            <Pressable style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 16 }} onPress={() => setFakeHomeDontShowGlobal(!fakeHomeDontShowGlobal)}>
-              <View style={{ width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, borderColor: fakeHomeDontShowGlobal ? colors.accent : colors.border, backgroundColor: fakeHomeDontShowGlobal ? colors.accent : "transparent", alignItems: "center", justifyContent: "center" }}>
-                {fakeHomeDontShowGlobal && <Ionicons name="checkmark" size={12} color="#fff" />}
-              </View>
-              <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: colors.textSecondary }}>Non mostrare più</Text>
-            </Pressable>
-            <Pressable style={{ backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: "center" }} onPress={() => {
-              if (fakeHomeDontShowGlobal) AsyncStorage.setItem(FAKE_HOME_INTRO_KEY, "dismissed").catch(() => {});
-              setShowFakeHomeGlobal(false);
-            }}>
-              <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" }}>OK</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <FakeHomeIntroModal
+        visible={showFakeHomeGlobal}
+        onClose={(dontShowAgain) => {
+          if (dontShowAgain) AsyncStorage.setItem(FAKE_HOME_INTRO_KEY, "dismissed").catch(() => {});
+          setShowFakeHomeGlobal(false);
+        }}
+        dontShowAgain={fakeHomeDontShowGlobal}
+        setDontShowAgain={setFakeHomeDontShowGlobal}
+      />
     </>
   );
 }
 
-const sprintLockOverlayStyles = StyleSheet.create({
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0, 0, 0, 0.55)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 9998,
-  },
-  icon: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
-  title: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 22,
-    color: "#facc15",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  msg: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: "#ffffff",
-    textAlign: "center",
-  },
-});
-
-const handsOffOverlayStyles = StyleSheet.create({
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(220, 38, 38, 0.18)",
-    justifyContent: "center",
-    alignItems: "center",
-    zIndex: 9999,
-  },
-  title: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 30,
-    color: "#ef4444",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  msg: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 20,
-    color: "#ef4444",
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  sub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: "#ef4444",
-    textAlign: "center",
-  },
-});
-
-const gpsBannerStyles = StyleSheet.create({
-  banner: {
-    backgroundColor: "#D32F2F",
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    alignItems: "center",
-    gap: 6,
-  },
-  title: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    color: "#fff",
-  },
-  text: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: "rgba(255,255,255,0.9)",
-    textAlign: "center",
-    lineHeight: 20,
-  },
-  btn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 6,
-  },
-  btnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: "#fff",
-  },
-});
-
-const reminderStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 24,
-  },
-  card: {
-    borderRadius: 16,
-    padding: 28,
-    alignItems: "center",
-    width: "100%",
-    maxWidth: 340,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
-  text: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    textAlign: "center",
-    lineHeight: 22,
-    marginBottom: 20,
-  },
-  btn: {
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 40,
-  },
-  btnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: "#000",
-  },
-});
