@@ -192,6 +192,7 @@ export const proposals = pgTable("proposals", {
   clubId: varchar("club_id", { length: 36 }),
   extendToDestination: boolean("extend_to_destination").notNull().default(false),
   destinationSearchRadius: integer("destination_search_radius"),
+  searchTypes: jsonb("search_types").$type<string[]>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [

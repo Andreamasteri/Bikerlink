@@ -48,6 +48,16 @@ function formatTimeInput(val: string): string {
   return nums.slice(0, 2) + ":" + nums.slice(2, 4);
 }
 
+function autoCompleteTime(val: string): string {
+  const trimmed = val.trim();
+  if (!trimmed || trimmed.includes(":")) return trimmed;
+  const nums = trimmed.replace(/\D/g, "");
+  if (nums.length === 0) return "";
+  const h = parseInt(nums.slice(0, 2), 10);
+  if (isNaN(h) || h > 23) return trimmed;
+  return String(h).padStart(2, "0") + ":00";
+}
+
 function formatDateDDMMYYYY(d: Date): string {
   const dd = String(d.getDate()).padStart(2, "0");
   const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -71,10 +81,10 @@ export default function CreateProposalScreen() {
   const { user } = useAuth();
   const t = useT();
 
-  const [searchType, setSearchType] = useState("");
+  const [selectedSearchTypes, setSelectedSearchTypes] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [searchRadius, setSearchRadius] = useState("30");
+  const [searchRadius, setSearchRadius] = useState("50");
   const [selectedMotoId, setSelectedMotoId] = useState("");
   const [selectedWishlistMotoId, setSelectedWishlistMotoId] = useState("");
   const [anyMotoOk, setAnyMotoOk] = useState(false);
@@ -102,7 +112,7 @@ export default function CreateProposalScreen() {
   const [destinationExtLngStr, setDestinationExtLngStr] = useState("");
   const [destinationExtLat, setDestinationExtLat] = useState<number | null>(null);
   const [destinationExtLng, setDestinationExtLng] = useState<number | null>(null);
-  const [destinationExtRadius, setDestinationExtRadius] = useState("30");
+  const [destinationExtRadius, setDestinationExtRadius] = useState("50");
 
   useEffect(() => {
     if (!showMapPicker) return;
@@ -148,19 +158,27 @@ export default function CreateProposalScreen() {
 
   const searchTypes = isBikerOrCoppia ? BIKER_SEARCH_TYPES : ZAVORRINA_SEARCH_TYPES;
 
-  const needsMotoSelection = isBikerOrCoppia && ["find_a_friend", "find_a_guest", "hitcher"].includes(searchType);
-  const needsWishlistMoto = isZavorrina && searchType === "find_a_biker";
-  const needsDestination = searchType === "hitchhiker";
-  const canExtendToDestination = isBikerOrCoppia && (searchType === "find_a_friend" || searchType === "find_a_guest");
+  const toggleSearchType = (key: string) => {
+    setSelectedSearchTypes((prev) => {
+      if (prev.includes(key)) return prev.filter((k) => k !== key);
+      if (prev.length >= 4) return prev;
+      return [...prev, key];
+    });
+  };
+
+  const needsMotoSelection = isBikerOrCoppia && selectedSearchTypes.some((t) => ["find_a_friend", "find_a_guest", "hitcher"].includes(t));
+  const needsWishlistMoto = isZavorrina && selectedSearchTypes.includes("find_a_biker");
+  const needsDestination = selectedSearchTypes.includes("hitchhiker");
+  const canExtendToDestination = isBikerOrCoppia && (selectedSearchTypes.includes("find_a_friend") || selectedSearchTypes.includes("find_a_guest"));
 
   const { data: motorcycles } = useQuery({
     queryKey: ["/api/motorcycles"],
-    enabled: isBikerOrCoppia && !!searchType,
+    enabled: isBikerOrCoppia && selectedSearchTypes.length > 0,
   });
 
   const { data: wishlistData } = useQuery({
     queryKey: ["/api/wishlist"],
-    enabled: isZavorrina && !!searchType,
+    enabled: isZavorrina && selectedSearchTypes.length > 0,
   });
 
   const { data: myClubsData } = useQuery({
@@ -173,13 +191,14 @@ export default function CreateProposalScreen() {
   const wishlistMotos = (wishlistData as any)?.motos || [];
 
   const proposalType = useMemo(() => {
-    if (!searchType) return "";
-    if (searchType === "find_a_friend") return "giro";
-    if (searchType === "find_a_guest") return "con_zavorrina";
-    if (searchType === "hitcher" || searchType === "hitchhiker") return "passaggio_al_volo";
-    if (searchType === "find_a_biker") return "richiesta";
+    const first = selectedSearchTypes[0];
+    if (!first) return "";
+    if (first === "find_a_friend") return "giro";
+    if (first === "find_a_guest") return "con_zavorrina";
+    if (first === "hitcher" || first === "hitchhiker") return "passaggio_al_volo";
+    if (first === "find_a_biker") return "richiesta";
     return "giro";
-  }, [searchType]);
+  }, [selectedSearchTypes]);
 
   const createMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
@@ -207,7 +226,7 @@ export default function CreateProposalScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!searchType) {
+    if (selectedSearchTypes.length === 0) {
       Alert.alert(t("common.error"), t("proposals.create.selectSearch"));
       return;
     }
@@ -311,10 +330,11 @@ export default function CreateProposalScreen() {
 
     const data: Record<string, unknown> = {
       proposalType,
-      searchType,
+      searchType: selectedSearchTypes[0] || null,
+      searchTypes: selectedSearchTypes,
       title: title.trim(),
       description: description.trim() || null,
-      searchRadius: parseInt(searchRadius) || 30,
+      searchRadius: parseInt(searchRadius) || 50,
       departureAddress: departureAddress.trim() || "da qui....",
       departureLatitude: finalLat,
       departureLongitude: finalLng,
@@ -341,7 +361,7 @@ export default function CreateProposalScreen() {
       data.extendToDestination = true;
       data.destinationLatitude = destinationExtLat;
       data.destinationLongitude = destinationExtLng;
-      data.destinationSearchRadius = parseInt(destinationExtRadius) || 30;
+      data.destinationSearchRadius = parseInt(destinationExtRadius) || 50;
     }
 
     createMutation.mutate(data);
@@ -374,29 +394,38 @@ export default function CreateProposalScreen() {
           {isZavorrina ? "Cosa vorresti?" : "Cosa cerchi?"}
         </Text>
         <View style={styles.typeGrid}>
-          {searchTypes.map((st) => (
-            <TouchableOpacity
-              key={st.key}
-              style={[
-                styles.typeCard,
-                searchType === st.key && { borderColor: st.color, backgroundColor: st.color + "15" },
-              ]}
-              onPress={() => setSearchType(st.key)}
-            >
-              <MaterialCommunityIcons
-                name={st.icon as any}
-                size={28}
-                color={searchType === st.key ? st.color : Colors.textSecondary}
-              />
-              <Text style={[styles.typeCardLabel, searchType === st.key && { color: st.color }]}>
-                {(st as any).labelKey ? t((st as any).labelKey) : st.label}
-              </Text>
-              <Text style={styles.typeCardSub}>{t(st.subtitleKey)}</Text>
-            </TouchableOpacity>
-          ))}
+          {searchTypes.map((st) => {
+            const isSelected = selectedSearchTypes.includes(st.key);
+            const isDisabled = !isSelected && selectedSearchTypes.length >= 4;
+            return (
+              <TouchableOpacity
+                key={st.key}
+                style={[
+                  styles.typeCard,
+                  isSelected && { borderColor: st.color, backgroundColor: st.color + "15" },
+                  isDisabled && { opacity: 0.4 },
+                ]}
+                onPress={() => toggleSearchType(st.key)}
+                disabled={isDisabled}
+              >
+                <MaterialCommunityIcons
+                  name={st.icon as any}
+                  size={28}
+                  color={isSelected ? st.color : Colors.textSecondary}
+                />
+                <Text style={[styles.typeCardLabel, isSelected && { color: st.color }]}>
+                  {(st as any).labelKey ? t((st as any).labelKey) : st.label}
+                </Text>
+                <Text style={styles.typeCardSub}>{t(st.subtitleKey)}</Text>
+                {isSelected && (
+                  <Ionicons name="checkmark-circle" size={16} color={st.color} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
-        {!!searchType && (
+        {selectedSearchTypes.length > 0 && (
           <>
             <Text style={styles.sectionTitle}>Titolo *</Text>
             <TextInput
@@ -413,7 +442,7 @@ export default function CreateProposalScreen() {
               style={styles.input}
               value={searchRadius}
               onChangeText={setSearchRadius}
-              placeholder="30"
+              placeholder="50"
               placeholderTextColor={Colors.textSecondary}
               keyboardType="number-pad"
             />
@@ -658,7 +687,7 @@ export default function CreateProposalScreen() {
                       style={styles.input}
                       value={destinationExtRadius}
                       onChangeText={setDestinationExtRadius}
-                      placeholder="30"
+                      placeholder="50"
                       placeholderTextColor={Colors.textSecondary}
                       keyboardType="number-pad"
                     />
@@ -703,6 +732,7 @@ export default function CreateProposalScreen() {
                   style={styles.input}
                   value={timeFrom}
                   onChangeText={(v) => setTimeFrom(formatTimeInput(v))}
+                  onBlur={() => setTimeFrom((v) => autoCompleteTime(v))}
                   placeholder="HH:MM"
                   placeholderTextColor={Colors.textSecondary}
                   keyboardType="number-pad"
@@ -715,6 +745,7 @@ export default function CreateProposalScreen() {
                   style={styles.input}
                   value={timeTo}
                   onChangeText={(v) => setTimeTo(formatTimeInput(v))}
+                  onBlur={() => setTimeTo((v) => autoCompleteTime(v))}
                   placeholder="HH:MM"
                   placeholderTextColor={Colors.textSecondary}
                   keyboardType="number-pad"
@@ -774,6 +805,7 @@ export default function CreateProposalScreen() {
                   style={styles.input}
                   value={returnDeadlineTime}
                   onChangeText={(v) => setReturnDeadlineTime(formatTimeInput(v))}
+                  onBlur={() => setReturnDeadlineTime((v) => autoCompleteTime(v))}
                   placeholder="HH:MM"
                   placeholderTextColor={Colors.textSecondary}
                   keyboardType="number-pad"
@@ -842,10 +874,10 @@ export default function CreateProposalScreen() {
             <TouchableOpacity
               style={[
                 styles.submitButton,
-                (!searchType || !title.trim() || createMutation.isPending) && styles.submitButtonDisabled,
+                (selectedSearchTypes.length === 0 || !title.trim() || createMutation.isPending) && styles.submitButtonDisabled,
               ]}
               onPress={handleSubmit}
-              disabled={!searchType || !title.trim() || createMutation.isPending}
+              disabled={selectedSearchTypes.length === 0 || !title.trim() || createMutation.isPending}
               activeOpacity={0.8}
             >
               {createMutation.isPending ? (

@@ -1674,6 +1674,17 @@ function setupErrorHandler(app: express.Application) {
           console.warn("[MIGRATION] segment_telemetry.curvy_score:", e);
         }
 
+        // Task #1904 — Proposals search_types: colonna JSONB per multi-selezione categoria
+        try {
+          await db.execute(sql`
+            ALTER TABLE proposals
+            ADD COLUMN IF NOT EXISTS search_types jsonb
+          `);
+          console.log("[MIGRATION] proposals.search_types column ensured");
+        } catch (e) {
+          console.warn("[MIGRATION] proposals.search_types:", e);
+        }
+
         // Task #1770 — OTA Publish Tokens: tabella per autenticazione script publish-ota.sh
         try {
           await db.execute(sql`

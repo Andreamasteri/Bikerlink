@@ -764,7 +764,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     }
 
     const {
-      proposalType, searchType, title, description,
+      proposalType, searchType, searchTypes: searchTypesArr, title, description,
       searchRadius, motorcycleId, wishlistMotoId, anyMotoOk,
       departureLatitude, departureLongitude, departureAddress,
       destinationAddress, destinationLatitude, destinationLongitude,
@@ -772,6 +772,10 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       stops, maxParticipants, clubId,
       extendToDestination, destinationSearchRadius,
     } = req.body;
+
+    const resolvedSearchTypes: string[] | null = Array.isArray(searchTypesArr) && searchTypesArr.length > 0
+      ? searchTypesArr
+      : (searchType ? [searchType] : null);
 
     if (!proposalType || !title) {
       return res.status(400).json({ message: "Tipo e titolo sono obbligatori" });
@@ -783,13 +787,14 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       if (!isMember) return res.status(403).json({ message: "Devi essere membro attivo del club per creare questa proposta" });
     }
 
-    if (searchType) {
+    const typesToValidate: string[] = resolvedSearchTypes ?? (searchType ? [searchType] : []);
+    if (typesToValidate.length > 0) {
       const userType = user.userType;
-      if ((userType === "biker" || userType === "coppia") && !BIKER_SEARCH_TYPES.includes(searchType)) {
-        return res.status(400).json({ message: "Tipo di ricerca non valido per biker/coppia" });
-      }
-      if (userType === "zavorrina" && !ZAVORRINA_SEARCH_TYPES.includes(searchType)) {
-        return res.status(400).json({ message: "Tipo di ricerca non valido per zavorrina" });
+      const allowedSet = (userType === "biker" || userType === "coppia") ? BIKER_SEARCH_TYPES : ZAVORRINA_SEARCH_TYPES;
+      for (const t of typesToValidate) {
+        if (!allowedSet.includes(t)) {
+          return res.status(400).json({ message: `Tipo di ricerca non valido per ${userType}: ${t}` });
+        }
       }
     }
 
@@ -801,7 +806,8 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     const proposal = await storage.createProposal({
       userId,
       proposalType,
-      searchType: searchType || null,
+      searchType: searchType || (resolvedSearchTypes?.[0] ?? null),
+      searchTypes: resolvedSearchTypes,
       title,
       description: description || null,
       searchRadius: searchRadius || null,
