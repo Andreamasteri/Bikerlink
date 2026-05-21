@@ -5624,13 +5624,13 @@ router.post("/translations/restart", async (_req: Request, res: Response) => {
 
 router.post("/translations/ai-complete", async (_req: Request, res: Response) => {
   try {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
+    if (!process.env.OPENAI_API_KEY) {
       return res.status(503).json({ message: "OPENAI_API_KEY non configurata. Aggiungila nei Secrets di Replit." });
     }
 
-    const OpenAI = (await import("openai")).default;
-    const openai = new OpenAI({ apiKey });
+    const { generateObject } = await import("ai");
+    const { openai } = await import("@ai-sdk/openai");
+    const { z } = await import("zod");
 
     const itPath = path.resolve(process.cwd(), "lib/i18n/it.ts");
     const itRaw = fs.readFileSync(itPath, "utf-8");
@@ -5687,18 +5687,13 @@ router.post("/translations/ai-complete", async (_req: Request, res: Response) =>
         const userPrompt = `Translate these Italian strings to ${LANG_NAMES[lang]}:\n${JSON.stringify(payload, null, 2)}`;
 
         try {
-          const completion = await openai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
+          const { object: parsed } = await generateObject({
+            model: openai("gpt-4o-mini"),
+            schema: z.record(z.string()),
+            system: systemPrompt,
+            prompt: userPrompt,
             temperature: 0.2,
-            response_format: { type: "json_object" },
           });
-
-          const raw = completion.choices[0]?.message?.content ?? "{}";
-          const parsed = JSON.parse(raw) as Record<string, string>;
           for (const k of batch) {
             if (parsed[k] && typeof parsed[k] === "string" && parsed[k].trim()) {
               allTranslations[k] = parsed[k].trim();

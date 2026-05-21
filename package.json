@@ -92,7 +92,6 @@
     "multer": "^2.1.0",
     "node-forge": "^1.4.0",
     "nodemailer": "^8.0.7",
-    "openai": "^6.38.0",
     "path-to-regexp": "^8.4.2",
     "pdfkit": "^0.18.0",
     "pg": "^8.21.0",
