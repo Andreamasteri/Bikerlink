@@ -513,6 +513,20 @@ export default function CreateRouteScreen() {
                 originWhitelist={["*"]}
                 onLoadEnd={handleMapLoaded}
               />
+              {/* Style badge overlay */}
+              {(() => {
+                const styleMeta = {
+                  curvy: { label: "Panoramico", icon: "terrain" as const, color: "#4CAF50" },
+                  balanced: { label: "Bilanciato", icon: "swap-horizontal" as const, color: Colors.accent },
+                  fastest: { label: "Veloce", icon: "flash" as const, color: "#FF9800" },
+                }[routeStyle];
+                return (
+                  <View style={[styles.styleBadge, { backgroundColor: styleMeta.color + "DD" }]}>
+                    <Ionicons name={styleMeta.icon} size={12} color="#fff" />
+                    <Text style={styles.styleBadgeText}>{styleMeta.label}</Text>
+                  </View>
+                );
+              })()}
               {isCalculatingRoute && (
                 <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center" }}>
                   <ActivityIndicator size="small" color="#fff" />
@@ -1092,6 +1106,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500" as const,
     color: Colors.textSecondary,
+  },
+  styleBadge: {
+    position: "absolute" as const,
+    bottom: 8,
+    left: 8,
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  styleBadgeText: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    color: "#fff",
+    letterSpacing: 0.3,
   },
   routeStatsRow: {
     flexDirection: "row" as const,
