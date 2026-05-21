@@ -1,6 +1,6 @@
 ---
 name: bikerlink-ota-publish
-description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink (Expo/Android). Usa questa skill ogni volta che l'utente chiede di pubblicare una OTA, rilasciare un aggiornamento, distribuire modifiche agli utenti Android, o aggiornare il numero OTA.
+description: Procedura completa per pubblicare un aggiornamento OTA su BikerLink (Expo/Android). Usa questa skill ogni volta che l'utente chiede di pubblicare una OTA, rilasciare un aggiornamento, distribuire modifiche agli utenti Android, o aggiornare il numero OTA. Trigger espliciti riconosciuti: "vai con l'ota", "fai l'ota", "pubblica ota", "pubblica l'ota", "crea l'OTA", "prepara l'OTA".
 ---
 
 ## ⛔ REGOLA UTENTE — NON eseguire durante un task
@@ -18,7 +18,7 @@ Motivazione: esportare il bundle a fine task rischia di includere commit parzial
 # BikerLink — Pubblicazione OTA
 
 ## ⚡ REGOLA FONDAMENTALE — Flusso a due stage nel sandbox Replit
-**Quando l'utente dice "crea l'OTA", "prepara l'OTA", "fai l'OTA" o qualsiasi variante:**
+**Quando l'utente dice "vai con l'ota", "fai l'ota", "pubblica ota", "pubblica l'ota", "crea l'OTA", "prepara l'OTA", "fai l'OTA" o qualsiasi variante:**
 - La pubblicazione è **inclusa automaticamente** — non è opzionale
 - **Non chiedere conferma separata** prima di eseguire lo script
 - **Non modificare manualmente** `lib/ota.ts` né `ota-updates.json` — lo script lo fa in automatico
@@ -96,6 +96,17 @@ limite ~120s e cgroup reaper che killa i processi background al termine del tool
 obbligatorio usare i due stage separati** — la modalità legacy single-shot funziona solo
 in terminali long-running (CI, shell desktop).
 
+### Stage 0 — Git push → GitHub (obbligatorio, prima di tutto)
+Prima di avviare l'export, assicurarsi che tutti i commit locali siano su GitHub. Questo garantisce che il bundle esportato corrisponda al codice versionato.
+
+```bash
+git add -A && (git commit -m "chore: pre-OTA-$(date +%Y%m%d)" || true) && git push origin $(git rev-parse --abbrev-ref HEAD)
+```
+
+> **Nota**: il `|| true` dopo `git commit` garantisce che il push venga eseguito **sempre**, anche se non ci sono nuovi commit da inviare (`nothing to commit, working tree clean`). In quel caso il push assicura comunque che i commit già presenti localmente siano sincronizzati con GitHub.
+
+> ⛔ **Non saltare questo step**: eseguire `export` con commit locali non pushati significa distribuire un bundle non tracciabile su GitHub in caso di rollback o debug.
+
 ### Stage 1 — `export` (~80s, dentro il bash tool)
 ```bash
 BIKERLINK_ADMIN_EMAIL="admin@bikerlink.it" \
@@ -123,14 +134,22 @@ pubblicazione (`/publish`), verifica backend 200, finalizzazione `ota-updates.js
 > nell'app. Solo dopo l'approvazione la release viene promossa a `slot=stable` e
 > distribuita agli utenti.
 
-### Stage 3 — Approvazione admin (via app)
-1. Apri l'app BikerLink → scheda **Profilo**
-2. Trovi il widget arancio **"N OTA in attesa"** con il pulsante **"Distribuisci"**
-3. Premi **"Distribuisci"** per approvare la release
-4. La release viene promossa a `slot=stable` — i client iniziano a riceverla
+### Stage 3 — Approvazione admin (via app) ⚠️ OBBLIGATORIO
+**Questo stage è obbligatorio.** La release rimane in `pending-approval` e i client non ricevono nulla finché l'admin non approva esplicitamente.
+
+Dopo il completamento dello Stage 2 (`publish`), l'**admin riceve automaticamente una push notification** (introdotta in Task #1887) che lo avvisa della nuova OTA in attesa — non è necessario che apra l'app manualmente per accorgersene.
+
+Procedura di approvazione:
+1. L'admin riceve la push notification sul dispositivo: **"OTA in attesa di approvazione"**
+2. Apri l'app BikerLink → scheda **Profilo**
+3. Trovi il widget arancio **"N OTA in attesa"** con il pulsante **"Distribuisci"**
+4. Premi **"Distribuisci"** per approvare la release
+5. La release viene promossa a `slot=stable` — i client iniziano a riceverla
 
 > In alternativa il widget è visibile anche nel pannello **Admin → OTA History** con
 > il badge **"⏳ In attesa di approvazione"**.
+
+> ⛔ **Finché l'admin non preme "Distribuisci", la release è distribuita a zero utenti** — anche se `publish` ha avuto successo e il backend risponde 200.
 
 ### Rollback dell'export (prima di pubblicare)
 Se dopo `export` decidi di non procedere:
