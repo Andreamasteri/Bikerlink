@@ -1,0 +1,81 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import express, { type Request, type Response, type NextFunction } from "express";
+import request from "supertest";
+
+vi.mock("../db", () => ({
+  db: {
+    execute: vi.fn(),
+    insert: vi.fn(() => ({ values: vi.fn() })),
+  },
+  pool: { query: vi.fn(), connect: vi.fn() },
+}));
+
+import { db } from "../db";
+import telemetryRouter from "../routes/telemetry";
+
+const USER_ID = "test-user-ideal-lap";
+
+function buildApp(): express.Application {
+  const app = express();
+  app.use(express.json());
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    (req as any).session = { userId: USER_ID };
+    next();
+  });
+  app.use("/api/telemetry", telemetryRouter);
+  return app;
+}
+
+describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
+  let app: express.Application;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    app = buildApp();
+  });
+
+  it("progress_pct stays 0 when DB returns 0 km (i.e. ideal_lap filtered out)", async () => {
+    const dbExecute = vi.mocked(db.execute);
+
+    dbExecute
+      .mockResolvedValueOnce({ rows: [{ sample_count: "0", session_count: "0" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "0" }] } as any);
+
+    const res = await request(app).get("/api/telemetry/stats");
+
+    expect(res.status).toBe(200);
+    expect(res.body.km_collected).toBe(0);
+    expect(res.body.session_count).toBe(0);
+    expect(res.body.progress_pct).toBe(0);
+  });
+
+  it("progress_pct and session_count reflect only non-ideal_lap data from DB", async () => {
+    const dbExecute = vi.mocked(db.execute);
+
+    dbExecute
+      .mockResolvedValueOnce({ rows: [{ sample_count: "200", session_count: "3" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "150.5" }] } as any);
+
+    const res = await request(app).get("/api/telemetry/stats");
+
+    expect(res.status).toBe(200);
+    expect(res.body.session_count).toBe(3);
+    expect(res.body.km_collected).toBe(150.5);
+    expect(res.body.progress_pct).toBe(15);
+    expect(res.body.target_km).toBe(1000);
+  });
+
+  it("adding more km (simulating a non-ideal ride) increases progress_pct", async () => {
+    const dbExecute = vi.mocked(db.execute);
+
+    dbExecute
+      .mockResolvedValueOnce({ rows: [{ sample_count: "500", session_count: "5" }] } as any)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "300" }] } as any);
+
+    const res = await request(app).get("/api/telemetry/stats");
+
+    expect(res.status).toBe(200);
+    expect(res.body.progress_pct).toBe(30);
+    expect(res.body.km_collected).toBe(300);
+  });
+});
