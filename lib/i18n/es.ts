@@ -407,6 +407,7 @@ const es: Record<string, string> = {
   "profile.donatePaypal": "Enviar apoyo a",
   "ride.ghostMode": "Ghost Mode",
   "ride.ghostModeDesc": "Apareces desconectado para todos los demás usuarios",
+  "ride.ghostModeNotAvailable": "Función no activa en esta plataforma",
   "profile.revokeConsent": "Revocar el consentimiento al tratamiento de datos",
   "profile.revokeConsentTitle": "Revocar consentimiento",
   "profile.revokeConsentDesc": "El tratamiento de tus datos se basa exclusivamente en tu consentimiento (art. 7 RGPD).\n\nRevocar el consentimiento implica la eliminación permanente de tu cuenta en un plazo de 30 días, incluyendo todos los datos personales asociados.\n\nEste proceso es idéntico a \"Eliminar cuenta\". Durante los 30 días puedes cancelar la solicitud iniciando sesión.\n\n¿Confirmas la revocación del consentimiento y la eliminación de la cuenta?",

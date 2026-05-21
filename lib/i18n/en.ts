@@ -441,6 +441,7 @@ const en: Record<string, string> = {
   "profile.donatePaypal": "Send support to",
   "ride.ghostMode": "Ghost Mode",
   "ride.ghostModeDesc": "You appear offline to all other users",
+  "ride.ghostModeNotAvailable": "Feature not active on this platform",
 
   "profile.revokeConsent": "Withdraw data processing consent",
   "profile.revokeConsentTitle": "Withdraw consent",

@@ -363,6 +363,9 @@ export default function ReadyToRideScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
       AsyncStorage.setItem("user_ghost_mode", enabled ? "true" : "false").catch(() => {});
     },
+    onError: () => {
+      Alert.alert(t("common.error"), t("ride.ghostModeNotAvailable"));
+    },
   });
 
   const repushLocation = useCallback(async () => {
@@ -786,23 +789,27 @@ export default function ReadyToRideScreen() {
 
         <View style={styles.settingsGroup}>
           <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
-              <View style={styles.privacyRow}>
+              <View style={[styles.privacyRow, !ghostModeFeatureEnabled && { opacity: 0.5 }]}>
                 <Ionicons
                   name={isGhostMode ? "eye-off" : "eye"}
                   size={20}
-                  color={isGhostMode ? Colors.accent : Colors.textSecondary}
+                  color={isGhostMode && ghostModeFeatureEnabled ? Colors.accent : Colors.textSecondary}
                   style={styles.privacyRowIcon}
                 />
                 <View style={styles.privacyRowText}>
                   <Text style={styles.privacyRowLabel}>{t("ride.ghostMode")}</Text>
                   <Text style={styles.privacyRowDesc}>
-                    {isGhostMode ? t("ride.ghostModeDesc") : t("ready.privacy.visibleOnMap")}
+                    {!ghostModeFeatureEnabled
+                      ? t("ride.ghostModeNotAvailable")
+                      : isGhostMode
+                        ? t("ride.ghostModeDesc")
+                        : t("ready.privacy.visibleOnMap")}
                   </Text>
                 </View>
                 <Switch
-                  value={isGhostMode}
+                  value={ghostModeFeatureEnabled ? isGhostMode : false}
                   onValueChange={(val) => ghostMutation.mutate(val)}
-                  disabled={ghostMutation.isPending}
+                  disabled={!ghostModeFeatureEnabled || ghostMutation.isPending}
                   trackColor={{ false: Colors.border, true: Colors.accent }}
                   thumbColor="#fff"
                 />

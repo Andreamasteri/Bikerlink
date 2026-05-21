@@ -407,6 +407,7 @@ const tr: Record<string, string> = {
   "profile.donatePaypal": "Destek gönder",
   "ride.ghostMode": "Hayalet Modu",
   "ride.ghostModeDesc": "Diğer tüm kullanıcılara çevrimdışı görünürsün",
+  "ride.ghostModeNotAvailable": "Bu platformda özellik aktif değil",
   "profile.revokeConsent": "Veri işleme iznini iptal et",
   "profile.revokeConsentTitle": "İzni iptal et",
   "profile.revokeConsentDesc": "Verilerinin işlenmesi yalnızca senin iznine (GDPR Madde 7) dayanmaktadır.\n\nİzni iptal etmek, hesabının 30 gün içinde kalıcı olarak silinmesini ve tüm ilgili kişisel verilerin kaldırılmasını içerir.\n\nBu işlem 'Hesabı Sil' ile aynıdır. 30 gün içinde giriş yaparak isteği iptal edebilirsin.\n\nİzni iptal etmek ve hesabı silmek istediğini onaylıyor musun?",

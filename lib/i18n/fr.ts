@@ -407,6 +407,7 @@ const fr: Record<string, string> = {
   "profile.donatePaypal": "Envoyer un soutien à",
   "ride.ghostMode": "Ghost Mode",
   "ride.ghostModeDesc": "Vous apparaissez hors ligne pour tous les autres utilisateurs",
+  "ride.ghostModeNotAvailable": "Fonctionnalité non active sur cette plateforme",
   "profile.revokeConsent": "Retirer le consentement au traitement des données",
   "profile.revokeConsentTitle": "Retirer le consentement",
   "profile.revokeConsentDesc": "Le traitement de vos données est basé exclusivement sur votre consentement (art. 7 RGPD).\n\nRetirer le consentement entraîne la suppression définitive de votre compte dans un délai de 30 jours, y compris toutes les données personnelles associées.\n\nCe processus est identique à « Supprimer le compte ». Pendant les 30 jours, vous pouvez annuler la demande en vous connectant.\n\nConfirmez-vous le retrait du consentement et la suppression du compte ?",
