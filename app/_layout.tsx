@@ -59,6 +59,9 @@ import {
   stopBackgroundLocationTask,
   isBackgroundLocationSupported,
 } from "@/lib/background-location-task";
+// Side-effect import: registers the TASK_TELEMETRY background task with expo-task-manager
+// so it is available before any component mounts.
+import "@/lib/background-telemetry-task";
 
 SplashScreen.preventAutoHideAsync();
 

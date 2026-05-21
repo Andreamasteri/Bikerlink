@@ -2,7 +2,14 @@ import { useEffect, useRef, useCallback } from "react";
 import { Platform, AppState, type AppStateStatus } from "react-native";
 import * as Location from "expo-location";
 import { Accelerometer } from "expo-sensors";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest } from "@/lib/query-client";
+import {
+  BG_TELEMETRY_SESSION_KEY,
+  startTelemetryBackgroundTask,
+  stopTelemetryBackgroundTask,
+  drainBackgroundTelemetryBuffer,
+} from "@/lib/background-telemetry-task";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const SAMPLE_INTERVAL_MS = 1000;   // 1 Hz
@@ -51,7 +58,10 @@ function calcLeanAngle(x: number, z: number): number {
  * Session lifecycle:
  *  - isActive true  → new session starts (new UUID, fresh buffer)
  *  - isActive false → session ends: subs stopped, remaining buffer force-flushed
- *  - App backgrounding → same as explicit stop (full teardown + force flush)
+ *  - App backgrounding → foreground subs paused; background task (TASK_TELEMETRY)
+ *                        continues writing samples to AsyncStorage
+ *  - App foregrounding → background task stopped; buffered samples drained and
+ *                        flushed to the server; foreground subs restarted
  *  - Component unmount → same as explicit stop
  */
 export function useTelemetry(isActive: boolean) {
@@ -61,10 +71,13 @@ export function useTelemetry(isActive: boolean) {
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);
   const accelSubRef    = useRef<ReturnType<typeof Accelerometer.addListener> | null>(null);
   const flushTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isFlushing     = useRef(false);
-  const activeRef      = useRef(false); // mirrors isActive without re-render closure issues
+  const isFlushing      = useRef(false);
+  const activeRef       = useRef(false); // mirrors isActive without re-render closure issues
+  const inBackgroundRef = useRef(false); // true while background task is handling collection
+  // Serializes async AppState transitions so handoff/resume can never overlap.
+  const transitionRef   = useRef<Promise<void>>(Promise.resolve());
 
-  // ── flush buffer to server ─────────────────────────────────────────────────
+  // ── flush foreground buffer to server ─────────────────────────────────────
   // force=true → send even when below FLUSH_MIN_SAMPLES (used for stop/background)
   // force=false → respect FLUSH_MIN_SAMPLES gate (used for periodic timer)
   const flush = useCallback(async (force: boolean) => {
@@ -76,7 +89,7 @@ export function useTelemetry(isActive: boolean) {
     const sessionId = sessionIdRef.current;
     if (!sessionId) return;
 
-    const toSend = buf.splice(0, FLUSH_MAX_SAMPLES);
+    const toSend = bufferRef.current.splice(0, FLUSH_MAX_SAMPLES);
     isFlushing.current = true;
 
     try {
@@ -94,7 +107,33 @@ export function useTelemetry(isActive: boolean) {
     }
   }, []);
 
-  // ── internal teardown (subscriptions + timer) ─────────────────────────────
+  // ── drain AsyncStorage background buffer and flush to server ───────────────
+  const drainAndFlushBackgroundBuffer = useCallback(async () => {
+    const bgSamples = await drainBackgroundTelemetryBuffer();
+    if (bgSamples.length === 0) return;
+
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return;
+
+    // Send in FLUSH_MAX_SAMPLES chunks
+    let offset = 0;
+    while (offset < bgSamples.length) {
+      const chunk = bgSamples.slice(offset, offset + FLUSH_MAX_SAMPLES);
+      offset += FLUSH_MAX_SAMPLES;
+      try {
+        await apiRequest("POST", "/api/telemetry/batch", {
+          session_id:   sessionId,
+          session_type: "ride",
+          samples:      chunk,
+        });
+      } catch (err) {
+        console.warn("[useTelemetry] background buffer flush failed", err);
+        break; // stop on first error; remaining samples will be lost (acceptable trade-off)
+      }
+    }
+  }, []);
+
+  // ── internal teardown (subscriptions + timer, foreground only) ────────────
   const teardown = useCallback(() => {
     if (flushTimerRef.current) {
       clearInterval(flushTimerRef.current);
@@ -113,20 +152,26 @@ export function useTelemetry(isActive: boolean) {
   // ── full session stop: teardown + force flush + clear session ─────────────
   const stopSession = useCallback(async () => {
     if (!activeRef.current) return;
-    activeRef.current = false;
+    activeRef.current    = false;
+    inBackgroundRef.current = false;
 
     teardown();
-    await flush(true); // force-flush remaining buffer
+
+    // Stop background task if it was running
+    if (Platform.OS !== "web") {
+      await stopTelemetryBackgroundTask();
+      // Drain any remaining background samples before clearing the session
+      await drainAndFlushBackgroundBuffer();
+      await AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY);
+    }
+
+    await flush(true); // force-flush remaining foreground buffer
     sessionIdRef.current = null;
     bufferRef.current = [];
-  }, [flush, teardown]);
+  }, [flush, teardown, drainAndFlushBackgroundBuffer]);
 
-  // ── start collection ───────────────────────────────────────────────────────
-  const startSession = useCallback(async () => {
-    activeRef.current   = true;
-    sessionIdRef.current = makeUUID();
-    bufferRef.current   = [];
-
+  // ── start foreground location + accelerometer subscriptions ───────────────
+  const startForegroundSubs = useCallback(async () => {
     // Accelerometer at 1 Hz (native only)
     if (Platform.OS !== "web") {
       Accelerometer.setUpdateInterval(SAMPLE_INTERVAL_MS);
@@ -135,7 +180,7 @@ export function useTelemetry(isActive: boolean) {
       });
     }
 
-    // GPS at 1 Hz — independent subscription so this hook is self-contained
+    // GPS at 1 Hz
     try {
       const sub = await Location.watchPositionAsync(
         {
@@ -144,7 +189,7 @@ export function useTelemetry(isActive: boolean) {
           distanceInterval: 0,
         },
         (loc) => {
-          if (!activeRef.current) return; // guard against late callbacks after stop
+          if (!activeRef.current || inBackgroundRef.current) return;
 
           const { latitude, longitude, altitude, speed, heading } = loc.coords;
           const accel = accelRef.current;
@@ -190,6 +235,79 @@ export function useTelemetry(isActive: boolean) {
     }, FLUSH_INTERVAL_MS);
   }, [flush]);
 
+  // ── start collection ───────────────────────────────────────────────────────
+  const startSession = useCallback(async () => {
+    activeRef.current    = true;
+    inBackgroundRef.current = false;
+    sessionIdRef.current = makeUUID();
+    bufferRef.current    = [];
+
+    // Persist session ID so the background task can tag its samples
+    if (Platform.OS !== "web") {
+      await AsyncStorage.setItem(BG_TELEMETRY_SESSION_KEY, sessionIdRef.current);
+    }
+
+    await startForegroundSubs();
+  }, [startForegroundSubs]);
+
+  // ── enqueue a serialized AppState transition ──────────────────────────────
+  // All async handoff/resume work is chained onto transitionRef so that a
+  // rapid inactive→active flip cannot cause the background task to start
+  // after the foreground has already resumed.
+  const enqueueTransition = useCallback((fn: () => Promise<void>) => {
+    transitionRef.current = transitionRef.current.then(fn).catch(() => {});
+  }, []);
+
+  // ── hand off to background task when app enters background ───────────────
+  // NOTE: only triggered on "background", NOT "inactive".  "inactive" is a
+  // transient iOS state (phone call, control-centre swipe, etc.) and does
+  // not warrant starting the battery-heavy background location task.
+  const handoffToBackground = useCallback(() => {
+    enqueueTransition(async () => {
+      // Re-check inside the serialized chain — state may have changed while
+      // a previous transition was awaiting.
+      if (!activeRef.current || inBackgroundRef.current) return;
+      inBackgroundRef.current = true;
+
+      // Stop foreground subscriptions; background task takes over GPS.
+      teardown();
+
+      // Flush whatever is in the foreground buffer before switching.
+      await flush(true);
+
+      if (Platform.OS !== "web") {
+        const started = await startTelemetryBackgroundTask();
+        if (!started) {
+          // Background permission not granted — fall back to a full stop.
+          inBackgroundRef.current = false;
+          activeRef.current = false;
+          await AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY);
+          sessionIdRef.current = null;
+          bufferRef.current = [];
+        }
+      }
+    });
+  }, [enqueueTransition, flush, teardown]);
+
+  // ── resume foreground collection when app comes back to active ────────────
+  const resumeFromBackground = useCallback(() => {
+    enqueueTransition(async () => {
+      if (!activeRef.current || !inBackgroundRef.current) return;
+      inBackgroundRef.current = false;
+
+      if (Platform.OS !== "web") {
+        // Stop the background task before restarting foreground subs.
+        // This must complete before we call startForegroundSubs so there is
+        // no window where both are running simultaneously.
+        await stopTelemetryBackgroundTask();
+        // Drain and flush background samples before restarting foreground.
+        await drainAndFlushBackgroundBuffer();
+      }
+
+      await startForegroundSubs();
+    });
+  }, [enqueueTransition, startForegroundSubs, drainAndFlushBackgroundBuffer]);
+
   // ── react to isActive changes ──────────────────────────────────────────────
   useEffect(() => {
     if (isActive) {
@@ -199,12 +317,17 @@ export function useTelemetry(isActive: boolean) {
     }
 
     return () => {
-      // On unmount: do a full stop regardless of current isActive
-      activeRef.current = false;
+      // On unmount: full stop regardless of current isActive
+      activeRef.current    = false;
+      inBackgroundRef.current = false;
       teardown();
       // Best-effort final flush on unmount (fire-and-forget, not awaited)
       if (sessionIdRef.current && bufferRef.current.length > 0) {
         flush(true).catch(() => {});
+      }
+      if (Platform.OS !== "web") {
+        stopTelemetryBackgroundTask().catch(() => {});
+        AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY).catch(() => {});
       }
       sessionIdRef.current = null;
       bufferRef.current = [];
@@ -212,19 +335,27 @@ export function useTelemetry(isActive: boolean) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive]);
 
-  // ── full session stop on app backgrounding ─────────────────────────────────
+  // ── serialized AppState handler ────────────────────────────────────────────
+  // Only "background" triggers the background task handoff.
+  // "inactive" is a transient iOS state and is deliberately ignored here to
+  // prevent spurious background task churn on brief interruptions.
   useEffect(() => {
     const handleAppState = (nextState: AppStateStatus) => {
-      if (nextState === "background" || nextState === "inactive") {
-        if (activeRef.current) {
-          stopSession();
+      if (nextState === "background") {
+        if (activeRef.current && !inBackgroundRef.current) {
+          handoffToBackground();
+        }
+      } else if (nextState === "active") {
+        if (activeRef.current && inBackgroundRef.current) {
+          resumeFromBackground();
         }
       }
+      // "inactive" intentionally not handled.
     };
 
     const sub = AppState.addEventListener("change", handleAppState);
     return () => sub.remove();
-  }, [stopSession]);
+  }, [handoffToBackground, resumeFromBackground]);
 
   return { sessionId: sessionIdRef.current };
 }
