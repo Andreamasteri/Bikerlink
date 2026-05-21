@@ -23,6 +23,7 @@ import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import FavoriteStar from "@/components/FavoriteStar";
 import { t } from "@/lib/i18n";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 function formatLastSeen(dateStr: string | null): string {
   if (!dateStr) return "";
@@ -505,13 +506,15 @@ export default function PublicProfileScreen() {
           return (
             <TouchableOpacity
               style={styles.geoButton}
-              onPress={() => router.navigate({
-                pathname: "/(tabs)/index",
-                params: {
-                  focusLat: String(profile.latitude),
-                  focusLng: String(profile.longitude),
-                },
-              })}
+              onPress={async () => {
+                try {
+                  await AsyncStorage.setItem(
+                    "pending_focus_coords",
+                    JSON.stringify({ lat: profile.latitude, lng: profile.longitude, ts: Date.now() })
+                  );
+                } catch {}
+                router.navigate({ pathname: "/(tabs)/index" });
+              }}
               activeOpacity={0.8}
             >
               <Ionicons name="navigate" size={20} color="#4CAF50" />

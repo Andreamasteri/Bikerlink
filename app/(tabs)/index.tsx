@@ -10,7 +10,7 @@ import {
   Linking,
   Platform,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -51,7 +51,7 @@ type UserWithProfileCoords = Omit<User, "password"> & {
 
 export default function MapScreen() {
   const router = useRouter();
-  const { focusLat: focusLatParam, focusLng: focusLngParam } = useLocalSearchParams<{ focusLat?: string; focusLng?: string }>();
+  useLocalSearchParams();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const t = useT();
   const insets = useSafeAreaInsets();
@@ -86,7 +86,7 @@ export default function MapScreen() {
   const [countriesLoaded, setCountriesLoaded] = useState(false);
   const [showHomeMessage, setShowHomeMessage] = useState(false);
   const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
-  const lastFocusParamRef = useRef<string | null>(null);
+  const [pendingFocusCoords, setPendingFocusCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [showLocationNudge, setShowLocationNudge] = useState(false);
   const locationNudgeCheckedRef = useRef(false);
 
@@ -169,18 +169,31 @@ export default function MapScreen() {
     return () => clearTimeout(timer);
   }, [mapReady]);
 
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        try {
+          const raw = await AsyncStorage.getItem("pending_focus_coords");
+          if (!raw) return;
+          await AsyncStorage.removeItem("pending_focus_coords");
+          const parsed = JSON.parse(raw);
+          const lat = parseFloat(parsed.lat);
+          const lng = parseFloat(parsed.lng);
+          if (isNaN(lat) || isNaN(lng)) return;
+          setPendingFocusCoords({ lat, lng });
+        } catch {}
+      })();
+    }, [])
+  );
+
   useEffect(() => {
     if (!mapReady) return;
-    if (!focusLatParam || !focusLngParam) return;
-    const key = `${focusLatParam},${focusLngParam}`;
-    if (lastFocusParamRef.current === key) return;
-    lastFocusParamRef.current = key;
-    const lat = parseFloat(focusLatParam);
-    const lng = parseFloat(focusLngParam);
-    if (isNaN(lat) || isNaN(lng)) return;
+    if (!pendingFocusCoords) return;
+    const { lat, lng } = pendingFocusCoords;
+    setPendingFocusCoords(null);
     const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
     activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng });
-  }, [mapReady, focusLatParam, focusLngParam, mapFullscreen]);
+  }, [mapReady, pendingFocusCoords, mapFullscreen]);
 
   useEffect(() => {
     if (mapFullscreen) {
