@@ -1,9 +1,8 @@
 import React, { useEffect } from "react";
-import { AppState, Platform } from "react-native";
-import * as Updates from "expo-updates";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { triggerOtaCheck, OTA_PENDING_KEY, reportOtaEvent } from "@/lib/ota-check";
+import { AppState } from "react-native";
+import { triggerOtaCheck } from "@/lib/ota-check";
 import { initOtaHardening } from "@/lib/ota-hardening";
+import { applyPendingOtaIfNeeded } from "@/lib/ota-startup";
 
 export function OtaStartupChecker() {
   useEffect(() => {
@@ -19,31 +18,9 @@ export function OtaStartupChecker() {
       // precedente ma reloadAsync() nel background listener non è scattato
       // (comportamento inaffidabile su Android). Lo applichiamo subito, prima
       // che l'utente veda qualsiasi schermata, senza aspettare 3 secondi.
-      if (!__DEV__ && Platform.OS !== "web") {
-        try {
-          const pending = await AsyncStorage.getItem(OTA_PENDING_KEY);
-          if (pending === "1" && mounted) {
-            // Rimuoviamo la chiave solo DOPO che reloadAsync ha avuto successo.
-            // reloadAsync non ritorna in condizioni normali (l'app si riavvia).
-            // Se lancia un errore, la chiave rimane → il prossimo cold start riprova.
-            Updates.reloadAsync()
-              .then(() => {
-                AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
-              })
-              .catch((err: unknown) => {
-                const msg = err instanceof Error ? err.message : String(err);
-                reportOtaEvent({
-                  phase: "reload-failed",
-                  source: "startup",
-                  currentUpdateId: Updates.updateId ?? "embedded",
-                  runtimeVersion: Updates.runtimeVersion ?? "unknown",
-                  error: `[reload-failed/startup] ${msg}`.substring(0, 500),
-                });
-              });
-            return; // non schedula il check normale
-          }
-        } catch {}
-      }
+      const triggered = await applyPendingOtaIfNeeded(() => mounted);
+      if (triggered) return; // non schedula il check normale
+
       if (!mounted) return;
       timerHandle = setTimeout(() => {
         triggerOtaCheck("startup");

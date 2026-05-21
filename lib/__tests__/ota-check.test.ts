@@ -119,6 +119,93 @@ afterEach(() => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
+describe("triggerOtaCheck immediateReload: OTA_PENDING_KEY flag persistence", () => {
+  /**
+   * The immediateReload path (lib/ota-check.ts) calls reloadAsync() directly
+   * inside the try block. If the reload throws, execution jumps to the catch
+   * branch which does NOT call removeItem. A pre-existing OTA_PENDING_KEY flag
+   * (written by a previous session) must therefore survive the failed reload so
+   * the next cold-start can retry via applyPendingOtaIfNeeded.
+   */
+
+  it("flag SURVIVES when reloadAsync() rejects on immediateReload (isNew:true path)", async () => {
+    mockReloadAsync.mockRejectedValue(new Error("reload-failed"));
+
+    // Pre-populate a flag from a previous session.
+    asyncStorageStore["@bikerlink/ota_pending_reload"] = "1";
+
+    const { triggerOtaCheck, OTA_PENDING_KEY } = await importFresh();
+
+    // Force immediateReload — bypasses the "schedule on background" branch.
+    const result = await triggerOtaCheck("manual", {
+      force: true,
+      immediateReload: true,
+    });
+
+    // The check itself should report a reload-phase error.
+    expect(result.phase).toBe("reload");
+    expect(result.ok).toBe(false);
+
+    // reloadAsync was attempted.
+    expect(mockReloadAsync).toHaveBeenCalledTimes(1);
+
+    // removeItem must NOT have been called — flag survives for the next cold-start.
+    expect(mockRemoveItem).not.toHaveBeenCalledWith(OTA_PENDING_KEY);
+    expect(asyncStorageStore[OTA_PENDING_KEY]).toBe("1");
+  });
+
+  it("flag is REMOVED when reloadAsync() resolves on immediateReload (isNew:true path)", async () => {
+    mockReloadAsync.mockResolvedValue(undefined);
+
+    asyncStorageStore["@bikerlink/ota_pending_reload"] = "1";
+
+    const { triggerOtaCheck, OTA_PENDING_KEY } = await importFresh();
+
+    const result = await triggerOtaCheck("manual", {
+      force: true,
+      immediateReload: true,
+    });
+
+    expect(result.phase).toBe("reload");
+    expect(result.ok).toBe(true);
+    expect(mockReloadAsync).toHaveBeenCalledTimes(1);
+
+    // removeItem IS called after a successful reload.
+    expect(mockRemoveItem).toHaveBeenCalledWith(OTA_PENDING_KEY);
+    expect(asyncStorageStore[OTA_PENDING_KEY]).toBeUndefined();
+  });
+
+  it("flag SURVIVES when reloadAsync() rejects on immediateReload (isNew:false path)", async () => {
+    // Simulate update already downloaded (fetched.isNew = false).
+    vi.doMock("expo-updates", () => ({
+      checkForUpdateAsync: vi.fn().mockResolvedValue({ isAvailable: true }),
+      fetchUpdateAsync: vi.fn().mockResolvedValue({ isNew: false }),
+      reloadAsync: mockReloadAsync,
+      updateId: "embedded",
+      runtimeVersion: "1.0.0",
+      updateUrl: null,
+      channel: "default",
+    }));
+    mockReloadAsync.mockRejectedValue(new Error("reload-failed"));
+
+    asyncStorageStore["@bikerlink/ota_pending_reload"] = "1";
+
+    const { triggerOtaCheck, OTA_PENDING_KEY } = await importFresh();
+
+    const result = await triggerOtaCheck("manual", {
+      force: true,
+      immediateReload: true,
+    });
+
+    expect(result.phase).toBe("reload");
+    expect(result.ok).toBe(false);
+    expect(mockReloadAsync).toHaveBeenCalledTimes(1);
+
+    expect(mockRemoveItem).not.toHaveBeenCalledWith(OTA_PENDING_KEY);
+    expect(asyncStorageStore[OTA_PENDING_KEY]).toBe("1");
+  });
+});
+
 describe("_doReload: OTA_PENDING_KEY flag persistence", () => {
   it("flag is REMOVED when reloadAsync() resolves (update applied)", async () => {
     mockReloadAsync.mockResolvedValue(undefined);
