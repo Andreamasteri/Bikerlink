@@ -14,7 +14,7 @@ import { getCachedDeviceId } from "@/lib/device-id";
 export const OTA_PENDING_KEY = "@bikerlink/ota_pending_reload";
 
 export type OtaTriggerSource = "startup" | "appstate" | "login" | "register" | "manual";
-export type OtaPhase = "check" | "fetch" | "reload" | "no-update" | "fetch-not-new" | "fetched" | "skipped";
+export type OtaPhase = "check" | "fetch" | "reload" | "reload-failed" | "no-update" | "fetch-not-new" | "fetched" | "skipped";
 
 type OtaResultListener = (result: OtaManualResult) => void;
 const _otaResultListeners = new Set<OtaResultListener>();
@@ -66,7 +66,7 @@ let _bgListenerSub: ReturnType<typeof AppState.addEventListener> | null = null;
 // 5s evita reload indesiderati per switch rapidi ad altre app.
 const BG_RELOAD_DELAY_MS = 5_000;
 
-function _scheduleReloadOnBackground() {
+function _scheduleReloadOnBackground(source: OtaTriggerSource) {
   if (_bgListenerSub) return;
 
   // Timer locale alla closure: si avvia quando l'app va in background,
@@ -86,7 +86,20 @@ function _scheduleReloadOnBackground() {
     // su Android), il flag rimane e OtaStartupChecker lo applica al cold start.
     Updates.reloadAsync()
       .then(() => AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {}))
-      .catch(() => {});
+      .catch((err) => {
+        const details = extractErrorDetails(err);
+        reportOtaEvent({
+          phase: "reload-failed",
+          source,
+          currentUpdateId: Updates.updateId ?? "embedded",
+          runtimeVersion: Updates.runtimeVersion ?? "unknown",
+          error: `[reload-failed/bg/${source}] ${details.message}`,
+          errorCode: details.code,
+          errorCause: details.cause,
+          errorUserInfo: details.userInfo,
+          nativeStack: details.nativeStack,
+        });
+      });
   };
 
   _bgListenerSub = AppState.addEventListener("change", (nextState) => {
@@ -240,7 +253,7 @@ interface ReportPayload {
   probe?: OtaProbeResult;
 }
 
-function reportOtaEvent(payload: ReportPayload) {
+export function reportOtaEvent(payload: ReportPayload) {
   try {
     fetch(new URL("/api/admin/ota-error", getApiUrl()).toString(), {
       method: "POST",
@@ -369,7 +382,7 @@ export async function triggerOtaCheck(
       // il prossimo cold start chiamerà reloadAsync() prima dei 3s.
       AsyncStorage.setItem(OTA_PENDING_KEY, "1").catch(() => {});
       _pendingReload = true;
-      _scheduleReloadOnBackground();
+      _scheduleReloadOnBackground(source);
       const r: OtaManualResult = { ok: true, phase: "fetch-not-new" };
       _emitOtaResult(r);
       return r;
@@ -402,7 +415,7 @@ export async function triggerOtaCheck(
     // rileverà il flag e chiamerà reloadAsync() immediatamente.
     AsyncStorage.setItem(OTA_PENDING_KEY, "1").catch(() => {});
     _pendingReload = true;
-    _scheduleReloadOnBackground();
+    _scheduleReloadOnBackground(source);
     const r: OtaManualResult = { ok: true, phase: "fetched" };
     _emitOtaResult(r);
     return r;
@@ -414,9 +427,13 @@ export async function triggerOtaCheck(
       probePromise.catch((e) => ({ error: String(e).substring(0, 200) } as OtaProbeResult)),
       networkInfoPromise.catch(() => "unknown"),
     ]);
-    const errMsg = `[${phase}/${source}] ${details.message}`;
+    // Distinguish reload-phase failures from fetch/check failures so the backend
+    // can alert on them separately. reloadAsync() errors land here when phase
+    // has already been set to "reload" before the await.
+    const reportedPhase: OtaPhase = phase === "reload" ? "reload-failed" : phase;
+    const errMsg = `[${reportedPhase}/${source}] ${details.message}`;
     reportOtaEvent({
-      phase,
+      phase: reportedPhase,
       source,
       currentUpdateId,
       runtimeVersion,
@@ -431,7 +448,7 @@ export async function triggerOtaCheck(
       networkInfo: netInfo,
       probe: probeRes,
     });
-    const r: OtaManualResult = { ok: false, phase, error: errMsg };
+    const r: OtaManualResult = { ok: false, phase: reportedPhase, error: errMsg };
     _emitOtaResult(r);
     return r;
   } finally {

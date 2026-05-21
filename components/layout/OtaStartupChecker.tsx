@@ -2,7 +2,7 @@ import React, { useEffect } from "react";
 import { AppState, Platform } from "react-native";
 import * as Updates from "expo-updates";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { triggerOtaCheck, OTA_PENDING_KEY } from "@/lib/ota-check";
+import { triggerOtaCheck, OTA_PENDING_KEY, reportOtaEvent } from "@/lib/ota-check";
 import { initOtaHardening } from "@/lib/ota-hardening";
 
 export function OtaStartupChecker() {
@@ -30,7 +30,16 @@ export function OtaStartupChecker() {
               .then(() => {
                 AsyncStorage.removeItem(OTA_PENDING_KEY).catch(() => {});
               })
-              .catch(() => {});
+              .catch((err: unknown) => {
+                const msg = err instanceof Error ? err.message : String(err);
+                reportOtaEvent({
+                  phase: "reload-failed",
+                  source: "startup",
+                  currentUpdateId: Updates.updateId ?? "embedded",
+                  runtimeVersion: Updates.runtimeVersion ?? "unknown",
+                  error: `[reload-failed/startup] ${msg}`.substring(0, 500),
+                });
+              });
             return; // non schedula il check normale
           }
         } catch {}
