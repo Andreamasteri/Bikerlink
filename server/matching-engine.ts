@@ -1662,6 +1662,7 @@ export async function runProposalToProfileMatching(
     if (activeProposals.length === 0) return 0;
 
     const existingKeys = await storage.getAllExistingProposalProfileMatchKeys();
+    const actedUponPairs = await storage.getActedUponBikerZavarrinaPairs();
 
     const allZavorrine = await db
       .select({
@@ -1701,6 +1702,9 @@ export async function runProposalToProfileMatching(
 
         const key = `${proposal.id}:${zav.userId}`;
         if (existingKeys.has(key)) continue;
+
+        const pairKey = `${proposal.userId}:${zav.userId}`;
+        if (actedUponPairs.has(pairKey)) continue;
 
         const distKm = haversineDistance(pLat, pLng, zav.lat, zav.lng);
         if (distKm > radius) continue;

@@ -825,6 +825,9 @@ export const proposalProfileMatches = pgTable("proposal_profile_matches", {
   index("ppm_zavorrina_id_idx").on(table.zavarrinaId),
   index("ppm_proposal_id_idx").on(table.proposalId),
   uniqueIndex("ppm_proposal_zavorrina_unique_idx").on(table.proposalId, table.zavarrinaId),
+  uniqueIndex("ppm_biker_zavorrina_active_idx")
+    .on(table.bikerId, table.zavarrinaId)
+    .where(sql`${table.status} = 'new'`),
 ]);
 
 export type ProposalProfileMatch = typeof proposalProfileMatches.$inferSelect;

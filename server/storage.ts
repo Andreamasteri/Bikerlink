@@ -438,6 +438,7 @@ export interface IStorage {
   getProposalProfileMatchesForUser(userId: string): Promise<ProposalProfileMatch[]>;
   getProposalProfileMatchesForProposal(proposalId: string): Promise<ProposalProfileMatch[]>;
   getAllExistingProposalProfileMatchKeys(): Promise<Set<string>>;
+  getActedUponBikerZavarrinaPairs(): Promise<Set<string>>;
   updateProposalProfileMatch(id: string, data: Partial<InsertProposalProfileMatch>): Promise<ProposalProfileMatch | undefined>;
   deleteProposalProfileMatch(id: string, userId: string): Promise<boolean>;
 }
@@ -2533,9 +2534,12 @@ export class DatabaseStorage implements IStorage {
 
   async getProposalProfileMatchesForUser(userId: string): Promise<ProposalProfileMatch[]> {
     return db.select().from(proposalProfileMatches).where(
-      or(
-        eq(proposalProfileMatches.bikerId, userId),
-        eq(proposalProfileMatches.zavarrinaId, userId)
+      and(
+        or(
+          eq(proposalProfileMatches.bikerId, userId),
+          eq(proposalProfileMatches.zavarrinaId, userId)
+        ),
+        eq(proposalProfileMatches.status, "new")
       )
     ).orderBy(desc(proposalProfileMatches.createdAt)).limit(200);
   }
@@ -2556,6 +2560,19 @@ export class DatabaseStorage implements IStorage {
       keys.add(`${r.proposalId}:${r.zavarrinaId}`);
     }
     return keys;
+  }
+
+  async getActedUponBikerZavarrinaPairs(): Promise<Set<string>> {
+    const rows = await db.select({
+      bikerId: proposalProfileMatches.bikerId,
+      zavarrinaId: proposalProfileMatches.zavarrinaId,
+    }).from(proposalProfileMatches)
+      .where(inArray(proposalProfileMatches.status, ["accepted", "rejected"]));
+    const pairs = new Set<string>();
+    for (const r of rows) {
+      pairs.add(`${r.bikerId}:${r.zavarrinaId}`);
+    }
+    return pairs;
   }
 
   async updateProposalProfileMatch(id: string, data: Partial<InsertProposalProfileMatch>): Promise<ProposalProfileMatch | undefined> {
