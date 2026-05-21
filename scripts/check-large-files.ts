@@ -71,5 +71,29 @@ if (violations.length === 0) {
     console.error(`  ${file.padEnd(maxLen + 2)} ${lines} lines  (+${excess} over limit)`);
   }
   console.error(`\nPlease split these files into focused modules before committing.\n`);
+
+  const proposalLines: string[] = [
+    "",
+    "=== PROPOSTA TASK ===",
+    `Titolo suggerito: Split file TypeScript — ${violations.length} file oltre i ${MAX_LINES} righe`,
+    "",
+    "File da splittare (Relevant files per il task):",
+  ];
+  for (const { file, lines } of violations) {
+    proposalLines.push(`  - ${file}  (${lines} righe, +${lines - MAX_LINES} oltre il limite)`);
+  }
+  proposalLines.push(
+    "",
+    "Nota per l'agente:",
+    `  Crea un task di split con questi file come "Relevant files".`,
+    `  Soglia: ${MAX_LINES} righe per file.`,
+    "  Obiettivo: spezzare ogni file in moduli focalizzati (es. un file per route,",
+    "  un file per tipo di helper, un barrel index.ts per i re-export).",
+    "  Aggiorna tutti gli import nei file che li usano dopo lo split.",
+    "=== FINE PROPOSTA ===",
+    "",
+  );
+
+  console.error(proposalLines.join("\n"));
   process.exit(1);
 }

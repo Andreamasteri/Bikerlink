@@ -34,4 +34,61 @@ fi
 echo "════════════════════════════════════════"
 echo ""
 
+# ── CONTROLLO IMPORT TYPESCRIPT POST-MERGE ───────────────────
+echo "════════════════════════════════════════"
+echo "  Controllo import TypeScript post-merge"
+echo "════════════════════════════════════════"
+
+TS_MODIFIED=$(git diff HEAD~1 HEAD --name-only 2>/dev/null | grep -cE '\.(ts|tsx)$' || true)
+
+if [ "$TS_MODIFIED" -gt 0 ]; then
+  echo "📂 $TS_MODIFIED file/i .ts/.tsx modificati — avvio controllo import..."
+  echo ""
+
+  CLIENT_EXIT=0
+  SERVER_EXIT=0
+
+  # Controllo client (tsconfig.json nella root)
+  if [ -f "tsconfig.json" ]; then
+    echo "→ Client (tsconfig.json)..."
+    CLIENT_ERRORS=$(npx tsc --noEmit --project tsconfig.json 2>&1) || CLIENT_EXIT=$?
+    if [ "$CLIENT_EXIT" -eq 0 ]; then
+      echo "  ✅ Client: nessun errore di import."
+    else
+      echo "  ❌ Client: import rotti rilevati:"
+      echo "$CLIENT_ERRORS" | sed 's/^/     /'
+    fi
+  else
+    echo "  ⚠️  tsconfig.json non trovato — controllo client saltato."
+  fi
+
+  echo ""
+
+  # Controllo server (server/tsconfig.json)
+  if [ -f "server/tsconfig.json" ]; then
+    echo "→ Server (server/tsconfig.json)..."
+    SERVER_ERRORS=$(npx tsc --noEmit --project server/tsconfig.json 2>&1) || SERVER_EXIT=$?
+    if [ "$SERVER_EXIT" -eq 0 ]; then
+      echo "  ✅ Server: nessun errore di import."
+    else
+      echo "  ❌ Server: import rotti rilevati:"
+      echo "$SERVER_ERRORS" | sed 's/^/     /'
+    fi
+  else
+    echo "  ⚠️  server/tsconfig.json non trovato — controllo server saltato."
+  fi
+
+  echo ""
+  if [ "$CLIENT_EXIT" -eq 0 ] && [ "$SERVER_EXIT" -eq 0 ]; then
+    echo "✅ Controllo TypeScript completato: nessun import rotto."
+  else
+    echo "❌ Controllo TypeScript: import rotti trovati — verificare prima di pubblicare."
+  fi
+else
+  echo "✅ Nessun file .ts/.tsx modificato — controllo import saltato."
+fi
+
+echo "════════════════════════════════════════"
+echo ""
+
 exit 0

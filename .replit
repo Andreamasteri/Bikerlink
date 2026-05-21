@@ -73,6 +73,10 @@ args = "ota-token-safety"
 task = "workflow.run"
 args = "typecheck"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "file-conflict-guard"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -208,6 +212,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/typecheck.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "file-conflict-guard"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx ts-node scripts/check-file-conflicts.ts"
 
 [workflows.workflow.metadata]
 isValidation = true
