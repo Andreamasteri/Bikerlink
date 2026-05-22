@@ -1540,7 +1540,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-22T14:55:15.989Z"
+  },
+  {
+    "updateNumber": 11,
+    "version": "48.11.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-11 rv10.0.0: OTA-11: fix crash login Android — expo-location lazy getter in location-context, rimosso require expo-location da handleLogin, beacon granulari login_1..5, GET /startup-beacons endpoint",
+    "note": "CURRENT_OTA_NUMBER=11. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "e2c30634-b7d9-4d37-aa36-5fa5d4253e95",
+    "bundleUrl": "private/ota/ota-48.11.10-1779469794514.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "72e24175ba8c4f2e182c42c3ada4eb0db1cd9f0c",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-22T17:10:00.724Z"
   }
 ]
