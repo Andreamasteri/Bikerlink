@@ -3,7 +3,7 @@ import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { motoClubs, motoClubMembers } from "@shared/schema";
+import { motoClubs, motoClubMembers } from "@shared/db";
 import { eq, and } from "drizzle-orm";
 import { uploadBuffer, downloadBuffer } from "../../objectStorage";
 import { notifyChatEvent } from "../../chat-sse";

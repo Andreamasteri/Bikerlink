@@ -45,7 +45,7 @@ npx esbuild server/index.ts \
   --bundle \
   --format=cjs \
   --outdir="$DIST_DIR" \
-  --alias:@shared/schema=./shared/schema \
+  --alias:@shared/db=./shared/db \
   --alias:@shared/privacy-policy-it=./shared/privacy-policy-it \
   2>&1
 

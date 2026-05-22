@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { db } from "./db";
-import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos } from "@shared/schema";
+import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { pool } from "./db";
 

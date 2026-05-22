@@ -1,7 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import multer from "multer";
 import { db } from "../db";
-import { mediaLibrary } from "@shared/schema";
+import { mediaLibrary } from "@shared/db";
 import { eq, asc } from "drizzle-orm";
 import { storage as appStorage } from "../storage";
 import { sendSuccess, sendError } from "../lib/api-response";

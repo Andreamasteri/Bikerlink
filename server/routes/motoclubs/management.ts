@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { motoClubs, motoClubMembers } from "@shared/schema";
+import { motoClubs, motoClubMembers } from "@shared/db";
 import { proposeLocationSchema } from "@shared/validators";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { allLimited } from "../../lib/concurrency";

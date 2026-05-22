@@ -45,7 +45,7 @@ import {
   type UserBlock,
   type WorkshopContact as WorkshopContactType,
   type ProposalProfileMatch, type InsertProposalProfileMatch,
-} from "@shared/schema";
+} from "@shared/db";
 import { FakeUsersStorage } from "./fake-users";
 
 export interface IStorage {

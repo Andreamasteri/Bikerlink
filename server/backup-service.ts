@@ -7,7 +7,7 @@ import os from "os";
 import path from "path";
 import { uploadBuffer } from "./objectStorage";
 import { db } from "./db";
-import { appSettings } from "@shared/schema";
+import { appSettings } from "@shared/db";
 import { eq } from "drizzle-orm";
 
 const execAsync = promisify(exec);

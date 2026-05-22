@@ -1,5 +1,5 @@
 import { haversineDistance } from "../geo";
-import { type Proposal } from "@shared/schema";
+import { type Proposal } from "@shared/db";
 import { sameDay, timeRangesOverlap, MATCH_RULES } from "./filters";
 
 type ProposalWithAuthor = Proposal & { authorUserType?: string | null };

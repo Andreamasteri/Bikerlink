@@ -7,7 +7,7 @@ import {
   eventImages,
   eventParticipants,
   users,
-} from "@shared/schema";
+} from "@shared/db";
 import {
   eq,
   and,

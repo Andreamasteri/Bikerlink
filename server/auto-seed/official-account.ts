@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { db } from "../db";
-import { users } from "@shared/schema";
+import { users } from "@shared/db";
 import { eq } from "drizzle-orm";
 
 export async function ensureBikerLinkOfficialOnBoot(): Promise<void> {

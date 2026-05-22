@@ -1,7 +1,7 @@
 import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response, type RequestHandler } from "express";
 import { db } from "../db";
-import { appCrashLogs, users } from "@shared/schema";
+import { appCrashLogs, users } from "@shared/db";
 import { crashLogsSchema } from "@shared/validators";
 import { eq, desc, and, gte, lte, inArray, count, sql } from "drizzle-orm";
 import { storage } from "../storage";

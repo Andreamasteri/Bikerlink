@@ -5,7 +5,7 @@ import {
   users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos,
   conversations, conversationParticipants, messages,
   type User,
-} from "@shared/schema";
+} from "@shared/db";
 import { eq, sql, inArray } from "drizzle-orm";
 import {
   EUROPEAN_ZONES, MOTORCYCLES,

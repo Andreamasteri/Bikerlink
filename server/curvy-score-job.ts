@@ -25,7 +25,7 @@
  */
 
 import { db } from "./db";
-import { segmentTelemetry } from "@shared/schema";
+import { segmentTelemetry } from "@shared/db";
 import { sql } from "drizzle-orm";
 import { storage } from "./storage";
 

@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { motoClubMembers } from "@shared/schema";
+import { motoClubMembers } from "@shared/db";
 import { eq, and, count } from "drizzle-orm";
 import { createRegionalClubInvite, createClubInvitesForMoto } from "./utils";
 

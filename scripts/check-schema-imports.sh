@@ -8,7 +8,7 @@
 # (users, events, etc.) may still come from @shared/schema.
 #
 # Catches:
-#   - Static imports:  import { insertUserSchema } from "@shared/schema"
+#   - Static imports:  import { insertUserSchema } from "@shared/db"
 #   - Dynamic imports: const { fooSchema } = await import("@shared/schema")
 #   - Multi-line static imports spanning several lines
 #
@@ -36,7 +36,7 @@ import os
 routes_dir = sys.argv[1]
 violations = []
 
-# Pattern 1: static import block  — import { ...Schema... } from "@shared/schema"
+# Pattern 1: static import block  — import { ...Schema... } from "@shared/db"
 static_re = re.compile(
     r'import\s*\{([^}]+)\}\s*from\s*["\']@shared/schema["\']',
     re.DOTALL

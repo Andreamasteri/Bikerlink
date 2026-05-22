@@ -1,6 +1,6 @@
 import { storage } from "../storage";
 import { db } from "../db";
-import { motoClubs, motoClubMembers, users } from "@shared/schema";
+import { motoClubs, motoClubMembers, users } from "@shared/db";
 import { and, eq, isNotNull, sql } from "drizzle-orm";
 import { sendMatchPushNotifications } from "../push-notifications";
 import { loadMatchPreferencesMap, prefEnabled } from "./filters";

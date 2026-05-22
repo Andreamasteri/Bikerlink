@@ -1,7 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
-import { motoClubs } from "@shared/schema";
+import { motoClubs } from "@shared/db";
 import { requireAuth, asc, eq } from "../events-helpers";
 
 const router = Router();

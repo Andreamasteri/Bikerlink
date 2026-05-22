@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import { db } from "../../db";
-import { userLastfmSessions, userMusicTracks } from "@shared/schema";
+import { userLastfmSessions, userMusicTracks } from "@shared/db";
 import { eq, and } from "drizzle-orm";
 import { isLastfmConfigured, lastfmApiCall } from "./utils";
 import { syncLastfmTracks } from "./sync-utils";

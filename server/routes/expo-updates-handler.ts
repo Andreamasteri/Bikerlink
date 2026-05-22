@@ -91,7 +91,7 @@ export function registerExpoUpdatesRoutes(app: Express) {
       const sampled = Math.floor(Math.random() * otaProbeSampleN) === 0;
       if (!debug && !isAnomaly && !sampled) return;
       try {
-        const { otaEvents } = await import("@shared/schema");
+        const { otaEvents } = await import("@shared/db");
         const { db: dbInner } = await import("../db");
         const durationMs = Date.now() - requestStartedAt;
         const detail = errMsg ? `${status} | ${errMsg} | ${durationMs}ms` : `${status} | ${durationMs}ms`;
@@ -384,7 +384,7 @@ export function registerExpoUpdatesRoutes(app: Express) {
         if (recent.rows.length > 0) shouldIncrementCount = false;
       }
 
-      const { otaEvents } = await import("@shared/schema");
+      const { otaEvents } = await import("@shared/db");
 
       await db.insert(otaEvents).values({
         phase: "loaded",

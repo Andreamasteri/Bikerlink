@@ -51,7 +51,7 @@ import sprintsRoutes from "./routes/sprints";
 import { publicMediaRouter, adminMediaRouter } from "./routes/media-library";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
-import { users, userFavorites } from "@shared/schema";
+import { users, userFavorites } from "@shared/db";
 import { ilike, eq, and, sql } from "drizzle-orm";
 import { onlineTracker } from "./online-tracker";
 import { registerExpoUpdatesRoutes } from "./routes/expo-updates-handler";

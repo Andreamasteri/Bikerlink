@@ -1,7 +1,7 @@
 import { 
   type Proposal, 
   matchPreferences 
-} from "@shared/schema";
+} from "@shared/db";
 
 export type MatchPrefRow = typeof matchPreferences.$inferSelect;
 

@@ -1,7 +1,7 @@
 import { storage } from "../storage";
 import { db } from "../db";
 import { haversineDistance } from "../geo";
-import { routes, routePoints, users } from "@shared/schema";
+import { routes, routePoints, users } from "@shared/db";
 import { and, avg, eq, isNotNull } from "drizzle-orm";
 import { sendMatchPushNotifications } from "../push-notifications";
 import { loadMatchPreferencesMap, bothPrefsEnabled, prefEnabled } from "./filters";

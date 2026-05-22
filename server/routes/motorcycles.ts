@@ -3,7 +3,7 @@ import path from "path";
 import fs from "fs";
 import { and, ne, eq } from "drizzle-orm";
 import { db } from "../db";
-import { userMotorcycles } from "@shared/schema";
+import { userMotorcycles } from "@shared/db";
 import { createMotorcycleSchema, updateMotorcycleSchema, uploadPhotoSchema } from "@shared/validators";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";

@@ -3,7 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { db } from "./db";
-import { appSettings } from "@shared/schema";
+import { appSettings } from "@shared/db";
 import { eq } from "drizzle-orm";
 
 const INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 ore

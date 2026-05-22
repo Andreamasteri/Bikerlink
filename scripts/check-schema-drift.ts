@@ -16,7 +16,7 @@
  */
 
 import { Pool } from "pg";
-import * as schema from "../shared/schema/index";
+import * as schema from "../shared/db/index";
 import { SQL } from "drizzle-orm";
 import { PgTable, getTableConfig } from "drizzle-orm/pg-core";
 

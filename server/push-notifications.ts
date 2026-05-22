@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, userProfiles, appSettings } from "@shared/schema";
+import { users, userProfiles, appSettings } from "@shared/db";
 import { inArray, eq } from "drizzle-orm";
 import it from "../lib/i18n/it";
 

@@ -4,7 +4,7 @@ import {
   adCampaigns, adClicks,
   type AdCampaign, type InsertAdCampaign,
   type AdClick, type InsertAdClick,
-} from "@shared/schema";
+} from "@shared/db";
 import { SocialStorage } from "./social";
 
 export class AdsStorage extends SocialStorage {

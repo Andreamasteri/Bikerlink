@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
-import { notifications } from "@shared/schema";
+import { notifications } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";

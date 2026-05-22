@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
-import { matchPreferences } from "@shared/schema";
+import { matchPreferences } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { storage } from "../storage";
 import { requireAuth } from "../lib/auth-middleware";

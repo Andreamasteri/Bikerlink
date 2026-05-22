@@ -5,7 +5,7 @@ vi.mock("../db", () => ({
   pool: {},
 }));
 
-vi.mock("@shared/schema", () => ({
+vi.mock("@shared/db", () => ({
   matchPreferences: {},
   motoClubMembers: {},
 }));

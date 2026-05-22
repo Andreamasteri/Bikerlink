@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
-import { users } from "@shared/schema";
+import { users } from "@shared/db";
 import { ilike } from "drizzle-orm";
 import { sendSuccess, sendError } from "../lib/api-response";
 

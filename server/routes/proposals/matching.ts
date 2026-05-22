@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { motoClubMembers, proposalZoneNotifications } from "@shared/schema";
+import { motoClubMembers, proposalZoneNotifications } from "@shared/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { haversineKm } from "../../geo";
 import { isSystemAccount } from "../../lib/system-account-filter";

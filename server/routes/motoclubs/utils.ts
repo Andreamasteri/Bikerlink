@@ -8,7 +8,7 @@ import {
   conversationParticipants,
   messages,
   users,
-} from "@shared/schema";
+} from "@shared/db";
 import { eq, and, ne, sql, desc, or, ilike } from "drizzle-orm";
 import { sendMotoclubPushNotifications } from "../../push-notifications";
 

@@ -3,7 +3,7 @@ import { db } from "../db";
 import {
   sosRequests,
   type SosRequest, type InsertSosRequest,
-} from "@shared/schema";
+} from "@shared/db";
 import { BikerMatchesStorage } from "./biker-matches";
 
 export class SosStorage extends BikerMatchesStorage {

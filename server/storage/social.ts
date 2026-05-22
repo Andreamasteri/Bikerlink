@@ -8,7 +8,7 @@ import {
   type CollectedEasterEgg, type InsertCollectedEasterEgg,
   type Report, type InsertReport,
   type ModeratorLog, type InsertModeratorLog,
-} from "@shared/schema";
+} from "@shared/db";
 import { TrackingStorage } from "./tracking";
 
 export class SocialStorage extends TrackingStorage {

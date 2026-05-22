@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db } from "../db";
-import { users, userProfiles } from "@shared/schema";
+import { users, userProfiles } from "@shared/db";
 import { eq } from "drizzle-orm";
 
 export const FORBIDDEN_SEED_PASSWORDS = new Set<string>([

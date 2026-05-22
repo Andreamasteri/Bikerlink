@@ -8,7 +8,7 @@ import {
   users,
   messages,
   conversationParticipants,
-} from "@shared/schema";
+} from "@shared/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { allLimited } from "../../lib/concurrency";
 

@@ -1,5 +1,5 @@
 import { db } from "../db";
-import { motoClubs, conversations, motoClubMembers, conversationParticipants, type User } from "@shared/schema";
+import { motoClubs, conversations, motoClubMembers, conversationParticipants, type User } from "@shared/db";
 import { eq, and } from "drizzle-orm";
 import { SpecMeta } from "./seed-users";
 

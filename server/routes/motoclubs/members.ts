@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { motoClubs, motoClubMembers, motoClubInvites, users, conversationParticipants } from "@shared/schema";
+import { motoClubs, motoClubMembers, motoClubInvites, users, conversationParticipants } from "@shared/db";
 import { eq, and, sql } from "drizzle-orm";
 import { systemAccountConditions } from "../../lib/system-account-filter";
 import { createClubConversation, addMemberToConversation, removeMemberFromConversation, notifyTopMembersOfNewJoin } from "./utils";

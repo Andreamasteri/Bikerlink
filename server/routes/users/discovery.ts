@@ -34,7 +34,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 
     if (lat != null && lng != null) {
       const { db } = await import("../../db");
-      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
+      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/db");
       const { eq, and, notInArray: notInArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance");
@@ -134,7 +134,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     if (mapVisibilityFilter !== "online_only" && mapVisibilityFilter !== "available_only") {
       try {
         const { db } = await import("../../db");
-        const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
+        const { users: usersTable, userProfiles: profilesTable } = await import("@shared/db");
         const { eq, and, notInArray: notInArr, inArray: inArr } = await import("drizzle-orm");
         const { sql: sqlTag } = await import("drizzle-orm");
         const distanceExpr = lat != null && lng != null
@@ -301,7 +301,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
     let allResults = onlineResults;
     if (includeOffline && mapVisibilityFilter !== "online_only" && mapVisibilityFilter !== "available_only") {
       const { db } = await import("../../db");
-      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
+      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/db");
       const { eq, and, or, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null
@@ -397,7 +397,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
     let allResults = onlineResults;
     if (includeOffline && mapVisibilityFilter !== "online_only" && mapVisibilityFilter !== "available_only") {
       const { db } = await import("../../db");
-      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
+      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/db");
       const { eq, and, inArray: inArr } = await import("drizzle-orm");
       const { sql: sqlTag } = await import("drizzle-orm");
       const distanceExpr = lat != null && lng != null

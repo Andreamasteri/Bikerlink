@@ -2,7 +2,7 @@ import { sendError } from "../lib/api-response";
 import { type Request, type Response } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
-import { userMusicTracks, users } from "@shared/schema";
+import { userMusicTracks, users } from "@shared/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { haversineKm } from "../geo";
 

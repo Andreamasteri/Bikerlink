@@ -5,7 +5,7 @@ import {
   type Conversation, type InsertConversation,
   type ConversationParticipant, type InsertConversationParticipant,
   type Message, type InsertMessage,
-} from "@shared/schema";
+} from "@shared/db";
 import { AuthStorage } from "./auth";
 
 export class ConversationsStorage extends AuthStorage {

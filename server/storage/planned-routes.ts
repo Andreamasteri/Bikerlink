@@ -5,7 +5,7 @@ import {
   type CoordinateHistory,
   type PlannedRoute, type InsertPlannedRoute,
   type RouteWeatherCache, type InsertRouteWeatherCache,
-} from "@shared/schema";
+} from "@shared/db";
 import { SystemStorage } from "./system";
 
 export class PlannedRoutesStorage extends SystemStorage {

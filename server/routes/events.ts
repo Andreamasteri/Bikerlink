@@ -3,7 +3,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { haversineKm } from "../geo";
 import { db } from "../db";
-import { events, eventImages, eventParticipants, users, type InsertEvent } from "@shared/schema";
+import { events, eventImages, eventParticipants, users, type InsertEvent } from "@shared/db";
 import { createEventSchema } from "@shared/validators";
 import {
   eq,

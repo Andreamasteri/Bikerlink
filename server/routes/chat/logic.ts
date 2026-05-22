@@ -1,6 +1,6 @@
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { motoClubs, motoClubMembers, users } from "@shared/schema";
+import { motoClubs, motoClubMembers, users } from "@shared/db";
 import { eq, and, ne } from "drizzle-orm";
 import { invalidateConvCache, escapeHtml } from "./utils";
 import { notifyChatEvent } from "../../chat-sse";

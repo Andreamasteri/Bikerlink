@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { events, motoClubs, eventClubInvites, motoClubMembers, type Event } from "@shared/schema";
+import { events, motoClubs, eventClubInvites, motoClubMembers, type Event } from "@shared/db";
 import { requireAuth, eq, ilike, and, allLimited } from "../events-helpers";
 import { sendEventiPushNotifications } from "../../push-notifications";
 

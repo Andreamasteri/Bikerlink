@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { gpsRejectionStats } from "@shared/schema";
+import { gpsRejectionStats } from "@shared/db";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { sql, desc } from "drizzle-orm";
 

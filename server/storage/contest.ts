@@ -6,7 +6,7 @@ import {
   type PhotoVote, type InsertPhotoVote,
   type DailyVoteCount,
   type PhotoWinner, type InsertPhotoWinner,
-} from "@shared/schema";
+} from "@shared/db";
 import { MapStorage } from "./map";
 
 export class ContestStorage extends MapStorage {

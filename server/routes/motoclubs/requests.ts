@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, feedbackTickets } from "@shared/schema";
+import { motoClubs, motoClubMembers, motoClubInvites, motoClubRequests, feedbackTickets } from "@shared/db";
 import { respondToInviteSchema, createMotoClubSchema } from "@shared/validators";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { sendEmail } from "../../email";

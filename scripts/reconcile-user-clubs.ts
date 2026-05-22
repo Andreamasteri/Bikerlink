@@ -15,7 +15,7 @@
 
 import { db } from "../server/db";
 import { createClubInvitesForMoto } from "../server/routes/motoclubs";
-import { motoClubInvites, userMotorcycles, users } from "../shared/schema";
+import { motoClubInvites, userMotorcycles, users } from "../shared/db";
 import { eq, sql } from "drizzle-orm";
 
 async function reconcileUserClubs(userId: string): Promise<void> {

@@ -8,7 +8,7 @@ import {
   type UserMotorcycle, type InsertUserMotorcycle,
   type UserProfile, type InsertUserProfile,
   type MotorcyclePhoto, type InsertMotorcyclePhoto,
-} from "@shared/schema";
+} from "@shared/db";
 
 function maskHiddenLocation(profile: UserProfile | null | undefined): UserProfile {
   if (!profile) return profile as unknown as UserProfile;
@@ -205,7 +205,7 @@ export class UsersStorage {
   }
 
   async recordFakeUserInteraction(fakeUserId: string, realUserId: string, interactionType: string): Promise<void> {
-    const { fakeUserInteractions } = await import("@shared/schema");
+    const { fakeUserInteractions } = await import("@shared/db");
     await db.insert(fakeUserInteractions).values({ fakeUserId, realUserId, interactionType });
   }
 

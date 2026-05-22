@@ -1,7 +1,7 @@
 import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
-import { sprintResults, users, userMotorcycles } from "@shared/schema";
+import { sprintResults, users, userMotorcycles } from "@shared/db";
 import { createSprintSchema } from "@shared/validators";
 import { eq, asc, and, gte, lte, sql } from "drizzle-orm";
 import { requireUserId } from "../lib/auth-middleware";

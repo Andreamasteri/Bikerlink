@@ -5,7 +5,7 @@ import { maskHiddenLocationRows } from "./users";
 import {
   users, userProfiles,
   type User, type UserProfile,
-} from "@shared/schema";
+} from "@shared/db";
 import { PlannedRoutesStorage } from "./planned-routes";
 
 export class MapStorage extends PlannedRoutesStorage {

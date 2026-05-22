@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { Request, Response } from "express";
 import { db } from "../db";
-import { siteVisits } from "@shared/schema";
+import { siteVisits } from "@shared/db";
 import { getTrustedClientIp } from "./abuse-rate-limit";
 
 export const VISITOR_COOKIE_NAME = "bl_vid";

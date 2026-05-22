@@ -6,7 +6,7 @@ import {
   type Proposal, type InsertProposal,
   type ProposalParticipant, type InsertProposalParticipant,
   type ProposalMatch, type InsertProposalMatch,
-} from "@shared/schema";
+} from "@shared/db";
 import { ConversationsStorage } from "./conversations";
 
 export class ProposalsStorage extends ConversationsStorage {

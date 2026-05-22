@@ -1,5 +1,5 @@
 import { db } from "../../db";
-import { userMusicTracks, userPlaylistSnapshots } from "@shared/schema";
+import { userMusicTracks, userPlaylistSnapshots } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { lastfmApiCall, lastfmPublicCall } from "./utils";
 

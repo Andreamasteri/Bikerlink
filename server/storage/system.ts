@@ -8,7 +8,7 @@ import {
   type FeedbackTicket, type InsertFeedbackTicket,
   type AppSetting,
   type WorkshopContact,
-} from "@shared/schema";
+} from "@shared/db";
 import { AdsStorage } from "./ads";
 
 export class SystemStorage extends AdsStorage {

@@ -5,7 +5,7 @@ import {
   motoClubMembers, 
   conversations, 
   conversationParticipants 
-} from "@shared/schema";
+} from "@shared/db";
 import { storage } from "./storage";
 
 export async function initMissingClubConversations() {

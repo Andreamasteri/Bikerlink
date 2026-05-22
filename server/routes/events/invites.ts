@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { events, eventParticipants } from "@shared/schema";
+import { events, eventParticipants } from "@shared/db";
 import { inviteUserToEventSchema } from "@shared/validators";
 import { requireAuth, eq, and } from "../events-helpers";
 import { sendSuccess, sendError } from "../../lib/api-response";

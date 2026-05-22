@@ -282,7 +282,7 @@ elif [ "$b_has_fail" -eq 0 ]; then
 else
   if [ -n "$all_b_missing" ]; then
     echo "  Fix (missing exports): add the missing export to the appropriate shared file."
-    echo "       For @shared/schema, ensure shared/schema.ts re-exports the symbol."
+    echo "       For @shared/db, ensure shared/db/index.ts exports the symbol."
   fi
   FAIL=$((FAIL + 1))
 fi
@@ -308,7 +308,7 @@ else
   echo "  ✗ mocks/empty.js does NOT use Proxy!"
   echo ""
   echo "  This is the OTA-4 regression risk: if pgTable(), sql\`\`, etc. are"
-  echo "  undefined, shared/schema.ts crashes at module init and ALL exports"
+  echo "  undefined, shared/db/*.ts crashes at module init and ALL exports"
   echo "  (including loginSchema) become undefined at runtime on the client."
   echo ""
   echo "  Fix: restore mocks/empty.js to the universal no-op Proxy pattern."
@@ -383,7 +383,7 @@ echo ""
 # ---------------------------------------------------------------------------
 echo "[E] Self-test: verifying Check B grep correctly rejects a nonexistent symbol..."
 
-SCHEMA_FILE="shared/schema.ts"
+SCHEMA_FILE="shared/db/index.ts"
 SENTINEL="__DOES_NOT_EXIST_OTA4_SENTINEL__"
 if [ -f "$SCHEMA_FILE" ]; then
   if grep -qE \
@@ -398,7 +398,7 @@ if [ -f "$SCHEMA_FILE" ]; then
     PASS=$((PASS + 1))
   fi
 else
-  echo "  - Self-test skipped: shared/schema.ts not found"
+  echo "  - Self-test skipped: shared/db/index.ts not found"
 fi
 echo ""
 
@@ -414,15 +414,15 @@ echo ""
 # which in turn loads drizzle-orm — the exact hazard @shared/validators
 # was created to eliminate.
 # ---------------------------------------------------------------------------
-echo "[E] Checking for @shared/schema value imports in client code..."
+echo "[E] Checking for @shared/db value imports in client code..."
 echo "    (type-only imports are OK; value imports should use @shared/validators)"
 
 schema_value_hits=""
 for dir in $CLIENT_DIRS; do
   if [ -d "$dir" ]; then
-    # Find all lines that import from @shared/schema but are NOT type-only
+    # Find all lines that import from @shared/db but are NOT type-only
     hits=$(grep -rn --include="*.ts" --include="*.tsx" \
-      -E "from ['\"]@shared/schema['\"]" "$dir" 2>/dev/null \
+      -E "from ['\"]@shared/db['\"]" "$dir" 2>/dev/null \
       | grep -v "import type " || true)
     if [ -n "$hits" ]; then
       schema_value_hits="${schema_value_hits}${hits}"$'\n'
@@ -431,15 +431,15 @@ for dir in $CLIENT_DIRS; do
 done
 
 if [ -z "$schema_value_hits" ]; then
-  echo "  ✓ No @shared/schema value imports found in client code"
+  echo "  ✓ No @shared/db value imports found in client code"
   PASS=$((PASS + 1))
 else
-  echo "  ✗ @shared/schema value imports detected in client code:"
+  echo "  ✗ @shared/db value imports detected in client code:"
   echo ""
   echo "$schema_value_hits" | sed 's/^/    /'
   echo ""
   echo "  Fix: import Zod schemas and types from @shared/validators instead."
-  echo "       Type-only imports (import type) from @shared/schema are still OK."
+  echo "       Type-only imports (import type) from @shared/db are still OK."
   FAIL=$((FAIL + 1))
 fi
 echo ""

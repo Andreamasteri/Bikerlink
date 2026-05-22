@@ -8,7 +8,7 @@ import {
   motorcyclePhotos, 
   userMotorcycles, 
   userPhotos 
-} from "@shared/schema";
+} from "@shared/db";
 import { eq } from "drizzle-orm";
 
 const log = console.log;

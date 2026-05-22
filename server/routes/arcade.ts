@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
-import { arcadeScores } from "@shared/schema";
+import { arcadeScores } from "@shared/db";
 import { arcadeScoreSchema } from "@shared/validators";
 import { eq, sql, max, and } from "drizzle-orm";
 

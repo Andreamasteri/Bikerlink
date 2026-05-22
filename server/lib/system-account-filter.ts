@@ -1,6 +1,6 @@
 import { notInArray } from "drizzle-orm";
 import { PROTECTED_NICKNAMES } from "../constants";
-import { users } from "@shared/schema";
+import { users } from "@shared/db";
 
 /**
  * Task #1236: JS-level system-account predicate.
@@ -25,7 +25,7 @@ export function isSystemAccount(u: { role?: string | null; nickname?: string | n
  *   .where(and(...systemAccountConditions(users), ...otherConditions))
  *
  * In dynamic-import route handlers pass the locally imported table:
- *   const { users: usersTable } = await import("@shared/schema");
+ *   const { users: usersTable } = await import("@shared/db");
  *   .where(and(...systemAccountConditions(usersTable), ...rest))
  */
 export function systemAccountConditions(usersTable: typeof users) {

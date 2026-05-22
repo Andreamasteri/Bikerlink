@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db } from "../db";
-import { users, userProfiles, userMotorcycles, invitationCodes } from "@shared/schema";
+import { users, userProfiles, userMotorcycles, invitationCodes } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { isPasswordTooWeak } from "./essential-users";
 

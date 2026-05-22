@@ -5,7 +5,7 @@ import { storage } from "../storage";
 import { uploadBuffer, downloadBuffer, deleteObject } from "../objectStorage";
 import { allLimited } from "../lib/concurrency";
 import { db } from "../db";
-import { photoContestEntries } from "@shared/schema";
+import { photoContestEntries } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { sendSuccess, sendError } from "../lib/api-response";
 

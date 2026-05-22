@@ -4,7 +4,7 @@ import {
   bikerBikerMatches, userBlocks, users,
   type BikerBikerMatch, type InsertBikerBikerMatch,
   type UserBlock,
-} from "@shared/schema";
+} from "@shared/db";
 import { MatchingStorage } from "./matching";
 
 export class BikerMatchesStorage extends MatchingStorage {
@@ -180,7 +180,7 @@ export class BikerMatchesStorage extends MatchingStorage {
     console.log(`[AdminCleanup] Trovati ${adminIds.length} utenti admin da escludere dai match`);
     let bzDeleted = 0;
     let bbDeleted = 0;
-    const { bikerZavarrinaMatches: bzTable } = await import("@shared/schema");
+    const { bikerZavarrinaMatches: bzTable } = await import("@shared/db");
     for (const adminId of adminIds) {
       const bzResult = await db.delete(bzTable).where(or(eq(bzTable.bikerId, adminId), eq(bzTable.zavarrinaId, adminId))).returning();
       bzDeleted += bzResult.length;

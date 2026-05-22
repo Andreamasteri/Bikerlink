@@ -252,7 +252,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
     const runPlaylistSnapshot = async () => {
       try {
-        const { userMusicTracks: umt, userPlaylistSnapshots } = await import("@shared/schema");
+        const { userMusicTracks: umt, userPlaylistSnapshots } = await import("@shared/db");
         const { eq: eqSnap } = await import("drizzle-orm");
         const usersWithTracks = await db.execute(sql`SELECT DISTINCT user_id FROM user_music_tracks`);
         let saved = 0;

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { db } from "../../db";
-import { userLastfmSessions, userMusicTracks } from "@shared/schema";
+import { userLastfmSessions, userMusicTracks } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { requireAuth, buildLastfmUrl, aggregateGenresFromTags } from "./utils";
 

@@ -3,7 +3,7 @@ import {
   matchPreferences,
   motoClubMembers,
   type Proposal
-} from "@shared/schema";
+} from "@shared/db";
 import { and, eq, inArray } from "drizzle-orm";
 import { MatchPrefRow, MatchRule } from "./types";
 

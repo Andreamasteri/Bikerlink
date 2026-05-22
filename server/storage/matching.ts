@@ -10,7 +10,7 @@ import {
   type ZavarrinaWishlistMoto, type InsertZavarrinaWishlistMoto,
   type BikerZavarrinaMatch, type InsertBikerZavarrinaMatch,
   type ProposalProfileMatch, type InsertProposalProfileMatch,
-} from "@shared/schema";
+} from "@shared/db";
 import { ContestStorage } from "./contest";
 
 export class MatchingStorage extends ContestStorage {

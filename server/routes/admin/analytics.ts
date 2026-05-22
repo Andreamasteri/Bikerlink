@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { users, moderatorLogs, siteVisits } from "@shared/schema";
+import { users, moderatorLogs, siteVisits } from "@shared/db";
 import { sql, desc } from "drizzle-orm";
 
 const router = Router();

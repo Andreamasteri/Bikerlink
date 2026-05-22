@@ -3,7 +3,7 @@ import multer, { MulterError } from "multer";
 import path from "path";
 import fs from "fs";
 import { storage } from "../../storage";
-import { userPhotos } from "@shared/schema";
+import { userPhotos } from "@shared/db";
 import { userReportSchema } from "@shared/validators";
 import { db } from "../../db";
 import { eq } from "drizzle-orm";
@@ -11,7 +11,7 @@ import { uploadBuffer, downloadBuffer, deleteObject } from "../../objectStorage"
 import { reportRateLimiter, getTrustedClientIp } from "../../lib/abuse-rate-limit";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { isProtectedUser } from "../../constants";
-import type { InsertReport } from "@shared/schema";
+import type { InsertReport } from "@shared/db";
 
 import { requireAuth } from "../../lib/auth-middleware";
 

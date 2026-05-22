@@ -13,7 +13,7 @@
  * Exit 1 → colonne senza copertura Phase 1 trovate (build bloccata)
  */
 
-import { users, userProfiles, motoClubs } from "../shared/schema";
+import { users, userProfiles, motoClubs } from "../shared/db";
 import * as fs from "fs";
 
 // ── Baseline: colonne presenti nel DB dalla creazione iniziale del progetto ───

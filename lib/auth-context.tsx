@@ -14,7 +14,7 @@ import {
   initSessionToken,
   authFetchHeaders,
 } from "@/lib/query-client";
-import type { User } from "@shared/schema";
+import type { User } from "@shared/db";
 
 type SafeUser = Omit<User, "password">;
 

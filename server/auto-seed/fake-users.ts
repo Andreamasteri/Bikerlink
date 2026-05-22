@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "node:crypto";
 import { db } from "../db";
-import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos, appSettings } from "@shared/schema";
+import { users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos, appSettings } from "@shared/db";
 import { eq, sql } from "drizzle-orm";
 
 const regionCoords: Record<string, { lat: number; lng: number }> = {

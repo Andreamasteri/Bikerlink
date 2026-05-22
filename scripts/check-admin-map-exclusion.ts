@@ -14,7 +14,7 @@
  */
 
 import { db } from "../server/db";
-import { users, userProfiles } from "../shared/schema";
+import { users, userProfiles } from "../shared/db";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { DatabaseStorage } from "../server/storage";

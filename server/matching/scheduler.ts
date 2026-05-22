@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { storage } from "../storage";
-import { proposals, proposalZoneNotifications, proposalProfileMatches, type Proposal } from "@shared/schema";
+import { proposals, proposalZoneNotifications, proposalProfileMatches, type Proposal } from "@shared/db";
 import { eq, sql, lt } from "drizzle-orm";
 import { runMatching, runWishlistMatching } from "./run-matching";
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";

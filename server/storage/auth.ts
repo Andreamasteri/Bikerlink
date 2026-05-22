@@ -4,7 +4,7 @@ import {
   passwordResetTokens, emailVerificationTokens, verificationCodes,
   type VerificationCode, type InsertVerificationCode,
   type EmailVerificationToken,
-} from "@shared/schema";
+} from "@shared/db";
 import { UsersStorage } from "./users";
 
 export class AuthStorage extends UsersStorage {

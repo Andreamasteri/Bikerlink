@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { motoClubs, motoClubMembers, users, userMotorcycles, routes } from "@shared/schema";
+import { motoClubs, motoClubMembers, users, userMotorcycles, routes } from "@shared/db";
 import { eq, and, desc, sql, or, ilike } from "drizzle-orm";
 import { systemAccountConditions } from "../../lib/system-account-filter";
 import { allLimited } from "../../lib/concurrency";

@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { adCampaigns as adCampaignsTable } from "@shared/schema";
+import { adCampaigns as adCampaignsTable } from "@shared/db";
 import { adsBulkSchema, adsCreateSchema, adsUpdateSchema, adsBulkDeleteSchema, adsGroupUpdateSchema } from "@shared/validators";
 import { eq, inArray, sql } from "drizzle-orm";
 import multer from "multer";

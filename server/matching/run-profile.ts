@@ -7,7 +7,7 @@ import {
   proposals,
   proposalProfileMatches,
   type Proposal,
-} from "@shared/schema";
+} from "@shared/db";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { sendMatchPushNotifications } from "../push-notifications";
 import it from "../../lib/i18n/it";

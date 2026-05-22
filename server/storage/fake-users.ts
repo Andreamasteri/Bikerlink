@@ -3,7 +3,7 @@ import { db } from "../db";
 import {
   users, userProfiles, userMotorcycles, conversations, conversationParticipants, messages, fakeUserInteractions,
   type User,
-} from "@shared/schema";
+} from "@shared/db";
 import { SosStorage } from "./sos";
 
 export class FakeUsersStorage extends SosStorage {

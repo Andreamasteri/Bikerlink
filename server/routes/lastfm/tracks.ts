@@ -1,7 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
-import { userMusicTracks, userLastfmSessions } from "@shared/schema";
+import { userMusicTracks, userLastfmSessions } from "@shared/db";
 import { eq, and } from "drizzle-orm";
 import { isLastfmConfigured, lastfmPublicCall } from "./utils";
 import { syncLastfmTracks } from "./sync-utils";

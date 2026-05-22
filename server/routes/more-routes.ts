@@ -4,7 +4,7 @@ import fs from "node:fs";
 import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
-import { users, userFavorites, serverRestarts } from "@shared/schema";
+import { users, userFavorites, serverRestarts } from "@shared/db";
 import { PRIVACY_POLICY_IT } from "@shared/privacy-policy-it";
 import { eq, sql, desc, count } from "drizzle-orm";
 import { triggerMatchingRun, triggerMatchingForUser } from "../matching-engine";

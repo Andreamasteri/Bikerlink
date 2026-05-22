@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { motoClubMembers } from "@shared/schema";
+import { motoClubMembers } from "@shared/db";
 import { and, eq } from "drizzle-orm";
 
 import { requireAuth } from "../../lib/auth-middleware";

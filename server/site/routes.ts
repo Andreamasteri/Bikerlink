@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import * as path from "path";
 import * as fs from "fs";
 import { db } from "../db";
-import { users } from "@shared/schema";
+import { users } from "@shared/db";
 import { sql } from "drizzle-orm";
 import { renderPage, getBaseUrl } from "./render";
 import { ensureVisitorId, recordVisit } from "../lib/visitor-tracking";

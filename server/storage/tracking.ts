@@ -7,7 +7,7 @@ import {
   type GpsError, type InsertGpsError,
   type CustomRoute, type InsertCustomRoute,
   type CustomRouteWaypoint, type InsertCustomRouteWaypoint,
-} from "@shared/schema";
+} from "@shared/db";
 import { ProposalsStorage } from "./proposals";
 
 export class TrackingStorage extends ProposalsStorage {

@@ -8,7 +8,7 @@ import {
   zavarrinaWishlists,
   zavarrinaWishlistMotos,
   eventParticipants,
-} from "@shared/schema";
+} from "@shared/db";
 import { and, eq, isNotNull, gt } from "drizzle-orm";
 import { sendMatchPushNotifications } from "../push-notifications";
 import { loadMatchPreferencesMap, bothPrefsEnabled, prefEnabled } from "./filters";

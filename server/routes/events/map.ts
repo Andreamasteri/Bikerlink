@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { events, users } from "@shared/schema";
+import { events, users } from "@shared/db";
 import { requireAuth, eq, and, asc, systemAccountConditions, enrichEvent, type EventRow } from "../events-helpers";
 
 const router = Router();

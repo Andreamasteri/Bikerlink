@@ -8,7 +8,7 @@ import {
   users,
   notifications,
   matchPreferences,
-} from "@shared/schema";
+} from "@shared/db";
 import { and, eq, or } from "drizzle-orm";
 
 import { requireAuth } from "../lib/auth-middleware";

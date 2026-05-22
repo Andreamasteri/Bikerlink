@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { users, conversationParticipants, messages } from "@shared/schema";
+import { users, conversationParticipants, messages } from "@shared/db";
 import { createConversationSchema } from "@shared/validators";
 import { inArray, desc } from "drizzle-orm";
 import { convCacheKey, convCache, CONV_CACHE_TTL_MS, pruneConvCache, invalidateConvCache } from "./utils";

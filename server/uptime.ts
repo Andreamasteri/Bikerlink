@@ -2,7 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as http from "http";
 import { db } from "./db";
-import { serverRestarts } from "@shared/schema";
+import { serverRestarts } from "@shared/db";
 
 export const SERVER_START_TIME = Date.now();
 

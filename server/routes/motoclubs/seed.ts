@@ -1,5 +1,5 @@
 import { db } from "../../db";
-import { motoClubs } from "@shared/schema";
+import { motoClubs } from "@shared/db";
 import { eq, and, ilike, sql } from "drizzle-orm";
 
 const SEED_BRANDS = [

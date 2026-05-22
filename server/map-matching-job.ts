@@ -22,7 +22,7 @@
  */
 
 import { db } from "./db";
-import { rideTelemetry, segmentTelemetry } from "@shared/schema";
+import { rideTelemetry, segmentTelemetry } from "@shared/db";
 import { eq, sql, and } from "drizzle-orm";
 import { mapMatch, isSelfHosted, GHPoint } from "./graphhopper-client";
 import { storage } from "./storage";
