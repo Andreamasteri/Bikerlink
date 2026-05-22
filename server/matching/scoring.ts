@@ -17,16 +17,31 @@ export function deriveTargetUserTypes(p: ProposalWithAuthor): string[] {
   }
 }
 
+function getAllSearchTypes(p: ProposalWithAuthor): string[] {
+  const types: string[] = [];
+  if (Array.isArray(p.searchTypes)) {
+    for (const t of p.searchTypes as string[]) {
+      if (t && !types.includes(t)) types.push(t);
+    }
+  }
+  if (p.searchType && !types.includes(p.searchType)) {
+    types.push(p.searchType);
+  }
+  return types;
+}
+
 export function resolveMatchPool(p1: ProposalWithAuthor, p2: ProposalWithAuthor): boolean {
   const hasExplicit1 = Array.isArray(p1.targetUserTypes) && (p1.targetUserTypes as string[]).length > 0;
   const hasExplicit2 = Array.isArray(p2.targetUserTypes) && (p2.targetUserTypes as string[]).length > 0;
 
   if (!hasExplicit1 && !hasExplicit2) {
-    if (!p1.searchType || !p2.searchType) return false;
+    const types1 = getAllSearchTypes(p1);
+    const types2 = getAllSearchTypes(p2);
+    if (types1.length === 0 || types2.length === 0) return false;
     return MATCH_RULES.some(
       (r) =>
-        (r.searchType1 === p1.searchType && r.searchType2 === p2.searchType) ||
-        (r.searchType1 === p2.searchType && r.searchType2 === p1.searchType)
+        (types1.includes(r.searchType1) && types2.includes(r.searchType2)) ||
+        (types1.includes(r.searchType2) && types2.includes(r.searchType1))
     );
   }
 
