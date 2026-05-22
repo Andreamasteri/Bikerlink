@@ -155,9 +155,22 @@ else
   warning "GET /api/health saltato — backend non raggiungibile su porta 5000"
 fi
 
-# ── 3. Porta 8081 — Metro / Expo ─────────────────────────────────────────────
+# ── 3. Porta 8081 — Metro / Expo (warning-only: dev server, not required for backend tasks) ──
 $QUIET || echo ""
-check_port 8081 "Metro / Expo" || true
+$QUIET || echo -e "  ${BOLD}─── Porta 8081 (Metro / Expo) ───────────────────────────────${RESET}"
+METRO_UP=false
+for attempt in 1 2 3; do
+  if timeout "$PORT_TIMEOUT" bash -c "echo > /dev/tcp/localhost/8081" 2>/dev/null; then
+    ok "Porta 8081 (Metro / Expo) raggiungibile (tentativo ${attempt}/3)"
+    METRO_UP=true
+    break
+  fi
+  $QUIET || info "Tentativo ${attempt}/3 fallito — porta 8081 non risponde"
+  [ "$attempt" -lt 3 ] && sleep 1
+done
+if [ "$METRO_UP" = false ]; then
+  warning "Porta 8081 (Metro / Expo) non raggiungibile — frontend dev server non avviato (non bloccante per task backend)"
+fi
 
 # ── 4. Controllo FATAL nei log recenti ───────────────────────────────────────
 $QUIET || echo ""
@@ -174,6 +187,8 @@ FATAL_LINES=()
 for log_dir in "${LOG_DIRS[@]}"; do
   if [ -d "$log_dir" ]; then
     while IFS= read -r -d '' logfile; do
+      # Salta i log prodotti da questo script stesso (evita falsi positivi auto-referenziali)
+      [[ "$(basename "$logfile")" == healthcheck_* ]] && continue
       # Considera solo log modificati negli ultimi 10 minuti
       if [ -n "$(find "$logfile" -mmin -10 2>/dev/null)" ]; then
         matches=$(grep -iE "FATAL" "$logfile" 2>/dev/null | tail -5 || true)
@@ -216,7 +231,7 @@ echo "SISTEMA B — Findings runtime:"
 if [ ${#FINDINGS[@]} -eq 0 ]; then
   echo "- nessun finding"
 else
-  printf '- %s\n' "${FINDINGS[@]}"
+  printf -- '- %s\n' "${FINDINGS[@]}"
 fi
 echo ""
 echo "ESITO FINALE: $ESITO ($BLOCKING bloccanti, $WARNINGS warning)"

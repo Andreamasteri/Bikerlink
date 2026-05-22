@@ -6,9 +6,9 @@ import {
   users, userProfiles,
   type User, type UserProfile,
 } from "@shared/schema";
-import { SystemStorage } from "./system";
+import { PlannedRoutesStorage } from "./planned-routes";
 
-export class MapStorage extends SystemStorage {
+export class MapStorage extends PlannedRoutesStorage {
   async getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
     const conditions: any[] = [
       eq(users.status, "active"),

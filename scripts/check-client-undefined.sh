@@ -204,10 +204,30 @@ for module_suffix in "${!seen_modules[@]}"; do
         # Check the resolved file for a concrete export of this symbol.
         # Matches: export const|function|class|type|interface|enum <name>
         # or:      export { ..., <name>, ... }
-        # Does NOT match "export *" — that would bypass the check.
-        if ! grep -qE \
-          "^export (const|function|class|type|interface|enum|abstract class) ${clean_name}[ <({=]|^export \{[^}]*\b${clean_name}\b[^}]*\}" \
-          "$resolved_file" 2>/dev/null; then
+        # Also follows one level of "export * from './sub'" barrel re-exports
+        # so that split barrel modules (e.g. shared/validators/index.ts) are
+        # verified correctly without requiring explicit re-declarations.
+        _EXPORT_GREP="^export (const|function|class|type|interface|enum|abstract class) ${clean_name}[ <({=]|^export \{[^}]*\b${clean_name}\b[^}]*\}"
+        _found_export=false
+        if grep -qE "$_EXPORT_GREP" "$resolved_file" 2>/dev/null; then
+          _found_export=true
+        else
+          # Follow one level of "export * from '...'" barrel re-exports
+          _resolved_dir=$(dirname "$resolved_file")
+          while IFS= read -r _reexport_spec; do
+            _reexport_path=$(echo "$_reexport_spec" | grep -oE "['\"][^'\"]+['\"]" | tr -d "'\"")
+            [ -z "$_reexport_path" ] && continue
+            for _ext in ".ts" "/index.ts" ""; do
+              _candidate="${_resolved_dir}/${_reexport_path}${_ext}"
+              if [ -f "$_candidate" ] && grep -qE "$_EXPORT_GREP" "$_candidate" 2>/dev/null; then
+                _found_export=true
+                break
+              fi
+            done
+            [ "$_found_export" = true ] && break
+          done < <(grep -E "^export \* from " "$resolved_file" 2>/dev/null || true)
+        fi
+        if [ "$_found_export" = false ]; then
           module_missing="${module_missing}      ${file}:${lineno} — '${clean_name}' not exported from ${resolved_file}"$'\n'
         fi
       done

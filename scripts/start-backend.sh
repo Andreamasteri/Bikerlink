@@ -83,6 +83,15 @@ for retry in $(seq 1 $MAX_RETRIES); do
   kill_port
 
   echo "Porta $PORT libera, avvio backend..."
+  if [ ! -f "server_dist/index.js" ]; then
+    echo "server_dist/index.js non trovato — build in corso..."
+    bash scripts/build-server.sh
+    if [ $? -ne 0 ]; then
+      echo "Build fallita — impossibile avviare il backend."
+      exit 1
+    fi
+    echo "Build completata."
+  fi
   START_TIME=$(date +%s)
   NODE_ENV=production node --max-old-space-size=512 server_dist/index.js &
   SERVER_PID=$!
