@@ -1,0 +1,87 @@
+import type {
+  MapUser, MapWorkshop, MapEasterEgg, MapSosRequest, ClubMapPin, EventMapPin,
+} from "@/components/map/map-types";
+import { getTileConfig, type MapProvider } from "@/lib/map-tiles";
+
+interface BuildMapMarkersStateParams {
+  mapsEnabled: boolean;
+  resolvedProvider: MapProvider;
+  userLocation: { latitude: number; longitude: number } | null;
+  isAvailable: boolean;
+  searchRadiusKm?: number | null;
+  filteredUsers: MapUser[];
+  workshops: MapWorkshop[];
+  eventPins: EventMapPin[];
+  showEventPins: boolean;
+  filterEvents: boolean;
+  clubPins: ClubMapPin[];
+  filterClubs: boolean;
+  easterEggs: MapEasterEgg[];
+  activeSosRequests: MapSosRequest[];
+  realMeMarker?: { latitude: number; longitude: number } | null;
+  fakeMeMarker?: { latitude: number; longitude: number } | null;
+  currentUserId?: string | null;
+}
+
+export function buildMapMarkersState(p: BuildMapMarkersStateParams): string {
+  const tileConfig = p.mapsEnabled ? getTileConfig(p.resolvedProvider) : getTileConfig("carto_dark");
+  const loc = p.userLocation;
+  const state = {
+    tileUrl: tileConfig.urlTemplate,
+    tileMaxZoom: tileConfig.maximumZ,
+    userLocation: loc ? { lat: loc.latitude, lng: loc.longitude } : null,
+    searchRadius:
+      p.isAvailable && loc && p.searchRadiusKm && p.searchRadiusKm > 0
+        ? { lat: loc.latitude, lng: loc.longitude, km: p.searchRadiusKm }
+        : null,
+    markers: {
+      users: p.filteredUsers.map((u) => ({
+        id: u.id,
+        lat: u.latitude,
+        lng: u.longitude,
+        userType: u.userType,
+        sex: u.sex ?? null,
+        nickname: u.nickname,
+        country: u.country ?? null,
+        isCurrentUser: p.currentUserId != null && u.id === p.currentUserId,
+      })),
+      workshops: p.workshops.map((ws) => ({
+        id: ws.id,
+        lat: ws.latitude,
+        lng: ws.longitude,
+        name: ws.name,
+      })),
+      events:
+        p.showEventPins && p.filterEvents
+          ? p.eventPins.map((ep) => ({ id: ep.id, lat: ep.latitude, lng: ep.longitude, title: ep.title }))
+          : [],
+      clubs: p.filterClubs
+        ? p.clubPins.map((c) => ({
+            id: c.id,
+            lat: c.latitude,
+            lng: c.longitude,
+            name: c.name,
+            isFictitious: c.isFictitious,
+            memberCount: c.memberCount,
+          }))
+        : [],
+      easterEggs: p.easterEggs.map((e) => ({
+        id: e.id,
+        lat: e.latitude,
+        lng: e.longitude,
+        name: e.name,
+      })),
+      sos: p.activeSosRequests.map((s) => ({
+        id: s.id,
+        lat: s.latitude,
+        lng: s.longitude,
+        radiusKm: s.radiusKm,
+        reason: s.reason,
+        nickname: s.requesterNickname ?? null,
+      })),
+      realMe: p.realMeMarker ? { lat: p.realMeMarker.latitude, lng: p.realMeMarker.longitude } : null,
+      fakeMe: p.fakeMeMarker ? { lat: p.fakeMeMarker.latitude, lng: p.fakeMeMarker.longitude } : null,
+    },
+  };
+  return JSON.stringify(JSON.stringify(state));
+}
