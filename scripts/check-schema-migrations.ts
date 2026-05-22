@@ -181,7 +181,7 @@ async function main(): Promise<void> {
   let hasErrors = false;
 
   for (const { name, schema } of TABLES_TO_CHECK) {
-    const schemaCols = getSchemaColumns(schema as Record<string, unknown>);
+    const schemaCols = getSchemaColumns(schema as unknown as Record<string, unknown>);
     const migratedCols = getMigratedColumns(name);
     const baseline = BASELINE_COLUMNS[name] ?? new Set<string>();
 

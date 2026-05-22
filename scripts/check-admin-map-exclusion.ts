@@ -197,11 +197,13 @@ function checkTrackerMethods(tracker: OnlineTracker): void {
   // Attempt to register the admin — setOnline must silently reject it.
   tracker.setOnline(ADMIN_ID, {
     role: "admin",
+    nickname: "admin",
     status: "active",
     userType: "biker",
     isAvailable: true,
     ghostMode: false,
     country: "IT",
+    isFake: false,
   });
 
   assert(

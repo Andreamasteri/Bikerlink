@@ -89,6 +89,27 @@ echo ""
 echo "All import checks passed."
 
 # ---------------------------------------------------------------------------
+# Full type check — covers scripts/, server/__tests__/, and all *.ts files
+# that are excluded from the per-project tsconfigs.  Uses the root tsconfig
+# (tsconfig.json) which includes "**/*.ts".
+# ---------------------------------------------------------------------------
+echo ""
+echo "Running full type check (npx tsc --noEmit)..."
+FULL_TSC_OUTPUT=$(npx tsc --noEmit 2>&1 || true)
+FULL_TSC_ERRORS=$(echo "$FULL_TSC_OUTPUT" | grep -E "error TS[0-9]+" || true)
+if [ -z "$FULL_TSC_ERRORS" ]; then
+  echo "  ✓ Full type check: no type errors found"
+else
+  COUNT=$(echo "$FULL_TSC_ERRORS" | wc -l | tr -d ' ')
+  echo "  ✗ Full type check: ${COUNT} type error(s) detected"
+  echo ""
+  echo "$FULL_TSC_ERRORS" | sed 's/^/    /'
+  echo ""
+  echo "Fix the type errors above, then re-run: bash scripts/typecheck.sh"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
 # Run client-undefined safety check (guards against OTA-4 pattern)
 # ---------------------------------------------------------------------------
 echo ""

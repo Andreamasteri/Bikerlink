@@ -354,7 +354,7 @@ describe("Real admin router — GET /users", () => {
     await supertest(buildAdminApp()).get("/users");
 
     const visFilterCalls = mockGetAppSetting.mock.calls.filter(
-      ([key]: [string]) => key === "map_visibility_filter"
+      ([key]: string[]) => key === "map_visibility_filter"
     );
     expect(visFilterCalls).toHaveLength(0);
   });
@@ -430,7 +430,7 @@ describe("Real admin router — GET /users/match-summary", () => {
     await supertest(buildAdminApp()).get("/users/match-summary");
 
     const visFilterCalls = mockGetAppSetting.mock.calls.filter(
-      ([key]: [string]) => key === "map_visibility_filter"
+      ([key]: string[]) => key === "map_visibility_filter"
     );
     expect(visFilterCalls).toHaveLength(0);
   });
