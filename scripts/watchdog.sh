@@ -162,8 +162,23 @@ record_metro_crash_session() {
   return 0
 }
 
+METRO_LOCK_FILE="/tmp/start-metro.lock"
+
 restart_metro() {
   log "METRO CRASH: porta $METRO_PORT non risponde. Pulizia cache e riavvio..."
+
+  # Controlla se start-expo.sh è già in avvio tramite lock file (simmetrico al backend).
+  # Usa flock -n per verificare se il lock è ancora detenuto, eliminando i falsi
+  # positivi da PID reuse: se flock -n fallisce, il lock è realmente attivo.
+  if [ -f "$METRO_LOCK_FILE" ]; then
+    LOCK_PID=$(cat "$METRO_LOCK_FILE" 2>/dev/null || echo "?")
+    if ! flock -n "$METRO_LOCK_FILE" true 2>/dev/null; then
+      log "Metro startup già in corso (PID: $LOCK_PID) — skip restart"
+      return 0
+    fi
+    # Il lock non è più detenuto: file stale, rimuovi
+    rm -f "$METRO_LOCK_FILE"
+  fi
 
   lsof -ti:"$METRO_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
   pkill -f "expo start" 2>/dev/null || true
