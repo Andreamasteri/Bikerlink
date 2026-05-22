@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { allLimited } from "../lib/concurrency";
@@ -13,19 +14,19 @@ router.post("/", async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsed = createSosSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
     const { reason, latitude, longitude, radiusKm } = parsed.data;
     const radius = radiusKm ?? 10;
 
     const sosEnabled = await storage.getAppSetting("sos_enabled");
     if (sosEnabled?.value === "false") {
-      return res.status(403).json({ message: "Funzione SOS disabilitata" });
+      return sendError(res, 403, "Funzione SOS disabilitata");
     }
 
     const existing = await storage.getActiveSosRequestByUser(userId);
     if (existing) {
-      return res.status(409).json({ message: "Hai già una richiesta SOS attiva" });
+      return sendError(res, 409, "Hai già una richiesta SOS attiva");
     }
 
     const sosRequest = await storage.createSosRequest({
@@ -50,7 +51,7 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(201).json(sosRequest);
   } catch (error) {
     console.error("SOS create error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -75,7 +76,7 @@ router.get("/active", async (req: Request, res: Response) => {
     return res.json(enriched);
   } catch (error) {
     console.error("SOS get active error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -86,7 +87,7 @@ router.get("/my", async (req: Request, res: Response) => {
     return res.json(active || null);
   } catch (error) {
     console.error("SOS get my error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -96,20 +97,20 @@ router.put("/:id/cancel", async (req: Request, res: Response) => {
     const sosRequest = await storage.getSosRequest(req.params.id);
 
     if (!sosRequest) {
-      return res.status(404).json({ message: "Richiesta SOS non trovata" });
+      return sendError(res, 404, "Richiesta SOS non trovata");
     }
     if (sosRequest.requesterId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
     if (sosRequest.status !== "active") {
-      return res.status(400).json({ message: "Richiesta già chiusa" });
+      return sendError(res, 400, "Richiesta già chiusa");
     }
 
     const updated = await storage.updateSosRequest(sosRequest.id, { status: "cancelled" });
     return res.json(updated);
   } catch (error) {
     console.error("SOS cancel error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -119,13 +120,13 @@ router.put("/:id/accept", async (req: Request, res: Response) => {
     const sosRequest = await storage.getSosRequest(req.params.id);
 
     if (!sosRequest) {
-      return res.status(404).json({ message: "Richiesta SOS non trovata" });
+      return sendError(res, 404, "Richiesta SOS non trovata");
     }
     if (sosRequest.status !== "active") {
-      return res.status(400).json({ message: "Richiesta non più attiva" });
+      return sendError(res, 400, "Richiesta non più attiva");
     }
     if (sosRequest.requesterId === userId) {
-      return res.status(400).json({ message: "Non puoi accettare la tua stessa richiesta" });
+      return sendError(res, 400, "Non puoi accettare la tua stessa richiesta");
     }
 
     const conv = await storage.createConversation({
@@ -169,7 +170,7 @@ router.put("/:id/accept", async (req: Request, res: Response) => {
     return res.json({ sosRequest: updated, conversationId: conv.id });
   } catch (error) {
     console.error("SOS accept error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

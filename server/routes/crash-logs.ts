@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response, type RequestHandler } from "express";
 import { db } from "../db";
 import { appCrashLogs, users, crashLogsSchema } from "@shared/schema";
@@ -15,21 +16,21 @@ function trunc(s: unknown, max: number): string {
 
 const requireAdmin: RequestHandler = (req, res, next) => {
   if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
+    sendError(res, 401, "Non autenticato");
     return;
   }
   storage
     .getUser(req.session.userId)
     .then((user) => {
       if (!user || user.role !== "admin") {
-        res.status(403).json({ message: "Accesso non autorizzato" });
+        sendError(res, 403, "Accesso non autorizzato");
         return;
       }
       next();
     })
     .catch((err) => {
       console.error("[crash-logs] requireAdmin db error:", err);
-      res.status(500).json({ message: "Errore interno" });
+      sendError(res, 500, "Errore interno");
     });
 };
 
@@ -50,13 +51,13 @@ export const publicRouter = Router();
 
 publicRouter.post("/", (req: Request, res: Response): void => {
   if (!req.session.userId) {
-    res.status(401).json({ message: "Non autenticato" });
+    sendError(res, 401, "Non autenticato");
     return;
   }
 
   const parsed = crashLogsSchema.safeParse(req.body);
   if (!parsed.success) {
-    res.status(400).json({ message: parsed.error.issues[0].message });
+    sendError(res, 400, parsed.error.issues[0].message);
     return;
   }
 
@@ -90,7 +91,7 @@ publicRouter.post("/", (req: Request, res: Response): void => {
     })
     .catch((err) => {
       console.error("[crash-logs] insert error:", err);
-      res.status(500).json({ message: "Errore interno" });
+      sendError(res, 500, "Errore interno");
     });
 });
 
@@ -158,7 +159,7 @@ adminRouter.get("/stats", requireAdmin, (_req: Request, res: Response): void => 
     })
     .catch((err) => {
       console.error("[crash-logs stats] query error:", err);
-      res.status(500).json({ message: "Errore interno" });
+      sendError(res, 500, "Errore interno");
     });
 });
 
@@ -229,6 +230,6 @@ adminRouter.get("/", requireAdmin, (req: Request, res: Response): void => {
     })
     .catch((err) => {
       console.error("[crash-logs admin] query error:", err);
-      res.status(500).json({ message: "Errore interno" });
+      sendError(res, 500, "Errore interno");
     });
 });

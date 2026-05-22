@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import { type Request, type Response } from "express";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -136,6 +137,6 @@ export async function handleMusicMatch(req: Request, res: Response) {
     return res.json({ matches });
   } catch (error) {
     console.error("[MusicMatch] match/music error:", error);
-    return res.status(500).json({ message: "Errore durante il calcolo dei match musicali" });
+    return sendError(res, 500, "Errore durante il calcolo dei match musicali");
   }
 }

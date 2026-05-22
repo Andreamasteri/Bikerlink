@@ -3,6 +3,7 @@ import { storage } from "../../storage";
 import { db } from "../../db";
 import { events, eventParticipants, inviteUserToEventSchema } from "@shared/schema";
 import { requireAuth, eq, and } from "../events-helpers";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -12,7 +13,7 @@ router.post("/:id/invite-user", async (req: Request, res: Response) => {
     if (!requesterId) return;
     const eventId = req.params.id;
     const parsedIu = inviteUserToEventSchema.safeParse(req.body);
-    if (!parsedIu.success) return res.status(400).json({ message: parsedIu.error.issues[0].message });
+    if (!parsedIu.success) return sendError(res, 400, parsedIu.error.issues[0].message);
     const { userId: targetUserId } = parsedIu.data;
 
     const [event] = await db.select({
@@ -22,39 +23,39 @@ router.post("/:id/invite-user", async (req: Request, res: Response) => {
       status: events.status,
       eventDate: events.eventDate,
     }).from(events).where(eq(events.id, eventId)).limit(1);
-    if (!event) return res.status(404).json({ message: "Evento non trovato" });
+    if (!event) return sendError(res, 404, "Evento non trovato");
 
     if (event.status !== "approved") {
-      return res.status(403).json({ message: "Solo gli eventi approvati accettano inviti" });
+      return sendError(res, 403, "Solo gli eventi approvati accettano inviti");
     }
     const todayStr = new Date().toISOString().substring(0, 10);
     if (!event.eventDate || String(event.eventDate).substring(0, 10) < todayStr) {
-      return res.status(403).json({ message: "Non puoi invitare a un evento già passato" });
+      return sendError(res, 403, "Non puoi invitare a un evento già passato");
     }
 
     const requester = await storage.getUser(requesterId);
-    if (!requester) return res.status(404).json({ message: "Utente non trovato" });
+    if (!requester) return sendError(res, 404, "Utente non trovato");
 
     const isOrganizerOrAdmin =
       event.organizerId === requesterId ||
       requester.role === "admin" ||
       requester.role === "moderator";
     if (!isOrganizerOrAdmin) {
-      return res.status(403).json({ message: "Solo l'organizzatore o un admin può invitare utenti" });
+      return sendError(res, 403, "Solo l'organizzatore o un admin può invitare utenti");
     }
 
     const targetUser = await storage.getUser(targetUserId);
-    if (!targetUser) return res.status(404).json({ message: "Utente destinatario non trovato" });
+    if (!targetUser) return sendError(res, 404, "Utente destinatario non trovato");
 
     const isBlocked = await storage.hasBlockedUser(targetUserId, requesterId);
-    if (isBlocked) return res.status(403).json({ message: "Non puoi contattare questo utente" });
+    if (isBlocked) return sendError(res, 403, "Non puoi contattare questo utente");
 
     const [existing] = await db.select({ id: eventParticipants.id })
       .from(eventParticipants)
       .where(and(eq(eventParticipants.eventId, eventId), eq(eventParticipants.userId, targetUserId)))
       .limit(1);
     if (existing) {
-      return res.status(409).json({ message: "L'utente partecipa già a questo evento" });
+      return sendError(res, 409, "L'utente partecipa già a questo evento");
     }
 
     await storage.createNotification({
@@ -66,10 +67,10 @@ router.post("/:id/invite-user", async (req: Request, res: Response) => {
       referenceId: eventId,
     });
 
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (e) {
     console.error("[POST /events/:id/invite-user]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

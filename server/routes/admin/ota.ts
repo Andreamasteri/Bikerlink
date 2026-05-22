@@ -6,6 +6,7 @@ import { sql, eq, and, or, isNull, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "../../objectStorage";
 import { sendOtaPendingApprovalPushToAdmins } from "../../push-notifications";
+import { sendSuccess, sendError } from "../../lib/api-response";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -54,7 +55,7 @@ router.get("/ota-events", async (req: Request, res: Response) => {
     return res.json({ events: result.rows, limit, filters: { phase: phaseFilter, source: sourceFilter, platform: platformFilter, updateId: updateIdFilter, deviceId: deviceIdFilter } });
   } catch (err) {
     console.error("[OTA-EVENTS] read error:", err);
-    return res.status(500).json({ message: "Errore lettura eventi OTA" });
+    return sendError(res, 500, "Errore lettura eventi OTA");
   }
 });
 
@@ -62,7 +63,7 @@ router.get("/ota-device-history", async (req: Request, res: Response) => {
   try {
     const rawDeviceId = req.query.deviceId ? String(req.query.deviceId).trim().substring(0, 64) : null;
     if (!rawDeviceId) {
-      return res.status(400).json({ message: "deviceId è obbligatorio" });
+      return sendError(res, 400, "deviceId è obbligatorio");
     }
     const fuzzy = req.query.fuzzy === "true";
     const pageRaw = parseInt(String(req.query.page ?? "1"), 10);
@@ -137,7 +138,7 @@ router.get("/ota-device-history", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[OTA-DEVICE-HISTORY] read error:", err);
-    return res.status(500).json({ message: "Errore lettura storico dispositivo" });
+    return sendError(res, 500, "Errore lettura storico dispositivo");
   }
 });
 
@@ -173,7 +174,7 @@ router.get("/ota-adoption", async (_req: Request, res: Response) => {
     return res.json({ breakdown: result.rows, daily: daily.rows });
   } catch (err) {
     console.error("[OTA-ADOPTION] read error:", err);
-    return res.status(500).json({ message: "Errore lettura adoption trends" });
+    return sendError(res, 500, "Errore lettura adoption trends");
   }
 });
 
@@ -201,7 +202,7 @@ router.get("/ota-stats", async (_req: Request, res: Response) => {
     return res.json({ stats: result.rows });
   } catch (err) {
     console.error("[OTA-STATS] read error:", err);
-    return res.status(500).json({ message: "Errore lettura OTA stats" });
+    return sendError(res, 500, "Errore lettura OTA stats");
   }
 });
 
@@ -246,16 +247,16 @@ router.get("/ota-stuck-events", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[OTA-STUCK-EVENTS] read error:", err);
-    return res.status(500).json({ message: "Errore lettura stuck events" });
+    return sendError(res, 500, "Errore lettura stuck events");
   }
 });
 
 router.post("/ota/upload", otaUpload.single("bundle"), async (req: Request, res: Response) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "Nessun file bundle fornito" });
+    if (!req.file) return sendError(res, 400, "Nessun file bundle fornito");
     const { runtimeVersion } = req.body;
     if (!runtimeVersion) {
-      return res.status(400).json({ message: "runtimeVersion è obbligatorio" });
+      return sendError(res, 400, "runtimeVersion è obbligatorio");
     }
 
     const filename = `ota-${runtimeVersion}-${Date.now()}.js`;
@@ -276,14 +277,14 @@ router.post("/ota/upload", otaUpload.single("bundle"), async (req: Request, res:
     return res.status(201).json(release);
   } catch (error) {
     console.error("OTA upload error:", error);
-    return res.status(500).json({ message: "Errore durante il caricamento del bundle" });
+    return sendError(res, 500, "Errore durante il caricamento del bundle");
   }
 });
 
 router.post("/ota", async (req: Request, res: Response) => {
   try {
     const parsedPublish = publishOtaReleaseSchema.safeParse(req.body);
-    if (!parsedPublish.success) return res.status(400).json({ message: parsedPublish.error.issues[0].message });
+    if (!parsedPublish.success) return sendError(res, 400, parsedPublish.error.issues[0].message);
     const { version, runtimeVersion, bundlePath, releaseNotes, slot } = parsedPublish.data;
 
     const [release] = await db.insert(otaReleases).values({
@@ -311,17 +312,17 @@ router.post("/ota", async (req: Request, res: Response) => {
     return res.status(201).json(release);
   } catch (err) {
     console.error("OTA create error:", err);
-    return res.status(500).json({ message: "Errore creazione release" });
+    return sendError(res, 500, "Errore creazione release");
   }
 });
 
 router.post("/ota/:id/publish", async (req: Request, res: Response) => {
   try {
     const id = paramStr(req.params.id);
-    if (!id) return res.status(400).json({ message: "ID non valido" });
+    if (!id) return sendError(res, 400, "ID non valido");
 
     const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
-    if (!existing.length) return res.status(404).json({ message: "Release non trovata" });
+    if (!existing.length) return sendError(res, 404, "Release non trovata");
 
     const [updated] = await db.update(otaReleases)
       .set({ status: "active", publishedAt: new Date(), updatedAt: new Date() })
@@ -342,14 +343,14 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
     return res.json(updated);
   } catch (err) {
     console.error("OTA publish error:", err);
-    return res.status(500).json({ message: "Errore pubblicazione release" });
+    return sendError(res, 500, "Errore pubblicazione release");
   }
 });
 
 router.post("/ota/token", async (req: Request, res: Response) => {
   try {
     const parsedToken = createOtaTokenSchema.safeParse(req.body);
-    if (!parsedToken.success) return res.status(400).json({ message: parsedToken.error.issues[0].message });
+    if (!parsedToken.success) return sendError(res, 400, parsedToken.error.issues[0].message);
     const { name, expiresAt } = parsedToken.data;
 
     const rawToken = `ota_${crypto.randomBytes(32).toString("hex")}`;
@@ -373,7 +374,7 @@ router.post("/ota/token", async (req: Request, res: Response) => {
     return res.status(201).json({ ...row[0], rawToken });
   } catch (err) {
     console.error("OTA token create error:", err);
-    return res.status(500).json({ message: "Errore creazione token" });
+    return sendError(res, 500, "Errore creazione token");
   }
 });
 
@@ -383,7 +384,7 @@ router.get("/ota", async (_req: Request, res: Response) => {
     return res.json(releases);
   } catch (err) {
     console.error("OTA get error:", err);
-    return res.status(500).json({ message: "Errore lettura release" });
+    return sendError(res, 500, "Errore lettura release");
   }
 });
 
@@ -393,14 +394,14 @@ router.get("/ota/tokens", async (_req: Request, res: Response) => {
     return res.json(tokens);
   } catch (err) {
     console.error("OTA tokens get error:", err);
-    return res.status(500).json({ message: "Errore lettura token" });
+    return sendError(res, 500, "Errore lettura token");
   }
 });
 
 router.delete("/ota/token/:id", async (req: Request, res: Response) => {
   try {
     const id = paramStr(req.params.id);
-    if (!id) return res.status(400).json({ message: "ID non valido" });
+    if (!id) return sendError(res, 400, "ID non valido");
 
     await db.update(otaPublishTokens).set({ revoked: true }).where(eq(otaPublishTokens.id, id));
 
@@ -411,10 +412,10 @@ router.delete("/ota/token/:id", async (req: Request, res: Response) => {
       targetId: id,
     });
 
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (err) {
     console.error("OTA token delete error:", err);
-    return res.status(500).json({ message: "Errore revoca token" });
+    return sendError(res, 500, "Errore revoca token");
   }
 });
 
@@ -423,23 +424,23 @@ router.get("/ota/pending", async (_req: Request, res: Response) => {
     const pending = await db.select().from(otaEvents).where(eq(otaEvents.phase, "pending")).orderBy(desc(otaEvents.createdAt));
     return res.json(pending);
   } catch (err) {
-    return res.status(500).json({ message: "Errore lettura pending OTA" });
+    return sendError(res, 500, "Errore lettura pending OTA");
   }
 });
 
 router.post("/ota/:id/approve", async (req: Request, res: Response) => {
   try {
     const id = paramStr(req.params.id);
-    if (!id) return res.status(400).json({ message: "ID non valido" });
+    if (!id) return sendError(res, 400, "ID non valido");
     const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
-    if (!existing.length) return res.status(404).json({ message: "Release non trovata" });
+    if (!existing.length) return sendError(res, 404, "Release non trovata");
     const [updated] = await db.update(otaReleases)
       .set({ approved: true, approvedAt: new Date(), approvedBy: req.session.userId ?? null, slot: "stable", updatedAt: new Date() })
       .where(eq(otaReleases.id, id))
       .returning();
     return res.json(updated);
   } catch (err) {
-    return res.status(500).json({ message: "Errore approvazione release" });
+    return sendError(res, 500, "Errore approvazione release");
   }
 });
 
@@ -448,29 +449,29 @@ router.get("/ota/releases", async (_req: Request, res: Response) => {
     const releases = await db.select().from(otaReleases).orderBy(desc(otaReleases.createdAt));
     return res.json(releases);
   } catch (err) {
-    return res.status(500).json({ message: "Errore lettura release" });
+    return sendError(res, 500, "Errore lettura release");
   }
 });
 
 router.post("/ota/assign-slot", async (req: Request, res: Response) => {
   try {
     const parsed = assignOtaSlotSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const { updateId } = parsed.data;
     void updateId;
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (err) {
-    return res.status(500).json({ message: "Errore assegnazione slot" });
+    return sendError(res, 500, "Errore assegnazione slot");
   }
 });
 
 router.post("/ota/assign-device", async (req: Request, res: Response) => {
   try {
     const parsed = otaAssignDeviceSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
-    return res.json({ success: true });
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    return sendSuccess(res);
   } catch (err) {
-    return res.status(500).json({ message: "Errore assegnazione dispositivo" });
+    return sendError(res, 500, "Errore assegnazione dispositivo");
   }
 });
 
@@ -478,43 +479,43 @@ router.get("/ota/device-assignments", async (_req: Request, res: Response) => {
   try {
     return res.json([]);
   } catch (err) {
-    return res.status(500).json({ message: "Errore lettura assegnazioni" });
+    return sendError(res, 500, "Errore lettura assegnazioni");
   }
 });
 
 router.delete("/ota/device-assignments/:deviceId", async (req: Request, res: Response) => {
   try {
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (err) {
-    return res.status(500).json({ message: "Errore eliminazione assegnazione" });
+    return sendError(res, 500, "Errore eliminazione assegnazione");
   }
 });
 
 router.post("/ota/promote", async (req: Request, res: Response) => {
   try {
     const parsed = otaPromoteSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
-    return res.json({ success: true });
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    return sendSuccess(res);
   } catch (err) {
-    return res.status(500).json({ message: "Errore promozione release" });
+    return sendError(res, 500, "Errore promozione release");
   }
 });
 
 router.post("/ota/revert", async (req: Request, res: Response) => {
   try {
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (err) {
-    return res.status(500).json({ message: "Errore revert release" });
+    return sendError(res, 500, "Errore revert release");
   }
 });
 
 router.post("/ota/mark-broken", async (req: Request, res: Response) => {
   try {
     const parsed = otaMarkBrokenSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
-    return res.json({ success: true });
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    return sendSuccess(res);
   } catch (err) {
-    return res.status(500).json({ message: "Errore segnalazione release" });
+    return sendError(res, 500, "Errore segnalazione release");
   }
 });
 
@@ -523,7 +524,7 @@ router.get("/ota/events", async (req: Request, res: Response) => {
     const result = await db.select().from(otaEvents).orderBy(desc(otaEvents.createdAt)).limit(100);
     return res.json(result);
   } catch (err) {
-    return res.status(500).json({ message: "Errore lettura eventi" });
+    return sendError(res, 500, "Errore lettura eventi");
   }
 });
 

@@ -7,6 +7,7 @@ import { sendMatchPushNotifications } from "../push-notifications";
 import { updateWishlistSchema, uploadPhotoSchema, addWishlistMotoSchema, updateWishlistMotoSchema } from "@shared/schema";
 
 import { requireAuth } from "../lib/auth-middleware";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 const router = Router();
 
@@ -20,7 +21,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const user = await storage.getUser(userId);
     if (!user || user.userType !== "zavorrina") {
-      return res.status(403).json({ message: "Solo le zavorrine possono accedere alla wishlist" });
+      return sendError(res, 403, "Solo le zavorrine possono accedere alla wishlist");
     }
 
     let wishlist = await storage.getWishlist(userId);
@@ -34,7 +35,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.json({ wishlist, photos, motos });
   } catch (error) {
     console.error("Get wishlist error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -43,14 +44,14 @@ router.put("/", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsed = updateWishlistSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
     const { description } = parsed.data;
     const wishlist = await storage.createOrUpdateWishlist(userId, description ?? "");
     return res.json(wishlist);
   } catch (error) {
     console.error("Update wishlist error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -64,12 +65,12 @@ router.post("/photos", requireAuth, async (req: Request, res: Response) => {
 
     const count = await storage.getWishlistPhotoCount(wishlist.id);
     if (count >= 3) {
-      return res.status(400).json({ message: "Massimo 3 foto permesse" });
+      return sendError(res, 400, "Massimo 3 foto permesse");
     }
 
     const parsedPhoto = uploadPhotoSchema.safeParse(req.body);
     if (!parsedPhoto.success) {
-      return res.status(400).json({ message: parsedPhoto.error.issues[0].message });
+      return sendError(res, 400, parsedPhoto.error.issues[0].message);
     }
     const { imageBase64, filename } = parsedPhoto.data;
 
@@ -89,7 +90,7 @@ router.post("/photos", requireAuth, async (req: Request, res: Response) => {
     return res.status(201).json(photo);
   } catch (error) {
     console.error("Upload wishlist photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -97,10 +98,10 @@ router.delete("/photos/:photoId", requireAuth, async (req: Request, res: Respons
   try {
     const photoId = req.params.photoId as string;
     await storage.deleteWishlistPhoto(photoId);
-    return res.json({ message: "Foto eliminata" });
+    return sendSuccess(res, undefined, "Foto eliminata");
   } catch (error) {
     console.error("Delete wishlist photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -114,12 +115,12 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
 
     const count = await storage.getWishlistMotoCount(wishlist.id);
     if (count >= 5) {
-      return res.status(400).json({ message: "Massimo 5 moto nella wishlist" });
+      return sendError(res, 400, "Massimo 5 moto nella wishlist");
     }
 
     const parsedMoto = addWishlistMotoSchema.safeParse(req.body);
     if (!parsedMoto.success) {
-      return res.status(400).json({ message: parsedMoto.error.issues[0].message });
+      return sendError(res, 400, parsedMoto.error.issues[0].message);
     }
     const { brand, model, ridingStyle, motorcycleType } = parsedMoto.data;
 
@@ -175,7 +176,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
     return res.status(201).json({ moto, matches });
   } catch (error) {
     console.error("Add wishlist moto error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -186,24 +187,24 @@ router.put("/motos/:motoId", requireAuth, async (req: Request, res: Response) =>
 
     const existingMoto = await storage.getWishlistMoto(motoId);
     if (!existingMoto) {
-      return res.status(404).json({ message: "Moto non trovata" });
+      return sendError(res, 404, "Moto non trovata");
     }
 
     const userWishlist = await storage.getWishlist(userId);
     if (!userWishlist || existingMoto.wishlistId !== userWishlist.id) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const parsedMotoUpdate = updateWishlistMotoSchema.safeParse(req.body);
     if (!parsedMotoUpdate.success) {
-      return res.status(400).json({ message: parsedMotoUpdate.error.issues[0].message });
+      return sendError(res, 400, parsedMotoUpdate.error.issues[0].message);
     }
     const { brand, model, ridingStyle, motorcycleType } = parsedMotoUpdate.data;
     const moto = await storage.updateWishlistMoto(motoId, { brand, model, ridingStyle, motorcycleType });
     return res.json(moto);
   } catch (error) {
     console.error("Update wishlist moto error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -214,19 +215,19 @@ router.delete("/motos/:motoId", requireAuth, async (req: Request, res: Response)
 
     const existingMoto = await storage.getWishlistMoto(motoId);
     if (!existingMoto) {
-      return res.status(404).json({ message: "Moto non trovata" });
+      return sendError(res, 404, "Moto non trovata");
     }
 
     const userWishlist = await storage.getWishlist(userId);
     if (!userWishlist || existingMoto.wishlistId !== userWishlist.id) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     await storage.deleteWishlistMoto(motoId);
-    return res.json({ message: "Moto eliminata dalla wishlist" });
+    return sendSuccess(res, undefined, "Moto eliminata dalla wishlist");
   } catch (error) {
     console.error("Delete wishlist moto error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { requireAuth, decodePolyline, computeBikerScoreFromPoints } from "./utils";
 import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, weatherWaypointsSchema, poiRequestSchema, poiPhotoSchema } from "@shared/schema";
@@ -204,11 +205,11 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedAi = aiPromptSchema.safeParse(req.body);
-  if (!parsedAi.success) return res.status(400).json({ message: parsedAi.error.issues[0].message });
+  if (!parsedAi.success) return sendError(res, 400, parsedAi.error.issues[0].message);
   const { prompt } = parsedAi.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
+  if (!apiKey) return sendError(res, 503, "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
@@ -243,11 +244,11 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedAiStream = aiPromptSchema.safeParse(req.body);
-  if (!parsedAiStream.success) return res.status(400).json({ message: parsedAiStream.error.issues[0].message });
+  if (!parsedAiStream.success) return sendError(res, 400, parsedAiStream.error.issues[0].message);
   const { prompt } = parsedAiStream.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(503).json({ message: "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante" });
+  if (!apiKey) return sendError(res, 503, "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante");
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -298,7 +299,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
 
 router.get("/geocode", async (req: Request, res: Response) => {
   const { q } = req.query as { q?: string };
-  if (!q) return res.status(400).json({ message: "Query richiesta" });
+  if (!q) return sendError(res, 400, "Query richiesta");
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=it`;
     const resp = await fetch(url, { headers: { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" } });
@@ -308,7 +309,7 @@ router.get("/geocode", async (req: Request, res: Response) => {
     })));
   } catch (err) {
     console.error("[geocode] error:", err);
-    return res.status(502).json({ message: "Geocoding non disponibile" });
+    return sendError(res, 502, "Geocoding non disponibile");
   }
 });
 
@@ -318,7 +319,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
 
   const parsedCalc = calculateRouteRequestSchema.safeParse(req.body);
   if (!parsedCalc.success) {
-    return res.status(400).json({ message: parsedCalc.error.issues[0].message });
+    return sendError(res, 400, parsedCalc.error.issues[0].message);
   }
   const {
     waypoints,
@@ -463,7 +464,7 @@ router.post("/weather", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedWp = weatherWaypointsSchema.safeParse(req.body);
-  if (!parsedWp.success) return res.status(400).json({ message: parsedWp.error.issues[0].message });
+  if (!parsedWp.success) return sendError(res, 400, parsedWp.error.issues[0].message);
   const { waypoints, departureIso, avgSpeedKmh } = parsedWp.data as any;
 
   try {
@@ -472,7 +473,7 @@ router.post("/weather", async (req: Request, res: Response) => {
     return res.json(weather);
   } catch (err) {
     console.error("[weather] error:", err);
-    return res.status(502).json({ message: "Meteo non disponibile" });
+    return sendError(res, 502, "Meteo non disponibile");
   }
 });
 
@@ -481,7 +482,7 @@ router.post("/poi", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedPoi = poiRequestSchema.safeParse(req.body);
-  if (!parsedPoi.success) return res.status(400).json({ message: parsedPoi.error.issues[0].message });
+  if (!parsedPoi.success) return sendError(res, 400, parsedPoi.error.issues[0].message);
   const { bbox, types } = parsedPoi.data;
 
   try {
@@ -520,7 +521,7 @@ router.post("/poi", async (req: Request, res: Response) => {
     return res.json(results);
   } catch (err) {
     console.error("[poi] error:", err);
-    return res.status(502).json({ message: "Punti di interesse non disponibili" });
+    return sendError(res, 502, "Punti di interesse non disponibili");
   }
 });
 
@@ -529,7 +530,7 @@ router.post("/poi-photo", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedPhoto = poiPhotoSchema.safeParse(req.body);
-  if (!parsedPhoto.success) return res.status(400).json({ message: parsedPhoto.error.issues[0].message });
+  if (!parsedPhoto.success) return sendError(res, 400, parsedPhoto.error.issues[0].message);
   const { poiId } = parsedPhoto.data;
 
   try {
@@ -545,7 +546,7 @@ router.post("/poi-search", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedSearch = poiSearchSchema.safeParse(req.body);
-  if (!parsedSearch.success) return res.status(400).json({ message: parsedSearch.error.issues[0].message });
+  if (!parsedSearch.success) return sendError(res, 400, parsedSearch.error.issues[0].message);
   const { lat, lng, radius = 10000 } = parsedSearch.data;
 
   try {
@@ -563,7 +564,7 @@ router.post("/poi-search", async (req: Request, res: Response) => {
     return res.json(results);
   } catch (err) {
     console.error("[poi-search] error:", err);
-    return res.status(502).json({ message: "Ricerca non disponibile" });
+    return sendError(res, 502, "Ricerca non disponibile");
   }
 });
 

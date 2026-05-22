@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { haversineKm } from "../geo";
@@ -59,7 +60,7 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
 
     const { filename } = req.params;
     if (!filename || /[/\\.]\./.test(filename) || filename.includes("..")) {
-      return res.status(400).json({ message: "Nome file non valido" });
+      return sendError(res, 400, "Nome file non valido");
     }
 
     const imageUrl = `/api/events/images/${filename}`;
@@ -71,12 +72,12 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
       .limit(1);
 
     if (!parent) {
-      return res.status(404).json({ message: "Immagine non trovata" });
+      return sendError(res, 404, "Immagine non trovata");
     }
     if (parent.status !== "approved" && parent.creatorId !== userId) {
       const allowed = await isAdminOrModUser(userId);
       if (!allowed) {
-        return res.status(404).json({ message: "Immagine non trovata" });
+        return sendError(res, 404, "Immagine non trovata");
       }
     }
 
@@ -88,7 +89,7 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     res.setHeader("Cache-Control", "private, max-age=86400");
     return res.send(buf);
   } catch {
-    return res.status(404).json({ message: "Immagine non trovata" });
+    return sendError(res, 404, "Immagine non trovata");
   }
 });
 
@@ -167,7 +168,7 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json({ events: enriched, total, page: pageNum, limit: limitNum });
   } catch (err) {
     console.error("[events] GET / error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -180,7 +181,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const parsedEvent = createEventSchema.safeParse(req.body);
     if (!parsedEvent.success) {
-      return res.status(400).json({ message: parsedEvent.error.issues[0].message });
+      return sendError(res, 400, parsedEvent.error.issues[0].message);
     }
     const {
       title, description, eventType, latitude, longitude,
@@ -197,7 +198,7 @@ router.post("/", async (req: Request, res: Response) => {
       .where(and(eq(events.creatorId, userId), gte(events.createdAt, todayStart)));
 
     if (Number(todayCount?.count ?? 0) >= 5) {
-      return res.status(429).json({ message: "Hai raggiunto il limite di 5 eventi al giorno" });
+      return sendError(res, 429, "Hai raggiunto il limite di 5 eventi al giorno");
     }
 
     const creator = await storage.getUser(userId);
@@ -252,7 +253,7 @@ router.post("/", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[events] POST / error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

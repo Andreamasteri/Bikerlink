@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { onlineTracker } from "../../online-tracker";
@@ -73,7 +74,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.json(results);
   } catch (error) {
     console.error("Get users error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -92,7 +93,7 @@ router.get("/available-count", requireAuth, async (req: Request, res: Response) 
     });
   } catch (error) {
     console.error("Available count error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -195,7 +196,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     return res.json(mapped);
   } catch (error) {
     console.error("Online list error:", error);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -247,7 +248,7 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
     return res.json(mapped);
   } catch (error) {
     console.error("Available list error:", error);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -353,7 +354,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
     return res.json(mapped);
   } catch (error) {
     console.error("Biker available list error:", error);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -449,7 +450,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
     return res.json(mapped);
   } catch (error) {
     console.error("Zavorrine available list error:", error);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -462,7 +463,7 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
 
     if (isNaN(lat) || isNaN(lng)) {
-      return res.status(400).json({ message: "Parametri lat e lng richiesti" });
+      return sendError(res, 400, "Parametri lat e lng richiesti");
     }
 
     const [offlineRandomSetting, mapFilterSetting] = await Promise.all([
@@ -515,7 +516,7 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     return res.json(results);
   } catch (error) {
     console.error("Nearby users error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -570,7 +571,7 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
     return res.json(safeResults);
   } catch (error) {
     console.error("Search users error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

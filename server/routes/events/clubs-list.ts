@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { motoClubs } from "@shared/schema";
@@ -27,7 +28,7 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(clubs);
   } catch (err) {
     console.error("[events] GET /clubs-list error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

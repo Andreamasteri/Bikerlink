@@ -3,6 +3,7 @@ import { storage } from "../../storage";
 import { routeStatsSchema, stopRouteSchema, updateRouteTitleSchema } from "@shared/schema";
 import { haversineKm } from "../../geo";
 import { requireUserId } from "../../lib/auth-middleware";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -15,17 +16,17 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
     const route = await storage.getRoute(id);
 
     if (!route) {
-      return res.status(404).json({ message: "Percorso non trovato" });
+      return sendError(res, 404, "Percorso non trovato");
     }
     if (route.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const stoppedAt = new Date();
 
     const parsedStop = stopRouteSchema.safeParse(req.body);
     if (!parsedStop.success) {
-      return res.status(400).json({ message: parsedStop.error.issues[0].message });
+      return sendError(res, 400, parsedStop.error.issues[0].message);
     }
     const {
       totalDistanceKm: clientDistanceKm,
@@ -205,7 +206,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
     return res.json(updated);
   } catch (error) {
     console.error("Stop route error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -218,18 +219,18 @@ router.patch("/:id/stats", async (req: Request, res: Response) => {
     const route = await storage.getRoute(id);
 
     if (!route) {
-      return res.status(404).json({ message: "Percorso non trovato" });
+      return sendError(res, 404, "Percorso non trovato");
     }
     if (route.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
     if (route.status !== "active") {
-      return res.status(400).json({ message: "Il percorso non è attivo" });
+      return sendError(res, 400, "Il percorso non è attivo");
     }
 
     const parsedStats = routeStatsSchema.safeParse(req.body);
     if (!parsedStats.success) {
-      return res.status(400).json({ message: parsedStats.error.issues[0].message });
+      return sendError(res, 400, parsedStats.error.issues[0].message);
     }
     const { totalDistanceKm, maxSpeedKmh, avgSpeedKmh, maxAltitude, idleTimeSeconds } = parsedStats.data;
     const updates: any = {};
@@ -243,10 +244,10 @@ router.patch("/:id/stats", async (req: Request, res: Response) => {
       await storage.updateRoute(id, updates);
     }
 
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Update route stats error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -259,23 +260,23 @@ router.patch("/:id/title", async (req: Request, res: Response) => {
     const route = await storage.getRoute(id);
 
     if (!route) {
-      return res.status(404).json({ message: "Percorso non trovato" });
+      return sendError(res, 404, "Percorso non trovato");
     }
     if (route.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const parsedTitle = updateRouteTitleSchema.safeParse(req.body);
     if (!parsedTitle.success) {
-      return res.status(400).json({ message: parsedTitle.error.issues[0].message });
+      return sendError(res, 400, parsedTitle.error.issues[0].message);
     }
     const { title } = parsedTitle.data;
     const titleUpdate: Partial<import("@shared/schema").InsertRoute> = { title: title.trim() };
     await storage.updateRoute(id, titleUpdate);
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Patch route title error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

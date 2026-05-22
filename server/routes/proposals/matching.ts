@@ -6,6 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { haversineKm } from "../../geo";
 import { isSystemAccount } from "../../lib/system-account-filter";
 import { runMatchingForUser, runProposalMatchingForUser } from "../../matching-engine";
+import { sendSuccess, sendError } from "../../lib/api-response";
 import { allLimited, matchEnrichmentSemaphore, SemaphoreQueueFullError } from "../../lib/concurrency";
 import { sendZoneMatchedPushNotifications } from "../../push-notifications";
 
@@ -77,7 +78,7 @@ router.get("/matches", requireAuth, async (req: Request, res: Response) => {
     return res.json(results.filter(Boolean));
   } catch (error) {
     console.error("Get matches error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -194,16 +195,16 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
         return res.json([...bestByUser.values()]);
       } catch (error) {
         console.error("Get garage matches error:", error);
-        return res.status(500).json({ message: "Errore interno del server" });
+        return sendError(res, 500, "Errore interno del server");
       }
     });
   } catch (err) {
     if (err instanceof SemaphoreQueueFullError) {
       res.setHeader("Retry-After", "3");
-      return res.status(503).json({ message: "Server occupato, riprova più tardi" });
+      return sendError(res, 503, "Server occupato, riprova più tardi");
     }
     console.error("Get garage matches outer error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -211,23 +212,23 @@ router.post("/garage-matches/:id/accept", requireAuth, async (req: Request, res:
   try {
     const userId = req.session.userId as string;
     const matchId = req.params.id;
-    if (!matchId) return res.status(400).json({ message: "ID match mancante" });
+    if (!matchId) return sendError(res, 400, "ID match mancante");
     const match = await storage.getGarageMatch(matchId);
     if (!match) {
-      return res.status(404).json({ message: "Match non trovato" });
+      return sendError(res, 404, "Match non trovato");
     }
     if (match.bikerId !== userId && match.zavarrinaId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
     if (match.status !== "new") {
-      return res.status(400).json({ message: "Match già gestito" });
+      return sendError(res, 400, "Match già gestito");
     }
     const updated = await storage.updateGarageMatch(matchId, { status: "accepted" });
-    if (!updated) return res.status(500).json({ message: "Aggiornamento match fallito" });
+    if (!updated) return sendError(res, 500, "Aggiornamento match fallito");
     return res.json(updated);
   } catch (error) {
     console.error("Accept garage match error:", error instanceof Error ? error.message : error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -235,23 +236,23 @@ router.post("/garage-matches/:id/reject", requireAuth, async (req: Request, res:
   try {
     const userId = req.session.userId as string;
     const matchId = req.params.id;
-    if (!matchId) return res.status(400).json({ message: "ID match mancante" });
+    if (!matchId) return sendError(res, 400, "ID match mancante");
     const match = await storage.getGarageMatch(matchId);
     if (!match) {
-      return res.status(404).json({ message: "Match non trovato" });
+      return sendError(res, 404, "Match non trovato");
     }
     if (match.bikerId !== userId && match.zavarrinaId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
     if (match.status !== "new") {
-      return res.status(400).json({ message: "Match già gestito" });
+      return sendError(res, 400, "Match già gestito");
     }
     const updated = await storage.updateGarageMatch(matchId, { status: "rejected" });
-    if (!updated) return res.status(500).json({ message: "Aggiornamento match fallito" });
+    if (!updated) return sendError(res, 500, "Aggiornamento match fallito");
     return res.json(updated);
   } catch (error) {
     console.error("Reject garage match error:", error instanceof Error ? error.message : error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -262,32 +263,32 @@ router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Respon
 
     const match = await storage.getProposalMatch(matchId);
     if (!match) {
-      return res.status(404).json({ message: "Match non trovato" });
+      return sendError(res, 404, "Match non trovato");
     }
     if (match.status !== "pending") {
-      return res.status(400).json({ message: "Match non più in attesa" });
+      return sendError(res, 400, "Match non più in attesa");
     }
 
     const isUser1 = match.userId1 === userId;
     const isUser2 = match.userId2 === userId;
     if (!isUser1 && !isUser2) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const proposal1 = await storage.getProposal(match.proposalId1);
     const proposal2 = await storage.getProposal(match.proposalId2);
     if (proposal1?.clubId && !(await isActiveClubMember(userId, proposal1.clubId))) {
-      return res.status(403).json({ message: "Non sei più membro del club di questa proposta" });
+      return sendError(res, 403, "Non sei più membro del club di questa proposta");
     }
     if (proposal2?.clubId && !(await isActiveClubMember(userId, proposal2.clubId))) {
-      return res.status(403).json({ message: "Non sei più membro del club di questa proposta" });
+      return sendError(res, 403, "Non sei più membro del club di questa proposta");
     }
     const otherUserId = isUser1 ? match.userId2 : match.userId1;
     if (proposal1?.clubId && !(await isActiveClubMember(otherUserId, proposal1.clubId))) {
-      return res.status(403).json({ message: "L'altra persona non è più membro del club" });
+      return sendError(res, 403, "L'altra persona non è più membro del club");
     }
     if (proposal2?.clubId && !(await isActiveClubMember(otherUserId, proposal2.clubId))) {
-      return res.status(403).json({ message: "L'altra persona non è più membro del club" });
+      return sendError(res, 403, "L'altra persona non è più membro del club");
     }
 
     const updateData: Record<string, unknown> = {};
@@ -379,7 +380,7 @@ router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Respon
     return res.json(updated);
   } catch (error) {
     console.error("Accept match error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -390,17 +391,17 @@ router.post("/matches/:id/reject", requireAuth, async (req: Request, res: Respon
 
     const match = await storage.getProposalMatch(matchId);
     if (!match) {
-      return res.status(404).json({ message: "Match non trovato" });
+      return sendError(res, 404, "Match non trovato");
     }
     if (match.userId1 !== userId && match.userId2 !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const updated = await storage.updateProposalMatch(matchId, { status: "rejected" } as any);
     return res.json(updated);
   } catch (error) {
     console.error("Reject match error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -490,16 +491,16 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
         return res.json(results.filter(Boolean));
       } catch (error) {
         console.error("Get biker matches error:", error);
-        return res.status(500).json({ message: "Errore interno del server" });
+        return sendError(res, 500, "Errore interno del server");
       }
     });
   } catch (err) {
     if (err instanceof SemaphoreQueueFullError) {
       res.setHeader("Retry-After", "3");
-      return res.status(503).json({ message: "Server occupato, riprova più tardi" });
+      return sendError(res, 503, "Server occupato, riprova più tardi");
     }
     console.error("Get biker matches outer error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -508,14 +509,14 @@ router.post("/biker-matches/:id/accept", requireAuth, async (req: Request, res: 
     const userId = req.session.userId as string;
     const matchId = req.params.id;
     const match = await storage.getBikerBikerMatch(matchId);
-    if (!match) return res.status(404).json({ message: "Match non trovato" });
-    if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
-    if (match.status !== "new") return res.status(400).json({ message: "Match già gestito" });
+    if (!match) return sendError(res, 404, "Match non trovato");
+    if (match.biker1Id !== userId && match.biker2Id !== userId) return sendError(res, 403, "Non autorizzato");
+    if (match.status !== "new") return sendError(res, 400, "Match già gestito");
     const updated = await storage.updateBikerBikerMatch(matchId, { status: "accepted" });
     return res.json(updated);
   } catch (error) {
     console.error("Accept biker match error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -524,14 +525,14 @@ router.post("/biker-matches/:id/reject", requireAuth, async (req: Request, res: 
     const userId = req.session.userId as string;
     const matchId = req.params.id;
     const match = await storage.getBikerBikerMatch(matchId);
-    if (!match) return res.status(404).json({ message: "Match non trovato" });
-    if (match.biker1Id !== userId && match.biker2Id !== userId) return res.status(403).json({ message: "Non autorizzato" });
-    if (match.status !== "new") return res.status(400).json({ message: "Match già gestito" });
+    if (!match) return sendError(res, 404, "Match non trovato");
+    if (match.biker1Id !== userId && match.biker2Id !== userId) return sendError(res, 403, "Non autorizzato");
+    if (match.status !== "new") return sendError(res, 400, "Match già gestito");
     const updated = await storage.updateBikerBikerMatch(matchId, { status: "rejected" });
     return res.json(updated);
   } catch (error) {
     console.error("Reject biker match error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -540,10 +541,10 @@ router.post("/trigger-matching", requireAuth, async (req: Request, res: Response
     const userId = req.session.userId as string;
     runMatchingForUser(userId).catch(err => console.error("Matching error:", err));
     runProposalMatchingForUser(userId).catch(err => console.error("Proposal matching error:", err));
-    return res.json({ success: true, message: "Matching triggered" });
+    return sendSuccess(res, undefined, "Matching triggered");
   } catch (error) {
     console.error("Trigger matching error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -551,11 +552,11 @@ router.delete("/garage-matches/:matchId", requireAuth, async (req: Request, res:
   try {
     const userId = req.session.userId as string;
     const ok = await storage.resetGarageMatchToNew(req.params.matchId, userId);
-    if (!ok) return res.status(404).json({ message: "Match non trovato o non autorizzato" });
-    return res.json({ deleted: true });
+    if (!ok) return sendError(res, 404, "Match non trovato o non autorizzato");
+    return sendSuccess(res, { deleted: true });
   } catch (error) {
     console.error("Reset garage match error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

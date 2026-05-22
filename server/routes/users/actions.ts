@@ -8,6 +8,7 @@ import { db } from "../../db";
 import { eq } from "drizzle-orm";
 import { uploadBuffer, downloadBuffer, deleteObject } from "../../objectStorage";
 import { reportRateLimiter, getTrustedClientIp } from "../../lib/abuse-rate-limit";
+import { sendSuccess, sendError } from "../../lib/api-response";
 import { isProtectedUser } from "../../constants";
 import type { InsertReport } from "@shared/schema";
 
@@ -45,9 +46,9 @@ router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
 
   if (multerError) {
     if (multerError instanceof MulterError && multerError.code === "LIMIT_FILE_SIZE") {
-      return res.status(400).json({ message: "Foto troppo grande. Dimensione massima consentita: 5 MB." });
+      return sendError(res, 400, "Foto troppo grande. Dimensione massima consentita: 5 MB.");
     }
-    return res.status(400).json({ message: multerError.message || "Formato file non supportato." });
+    return sendError(res, 400, multerError.message || "Formato file non supportato.");
   }
 
   try {
@@ -55,16 +56,16 @@ router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
 
     const user = await storage.getUser(userId);
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
 
     const count = await storage.getUserPhotoCount(userId);
     if (count >= 3) {
-      return res.status(400).json({ message: "Massimo 3 foto consentite" });
+      return sendError(res, 400, "Massimo 3 foto consentite");
     }
 
     if (!req.file) {
-      return res.status(400).json({ message: "Nessuna foto caricata" });
+      return sendError(res, 400, "Nessuna foto caricata");
     }
 
     const { compressToWebP } = await import("../../utils/image-processing");
@@ -87,14 +88,14 @@ router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
     return res.status(201).json(photo);
   } catch (error) {
     console.error("Upload photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.get("/photos/:filename", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
     const requesterId = req.session.userId;
     const filename = req.params.filename;
@@ -107,17 +108,17 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
       .limit(1);
 
     if (!photoRow) {
-      return res.status(404).json({ message: "Foto non trovata" });
+      return sendError(res, 404, "Foto non trovata");
     }
 
     const isOwner = photoRow.userId === requesterId;
     if (!isOwner) {
       if (!photoRow.isApproved) {
-        return res.status(404).json({ message: "Foto non trovata" });
+        return sendError(res, 404, "Foto non trovata");
       }
       const blocked = await storage.hasBlockedUser(photoRow.userId, requesterId);
       if (blocked) {
-        return res.status(403).json({ message: "Non puoi visualizzare questa foto" });
+        return sendError(res, 403, "Non puoi visualizzare questa foto");
       }
     }
 
@@ -135,7 +136,7 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
     res.set("Cache-Control", "private, max-age=3600");
     return res.send(buffer);
   } catch {
-    return res.status(404).json({ message: "Foto non trovata" });
+    return sendError(res, 404, "Foto non trovata");
   }
 });
 
@@ -146,11 +147,11 @@ router.delete("/me/photos/:id", requireAuth, async (req: Request, res: Response)
 
     const photo = await storage.getUserPhoto(photoId);
     if (!photo) {
-      return res.status(404).json({ message: "Foto non trovata" });
+      return sendError(res, 404, "Foto non trovata");
     }
 
     if (photo.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const photoUrl = photo.photoUrl;
@@ -166,10 +167,10 @@ router.delete("/me/photos/:id", requireAuth, async (req: Request, res: Response)
 
     await storage.deleteUserPhoto(photoId);
 
-    return res.json({ message: "Foto eliminata" });
+    return sendSuccess(res, undefined, "Foto eliminata");
   } catch (error) {
     console.error("Delete photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -180,7 +181,7 @@ router.get("/blocked", requireAuth, async (req: Request, res: Response) => {
     return res.json(blockedIds);
   } catch (error) {
     console.error("Get blocked users error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -189,16 +190,16 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
     const reporterId = req.session.userId!;
     const reportedUserId = req.params.id as string;
     const parsedRep = userReportSchema.safeParse(req.body);
-    if (!parsedRep.success) return res.status(400).json({ message: parsedRep.error.issues[0].message });
+    if (!parsedRep.success) return sendError(res, 400, parsedRep.error.issues[0].message);
     const { reason, description } = parsedRep.data;
 
     const ip = getTrustedClientIp(req) ?? "";
     if (reportRateLimiter.isOverLimit(reporterId, ip)) {
-      return res.status(429).json({ message: "Hai inviato troppe segnalazioni. Riprova tra un'ora." });
+      return sendError(res, 429, "Hai inviato troppe segnalazioni. Riprova tra un'ora.");
     }
 
     if (reporterId === reportedUserId) {
-      return res.status(400).json({ message: "Non puoi segnalare te stesso" });
+      return sendError(res, 400, "Non puoi segnalare te stesso");
     }
 
     const validReasons = [
@@ -210,16 +211,16 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
       "Altro",
     ];
     if (!reason || !validReasons.includes(reason)) {
-      return res.status(400).json({ message: "Motivo non valido" });
+      return sendError(res, 400, "Motivo non valido");
     }
 
     if (description && typeof description === "string" && description.length > 500) {
-      return res.status(400).json({ message: "La descrizione non può superare 500 caratteri" });
+      return sendError(res, 400, "La descrizione non può superare 500 caratteri");
     }
 
     const targetUser = await storage.getUser(reportedUserId);
     if (!targetUser) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
 
     const reportData: InsertReport = {
@@ -231,10 +232,10 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
     };
     await storage.createReport(reportData);
 
-    return res.json({ message: "Segnalazione inviata con successo" });
+    return sendSuccess(res, undefined, "Segnalazione inviata con successo");
   } catch (error) {
     console.error("Report user error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -244,29 +245,29 @@ router.post("/:id/block", requireAuth, async (req: Request, res: Response) => {
     const blockedId = req.params.id as string;
 
     if (blockerId === blockedId) {
-      return res.status(400).json({ message: "Non puoi bloccare te stesso" });
+      return sendError(res, 400, "Non puoi bloccare te stesso");
     }
 
     const targetUser = await storage.getUser(blockedId);
     if (!targetUser) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
 
     if (isProtectedUser(targetUser.nickname)) {
-      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+      return sendError(res, 403, "Utente di sistema non modificabile");
     }
 
     const alreadyBlocked = await storage.isBlocked(blockerId, blockedId);
     if (alreadyBlocked) {
-      return res.status(409).json({ message: "Utente già bloccato" });
+      return sendError(res, 409, "Utente già bloccato");
     }
 
     await storage.blockUser(blockerId, blockedId);
     await storage.deleteBikerBikerMatchesBetween(blockerId, blockedId);
-    return res.json({ message: "Utente bloccato con successo" });
+    return sendSuccess(res, undefined, "Utente bloccato con successo");
   } catch (error) {
     console.error("Block user error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -276,18 +277,18 @@ router.delete("/:id/block", requireAuth, async (req: Request, res: Response) => 
     const blockedId = req.params.id as string;
 
     if (blockerId === blockedId) {
-      return res.status(400).json({ message: "Non puoi sbloccare te stesso" });
+      return sendError(res, 400, "Non puoi sbloccare te stesso");
     }
 
     const success = await storage.unblockUser(blockerId, blockedId);
     if (!success) {
-      return res.status(404).json({ message: "Blocco non trovato" });
+      return sendError(res, 404, "Blocco non trovato");
     }
 
-    return res.json({ message: "Utente sbloccato con successo" });
+    return sendSuccess(res, undefined, "Utente sbloccato con successo");
   } catch (error) {
     console.error("Unblock user error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

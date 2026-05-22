@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import express, { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { sendEmail } from "../email";
@@ -54,7 +55,7 @@ const router = Router();
 router.post("/", feedbackJson, async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
 
     // Task #1125: per-user + per-IP throttle. Each accepted feedback
@@ -75,7 +76,7 @@ router.post("/", feedbackJson, async (req: Request, res: Response) => {
 
     const parsed = createFeedbackSchema.safeParse(req.body ?? {});
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
     const { ticketType, subject, message } = parsed.data;
     const trimmedSubject = subject.trim();
@@ -104,52 +105,52 @@ router.post("/", feedbackJson, async (req: Request, res: Response) => {
     return res.status(201).json(ticket);
   } catch (error) {
     console.error("Feedback create error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.get("/", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
 
     const user = await storage.getUser(req.session.userId);
     if (!user || (user.role !== "admin" && user.role !== "moderator")) {
-      return res.status(403).json({ message: "Accesso negato" });
+      return sendError(res, 403, "Accesso negato");
     }
 
     const tickets = await storage.getFeedbackTickets();
     return res.json(tickets);
   } catch (error) {
     console.error("Feedback list error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.patch("/:id", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
     const user = await storage.getUser(req.session.userId);
     if (!user || (user.role !== "admin" && user.role !== "moderator")) {
-      return res.status(403).json({ message: "Accesso negato" });
+      return sendError(res, 403, "Accesso negato");
     }
     const parsedFbu = updateFeedbackTicketSchema.safeParse(req.body);
-    if (!parsedFbu.success) return res.status(400).json({ message: parsedFbu.error.issues[0].message });
+    if (!parsedFbu.success) return sendError(res, 400, parsedFbu.error.issues[0].message);
     const { status, internalNote } = parsedFbu.data;
     const updates: { status?: string; internalNote?: string } = {};
     if (status !== undefined) updates.status = status;
     if (internalNote !== undefined) updates.internalNote = internalNote;
     const ticket = await storage.updateFeedbackTicket(req.params.id, updates);
     if (!ticket) {
-      return res.status(404).json({ message: "Ticket non trovato" });
+      return sendError(res, 404, "Ticket non trovato");
     }
     return res.json(ticket);
   } catch (error) {
     console.error("Feedback update error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

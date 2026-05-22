@@ -4,12 +4,13 @@ import { db } from "../db";
 import { mediaLibrary } from "@shared/schema";
 import { eq, asc } from "drizzle-orm";
 import { storage as appStorage } from "../storage";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const sess = (req as any).session as { userId?: string };
-  if (!sess?.userId) return res.status(401).json({ message: "Non autenticato" });
+  if (!sess?.userId) return sendError(res, 401, "Non autenticato");
   const user = await appStorage.getUser(sess.userId);
-  if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+  if (!user || user.role !== "admin") return sendError(res, 403, "Accesso non autorizzato");
   next();
 }
 
@@ -34,7 +35,7 @@ publicMediaRouter.get("/", async (_req: Request, res: Response) => {
     return res.json(items);
   } catch (err) {
     console.error("[media] GET / error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -48,7 +49,7 @@ publicMediaRouter.get("/file/:filename", async (req: Request, res: Response) => 
       filename.includes("..") ||
       filename.includes("\0")
     ) {
-      return res.status(400).json({ message: "Chiave file non valida" });
+      return sendError(res, 400, "Chiave file non valida");
     }
 
     const buffer = await downloadBuffer(filename);
@@ -66,7 +67,7 @@ publicMediaRouter.get("/file/:filename", async (req: Request, res: Response) => 
     return res.send(buffer);
   } catch (err) {
     console.error("[media] file serve error:", err);
-    return res.status(404).json({ message: "File non trovato" });
+    return sendError(res, 404, "File non trovato");
   }
 });
 
@@ -79,13 +80,13 @@ adminMediaRouter.post("/", async (req: Request, res: Response) => {
   try {
     const { type, titleIt, titleEn, url, thumbnailUrl, sortOrder } = req.body;
     if (!type || !titleIt || !titleEn || !url) {
-      return res.status(400).json({ message: "type, titleIt, titleEn, url sono obbligatori" });
+      return sendError(res, 400, "type, titleIt, titleEn, url sono obbligatori");
     }
     if (!validateType(type)) {
-      return res.status(400).json({ message: "type deve essere 'pdf' o 'video'" });
+      return sendError(res, 400, "type deve essere 'pdf' o 'video'");
     }
     if (typeof url !== "string" || !url.startsWith("http") && !url.startsWith("/")) {
-      return res.status(400).json({ message: "url non valido" });
+      return sendError(res, 400, "url non valido");
     }
     const [item] = await db.insert(mediaLibrary).values({
       type,
@@ -98,7 +99,7 @@ adminMediaRouter.post("/", async (req: Request, res: Response) => {
     return res.status(201).json(item);
   } catch (err) {
     console.error("[media] POST / error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -107,7 +108,7 @@ adminMediaRouter.put("/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
     const { type, titleIt, titleEn, url, thumbnailUrl, sortOrder } = req.body;
     if (type !== undefined && !validateType(type)) {
-      return res.status(400).json({ message: "type deve essere 'pdf' o 'video'" });
+      return sendError(res, 400, "type deve essere 'pdf' o 'video'");
     }
     const updates: Partial<typeof mediaLibrary.$inferInsert> = {};
     if (type !== undefined) updates.type = type;
@@ -117,11 +118,11 @@ adminMediaRouter.put("/:id", async (req: Request, res: Response) => {
     if (thumbnailUrl !== undefined) updates.thumbnailUrl = thumbnailUrl || null;
     if (sortOrder !== undefined) updates.sortOrder = Number(sortOrder);
     const [item] = await db.update(mediaLibrary).set(updates).where(eq(mediaLibrary.id, id)).returning();
-    if (!item) return res.status(404).json({ message: "Elemento non trovato" });
+    if (!item) return sendError(res, 404, "Elemento non trovato");
     return res.json(item);
   } catch (err) {
     console.error("[media] PUT /:id error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -129,17 +130,17 @@ adminMediaRouter.delete("/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const [deleted] = await db.delete(mediaLibrary).where(eq(mediaLibrary.id, id)).returning();
-    if (!deleted) return res.status(404).json({ message: "Elemento non trovato" });
-    return res.json({ message: "Eliminato" });
+    if (!deleted) return sendError(res, 404, "Elemento non trovato");
+    return sendSuccess(res, undefined, "Eliminato");
   } catch (err) {
     console.error("[media] DELETE /:id error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 adminMediaRouter.post("/upload", upload.single("file"), async (req: Request, res: Response) => {
   try {
-    if (!req.file) return res.status(400).json({ message: "Nessun file caricato" });
+    if (!req.file) return sendError(res, 400, "Nessun file caricato");
     const { uploadBuffer } = await import("../objectStorage");
     const ext = req.file.originalname.split(".").pop()?.toLowerCase() || "bin";
     const safeExt = ["pdf", "mp4", "webm", "jpg", "jpeg", "png"].includes(ext) ? ext : "bin";
@@ -154,7 +155,7 @@ adminMediaRouter.post("/upload", upload.single("file"), async (req: Request, res
     return res.json({ url: publicUrl, filename });
   } catch (err) {
     console.error("[media] upload error:", err);
-    return res.status(500).json({ message: "Errore upload" });
+    return sendError(res, 500, "Errore upload");
   }
 });
 

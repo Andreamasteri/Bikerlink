@@ -8,6 +8,7 @@ import path from "path";
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, ShadingType, AlignmentType, TextRun, HeightRule } from "docx";
 import bcrypt from "bcryptjs";
 import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "../objectStorage";
+import { sendSuccess, sendError } from "../lib/api-response";
 import { storage } from "../storage";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
@@ -243,29 +244,29 @@ function requireAdmin(req: Request, res: Response, next: Function) {
   const sid = req.sessionID ? `…${req.sessionID.slice(-6)}` : "none";
   if (!req.session.userId) {
     console.warn(`[admin-auth] 401 reason=no-session path=${path} sid=${sid}`);
-    return res.status(401).json({ message: "Sessione scaduta. Effettua di nuovo l'accesso.", reason: "no-session" });
+    return sendError(res, 401, "Sessione scaduta. Effettua di nuovo l'accesso.");
   }
   storage.getUser(req.session.userId).then((user) => {
     if (!user) {
       console.warn(`[admin-auth] 403 reason=user-not-found path=${path} sid=${sid} userId=${req.session.userId}`);
-      return res.status(403).json({ message: "Account non trovato.", reason: "user-not-found" });
+      return sendError(res, 403, "Account non trovato.");
     }
     if (user.role !== "admin") {
       console.warn(`[admin-auth] 403 reason=not-admin path=${path} sid=${sid} userId=${user.id} role=${user.role}`);
-      return res.status(403).json({ message: "Accesso riservato agli amministratori.", reason: "not-admin" });
+      return sendError(res, 403, "Accesso riservato agli amministratori.");
     }
     // Task #1078: defense-in-depth — admin sospeso/bloccato non deve continuare
     // a chiamare endpoint privilegiati anche se la sessione è ancora viva.
     // (Il middleware globale in routes.ts dovrebbe già averla distrutta.)
     if (user.status !== "active") {
       console.warn(`[admin-auth] 403 reason=not-active path=${path} sid=${sid} userId=${user.id} status=${user.status}`);
-      return res.status(403).json({ message: "Account non attivo.", reason: "not-active" });
+      return sendError(res, 403, "Account non attivo.");
     }
     (req as any).currentUser = user;
     next();
   }).catch((err) => {
     console.error(`[admin-auth] 500 reason=db-error path=${path} sid=${sid} userId=${req.session.userId}`, err);
-    return res.status(500).json({ message: "Errore autenticazione admin", reason: "db-error" });
+    return sendError(res, 500, "Errore autenticazione admin");
   });
 }
 
@@ -431,11 +432,11 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
     // X-Forwarded-For inconsistently.
     const ip = clientIp(req);
     if (!checkOtaErrorRate(ip)) {
-      return res.status(429).json({ message: "Troppi eventi OTA: rallenta." });
+      return sendError(res, 429, "Troppi eventi OTA: rallenta.");
     }
     const parsedOtaErr = otaErrorSchema.safeParse(req.body);
     if (!parsedOtaErr.success) {
-      return res.status(400).json({ message: parsedOtaErr.error.issues[0].message });
+      return sendError(res, 400, parsedOtaErr.error.issues[0].message);
     }
     const {
       error, failCount, updateId, runtimeVersion, phase, source, platform,
@@ -517,9 +518,9 @@ router.post("/ota-error", otaErrorLimiter, otaErrorJson, async (req: Request, re
       );
     }
 
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (err) {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -546,7 +547,7 @@ router.post("/client-error", clientErrorLimiter, clientErrorJson, (req: Request,
 router.post("/startup-beacon", startupBeaconLimiter, startupBeaconJson, (req: Request, res: Response) => {
   try {
     const parsedSb = startupBeaconSchema.safeParse(req.body ?? {});
-    if (!parsedSb.success) return res.status(400).json({ message: parsedSb.error.issues[0].message });
+    if (!parsedSb.success) return sendError(res, 400, parsedSb.error.issues[0].message);
     const { step, ts, recovered, platform, ...rest } = parsedSb.data;
     const tsNum = typeof ts === "number" ? ts : Date.now();
     const entry: StartupBeaconEntry = {
@@ -561,9 +562,9 @@ router.post("/startup-beacon", startupBeaconLimiter, startupBeaconJson, (req: Re
     startupBeacons.push(entry);
     if (startupBeacons.length > BEACONS_MAX) startupBeacons.splice(0, startupBeacons.length - BEACONS_MAX);
     console.log(`[BEACON]${entry.recovered ? " RECOVERED" : ""} step=${entry.step} platform=${entry.platform ?? "?"} t=${entry.isoTime}${entry.data ? " data=" + JSON.stringify(entry.data) : ""}`);
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

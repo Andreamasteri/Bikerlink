@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import rateLimit, { MemoryStore } from "express-rate-limit";
@@ -87,7 +88,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
   try {
     const parsed = registerSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
 
     const data = parsed.data;
@@ -96,7 +97,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       const currentYear = new Date().getFullYear();
       const age = currentYear - data.birthYear;
       if (age < 18) {
-        return res.status(400).json({ message: "Devi avere almeno 18 anni per registrarti" });
+        return sendError(res, 400, "Devi avere almeno 18 anni per registrarti");
       }
     }
 
@@ -104,17 +105,17 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
     const existingEmail = await storage.getUserByEmail(data.email);
     if (existingEmail) {
-      return res.status(409).json({ message: "Email già registrata" });
+      return sendError(res, 409, "Email già registrata");
     }
 
     const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
     if (reservedNicknames.includes(data.nickname.toLowerCase())) {
-      return res.status(400).json({ message: "Nickname non disponibile" });
+      return sendError(res, 400, "Nickname non disponibile");
     }
 
     const existingNickname = await storage.getUserByNickname(data.nickname);
     if (existingNickname) {
-      return res.status(409).json({ message: "Nickname già in uso" });
+      return sendError(res, 409, "Nickname già in uso");
     }
 
     let invitationGiftMessage: string | null = null;
@@ -123,10 +124,10 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     if (data.invitationCode) {
       const invitation = await storage.getInvitationCode(data.invitationCode);
       if (!invitation || !invitation.isActive || invitation.currentUses >= invitation.maxUses) {
-        return res.status(400).json({ message: "Codice invito non valido" });
+        return sendError(res, 400, "Codice invito non valido");
       }
       if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
-        return res.status(400).json({ message: "Codice invito scaduto" });
+        return sendError(res, 400, "Codice invito scaduto");
       }
       await storage.incrementInvitationCodeUses(invitation.id);
       invitationGiftMessage = invitation.giftMessage ?? null;
@@ -266,7 +267,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
     console.error("Register error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -274,21 +275,21 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
   try {
     const { email, token } = req.body;
     if (!email || !token) {
-      return res.status(400).json({ message: "Email e codice richiesti" });
+      return sendError(res, 400, "Email e codice richiesti");
     }
     const normalizedToken = String(token).trim().toUpperCase();
     if (!VERIFY_TOKEN_RE.test(normalizedToken)) {
-      return res.status(400).json({ message: "Codice non valido" });
+      return sendError(res, 400, "Codice non valido");
     }
 
     const user = await storage.getUserByEmail(email.trim().toLowerCase());
     if (!user) {
-      return res.status(400).json({ message: "Codice non valido" });
+      return sendError(res, 400, "Codice non valido");
     }
 
     if (isVerifyLockedOut(user.id)) {
       await storage.deleteEmailVerificationTokens(user.id).catch(() => {});
-      return res.status(429).json({ message: "Troppi tentativi. Richiedi un nuovo codice." });
+      return sendError(res, 429, "Troppi tentativi. Richiedi un nuovo codice.");
     }
 
     const verif = await storage.getEmailVerificationToken(normalizedToken);
@@ -297,12 +298,12 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
       if (attempts >= VERIFY_MAX_ATTEMPTS) {
         await storage.deleteEmailVerificationTokens(user.id).catch(() => {});
       }
-      return res.status(400).json({ message: "Codice non valido" });
+      return sendError(res, 400, "Codice non valido");
     }
 
     if (new Date(verif.expiresAt) < new Date()) {
       recordVerifyFailure(user.id);
-      return res.status(400).json({ message: "Codice scaduto. Richiedi un nuovo codice." });
+      return sendError(res, 400, "Codice scaduto. Richiedi un nuovo codice.");
     }
 
     await storage.markUserEmailVerified(user.id);
@@ -317,7 +318,7 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
     return res.json({ ...safeUser, emailVerified: true, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
     console.error("Verify email error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -325,7 +326,7 @@ router.post("/resend-verification", resendVerificationLimiter, async (req: Reque
   try {
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({ message: "Email richiesta" });
+      return sendError(res, 400, "Email richiesta");
     }
 
     const genericResponse = { message: "Se l'email è registrata e in attesa di verifica, riceverai un nuovo codice." };
@@ -348,7 +349,7 @@ router.post("/resend-verification", resendVerificationLimiter, async (req: Reque
     return res.json(genericResponse);
   } catch (error) {
     console.error("Resend verification error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

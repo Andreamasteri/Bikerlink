@@ -6,6 +6,7 @@ import { eq, and, desc, sql } from "drizzle-orm";
 import { allLimited } from "../../lib/concurrency";
 
 import { requireAuth } from "../../lib/auth-middleware";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -14,7 +15,7 @@ router.get("/map/pending-locations", requireAuth, async (req: Request, res: Resp
     const userId = req.session.userId!;
     const user = await storage.getUser(userId);
     if (!user || (user.role !== "admin" && user.role !== "moderator" && user.role !== "moderatore")) {
-      return res.status(403).json({ message: "Accesso non autorizzato" });
+      return sendError(res, 403, "Accesso non autorizzato");
     }
 
     const clubs = await db.select({
@@ -48,7 +49,7 @@ router.get("/map/pending-locations", requireAuth, async (req: Request, res: Resp
     return res.json(enriched);
   } catch (e) {
     console.error("[GET /motoclubs/map/pending-locations]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -57,17 +58,17 @@ router.post("/:id/propose-location", requireAuth, async (req: Request, res: Resp
     const userId = req.session.userId!;
     const clubId = req.params.id;
     const parsedPl = proposeLocationSchema.safeParse(req.body);
-    if (!parsedPl.success) return res.status(400).json({ message: parsedPl.error.issues[0].message });
+    if (!parsedPl.success) return sendError(res, 400, parsedPl.error.issues[0].message);
     const { latitude, longitude, address } = parsedPl.data;
 
     const [club] = await db.select().from(motoClubs).where(and(eq(motoClubs.id, clubId as string), eq(motoClubs.isApproved, true))).limit(1);
-    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    if (!club) return sendError(res, 404, "Club non trovato");
 
     const [membership] = await db.select()
       .from(motoClubMembers)
       .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")))
       .limit(1);
-    if (!membership) return res.status(403).json({ message: "Devi essere membro del club per proporre una sede" });
+    if (!membership) return sendError(res, 403, "Devi essere membro del club per proporre una sede");
 
     await db.update(motoClubs).set({
       proposedLatitude: latitude,
@@ -87,10 +88,10 @@ router.post("/:id/propose-location", requireAuth, async (req: Request, res: Resp
       referenceId: clubId as string,
     });
 
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (e) {
     console.error("[POST /motoclubs/:id/propose-location]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -100,12 +101,12 @@ router.post("/:id/approve-location", requireAuth, async (req: Request, res: Resp
     const clubId = req.params.id;
     const adminUser = await storage.getUser(userId);
     if (!adminUser || (adminUser.role !== "admin" && adminUser.role !== "moderator" && adminUser.role !== "moderatore")) {
-      return res.status(403).json({ message: "Accesso non autorizzato" });
+      return sendError(res, 403, "Accesso non autorizzato");
     }
 
     const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId as string)).limit(1);
-    if (!club) return res.status(404).json({ message: "Club non trovato" });
-    if (club.proposedLatitude == null) return res.status(400).json({ message: "Nessuna proposta in attesa" });
+    if (!club) return sendError(res, 404, "Club non trovato");
+    if (club.proposedLatitude == null) return sendError(res, 400, "Nessuna proposta in attesa");
 
     await db.update(motoClubs).set({
       latitude: club.proposedLatitude,
@@ -129,10 +130,10 @@ router.post("/:id/approve-location", requireAuth, async (req: Request, res: Resp
       });
     }
 
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (e) {
     console.error("[POST /motoclubs/:id/approve-location]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -142,11 +143,11 @@ router.post("/:id/reject-location", requireAuth, async (req: Request, res: Respo
     const clubId = req.params.id;
     const adminUser = await storage.getUser(userId);
     if (!adminUser || (adminUser.role !== "admin" && adminUser.role !== "moderator" && adminUser.role !== "moderatore")) {
-      return res.status(403).json({ message: "Accesso non autorizzato" });
+      return sendError(res, 403, "Accesso non autorizzato");
     }
 
     const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId as string)).limit(1);
-    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    if (!club) return sendError(res, 404, "Club non trovato");
 
     const proposedByUserId = club.proposedBy;
 
@@ -170,10 +171,10 @@ router.post("/:id/reject-location", requireAuth, async (req: Request, res: Respo
       });
     }
 
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (e) {
     console.error("[POST /motoclubs/:id/reject-location]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { storage } from "../../storage";
 import { savePlannedRouteSchema, updatePlannedRouteBodySchema } from "@shared/schema";
@@ -11,7 +12,7 @@ router.post("/", async (req: Request, res: Response) => {
 
   const parsedRoute = savePlannedRouteSchema.safeParse(req.body);
   if (!parsedRoute.success) {
-    return res.status(400).json({ message: parsedRoute.error.issues[0].message });
+    return sendError(res, 400, parsedRoute.error.issues[0].message);
   }
   const body = parsedRoute.data;
 
@@ -39,7 +40,7 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(201).json(route);
   } catch (err) {
     console.error("[planned-routes] create error:", err);
-    return res.status(500).json({ message: "Errore salvataggio" });
+    return sendError(res, 500, "Errore salvataggio");
   }
 });
 
@@ -58,7 +59,7 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(routes);
   } catch (err) {
     console.error("[planned-routes] list error:", err);
-    return res.status(500).json({ message: "Errore caricamento" });
+    return sendError(res, 500, "Errore caricamento");
   }
 });
 
@@ -69,14 +70,14 @@ router.get("/:id", async (req: Request, res: Response) => {
 
   try {
     const route = await storage.getPlannedRoute(id);
-    if (!route) return res.status(404).json({ message: "Percorso non trovato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
     if (route.userId !== userId && !route.isPublic) {
-      return res.status(403).json({ message: "Accesso non consentito" });
+      return sendError(res, 403, "Accesso non consentito");
     }
     return res.json(route);
   } catch (err) {
     console.error("[planned-routes] get error:", err);
-    return res.status(500).json({ message: "Errore" });
+    return sendError(res, 500, "Errore");
   }
 });
 
@@ -87,16 +88,16 @@ router.patch("/:id", async (req: Request, res: Response) => {
 
   try {
     const existing = await storage.getPlannedRoute(id);
-    if (!existing) return res.status(404).json({ message: "Non trovato" });
-    if (existing.userId !== userId) return res.status(403).json({ message: "Non autorizzato" });
+    if (!existing) return sendError(res, 404, "Non trovato");
+    if (existing.userId !== userId) return sendError(res, 403, "Non autorizzato");
 
     const parsedUpd = updatePlannedRouteBodySchema.safeParse(req.body);
-    if (!parsedUpd.success) return res.status(400).json({ message: parsedUpd.error.issues[0].message });
+    if (!parsedUpd.success) return sendError(res, 400, parsedUpd.error.issues[0].message);
     const updated = await storage.updatePlannedRoute(id, parsedUpd.data);
     return res.json(updated);
   } catch (err) {
     console.error("[planned-routes] update error:", err);
-    return res.status(500).json({ message: "Errore aggiornamento" });
+    return sendError(res, 500, "Errore aggiornamento");
   }
 });
 
@@ -107,14 +108,14 @@ router.delete("/:id", async (req: Request, res: Response) => {
 
   try {
     const existing = await storage.getPlannedRoute(id);
-    if (!existing) return res.status(404).json({ message: "Non trovato" });
-    if (existing.userId !== userId) return res.status(403).json({ message: "Non autorizzato" });
+    if (!existing) return sendError(res, 404, "Non trovato");
+    if (existing.userId !== userId) return sendError(res, 403, "Non autorizzato");
 
     await storage.deletePlannedRoute(id);
     return res.status(204).send();
   } catch (err) {
     console.error("[planned-routes] delete error:", err);
-    return res.status(500).json({ message: "Errore eliminazione" });
+    return sendError(res, 500, "Errore eliminazione");
   }
 });
 

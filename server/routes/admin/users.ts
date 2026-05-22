@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import { isProtectedUser } from "../../constants";
 import { closeSseClient } from "../../chat-sse";
 import { revokeAllUserSessions } from "../../session-utils";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -28,7 +29,7 @@ router.get("/", async (_req: Request, res: Response) => {
     return res.json(safeUsers);
   } catch (error) {
     console.error("Admin get users error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -75,7 +76,7 @@ router.get("/stats/summary", async (_req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[admin] users stats summary error:", err);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -83,16 +84,16 @@ router.put("/:id/status", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const parsedUs = userStatusSchema.safeParse(req.body);
-    if (!parsedUs.success) return res.status(400).json({ message: parsedUs.error.issues[0].message });
+    if (!parsedUs.success) return sendError(res, 400, parsedUs.error.issues[0].message);
     const { status } = parsedUs.data;
     const targetUser = await storage.getUser(id);
-    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (!targetUser) return sendError(res, 404, "Utente non trovato");
     if (isProtectedUser(targetUser.nickname)) {
-      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+      return sendError(res, 403, "Utente di sistema non modificabile");
     }
     const user = await storage.updateUser(id, { status });
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -108,7 +109,7 @@ router.put("/:id/status", async (req: Request, res: Response) => {
     return res.json(safeUser);
   } catch (error) {
     console.error("Admin update user status error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -116,16 +117,16 @@ router.put("/:id/role", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const parsedUr = userRoleSchema.safeParse(req.body);
-    if (!parsedUr.success) return res.status(400).json({ message: parsedUr.error.issues[0].message });
+    if (!parsedUr.success) return sendError(res, 400, parsedUr.error.issues[0].message);
     const { role } = parsedUr.data;
     const targetUser = await storage.getUser(id);
-    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (!targetUser) return sendError(res, 404, "Utente non trovato");
     if (isProtectedUser(targetUser.nickname)) {
-      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+      return sendError(res, 403, "Utente di sistema non modificabile");
     }
     const user = await storage.updateUser(id, { role });
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -138,7 +139,7 @@ router.put("/:id/role", async (req: Request, res: Response) => {
     return res.json(safeUser);
   } catch (error) {
     console.error("Admin update user role error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -146,16 +147,16 @@ router.put("/:id/email", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const parsedUe = userEmailAdminSchema.safeParse(req.body);
-    if (!parsedUe.success) return res.status(400).json({ message: parsedUe.error.issues[0].message });
+    if (!parsedUe.success) return sendError(res, 400, parsedUe.error.issues[0].message);
     const { email } = parsedUe.data;
     const targetUser = await storage.getUser(id);
-    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (!targetUser) return sendError(res, 404, "Utente non trovato");
     if (isProtectedUser(targetUser.nickname)) {
-      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+      return sendError(res, 403, "Utente di sistema non modificabile");
     }
     const user = await storage.updateUser(id, { email });
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -168,7 +169,7 @@ router.put("/:id/email", async (req: Request, res: Response) => {
     return res.json(safeUser);
   } catch (error) {
     console.error("Admin update user email error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -176,12 +177,12 @@ router.put("/:id/password", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const parsedAsp = adminSetPasswordSchema.safeParse(req.body);
-    if (!parsedAsp.success) return res.status(400).json({ message: parsedAsp.error.issues[0].message });
+    if (!parsedAsp.success) return sendError(res, 400, parsedAsp.error.issues[0].message);
     const { password } = parsedAsp.data;
     const targetUser = await storage.getUser(id);
-    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (!targetUser) return sendError(res, 404, "Utente non trovato");
     if (isProtectedUser(targetUser.nickname)) {
-      return res.status(403).json({ message: "Utente di sistema non modificabile" });
+      return sendError(res, 403, "Utente di sistema non modificabile");
     }
     let revoked = 0;
     try {
@@ -196,7 +197,7 @@ router.put("/:id/password", async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, 12);
     const user = await storage.updateUser(id, { password: hashedPassword });
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -209,7 +210,7 @@ router.put("/:id/password", async (req: Request, res: Response) => {
     return res.json(safeUser);
   } catch (error) {
     console.error("Admin update user password error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -217,11 +218,11 @@ router.put("/:id/primal", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const parsedPr = primalSchema.safeParse(req.body);
-    if (!parsedPr.success) return res.status(400).json({ message: parsedPr.error.issues[0].message });
+    if (!parsedPr.success) return sendError(res, 400, parsedPr.error.issues[0].message);
     const { isPrimal } = parsedPr.data;
     const user = await storage.updateUser(id, { isPrimal });
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -234,7 +235,7 @@ router.put("/:id/primal", async (req: Request, res: Response) => {
     return res.json(safeUser);
   } catch (error) {
     console.error("Admin update user primal status error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -242,9 +243,9 @@ router.delete("/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
     const targetUser = await storage.getUser(id);
-    if (!targetUser) return res.status(404).json({ message: "Utente non trovato" });
+    if (!targetUser) return sendError(res, 404, "Utente non trovato");
     if (isProtectedUser(targetUser.nickname)) {
-      return res.status(403).json({ message: "Utente di sistema non eliminabile" });
+      return sendError(res, 403, "Utente di sistema non eliminabile");
     }
     await storage.deleteUser(id);
     await storage.createModeratorLog({
@@ -254,10 +255,10 @@ router.delete("/:id", async (req: Request, res: Response) => {
       targetId: id,
       details: `Utente eliminato: ${targetUser.nickname}`,
     });
-    return res.json({ message: "Utente eliminato" });
+    return sendSuccess(res, undefined, "Utente eliminato");
   } catch (error) {
     console.error("Admin delete user error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -273,10 +274,10 @@ router.delete("/:id/lastfm", async (req: Request, res: Response) => {
       targetId: id,
       details: "Dati Last.fm (sessioni e brani) eliminati",
     });
-    return res.json({ message: "Dati Last.fm eliminati" });
+    return sendSuccess(res, undefined, "Dati Last.fm eliminati");
   } catch (error) {
     console.error("Admin clear lastfm data error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -285,7 +286,7 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
     const id = req.params.id;
     return res.json({ userId: id, stats: {} });
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura statistiche" });
+    return sendError(res, 500, "Errore lettura statistiche");
   }
 });
 
@@ -294,7 +295,7 @@ router.get("/:id/geo-insights", async (req: Request, res: Response) => {
     const id = req.params.id;
     return res.json({ userId: id, insights: [] });
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura geo-insights" });
+    return sendError(res, 500, "Errore lettura geo-insights");
   }
 });
 
@@ -304,7 +305,7 @@ router.get("/:userId/sessions", async (req: Request, res: Response) => {
     const sessions = await db.execute(sql`SELECT sid, sess->'userId' as user_id, expire FROM session WHERE sess->>'userId' = ${userId}`);
     return res.json(sessions.rows);
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura sessioni" });
+    return sendError(res, 500, "Errore lettura sessioni");
   }
 });
 
@@ -312,9 +313,9 @@ router.delete("/:userId/sessions/:sid", async (req: Request, res: Response) => {
   try {
     const sid = req.params.sid;
     await db.execute(sql`DELETE FROM session WHERE sid = ${sid}`);
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (error) {
-    return res.status(500).json({ message: "Errore eliminazione sessione" });
+    return sendError(res, 500, "Errore eliminazione sessione");
   }
 });
 

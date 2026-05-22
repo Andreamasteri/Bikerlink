@@ -12,6 +12,7 @@ import {
 import { and, eq, or } from "drizzle-orm";
 
 import { requireAuth } from "../lib/auth-middleware";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 const router = Router();
 
@@ -167,7 +168,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.json([...friendMap.values()]);
   } catch (error) {
     console.error("Get friends error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -220,7 +221,7 @@ router.get("/status/:userId", requireAuth, async (req: Request, res: Response) =
     return res.json({ status: "none" });
   } catch (error) {
     console.error("Friends status error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -230,7 +231,7 @@ router.post("/request/:userId", requireAuth, async (req: Request, res: Response)
     const targetUserId = req.params.userId;
 
     if (currentUserId === targetUserId) {
-      return res.status(400).json({ message: "Non puoi inviare una richiesta a te stesso" });
+      return sendError(res, 400, "Non puoi inviare una richiesta a te stesso");
     }
 
     const targetUser = await db
@@ -240,12 +241,12 @@ router.post("/request/:userId", requireAuth, async (req: Request, res: Response)
       .limit(1);
 
     if (!targetUser[0]) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
 
     const alreadyFriends = await isFriendsWith(currentUserId, targetUserId);
     if (alreadyFriends) {
-      return res.status(409).json({ message: "Siete già amici" });
+      return sendError(res, 409, "Siete già amici");
     }
 
     const existing = await db
@@ -268,7 +269,7 @@ router.post("/request/:userId", requireAuth, async (req: Request, res: Response)
       .limit(1);
 
     if (existing.length > 0) {
-      return res.status(409).json({ message: "Richiesta già in attesa" });
+      return sendError(res, 409, "Richiesta già in attesa");
     }
 
     const sender = await db
@@ -283,7 +284,7 @@ router.post("/request/:userId", requireAuth, async (req: Request, res: Response)
       .where(eq(matchPreferences.userId, targetUserId))
       .limit(1);
     if (receiverPrefs.length > 0 && receiverPrefs[0].directMatch === false) {
-      return res.status(403).json({ message: "Questo utente non accetta richieste di direct match" });
+      return sendError(res, 403, "Questo utente non accetta richieste di direct match");
     }
 
     const rejectedOutgoing = await db
@@ -325,13 +326,13 @@ router.post("/request/:userId", requireAuth, async (req: Request, res: Response)
       referenceId: newRequest.id,
     });
 
-    return res.json({ success: true, requestId: newRequest.id });
+    return sendSuccess(res, { requestId: newRequest.id });
   } catch (error: any) {
     if (error?.code === "23505") {
-      return res.status(409).json({ message: "Richiesta già in attesa" });
+      return sendError(res, 409, "Richiesta già in attesa");
     }
     console.error("Send match request error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -353,7 +354,7 @@ router.delete("/request/:userId", requireAuth, async (req: Request, res: Respons
       .limit(1);
 
     if (existing.length === 0) {
-      return res.status(404).json({ message: "Nessuna richiesta pendente trovata" });
+      return sendError(res, 404, "Nessuna richiesta pendente trovata");
     }
 
     const requestId = existing[0].id;
@@ -373,10 +374,10 @@ router.delete("/request/:userId", requireAuth, async (req: Request, res: Respons
         .where(eq(directMatchRequests.id, requestId));
     });
 
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Cancel match request error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -392,15 +393,15 @@ router.post("/request/:requestId/accept", requireAuth, async (req: Request, res:
       .limit(1);
 
     if (!request[0]) {
-      return res.status(404).json({ message: "Richiesta non trovata" });
+      return sendError(res, 404, "Richiesta non trovata");
     }
 
     if (request[0].receiverId !== currentUserId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     if (request[0].status !== "pending") {
-      return res.status(409).json({ message: "Richiesta già gestita" });
+      return sendError(res, 409, "Richiesta già gestita");
     }
 
     const receiver = await db
@@ -464,10 +465,10 @@ router.post("/request/:requestId/accept", requireAuth, async (req: Request, res:
       referenceId: currentUserId,
     });
 
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Accept match request error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -483,15 +484,15 @@ router.post("/request/:requestId/reject", requireAuth, async (req: Request, res:
       .limit(1);
 
     if (!request[0]) {
-      return res.status(404).json({ message: "Richiesta non trovata" });
+      return sendError(res, 404, "Richiesta non trovata");
     }
 
     if (request[0].receiverId !== currentUserId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     if (request[0].status !== "pending") {
-      return res.status(409).json({ message: "Richiesta già gestita" });
+      return sendError(res, 409, "Richiesta già gestita");
     }
 
     await db
@@ -510,10 +511,10 @@ router.post("/request/:requestId/reject", requireAuth, async (req: Request, res:
         )
       );
 
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Reject match request error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -548,7 +549,7 @@ router.get("/requests/incoming", requireAuth, async (req: Request, res: Response
     return res.json(result);
   } catch (error) {
     console.error("Get incoming requests error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

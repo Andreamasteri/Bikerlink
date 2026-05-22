@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { generateInvitationSchema } from "@shared/schema";
@@ -7,17 +8,17 @@ const router = Router();
 router.post("/generate", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
 
     const user = await storage.getUser(req.session.userId);
     if (!user || user.role !== "admin") {
-      return res.status(403).json({ message: "Accesso negato" });
+      return sendError(res, 403, "Accesso negato");
     }
 
     const parsed = generateInvitationSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
     const { maxUses, expiresAt } = parsed.data;
 
@@ -33,26 +34,26 @@ router.post("/generate", async (req: Request, res: Response) => {
     return res.status(201).json(invitation);
   } catch (error) {
     console.error("Invitation generate error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.get("/", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
 
     const user = await storage.getUser(req.session.userId);
     if (!user || user.role !== "admin") {
-      return res.status(403).json({ message: "Accesso negato" });
+      return sendError(res, 403, "Accesso negato");
     }
 
     const codes = await storage.getInvitationCodes();
     return res.json(codes);
   } catch (error) {
     console.error("Invitation list error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -87,17 +88,17 @@ router.get("/placeholders", async (_req: Request, res: Response) => {
 router.get("/preview/:code", async (req: Request, res: Response) => {
   try {
     const { code } = req.params;
-    if (!code) return res.status(400).json({ message: "Codice mancante" });
+    if (!code) return sendError(res, 400, "Codice mancante");
 
     const invitation = await storage.getInvitationCode(code.toUpperCase());
     if (!invitation || !invitation.isActive) {
-      return res.status(404).json({ message: "Codice non valido" });
+      return sendError(res, 404, "Codice non valido");
     }
     if (invitation.currentUses >= invitation.maxUses) {
-      return res.status(404).json({ message: "Codice esaurito" });
+      return sendError(res, 404, "Codice esaurito");
     }
     if (invitation.expiresAt && new Date(invitation.expiresAt) < new Date()) {
-      return res.status(404).json({ message: "Codice scaduto" });
+      return sendError(res, 404, "Codice scaduto");
     }
 
     return res.json({
@@ -107,7 +108,7 @@ router.get("/preview/:code", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Invite preview error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

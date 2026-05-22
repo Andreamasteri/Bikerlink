@@ -7,6 +7,7 @@ import { allLimited } from "../lib/concurrency";
 import { db } from "../db";
 import { photoContestEntries } from "@shared/schema";
 import { eq } from "drizzle-orm";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 import { requireUserId } from "../lib/auth-middleware";
 
@@ -58,7 +59,7 @@ router.post("/entries", upload.single("photo"), async (req: Request, res: Respon
     }
 
     if (!photoUrl && !performanceData) {
-      return res.status(400).json({ message: "Foto o dati performance obbligatori" });
+      return sendError(res, 400, "Foto o dati performance obbligatori");
     }
 
     const now = new Date();
@@ -78,7 +79,7 @@ router.post("/entries", upload.single("photo"), async (req: Request, res: Respon
     return res.status(201).json(entry);
   } catch (error) {
     console.error("Contest entry error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -117,7 +118,7 @@ router.get("/entries", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Contest entries error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -145,33 +146,33 @@ router.post("/entries/:id/vote", async (req: Request, res: Response) => {
     }
 
     if (!entry) {
-      return res.status(404).json({ message: "Foto non trovata" });
+      return sendError(res, 404, "Foto non trovata");
     }
 
     if (entry.userId === userId) {
-      return res.status(400).json({ message: "Non puoi votare la tua foto" });
+      return sendError(res, 400, "Non puoi votare la tua foto");
     }
 
     const entryId = Array.isArray(id) ? id[0] : id;
     const existingVote = await storage.getPhotoVote(entryId, userId);
     if (existingVote) {
-      return res.status(400).json({ message: "Hai già votato questa foto" });
+      return sendError(res, 400, "Hai già votato questa foto");
     }
 
     const today = new Date().toISOString().split("T")[0] as string;
     const dailyCount = await storage.getDailyVoteCount(userId, today);
     if (dailyCount && dailyCount.count >= 10) {
-      return res.status(400).json({ message: "Hai raggiunto il limite di 10 voti giornalieri" });
+      return sendError(res, 400, "Hai raggiunto il limite di 10 voti giornalieri");
     }
 
     await storage.createPhotoVote({ entryId, userId });
     await storage.incrementEntryVotes(entryId);
     await storage.upsertDailyVoteCount(userId, today);
 
-    return res.json({ message: "Voto registrato" });
+    return sendSuccess(res, undefined, "Voto registrato");
   } catch (error) {
     console.error("Contest vote error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -184,11 +185,11 @@ router.delete("/entries/:id", async (req: Request, res: Response) => {
 
     const entry = await storage.getPhotoContestEntry(id);
     if (!entry) {
-      return res.status(404).json({ message: "Foto non trovata" });
+      return sendError(res, 404, "Foto non trovata");
     }
 
     if (entry.userId !== userId) {
-      return res.status(403).json({ message: "Non puoi eliminare questa foto" });
+      return sendError(res, 403, "Non puoi eliminare questa foto");
     }
 
     await storage.deletePhotoContestEntry(id);
@@ -199,10 +200,10 @@ router.delete("/entries/:id", async (req: Request, res: Response) => {
         await deleteObject(`public/contest/${photoFilename}`).catch(() => {});
       }
     }
-    return res.json({ message: "Foto eliminata" });
+    return sendSuccess(res, undefined, "Foto eliminata");
   } catch (error) {
     console.error("Contest delete entry error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -231,7 +232,7 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
     // Se in futuro lo schema permettesse isApproved nullable o pending,
     // vogliamo comunque non servire la foto.
     if (!entry || entry.isApproved !== true) {
-      return res.status(404).json({ message: "Foto non trovata" });
+      return sendError(res, 404, "Foto non trovata");
     }
 
     const objectPath = `public/contest/${filename}`;
@@ -248,7 +249,7 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
     res.set("Cache-Control", "private, no-store");
     return res.send(buffer);
   } catch {
-    return res.status(404).json({ message: "Foto non trovata" });
+    return sendError(res, 404, "Foto non trovata");
   }
 });
 
@@ -261,7 +262,7 @@ router.get("/winners", async (req: Request, res: Response) => {
     return res.json(winners);
   } catch (error) {
     console.error("Contest winners error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

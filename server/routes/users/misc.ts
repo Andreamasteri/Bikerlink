@@ -6,6 +6,7 @@ import { applyFakeZones, applyPositionFuzz, fuzzedCoordsForViewer, isPositionFuz
 import { triggerProposalProfileMatchingForZavorrina } from "../../matching-engine";
 
 import { requireAuth } from "../../lib/auth-middleware";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -13,7 +14,7 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     const parsedLoc = updateLocationSchema.safeParse(req.body);
-    if (!parsedLoc.success) return res.status(400).json({ message: parsedLoc.error.issues[0].message });
+    if (!parsedLoc.success) return sendError(res, 400, parsedLoc.error.issues[0].message);
     const { latitude, longitude } = parsedLoc.data;
     const existingProfile = await storage.getUserProfile(userId);
     let fLat = latitude;
@@ -39,10 +40,10 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
       triggerProposalProfileMatchingForZavorrina(userId).catch(e => console.error("[triggerMatchingForZavorrina error]", e));
     }
 
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Update location error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -58,10 +59,10 @@ router.post("/app-close", requireAuth, async (req: Request, res: Response) => {
         lastOfflineLng: fuzzed.lng,
       } as any);
     }
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("App close error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -71,11 +72,11 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     const userId = req.params.id as string;
     const user = await storage.getUser(userId);
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
     const blocked = await storage.hasBlockedUser(userId, requesterId);
     if (blocked) {
-      return res.status(403).json({ message: "Non puoi visualizzare questo profilo" });
+      return sendError(res, 403, "Non puoi visualizzare questo profilo");
     }
     const { password: _, ...safeUser } = user;
     const profile = await storage.getUserProfile(userId);
@@ -112,7 +113,7 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Get public profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

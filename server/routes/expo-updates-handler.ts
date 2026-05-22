@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { db } from "../db";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
+import { sendSuccess, sendError } from "../lib/api-response";
 import { sql } from "drizzle-orm";
 
 export function registerExpoUpdatesRoutes(app: Express) {
@@ -155,7 +156,7 @@ export function registerExpoUpdatesRoutes(app: Express) {
 
       const SEMVER_RE = /^\d+\.\d+\.\d+$/;
       if (runtimeVersion !== undefined && !SEMVER_RE.test(runtimeVersion)) {
-        return res.status(400).json({ message: "expo-runtime-version non valida (formato atteso: X.Y.Z)" });
+        return sendError(res, 400, "expo-runtime-version non valida (formato atteso: X.Y.Z)");
       }
 
       if (!runtimeVersion || !platform) {
@@ -317,7 +318,7 @@ export function registerExpoUpdatesRoutes(app: Express) {
       } catch {
         // best-effort
       }
-      return res.status(500).json({ message: "Internal server error" });
+      return sendError(res, 500, "Internal server error");
     }
   });
 
@@ -351,10 +352,10 @@ export function registerExpoUpdatesRoutes(app: Express) {
     try {
       const { deviceId, releaseId, runtimeVersion } = req.body ?? {};
       if (!releaseId || typeof releaseId !== "string") {
-        return res.status(400).json({ message: "releaseId obbligatorio" });
+        return sendError(res, 400, "releaseId obbligatorio");
       }
       if (runtimeVersion !== undefined && runtimeVersion !== null && !(/^\d+\.\d+\.\d+$/).test(String(runtimeVersion))) {
-        return res.status(400).json({ message: "runtime_version non valida (formato atteso: X.Y.Z)" });
+        return sendError(res, 400, "runtime_version non valida (formato atteso: X.Y.Z)");
       }
       const stripNull = (s: string) => s.replace(/\x00/g, "");
       const safeDeviceId = deviceId ? stripNull(String(deviceId)).substring(0, 32) : null;
@@ -369,13 +370,13 @@ export function registerExpoUpdatesRoutes(app: Express) {
       } else {
         rl.count++;
         if (rl.count > 10) {
-          return res.status(429).json({ message: "Too many heartbeats" });
+          return sendError(res, 429, "Too many heartbeats");
         }
       }
 
       const exists = await db.execute(sql`SELECT id FROM ota_releases WHERE id = ${safeReleaseId} LIMIT 1`);
       if (!exists.rows.length) {
-        return res.status(404).json({ message: "Release non trovata" });
+        return sendError(res, 404, "Release non trovata");
       }
 
       let shouldIncrementCount = true;
@@ -401,10 +402,10 @@ export function registerExpoUpdatesRoutes(app: Express) {
         await db.execute(sql`UPDATE ota_releases SET success_count = success_count + 1, updated_at = NOW() WHERE id = ${safeReleaseId}`);
       }
 
-      return res.json({ ok: true, counted: shouldIncrementCount });
+      return sendSuccess(res, { counted: shouldIncrementCount });
     } catch (error) {
       console.error("[ota/heartbeat] Error:", error);
-      return res.status(500).json({ message: "Internal server error" });
+      return sendError(res, 500, "Internal server error");
     }
   });
 
@@ -413,7 +414,7 @@ export function registerExpoUpdatesRoutes(app: Express) {
       const { otaStuckEventSchema } = await import("@shared/schema");
       const bodyParsed = otaStuckEventSchema.safeParse(req.body ?? {});
       if (!bodyParsed.success) {
-        return res.status(400).json({ message: bodyParsed.error.issues[0]?.message ?? "Payload non valido" });
+        return sendError(res, 400, bodyParsed.error.issues[0]?.message ?? "Payload non valido");
       }
       const { deviceId, rollbackCount, stuckSessions, runtimeVersion } = bodyParsed.data;
       const stripNull = (s: string) => s.replace(/\x00/g, "");
@@ -426,10 +427,10 @@ export function registerExpoUpdatesRoutes(app: Express) {
         INSERT INTO ota_stuck_events (device_id, rollback_count, stuck_sessions, runtime_version, created_at)
         VALUES (${safeDeviceId}, ${safeRollback}, ${safeStuck}, ${safeRv}, NOW())
       `);
-      return res.json({ ok: true });
+      return sendSuccess(res);
     } catch (error) {
       console.error("[ota/stuck-event] Error:", error);
-      return res.status(500).json({ message: "Internal server error" });
+      return sendError(res, 500, "Internal server error");
     }
   });
 }

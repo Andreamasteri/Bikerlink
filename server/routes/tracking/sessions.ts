@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { createRouteSchema } from "@shared/schema";
@@ -36,7 +37,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const parsed = createRouteSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
     const { title, trackingFrequency, isSprint } = parsed.data;
 
@@ -52,7 +53,7 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(201).json(route);
   } catch (error) {
     console.error("Create route error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -75,7 +76,7 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(filtered);
   } catch (error) {
     console.error("Get routes error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

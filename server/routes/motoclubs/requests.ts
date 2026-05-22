@@ -7,6 +7,7 @@ import { sendEmail } from "../../email";
 import { createClubConversation, addMemberToConversation, notifyTopMembersOfNewJoin } from "./utils";
 
 import { requireAuth } from "../../lib/auth-middleware";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get("/invites", requireAuth, async (req: Request, res: Response) => {
 
     return res.json(invites.map(r => ({ ...r.invite, club: r.club })));
   } catch (e) {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -33,7 +34,7 @@ router.put("/invites/:id/respond", requireAuth, async (req: Request, res: Respon
     const inviteId = req.params.id;
     const parsedInvite = respondToInviteSchema.safeParse(req.body);
     if (!parsedInvite.success) {
-      return res.status(400).json({ message: parsedInvite.error.issues[0].message });
+      return sendError(res, 400, parsedInvite.error.issues[0].message);
     }
     const { response } = parsedInvite.data;
 
@@ -41,7 +42,7 @@ router.put("/invites/:id/respond", requireAuth, async (req: Request, res: Respon
       .where(and(eq(motoClubInvites.id, inviteId as string), eq(motoClubInvites.userId, userId)))
       .limit(1);
 
-    if (!invite) return res.status(404).json({ message: "Invito non trovato" });
+    if (!invite) return sendError(res, 404, "Invito non trovato");
 
     await db.update(motoClubInvites)
       .set({ status: response })
@@ -74,10 +75,10 @@ router.put("/invites/:id/respond", requireAuth, async (req: Request, res: Respon
       }
     }
 
-    return res.json({ message: response === "accepted" ? "Sei entrato nel club!" : "Invito rifiutato" });
+    return sendSuccess(res, undefined, response === "accepted" ? "Sei entrato nel club!" : "Invito rifiutato");
   } catch (e) {
     console.error("[PUT /invites/:id/respond]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -86,7 +87,7 @@ router.post("/request", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const parsedReq = createMotoClubSchema.safeParse(req.body);
     if (!parsedReq.success) {
-      return res.status(400).json({ message: parsedReq.error.issues[0].message });
+      return sendError(res, 400, parsedReq.error.issues[0].message);
     }
     const { name, clubType, brandName, modelName } = parsedReq.data;
 
@@ -101,7 +102,7 @@ router.post("/request", requireAuth, async (req: Request, res: Response) => {
 
     return res.status(201).json(request);
   } catch (e) {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -111,12 +112,12 @@ router.post("/creation-request", requireAuth, async (req: Request, res: Response
 
     const creationEnabled = await storage.getAppSetting("motoclub_user_creation_enabled");
     if (creationEnabled?.value !== "true") {
-      return res.status(403).json({ message: "Creazione motoclub non abilitata" });
+      return sendError(res, 403, "Creazione motoclub non abilitata");
     }
 
     const parsedCreation = createMotoClubSchema.safeParse(req.body);
     if (!parsedCreation.success) {
-      return res.status(400).json({ message: parsedCreation.error.issues[0].message });
+      return sendError(res, 400, parsedCreation.error.issues[0].message);
     }
     const { name, parentClubId, latitude, longitude, inviteRadiusKm, inviteUserIds } = parsedCreation.data as {
       name: string;
@@ -177,7 +178,7 @@ router.post("/creation-request", requireAuth, async (req: Request, res: Response
     return res.status(201).json({ success: true, requestId: request.id });
   } catch (e) {
     console.error("[POST /creation-request]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -199,7 +200,7 @@ router.get("/creation-request/status", requireAuth, async (req: Request, res: Re
       reviewNote: request.reviewNote,
     });
   } catch (e) {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

@@ -1,18 +1,19 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { onlineTracker } from "../../online-tracker";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
 router.get("/me", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
 
     const user = await storage.getUser(req.session.userId);
     if (!user) {
-      return res.status(401).json({ message: "Utente non trovato" });
+      return sendError(res, 401, "Utente non trovato");
     }
 
     const { password: _, ...safeUser } = user;
@@ -25,14 +26,14 @@ router.get("/me", async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Me error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.post("/heartbeat", async (req: Request, res: Response) => {
   try {
     const userId = req.session?.userId;
-    if (!userId) return res.status(401).json({ ok: false });
+    if (!userId) return sendError(res, 401, "Non autenticato");
     const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown; otaNumber?: unknown };
     const semverRe = /^\d+\.\d+\.\d+$/;
     const platformAllowed = new Set(["android", "ios", "web"]);
@@ -55,9 +56,9 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
       ...(lastOtaNumber !== undefined ? { lastOtaNumber } : {}),
     });
     onlineTracker.touch(userId);
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch {
-    return res.status(500).json({ ok: false });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

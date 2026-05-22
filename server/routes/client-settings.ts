@@ -3,6 +3,7 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { users } from "@shared/schema";
 import { ilike } from "drizzle-orm";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 export function registerClientSettingsRoutes(app: Express) {
   app.get("/api/settings/privacy-policy", async (_req, res) => {
@@ -260,7 +261,7 @@ export function registerClientSettingsRoutes(app: Express) {
   });
 
   app.get("/api/users/search", async (req: Request, res: Response) => {
-    if (!req.session?.userId) return res.status(401).json({ message: "Non autenticato" });
+    if (!req.session?.userId) return sendError(res, 401, "Non autenticato");
     try {
       const { q } = req.query as { q?: string };
       if (!q || q.trim().length < 2) return res.json([]);
@@ -271,7 +272,7 @@ export function registerClientSettingsRoutes(app: Express) {
         .limit(30);
       return res.json(results);
     } catch {
-      return res.status(500).json({ message: "Errore interno" });
+      return sendError(res, 500, "Errore interno");
     }
   });
 
@@ -458,12 +459,12 @@ export function registerClientSettingsRoutes(app: Express) {
   app.post("/api/location/bg-update", async (req: any, res) => {
     try {
       if (!req.session?.userId) {
-        return res.status(401).json({ message: "Non autenticato" });
+        return sendError(res, 401, "Non autenticato");
       }
       const userId: string = req.session.userId;
       const { latitude, longitude, altitude, accuracy, timestamp, activeRouteId, isSosActive, isGhostMode } = req.body;
       if (typeof latitude !== "number" || typeof longitude !== "number") {
-        return res.status(400).json({ message: "Coordinate non valide" });
+        return sendError(res, 400, "Coordinate non valide");
       }
       try {
         const profileUpdate: any = { latitude, longitude, coordinatesUpdatedAt: new Date() };
@@ -491,10 +492,10 @@ export function registerClientSettingsRoutes(app: Express) {
         } catch {}
       }
 
-      return res.json({ ok: true });
+      return sendSuccess(res);
     } catch (error) {
       console.error("BG location update error:", error);
-      return res.status(500).json({ message: "Errore interno del server" });
+      return sendError(res, 500, "Errore interno del server");
     }
   });
 

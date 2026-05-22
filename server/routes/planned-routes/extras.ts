@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { storage } from "../../storage";
 import { requireAuth, decodePolyline } from "./utils";
@@ -34,7 +35,7 @@ router.get("/my-style-profile", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[planned-routes/my-style-profile] error:", err);
-    return res.status(500).json({ message: "Errore caricamento profilo" });
+    return sendError(res, 500, "Errore caricamento profilo");
   }
 });
 
@@ -43,7 +44,7 @@ router.post("/hotels", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedHotels = hotelsSchema.safeParse(req.body);
-  if (!parsedHotels.success) return res.status(400).json({ message: parsedHotels.error.issues[0].message });
+  if (!parsedHotels.success) return sendError(res, 400, parsedHotels.error.issues[0].message);
   const { lat, lng, radius = 10000 } = parsedHotels.data;
 
   try {
@@ -66,7 +67,7 @@ router.post("/hotels", async (req: Request, res: Response) => {
     return res.json({ days: [{ waypoint: `${lat},${lng}`, hotels: elements.slice(0, 5) }] });
   } catch (err) {
     console.error("[hotels] error:", err);
-    return res.status(502).json({ message: "Hotel non disponibili" });
+    return sendError(res, 502, "Hotel non disponibili");
   }
 });
 
@@ -75,7 +76,7 @@ router.post("/segment-multiday", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const parsedSmd = segmentMultidaySchema.safeParse(req.body);
-  if (!parsedSmd.success) return res.status(400).json({ message: parsedSmd.error.issues[0].message });
+  if (!parsedSmd.success) return sendError(res, 400, parsedSmd.error.issues[0].message);
   const { waypoints } = parsedSmd.data;
 
   try {
@@ -92,7 +93,7 @@ router.post("/segment-multiday", async (req: Request, res: Response) => {
     return res.json({ days, totalDays: 1, kmPerDay: 100 });
   } catch (err) {
     console.error("[segment-multiday] error:", err);
-    return res.status(500).json({ message: "Errore segmentazione" });
+    return sendError(res, 500, "Errore segmentazione");
   }
 });
 
@@ -103,9 +104,9 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
 
   try {
     const route = await storage.getPlannedRoute(id);
-    if (!route) return res.status(404).json({ message: "Percorso non trovato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
     if (route.userId !== userId && !route.isPublic) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const meta = (route.extraJson ?? {}) as Record<string, unknown>;
@@ -122,7 +123,7 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
     }
 
     if (rawPoints.length === 0) {
-      return res.status(422).json({ message: "Nessun punto disponibile per il profilo altimetrico" });
+      return sendError(res, 422, "Nessun punto disponibile per il profilo altimetrico");
     }
 
     const MAX_SAMPLES = 100;
@@ -156,12 +157,12 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
       elevations = (topoData.results as any[]).map((r: any) => Math.round(r.elevation ?? 0));
     } catch (err) {
       console.error("[elevation] OpenTopoData error:", err);
-      return res.status(502).json({ message: "Dati altimetrici non disponibili al momento" });
+      return sendError(res, 502, "Dati altimetrici non disponibili al momento");
     }
 
     const validEle = elevations.filter((e) => e != null && !isNaN(e));
     if (validEle.length === 0) {
-      return res.status(502).json({ message: "Dati altimetrici non disponibili al momento" });
+      return sendError(res, 502, "Dati altimetrici non disponibili al momento");
     }
     const minEle = Math.min(...validEle);
     const maxEle = Math.max(...validEle);
@@ -190,7 +191,7 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
     return res.json(payload);
   } catch (err) {
     console.error("[elevation] error:", err);
-    return res.status(500).json({ message: "Errore profilo altimetrico" });
+    return sendError(res, 500, "Errore profilo altimetrico");
   }
 });
 

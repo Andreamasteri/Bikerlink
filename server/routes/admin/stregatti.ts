@@ -3,6 +3,7 @@ import { storage } from "../../storage";
 import { db } from "../../db";
 import { stregattaSchema, users } from "@shared/schema";
 import { eq, sql } from "drizzle-orm";
+import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -17,18 +18,18 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error) {
     console.error("Admin get stregatti error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.post("/", async (req: Request, res: Response) => {
   try {
     const parsedSt = stregattaSchema.safeParse(req.body);
-    if (!parsedSt.success) return res.status(400).json({ message: parsedSt.error.issues[0].message });
+    if (!parsedSt.success) return sendError(res, 400, parsedSt.error.issues[0].message);
     const { nickname, userType, sex, coupleSexConfig, birthYear, region, bio, moto, wishlistDescription, wishlistMotos } = parsedSt.data as any;
     const existingNickname = await storage.getUserByNickname(nickname);
     if (existingNickname) {
-      return res.status(409).json({ message: "Nickname già in uso" });
+      return sendError(res, 409, "Nickname già in uso");
     }
     const email = `fake_${nickname.toLowerCase().replace(/[^a-z0-9]/g, "")}@fakeuser.bikerlink.it`;
     const fakeSecret = crypto.randomBytes(32).toString("base64url");
@@ -53,7 +54,7 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(201).json(user);
   } catch (error) {
     console.error("Admin create stregatto error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -63,9 +64,9 @@ router.put("/toggle-all", async (req: Request, res: Response) => {
     await db.update(users).set({ 
       lastLoginAt: online ? new Date() : sql`last_login_at` 
     }).where(eq(users.isFake, true));
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (error) {
-    return res.status(500).json({ message: "Errore toggle globale" });
+    return sendError(res, 500, "Errore toggle globale");
   }
 });
 
@@ -75,26 +76,26 @@ router.delete("/", async (req: Request, res: Response) => {
     for (const f of fakes) {
       await storage.deleteUser(f.id);
     }
-    return res.json({ deleted: fakes.length });
+    return sendSuccess(res, { deleted: fakes.length });
   } catch (error) {
-    return res.status(500).json({ message: "Errore eliminazione globale" });
+    return sendError(res, 500, "Errore eliminazione globale");
   }
 });
 
 router.post("/wake-all", async (_req: Request, res: Response) => {
   try {
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.isFake, true));
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (error) {
-    return res.status(500).json({ message: "Errore wake all" });
+    return sendError(res, 500, "Errore wake all");
   }
 });
 
 router.post("/distribute-to-clubs", async (_req: Request, res: Response) => {
   try {
-    return res.json({ success: true });
+    return sendSuccess(res);
   } catch (error) {
-    return res.status(500).json({ message: "Errore distribuzione" });
+    return sendError(res, 500, "Errore distribuzione");
   }
 });
 

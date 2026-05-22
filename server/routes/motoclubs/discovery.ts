@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -73,7 +74,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.json(result);
   } catch (e) {
     console.error("[GET /motoclubs]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -90,7 +91,7 @@ router.get("/featured", requireAuth, async (_req: Request, res: Response) => {
 
     return res.json(club ? { ...club.club, memberCount: club.memberCount } : null);
   } catch (e) {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -164,7 +165,7 @@ router.get("/map", requireAuth, async (req: Request, res: Response) => {
     return res.json(result);
   } catch (e) {
     console.error("[GET /motoclubs/map]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -192,7 +193,7 @@ router.get("/:id/stats", requireAuth, async (req: Request, res: Response) => {
       memberCount: members.length,
     });
   } catch (e) {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -213,11 +214,11 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
       activityScore: motoClubs.activityScore,
       createdAt: motoClubs.createdAt,
     }).from(motoClubs).where(and(eq(motoClubs.id, clubId as string), eq(motoClubs.isApproved, true))).limit(1);
-    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    if (!club) return sendError(res, 404, "Club non trovato");
     return res.json(club);
   } catch (e) {
     console.error("Public club error:", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

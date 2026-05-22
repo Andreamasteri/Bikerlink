@@ -3,6 +3,7 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { rideTelemetry } from "@shared/schema";
 import { requireUserId } from "../lib/auth-middleware";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 const router = Router();
 
@@ -20,14 +21,14 @@ router.post("/batch", async (req: Request, res: Response) => {
     };
 
     if (!session_id || typeof session_id !== "string") {
-      return res.status(400).json({ message: "session_id obbligatorio" });
+      return sendError(res, 400, "session_id obbligatorio");
     }
 
     const validSessionTypes = ["ride", "trip", "free", "ideal_lap"];
     const resolvedType = validSessionTypes.includes(session_type ?? "") ? session_type! : "ride";
 
     if (!Array.isArray(samples) || samples.length === 0) {
-      return res.status(400).json({ message: "samples[] obbligatorio e non vuoto" });
+      return sendError(res, 400, "samples[] obbligatorio e non vuoto");
     }
 
     type RawSample = {
@@ -69,7 +70,7 @@ router.post("/batch", async (req: Request, res: Response) => {
     }
 
     if (rows.length === 0) {
-      return res.status(400).json({ message: "Nessun campione valido (ts, lat, lon obbligatori per ogni campione)" });
+      return sendError(res, 400, "Nessun campione valido (ts, lat, lon obbligatori per ogni campione)");
     }
 
     const CHUNK = 500;
@@ -80,7 +81,7 @@ router.post("/batch", async (req: Request, res: Response) => {
     return res.status(200).json({ inserted: rows.length, session_id });
   } catch (err) {
     console.error("[telemetry/batch] error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -181,7 +182,7 @@ router.get("/stats", async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[telemetry/stats] error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -233,7 +234,7 @@ router.get("/ideal-laps", async (req: Request, res: Response) => {
     return res.json({ laps });
   } catch (err) {
     console.error("[telemetry/ideal-laps] error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -242,7 +243,7 @@ router.delete("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
   if (!userId) return;
 
   const { sessionId } = req.params;
-  if (!sessionId) return res.status(400).json({ message: "sessionId obbligatorio" });
+  if (!sessionId) return sendError(res, 400, "sessionId obbligatorio");
 
   try {
     await db.execute(sql`
@@ -251,10 +252,10 @@ router.delete("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
         AND session_id = ${sessionId}
         AND session_type = 'ideal_lap'
     `);
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (err) {
     console.error("[telemetry/ideal-laps DELETE] error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -273,7 +274,7 @@ router.delete("/reset", async (req: Request, res: Response) => {
     return res.json({ deleted });
   } catch (err) {
     console.error("[telemetry/reset] error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

@@ -4,6 +4,7 @@ import { matchPreferences } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { storage } from "../storage";
 import { requireAuth } from "../lib/auth-middleware";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 const router = Router();
 
@@ -65,7 +66,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("[MatchPreferences] GET error:", error);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -99,10 +100,10 @@ router.put("/", requireAuth, async (req: Request, res: Response) => {
       });
     }
 
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("[MatchPreferences] PUT error:", error);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

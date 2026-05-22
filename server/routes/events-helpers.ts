@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import { type Request, type Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
@@ -22,7 +23,7 @@ export async function requireAdminOrMod(req: Request, res: Response): Promise<st
   if (!userId) return null;
   const user = await storage.getUser(userId);
   if (!user || (user.role !== "admin" && user.role !== "moderator")) {
-    res.status(403).json({ message: "Accesso non autorizzato" });
+    sendError(res, 403, "Accesso non autorizzato");
     return null;
   }
   return userId;

@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { eventParticipants } from "@shared/schema";
@@ -19,7 +20,7 @@ router.get("/:userId", async (req: Request, res: Response) => {
     return res.json(rows.map((r) => r.eventId));
   } catch (e) {
     console.error("[GET /events/user-events/:userId]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

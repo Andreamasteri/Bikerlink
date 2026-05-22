@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { downloadBuffer, deleteObject, listObjects } from "../objectStorage";
+import { sendSuccess, sendError } from "../lib/api-response";
 import path from "path";
 import fs from "fs";
 
@@ -156,7 +157,7 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
 router.get("/images/:filename", async (req: Request, res: Response) => {
   const filename = req.params.filename;
   if (!filename || filename.includes("..") || filename.includes("/")) {
-    return res.status(400).json({ message: "Nome file non valido" });
+    return sendError(res, 400, "Nome file non valido");
   }
   const localPath = path.resolve(process.cwd(), "uploads", "ads", filename);
   if (fs.existsSync(localPath)) {
@@ -185,7 +186,7 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Ad image serve error:", error);
     res.setHeader("Cache-Control", "no-store");
-    return res.status(404).json({ message: "Immagine non trovata" });
+    return sendError(res, 404, "Immagine non trovata");
   }
 });
 
@@ -212,7 +213,7 @@ router.get("/active", async (req: Request, res: Response) => {
     return res.json(activeCampaigns);
   } catch (error) {
     console.error("Get active ads error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -225,11 +226,11 @@ router.get("/my-ads", async (req: Request, res: Response) => {
 
     const userId = req.session?.userId;
     if (!userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
     const user = await storage.getUser(userId);
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
     const userType = user.userType || "biker";
     const campaigns = await storage.getActiveAdsByUserType(userType);
@@ -245,7 +246,7 @@ router.get("/my-ads", async (req: Request, res: Response) => {
     return res.json(activeCampaigns);
   } catch (error) {
     console.error("Get my ads error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -277,7 +278,7 @@ router.get("/placement/:placement", async (req: Request, res: Response) => {
     return res.json(activeCampaigns);
   } catch (error) {
     console.error("Get placement ads error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -298,7 +299,7 @@ router.get("/guide-zip", async (_req: Request, res: Response) => {
     return res.send(zipBuffer);
   } catch (error) {
     console.error("Guide ZIP serve error:", error);
-    return res.status(404).json({ message: "File guida non disponibile" });
+    return sendError(res, 404, "File guida non disponibile");
   }
 });
 
@@ -312,10 +313,10 @@ router.post("/:id/click", async (req: Request, res: Response) => {
       userId,
     });
 
-    return res.json({ message: "Click registrato" });
+    return sendSuccess(res, undefined, "Click registrato");
   } catch (error) {
     console.error("Ad click error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

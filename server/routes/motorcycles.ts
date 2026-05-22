@@ -7,6 +7,7 @@ import { userMotorcycles, createMotorcycleSchema, updateMotorcycleSchema, upload
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { sendMatchPushNotifications } from "../push-notifications";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 import { requireAuth } from "../lib/auth-middleware";
 
@@ -28,7 +29,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error) {
     console.error("Get motorcycles error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -38,16 +39,16 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
     const user = await storage.getUser(userId);
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
 
     if (user.userType !== "biker" && user.userType !== "coppia" && user.userType !== "admin") {
-      return res.status(403).json({ message: "Solo biker, coppie e admin possono aggiungere moto" });
+      return sendError(res, 403, "Solo biker, coppie e admin possono aggiungere moto");
     }
 
     const parsed = createMotorcycleSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
     const { brand, model, year, displacement, motorcycleType, ridingStyle, photoUrl, isForSale, saleDescription, isDefault, motoDescription } = parsed.data;
 
@@ -116,7 +117,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     return res.status(201).json({ motorcycle, matches });
   } catch (error) {
     console.error("Create motorcycle error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -127,16 +128,16 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
 
     const existing = await storage.getUserMotorcycle(motoId);
     if (!existing) {
-      return res.status(404).json({ message: "Moto non trovata" });
+      return sendError(res, 404, "Moto non trovata");
     }
 
     if (existing.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const parsedUpdate = updateMotorcycleSchema.safeParse(req.body);
     if (!parsedUpdate.success) {
-      return res.status(400).json({ message: parsedUpdate.error.issues[0].message });
+      return sendError(res, 400, parsedUpdate.error.issues[0].message);
     }
     const b = parsedUpdate.data;
     const updateData: Record<string, unknown> = {};
@@ -163,7 +164,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
     return res.json(motorcycle);
   } catch (error) {
     console.error("Update motorcycle error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -174,19 +175,19 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
 
     const existing = await storage.getUserMotorcycle(motoId);
     if (!existing) {
-      return res.status(404).json({ message: "Moto non trovata" });
+      return sendError(res, 404, "Moto non trovata");
     }
 
     if (existing.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     await storage.deleteUserMotorcycle(motoId);
 
-    return res.json({ message: "Moto eliminata" });
+    return sendSuccess(res, undefined, "Moto eliminata");
   } catch (error) {
     console.error("Delete motorcycle error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -204,14 +205,14 @@ router.get("/:id/photos", requireAuth, async (req: Request, res: Response) => {
     // di confermare l'esistenza di moto altrui.
     const moto = await storage.getUserMotorcycle(motoId);
     if (!moto || moto.userId !== userId) {
-      return res.status(404).json({ message: "Moto non trovata" });
+      return sendError(res, 404, "Moto non trovata");
     }
 
     const photos = await storage.getMotorcyclePhotos(motoId);
     return res.json(photos);
   } catch (error) {
     console.error("Get motorcycle photos error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -222,17 +223,17 @@ router.post("/:id/photos", requireAuth, async (req: Request, res: Response) => {
 
     const existing = await storage.getUserMotorcycle(motoId);
     if (!existing || existing.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const count = await storage.getMotorcyclePhotoCount(motoId);
     if (count >= 3) {
-      return res.status(400).json({ message: "Massimo 3 foto per moto" });
+      return sendError(res, 400, "Massimo 3 foto per moto");
     }
 
     const parsedPhoto = uploadPhotoSchema.safeParse(req.body);
     if (!parsedPhoto.success) {
-      return res.status(400).json({ message: parsedPhoto.error.issues[0].message });
+      return sendError(res, 400, parsedPhoto.error.issues[0].message);
     }
     const { imageBase64 } = parsedPhoto.data;
 
@@ -254,7 +255,7 @@ router.post("/:id/photos", requireAuth, async (req: Request, res: Response) => {
     return res.status(201).json(photo);
   } catch (error) {
     console.error("Upload motorcycle photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -272,18 +273,18 @@ router.delete("/:id/photos/:photoId", requireAuth, async (req: Request, res: Res
     // di proprieta' del richiedente.
     const photo = await storage.getMotorcyclePhoto(photoId);
     if (!photo || photo.motorcycleId !== motoId) {
-      return res.status(404).json({ message: "Foto non trovata" });
+      return sendError(res, 404, "Foto non trovata");
     }
     const moto = await storage.getUserMotorcycle(motoId);
     if (!moto || moto.userId !== userId) {
-      return res.status(404).json({ message: "Foto non trovata" });
+      return sendError(res, 404, "Foto non trovata");
     }
 
     await storage.deleteMotorcyclePhoto(photoId);
-    return res.json({ message: "Foto eliminata" });
+    return sendSuccess(res, undefined, "Foto eliminata");
   } catch (error) {
     console.error("Delete motorcycle photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

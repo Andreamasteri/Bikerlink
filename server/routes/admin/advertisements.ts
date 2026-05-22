@@ -8,6 +8,7 @@ import path from "path";
 import fs from "fs";
 import { objectExists, uploadBuffer } from "../../objectStorage";
 import { cacheAdImage } from "../ads";
+import { sendSuccess, sendError } from "../../lib/api-response";
 import crypto from "crypto";
 
 const router = Router();
@@ -43,14 +44,14 @@ router.get("/", async (_req: Request, res: Response) => {
     return res.json(campaigns);
   } catch (error) {
     console.error("Admin get advertisements error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.post("/bulk", adUpload.array("images", 10), async (req: Request, res: Response) => {
   try {
     const parsedAb = adsBulkSchema.safeParse(req.body);
-    if (!parsedAb.success) return res.status(400).json({ message: parsedAb.error.issues[0].message });
+    if (!parsedAb.success) return sendError(res, 400, parsedAb.error.issues[0].message);
     const { name, sponsor, linkUrl, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = parsedAb.data;
 
     const files = (req.files as Express.Multer.File[]) || [];
@@ -90,21 +91,21 @@ router.post("/bulk", adUpload.array("images", 10), async (req: Request, res: Res
     return res.status(201).json(campaigns);
   } catch (error) {
     console.error("Admin bulk advertisement error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.post("/", adUpload.single("image"), async (req: Request, res: Response) => {
   try {
     const parsedAc = adsCreateSchema.safeParse(req.body);
-    if (!parsedAc.success) return res.status(400).json({ message: parsedAc.error.issues[0].message });
+    if (!parsedAc.success) return sendError(res, 400, parsedAc.error.issues[0].message);
     const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = parsedAc.data;
     let imageUrl: string | null = null;
     if (req.file) {
       imageUrl = await uploadAdImageToObjectStorage(req.file.buffer, req.file.originalname, req.file.mimetype);
     } else if (req.body.imageUrl) {
       if (!String(req.body.imageUrl).startsWith("/api/ads/images/")) {
-        return res.status(400).json({ message: "imageUrl non valido: sono accettati solo percorsi interni" });
+        return sendError(res, 400, "imageUrl non valido: sono accettati solo percorsi interni");
       }
       imageUrl = req.body.imageUrl;
     }
@@ -134,16 +135,16 @@ router.post("/", adUpload.single("image"), async (req: Request, res: Response) =
     return res.status(201).json(campaign);
   } catch (error) {
     console.error("Admin create advertisement error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.put("/:id", adUpload.single("image"), async (req: Request, res: Response) => {
   try {
     const id = paramStr(req.params.id);
-    if (id === null) return res.status(400).json({ message: "ID non valido" });
+    if (id === null) return sendError(res, 400, "ID non valido");
     const parsedAu = adsUpdateSchema.safeParse(req.body);
-    if (!parsedAu.success) return res.status(400).json({ message: parsedAu.error.issues[0].message });
+    if (!parsedAu.success) return sendError(res, 400, parsedAu.error.issues[0].message);
     const adBody = parsedAu.data as any;
     const updates: any = {};
     if (adBody.name !== undefined) updates.name = adBody.name;
@@ -166,7 +167,7 @@ router.put("/:id", adUpload.single("image"), async (req: Request, res: Response)
       updates.imageVersion = ((existing?.imageVersion ?? 0) + 1);
     } else if (req.body.imageUrl !== undefined) {
       if (req.body.imageUrl !== null && req.body.imageUrl !== "" && !String(req.body.imageUrl).startsWith("/api/ads/images/")) {
-        return res.status(400).json({ message: "imageUrl non valido: sono accettati solo percorsi interni" });
+        return sendError(res, 400, "imageUrl non valido: sono accettati solo percorsi interni");
       }
       updates.imageUrl = req.body.imageUrl;
     }
@@ -176,7 +177,7 @@ router.put("/:id", adUpload.single("image"), async (req: Request, res: Response)
     }
     const campaign = await storage.updateAdCampaign(id, updates);
     if (!campaign) {
-      return res.status(404).json({ message: "Campagna non trovata" });
+      return sendError(res, 404, "Campagna non trovata");
     }
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -200,14 +201,14 @@ router.put("/:id", adUpload.single("image"), async (req: Request, res: Response)
     return res.json(campaign);
   } catch (error) {
     console.error("Admin update advertisement error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.delete("/bulk-delete", async (req: Request, res: Response) => {
   try {
     const parsedBd = adsBulkDeleteSchema.safeParse(req.body);
-    if (!parsedBd.success) return res.status(400).json({ message: parsedBd.error.issues[0].message });
+    if (!parsedBd.success) return sendError(res, 400, parsedBd.error.issues[0].message);
     const { ids } = parsedBd.data;
     const toDelete = await db.select().from(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
     await db.delete(adCampaignsTable).where(inArray(adCampaignsTable.id, ids));
@@ -229,10 +230,10 @@ router.delete("/bulk-delete", async (req: Request, res: Response) => {
       targetId: ids[0] ?? "bulk",
       details: `Eliminate ${ids.length} campagne in blocco`,
     });
-    return res.json({ deleted: ids.length });
+    return sendSuccess(res, { deleted: ids.length });
   } catch (error) {
     console.error("Admin bulk delete advertisements error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -240,14 +241,14 @@ router.put("/group/:groupId", async (req: Request, res: Response) => {
   try {
     const { groupId } = req.params;
     const parsedGu = adsGroupUpdateSchema.safeParse(req.body);
-    if (!parsedGu.success) return res.status(400).json({ message: parsedGu.error.issues[0].message });
+    if (!parsedGu.success) return sendError(res, 400, parsedGu.error.issues[0].message);
     const { name, linkUrl, isActive } = parsedGu.data as any;
     if (!name?.trim()) {
-      return res.status(400).json({ message: "Nome base obbligatorio" });
+      return sendError(res, 400, "Nome base obbligatorio");
     }
     const existing = await db.select().from(adCampaignsTable).where(eq(adCampaignsTable.groupId, groupId));
     if (existing.length === 0) {
-      return res.status(404).json({ message: "Gruppo non trovato" });
+      return sendError(res, 404, "Gruppo non trovato");
     }
     const sorted = [...existing].sort((a, b) => {
       const numA = parseInt(a.name.match(/#(\d+)$/)?.[1] ?? "0");
@@ -276,14 +277,14 @@ router.put("/group/:groupId", async (req: Request, res: Response) => {
     return res.json(updated);
   } catch (error) {
     console.error("Admin update advertisement group error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
     const id = paramStr(req.params.id);
-    if (id === null) return res.status(400).json({ message: "ID non valido" });
+    if (id === null) return sendError(res, 400, "ID non valido");
     const campaign = await storage.getAdCampaign(id);
     await storage.deleteCampaign(id);
     if (campaign?.imageUrl) {
@@ -301,10 +302,10 @@ router.delete("/:id", async (req: Request, res: Response) => {
       targetType: "campaign",
       targetId: id,
     });
-    return res.json({ message: "Pubblicità eliminata" });
+    return sendSuccess(res, undefined, "Pubblicità eliminata");
   } catch (error) {
     console.error("Admin delete advertisement error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

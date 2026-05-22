@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
 import { sprintResults, users, userMotorcycles, createSprintSchema } from "@shared/schema";
@@ -13,7 +14,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const parsed = createSprintSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
     const { sprint0to100Ms, maxAccelerationG, maxDecelerationG, maxTiltDeg, routeId } = parsed.data;
     const safeAccelG = maxAccelerationG ?? null;
@@ -35,7 +36,7 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(201).json(result);
   } catch (error) {
     console.error("Save sprint error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -54,7 +55,7 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(sprints);
   } catch (error) {
     console.error("Get sprints error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -212,7 +213,7 @@ router.get("/leaderboard", async (req: Request, res: Response) => {
     return res.json(leaderboard);
   } catch (error) {
     console.error("Get sprint leaderboard error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -222,7 +223,7 @@ router.get("/leaderboard/rank/:userId", async (req: Request, res: Response) => {
     if (!requesterId) return;
 
     const { userId } = req.params;
-    if (!userId) return res.status(400).json({ message: "userId richiesto" });
+    if (!userId) return sendError(res, 400, "userId richiesto");
 
     const bestPerUser = db
       .selectDistinctOn([sprintResults.userId], {
@@ -265,7 +266,7 @@ router.get("/leaderboard/rank/:userId", async (req: Request, res: Response) => {
     return res.json({ rank, sprint0to100Ms: targetMs });
   } catch (error) {
     console.error("Get sprint rank error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

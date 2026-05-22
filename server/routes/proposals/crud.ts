@@ -7,6 +7,7 @@ import { triggerProposalCreatedMatching } from "../../matching-engine";
 import { allLimited } from "../../lib/concurrency";
 
 import { requireAuth } from "../../lib/auth-middleware";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -72,7 +73,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.json(results);
   } catch (error) {
     console.error("Get proposals error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -96,7 +97,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         ))
         .limit(1);
       if (!membership) {
-        return res.status(403).json({ message: "Puoi creare proposte solo per club di cui sei membro attivo" });
+        return sendError(res, 403, "Puoi creare proposte solo per club di cui sei membro attivo");
       }
     }
 
@@ -109,7 +110,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     return res.json(proposal);
   } catch (error) {
     console.error("Create proposal error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -118,7 +119,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     const proposalId = req.params.id as string;
     const proposal = await storage.getProposal(proposalId);
     if (!proposal) {
-      return res.status(404).json({ message: "Proposta non trovata" });
+      return sendError(res, 404, "Proposta non trovata");
     }
 
     const userId = req.session.userId!;
@@ -133,7 +134,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
         ))
         .limit(1);
       if (!membership) {
-        return res.status(403).json({ message: "Questa proposta è riservata ai membri del club" });
+        return sendError(res, 403, "Questa proposta è riservata ai membri del club");
       }
     }
 
@@ -157,7 +158,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Get proposal error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -167,16 +168,16 @@ router.patch("/:id", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const proposal = await storage.getProposal(proposalId);
     if (!proposal) {
-      return res.status(404).json({ message: "Proposta non trovata" });
+      return sendError(res, 404, "Proposta non trovata");
     }
     if (proposal.userId !== userId) {
-      return res.status(403).json({ message: "Solo il creatore può modificare questa proposta" });
+      return sendError(res, 403, "Solo il creatore può modificare questa proposta");
     }
     const updated = await storage.updateProposal(proposalId, req.body);
     return res.json(updated);
   } catch (error) {
     console.error("Update proposal error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -186,10 +187,10 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const proposal = await storage.getProposal(proposalId);
     if (!proposal) {
-      return res.status(404).json({ message: "Proposta non trovata" });
+      return sendError(res, 404, "Proposta non trovata");
     }
     if (proposal.userId !== userId) {
-      return res.status(403).json({ message: "Solo il creatore può eliminare questa proposta" });
+      return sendError(res, 403, "Solo il creatore può eliminare questa proposta");
     }
     if (proposal.clubId) {
       const [membership] = await db
@@ -202,14 +203,14 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
         ))
         .limit(1);
       if (!membership) {
-        return res.status(403).json({ message: "Non sei più membro attivo del club" });
+        return sendError(res, 403, "Non sei più membro attivo del club");
       }
     }
     await storage.deleteProposal(proposalId);
-    return res.json({ message: "Proposta eliminata" });
+    return sendSuccess(res, undefined, "Proposta eliminata");
   } catch (error) {
     console.error("Delete proposal error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

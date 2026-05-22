@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { storage } from "../storage";
@@ -75,23 +76,23 @@ router.post("/", async (req: Request, res: Response) => {
     // public telemetry endpoints share the same trust-proxy contract.
     const ip = getTrustedClientIp(req) ?? "";
     if (reportRateLimiter.isOverLimit(userId, ip)) {
-      return res.status(429).json({ message: "Hai inviato troppe segnalazioni. Riprova tra un'ora." });
+      return sendError(res, 429, "Hai inviato troppe segnalazioni. Riprova tra un'ora.");
     }
 
     const parsed = createReportSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
 
     const { reportedUserId, reason, description } = parsed.data;
 
     if (reportedUserId === userId) {
-      return res.status(400).json({ message: "Non puoi segnalare te stesso" });
+      return sendError(res, 400, "Non puoi segnalare te stesso");
     }
 
     const reportedUser = await storage.getUser(reportedUserId);
     if (!reportedUser) {
-      return res.status(404).json({ message: "Utente segnalato non trovato" });
+      return sendError(res, 404, "Utente segnalato non trovato");
     }
 
     const report = await storage.createReport({
@@ -117,7 +118,7 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(201).json(report);
   } catch (error) {
     console.error("Create report error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -128,7 +129,7 @@ router.get("/", async (req: Request, res: Response) => {
 
     const user = await storage.getUser(userId);
     if (!user || (user.role !== "admin" && user.role !== "moderator")) {
-      return res.status(403).json({ message: "Accesso non autorizzato" });
+      return sendError(res, 403, "Accesso non autorizzato");
     }
 
     const status = req.query.status as string | undefined;
@@ -136,7 +137,7 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(reportsList);
   } catch (error) {
     console.error("Get reports error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

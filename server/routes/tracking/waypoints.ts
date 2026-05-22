@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
@@ -18,13 +19,13 @@ router.post("/:id/points", async (req: Request, res: Response) => {
     const route = await storage.getRoute(id);
 
     if (!route) {
-      return res.status(404).json({ message: "Percorso non trovato" });
+      return sendError(res, 404, "Percorso non trovato");
     }
     if (route.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
     if (route.status !== "active") {
-      return res.status(400).json({ message: "Il percorso non è attivo" });
+      return sendError(res, 400, "Il percorso non è attivo");
     }
 
     const parsedPoints = addRoutePointsSchema.safeParse(req.body);
@@ -71,7 +72,7 @@ router.post("/:id/points", async (req: Request, res: Response) => {
           invalidCount: invalidPoints.length,
         });
       }
-      return res.status(400).json({ message: parsedPoints.error.issues[0].message });
+      return sendError(res, 400, parsedPoints.error.issues[0].message);
     }
 
     const { points } = parsedPoints.data;
@@ -90,7 +91,7 @@ router.post("/:id/points", async (req: Request, res: Response) => {
     return res.status(201).json(created);
   } catch (error) {
     console.error("Add route points error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

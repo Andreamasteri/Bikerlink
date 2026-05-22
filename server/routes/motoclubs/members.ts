@@ -7,6 +7,7 @@ import { systemAccountConditions } from "../../lib/system-account-filter";
 import { createClubConversation, addMemberToConversation, removeMemberFromConversation, notifyTopMembersOfNewJoin } from "./utils";
 
 import { requireAuth } from "../../lib/auth-middleware";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.get("/me/clubs", requireAuth, async (req: Request, res: Response) => {
 
     return res.json(clubs.map(r => ({ ...r.club, joinedAt: r.member.joinedAt, role: r.member.role })));
   } catch (e) {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -33,14 +34,14 @@ router.post("/:id/join", requireAuth, async (req: Request, res: Response) => {
     const clubId = req.params.id;
 
     const [club] = await db.select().from(motoClubs).where(and(eq(motoClubs.id, clubId as string), eq(motoClubs.isApproved, true))).limit(1);
-    if (!club) return res.status(404).json({ message: "Club non trovato" });
+    if (!club) return sendError(res, 404, "Club non trovato");
 
     const existing = await db.select().from(motoClubMembers)
       .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.userId, userId)))
       .limit(1);
 
     if (existing.length > 0 && existing[0].status === "active") {
-      return res.status(409).json({ message: "Sei già membro di questo club" });
+      return sendError(res, 409, "Sei già membro di questo club");
     }
 
     if (existing.length > 0) {
@@ -82,10 +83,10 @@ router.post("/:id/join", requireAuth, async (req: Request, res: Response) => {
 
     await notifyTopMembersOfNewJoin(clubId as string, userId, club.name);
 
-    return res.json({ message: "Sei entrato nel club" });
+    return sendSuccess(res, undefined, "Sei entrato nel club");
   } catch (e) {
     console.error("[POST /motoclubs/:id/join]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -103,9 +104,9 @@ router.post("/:id/leave", requireAuth, async (req: Request, res: Response) => {
       await removeMemberFromConversation(club.conversationId, userId);
     }
 
-    return res.json({ message: "Hai lasciato il club" });
+    return sendSuccess(res, undefined, "Hai lasciato il club");
   } catch (e) {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -137,7 +138,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
       updatedAt: motoClubs.updatedAt,
       _proposedLatitude: motoClubs.proposedLatitude,
     }).from(motoClubs).where(eq(motoClubs.id, clubId as string)).limit(1);
-    if (!clubRow) return res.status(404).json({ message: "Club non trovato" });
+    if (!clubRow) return sendError(res, 404, "Club non trovato");
     const { _proposedLatitude, ...club } = clubRow;
     const hasPendingLocationProposal = _proposedLatitude != null;
 
@@ -149,7 +150,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
         eq(motoClubMembers.status, "active"),
       ))
       .limit(1);
-    if (!membership) return res.status(403).json({ message: "Non sei membro di questo club" });
+    if (!membership) return sendError(res, 403, "Non sei membro di questo club");
 
     const membersRaw = await db.select({
       member: motoClubMembers,
@@ -170,7 +171,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
 
     return res.json({ ...club, hasPendingLocationProposal, members, memberCount: members.length });
   } catch (e) {
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -204,7 +205,7 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
       updatedAt: motoClubs.updatedAt,
       _proposedLatitude: motoClubs.proposedLatitude,
     }).from(motoClubs).where(eq(motoClubs.id, clubId as string)).limit(1);
-    if (!clubRow) return res.status(404).json({ message: "Club non trovato" });
+    if (!clubRow) return sendError(res, 404, "Club non trovato");
     const { _proposedLatitude, ...club } = clubRow;
     const hasPendingLocationProposal = _proposedLatitude != null;
 
@@ -216,7 +217,7 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
         eq(motoClubMembers.status, "active"),
       ))
       .limit(1);
-    if (!membership) return res.status(403).json({ message: "Non sei membro di questo club" });
+    if (!membership) return sendError(res, 403, "Non sei membro di questo club");
 
     const memberships = await db
       .select({
@@ -245,7 +246,7 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
     return res.json({ ...club, hasPendingLocationProposal, members: memberships, totalCount: total, hasMore: offset + limit < total });
   } catch (e) {
     console.error("[GET /:id/detail]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

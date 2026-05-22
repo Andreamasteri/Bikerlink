@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { sendMessageSchema } from "@shared/schema";
@@ -43,7 +44,7 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
 
     const participants = await storage.getConversationParticipants(conversationId);
     if (!participants.find((p) => p.userId === userId)) {
-      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      return sendError(res, 403, "Non fai parte di questa conversazione");
     }
 
     const messages = await storage.getMessages(conversationId, limit, offset);
@@ -59,7 +60,7 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     return res.json(messagesWithSender);
   } catch (error) {
     console.error("Get messages error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -71,7 +72,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     const id = req.params.id;
     const parsed = sendMessageSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
 
     const { content, messageType, imageUrl, latitude, longitude, playlistId } = parsed.data;
@@ -82,7 +83,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     ]);
 
     if (!participants.find((p) => p.userId === userId)) {
-      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      return sendError(res, 403, "Non fai parte di questa conversazione");
     }
 
     const isDirectConv = conversation && (
@@ -96,7 +97,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
       for (const other of otherParticipants) {
         const blocked = await storage.isBlocked(userId, other.userId);
         if (blocked) {
-          return res.status(403).json({ message: "Utente bloccato" });
+          return sendError(res, 403, "Utente bloccato");
         }
       }
     }
@@ -143,7 +144,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     return res.status(201).json(messagePayload);
   } catch (error) {
     console.error("Send message error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

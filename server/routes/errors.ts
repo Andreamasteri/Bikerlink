@@ -1,3 +1,4 @@
+import { sendError, sendSuccess } from "../lib/api-response";
 import express, { Router, type Request, type Response, type NextFunction } from "express";
 import { sendEmail } from "../email";
 import { storage } from "../storage";
@@ -39,7 +40,7 @@ function isRateLimited(ip: string): boolean {
 function errorsRateLimiter(req: Request, res: Response, next: NextFunction) {
   const ip = getTrustedClientIp(req) ?? "unknown";
   if (isRateLimited(ip)) {
-    return res.status(429).json({ message: "Troppe richieste" });
+    return sendError(res, 429, "Troppe richieste");
   }
   return next();
 }
@@ -100,7 +101,7 @@ router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Respon
   try {
     const bodyParsed = gpsErrorSchema.safeParse(req.body ?? {});
     if (!bodyParsed.success) {
-      return res.status(400).json({ message: bodyParsed.error.issues[0]?.message ?? "Payload non valido" });
+      return sendError(res, 400, bodyParsed.error.issues[0]?.message ?? "Payload non valido");
     }
     const body = bodyParsed.data;
     const errorMessage = truncate(body.errorMessage, MAX_STRING_LEN);
@@ -148,10 +149,10 @@ router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Respon
       speedKmh: body.speedKmh != null ? Number(body.speedKmh) || null : null,
     }).catch(() => {});
 
-    return res.status(200).json({ ok: true });
+    return sendSuccess(res);
   } catch (err) {
     console.error("[GPS_ERROR] Errore nel route /api/errors:", err);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

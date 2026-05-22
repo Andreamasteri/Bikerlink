@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { userMusicTracks, userLastfmSessions } from "@shared/schema";
@@ -11,10 +12,10 @@ const router = Router();
 
 router.get("/search", requireAuth, async (req: Request, res: Response) => {
   if (!isLastfmConfigured()) {
-    return res.status(503).json({ message: "Last.fm non configurato." });
+    return sendError(res, 503, "Last.fm non configurato.");
   }
   const q = (req.query.q as string ?? "").trim();
-  if (q.length < 2) return res.status(400).json({ message: "Query troppo corta" });
+  if (q.length < 2) return sendError(res, 400, "Query troppo corta");
   try {
     const data = await lastfmPublicCall({
       method: "track.search",
@@ -51,13 +52,13 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
     return res.json({ tracks: result });
   } catch (err) {
     console.error("[Last.fm search]", err);
-    return res.status(500).json({ message: "Errore nella ricerca Last.fm" });
+    return sendError(res, 500, "Errore nella ricerca Last.fm");
   }
 });
 
 router.post("/sync", requireAuth, async (req: Request, res: Response) => {
   if (!isLastfmConfigured()) {
-    return res.status(503).json({ message: "Last.fm non configurato." });
+    return sendError(res, 503, "Last.fm non configurato.");
   }
   const userId = req.session.userId!;
   try {
@@ -67,13 +68,13 @@ router.post("/sync", requireAuth, async (req: Request, res: Response) => {
       .where(eq(userLastfmSessions.userId, userId))
       .limit(1);
 
-    if (!session) return res.status(401).json({ message: "Account Last.fm non collegato" });
+    if (!session) return sendError(res, 401, "Account Last.fm non collegato");
 
     const trackCount = await syncLastfmTracks(userId, session.sessionKey, session.lastfmUsername);
     return res.json({ synced: trackCount });
   } catch (err) {
     console.error("[Last.fm sync]", err);
-    return res.status(500).json({ message: "Errore durante la sincronizzazione" });
+    return sendError(res, 500, "Errore durante la sincronizzazione");
   }
 });
 
@@ -87,7 +88,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     return res.json({ tracks });
   } catch (err) {
     console.error("[Last.fm tracks]", err);
-    return res.status(500).json({ message: "Errore nel recupero brani" });
+    return sendError(res, 500, "Errore nel recupero brani");
   }
 });
 
@@ -105,7 +106,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       popularity?: number;
     };
   if (!lastfmTrackId || !trackName || !artistName) {
-    return res.status(400).json({ message: "Dati brano mancanti" });
+    return sendError(res, 400, "Dati brano mancanti");
   }
   try {
     const [track] = await db
@@ -127,7 +128,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
     return res.json({ track });
   } catch (err) {
     console.error("[Last.fm add track]", err);
-    return res.status(500).json({ message: "Errore nell'aggiunta del brano" });
+    return sendError(res, 500, "Errore nell'aggiunta del brano");
   }
 });
 
@@ -147,7 +148,7 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
     return res.json({ deleted: true });
   } catch (err) {
     console.error("[Last.fm delete track]", err);
-    return res.status(500).json({ message: "Errore nell'eliminazione del brano" });
+    return sendError(res, 500, "Errore nell'eliminazione del brano");
   }
 });
 

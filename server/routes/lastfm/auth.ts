@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import { db } from "../../db";
@@ -12,11 +13,11 @@ const router = Router();
 
 router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => {
   if (!isLastfmConfigured()) {
-    return res.status(503).json({ message: "Last.fm non configurato. Contatta l'amministratore." });
+    return sendError(res, 503, "Last.fm non configurato. Contatta l'amministratore.");
   }
   const { username, password } = req.body as { username?: string; password?: string };
   if (!username || !password) {
-    return res.status(400).json({ message: "Username e password sono obbligatori." });
+    return sendError(res, 400, "Username e password sono obbligatori.");
   }
   const userId = req.session.userId!;
 
@@ -42,18 +43,18 @@ router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => 
       } else {
         errMsg = sessionData.message ?? "Credenziali non valide. Riprova.";
       }
-      return res.status(401).json({ message: errMsg });
+      return sendError(res, 401, errMsg);
     }
 
     const key = sessionData?.session?.key;
     if (!key) {
-      return res.status(400).json({ message: "Autorizzazione Last.fm fallita. Controlla username e password." });
+      return sendError(res, 400, "Autorizzazione Last.fm fallita. Controlla username e password.");
     }
     sessionKey = key;
     lastfmUsername = sessionData?.session?.name ?? username;
   } catch (err) {
     console.error("[Last.fm mobile-auth] auth error:", err);
-    return res.status(401).json({ message: (err as Error).message ?? "Errore nella connessione Last.fm. Riprova." });
+    return sendError(res, 401, (err as Error).message ?? "Errore nella connessione Last.fm. Riprova.");
   }
 
   try {
@@ -75,35 +76,35 @@ router.post("/mobile-auth", requireAuth, async (req: Request, res: Response) => 
     return res.json({ connected: true, username: lastfmUsername, trackCount });
   } catch (err) {
     console.error("[Last.fm mobile-auth] DB error:", err);
-    return res.status(500).json({ message: "Errore nel salvataggio della sessione Last.fm." });
+    return sendError(res, 500, "Errore nel salvataggio della sessione Last.fm.");
   }
 });
 
 router.get("/auth-token", requireAuth, async (req: Request, res: Response) => {
   if (!isLastfmConfigured()) {
-    return res.status(503).json({ message: "Last.fm non configurato." });
+    return sendError(res, 503, "Last.fm non configurato.");
   }
   try {
     const data = await lastfmApiCall({ method: "auth.getToken" }) as { token?: string; error?: number; message?: string };
     if (data?.error || !data?.token) {
       console.warn(`[Last.fm auth-token] error=${data?.error} msg=${data?.message}`);
-      return res.status(500).json({ message: data?.message ?? "Impossibile ottenere il token Last.fm." });
+      return sendError(res, 500, data?.message ?? "Impossibile ottenere il token Last.fm.");
     }
     const apiKey = process.env.LASTFM_API_KEY!;
     const authUrl = `https://www.last.fm/api/auth/?api_key=${apiKey}&token=${data.token}&cb=bikerlink://lastfm-callback`;
     return res.json({ token: data.token, authUrl });
   } catch (err) {
     console.error("[Last.fm auth-token]", err);
-    return res.status(500).json({ message: "Errore di connessione a Last.fm." });
+    return sendError(res, 500, "Errore di connessione a Last.fm.");
   }
 });
 
 router.post("/auth-session", requireAuth, async (req: Request, res: Response) => {
   if (!isLastfmConfigured()) {
-    return res.status(503).json({ message: "Last.fm non configurato." });
+    return sendError(res, 503, "Last.fm non configurato.");
   }
   const { token } = req.body as { token?: string };
-  if (!token) return res.status(400).json({ message: "Token mancante." });
+  if (!token) return sendError(res, 400, "Token mancante.");
   const userId = req.session.userId!;
   try {
     const data = await lastfmApiCall({ method: "auth.getSession", token }, "POST") as { session?: { key?: string; name?: string }; error?: number; message?: string };
@@ -111,14 +112,14 @@ router.post("/auth-session", requireAuth, async (req: Request, res: Response) =>
       const code = data.error;
       console.warn(`[Last.fm auth-session] error code=${code} msg=${data.message}`);
       if (code === 14) {
-        return res.status(401).json({ message: "Non hai ancora autorizzato l'app su Last.fm. Apri il link, accedi e clicca 'Sì, permetti l'accesso', poi torna qui e riprova." });
+        return sendError(res, 401, "Non hai ancora autorizzato l'app su Last.fm. Apri il link, accedi e clicca 'Sì, permetti l'accesso', poi torna qui e riprova.");
       }
-      return res.status(401).json({ message: data.message ?? "Autorizzazione negata. Riprova." });
+      return sendError(res, 401, data.message ?? "Autorizzazione negata. Riprova.");
     }
     const key = data?.session?.key;
     const lastfmUsername = data?.session?.name;
     if (!key || !lastfmUsername) {
-      return res.status(400).json({ message: "Autorizzazione Last.fm fallita. Riprova." });
+      return sendError(res, 400, "Autorizzazione Last.fm fallita. Riprova.");
     }
     await db.insert(userLastfmSessions)
       .values({ userId, lastfmUsername, sessionKey: key })
@@ -135,7 +136,7 @@ router.post("/auth-session", requireAuth, async (req: Request, res: Response) =>
     return res.json({ connected: true, username: lastfmUsername, trackCount });
   } catch (err) {
     console.error("[Last.fm auth-session] error:", err);
-    return res.status(500).json({ message: (err as Error).message ?? "Errore di connessione a Last.fm." });
+    return sendError(res, 500, (err as Error).message ?? "Errore di connessione a Last.fm.");
   }
 });
 
@@ -164,7 +165,7 @@ router.get("/status", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (err) {
     console.error("[Last.fm status]", err);
-    return res.status(500).json({ message: "Errore nel recupero stato Last.fm" });
+    return sendError(res, 500, "Errore nel recupero stato Last.fm");
   }
 });
 
@@ -175,7 +176,7 @@ router.post("/disconnect", requireAuth, async (req: Request, res: Response) => {
     return res.json({ disconnected: true });
   } catch (err) {
     console.error("[Last.fm disconnect]", err);
-    return res.status(500).json({ message: "Errore nella disconnessione" });
+    return sendError(res, 500, "Errore nella disconnessione");
   }
 });
 

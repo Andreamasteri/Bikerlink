@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { storage } from "../../storage";
 import { requireAuth, decodePolyline, escapeXml, computeBikerScoreFromPoints } from "./utils";
@@ -13,7 +14,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
 
   try {
     const route = await storage.getPlannedRoute(id);
-    if (!route) return res.status(404).json({ message: "Percorso non trovato" });
+    if (!route) return sendError(res, 404, "Percorso non trovato");
 
     const waypoints = (route.waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
     const originWp = waypoints.find((wp) => wp.lat !== 0 && wp.lng !== 0);
@@ -102,7 +103,7 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
 
   const parsedGpxImport = plannedGpxImportSchema.safeParse(req.body);
   if (!parsedGpxImport.success) {
-    return res.status(400).json({ message: parsedGpxImport.error.issues[0].message });
+    return sendError(res, 400, parsedGpxImport.error.issues[0].message);
   }
   const { gpxContent, title: titleOverride, visibility = "public" } = parsedGpxImport.data;
 
@@ -155,7 +156,7 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
       ] : [];
 
     if (finalWaypoints.length < 2 && trackPoints.length < 2) {
-      return res.status(400).json({ message: "GPX non valido: nessun waypoint o traccia trovata" });
+      return sendError(res, 400, "GPX non valido: nessun waypoint o traccia trovata");
     }
 
     const route = await storage.createPlannedRoute({
@@ -175,7 +176,7 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
     return res.status(201).json(route);
   } catch (err) {
     console.error("[import-gpx] error:", err);
-    return res.status(500).json({ message: "Errore importazione GPX" });
+    return sendError(res, 500, "Errore importazione GPX");
   }
 });
 
@@ -186,9 +187,9 @@ router.get("/:id/export.gpx", async (req: Request, res: Response) => {
 
   try {
     const route = await storage.getPlannedRoute(id);
-    if (!route) return res.status(404).json({ message: "Non trovato" });
+    if (!route) return sendError(res, 404, "Non trovato");
     if (route.userId !== userId && route.visibility !== "public") {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const waypoints = (route.waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
@@ -229,7 +230,7 @@ ${trkpts}
     return res.send(gpx);
   } catch (err) {
     console.error("[gpx] export error:", err);
-    return res.status(500).json({ message: "Errore export GPX" });
+    return sendError(res, 500, "Errore export GPX");
   }
 });
 

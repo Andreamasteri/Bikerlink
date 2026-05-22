@@ -7,6 +7,7 @@ import { createRegionalClubInvite } from "../motoclubs/utils";
 import { triggerProposalProfileMatchingForZavorrina } from "../../matching-engine";
 
 import { requireAuth } from "../../lib/auth-middleware";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -27,7 +28,7 @@ router.get("/position", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Get user position error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -36,7 +37,7 @@ router.get("/me", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const user = await storage.getUser(userId);
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
 
     const { password: _, ...safeUser } = user;
@@ -52,7 +53,7 @@ router.get("/me", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Get user profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -62,7 +63,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
 
     const parsed = updateUserMeSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
     const b = parsed.data;
     const userUpdate: Record<string, unknown> = {};
@@ -80,11 +81,11 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
       if (userUpdate.nickname) {
         const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
         if (reservedNicknames.includes((userUpdate.nickname as string).toLowerCase())) {
-          return res.status(400).json({ message: "Nickname non disponibile" });
+          return sendError(res, 400, "Nickname non disponibile");
         }
         const existing = await storage.getUserByNickname(userUpdate.nickname as string);
         if (existing && existing.id !== userId) {
-          return res.status(409).json({ message: "Nickname già in uso" });
+          return sendError(res, 409, "Nickname già in uso");
         }
       }
       await storage.updateUser(userId, userUpdate as any);
@@ -111,14 +112,14 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
           !VALID_SPEED_UNITS.includes(up.speedUnit) ||
           !VALID_DISTANCE_UNITS.includes(up.distanceUnit))
       ) {
-        return res.status(400).json({ message: "Valore unitsPreference non valido" });
+        return sendError(res, 400, "Valore unitsPreference non valido");
       }
       profileUpdate.unitsPreference = up;
     }
     if (b.mapFilters !== undefined) {
       const mf = b.mapFilters;
       if (mf !== null && (typeof mf !== "object" || Array.isArray(mf))) {
-        return res.status(400).json({ message: "Valore mapFilters non valido" });
+        return sendError(res, 400, "Valore mapFilters non valido");
       }
       if (mf === null) {
         profileUpdate.mapFilters = null;
@@ -149,7 +150,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
 
     const user = await storage.getUser(userId);
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
     const { password: _, ...safeUser } = user;
     const profile = await storage.getUserProfile(userId);
@@ -164,7 +165,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Update user profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -173,7 +174,7 @@ router.get("/profile", requireAuth, async (req: Request, res: Response) => {
     const userId = req.session.userId!;
     const user = await storage.getUser(userId);
     if (!user) {
-      return res.status(404).json({ message: "Utente non trovato" });
+      return sendError(res, 404, "Utente non trovato");
     }
     const { password: _, ...safeUser } = user;
     const profile = await storage.getUserProfile(userId);
@@ -183,7 +184,7 @@ router.get("/profile", requireAuth, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Get user profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -191,7 +192,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
   try {
     const userId = req.session.userId!;
     const parsedDyn = updateProfileDynamicSchema.safeParse(req.body);
-    if (!parsedDyn.success) return res.status(400).json({ message: parsedDyn.error.issues[0].message });
+    if (!parsedDyn.success) return sendError(res, 400, parsedDyn.error.issues[0].message);
     const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications, notificationPreferences, pushNotificationsEnabled } = parsedDyn.data;
     const existingProfile = await storage.getUserProfile(userId);
     const updateData: Record<string, unknown> = {};
@@ -218,7 +219,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     const validMapStyles = ["carto_light", "carto_dark", "esri_gray"];
     if (preferredMapStyle !== undefined) {
       if (preferredMapStyle !== null && !validMapStyles.includes(preferredMapStyle)) {
-        return res.status(400).json({ message: "Stile mappa non valido" });
+        return sendError(res, 400, "Stile mappa non valido");
       }
       updateData.preferredMapStyle = preferredMapStyle;
     }
@@ -264,7 +265,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     }
   } catch (error) {
     console.error("Update dynamic profile error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -272,10 +273,10 @@ router.put("/me/match-seen", requireAuth, async (req: Request, res: Response) =>
   try {
     const userId = req.session.userId!;
     await storage.updateUser(userId, { lastSeenMatchAt: new Date() } as any);
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Match seen update error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -283,22 +284,22 @@ router.put("/me/push-token", requireAuth, async (req: Request, res: Response) =>
   try {
     const userId = req.session.userId!;
     const parsedPt = pushTokenSchema.safeParse(req.body ?? {});
-    if (!parsedPt.success) return res.status(400).json({ message: parsedPt.error.issues[0].message });
+    if (!parsedPt.success) return sendError(res, 400, parsedPt.error.issues[0].message);
     const { token } = parsedPt.data;
     if (token === null || token === undefined || token === "") {
       await storage.updateUser(userId, { expoPushToken: null });
-      return res.json({ ok: true, cleared: true });
+      return sendSuccess(res, { cleared: true });
     }
     const isValidToken = typeof token === "string" &&
       (token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken["));
     if (!isValidToken) {
-      return res.status(400).json({ message: "Token Expo push non valido" });
+      return sendError(res, 400, "Token Expo push non valido");
     }
     await storage.updateUser(userId, { expoPushToken: token });
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Push token update error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -306,18 +307,18 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
   try {
     const userId = req.session.userId!;
     const parsedGm = ghostModeSchema.safeParse(req.body);
-    if (!parsedGm.success) return res.status(400).json({ message: parsedGm.error.issues[0].message });
+    if (!parsedGm.success) return sendError(res, 400, parsedGm.error.issues[0].message);
     const { enabled } = parsedGm.data;
     const ghostModeSetting = await storage.getAppSetting("ghost_mode_enabled");
     if (ghostModeSetting?.value !== "true") {
-      return res.status(403).json({ message: "Ghost mode is currently disabled by administrator." });
+      return sendError(res, 403, "Ghost mode is currently disabled by administrator.");
     }
     await storage.updateUser(userId, { ghostMode: enabled } as any);
     onlineTracker.setGhostMode(userId, enabled);
-    return res.json({ ok: true, enabled });
+    return sendSuccess(res, { enabled });
   } catch (error) {
     console.error("Ghost mode update error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -325,7 +326,7 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
     const parsed = privacySettingsSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, fakeHomeEnabled, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize } = parsed.data;
 
     const existing = await storage.getUserProfile(userId);
@@ -358,10 +359,10 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     } else {
       await storage.createUserProfile({ userId, ...updateData } as any);
     }
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Privacy settings update error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -369,7 +370,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
   try {
     const userId = req.session.userId!;
     const parsed = availabilitySchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const { isAvailable, latitude, longitude } = parsed.data;
     const existing = await storage.getUserProfile(userId);
     const updateData: Record<string, any> = { isAvailable };
@@ -408,10 +409,10 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     }
 
     onlineTracker.setAvailability(userId, isAvailable);
-    return res.json({ ok: true, isAvailable });
+    return sendSuccess(res, { isAvailable });
   } catch (error) {
     console.error("Availability update error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -420,10 +421,10 @@ router.post("/me/request-deletion", requireAuth, async (req: Request, res: Respo
     const userId = req.session.userId!;
     await storage.requestUserDeletion(userId);
     req.session.destroy(() => {});
-    return res.json({ message: "Richiesta di cancellazione inviata. Il tuo account sarà eliminato tra 30 giorni." });
+    return sendSuccess(res, undefined, "Richiesta di cancellazione inviata. Il tuo account sarà eliminato tra 30 giorni.");
   } catch (error) {
     console.error("Request deletion error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -431,10 +432,10 @@ router.post("/me/cancel-deletion", requireAuth, async (req: Request, res: Respon
   try {
     const userId = req.session.userId!;
     await storage.cancelUserDeletion(userId);
-    return res.json({ message: "Richiesta di cancellazione annullata." });
+    return sendSuccess(res, undefined, "Richiesta di cancellazione annullata.");
   } catch (error) {
     console.error("Cancel deletion error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

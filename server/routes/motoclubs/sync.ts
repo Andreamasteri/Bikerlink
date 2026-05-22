@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -13,7 +14,7 @@ router.post("/sync-garage", requireAuth, async (req: Request, res: Response) => 
   try {
     const userId = req.session.userId!;
     const user = await storage.getUser(userId);
-    if (!user) return res.status(404).json({ message: "Utente non trovato" });
+    if (!user) return sendError(res, 404, "Utente non trovato");
 
     const before = await db.select({ c: count() })
       .from(motoClubMembers)
@@ -55,7 +56,7 @@ router.post("/sync-garage", requireAuth, async (req: Request, res: Response) => 
     });
   } catch (e) {
     console.error("[POST /sync-garage]", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -20,7 +21,7 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
     const userId = req.session.userId!;
     const { toUserId, conversationId } = req.body as { toUserId?: string; conversationId?: string };
     if (!toUserId) {
-      return res.status(400).json({ message: "toUserId è obbligatorio" });
+      return sendError(res, 400, "toUserId è obbligatorio");
     }
 
     const tracks = await db
@@ -30,7 +31,7 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
       .orderBy(userMusicTracks.trackName);
 
     if (tracks.length === 0) {
-      return res.status(400).json({ message: "Nessun brano Last.fm sincronizzato. Sincronizza prima nel tab Musica." });
+      return sendError(res, 400, "Nessun brano Last.fm sincronizzato. Sincronizza prima nel tab Musica.");
     }
 
     if (conversationId) {
@@ -41,10 +42,10 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
 
       const participantIds = participants.map((p) => p.userId);
       if (!participantIds.includes(userId)) {
-        return res.status(403).json({ message: "Non sei un partecipante di questa conversazione" });
+        return sendError(res, 403, "Non sei un partecipante di questa conversazione");
       }
       if (!participantIds.includes(toUserId)) {
-        return res.status(403).json({ message: "Il destinatario non è un partecipante di questa conversazione" });
+        return sendError(res, 403, "Il destinatario non è un partecipante di questa conversazione");
       }
     }
 
@@ -88,7 +89,7 @@ router.post("/share-playlist", requireAuth, async (req: Request, res: Response) 
     return res.json({ sharedPlaylistId: newPlaylist?.id, messageId });
   } catch (error) {
     console.error("[Last.fm] share-playlist error:", error);
-    return res.status(500).json({ message: "Errore durante la condivisione della libreria" });
+    return sendError(res, 500, "Errore durante la condivisione della libreria");
   }
 });
 
@@ -133,7 +134,7 @@ router.get("/shared-playlists", requireAuth, async (req: Request, res: Response)
     return res.json({ playlists: result });
   } catch (error) {
     console.error("[Last.fm] shared-playlists error:", error);
-    return res.status(500).json({ message: "Errore nel recupero delle playlist ricevute" });
+    return sendError(res, 500, "Errore nel recupero delle playlist ricevute");
   }
 });
 
@@ -142,7 +143,7 @@ router.get("/shared-playlists/:id", requireAuth, async (req: Request, res: Respo
     const userId = req.session.userId!;
     const playlistId = parseInt(req.params.id, 10);
     if (isNaN(playlistId)) {
-      return res.status(400).json({ message: "ID non valido" });
+      return sendError(res, 400, "ID non valido");
     }
 
     const [playlist] = await db
@@ -152,7 +153,7 @@ router.get("/shared-playlists/:id", requireAuth, async (req: Request, res: Respo
       .limit(1);
 
     if (!playlist) {
-      return res.status(404).json({ message: "Playlist non trovata" });
+      return sendError(res, 404, "Playlist non trovata");
     }
 
     const fromUser = await storage.getUser(playlist.fromUserId);
@@ -164,7 +165,7 @@ router.get("/shared-playlists/:id", requireAuth, async (req: Request, res: Respo
     });
   } catch (error) {
     console.error("[Last.fm] shared-playlists/:id error:", error);
-    return res.status(500).json({ message: "Errore nel recupero della playlist" });
+    return sendError(res, 500, "Errore nel recupero della playlist");
   }
 });
 
@@ -173,7 +174,7 @@ router.post("/merge-playlist/:playlistId", requireAuth, async (req: Request, res
     const userId = req.session.userId!;
     const playlistId = parseInt(req.params.playlistId, 10);
     if (isNaN(playlistId)) {
-      return res.status(400).json({ message: "ID playlist non valido" });
+      return sendError(res, 400, "ID playlist non valido");
     }
 
     const [playlist] = await db
@@ -183,7 +184,7 @@ router.post("/merge-playlist/:playlistId", requireAuth, async (req: Request, res
       .limit(1);
 
     if (!playlist) {
-      return res.status(404).json({ message: "Playlist non trovata" });
+      return sendError(res, 404, "Playlist non trovata");
     }
 
     const tracksData = playlist.tracksData as Array<{
@@ -224,7 +225,7 @@ router.post("/merge-playlist/:playlistId", requireAuth, async (req: Request, res
     return res.json({ merged: true, newTracksAdded });
   } catch (error) {
     console.error("[Last.fm] merge-playlist error:", error);
-    return res.status(500).json({ message: "Errore durante il merge della playlist" });
+    return sendError(res, 500, "Errore durante il merge della playlist");
   }
 });
 

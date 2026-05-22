@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
@@ -46,7 +47,7 @@ router.get("/unread-total", async (req: Request, res: Response) => {
     return res.json({ count: total });
   } catch (error) {
     console.error("Get unread total error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -146,7 +147,7 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error) {
     console.error("Get conversations error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -157,7 +158,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const parsedConv = createConversationSchema.safeParse(req.body);
     if (!parsedConv.success) {
-      return res.status(400).json({ message: parsedConv.error.issues[0].message });
+      return sendError(res, 400, parsedConv.error.issues[0].message);
     }
     const { conversationType, title, proposalId, participantIds } = parsedConv.data;
 
@@ -165,7 +166,7 @@ router.post("/", async (req: Request, res: Response) => {
       const targetUserId = participantIds[0];
       const blocked = await storage.isBlocked(userId, targetUserId);
       if (blocked) {
-        return res.status(403).json({ message: "Non puoi aprire una conversazione con questo utente" });
+        return sendError(res, 403, "Non puoi aprire una conversazione con questo utente");
       }
     }
 
@@ -198,7 +199,7 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(201).json(conversation);
   } catch (error) {
     console.error("Create conversation error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -213,7 +214,7 @@ router.post("/:id/read", async (req: Request, res: Response) => {
     return res.sendStatus(200);
   } catch (error) {
     console.error("Mark as read error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

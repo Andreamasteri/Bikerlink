@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
@@ -71,7 +72,7 @@ router.get("/marketplace", requireAuth, async (req: Request, res: Response) => {
     return res.json(result);
   } catch (e) {
     console.error("Marketplace error:", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -89,7 +90,7 @@ router.get("/:id/marketplace", requireAuth, async (req: Request, res: Response) 
       .from(motoClubMembers)
       .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")))
       .limit(1);
-    if (!isMember) return res.status(403).json({ message: "Devi essere membro del club" });
+    if (!isMember) return sendError(res, 403, "Devi essere membro del club");
 
     const memberIds = await db.select({ userId: motoClubMembers.userId })
       .from(motoClubMembers)
@@ -125,7 +126,7 @@ router.get("/:id/marketplace", requireAuth, async (req: Request, res: Response) 
     return res.json(result);
   } catch (e) {
     console.error("Club marketplace error:", e);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

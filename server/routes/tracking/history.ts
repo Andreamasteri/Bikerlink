@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { requireUserId } from "../../lib/auth-middleware";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
@@ -64,10 +65,10 @@ router.get("/:id", async (req: Request, res: Response) => {
     const route = await storage.getRoute(id);
 
     if (!route) {
-      return res.status(404).json({ message: "Percorso non trovato" });
+      return sendError(res, 404, "Percorso non trovato");
     }
     if (route.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const rawPoints = await storage.getRoutePoints(id);
@@ -76,7 +77,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     return res.json({ ...route, points });
   } catch (error) {
     console.error("Get route error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -89,17 +90,17 @@ router.delete("/:id", async (req: Request, res: Response) => {
     const route = await storage.getRoute(id);
 
     if (!route) {
-      return res.status(404).json({ message: "Percorso non trovato" });
+      return sendError(res, 404, "Percorso non trovato");
     }
     if (route.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     await storage.deleteRoute(id);
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Delete route error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -112,7 +113,7 @@ router.post("/:id/like", async (req: Request, res: Response) => {
     const route = await storage.getRoute(id);
 
     if (!route) {
-      return res.status(404).json({ message: "Percorso non trovato" });
+      return sendError(res, 404, "Percorso non trovato");
     }
 
     const updated = await storage.updateRoute(id, {
@@ -122,7 +123,7 @@ router.post("/:id/like", async (req: Request, res: Response) => {
     return res.json(updated);
   } catch (error) {
     console.error("Like route error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -135,10 +136,10 @@ router.get("/:id/export.gpx", async (req: Request, res: Response) => {
     const route = await storage.getRoute(id);
 
     if (!route) {
-      return res.status(404).json({ message: "Percorso non trovato" });
+      return sendError(res, 404, "Percorso non trovato");
     }
     if (route.userId !== userId) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     const points = await storage.getRoutePoints(id);
@@ -184,7 +185,7 @@ ${trkpts}
     return res.send(gpx);
   } catch (error) {
     console.error("GPX export error:", error);
-    return res.status(500).json({ message: "Errore durante l'esportazione GPX" });
+    return sendError(res, 500, "Errore durante l'esportazione GPX");
   }
 });
 

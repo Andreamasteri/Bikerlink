@@ -1,3 +1,4 @@
+import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { haversineDistance } from "../geo";
@@ -7,14 +8,14 @@ const router = Router();
 router.get("/nearby", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
 
     const lat = parseFloat(req.query.lat as string);
     const lng = parseFloat(req.query.lng as string);
 
     if (isNaN(lat) || isNaN(lng)) {
-      return res.status(400).json({ message: "Coordinate non valide" });
+      return sendError(res, 400, "Coordinate non valide");
     }
 
     const allEggs = await storage.getEasterEggs(true);
@@ -32,43 +33,43 @@ router.get("/nearby", async (req: Request, res: Response) => {
     return res.json(nearbyEggs);
   } catch (error) {
     console.error("Get nearby easter eggs error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.get("/collected", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
 
     const collected = await storage.getCollectedEasterEggs(req.session.userId);
     return res.json(collected);
   } catch (error) {
     console.error("Get collected easter eggs error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.post("/:id/collect", async (req: Request<{ id: string }>, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
 
     const eggId = req.params.id;
     const egg = await storage.getEasterEgg(eggId);
     if (!egg) {
-      return res.status(404).json({ message: "Easter egg non trovato" });
+      return sendError(res, 404, "Easter egg non trovato");
     }
 
     if (!egg.isActive) {
-      return res.status(400).json({ message: "Easter egg non attivo" });
+      return sendError(res, 400, "Easter egg non attivo");
     }
 
     const alreadyCollected = await storage.hasCollectedEasterEgg(eggId, req.session.userId);
     if (alreadyCollected) {
-      return res.status(409).json({ message: "Easter egg già raccolto" });
+      return sendError(res, 409, "Easter egg già raccolto");
     }
 
     const collected = await storage.collectEasterEgg({
@@ -96,7 +97,7 @@ router.post("/:id/collect", async (req: Request<{ id: string }>, res: Response) 
     });
   } catch (error) {
     console.error("Collect easter egg error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

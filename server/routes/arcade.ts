@@ -4,6 +4,7 @@ import { arcadeScores, arcadeScoreSchema } from "@shared/schema";
 import { eq, sql, max, and } from "drizzle-orm";
 
 import { requireUserId } from "../lib/auth-middleware";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 const router = Router();
 
@@ -24,16 +25,16 @@ router.post("/score", async (req: Request, res: Response) => {
 
   const parsed = arcadeScoreSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ message: parsed.error.issues[0].message });
+    return sendError(res, 400, parsed.error.issues[0].message);
   }
   const { game, score } = parsed.data;
 
   if (!VALID_GAMES.includes(game as GameId)) {
-    return res.status(400).json({ message: "Gioco non valido" });
+    return sendError(res, 400, "Gioco non valido");
   }
   const validGame = game as GameId;
   if (score > SCORE_CAPS[validGame]) {
-    return res.status(400).json({ message: "Punteggio non plausibile" });
+    return sendError(res, 400, "Punteggio non plausibile");
   }
 
   try {
@@ -43,17 +44,17 @@ router.post("/score", async (req: Request, res: Response) => {
       .where(and(eq(arcadeScores.userId, userId), eq(arcadeScores.game, game)));
 
     if (existing?.bestScore !== null && existing?.bestScore !== undefined && score <= existing.bestScore) {
-      return res.json({ success: true, skipped: true });
+      return sendSuccess(res, { skipped: true });
     }
 
     const [entry] = await db
       .insert(arcadeScores)
       .values({ userId, game, score })
       .returning();
-    return res.json({ success: true, entry });
+    return sendSuccess(res, { entry });
   } catch (err) {
     console.error("arcade score error:", err);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -61,7 +62,7 @@ router.get("/leaderboard/:game", async (req: Request, res: Response) => {
   const { game } = req.params as { game: string };
 
   if (!VALID_GAMES.includes(game as GameId)) {
-    return res.status(400).json({ message: "Gioco non valido" });
+    return sendError(res, 400, "Gioco non valido");
   }
 
   try {
@@ -104,7 +105,7 @@ router.get("/leaderboard/:game", async (req: Request, res: Response) => {
     return res.json(rows);
   } catch (err) {
     console.error("arcade leaderboard error:", err);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -165,7 +166,7 @@ router.get("/hall-of-fame", async (_req: Request, res: Response) => {
     return res.json(results);
   } catch (err) {
     console.error("arcade hall-of-fame error:", err);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 
@@ -190,7 +191,7 @@ router.get("/my-scores", async (req: Request, res: Response) => {
     return res.json(result);
   } catch (err) {
     console.error("arcade my-scores error:", err);
-    return res.status(500).json({ message: "Errore interno" });
+    return sendError(res, 500, "Errore interno");
   }
 });
 

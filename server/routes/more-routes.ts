@@ -8,16 +8,17 @@ import { users, userFavorites, serverRestarts } from "@shared/schema";
 import { PRIVACY_POLICY_IT } from "@shared/privacy-policy-it";
 import { eq, sql, desc, count } from "drizzle-orm";
 import { triggerMatchingRun, triggerMatchingForUser } from "../matching-engine";
+import { sendSuccess, sendError } from "../lib/api-response";
 import { initState } from "../init-state";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = (req as any).session as { userId?: string };
   if (!session?.userId) {
-    return res.status(401).json({ message: "Non autenticato" });
+    return sendError(res, 401, "Non autenticato");
   }
   const user = await storage.getUser(session.userId);
   if (!user || user.role !== "admin") {
-    return res.status(403).json({ message: "Accesso non autorizzato" });
+    return sendError(res, 403, "Accesso non autorizzato");
   }
   (req as any).adminUser = user;
   next();
@@ -35,7 +36,7 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/matching-system.pdf", (_req, res) => {
     if (!fs.existsSync(MATCHING_PDF_PATH)) {
-      return res.status(404).json({ message: "File non disponibile" });
+      return sendError(res, 404, "File non disponibile");
     }
     res.setHeader("Content-Disposition", 'inline; filename="BikerLink-MatchingSystem.pdf"');
     res.setHeader("Content-Type", "application/pdf");
@@ -44,7 +45,7 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/assets/competitor-analysis.pdf", (_req, res) => {
     if (!fs.existsSync(COMPETITOR_PDF_PATH)) {
-      return res.status(404).json({ message: "File non disponibile" });
+      return sendError(res, 404, "File non disponibile");
     }
     res.setHeader("Content-Disposition", 'inline; filename="competitor-analysis.pdf"');
     res.setHeader("Content-Type", "application/pdf");
@@ -53,7 +54,7 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/assets/competitor-analysis.png", (_req, res) => {
     if (!fs.existsSync(COMPETITOR_PNG_PATH)) {
-      return res.status(404).json({ message: "File non disponibile" });
+      return sendError(res, 404, "File non disponibile");
     }
     res.setHeader("Content-Type", "image/png");
     fs.createReadStream(COMPETITOR_PNG_PATH).pipe(res);
@@ -61,7 +62,7 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/manual/download", (_req, res) => {
     if (!fs.existsSync(MANUAL_PATH)) {
-      return res.status(404).json({ message: "Manuale non disponibile" });
+      return sendError(res, 404, "Manuale non disponibile");
     }
     res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-Manual.pdf"');
     res.setHeader("Content-Type", "application/pdf");
@@ -69,7 +70,7 @@ export function registerMoreRoutes(app: Express) {
     stream.on("error", (err) => {
       console.error("Manual stream error:", err);
       if (!res.headersSent) {
-        res.status(500).json({ message: "Errore lettura file" });
+        sendError(res, 500, "Errore lettura file");
       } else {
         res.end();
       }
@@ -106,13 +107,13 @@ export function registerMoreRoutes(app: Express) {
   });
 
   app.post("/api/admin/manual/upload", async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    if (!req.session.userId) return sendError(res, 401, "Non autenticato");
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+    if (!user || user.role !== "admin") return sendError(res, 403, "Accesso non autorizzato");
 
     manualUpload.single("file")(req, res, (err: any) => {
-      if (err) return res.status(400).json({ message: err.message || "Errore upload" });
-      if (!req.file) return res.status(400).json({ message: "Nessun file caricato" });
+      if (err) return sendError(res, 400, err.message || "Errore upload");
+      if (!req.file) return sendError(res, 400, "Nessun file caricato");
       const stats = fs.statSync(MANUAL_PATH);
       res.json({
         message: "Manuale aggiornato con successo",
@@ -155,14 +156,14 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/eula/download", (_req, res) => {
     if (!fs.existsSync(EULA_PDF_PATH)) {
-      return res.status(404).json({ message: "EULA non disponibile" });
+      return sendError(res, 404, "EULA non disponibile");
     }
     res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-EULA.pdf"');
     res.setHeader("Content-Type", "application/pdf");
     const stream = fs.createReadStream(EULA_PDF_PATH);
     stream.on("error", (err) => {
       console.error("EULA stream error:", err);
-      if (!res.headersSent) res.status(500).json({ message: "Errore lettura file" });
+      if (!res.headersSent) sendError(res, 500, "Errore lettura file");
       else res.end();
     });
     stream.pipe(res);
@@ -175,28 +176,28 @@ export function registerMoreRoutes(app: Express) {
   });
 
   app.post("/api/admin/eula/upload", async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    if (!req.session.userId) return sendError(res, 401, "Non autenticato");
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+    if (!user || user.role !== "admin") return sendError(res, 403, "Accesso non autorizzato");
 
     eulaUpload.single("file")(req, res, (err: any) => {
-      if (err) return res.status(400).json({ message: err.message || "Errore upload" });
-      if (!req.file) return res.status(400).json({ message: "Nessun file caricato" });
+      if (err) return sendError(res, 400, err.message || "Errore upload");
+      if (!req.file) return sendError(res, 400, "Nessun file caricato");
       const stats = fs.statSync(EULA_PDF_PATH);
-      res.json({ message: "EULA aggiornato con successo", fileName: "BikerLink-EULA.pdf", fileSize: stats.size, lastModified: stats.mtime.toISOString() });
+      sendSuccess(res, { fileName: "BikerLink-EULA.pdf", fileSize: stats.size, lastModified: stats.mtime.toISOString() }, "EULA aggiornato con successo");
     });
   });
 
   app.get("/api/privacy-policy/download", (_req, res) => {
     if (!fs.existsSync(PRIVACY_PDF_PATH)) {
-      return res.status(404).json({ message: "Privacy Policy non disponibile" });
+      return sendError(res, 404, "Privacy Policy non disponibile");
     }
     res.setHeader("Content-Disposition", 'attachment; filename="BikerLink-PrivacyPolicy.pdf"');
     res.setHeader("Content-Type", "application/pdf");
     const stream = fs.createReadStream(PRIVACY_PDF_PATH);
     stream.on("error", (err) => {
       console.error("Privacy Policy stream error:", err);
-      if (!res.headersSent) res.status(500).json({ message: "Errore lettura file" });
+      if (!res.headersSent) sendError(res, 500, "Errore lettura file");
       else res.end();
     });
     stream.pipe(res);
@@ -246,33 +247,33 @@ export function registerMoreRoutes(app: Express) {
       const stream = fs.createReadStream(PRIVACY_EXPORT_PDF_PATH);
       stream.on("error", (err) => {
         console.error("Privacy export stream error:", err);
-        if (!res.headersSent) res.status(500).json({ message: "Errore lettura file" });
+        if (!res.headersSent) sendError(res, 500, "Errore lettura file");
         else res.end();
       });
       stream.pipe(res);
     } catch (err) {
       console.error("Privacy Policy PDF export error:", err);
-      if (!res.headersSent) res.status(500).json({ message: "Errore generazione PDF" });
+      if (!res.headersSent) sendError(res, 500, "Errore generazione PDF");
     }
   });
 
   app.post("/api/admin/privacy-policy/upload", async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    if (!req.session.userId) return sendError(res, 401, "Non autenticato");
     const user = await storage.getUser(req.session.userId);
-    if (!user || user.role !== "admin") return res.status(403).json({ message: "Accesso non autorizzato" });
+    if (!user || user.role !== "admin") return sendError(res, 403, "Accesso non autorizzato");
 
     privacyUpload.single("file")(req, res, (err: any) => {
-      if (err) return res.status(400).json({ message: err.message || "Errore upload" });
-      if (!req.file) return res.status(400).json({ message: "Nessun file caricato" });
+      if (err) return sendError(res, 400, err.message || "Errore upload");
+      if (!req.file) return sendError(res, 400, "Nessun file caricato");
       const stats = fs.statSync(PRIVACY_PDF_PATH);
-      res.json({ message: "Privacy Policy aggiornata con successo", fileName: "BikerLink-PrivacyPolicy.pdf", fileSize: stats.size, lastModified: stats.mtime.toISOString() });
+      sendSuccess(res, { fileName: "BikerLink-PrivacyPolicy.pdf", fileSize: stats.size, lastModified: stats.mtime.toISOString() }, "Privacy Policy aggiornata con successo");
     });
   });
 
   app.get("/api/user/export-data", async (req, res) => {
-    if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });
+    if (!req.session.userId) return sendError(res, 401, "Non autenticato");
     const user = await storage.getUser(req.session.userId);
-    if (!user) return res.status(404).json({ message: "Utente non trovato" });
+    if (!user) return sendError(res, 404, "Utente non trovato");
 
     const userId = user.id;
 
@@ -361,12 +362,12 @@ export function registerMoreRoutes(app: Express) {
 
   app.post("/api/matching/trigger", (req, res) => {
     if (!req.session?.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
     const userId = req.session.userId;
     triggerMatchingForUser(userId);
     const result = triggerMatchingRun();
-    res.json({ ok: true, ...result });
+    sendSuccess(res, result);
   });
 
   app.get("/api/health", (_req, res) => {
@@ -457,7 +458,7 @@ export function registerMoreRoutes(app: Express) {
       const { clientErrorReportSchema } = await import("@shared/schema");
       const bodyParsed = clientErrorReportSchema.safeParse(req.body ?? {});
       if (!bodyParsed.success) {
-        return res.status(400).json({ message: bodyParsed.error.issues[0]?.message ?? "Payload non valido" });
+        return sendError(res, 400, bodyParsed.error.issues[0]?.message ?? "Payload non valido");
       }
       const { message, stack, componentStack, platform, appVersion } = bodyParsed.data;
       console.error("[CLIENT-ERROR]", JSON.stringify({
@@ -520,23 +521,23 @@ export function registerMoreRoutes(app: Express) {
     try {
       const { email, notifyRides } = req.body || {};
       if (!email || typeof email !== "string" || !email.includes("@")) {
-        return res.status(400).json({ message: "Email non valida" });
+        return sendError(res, 400, "Email non valida");
       }
       const normalizedEmail = email.trim().toLowerCase().slice(0, 254);
       const existing = await db.execute(sql`
         SELECT id FROM newsletter_subscribers WHERE email = ${normalizedEmail} LIMIT 1
       `);
       if (existing.rows.length > 0) {
-        return res.status(409).json({ message: "Già iscritto" });
+        return sendError(res, 409, "Già iscritto");
       }
       await db.execute(sql`
         INSERT INTO newsletter_subscribers (email, notify_rides)
         VALUES (${normalizedEmail}, ${notifyRides !== false})
       `);
-      return res.json({ success: true });
+      return sendSuccess(res);
     } catch (err) {
       console.error("[newsletter/subscribe] error:", err);
-      return res.status(500).json({ message: "Errore interno" });
+      return sendError(res, 500, "Errore interno");
     }
   });
 

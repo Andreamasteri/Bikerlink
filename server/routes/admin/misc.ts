@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
@@ -12,18 +13,18 @@ router.get("/workshops", async (_req: Request, res: Response) => {
     const workshops = await storage.getWorkshops();
     return res.json(workshops);
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura officine" });
+    return sendError(res, 500, "Errore lettura officine");
   }
 });
 
 router.post("/workshops", async (req: Request, res: Response) => {
   try {
     const parsed = workshopSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const workshop = await storage.createWorkshop(parsed.data as any);
     return res.status(201).json(workshop);
   } catch (error) {
-    return res.status(500).json({ message: "Errore creazione officina" });
+    return sendError(res, 500, "Errore creazione officina");
   }
 });
 
@@ -33,18 +34,18 @@ router.get("/easter-eggs", async (_req: Request, res: Response) => {
     const eggs = await storage.getEasterEggs();
     return res.json(eggs);
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura easter eggs" });
+    return sendError(res, 500, "Errore lettura easter eggs");
   }
 });
 
 router.post("/easter-eggs", async (req: Request, res: Response) => {
   try {
     const parsed = easterEggSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const egg = await storage.createEasterEgg(parsed.data as any);
     return res.status(201).json(egg);
   } catch (error) {
-    return res.status(500).json({ message: "Errore creazione easter egg" });
+    return sendError(res, 500, "Errore creazione easter egg");
   }
 });
 
@@ -54,7 +55,7 @@ router.get("/campaigns", async (_req: Request, res: Response) => {
     const campaigns = await storage.getAllCampaigns();
     return res.json(campaigns);
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura campagne" });
+    return sendError(res, 500, "Errore lettura campagne");
   }
 });
 
@@ -64,7 +65,7 @@ router.get("/reports", async (req: Request, res: Response) => {
     const reports = await storage.getReports();
     return res.json(reports);
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura segnalazioni" });
+    return sendError(res, 500, "Errore lettura segnalazioni");
   }
 });
 
@@ -72,7 +73,7 @@ router.put("/reports/:id/resolve", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const parsed = reportResolveSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ message: parsed.error.issues[0].message });
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     // Assuming resolveReport exists or using a generic update
     const [report] = await db.update(moderatorLogs)
         .set({ resolvedAt: new Date() })
@@ -80,7 +81,7 @@ router.put("/reports/:id/resolve", async (req: Request, res: Response) => {
         .returning();
     return res.json(report);
   } catch (error) {
-    return res.status(500).json({ message: "Errore risoluzione segnalazione" });
+    return sendError(res, 500, "Errore risoluzione segnalazione");
   }
 });
 
@@ -90,7 +91,7 @@ router.get("/motoclubs", async (_req: Request, res: Response) => {
     const clubs = await db.select().from(motoClubs);
     return res.json(clubs);
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura motoclub" });
+    return sendError(res, 500, "Errore lettura motoclub");
   }
 });
 
@@ -99,7 +100,7 @@ router.get("/motoclubs/requests", async (_req: Request, res: Response) => {
     const requests = await db.select().from(motoClubRequests).where(eq(motoClubRequests.status, "pending"));
     return res.json(requests);
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura richieste motoclub" });
+    return sendError(res, 500, "Errore lettura richieste motoclub");
   }
 });
 
@@ -109,7 +110,7 @@ router.get("/logs", async (_req: Request, res: Response) => {
     const logs = await storage.getModeratorLogs();
     return res.json(logs);
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura log" });
+    return sendError(res, 500, "Errore lettura log");
   }
 });
 
@@ -118,7 +119,7 @@ router.get("/moderator-logs", async (req: Request, res: Response) => {
     const logs = await storage.getModeratorLogs();
     return res.json({ logs, total: logs.length });
   } catch (error) {
-    return res.status(500).json({ message: "Errore lettura log moderatori" });
+    return sendError(res, 500, "Errore lettura log moderatori");
   }
 });
 

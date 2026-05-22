@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import multer from "multer";
 import { storage } from "../../storage";
@@ -26,7 +27,7 @@ router.post("/conversations/:id/images", chatImageUpload.single("image"), async 
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    if (!req.file) return res.status(400).json({ message: "Nessun file ricevuto" });
+    if (!req.file) return sendError(res, 400, "Nessun file ricevuto");
 
     const conversationId = req.params.id as string;
 
@@ -35,7 +36,7 @@ router.post("/conversations/:id/images", chatImageUpload.single("image"), async 
       storage.getConversationParticipants(conversationId),
     ]);
     if (!participants.find((p) => p.userId === userId)) {
-      return res.status(403).json({ message: "Non fai parte di questa conversazione" });
+      return sendError(res, 403, "Non fai parte di questa conversazione");
     }
 
     const isDirectConv = conversation && (
@@ -48,7 +49,7 @@ router.post("/conversations/:id/images", chatImageUpload.single("image"), async 
       for (const other of otherParticipants) {
         const blocked = await storage.isBlocked(userId, other.userId);
         if (blocked) {
-          return res.status(403).json({ message: "Utente bloccato" });
+          return sendError(res, 403, "Utente bloccato");
         }
       }
     }
@@ -91,7 +92,7 @@ router.post("/conversations/:id/images", chatImageUpload.single("image"), async 
     return res.status(201).json(imagePayload);
   } catch (error) {
     console.error("Chat image upload error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

@@ -6,6 +6,7 @@ import { storage } from "../storage";
 import { uploadBuffer, deleteObject } from "../objectStorage";
 import { cacheAdImage } from "./ads";
 import { requireUserId } from "../lib/auth-middleware";
+import { sendSuccess, sendError } from "../lib/api-response";
 
 const router = Router();
 
@@ -15,14 +16,14 @@ async function requireModerator(req: Request, res: Response): Promise<string | n
 
   const user = await storage.getUser(userId);
   if (!user || (user.role !== "admin" && user.role !== "moderator")) {
-    res.status(403).json({ message: "Accesso non autorizzato" });
+    sendError(res, 403, "Accesso non autorizzato");
     return null;
   }
   // Task #1078: defense-in-depth — moderatore sospeso/bloccato non deve continuare
   // a esercitare azioni di moderazione anche se la sessione è ancora viva.
   // (Il middleware globale in routes.ts dovrebbe già averla distrutta.)
   if (user.status !== "active") {
-    res.status(403).json({ message: "Account non attivo" });
+    sendError(res, 403, "Account non attivo");
     return null;
   }
   return userId;
@@ -59,7 +60,7 @@ router.get("/photos", async (req: Request, res: Response) => {
     return res.json(photos);
   } catch (error) {
     console.error("Get moderator photos error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -79,7 +80,7 @@ router.put("/photos/:id/approve", async (req: Request, res: Response) => {
     }
 
     if (!result) {
-      return res.status(404).json({ message: "Foto non trovata" });
+      return sendError(res, 404, "Foto non trovata");
     }
 
     await storage.createModeratorLog({
@@ -93,7 +94,7 @@ router.put("/photos/:id/approve", async (req: Request, res: Response) => {
     return res.json(result);
   } catch (error) {
     console.error("Approve photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -109,7 +110,7 @@ router.put("/photos/:id/reject", async (req: Request, res: Response) => {
     if (photoType === "contest_entry") {
       const entry = await storage.getPhotoContestEntry(id);
       if (!entry) {
-        return res.status(404).json({ message: "Foto non trovata" });
+        return sendError(res, 404, "Foto non trovata");
       }
       await storage.updateContestEntryApproval(id, false);
       // Defense-in-depth: rimuovi anche il file dal bucket object-storage.
@@ -133,7 +134,7 @@ router.put("/photos/:id/reject", async (req: Request, res: Response) => {
     } else {
       const photo = await storage.getUserPhoto(id);
       if (!photo) {
-        return res.status(404).json({ message: "Foto non trovata" });
+        return sendError(res, 404, "Foto non trovata");
       }
       await storage.deleteUserPhoto(id);
       // Task #1122: per le foto legacy locali, cancella anche il file da disco.
@@ -160,27 +161,27 @@ router.put("/photos/:id/reject", async (req: Request, res: Response) => {
       details: reason ? `Foto rifiutata: ${reason}` : "Foto rifiutata",
     });
 
-    return res.json({ message: "Foto rifiutata" });
+    return sendSuccess(res, undefined, "Foto rifiutata");
   } catch (error) {
     console.error("Reject photo error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.get("/logs", async (req: Request, res: Response) => {
   try {
     if (!req.session.userId) {
-      return res.status(401).json({ message: "Non autenticato" });
+      return sendError(res, 401, "Non autenticato");
     }
     const caller = await storage.getUser(req.session.userId);
     if (!caller || caller.role !== "admin") {
-      return res.status(403).json({ message: "Accesso riservato agli amministratori" });
+      return sendError(res, 403, "Accesso riservato agli amministratori");
     }
     const logs = await storage.getModeratorLogs();
     return res.json(logs);
   } catch (error) {
     console.error("Get moderator logs error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -211,7 +212,7 @@ router.get("/advertisements", async (req: Request, res: Response) => {
     return res.json(campaigns);
   } catch (error) {
     console.error("Moderator get campaigns error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -221,14 +222,14 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
     if (!moderatorId) return;
     const { name, sponsor, linkUrl, description, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = req.body;
     if (!name) {
-      return res.status(400).json({ message: "Nome campagna obbligatorio" });
+      return sendError(res, 400, "Nome campagna obbligatorio");
     }
     let imageUrl: string | null = null;
     if (req.file) {
       imageUrl = await uploadAdImage(req.file.buffer, req.file.originalname, req.file.mimetype);
     } else if (req.body.imageUrl) {
       if (!String(req.body.imageUrl).startsWith("/api/ads/images/")) {
-        return res.status(400).json({ message: "imageUrl non valido: sono accettati solo percorsi interni" });
+        return sendError(res, 400, "imageUrl non valido: sono accettati solo percorsi interni");
       }
       imageUrl = req.body.imageUrl;
     }
@@ -258,7 +259,7 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
     return res.status(201).json(campaign);
   } catch (error) {
     console.error("Moderator create campaign error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -289,7 +290,7 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
       updates.imageVersion = ((existing?.imageVersion ?? 0) + 1);
     } else if (req.body.imageUrl !== undefined) {
       if (req.body.imageUrl !== null && req.body.imageUrl !== "" && !String(req.body.imageUrl).startsWith("/api/ads/images/")) {
-        return res.status(400).json({ message: "imageUrl non valido: sono accettati solo percorsi interni" });
+        return sendError(res, 400, "imageUrl non valido: sono accettati solo percorsi interni");
       }
       updates.imageUrl = req.body.imageUrl;
     }
@@ -299,7 +300,7 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     }
     const campaign = await storage.updateAdCampaign(id, updates);
     if (!campaign) {
-      return res.status(404).json({ message: "Campagna non trovata" });
+      return sendError(res, 404, "Campagna non trovata");
     }
     await storage.createModeratorLog({
       moderatorId,
@@ -314,7 +315,7 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     return res.json(campaign);
   } catch (error) {
     console.error("Moderator update campaign error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -324,7 +325,7 @@ router.post("/log-profile-view", async (req: Request, res: Response) => {
     if (!moderatorId) return;
     const { targetUserId } = req.body;
     if (!targetUserId) {
-      return res.status(400).json({ message: "targetUserId richiesto" });
+      return sendError(res, 400, "targetUserId richiesto");
     }
     await storage.createModeratorLog({
       moderatorId,
@@ -333,10 +334,10 @@ router.post("/log-profile-view", async (req: Request, res: Response) => {
       targetId: targetUserId,
       details: null,
     });
-    return res.json({ ok: true });
+    return sendSuccess(res);
   } catch (error) {
     console.error("Log profile view error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
@@ -44,14 +45,14 @@ router.get("/:id", async (req: Request, res: Response) => {
       .leftJoin(users, eq(users.id, events.creatorId))
       .where(and(eq(events.id, id), ...systemAccountConditions(users)));
 
-    if (!row) return res.status(404).json({ message: "Evento non trovato" });
+    if (!row) return sendError(res, 404, "Evento non trovato");
 
     // Visibility: approved events are public; non-approved only for creator/admin/mod
     if (row.status !== "approved") {
       const isOwner = userId === row.creatorId;
       const isPrivileged = await isAdminOrModUser(userId);
       if (!isOwner && !isPrivileged) {
-        return res.status(404).json({ message: "Evento non trovato" });
+        return sendError(res, 404, "Evento non trovato");
       }
     }
 
@@ -59,7 +60,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     return res.json(enriched);
   } catch (err) {
     console.error("[events] GET /:id error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -71,23 +72,23 @@ router.put("/:id", async (req: Request, res: Response) => {
 
     const { id } = req.params;
     const [existing] = await db.select().from(events).where(eq(events.id, id));
-    if (!existing) return res.status(404).json({ message: "Evento non trovato" });
+    if (!existing) return sendError(res, 404, "Evento non trovato");
 
     const isPrivileged = await isAdminOrModUser(userId);
     const isOwner = existing.creatorId === userId;
 
     if (!isOwner && !isPrivileged) {
-      return res.status(403).json({ message: "Non autorizzato" });
+      return sendError(res, 403, "Non autorizzato");
     }
 
     // Creator can only edit events in pending or approved status
     if (isOwner && !isPrivileged && existing.status !== "pending" && existing.status !== "approved") {
-      return res.status(403).json({ message: "Non puoi modificare un evento rifiutato o cancellato" });
+      return sendError(res, 403, "Non puoi modificare un evento rifiutato o cancellato");
     }
 
     const parsedUpdate = updateEventSchema.safeParse(req.body);
     if (!parsedUpdate.success) {
-      return res.status(400).json({ message: parsedUpdate.error.issues[0].message });
+      return sendError(res, 400, parsedUpdate.error.issues[0].message);
     }
     const {
       title, description, eventType, latitude, longitude,
@@ -119,7 +120,7 @@ router.put("/:id", async (req: Request, res: Response) => {
     return res.json({ event: updated, message: "Evento aggiornato con successo" });
   } catch (err) {
     console.error("[events] PUT /:id error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

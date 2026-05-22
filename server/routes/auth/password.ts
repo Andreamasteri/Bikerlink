@@ -8,6 +8,7 @@ import { storage } from "../../storage";
 import { sendPasswordResetEmail, sendPasswordResetConfirmationEmail } from "../../email";
 import { revokeAllUserSessions } from "../../session-utils";
 import { closeSseClient } from "../../chat-sse";
+import { sendSuccess, sendError } from "../../lib/api-response";
 
 function buildSessionToken(sessionID: string): string {
   const secret = process.env.SESSION_SECRET;
@@ -45,12 +46,12 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
   try {
     const { email } = req.body;
     if (!email || typeof email !== "string") {
-      return res.status(400).json({ message: "Inserisci un'email valida" });
+      return sendError(res, 400, "Inserisci un'email valida");
     }
 
     const user = await storage.getUserByEmail(email.trim().toLowerCase());
     if (!user) {
-      return res.json({ message: "Se l'email è registrata, riceverai un codice di recupero" });
+      return sendSuccess(res, undefined, "Se l'email è registrata, riceverai un codice di recupero");
     }
 
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
@@ -74,10 +75,10 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
       console.warn(`[PASSWORD RESET] Email NON inviata a utente ${user.id}`);
     }
 
-    return res.json({ message: "Se l'email è registrata, riceverai un codice di recupero" });
+    return sendSuccess(res, undefined, "Se l'email è registrata, riceverai un codice di recupero");
   } catch (error) {
     console.error("Forgot password error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -85,33 +86,33 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
   try {
     const { email, code, password } = req.body;
     if (!email || !code || !password) {
-      return res.status(400).json({ message: "Email, codice e password richiesti" });
+      return sendError(res, 400, "Email, codice e password richiesti");
     }
 
     if (!/^\d{8}$/.test(String(code).trim())) {
-      return res.status(400).json({ message: "Il codice deve essere composto da 8 cifre" });
+      return sendError(res, 400, "Il codice deve essere composto da 8 cifre");
     }
 
     if (password.length < 8) {
-      return res.status(400).json({ message: "La password deve avere almeno 8 caratteri" });
+      return sendError(res, 400, "La password deve avere almeno 8 caratteri");
     }
 
     const user = await storage.getUserByEmail(email.trim().toLowerCase());
     if (!user) {
-      return res.status(400).json({ message: "Codice non valido o scaduto" });
+      return sendError(res, 400, "Codice non valido o scaduto");
     }
 
     if (user.status === "blocked" || user.status === "suspended") {
-      return res.status(403).json({ message: "Account sospeso o bloccato" });
+      return sendError(res, 403, "Account sospeso o bloccato");
     }
 
     const resetToken = await storage.getPasswordResetTokenByCode(user.id, String(code).trim());
     if (!resetToken) {
-      return res.status(400).json({ message: "Codice non valido o già utilizzato" });
+      return sendError(res, 400, "Codice non valido o già utilizzato");
     }
 
     if (new Date(resetToken.expiresAt) < new Date()) {
-      return res.status(400).json({ message: "Codice scaduto — richiedi un nuovo codice" });
+      return sendError(res, 400, "Codice scaduto — richiedi un nuovo codice");
     }
 
     let revoked = 0;
@@ -145,7 +146,7 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
     return res.json({ ...safeUser, passwordReset: true, sessionToken: buildSessionToken(req.sessionID) });
   } catch (error) {
     console.error("Reset password error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
@@ -153,12 +154,12 @@ router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: 
   try {
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({ message: "Email richiesta" });
+      return sendError(res, 400, "Email richiesta");
     }
 
     const user = await storage.getUserByEmail(email.trim().toLowerCase());
     if (!user) {
-      return res.json({ message: "Se l'email è registrata, riceverai un nuovo codice" });
+      return sendSuccess(res, undefined, "Se l'email è registrata, riceverai un nuovo codice");
     }
 
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
@@ -180,10 +181,10 @@ router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: 
       console.warn(`[PASSWORD RESET] Resend: email NON inviata a utente ${user.id}`);
     }
 
-    return res.json({ message: "Se l'email è registrata, riceverai un nuovo codice" });
+    return sendSuccess(res, undefined, "Se l'email è registrata, riceverai un nuovo codice");
   } catch (error) {
     console.error("Resend reset code error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 

@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from "express";
+import { sendSuccess } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 // @ts-ignore
@@ -8,6 +9,7 @@ import { storage } from "../../storage";
 import { onlineTracker } from "../../online-tracker";
 import { revokeSessionsByType } from "../../session-utils";
 import { notifySessionDisplaced } from "../../session-sse";
+import { sendSuccess, sendError } from "../../lib/api-response";
 import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
 import { createRegionalClubInvite } from "../motoclubs";
 import { addSessionSseClient, removeSessionSseClient } from "../../session-sse";
@@ -32,7 +34,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ message: parsed.error.issues[0].message });
+      return sendError(res, 400, parsed.error.issues[0].message);
     }
 
     const { identifier: rawIdentifier, password, latitude: loginLat, longitude: loginLng, platform: loginPlatform } = parsed.data;
@@ -44,25 +46,25 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     }
 
     if (!user) {
-      return res.status(401).json({ message: "Credenziali non valide" });
+      return sendError(res, 401, "Credenziali non valide");
     }
 
     if (user.isFake) {
-      return res.status(401).json({ message: "Credenziali non valide" });
+      return sendError(res, 401, "Credenziali non valide");
     }
 
     if (user.status === "blocked" || user.status === "suspended") {
-      return res.status(403).json({ message: "Account sospeso o bloccato" });
+      return sendError(res, 403, "Account sospeso o bloccato");
     }
 
     const emailVerifSetting = await storage.getAppSetting("email_verification_enabled");
     if (emailVerifSetting?.value === "true" && !user.emailVerified && !user.isPrimal && user.role !== "admin") {
-      return res.status(403).json({ message: "Verifica la tua email prima di accedere. Controlla la tua casella di posta." });
+      return sendError(res, 403, "Verifica la tua email prima di accedere. Controlla la tua casella di posta.");
     }
 
     const validPassword = await bcrypt.compare(password, user.password);
     if (!validPassword) {
-      return res.status(401).json({ message: "Credenziali non valide" });
+      return sendError(res, 401, "Credenziali non valide");
     }
 
     const updateData: Record<string, unknown> = { lastLoginAt: new Date() };
@@ -134,34 +136,34 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error("Login error:", error);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
 router.post("/clear-session-cookie", (_req: Request, res: Response) => {
   res.clearCookie("connect.sid", { path: "/" });
-  return res.status(200).json({ ok: true });
+  return sendSuccess(res);
 });
 
 router.post("/logout", (req: Request, res: Response) => {
   const userId = req.session?.userId;
   req.session.destroy(async (err) => {
     if (err) {
-      return res.status(500).json({ message: "Errore durante il logout" });
+      return sendError(res, 500, "Errore durante il logout");
     }
     if (userId) {
       onlineTracker.setOffline(userId);
       storage.updateUser(userId, { lastLogoutAt: new Date() } as any).catch(() => {});
     }
     res.clearCookie("connect.sid");
-    return res.json({ message: "Logout effettuato" });
+    return sendSuccess(res, undefined, "Logout effettuato");
   });
 });
 
 router.get("/session-events", (req: Request, res: Response) => {
   const userId = req.session?.userId;
   if (!userId) {
-    return res.status(401).json({ message: "Non autenticato" });
+    return sendError(res, 401, "Non autenticato");
   }
 
   res.setHeader("Content-Type", "text/event-stream");

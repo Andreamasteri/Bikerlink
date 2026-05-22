@@ -1,3 +1,4 @@
+import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
@@ -40,7 +41,7 @@ router.get("/", async (req: Request, res: Response) => {
     return res.json(filteredRows);
   } catch (err) {
     console.error("[events] GET /map error:", err);
-    return res.status(500).json({ message: "Errore interno del server" });
+    return sendError(res, 500, "Errore interno del server");
   }
 });
 
