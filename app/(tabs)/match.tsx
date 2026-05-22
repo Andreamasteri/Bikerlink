@@ -18,7 +18,7 @@ import { useT, useLocale } from "@/lib/language-context";
 
 import { FilterPanel } from "@/components/match/FilterPanel";
 import { MatchHeader } from "@/components/match/MatchHeader";
-import { GarageMatchCard, BikerBikerMatchCard, MatchCardFull } from "@/components/match/MatchCard";
+import { GarageMatchCard, BikerBikerMatchCard, MatchCardFull, ProposalProfileMatchCard } from "@/components/match/MatchCard";
 import { MatchList } from "@/components/match/MatchList";
 import { TabBar, TabKey } from "@/components/match/TabBar";
 
@@ -38,6 +38,7 @@ export default function MatchScreen() {
   const locale = useLocale();
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<TabKey>("zavorrine");
+  const [propProfilePendingId, setPropProfilePendingId] = useState<string | null>(null);
   const [pendingMatchId, setPendingMatchId] = useState<string | null>(null);
   const [distanceMode, setDistanceMode] = useState<"all" | "km">("all");
   const [distanceKm, setDistanceKm] = useState<string>("50");
@@ -116,6 +117,13 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
+  const { data: propProfileMatches, isLoading: propProfileLoading, refetch: propProfileRefetch, isRefetching: propProfileRefetching } = useQuery<any[]>({
+    queryKey: ["/api/proposals/proposal-profile-matches"],
+    enabled: !!user,
+    refetchInterval: 30000,
+    refetchOnMount: true,
+  });
+
   const { data: lastfmStatus } = useQuery<{ connected: boolean; username?: string }>({
     queryKey: ["/api/music/lastfm/status"],
     enabled: !!user,
@@ -177,6 +185,22 @@ export default function MatchScreen() {
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/biker-matches/${matchId}/reject`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
+    },
+  });
+
+  const acceptPropProfileMutation = useMutation({
+    mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/proposal-profile-matches/${matchId}/accept`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
+      setPropProfilePendingId(null);
+    },
+    onError: () => setPropProfilePendingId(null),
+  });
+
+  const rejectPropProfileMutation = useMutation({
+    mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/proposal-profile-matches/${matchId}/reject`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
     },
   });
 
@@ -278,7 +302,8 @@ export default function MatchScreen() {
     else if (activeTab === "blacklist") blockedRefetch();
     else if (activeTab === "music") musicRefetch();
     else if (activeTab === "accepted") acceptedRefetch();
-  }, [activeTab, proposalRefetch, garageRefetch, bikerRefetch, blockedRefetch, musicRefetch, acceptedRefetch]);
+    else if (activeTab === "propProfile") propProfileRefetch();
+  }, [activeTab, proposalRefetch, garageRefetch, bikerRefetch, blockedRefetch, musicRefetch, acceptedRefetch, propProfileRefetch]);
 
   const handleUnblock = useCallback((blockedUserId: string) => {
     Alert.alert(t("common.confirm"), t("match.confirmUnblock"), [
@@ -293,18 +318,20 @@ export default function MatchScreen() {
     if (activeTab === "biker") return bikerMatches?.filter(m => m.status === "new") || [];
     if (activeTab === "blacklist") return blockedUsers || [];
     if (activeTab === "music") return musicMatches || [];
+    if (activeTab === "propProfile") return propProfileMatches?.filter(m => m.status === "new") || [];
     if (activeTab === "accepted") {
       const g = (garageMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "garage" }));
       const b = (bikerMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "biker" }));
       const p = (proposalMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "proposal" }));
+      const pp = (propProfileMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "propProfile" }));
       const acc = (acceptedMatches || []).map(m => ({ ...m, _matchType: "generic" }));
-      return [...g, ...b, ...p, ...acc].sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+      return [...g, ...b, ...p, ...pp, ...acc].sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
     }
     return [];
-  }, [activeTab, proposalMatches, garageMatches, bikerMatches, blockedUsers, musicMatches, acceptedMatches]);
+  }, [activeTab, proposalMatches, garageMatches, bikerMatches, blockedUsers, musicMatches, acceptedMatches, propProfileMatches]);
 
-  const isLoading = proposalLoading || garageLoading || bikerLoading || blockedLoading || musicLoading || acceptedLoading;
-  const isRefetching = proposalRefetching || garageRefetching || bikerRefetching || blockedRefetching || musicRefetching || acceptedRefetching;
+  const isLoading = proposalLoading || garageLoading || bikerLoading || blockedLoading || musicLoading || acceptedLoading || propProfileLoading;
+  const isRefetching = proposalRefetching || garageRefetching || bikerRefetching || blockedRefetching || musicRefetching || acceptedRefetching || propProfileRefetching;
 
   const renderItem = useCallback(({ item }: { item: any }) => {
     if (activeTab === "blacklist") {
@@ -316,6 +343,26 @@ export default function MatchScreen() {
     if (activeTab === "music") {
       return (
         <MusicMatchCard item={item} onSendMessage={(userId) => startChatMutation.mutate(userId)} />
+      );
+    }
+
+    if (activeTab === "propProfile") {
+      const isBiker = item.bikerId === user?.id;
+      const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
+      return (
+        <ProposalProfileMatchCard
+          match={item}
+          currentUserId={user?.id || ""}
+          onAccept={() => {
+            setPropProfilePendingId(item.id);
+            acceptPropProfileMutation.mutate(item.id);
+          }}
+          onReject={() => rejectPropProfileMutation.mutate(item.id)}
+          onChatPress={item.status === "accepted" ? () => startChatMutation.mutate(otherUserId) : undefined}
+          isPending={propProfilePendingId === item.id}
+          t={t}
+          locale={locale}
+        />
       );
     }
 
@@ -349,6 +396,21 @@ export default function MatchScreen() {
             onReject={() => {}}
             onChatPress={() => startChatMutation.mutate(otherUserId)}
             onRemove={() => confirmRemoveGarageMatch(item.id)}
+            isPending={false}
+            t={t}
+            locale={locale}
+          />
+        );
+      }
+      if (item._matchType === "propProfile") {
+        const otherUserId = item.bikerId === user?.id ? item.zavarrinaId : item.bikerId;
+        return (
+          <ProposalProfileMatchCard
+            match={item}
+            currentUserId={user?.id || ""}
+            onAccept={() => {}}
+            onReject={() => {}}
+            onChatPress={() => startChatMutation.mutate(otherUserId)}
             isPending={false}
             t={t}
             locale={locale}
@@ -434,16 +496,18 @@ export default function MatchScreen() {
         locale={locale}
       />
     );
-  }, [activeTab, user?.id, pendingMatchId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, blockFromMatchMutation, acceptMutation, rejectMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, handleUnblock, router, t, locale]);
+  }, [activeTab, user?.id, pendingMatchId, propProfilePendingId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, blockFromMatchMutation, acceptMutation, rejectMutation, acceptPropProfileMutation, rejectPropProfileMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, handleUnblock, router, t, locale]);
 
   const newGarageMatches = useMemo(() => garageMatches?.filter(m => m.status === "new") || [], [garageMatches]);
   const newBikerMatches = useMemo(() => bikerMatches?.filter(m => m.status === "new") || [], [bikerMatches]);
   const newProposalMatches = useMemo(() => proposalMatches?.filter(m => m.status === "pending") || [], [proposalMatches]);
+  const newPropProfileMatches = useMemo(() => propProfileMatches?.filter(m => m.status === "new") || [], [propProfileMatches]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
     { key: "zavorrine", label: t("match.tabZavorrine"), icon: "person", count: newGarageMatches.length },
     { key: "biker", label: t("match.tabBiker"), icon: "bicycle", count: newBikerMatches.length },
     { key: "proposals", label: t("match.tabProposals"), icon: "flash", count: newProposalMatches.length },
+    { key: "propProfile", label: t("match.tabPropProfile"), icon: "location", count: newPropProfileMatches.length },
     { key: "music", label: t("match.tabMusic"), icon: "musical-notes", count: 0 },
     { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: 0 },
     { key: "blacklist", label: t("match.tabBlacklist"), icon: "ban", count: 0 },
@@ -455,6 +519,7 @@ export default function MatchScreen() {
     if (activeTab === "music") return "musical-notes-outline";
     if (activeTab === "accepted") return "checkmark-circle-outline";
     if (activeTab === "blacklist") return "ban-outline";
+    if (activeTab === "propProfile") return "location-outline";
     return "flash-outline";
   };
 
@@ -464,6 +529,7 @@ export default function MatchScreen() {
     if (activeTab === "music") return t("match.emptyMusicNoMatchTitle");
     if (activeTab === "accepted") return t("match.emptyAcceptedTitle");
     if (activeTab === "blacklist") return t("match.emptyBlacklistTitle");
+    if (activeTab === "propProfile") return t("match.emptyPropProfileTitle");
     return t("match.emptyProposalsTitle");
   };
 
@@ -473,6 +539,7 @@ export default function MatchScreen() {
     if (activeTab === "music") return t("match.emptyMusicNoMatchDesc");
     if (activeTab === "accepted") return t("match.emptyAcceptedDesc");
     if (activeTab === "blacklist") return t("match.emptyBlacklistDesc");
+    if (activeTab === "propProfile") return t("match.emptyPropProfileDesc");
     return t("match.emptyProposalsDesc");
   };
 

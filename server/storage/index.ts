@@ -292,6 +292,9 @@ export interface IStorage {
   getAllExistingProposalProfileMatchKeys(): Promise<Set<string>>;
   getActedUponBikerZavarrinaPairs(): Promise<Set<string>>;
   createProposalProfileMatch(data: InsertProposalProfileMatch): Promise<ProposalProfileMatch | null>;
+  getProposalProfileMatchesForUser(userId: string): Promise<ProposalProfileMatch[]>;
+  getProposalProfileMatch(id: string): Promise<ProposalProfileMatch | undefined>;
+  updateProposalProfileMatch(id: string, data: Partial<InsertProposalProfileMatch>): Promise<ProposalProfileMatch | undefined>;
   getPendingReportsCount(): Promise<number>;
 }
 

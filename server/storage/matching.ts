@@ -239,4 +239,26 @@ export class MatchingStorage extends ContestStorage {
     const [match] = await db.insert(proposalProfileMatches).values(data).onConflictDoNothing().returning();
     return match ?? null;
   }
+
+  async getProposalProfileMatchesForUser(userId: string): Promise<ProposalProfileMatch[]> {
+    return db.select().from(proposalProfileMatches).where(
+      or(
+        eq(proposalProfileMatches.bikerId, userId),
+        eq(proposalProfileMatches.zavarrinaId, userId),
+      )
+    ).orderBy(
+      sql`CASE WHEN ${proposalProfileMatches.status} = 'accepted' THEN 0 WHEN ${proposalProfileMatches.status} = 'new' THEN 1 ELSE 2 END`,
+      desc(proposalProfileMatches.createdAt)
+    ).limit(200);
+  }
+
+  async getProposalProfileMatch(id: string): Promise<ProposalProfileMatch | undefined> {
+    const [match] = await db.select().from(proposalProfileMatches).where(eq(proposalProfileMatches.id, id)).limit(1);
+    return match;
+  }
+
+  async updateProposalProfileMatch(id: string, data: Partial<InsertProposalProfileMatch>): Promise<ProposalProfileMatch | undefined> {
+    const [updated] = await db.update(proposalProfileMatches).set(data).where(eq(proposalProfileMatches.id, id)).returning();
+    return updated;
+  }
 }

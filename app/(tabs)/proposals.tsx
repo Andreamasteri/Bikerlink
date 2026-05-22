@@ -220,7 +220,13 @@ export default function ProposalsScreen() {
     queryKey: ["/api/proposals/matches"],
   });
 
+  const { data: propProfileMatches } = useQuery<any[]>({
+    queryKey: ["/api/proposals/proposal-profile-matches"],
+  });
+
   const pendingMatchCount = (matches || []).filter((m: any) => m.status === "pending").length;
+  const pendingPropProfileCount = (propProfileMatches || []).filter((m: any) => m.status === "new").length;
+  const totalPendingCount = pendingMatchCount + pendingPropProfileCount;
 
   const handleCreatePress = useCallback(() => {
     router.push("/proposals/create");
@@ -231,7 +237,7 @@ export default function ProposalsScreen() {
   }, [router]);
 
   const allData: any[] = [];
-  if (pendingMatchCount > 0) {
+  if (totalPendingCount > 0) {
     allData.push({ type: "matchBanner", key: "mb" });
   }
   allData.push({ type: "proposalHeader", key: "ph" });
@@ -296,9 +302,9 @@ export default function ProposalsScreen() {
             <Text style={[styles.filterText, activeFilter === f.key && styles.filterTextActive]}>
               {t(f.i18nKey)}
             </Text>
-            {f.key === "all" && pendingMatchCount > 0 && (
+            {f.key === "all" && totalPendingCount > 0 && (
               <View style={styles.matchBadge}>
-                <Text style={styles.matchBadgeText}>{pendingMatchCount}</Text>
+                <Text style={styles.matchBadgeText}>{totalPendingCount}</Text>
               </View>
             )}
           </Pressable>
@@ -327,7 +333,7 @@ export default function ProposalsScreen() {
                 >
                   <Ionicons name="flash" size={20} color={Colors.accent} />
                   <Text style={styles.matchBannerText}>
-                    {pendingMatchCount} {t("match.pendingBanner")}
+                    {totalPendingCount} {t("match.pendingBanner")}
                   </Text>
                   <Ionicons name="chevron-forward" size={18} color={Colors.accent} />
                 </TouchableOpacity>

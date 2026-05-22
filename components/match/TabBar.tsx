@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
-export type TabKey = "zavorrine" | "biker" | "proposals" | "music" | "accepted" | "blacklist";
+export type TabKey = "zavorrine" | "biker" | "proposals" | "propProfile" | "music" | "accepted" | "blacklist";
 
 interface TabBarProps {
   activeTab: TabKey;
