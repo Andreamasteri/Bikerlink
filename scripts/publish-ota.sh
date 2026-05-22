@@ -807,7 +807,19 @@ do_publish() {
   fi
   echo "   ✔ Release pubblicata (status: active)"
 
-  echo "   ✔ Release auto-approvata (slot=stable, approved=true)"
+  # ─── Step I+: Verifica che la release sia in slot=stable ────
+  # Il publish endpoint ora auto-approva (slot=stable, approved=true) per le
+  # release in slot=archived. Verifichiamo che la risposta lo confermi.
+  local PUBLISHED_SLOT PUBLISHED_APPROVED
+  PUBLISHED_SLOT=$(echo "$PUBLISH_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).slot ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
+  PUBLISHED_APPROVED=$(echo "$PUBLISH_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).approved ? 'true' : 'false'); } catch { console.log('false'); } })" 2>/dev/null || true)
+  if [ "$PUBLISHED_SLOT" = "stable" ] && [ "$PUBLISHED_APPROVED" = "true" ]; then
+    echo "   ✔ Release auto-approvata (slot=stable, approved=true)"
+  else
+    echo "   ⚠ Attenzione: release non in slot=stable (slot=$PUBLISHED_SLOT, approved=$PUBLISHED_APPROVED)"
+    echo "     I device potrebbero non ricevere l'aggiornamento automaticamente."
+    echo "     Approvare manualmente dall'app → Profilo oppure verificare il backend."
+  fi
 
   # ─── Step J: Verifica live — OTA servita ai device ───────
   # La release è ora slot=stable, approved=true: il backend deve rispondere 200

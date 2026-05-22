@@ -324,8 +324,22 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
     const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
     if (!existing.length) return sendError(res, 404, "Release non trovata");
 
+    // Se la release è in slot='archived' (pending-approval) o senza slot,
+    // promuovila a 'stable' e auto-approva. Se ha già uno slot esplicito
+    // (canary, preview, ecc.) lascialo invariato — approvazione sospesa solo
+    // per il canale default/stable.
+    const existingSlot = existing[0].slot as string | null;
+    const promotedSlot = (existingSlot === "archived" || existingSlot === null) ? "stable" : existingSlot;
+    const shouldAutoApprove = promotedSlot === "stable";
+
     const [updated] = await db.update(otaReleases)
-      .set({ status: "active", slot: "stable", approved: true, approvedAt: new Date(), publishedAt: new Date(), updatedAt: new Date() })
+      .set({
+        status: "active",
+        slot: promotedSlot,
+        ...(shouldAutoApprove ? { approved: true, approvedAt: new Date() } : {}),
+        publishedAt: new Date(),
+        updatedAt: new Date(),
+      })
       .where(eq(otaReleases.id, id))
       .returning();
 

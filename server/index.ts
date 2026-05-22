@@ -172,7 +172,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       UPDATE ota_releases
       SET slot = 'stable', approved = true, approved_at = NOW(), updated_at = NOW()
       WHERE status = 'active'
-        AND (slot = 'archived' OR slot IS NULL OR approved = false)
+        AND slot = 'archived'
       RETURNING id, version, runtime_version
     `);
     const fixedRows = fixResult.rows as any[];
