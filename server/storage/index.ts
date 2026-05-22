@@ -164,6 +164,7 @@ export interface IStorage {
   getAppSetting(key: string): Promise<AppSetting | undefined>;
   upsertAppSetting(key: string, value?: string, valueJson?: unknown): Promise<AppSetting>;
   createVerificationCode(code: InsertVerificationCode): Promise<VerificationCode>;
+  createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
   getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>>;
   getUserMotorcycle(id: string): Promise<UserMotorcycle | undefined>;
   getUserPhoto(id: string): Promise<UserPhoto | undefined>;
