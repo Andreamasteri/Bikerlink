@@ -297,6 +297,19 @@ export function startMatchingEngine(): void {
     }
   })();
 
+  _engineTimers.push(setInterval(() => {
+    try {
+      console.log("[Matching] Ciclo automatico orario avviato");
+      const result = triggerMatchingRun();
+      if (!result.started) {
+        console.log(`[Matching] Ciclo automatico saltato: ${result.reason}`);
+      }
+    } catch (err) {
+      console.error("[Matching] Errore imprevisto nel ciclo automatico orario:", err);
+    }
+  }, 60 * 60 * 1000));
+  console.log("[Matching] Ciclo di matching automatico orario avviato");
+
   _engineTimers.push(setInterval(async () => {
     try {
       const expired = await runCleanup();

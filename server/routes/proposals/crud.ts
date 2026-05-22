@@ -103,9 +103,10 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
     const proposal = await storage.createProposal(proposalData);
 
-    (triggerProposalCreatedMatching as any)(proposal.id).catch((err: any) => {
-      console.error("Async matching error for new proposal:", err);
-    });
+    if (!proposal.userId || proposal.departureLatitude == null || proposal.departureLongitude == null) {
+      console.warn(`[ProposalCreated] Proposta ${proposal.id} manca di userId/departureLatitude/departureLongitude — matching potrebbe non trovare utenti vicini`);
+    }
+    triggerProposalCreatedMatching(proposal);
 
     return res.json(proposal);
   } catch (error) {
