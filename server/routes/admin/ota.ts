@@ -22,6 +22,23 @@ function paramStr(v: string | string[] | undefined): string | null {
   return typeof v === "string" ? v : null;
 }
 
+async function assertAdminSession(req: Request, res: Response): Promise<boolean> {
+  if (!req.session?.userId) {
+    sendError(res, 401, "Non autenticato");
+    return false;
+  }
+  const user = await storage.getUser(req.session.userId);
+  if (!user || user.role !== "admin") {
+    sendError(res, 403, "Accesso riservato agli amministratori");
+    return false;
+  }
+  if (user.status !== "active") {
+    sendError(res, 403, "Account non attivo");
+    return false;
+  }
+  return true;
+}
+
 router.get("/ota-events", async (req: Request, res: Response) => {
   try {
     const limitRaw = parseInt(String(req.query.limit ?? "100"), 10);
@@ -467,7 +484,8 @@ router.get("/ota/releases", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/ota/pending-approval", async (_req: Request, res: Response) => {
+router.get("/ota/pending-approval", async (req: Request, res: Response) => {
+  if (!await assertAdminSession(req, res)) return;
   try {
     const result = await db.execute(sql`
       SELECT * FROM ota_releases
@@ -484,6 +502,7 @@ router.get("/ota/pending-approval", async (_req: Request, res: Response) => {
 });
 
 router.post("/ota/assign-admin-preview", async (req: Request, res: Response) => {
+  if (!await assertAdminSession(req, res)) return;
   try {
     const rawDeviceId = typeof req.body?.deviceId === "string" ? req.body.deviceId.trim().substring(0, 128) : null;
     if (!rawDeviceId) return sendError(res, 400, "deviceId obbligatorio");
@@ -523,6 +542,7 @@ router.post("/ota/assign-admin-preview", async (req: Request, res: Response) => 
 });
 
 router.post("/ota/:id/distribute", async (req: Request, res: Response) => {
+  if (!await assertAdminSession(req, res)) return;
   try {
     const id = paramStr(req.params.id);
     if (!id) return sendError(res, 400, "ID non valido");
