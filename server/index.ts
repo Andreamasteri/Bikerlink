@@ -135,15 +135,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   // ── Phase 3: DB Init (non-fatal sub-steps) ────────────────────────────────
   bootLog(3, TOTAL, "DB Init", "start");
 
-  // Indices (non-fatal)
-  try {
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_events_phase_idx ON ota_events(phase)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_events_release_id_idx ON ota_events(release_id)`);
-    await db.execute(sql`CREATE INDEX IF NOT EXISTS ota_events_created_at_idx ON ota_events(created_at)`);
-  } catch (e) {
-    console.warn("[INIT] Phase 3 indices error (non-fatal):", e);
-  }
-
   // OTA event cleanup (non-fatal)
   try {
     const cleanupResult = await db.execute(sql`
