@@ -17,7 +17,7 @@ export function deriveTargetUserTypes(p: ProposalWithAuthor): string[] {
   }
 }
 
-function getAllSearchTypes(p: ProposalWithAuthor): string[] {
+export function getAllSearchTypes(p: ProposalWithAuthor): string[] {
   const types: string[] = [];
   if (Array.isArray(p.searchTypes)) {
     for (const t of p.searchTypes as string[]) {

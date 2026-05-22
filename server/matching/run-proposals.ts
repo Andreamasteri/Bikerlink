@@ -11,7 +11,7 @@ import {
   getActiveClubMembershipKeys,
   clubScopeAllows 
 } from "./filters";
-import { areCompatible } from "./scoring";
+import { areCompatible, getAllSearchTypes } from "./scoring";
 
 export async function runProposalMatchingForUser(userId: string): Promise<number> {
   try {
@@ -106,14 +106,25 @@ export async function runProposalZoneNotifications(proposal: Proposal): Promise<
 
     if (explicitTargets && explicitTargets.length > 0) {
       targetUserTypes = explicitTargets;
-    } else if (proposal.searchType === "find_a_friend") {
-      targetUserTypes = ["biker", "coppia"];
-    } else if (proposal.searchType === "find_a_biker" || proposal.searchType === "hitchhiker") {
-      targetUserTypes = ["biker", "coppia"];
-    } else if (proposal.searchType === "find_a_guest" || proposal.searchType === "hitcher") {
-      targetUserTypes = ["zavorrina", "coppia"];
     } else {
-      targetUserTypes = ["biker", "zavorrina", "coppia"];
+      const allTypes = getAllSearchTypes(proposal);
+      if (allTypes.length > 0) {
+        const merged = new Set<string>();
+        for (const t of allTypes) {
+          if (t === "find_a_friend") {
+            merged.add("biker"); merged.add("coppia");
+          } else if (t === "find_a_biker" || t === "hitchhiker") {
+            merged.add("biker"); merged.add("coppia");
+          } else if (t === "find_a_guest" || t === "hitcher") {
+            merged.add("zavorrina"); merged.add("coppia");
+          } else {
+            merged.add("biker"); merged.add("zavorrina"); merged.add("coppia");
+          }
+        }
+        targetUserTypes = [...merged];
+      } else {
+        targetUserTypes = ["biker", "zavorrina", "coppia"];
+      }
     }
 
     const usersWithProfiles = await db
