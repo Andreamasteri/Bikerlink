@@ -544,6 +544,27 @@ router.post("/client-error", clientErrorLimiter, clientErrorJson, (req: Request,
   }
 });
 
+router.get("/startup-beacons", async (req: Request, res: Response) => {
+  try {
+    const rawToken = (req.headers["x-ota-token"] as string | undefined) ?? (req.query.token as string | undefined);
+    if (!rawToken) return sendError(res, 401, "Token richiesto");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const now = new Date();
+    const rows = await db.select({ id: otaPublishTokens.id })
+      .from(otaPublishTokens)
+      .where(and(
+        eq(otaPublishTokens.tokenHash, tokenHash),
+        eq(otaPublishTokens.revoked, false),
+        or(isNull(otaPublishTokens.expiresAt), sql`${otaPublishTokens.expiresAt} > ${now}`)
+      ))
+      .limit(1);
+    if (rows.length === 0) return sendError(res, 401, "Token non valido");
+    return res.json({ count: startupBeacons.length, beacons: [...startupBeacons] });
+  } catch {
+    return sendError(res, 500, "Errore interno");
+  }
+});
+
 router.post("/startup-beacon", startupBeaconLimiter, startupBeaconJson, (req: Request, res: Response) => {
   try {
     const parsedSb = startupBeaconSchema.safeParse(req.body ?? {});

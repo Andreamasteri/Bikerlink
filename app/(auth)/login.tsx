@@ -18,6 +18,7 @@ import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
+import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -30,32 +31,20 @@ export default function LoginScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleLogin = async () => {
+    sendStartupBeacon("login_1_start");
     setError("");
     if (!identifier.trim() || !password) {
       setError(t("auth.enterCredentials"));
       return;
     }
+    sendStartupBeacon("login_2_validated");
     setIsSubmitting(true);
-    let gpsCoords: { latitude: number; longitude: number } | undefined;
-    try {
-      const Location = require('expo-location');
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === "granted") {
-        const pos = await Promise.race([
-          Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          }),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-        ]);
-        if (pos) {
-          gpsCoords = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
-        }
-      }
-    } catch {}
+    sendStartupBeacon("login_3_mutate");
     loginMutation.mutate(
-      { identifier: identifier.trim(), password, ...gpsCoords },
+      { identifier: identifier.trim(), password },
       {
         onSuccess: async () => {
+          sendStartupBeacon("login_4_success");
           setIsSubmitting(false);
           try {
             const ctrl = new AbortController();
@@ -71,6 +60,7 @@ export default function LoginScreen() {
           router.replace("/(tabs)");
         },
         onError: (err: any) => {
+          sendStartupBeacon("login_5_error");
           setIsSubmitting(false);
           const msg = err?.message || t("auth.loginError");
           const cleaned = msg.replace(/^\d+:\s*/, "");

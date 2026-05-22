@@ -1,10 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const Location = require("expo-location") as typeof import("expo-location");
 import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { apiRequest } from "@/lib/query-client";
+
+// Lazy getter — evita che expo-location venga caricato al momento dell'inizializzazione
+// del modulo (causa crash Android con inlineRequires: true).
+let _expoLocation: typeof import("expo-location") | null = null;
+function loc(): typeof import("expo-location") {
+  if (_expoLocation === null) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _expoLocation = require("expo-location") as typeof import("expo-location");
+  }
+  return _expoLocation!;
+}
 
 interface LocationContextType {
   hasLocationPermission: boolean;
@@ -96,7 +105,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const { status } = await Location.getForegroundPermissionsAsync();
+      const { status } = await loc().getForegroundPermissionsAsync();
       setHasPermission(status === "granted");
       setPermissionDenied(status === "denied");
       setPermissionPrompt(status === "undetermined");
@@ -114,7 +123,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const { status } = await Location.getBackgroundPermissionsAsync();
+      const { status } = await loc().getBackgroundPermissionsAsync();
       const granted = status === "granted";
       setHasBackgroundPermission(granted);
 
@@ -184,7 +193,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       });
     }
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await loc().requestForegroundPermissionsAsync();
       const granted = status === "granted";
       setHasPermission(granted);
       setPermissionDenied(status === "denied");
@@ -203,7 +212,7 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       return false;
     }
     try {
-      const { status } = await Location.requestBackgroundPermissionsAsync();
+      const { status } = await loc().requestBackgroundPermissionsAsync();
       const granted = status === "granted";
       setHasBackgroundPermission(granted);
       if (granted) {
