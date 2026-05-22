@@ -386,6 +386,12 @@ export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, 
         </View>
       </TouchableOpacity>
 
+      <CompatibilityBadge
+        myTargets={["biker"]}
+        theirTargets={["biker"]}
+        t={t}
+      />
+
       {isAccepted && onChatPress && (
         <TouchableOpacity style={sharedStyles.chatBtn} onPress={onChatPress}>
           <Ionicons name="chatbubble" size={18} color={Colors.background} />
