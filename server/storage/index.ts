@@ -396,4 +396,4 @@ export class DatabaseStorage extends FakeUsersStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage: IStorage = new DatabaseStorage();
