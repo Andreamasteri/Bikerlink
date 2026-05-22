@@ -1465,7 +1465,7 @@
     "cycle": "10.x",
     "channel": "preview",
     "platform": "android",
-    "message": "OTA-8 rv10.0.0: OTA-8 rv10.0.0: fix crash Android — expo-location lazy require al bootstrap (background-telemetry-task, background-location-task, location-context)",
+    "message": "OTA-8 rv10.0.0: fix crash Android — expo-location lazy require al bootstrap (background-telemetry-task, background-location-task, location-context)",
     "note": "CURRENT_OTA_NUMBER=8. Pubblicato da publish-ota.sh (2-stage).",
     "runtimeVersion": "10.0.0",
     "jsEngine": "hermes",
