@@ -18,7 +18,6 @@ import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
-import { loginSchema } from "@shared/validators";
 
 export default function LoginScreen() {
   const router = useRouter();

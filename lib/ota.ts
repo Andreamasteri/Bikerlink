@@ -1,4 +1,4 @@
 // ⚠️ CHECKLIST RELEASE: aggiornare questo numero PRIMA di ogni pubblicazione OTA
 // Ciclo 10.0.0 — APK v? — aggiornare ad ogni nuova OTA pubblicata
-export const CURRENT_OTA_NUMBER = 6;
-export const __OTA_BUILD_TAG__ = "BL-OTA-6";
+export const CURRENT_OTA_NUMBER = 7;
+export const __OTA_BUILD_TAG__ = "BL-OTA-7";

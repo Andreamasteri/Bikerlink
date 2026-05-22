@@ -1428,7 +1428,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-22T10:25:30.581Z"
+  },
+  {
+    "updateNumber": 7,
+    "version": "48.7.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-7 rv10.0.0: Fix crash login Android: rimosse import statiche expo-location e loginSchema (OTA-6 incompleto)",
+    "note": "CURRENT_OTA_NUMBER=7. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "7399d847-7a0a-45d2-88da-8d7748e2b443",
+    "bundleUrl": "private/ota/ota-48.7.10-1779448332941.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "358a262db9608b4cc8f5598e6061519eca27def5",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-22T11:12:16.199Z"
   }
 ]
