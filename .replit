@@ -198,12 +198,12 @@ args = "bash scripts/typecheck.sh"
 name = "file-conflict-guard"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx ts-node scripts/check-file-conflicts.ts"
-
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/check-file-conflicts.ts"
 
 [[workflows.workflow]]
 name = "api-responses"
