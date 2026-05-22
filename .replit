@@ -81,6 +81,14 @@ args = "version-alignment"
 task = "workflow.run"
 args = "healthcheck"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "typecheck-client"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "typecheck-server"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -234,6 +242,28 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/check-runtime-health.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "typecheck-client"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsc --noEmit --project tsconfig.json"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "typecheck-server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsc --noEmit --project server/tsconfig.json"
 
 [workflows.workflow.metadata]
 isValidation = true
