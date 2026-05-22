@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { AppState, AppStateStatus, Platform } from "react-native";
-import * as Location from "expo-location";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Location = require("expo-location") as typeof import("expo-location");
 import { useQuery } from "@tanstack/react-query";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { apiRequest } from "@/lib/query-client";

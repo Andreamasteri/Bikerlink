@@ -1456,7 +1456,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-22T11:12:16.199Z"
+  },
+  {
+    "updateNumber": 8,
+    "version": "48.8.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-8 rv10.0.0: OTA-8 rv10.0.0: fix crash Android — expo-location lazy require al bootstrap (background-telemetry-task, background-location-task, location-context)",
+    "note": "CURRENT_OTA_NUMBER=8. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "e03e4803-ac41-4798-b679-9f315e5443dd",
+    "bundleUrl": "private/ota/ota-48.8.10-1779449816248.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "f95f5f9580bbafe45a0dbd748366274ea50530d5",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-22T11:36:59.567Z"
   }
 ]

@@ -1,5 +1,5 @@
 import * as TaskManager from "expo-task-manager";
-import * as Location from "expo-location";
+import type { LocationObject } from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const TASK_TELEMETRY = "bikerlink-telemetry-bg";
@@ -30,6 +30,8 @@ interface BgTelemetrySample {
 
 export async function startTelemetryBackgroundTask(): Promise<boolean> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Location = require("expo-location") as typeof import("expo-location");
     const { status } = await Location.getBackgroundPermissionsAsync();
     if (status !== "granted") return false;
 
@@ -55,6 +57,8 @@ export async function startTelemetryBackgroundTask(): Promise<boolean> {
 
 export async function stopTelemetryBackgroundTask(): Promise<void> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Location = require("expo-location") as typeof import("expo-location");
     const isRunning = await TaskManager.isTaskRegisteredAsync(TASK_TELEMETRY);
     if (isRunning) {
       await Location.stopLocationUpdatesAsync(TASK_TELEMETRY);
@@ -83,7 +87,7 @@ TaskManager.defineTask(
     data,
     error,
   }: {
-    data: { locations: Location.LocationObject[] };
+    data: { locations: LocationObject[] };
     error: TaskManager.TaskManagerError | null;
   }) => {
     if (error) return;

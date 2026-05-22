@@ -1,5 +1,5 @@
 import * as TaskManager from "expo-task-manager";
-import * as Location from "expo-location";
+import type { LocationObject } from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export const BACKGROUND_LOCATION_TASK_NAME = "bikerlink-background-location";
@@ -10,6 +10,8 @@ const SETTINGS_TTL_MS = 5 * 60 * 1000;
 
 export async function isBackgroundLocationSupported(): Promise<boolean> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Location = require("expo-location") as typeof import("expo-location");
     const { status } = await Location.getBackgroundPermissionsAsync();
     return status === "granted";
   } catch {
@@ -22,6 +24,8 @@ export async function startBackgroundLocationTask(
   notificationText: string
 ): Promise<boolean> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Location = require("expo-location") as typeof import("expo-location");
     const isRunning = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK_NAME);
     if (isRunning) return true;
 
@@ -49,6 +53,8 @@ export async function startBackgroundLocationTask(
 
 export async function stopBackgroundLocationTask(): Promise<void> {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const Location = require("expo-location") as typeof import("expo-location");
     const isRunning = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK_NAME);
     if (isRunning) {
       await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
@@ -110,7 +116,7 @@ TaskManager.defineTask(
     data,
     error,
   }: {
-    data: { locations: Location.LocationObject[] };
+    data: { locations: LocationObject[] };
     error: TaskManager.TaskManagerError | null;
   }) => {
   if (error) {
