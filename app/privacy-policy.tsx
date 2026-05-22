@@ -312,6 +312,14 @@ BikerLink se réserve le droit de modifier la présente politique de confidentia
 
 Pour toute question ou précision, n'hésitez pas à nous contacter à l'adresse : privacy@bikerlink.app`,
 
+  el: `ΠΟΛΙΤΙΚΗ ΑΠΟΡΡΗΤΟΥ
+
+Τελευταία ενημέρωση: 20/03/2026
+
+1. ΥΠΕΥΘΥΝΟΣ ΕΠΕΞΕΡΓΑΣΙΑΣ ΔΕΔΟΜΕΝΩΝ
+
+Ο υπεύθυνος επεξεργασίας των προσωπικών δεδομένων είναι το BikerLink. Για οποιεσδήποτε ερωτήσεις σχετικά με την επεξεργασία των προσωπικών σας δεδομένων, μπορείτε να επικοινωνήσετε μαζί μας στη διεύθυνση: privacy@bikerlink.app`,
+
   tr: `GİZLİLİK POLİTİKASI
 
 Son güncelleme: 20/03/2026

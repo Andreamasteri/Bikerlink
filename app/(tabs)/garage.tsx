@@ -18,7 +18,7 @@ import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
-import { motorcycleSchema } from "@shared/schema";
+import { motorcycleSchema } from "@shared/validators";
 
 import { GarageHeader } from "@/components/garage/GarageHeader";
 import { MotoCard } from "@/components/garage/MotoCard";
@@ -159,7 +159,7 @@ function GarageContent() {
       displacement: form.displacement ? parseInt(form.displacement, 10) : undefined,
     });
     if (!parsed.success) {
-      Alert.alert(t("common.error"), parsed.error.errors[0]?.message ?? t("garage.fillRequired"));
+      Alert.alert(t("common.error"), parsed.error.issues[0]?.message ?? t("garage.fillRequired"));
       return;
     }
     saveMutation.mutate(form);

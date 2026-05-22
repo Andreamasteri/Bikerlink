@@ -191,8 +191,8 @@ export default function MatchScreen() {
   const startChatMutation = useMutation({
     mutationFn: (targetUserId: string) => apiRequest("POST", "/api/chat/conversations", { targetUserId }),
     onSuccess: (data) => {
-      if (data.id) {
-        router.push(`/chat/${data.id}` as any);
+      if ((data as any).id) {
+        router.push(`/chat/${(data as any).id}` as any);
       }
     },
   });

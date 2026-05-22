@@ -24,7 +24,7 @@ export default function UserInfoCards({ userDetail, onClose }: Props) {
             onClose();
             router.push({
               pathname: "/motoclub/[id]" as const,
-              params: { id: userDetail.primaryClubId },
+              params: { id: userDetail.primaryClubId ?? "" },
             });
           }}
         >

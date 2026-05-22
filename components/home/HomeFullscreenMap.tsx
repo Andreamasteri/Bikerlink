@@ -45,6 +45,7 @@ interface HomeFullscreenMapProps {
   bikerCount: number;
   zavCount: number;
   mapFullscreenReady: boolean;
+  onMapReady?: () => void;
   getUserIcon: any;
   getUserColor: any;
   getUserTypeLabel: any;

@@ -126,6 +126,7 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
     setClubInviteFeedback,
     uptimeWidgetEnabled,
     handleUptimeToggle,
+    autoMatchMutation: matching.autoMatchMutation,
     matchingEngineExpanded,
     setMatchingEngineExpanded,
     coordHistoryExpanded,

@@ -58,7 +58,7 @@ export default function AdminAds() {
     editGroupName, setEditGroupName,
     editGroupLinkUrl, setEditGroupLinkUrl,
     editGroupIsActive, setEditGroupIsActive,
-    setEditGroupIsActiveDirty,
+    editGroupIsActiveDirty, setEditGroupIsActiveDirty,
     settingsDuration, setSettingsDuration,
     settingsMode, setSettingsMode,
     campaigns,
@@ -119,7 +119,7 @@ export default function AdminAds() {
 
       <AdGroupList
         listItems={listItems}
-        flatListRef={flatListRef}
+        flatListRef={flatListRef as any}
         isLoading={isLoading}
         collapsedGroups={collapsedGroups}
         onToggleGroupCollapse={toggleGroupCollapse}

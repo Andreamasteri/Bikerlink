@@ -52,7 +52,7 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "Kagoshima", latitude: 31.5602, longitude: 130.5581 },
       { name: "Okinawa", latitude: 26.2124, longitude: 127.6809 },
     ],
-  },,
+  },
   {
     code: "IN", name: "India", flag: "🇮🇳",
     regions: [
@@ -93,7 +93,7 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "Lakshadweep", latitude: 10.5667, longitude: 72.6417 },
       { name: "Puducherry", latitude: 11.9416, longitude: 79.8083 },
     ],
-  },,
+  },
   {
     code: "CN", name: "中国", flag: "🇨🇳",
     regions: [
@@ -116,7 +116,7 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "Hong Kong", latitude: 22.3193, longitude: 114.1694 },
       { name: "Macau", latitude: 22.1987, longitude: 113.5439 },
     ],
-  },,
+  },
   {
     code: "KR", name: "대한민국", flag: "🇰🇷",
     regions: [
@@ -137,7 +137,7 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "Gyeongnam", latitude: 35.4606, longitude: 128.2132 },
       { name: "Jeju", latitude: 33.4996, longitude: 126.5312 },
     ],
-  },,
+  },
   {
     code: "VN", name: "Việt Nam", flag: "🇻🇳",
     regions: [
@@ -154,7 +154,7 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "Nghệ An", latitude: 18.6796, longitude: 105.6813 },
       { name: "Lào Cai", latitude: 22.4856, longitude: 103.9707 },
     ],
-  },,
+  },
   {
     code: "TH", name: "ประเทศไทย", flag: "🇹🇭",
     regions: [
@@ -171,7 +171,7 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "Hat Yai (Songkhla)", latitude: 7.0086, longitude: 100.4747 },
       { name: "Ayutthaya", latitude: 14.3692, longitude: 100.5876 },
     ],
-  },,
+  },
   {
     code: "ID", name: "Indonesia", flag: "🇮🇩",
     regions: [
@@ -191,7 +191,7 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "Papua", latitude: -4.2699, longitude: 138.0804 },
       { name: "Nusa Tenggara Barat (Lombok)", latitude: -8.6529, longitude: 117.3616 },
     ],
-  },,
+  },
   {
     code: "MY", name: "Malaysia", flag: "🇲🇾",
     regions: [
@@ -211,7 +211,7 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "Perlis", latitude: 6.4449, longitude: 100.2048 },
       { name: "Labuan", latitude: 5.2831, longitude: 115.2308 },
     ],
-  },,
+  },
   {
     code: "PH", name: "Pilipinas", flag: "🇵🇭",
     regions: [
@@ -230,7 +230,7 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "Palawan", latitude: 9.8349, longitude: 118.7384 },
       { name: "Bohol", latitude: 9.8500, longitude: 124.1435 },
     ],
-  },,
+  },
   {
     code: "SG", name: "Singapore", flag: "🇸🇬",
     regions: [
@@ -240,5 +240,5 @@ export const ASIA_COUNTRIES: CountryData[] = [
       { name: "North-East Region", latitude: 1.3691, longitude: 103.8454 },
       { name: "West Region", latitude: 1.3404, longitude: 103.7090 },
     ],
-  },,
+  },
 ];

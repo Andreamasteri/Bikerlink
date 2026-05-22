@@ -46,7 +46,7 @@ export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
                 onPress={() => setRouteStyle(s)}
                 testID={`route-style-${s}`}
               >
-                <Ionicons name={meta.icon} size={18} color={isActive ? meta.color : Colors.textSecondary} />
+                <Ionicons name={meta.icon as any} size={18} color={isActive ? meta.color : Colors.textSecondary} />
                 <Text style={[styles.styleBtnText, isActive && { color: meta.color, fontWeight: "700" as const }]}>
                   {meta.label}
                 </Text>
@@ -72,9 +72,9 @@ export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
             {/* Style badge overlay */}
             {(() => {
               const styleMeta = {
-                curvy: { label: "Panoramico", icon: "terrain" as const, color: "#4CAF50" },
-                balanced: { label: "Bilanciato", icon: "swap-horizontal" as const, color: Colors.accent },
-                fastest: { label: "Veloce", icon: "flash" as const, color: "#FF9800" },
+                curvy: { label: "Panoramico", icon: "terrain" as any, color: "#4CAF50" },
+                balanced: { label: "Bilanciato", icon: "swap-horizontal" as any, color: Colors.accent },
+                fastest: { label: "Veloce", icon: "flash" as any, color: "#FF9800" },
               }[routeStyle];
               return (
                 <View style={[styles.styleBadge, { backgroundColor: styleMeta.color + "DD" }]}>

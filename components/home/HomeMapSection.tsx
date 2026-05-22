@@ -12,7 +12,7 @@ interface HomeMapSectionProps {
   activeSosRequests: any[];
   isAvailable: boolean;
   ghostMode: boolean;
-  mySearchRadius: number;
+  mySearchRadius: number | null;
   filterBiker: boolean;
   filterZavorrina: boolean;
   toggleFilterBiker: () => void;
@@ -68,7 +68,7 @@ export const HomeMapSection: React.FC<HomeMapSectionProps> = ({
           activeSosRequests={activeSosRequests.filter((s: any) => s.latitude != null && s.longitude != null)}
           isAvailable={isAvailable}
           ghostMode={ghostMode}
-          searchRadiusKm={mySearchRadius}
+          searchRadiusKm={mySearchRadius ?? 0}
           filterBiker={filterBiker}
           filterZavorrina={filterZavorrina}
           onToggleFilterBiker={toggleFilterBiker}
@@ -77,7 +77,7 @@ export const HomeMapSection: React.FC<HomeMapSectionProps> = ({
           onEasterEggPress={handleEasterEggPress}
           onEventPress={onEventPress}
           onReady={() => setMapReady(true)}
-          currentUserId={userId ?? null}
+          currentUserId={userId != null ? String(userId) : null}
           realMeMarker={realMeMarker}
           fakeMeMarker={fakeMeMarker}
           showEventPins={false}

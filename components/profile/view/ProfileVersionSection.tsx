@@ -17,7 +17,7 @@ export const ProfileVersionSection: React.FC = () => {
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>Versione OTA</Text>
-        <Text style={styles.value}>{CURRENT_OTA_NUMBER === 0 ? "APK embed (rv5.0.0)" : `OTA-${CURRENT_OTA_NUMBER}`}</Text>
+        <Text style={styles.value}>{(CURRENT_OTA_NUMBER as number) === 0 ? "APK embed (rv5.0.0)" : `OTA-${CURRENT_OTA_NUMBER}`}</Text>
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>Commit EAS</Text>

@@ -383,6 +383,48 @@ fi
 echo ""
 
 # ---------------------------------------------------------------------------
+# CHECK E: no client file has value imports from @shared/schema
+#
+# Now that @shared/validators exists (pure Zod, no drizzle), client code
+# should import from @shared/validators instead of @shared/schema.
+# Type-only imports (`import type`) are still allowed from @shared/schema
+# because they are erased at compile time and never touch the drizzle mock.
+#
+# A value import from @shared/schema forces Metro to load shared/schema.ts
+# which in turn loads drizzle-orm — the exact hazard @shared/validators
+# was created to eliminate.
+# ---------------------------------------------------------------------------
+echo "[E] Checking for @shared/schema value imports in client code..."
+echo "    (type-only imports are OK; value imports should use @shared/validators)"
+
+schema_value_hits=""
+for dir in $CLIENT_DIRS; do
+  if [ -d "$dir" ]; then
+    # Find all lines that import from @shared/schema but are NOT type-only
+    hits=$(grep -rn --include="*.ts" --include="*.tsx" \
+      -E "from ['\"]@shared/schema['\"]" "$dir" 2>/dev/null \
+      | grep -v "import type " || true)
+    if [ -n "$hits" ]; then
+      schema_value_hits="${schema_value_hits}${hits}"$'\n'
+    fi
+  fi
+done
+
+if [ -z "$schema_value_hits" ]; then
+  echo "  ✓ No @shared/schema value imports found in client code"
+  PASS=$((PASS + 1))
+else
+  echo "  ✗ @shared/schema value imports detected in client code:"
+  echo ""
+  echo "$schema_value_hits" | sed 's/^/    /'
+  echo ""
+  echo "  Fix: import Zod schemas and types from @shared/validators instead."
+  echo "       Type-only imports (import type) from @shared/schema are still OK."
+  FAIL=$((FAIL + 1))
+fi
+echo ""
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo "=============================================="

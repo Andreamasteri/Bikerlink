@@ -463,7 +463,7 @@ export default function NavigateScreen() {
     <View style={s.container}>
       <NavigationMap
         mapHtml={mapHtml}
-        webViewRef={webViewRef}
+        webViewRef={webViewRef as any}
         handleMapMessage={handleMapMessage}
         handleClose={handleClose}
         isRerouting={isRerouting}

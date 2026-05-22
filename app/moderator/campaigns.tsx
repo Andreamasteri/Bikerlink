@@ -270,7 +270,7 @@ export default function ModeratorCampaigns() {
         style={[styles.tabBtn, active && { borderBottomColor: color, borderBottomWidth: 2 }]}
         onPress={() => setActiveTab(key)}
       >
-        <IconComp name={icon as "motorcycle"} size={18} color={active ? color : Colors.textSecondary} />
+        <IconComp name={icon as any} size={18} color={active ? color : Colors.textSecondary} />
         <Text style={[styles.tabLabel, { color: active ? color : Colors.textSecondary }]}>{label}</Text>
       </TouchableOpacity>
     );

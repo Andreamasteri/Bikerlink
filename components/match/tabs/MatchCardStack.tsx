@@ -4,7 +4,7 @@ import { MatchList } from '@/components/match/MatchList';
 
 interface MatchCardStackProps {
   currentList: any[];
-  renderItem: ({ item }: { item: any }) => JSX.Element;
+  renderItem: ({ item }: { item: any }) => React.ReactElement;
   isRefetching: boolean;
   onRefresh: () => void;
   isLoading: boolean;

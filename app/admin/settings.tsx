@@ -86,8 +86,8 @@ export default function AdminSettings() {
           expanded={state.matchingEngineExpanded}
           onToggle={() => state.setMatchingEngineExpanded((v) => !v)}
           autoMatchEnabled={state.autoMatchEnabled}
-          onAutoMatchToggle={(val) => state.autoMatchMutation.mutate(val)}
-          autoMatchPending={state.autoMatchMutation.isPending}
+          onAutoMatchToggle={(val) => (state as any).autoMatchMutation.mutate(val)}
+          autoMatchPending={(state as any).autoMatchMutation.isPending}
           showSearchPrefEnabled={state.showSearchPrefEnabled}
           onShowSearchPrefToggle={(val) => state.showSearchPrefMutation.mutate(val)}
           showSearchPrefPending={state.showSearchPrefMutation.isPending}
@@ -102,7 +102,7 @@ export default function AdminSettings() {
           onRefetchIntervalEndEditing={() => {
             const val = parseInt(state.refetchIntervalInput, 10);
             if (!isNaN(val) && val >= 5) {
-              state.refetchIntervalMutation.mutate(String(val));
+              state.refetchIntervalMutation.mutate(val);
             } else {
               state.setRefetchIntervalInput(String(state.refetchIntervalData?.seconds ?? 30));
             }
@@ -112,7 +112,7 @@ export default function AdminSettings() {
           onCoordMaxAgeEndEditing={() => {
             const val = parseInt(state.coordMaxAgeInput, 10);
             if (!isNaN(val) && val >= 10) {
-              state.coordMaxAgeMutation.mutate(String(val));
+              state.coordMaxAgeMutation.mutate(val);
             } else {
               state.setCoordMaxAgeInput(String(state.coordMaxAgeData?.value ?? 300));
             }
@@ -216,11 +216,11 @@ export default function AdminSettings() {
           otaGatePending={state.otaGateMutation.isPending}
           otaWaitInput={state.otaWaitInput}
           setOtaWaitInput={state.setOtaWaitInput}
-          onOtaWaitSave={() => state.otaWaitMutation.mutate(state.otaWaitInput)}
+          onOtaWaitSave={() => state.otaWaitMutation.mutate(parseInt(state.otaWaitInput, 10))}
           otaWaitPending={state.otaWaitPending}
           otaRetentionInput={state.otaRetentionInput}
           setOtaRetentionInput={state.setOtaRetentionInput}
-          onOtaRetentionSave={() => state.otaRetentionMutation.mutate(state.otaRetentionInput)}
+          onOtaRetentionSave={() => state.otaRetentionMutation.mutate(parseInt(state.otaRetentionInput, 10))}
           otaRetentionPending={state.otaRetentionMutation.isPending}
           otaRetentionSuccess={state.otaRetentionMutation.isSuccess}
         />

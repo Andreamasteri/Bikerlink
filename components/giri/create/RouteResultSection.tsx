@@ -48,7 +48,7 @@ export const RouteResultSection: React.FC<RouteResultSectionProps> = ({
         selectedMotoId={selectedMotoId}
         fuelStopsNeeded={fuelStopsNeeded}
       />
-      <ElevationProfile data={routeResult.elevationProfile || []} color={colors.accent} />
+      <ElevationProfile profile={(routeResult.elevationProfile || []) as any} />
     </View>
   );
 };

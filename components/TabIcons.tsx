@@ -1,12 +1,12 @@
 import React from "react";
-import { View } from "react-native";
+import { View, type ColorValue } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 
 interface TabIconProps {
   name: string;
   focused: boolean;
-  color: string;
+  color: string | ColorValue;
   size: number;
   unreadCount?: number;
   globalTrackingActive?: boolean;

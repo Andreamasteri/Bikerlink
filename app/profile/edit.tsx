@@ -25,7 +25,7 @@ import { findCountryByRegion } from "@/lib/countries-regions";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 import { useUnits } from "@/lib/units-context";
 import { useT } from "@/lib/language-context";
-import { updateUserSchema } from "@shared/schema";
+import { updateUserSchema } from "@shared/validators";
 
 import { EditBasicInfo } from "@/components/profile/edit/EditBasicInfo";
 import { EditMoto } from "@/components/profile/edit/EditMoto";
@@ -286,7 +286,7 @@ export default function EditProfileScreen() {
 
     const parsed = updateUserSchema.safeParse(data);
     if (!parsed.success) {
-      Alert.alert(t("common.error"), parsed.error.errors[0]?.message ?? "Dati non validi");
+      Alert.alert(t("common.error"), parsed.error.issues[0]?.message ?? "Dati non validi");
       return;
     }
     updateProfileMutation.mutate(parsed.data as Record<string, unknown>);

@@ -50,7 +50,7 @@ export function CountdownOverlay({
 
 const styles = StyleSheet.create({
   countdownContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.85)",
     alignItems: "center",
     justifyContent: "center",

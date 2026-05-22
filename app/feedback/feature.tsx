@@ -130,7 +130,7 @@ export default function FeatureRequestScreen() {
             </View>
           </View>
           <View style={styles.plannedCard}>
-            <Ionicons name="logo-spotify" size={20} color="#1DB954" />
+            <Ionicons name={"logo-spotify" as any} size={20} color="#1DB954" />
             <View style={styles.plannedInfo}>
               <Text style={styles.plannedName}>Integrazione playlist Spotify</Text>
               <Text style={styles.plannedDesc}>Condividi e scopri playlist con altri biker</Text>

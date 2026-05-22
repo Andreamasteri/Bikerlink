@@ -5,6 +5,7 @@ import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
 import { showImagePickerMenu, pickMultipleImages, BulkImageAsset } from "@/lib/image-picker-utils";
 import { Campaign } from "./AdCard";
+import { ListItem } from "./AdGroupList";
 
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
 
@@ -105,6 +106,28 @@ export function useAdAdmin() {
     }
     return meta;
   }, [campaigns]);
+
+  const listItems = useMemo((): ListItem[] => {
+    const items: ListItem[] = [];
+    const seenGroups = new Set<string>();
+    for (const campaign of campaigns) {
+      if (campaign.groupId) {
+        if (!seenGroups.has(campaign.groupId)) {
+          seenGroups.add(campaign.groupId);
+          const meta = groupMeta.get(campaign.groupId);
+          if (meta) {
+            items.push({ type: "groupHeader", groupId: campaign.groupId, ...meta });
+          }
+        }
+        if (!collapsedGroups.has(campaign.groupId)) {
+          items.push({ type: "campaign", data: campaign });
+        }
+      } else {
+        items.push({ type: "campaign", data: campaign });
+      }
+    }
+    return items;
+  }, [campaigns, groupMeta, collapsedGroups]);
 
   function toggleGroupCollapse(groupId: string) {
     setCollapsedGroups((prev) => {
@@ -500,7 +523,7 @@ export function useAdAdmin() {
     editGroupName, setEditGroupName,
     editGroupLinkUrl, setEditGroupLinkUrl,
     editGroupIsActive, setEditGroupIsActive,
-    setEditGroupIsActiveDirty,
+    editGroupIsActiveDirty, setEditGroupIsActiveDirty,
     settingsDuration, setSettingsDuration,
     settingsMode, setSettingsMode,
     campaigns,

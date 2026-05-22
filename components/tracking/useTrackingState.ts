@@ -225,7 +225,7 @@ export function useTrackingState() {
     refs.accelSubRef.current = null;
     if (bg.bgTrackingActiveRef.current) {
       bg.bgTrackingActiveRef.current = false;
-      Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).then(h => h && Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK));
+      Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).then((h: boolean) => { if (h) Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK); });
     }
     setTrackingActive(false);
     gps.setGpsLost(false);
@@ -320,7 +320,7 @@ export function useTrackingState() {
         sprint.sprintPhaseRef.current = "measuring"; sprint.sprintStartTimeRef.current = now; sprint.setSprintPhase("measuring"); setSprintMeasuringBroadcast(true);
       } else if (sprint.sprintPhaseRef.current === "measuring" && smoothedSpeed >= 100) {
         const diff = now - (sprint.sprintStartTimeRef.current || now);
-        sprint.sprintPhaseRef.current = "done"; sprint.sprint0to100MsRef.current = diff; sprint.setSprintPhase("done"); sprint.setSprint0to100Ms(diff); setSprintMeasuringBroadcast(false);
+        sprint.sprintPhaseRef.current = "completed"; sprint.sprint0to100MsRef.current = diff; sprint.setSprintPhase("completed"); sprint.setSprint0to100Ms(diff); setSprintMeasuringBroadcast(false);
       }
     }
     if (gps.lastPosRef.current) {

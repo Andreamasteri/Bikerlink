@@ -15,7 +15,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Béni Mellal-Khénifra", latitude: 32.3373, longitude: -6.3498 },
       { name: "Laâyoune-Sakia El Hamra", latitude: 27.1418, longitude: -13.1625 },
     ],
-  },,
+  },
   {
     code: "DZ", name: "Algeria", flag: "🇩🇿",
     regions: [
@@ -30,7 +30,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Ghardaïa", latitude: 32.4847, longitude: 3.6736 },
       { name: "Tamanrasset", latitude: 22.7850, longitude: 5.5228 },
     ],
-  },,
+  },
   {
     code: "TN", name: "Tunisia", flag: "🇹🇳",
     regions: [
@@ -44,7 +44,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Monastir", latitude: 35.7643, longitude: 10.8113 },
       { name: "Djerba (Médenine)", latitude: 33.8076, longitude: 10.8451 },
     ],
-  },,
+  },
   {
     code: "LY", name: "Libya", flag: "🇱🇾",
     regions: [
@@ -56,7 +56,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Zintan", latitude: 31.9341, longitude: 12.2504 },
       { name: "Al-Khums", latitude: 32.6499, longitude: 14.2615 },
     ],
-  },,
+  },
   {
     code: "EG", name: "Egitto", flag: "🇪🇬",
     regions: [
@@ -72,7 +72,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Ismailia", latitude: 30.5965, longitude: 32.2715 },
       { name: "Sinai", latitude: 29.5000, longitude: 34.0000 },
     ],
-  },,
+  },
   {
     code: "AO", name: "Angola", flag: "🇦🇴",
     regions: [
@@ -82,7 +82,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Benguela", latitude: -12.5763, longitude: 13.4055 },
       { name: "Cabinda", latitude: -5.5500, longitude: 12.2000 },
     ],
-  },,
+  },
   {
     code: "BF", name: "Burkina Faso", flag: "🇧🇫",
     regions: [
@@ -92,7 +92,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Banfora", latitude: 10.6333, longitude: -4.7667 },
       { name: "Ouahigouya", latitude: 13.5833, longitude: -2.4333 },
     ],
-  },,
+  },
   {
     code: "BI", name: "Burundi", flag: "🇧🇮",
     regions: [
@@ -102,7 +102,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Ngozi", latitude: -2.9076, longitude: 29.8301 },
       { name: "Rumonge", latitude: -3.9747, longitude: 29.4387 },
     ],
-  },,
+  },
   {
     code: "BJ", name: "Bénin", flag: "🇧🇯",
     regions: [
@@ -112,7 +112,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Abomey", latitude: 7.1836, longitude: 1.9886 },
       { name: "Natitingou", latitude: 10.3167, longitude: 1.3833 },
     ],
-  },,
+  },
   {
     code: "BW", name: "Botswana", flag: "🇧🇼",
     regions: [
@@ -122,7 +122,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Maun", latitude: -19.9833, longitude: 23.4167 },
       { name: "Serowe", latitude: -22.3914, longitude: 26.7119 },
     ],
-  },,
+  },
   {
     code: "CD", name: "DR Congo", flag: "🇨🇩",
     regions: [
@@ -133,7 +133,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Bukavu", latitude: -2.5085, longitude: 28.8612 },
       { name: "Goma", latitude: -1.6777, longitude: 29.2285 },
     ],
-  },,
+  },
   {
     code: "CF", name: "Centrafrique", flag: "🇨🇫",
     regions: [
@@ -143,7 +143,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Bambari", latitude: 5.7656, longitude: 20.6703 },
       { name: "Bouar", latitude: 5.9333, longitude: 15.5667 },
     ],
-  },,
+  },
   {
     code: "CG", name: "Congo", flag: "🇨🇬",
     regions: [
@@ -153,7 +153,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Nkayi", latitude: -4.1667, longitude: 13.2833 },
       { name: "Impfondo", latitude: 1.6167, longitude: 18.0667 },
     ],
-  },,
+  },
   {
     code: "CI", name: "Côte d'Ivoire", flag: "🇨🇮",
     regions: [
@@ -163,7 +163,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Daloa", latitude: 6.8771, longitude: -6.4501 },
       { name: "Korhogo", latitude: 9.4582, longitude: -5.6290 },
     ],
-  },,
+  },
   {
     code: "CM", name: "Cameroun", flag: "🇨🇲",
     regions: [
@@ -173,7 +173,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Bamenda", latitude: 5.9527, longitude: 10.1466 },
       { name: "Bafoussam", latitude: 5.4737, longitude: 10.4179 },
     ],
-  },,
+  },
   {
     code: "CV", name: "Cabo Verde", flag: "🇨🇻",
     regions: [
@@ -183,7 +183,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Assomada", latitude: 15.0956, longitude: -23.6713 },
       { name: "Sal Rei", latitude: 16.1769, longitude: -22.9167 },
     ],
-  },,
+  },
   {
     code: "DJ", name: "Djibouti", flag: "🇩🇯",
     regions: [
@@ -193,7 +193,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Dikhil", latitude: 11.1053, longitude: 42.3697 },
       { name: "Tadjoura", latitude: 11.7840, longitude: 42.8832 },
     ],
-  },,
+  },
   {
     code: "ER", name: "Eritrea", flag: "🇪🇷",
     regions: [
@@ -203,7 +203,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Assab", latitude: 13.0009, longitude: 42.7344 },
       { name: "Mendefera", latitude: 14.8833, longitude: 38.8167 },
     ],
-  },,
+  },
   {
     code: "ET", name: "Ethiopia", flag: "🇪🇹",
     regions: [
@@ -214,7 +214,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Bahir Dar", latitude: 11.5742, longitude: 37.3614 },
       { name: "Hawassa", latitude: 7.0600, longitude: 38.4800 },
     ],
-  },,
+  },
   {
     code: "GA", name: "Gabon", flag: "🇬🇦",
     regions: [
@@ -224,7 +224,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Oyem", latitude: 1.5994, longitude: 11.5786 },
       { name: "Moanda", latitude: -1.5667, longitude: 13.2000 },
     ],
-  },,
+  },
   {
     code: "GH", name: "Ghana", flag: "🇬🇭",
     regions: [
@@ -234,7 +234,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Sekondi-Takoradi", latitude: 4.9016, longitude: -1.7556 },
       { name: "Sunyani", latitude: 7.3349, longitude: -2.3295 },
     ],
-  },,
+  },
   {
     code: "GM", name: "Gambia", flag: "🇬🇲",
     regions: [
@@ -244,7 +244,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Farafenni", latitude: 13.5676, longitude: -15.5985 },
       { name: "Janjanbureh", latitude: 13.5424, longitude: -14.7704 },
     ],
-  },,
+  },
   {
     code: "GN", name: "Guinée", flag: "🇬🇳",
     regions: [
@@ -254,7 +254,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Kindia", latitude: 10.0667, longitude: -12.8667 },
       { name: "Labé", latitude: 11.3167, longitude: -12.2833 },
     ],
-  },,
+  },
   {
     code: "GQ", name: "Guinea Ecuatorial", flag: "🇬🇶",
     regions: [
@@ -264,7 +264,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Aconibe", latitude: 1.3000, longitude: 10.9333 },
       { name: "Mongomo", latitude: 1.6333, longitude: 13.6167 },
     ],
-  },,
+  },
   {
     code: "GW", name: "Guinée-Bissau", flag: "🇬🇼",
     regions: [
@@ -274,7 +274,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Bissorã", latitude: 12.2167, longitude: -15.5000 },
       { name: "Bolama", latitude: 11.5745, longitude: -15.4759 },
     ],
-  },,
+  },
   {
     code: "KE", name: "Kenya", flag: "🇰🇪",
     regions: [
@@ -285,7 +285,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Eldoret", latitude: 0.5143, longitude: 35.2698 },
       { name: "Turkana", latitude: 3.1192, longitude: 35.5956 },
     ],
-  },,
+  },
   {
     code: "KM", name: "Comores", flag: "🇰🇲",
     regions: [
@@ -294,7 +294,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Fomboni", latitude: -12.2941, longitude: 43.7406 },
       { name: "Domoni", latitude: -12.2500, longitude: 44.5333 },
     ],
-  },,
+  },
   {
     code: "LR", name: "Liberia", flag: "🇱🇷",
     regions: [
@@ -304,7 +304,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Bensonville", latitude: 6.4460, longitude: -10.6068 },
       { name: "Harper", latitude: 4.3750, longitude: -7.7167 },
     ],
-  },,
+  },
   {
     code: "LS", name: "Lesotho", flag: "🇱🇸",
     regions: [
@@ -314,7 +314,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Hlotse", latitude: -28.8833, longitude: 28.0500 },
       { name: "Mohale's Hoek", latitude: -30.1500, longitude: 27.4667 },
     ],
-  },,
+  },
   {
     code: "MG", name: "Madagascar", flag: "🇲🇬",
     regions: [
@@ -325,7 +325,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Mahajanga", latitude: -15.7167, longitude: 46.3167 },
       { name: "Toliara", latitude: -23.3568, longitude: 43.6714 },
     ],
-  },,
+  },
   {
     code: "ML", name: "Mali", flag: "🇲🇱",
     regions: [
@@ -335,7 +335,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Ségou", latitude: 13.4500, longitude: -6.2667 },
       { name: "Timbuktu", latitude: 16.7667, longitude: -3.0026 },
     ],
-  },,
+  },
   {
     code: "MR", name: "Mauritanie", flag: "🇲🇷",
     regions: [
@@ -345,7 +345,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Kaédi", latitude: 16.1500, longitude: -13.5000 },
       { name: "Rosso", latitude: 16.5130, longitude: -15.8054 },
     ],
-  },,
+  },
   {
     code: "MU", name: "Maurice", flag: "🇲🇺",
     regions: [
@@ -355,7 +355,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Curepipe", latitude: -20.3163, longitude: 57.5180 },
       { name: "Quatre Bornes", latitude: -20.2667, longitude: 57.4833 },
     ],
-  },,
+  },
   {
     code: "MW", name: "Malawi", flag: "🇲🇼",
     regions: [
@@ -365,7 +365,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Zomba", latitude: -15.3833, longitude: 35.3333 },
       { name: "Kasungu", latitude: -13.0333, longitude: 33.4833 },
     ],
-  },,
+  },
   {
     code: "MZ", name: "Moçambique", flag: "🇲🇿",
     regions: [
@@ -375,7 +375,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Nampula", latitude: -15.1165, longitude: 39.2666 },
       { name: "Quelimane", latitude: -17.8786, longitude: 36.8883 },
     ],
-  },,
+  },
   {
     code: "NA", name: "Namibia", flag: "🇳🇦",
     regions: [
@@ -385,7 +385,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Oshakati", latitude: -17.7833, longitude: 15.6833 },
       { name: "Swakopmund", latitude: -22.6783, longitude: 14.5269 },
     ],
-  },,
+  },
   {
     code: "NE", name: "Niger", flag: "🇳🇪",
     regions: [
@@ -395,7 +395,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Agadez", latitude: 16.9742, longitude: 7.9901 },
       { name: "Tahoua", latitude: 14.8889, longitude: 5.2680 },
     ],
-  },,
+  },
   {
     code: "NG", name: "Nigeria", flag: "🇳🇬",
     regions: [
@@ -406,7 +406,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Port Harcourt", latitude: 4.8156, longitude: 7.0498 },
       { name: "Kaduna", latitude: 10.5264, longitude: 7.4382 },
     ],
-  },,
+  },
   {
     code: "RW", name: "Rwanda", flag: "🇷🇼",
     regions: [
@@ -416,7 +416,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Ruhengeri", latitude: -1.4990, longitude: 29.6330 },
       { name: "Gisenyi", latitude: -1.7028, longitude: 29.2565 },
     ],
-  },,
+  },
   {
     code: "SC", name: "Seychelles", flag: "🇸🇨",
     regions: [
@@ -425,7 +425,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Beau Vallon", latitude: -4.6167, longitude: 55.4333 },
       { name: "Takamaka", latitude: -4.7667, longitude: 55.5167 },
     ],
-  },,
+  },
   {
     code: "SD", name: "Sudan", flag: "🇸🇩",
     regions: [
@@ -435,7 +435,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Kassala", latitude: 15.4500, longitude: 36.4000 },
       { name: "Nyala", latitude: 12.0500, longitude: 24.8833 },
     ],
-  },,
+  },
   {
     code: "SL", name: "Sierra Leone", flag: "🇸🇱",
     regions: [
@@ -445,7 +445,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Makeni", latitude: 8.8833, longitude: -12.0500 },
       { name: "Koidu", latitude: 8.6386, longitude: -10.9797 },
     ],
-  },,
+  },
   {
     code: "SN", name: "Sénégal", flag: "🇸🇳",
     regions: [
@@ -455,7 +455,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Kaolack", latitude: 14.1500, longitude: -16.0833 },
       { name: "Ziguinchor", latitude: 12.5667, longitude: -16.2667 },
     ],
-  },,
+  },
   {
     code: "SO", name: "Somalia", flag: "🇸🇴",
     regions: [
@@ -465,7 +465,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Bosaso", latitude: 11.2753, longitude: 49.1875 },
       { name: "Garowe", latitude: 8.4054, longitude: 48.4845 },
     ],
-  },,
+  },
   {
     code: "SS", name: "Sudan del Sud", flag: "🇸🇸",
     regions: [
@@ -475,7 +475,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Bor", latitude: 6.2100, longitude: 31.5593 },
       { name: "Yambio", latitude: 4.5696, longitude: 28.3962 },
     ],
-  },,
+  },
   {
     code: "ST", name: "São Tomé e Príncipe", flag: "🇸🇹",
     regions: [
@@ -483,7 +483,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Santo António", latitude: 1.6477, longitude: 7.4167 },
       { name: "Neves", latitude: 0.3617, longitude: 6.5533 },
     ],
-  },,
+  },
   {
     code: "SZ", name: "Eswatini", flag: "🇸🇿",
     regions: [
@@ -493,7 +493,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Nhlangano", latitude: -27.1167, longitude: 31.2000 },
       { name: "Siteki", latitude: -26.4500, longitude: 31.9500 },
     ],
-  },,
+  },
   {
     code: "TD", name: "Tchad", flag: "🇹🇩",
     regions: [
@@ -503,7 +503,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Abéché", latitude: 13.8314, longitude: 20.8325 },
       { name: "Kélo", latitude: 9.3000, longitude: 15.8000 },
     ],
-  },,
+  },
   {
     code: "TG", name: "Togo", flag: "🇹🇬",
     regions: [
@@ -513,7 +513,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Atakpamé", latitude: 7.5333, longitude: 1.1333 },
       { name: "Bassar", latitude: 9.2500, longitude: 0.7833 },
     ],
-  },,
+  },
   {
     code: "TZ", name: "Tanzania", flag: "🇹🇿",
     regions: [
@@ -524,7 +524,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Zanzibar", latitude: -6.1659, longitude: 39.2026 },
       { name: "Kilimanjaro", latitude: -3.2167, longitude: 37.0333 },
     ],
-  },,
+  },
   {
     code: "UG", name: "Uganda", flag: "🇺🇬",
     regions: [
@@ -534,7 +534,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Mbarara", latitude: -0.6075, longitude: 30.6568 },
       { name: "Jinja", latitude: 0.4478, longitude: 33.2026 },
     ],
-  },,
+  },
   {
     code: "ZA", name: "South Africa", flag: "🇿🇦",
     regions: [
@@ -548,7 +548,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "North West", latitude: -26.6638, longitude: 25.2838 },
       { name: "Northern Cape", latitude: -29.0467, longitude: 21.8569 },
     ],
-  },,
+  },
   {
     code: "ZM", name: "Zambia", flag: "🇿🇲",
     regions: [
@@ -558,7 +558,7 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Livingstone", latitude: -17.8500, longitude: 25.8500 },
       { name: "Chipata", latitude: -13.6333, longitude: 32.6500 },
     ],
-  },,
+  },
   {
     code: "ZW", name: "Zimbabwe", flag: "🇿🇼",
     regions: [
@@ -568,5 +568,5 @@ export const AFRICA_COUNTRIES: CountryData[] = [
       { name: "Mutare", latitude: -18.9667, longitude: 32.6667 },
       { name: "Gweru", latitude: -19.4500, longitude: 29.8167 },
     ],
-  },,
+  },
 ];

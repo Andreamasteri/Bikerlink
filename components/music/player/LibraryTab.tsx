@@ -38,12 +38,12 @@ export function LibraryTab({ onPlayTrack }: LibraryTabProps) {
       setLoading(true);
       try {
         const result = await MediaLibrary.getAssetsAsync({
-          mediaType: MediaLibrary.MediaType.audio,
+          mediaType: "audio" as any,
           first: 30,
           after: cursor,
-          sortBy: MediaLibrary.SortBy.default,
+          sortBy: ((MediaLibrary as any).SortBy?.default),
         });
-        setAssets((prev) => (cursor ? [...prev, ...result.assets] : result.assets));
+        setAssets((prev: any[]) => (cursor ? [...prev, ...result.assets] : result.assets));
         setHasMore(result.hasNextPage);
         setEndCursor(result.endCursor);
       } catch (err) {
@@ -152,15 +152,16 @@ export function LibraryTab({ onPlayTrack }: LibraryTabProps) {
         onEndReachedThreshold={0.5}
         ListFooterComponent={loading ? <ActivityIndicator color={Colors.accent} style={{ padding: 12 }} /> : null}
         renderItem={({ item }) => {
-          const title = (item.filename ?? "").replace(/\.[^.]+$/, "") || "Brano";
-          const durationSec = item.duration ?? 0;
+          const itemAny = item as any;
+          const title = (itemAny.filename ?? "").replace(/\.[^.]+$/, "") || "Brano";
+          const durationSec = itemAny.duration ?? 0;
           return (
             <TouchableOpacity
               style={styles.trackRow}
               onPress={() =>
                 onPlayTrack({
-                  id: item.id,
-                  url: item.uri,
+                  id: itemAny.id,
+                  url: itemAny.uri,
                   title,
                   artist: "Libreria locale",
                   duration: durationSec,

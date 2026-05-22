@@ -10,7 +10,7 @@ interface SensorOverlayPanelProps {
   maxAccelG: number;
   mountAxisCalib: MountAxisCalibration | null;
   sensorsEnabled: boolean;
-  colors: ReturnType<typeof useColors>["Colors"];
+  colors: any;
   styles: {
     sensorOverlayPanel: object;
     sensorOverlayItem: object;

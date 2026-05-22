@@ -34,6 +34,7 @@ function TrackingScreenInner() {
   const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
 
   const { state, handlers } = useTrackingState();
+  const handsOffAnim = React.useRef(new Animated.Value(1)).current;
 
   const isFermo = state.currentSpeed <= 2; // IDLE_THRESHOLD_KMH
   const netMs = Math.max(state.totalMs - state.displayIdleMs, 0);
@@ -115,7 +116,7 @@ function TrackingScreenInner() {
       {/* ── HANDS OFF OVERLAY ────────────────────────────────────────────── */}
       <HandsOffModal
         handsOffActive={state.handsOffActive}
-        handsOffAnim={state.handsOffAnim}
+        handsOffAnim={handsOffAnim}
         currentSpeed={state.currentSpeed}
         speedUnit={speedUnit}
         handsOffSpeedStr={state.handsOffSpeedStr}

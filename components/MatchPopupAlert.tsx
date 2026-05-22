@@ -112,12 +112,12 @@ export default function MatchPopupAlert() {
 
   return (
     <View
-      style={StyleSheet.absoluteFillObject}
+      style={StyleSheet.absoluteFill}
       pointerEvents={visible ? "box-none" : "none"}
     >
       {visible && (
         <TouchableWithoutFeedback onPress={dismiss}>
-          <View style={StyleSheet.absoluteFillObject} />
+          <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
       )}
 

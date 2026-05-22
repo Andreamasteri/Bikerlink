@@ -25,7 +25,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Valle d'Aosta", latitude: 45.7375, longitude: 7.3154 },
       { name: "Veneto", latitude: 45.4398, longitude: 12.3319 },
     ],
-  },,
+  },
   {
     code: "DE", name: "Deutschland", flag: "🇩🇪",
     regions: [
@@ -46,7 +46,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Schleswig-Holstein", latitude: 54.2194, longitude: 9.6961 },
       { name: "Thüringen", latitude: 50.861, longitude: 11.0514 },
     ],
-  },,
+  },
   {
     code: "AT", name: "Österreich", flag: "🇦🇹",
     regions: [
@@ -60,7 +60,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Vorarlberg", latitude: 47.2499, longitude: 9.9798 },
       { name: "Wien", latitude: 48.2082, longitude: 16.3738 },
     ],
-  },,
+  },
   {
     code: "CH", name: "Schweiz", flag: "🇨🇭",
     regions: [
@@ -77,7 +77,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Valais", latitude: 46.2335, longitude: 7.3596 },
       { name: "Fribourg", latitude: 46.8065, longitude: 7.1621 },
     ],
-  },,
+  },
   {
     code: "FR", name: "France", flag: "🇫🇷",
     regions: [
@@ -95,7 +95,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Pays de la Loire", latitude: 47.7633, longitude: -0.3296 },
       { name: "Provence-Alpes-Côte d'Azur", latitude: 43.9352, longitude: 6.0679 },
     ],
-  },,
+  },
   {
     code: "ES", name: "España", flag: "🇪🇸",
     regions: [
@@ -117,7 +117,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Navarra", latitude: 42.6954, longitude: -1.6761 },
       { name: "País Vasco", latitude: 42.9896, longitude: -2.6189 },
     ],
-  },,
+  },
   {
     code: "PT", name: "Portugal", flag: "🇵🇹",
     regions: [
@@ -129,7 +129,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Açores", latitude: 37.7412, longitude: -25.6756 },
       { name: "Madeira", latitude: 32.6669, longitude: -16.9241 },
     ],
-  },,
+  },
   {
     code: "GB", name: "United Kingdom", flag: "🇬🇧",
     regions: [
@@ -146,7 +146,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Wales", latitude: 52.1307, longitude: -3.7837 },
       { name: "Northern Ireland", latitude: 54.7877, longitude: -6.4923 },
     ],
-  },,
+  },
   {
     code: "IE", name: "Ireland", flag: "🇮🇪",
     regions: [
@@ -155,7 +155,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Munster", latitude: 52.2394, longitude: -8.8574 },
       { name: "Ulster", latitude: 54.5973, longitude: -7.3092 },
     ],
-  },,
+  },
   {
     code: "NL", name: "Nederland", flag: "🇳🇱",
     regions: [
@@ -172,7 +172,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Zeeland", latitude: 51.4941, longitude: 3.8497 },
       { name: "Zuid-Holland", latitude: 51.9851, longitude: 4.4928 },
     ],
-  },,
+  },
   {
     code: "BE", name: "Belgique", flag: "🇧🇪",
     regions: [
@@ -180,7 +180,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Wallonie", latitude: 50.4541, longitude: 4.4525 },
       { name: "Vlaanderen", latitude: 51.0501, longitude: 3.7303 },
     ],
-  },,
+  },
   {
     code: "LU", name: "Luxembourg", flag: "🇱🇺",
     regions: [
@@ -188,7 +188,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Diekirch", latitude: 49.8683, longitude: 6.1597 },
       { name: "Grevenmacher", latitude: 49.6806, longitude: 6.4407 },
     ],
-  },,
+  },
   {
     code: "DK", name: "Danmark", flag: "🇩🇰",
     regions: [
@@ -198,7 +198,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Sjælland", latitude: 55.4038, longitude: 11.3529 },
       { name: "Syddanmark", latitude: 55.3308, longitude: 9.1292 },
     ],
-  },,
+  },
   {
     code: "SE", name: "Sverige", flag: "🇸🇪",
     regions: [
@@ -206,7 +206,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Svealand", latitude: 59.3293, longitude: 18.0686 },
       { name: "Norrland", latitude: 63.8258, longitude: 20.2631 },
     ],
-  },,
+  },
   {
     code: "NO", name: "Norge", flag: "🇳🇴",
     regions: [
@@ -216,7 +216,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Trøndelag", latitude: 63.4305, longitude: 10.3951 },
       { name: "Nord-Norge", latitude: 69.6496, longitude: 18.9554 },
     ],
-  },,
+  },
   {
     code: "FI", name: "Suomi", flag: "🇫🇮",
     regions: [
@@ -226,7 +226,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Pohjois-Suomi", latitude: 65.0121, longitude: 25.4651 },
       { name: "Lappi", latitude: 68.0588, longitude: 24.0581 },
     ],
-  },,
+  },
   {
     code: "PL", name: "Polska", flag: "🇵🇱",
     regions: [
@@ -247,7 +247,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Wielkopolskie", latitude: 52.4064, longitude: 16.9252 },
       { name: "Zachodniopomorskie", latitude: 53.4285, longitude: 14.553 },
     ],
-  },,
+  },
   {
     code: "CZ", name: "Česko", flag: "🇨🇿",
     regions: [
@@ -266,7 +266,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Zlínský", latitude: 49.2249, longitude: 17.6628 },
       { name: "Moravskoslezský", latitude: 49.8209, longitude: 18.2625 },
     ],
-  },,
+  },
   {
     code: "SK", name: "Slovensko", flag: "🇸🇰",
     regions: [
@@ -279,7 +279,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Prešovský", latitude: 49.0, longitude: 21.2393 },
       { name: "Košický", latitude: 48.7164, longitude: 21.2611 },
     ],
-  },,
+  },
   {
     code: "HU", name: "Magyarország", flag: "🇭🇺",
     regions: [
@@ -291,7 +291,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Észak-Alföld", latitude: 47.5316, longitude: 21.6273 },
       { name: "Dél-Alföld", latitude: 46.253, longitude: 20.1414 },
     ],
-  },,
+  },
   {
     code: "RO", name: "România", flag: "🇷🇴",
     regions: [
@@ -303,7 +303,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Banat", latitude: 45.7489, longitude: 21.2087 },
       { name: "Dobrogea", latitude: 44.1598, longitude: 28.6348 },
     ],
-  },,
+  },
   {
     code: "BG", name: "България", flag: "🇧🇬",
     regions: [
@@ -313,7 +313,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Burgas", latitude: 42.5048, longitude: 27.4626 },
       { name: "Veliko Tarnovo", latitude: 43.0757, longitude: 25.6172 },
     ],
-  },,
+  },
   {
     code: "HR", name: "Hrvatska", flag: "🇭🇷",
     regions: [
@@ -323,7 +323,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Istra", latitude: 45.2128, longitude: 13.8038 },
       { name: "Kvarner", latitude: 45.3271, longitude: 14.4422 },
     ],
-  },,
+  },
   {
     code: "SI", name: "Slovenija", flag: "🇸🇮",
     regions: [
@@ -332,7 +332,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Primorska", latitude: 45.7275, longitude: 13.8507 },
       { name: "Gorenjska", latitude: 46.3539, longitude: 14.0854 },
     ],
-  },,
+  },
   {
     code: "RS", name: "Srbija", flag: "🇷🇸",
     regions: [
@@ -341,28 +341,28 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Šumadija", latitude: 44.0165, longitude: 20.9079 },
       { name: "Južna Srbija", latitude: 43.3209, longitude: 21.8954 },
     ],
-  },,
+  },
   {
     code: "BA", name: "Bosna i Hercegovina", flag: "🇧🇦",
     regions: [
       { name: "Federacija BiH", latitude: 43.8563, longitude: 18.4131 },
       { name: "Republika Srpska", latitude: 44.7758, longitude: 17.1858 },
     ],
-  },,
+  },
   {
     code: "ME", name: "Crna Gora", flag: "🇲🇪",
     regions: [
       { name: "Podgorica", latitude: 42.4304, longitude: 19.2594 },
       { name: "Primorje", latitude: 42.294, longitude: 18.8395 },
     ],
-  },,
+  },
   {
     code: "MK", name: "Северна Македонија", flag: "🇲🇰",
     regions: [
       { name: "Skopje", latitude: 41.9981, longitude: 21.4254 },
       { name: "Ohrid", latitude: 41.1171, longitude: 20.802 },
     ],
-  },,
+  },
   {
     code: "AL", name: "Shqipëria", flag: "🇦🇱",
     regions: [
@@ -371,7 +371,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Vlorë", latitude: 40.4607, longitude: 19.4911 },
       { name: "Shkodër", latitude: 42.0693, longitude: 19.5126 },
     ],
-  },,
+  },
   {
     code: "GR", name: "Ελλάδα", flag: "🇬🇷",
     regions: [
@@ -383,7 +383,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Pelopónnisos", latitude: 37.508, longitude: 22.375 },
       { name: "Nótio Aigaío", latitude: 37.4415, longitude: 25.3489 },
     ],
-  },,
+  },
   {
     code: "CY", name: "Κύπρος", flag: "🇨🇾",
     regions: [
@@ -391,21 +391,21 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Lemesós", latitude: 34.6823, longitude: 33.0464 },
       { name: "Páfos", latitude: 34.7595, longitude: 32.4217 },
     ],
-  },,
+  },
   {
     code: "MT", name: "Malta", flag: "🇲🇹",
     regions: [
       { name: "Malta", latitude: 35.8989, longitude: 14.5146 },
       { name: "Gozo", latitude: 36.0444, longitude: 14.2518 },
     ],
-  },,
+  },
   {
     code: "EE", name: "Eesti", flag: "🇪🇪",
     regions: [
       { name: "Tallinn", latitude: 59.437, longitude: 24.7536 },
       { name: "Tartu", latitude: 58.378, longitude: 26.7291 },
     ],
-  },,
+  },
   {
     code: "LV", name: "Latvija", flag: "🇱🇻",
     regions: [
@@ -414,7 +414,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Kurzeme", latitude: 56.9523, longitude: 21.5601 },
       { name: "Latgale", latitude: 56.6523, longitude: 27.2445 },
     ],
-  },,
+  },
   {
     code: "LT", name: "Lietuva", flag: "🇱🇹",
     regions: [
@@ -422,7 +422,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Kaunas", latitude: 54.8985, longitude: 23.9036 },
       { name: "Klaipėda", latitude: 55.7033, longitude: 21.1443 },
     ],
-  },,
+  },
   {
     code: "IS", name: "Ísland", flag: "🇮🇸",
     regions: [
@@ -430,7 +430,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Suðurland", latitude: 63.9453, longitude: -20.6671 },
       { name: "Norðurland", latitude: 65.6835, longitude: -18.0878 },
     ],
-  },,
+  },
   {
     code: "TR", name: "Türkiye", flag: "🇹🇷",
     regions: [
@@ -443,7 +443,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Güneydoğu Anadolu", latitude: 37.0662, longitude: 37.3833 },
       { name: "İç Anadolu", latitude: 38.7312, longitude: 35.4787 },
     ],
-  },,
+  },
   {
     code: "AD", name: "Andorra", flag: "🇦🇩",
     regions: [
@@ -455,7 +455,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Sant Julià de Lòria", latitude: 42.4637, longitude: 1.4913 },
       { name: "Canillo", latitude: 42.5672, longitude: 1.5977 },
     ],
-  },,
+  },
   {
     code: "BY", name: "Belarus", flag: "🇧🇾",
     regions: [
@@ -466,7 +466,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Mogilev", latitude: 53.8998, longitude: 30.3449 },
       { name: "Vitebsk", latitude: 55.1846, longitude: 30.2058 },
     ],
-  },,
+  },
   {
     code: "LI", name: "Liechtenstein", flag: "🇱🇮",
     regions: [
@@ -476,7 +476,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Triesen", latitude: 47.1073, longitude: 9.5272 },
       { name: "Eschen", latitude: 47.2107, longitude: 9.5222 },
     ],
-  },,
+  },
   {
     code: "MC", name: "Monaco", flag: "🇲🇨",
     regions: [
@@ -485,7 +485,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "La Condamine", latitude: 43.7350, longitude: 7.4200 },
       { name: "Fontvieille", latitude: 43.7271, longitude: 7.4137 },
     ],
-  },,
+  },
   {
     code: "MD", name: "Moldova", flag: "🇲🇩",
     regions: [
@@ -497,7 +497,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Soroca", latitude: 48.1665, longitude: 28.2982 },
       { name: "Gagauzia", latitude: 46.3000, longitude: 28.6500 },
     ],
-  },,
+  },
   {
     code: "SM", name: "San Marino", flag: "🇸🇲",
     regions: [
@@ -508,7 +508,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Faetano", latitude: 43.9264, longitude: 12.4953 },
       { name: "Fiorentino", latitude: 43.9097, longitude: 12.4581 },
     ],
-  },,
+  },
   {
     code: "UA", name: "Ucraina", flag: "🇺🇦",
     regions: [
@@ -525,13 +525,13 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Ternopil", latitude: 49.5535, longitude: 25.5948 },
       { name: "Zakarpattia", latitude: 48.6208, longitude: 22.2879 },
     ],
-  },,
+  },
   {
     code: "VA", name: "Città del Vaticano", flag: "🇻🇦",
     regions: [
       { name: "Città del Vaticano", latitude: 41.9029, longitude: 12.4534 },
     ],
-  },,
+  },
   {
     code: "XK", name: "Kosovo", flag: "🇽🇰",
     regions: [
@@ -542,7 +542,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Mitrovica", latitude: 42.8833, longitude: 20.8667 },
       { name: "Ferizaj", latitude: 42.3703, longitude: 21.1553 },
     ],
-  },,
+  },
   {
     code: "GE", name: "Georgia", flag: "🇬🇪",
     regions: [
@@ -552,7 +552,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Kakheti", latitude: 41.6483, longitude: 45.6906 },
       { name: "Imereti", latitude: 42.2300, longitude: 42.7000 },
     ],
-  },,
+  },
   {
     code: "AM", name: "Armenia", flag: "🇦🇲",
     regions: [
@@ -561,7 +561,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Vanadzor", latitude: 40.8128, longitude: 44.4883 },
       { name: "Ararat", latitude: 39.8303, longitude: 44.7000 },
     ],
-  },,
+  },
   {
     code: "AZ", name: "Azerbaijan", flag: "🇦🇿",
     regions: [
@@ -570,7 +570,7 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Sumgait", latitude: 40.5897, longitude: 49.6318 },
       { name: "Lankaran", latitude: 38.7539, longitude: 48.8511 },
     ],
-  },,
+  },
   {
     code: "RU", name: "Russia", flag: "🇷🇺",
     regions: [
@@ -587,5 +587,5 @@ export const EUROPE_COUNTRIES: CountryData[] = [
       { name: "Samara", latitude: 53.1959, longitude: 50.1002 },
       { name: "Volgograd", latitude: 48.7080, longitude: 44.5133 },
     ],
-  },,
+  },
 ];

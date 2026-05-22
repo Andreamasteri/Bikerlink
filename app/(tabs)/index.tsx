@@ -181,7 +181,7 @@ export default function MapScreen() {
           if (data?.enabled) setShowHomeMessage(true);
         }}
         onChatPress={() => router.push("/chat" as any)}
-        homeMessageEnabled={mapData.homeMessageQuery.data?.enabled}
+        homeMessageEnabled={mapData.homeMessageQuery.data?.enabled ?? false}
       />
 
       {/* Search Bar */}
@@ -199,7 +199,7 @@ export default function MapScreen() {
       {/* Small Map */}
       <HomeMapSection
         mapFullscreen={mapFullscreen}
-        mapRef={mapRef}
+        mapRef={mapRef as any}
         usersWithSelf={usersWithSelf}
         workshops={mapData.workshopsQuery.data ?? []}
         activeSosRequests={mapData.activeSosQuery.data ?? []}
@@ -214,7 +214,7 @@ export default function MapScreen() {
         handleEasterEggPress={handleEasterEggPress}
         onEventPress={(id) => router.push({ pathname: "/evento/[id]" as const, params: { id } })}
         setMapReady={setMapReady}
-        userId={user?.id}
+        userId={user?.id as any}
         realMeMarker={realMeMarker}
         fakeMeMarker={fakeMeMarker}
         setLastSmallMapCenter={setLastSmallMapCenter}
@@ -309,7 +309,7 @@ export default function MapScreen() {
       <HomeFullscreenMap
         mapFullscreen={mapFullscreen}
         setMapFullscreen={setMapFullscreen}
-        fullscreenMapRef={fullscreenMapRef}
+        fullscreenMapRef={fullscreenMapRef as any}
         usersWithSelf={usersWithSelf}
         workshopsQuery={mapData.workshopsQuery}
         easterEggsQuery={mapData.easterEggsQuery}
@@ -334,7 +334,6 @@ export default function MapScreen() {
         insets={insets}
         setShowAreaModal={setShowAreaModal}
         areaLabel={areaLabel}
-        onRegionChangeComplete={undefined}
         onMapReady={handleFullscreenMapReady}
         searchText={searchText}
         handleSearch={handleSearch}

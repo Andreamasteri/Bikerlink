@@ -12,7 +12,7 @@ import { CONTINENT_MAP, getCountryByCode } from "@/lib/countries-regions";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { InteractiveMapHandle } from "@/components/InteractiveMap";
-import { User } from "@shared/schema";
+import type { User } from "@shared/schema";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 type UserWithProfileCoords = Omit<User, "password"> & {

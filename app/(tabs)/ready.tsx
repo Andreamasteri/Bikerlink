@@ -185,7 +185,7 @@ export default function ReadyToRideScreen() {
             ghostMutation={ghostMutation}
             hideFromMap={hideFromMap}
             offlineRandomize={offlineRandomize}
-            privacyMutation={privacyMutation}
+            privacyMutation={privacyMutation as any}
           />
 
           <PrivacyPositionSettings

@@ -141,7 +141,7 @@ function statusLabel(status?: string): string {
 export default function OtaHistoryScreen() {
   const t = useT();
   const insets = useSafeAreaInsets();
-  const updates = (otaUpdates as OtaUpdate[]).slice().reverse();
+  const updates = (otaUpdates as unknown as OtaUpdate[]).slice().reverse();
 
   const { data: adoptionData } = useQuery<AdoptionData>({
     queryKey: ["/api/admin/ota-adoption"],

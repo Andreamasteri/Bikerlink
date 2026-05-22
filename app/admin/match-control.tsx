@@ -268,7 +268,7 @@ export default function MatchControlScreen() {
                 >
                   {stat.totalMatches}
                 </Text>
-                <View style={[styles.tableCell, styles.tableCellCenter, { flex: 0.8 }]}>
+                <View style={[styles.tableCell, styles.tableCellCenter as any, { flex: 0.8 }]}>
                   {stat.isAnomaly ? (
                     <Ionicons name="warning" size={14} color={Colors.warning} />
                   ) : (

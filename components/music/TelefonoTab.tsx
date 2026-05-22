@@ -29,14 +29,14 @@ export function TelefonoTab() {
     setLoading(true);
     try {
       const result = await MediaLibrary.getAssetsAsync({
-        mediaType: MediaLibrary.MediaType.audio,
+        mediaType: "audio" as any,
         first: 50,
         after: cursor,
-        sortBy: MediaLibrary.SortBy.creationTime,
+        sortBy: ((MediaLibrary as any).SortBy?.creationTime ?? (MediaLibrary as any).SortBy?.default),
       });
-      setAssets((prev) => {
+      setAssets((prev: any[]) => {
         const combined = cursor ? [...prev, ...result.assets] : result.assets;
-        return combined.slice().sort((a, b) => {
+        return combined.slice().sort((a: any, b: any) => {
           const ta = parseAudioFilename(a.filename ?? "").title.toLowerCase();
           const tb = parseAudioFilename(b.filename ?? "").title.toLowerCase();
           return ta.localeCompare(tb);
@@ -61,7 +61,7 @@ export function TelefonoTab() {
     if (permission?.granted) loadAssets();
   }, [permission?.granted]);
 
-  const handlePlayTrack = useCallback((asset: MediaLibrary.Asset) => {
+  const handlePlayTrack = useCallback((asset: any) => {
     if (!playerAvailable) return;
     const { title, artist } = parseAudioFilename(asset.filename ?? "");
     playTrack({
@@ -76,7 +76,7 @@ export function TelefonoTab() {
 
   const handlePlayAll = useCallback(async () => {
     if (!playerAvailable || assets.length === 0) return;
-    const tracks: PlayerTrack[] = assets.map((a) => {
+    const tracks: PlayerTrack[] = (assets as any[]).map((a: any) => {
       const { title, artist } = parseAudioFilename(a.filename ?? "");
       return { id: a.id, url: a.uri, title, artist, duration: a.duration, source: "file" as const };
     });

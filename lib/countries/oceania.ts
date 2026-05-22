@@ -13,7 +13,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Northern Territory", latitude: -12.4634, longitude: 130.8456 },
       { name: "Australian Capital Territory", latitude: -35.2809, longitude: 149.1300 },
     ],
-  },,
+  },
   {
     code: "NZ", name: "New Zealand", flag: "🇳🇿",
     regions: [
@@ -25,7 +25,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Otago", latitude: -45.8788, longitude: 170.5028 },
       { name: "Northland", latitude: -35.7275, longitude: 174.3238 },
     ],
-  },,
+  },
   {
     code: "PG", name: "Papua Nuova Guinea", flag: "🇵🇬",
     regions: [
@@ -35,7 +35,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Madang", latitude: -5.2189, longitude: 145.7939 },
       { name: "Wewak", latitude: -3.5535, longitude: 143.6335 },
     ],
-  },,
+  },
   {
     code: "FJ", name: "Figi", flag: "🇫🇯",
     regions: [
@@ -45,7 +45,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Labasa", latitude: -16.4333, longitude: 179.3667 },
       { name: "Ba", latitude: -17.5333, longitude: 177.6833 },
     ],
-  },,
+  },
   {
     code: "SB", name: "Isole Salomone", flag: "🇸🇧",
     regions: [
@@ -54,7 +54,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Auki", latitude: -8.7667, longitude: 160.7000 },
       { name: "Kirakira", latitude: -10.4540, longitude: 161.9205 },
     ],
-  },,
+  },
   {
     code: "VU", name: "Vanuatu", flag: "🇻🇺",
     regions: [
@@ -63,7 +63,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Lakatoro", latitude: -16.1000, longitude: 167.4167 },
       { name: "Isangel", latitude: -19.5500, longitude: 169.2667 },
     ],
-  },,
+  },
   {
     code: "WS", name: "Samoa", flag: "🇼🇸",
     regions: [
@@ -72,7 +72,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Salelologa", latitude: -13.7333, longitude: -172.3500 },
       { name: "Falealupo", latitude: -13.4833, longitude: -172.7833 },
     ],
-  },,
+  },
   {
     code: "TO", name: "Tonga", flag: "🇹🇴",
     regions: [
@@ -81,7 +81,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Haveluloto", latitude: -21.1667, longitude: -175.1667 },
       { name: "Pangai", latitude: -19.8000, longitude: -174.3500 },
     ],
-  },,
+  },
   {
     code: "FM", name: "Micronesia", flag: "🇫🇲",
     regions: [
@@ -90,7 +90,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Tofol", latitude: 5.3231, longitude: 163.0148 },
       { name: "Kolonia", latitude: 6.9600, longitude: 158.2100 },
     ],
-  },,
+  },
   {
     code: "PW", name: "Palau", flag: "🇵🇼",
     regions: [
@@ -98,7 +98,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Koror", latitude: 7.3419, longitude: 134.4790 },
       { name: "Airai", latitude: 7.3667, longitude: 134.5667 },
     ],
-  },,
+  },
   {
     code: "MH", name: "Isole Marshall", flag: "🇲🇭",
     regions: [
@@ -106,7 +106,7 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Ebeye", latitude: 8.7833, longitude: 167.7333 },
       { name: "Jabor", latitude: 5.9167, longitude: 169.6667 },
     ],
-  },,
+  },
   {
     code: "NR", name: "Nauru", flag: "🇳🇷",
     regions: [
@@ -114,14 +114,14 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Aiwo", latitude: -0.5333, longitude: 166.9167 },
       { name: "Boe", latitude: -0.5333, longitude: 166.9333 },
     ],
-  },,
+  },
   {
     code: "TV", name: "Tuvalu", flag: "🇹🇻",
     regions: [
       { name: "Funafuti", latitude: -8.5211, longitude: 179.1983 },
       { name: "Vaiaku", latitude: -8.5167, longitude: 179.2167 },
     ],
-  },,
+  },
   {
     code: "KI", name: "Kiribati", flag: "🇰🇮",
     regions: [
@@ -129,5 +129,5 @@ export const OCEANIA_COUNTRIES: CountryData[] = [
       { name: "Betio", latitude: 1.3517, longitude: 172.9327 },
       { name: "London", latitude: 1.9828, longitude: -157.4729 },
     ],
-  },,
+  },
 ];

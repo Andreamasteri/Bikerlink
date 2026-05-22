@@ -89,7 +89,7 @@ interface InteractiveMapProps {
   activeSosRequests?: MapSosRequest[];
   isAvailable: boolean;
   ghostMode?: boolean;
-  searchRadiusKm?: number;
+  searchRadiusKm?: number | null;
   filterBiker: boolean;
   filterZavorrina: boolean;
   filterBarTopOffset?: number;
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "#1a1a1a",
   },
   loadingOverlay: {

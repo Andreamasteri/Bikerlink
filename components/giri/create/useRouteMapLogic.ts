@@ -36,7 +36,7 @@ export const useRouteMapLogic = ({
     if (routeResult.encoded) {
       pts = decodePolyline(routeResult.encoded);
     } else if (routeResult.rawPoints) {
-      pts = routeResult.rawPoints.map(({ lat, lng }) => ({ lat, lng }));
+      pts = routeResult.rawPoints.map(({ lat, lng }: { lat: number; lng: number }) => ({ lat, lng }));
     }
     if (pts.length < 2) return;
 

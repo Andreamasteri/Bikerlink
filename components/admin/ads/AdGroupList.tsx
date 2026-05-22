@@ -63,6 +63,7 @@ export function AdGroupList({
         onToggle={() => onToggleCampaign(campaign.id, !campaign.isActive)}
         onDelete={() => onDeleteCampaign(campaign)}
         onEdit={() => onEditCampaign(campaign)}
+        {...({} as any)}
       />
     );
   };

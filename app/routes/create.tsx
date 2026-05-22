@@ -291,7 +291,7 @@ export default function CreateRouteScreen() {
   const canSave = title.trim().length > 0 && waypoints.length >= 2;
 
   // Curvature map
-  const tileConfig = useMemo(() => getTileConfig(), []);
+  const tileConfig = useMemo(() => getTileConfig("carto_dark"), []);
   const [curvatureMapHtml, setCurvatureMapHtml] = useState<string>("");
   const curvatureMapMountedRef = useRef(false);
 
@@ -376,8 +376,8 @@ export default function CreateRouteScreen() {
     if (!curvatureMapMountedRef.current) {
       curvatureMapMountedRef.current = true;
       setCurvatureMapHtml(buildPlannerMapHtml(
-        tileConfig.url,
-        tileConfig.maxZoom,
+        tileConfig.urlTemplate,
+        19,
         Colors.accent,
         waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })),
         waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })),

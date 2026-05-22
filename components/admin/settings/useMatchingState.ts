@@ -37,13 +37,33 @@ export function useMatchingState(t: (k: string) => string) {
     onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
+  const autoMatchMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const baseUrl = getApiUrl();
+      const url = new URL("/api/admin/settings/auto_matching", baseUrl);
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ value: enabled ? "true" : "false" }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
+
   const triggerMatchingMutation = useMutation({
     mutationFn: async (data: { force?: boolean; country?: string }) => {
       const res = await apiRequest("POST", "/api/admin/matching/trigger", data);
       return res;
     },
     onSuccess: (data) => {
-      setMatchingTriggerFeedback(`${t("admin.matchingTriggered")}: ${data.count} ${t("admin.matchesCreated")}`);
+      setMatchingTriggerFeedback(`${t("admin.matchingTriggered")}: ${(data as any).count} ${t("admin.matchesCreated")}`);
       setTimeout(() => setMatchingTriggerFeedback(null), 5000);
     },
     onError: (e: Error) => Alert.alert("Errore", e.message),
@@ -55,6 +75,7 @@ export function useMatchingState(t: (k: string) => string) {
     matchingTriggerFeedback,
     setMatchingTriggerFeedback,
     autoMatchEnabled,
+    autoMatchMutation,
     matchPrefVisibleEnabled,
     matchPrefVisibleMutation,
     triggerMatchingMutation,

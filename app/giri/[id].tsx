@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Linking,
   Share,
+  Pressable,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -473,11 +474,11 @@ export default function GiriDetailScreen() {
         />
 
         <GiriOfflineCard
-          status={offline.status}
+          status={offline.status as "none" | "downloading" | "available"}
           progress={offline.progress}
-          onDownload={offline.downloadTiles}
+          onDownload={offline.startDownload}
           onCancel={offline.cancelDownload}
-          onDelete={offline.deleteTiles}
+          onDelete={offline.deleteOffline}
         />
 
         <GiriElevation

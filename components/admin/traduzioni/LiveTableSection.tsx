@@ -26,7 +26,7 @@ interface LiveTableSectionProps {
   activeCategory: string | null;
   setActiveCategory: (cat: string | null) => void;
   showMissingOnly: boolean;
-  setShowMissingOnly: (show: boolean) => void;
+  setShowMissingOnly: (show: boolean | ((prev: boolean) => boolean)) => void;
   missingCount: number;
   filteredData: TableRow[];
   tableData: TableRow[];
@@ -37,7 +37,7 @@ interface LiveTableSectionProps {
   editDraft: string;
   cellStates: Record<string, CellState>;
   rowHasMissing: (row: TableRow) => boolean;
-  handleSave: (key: string, lang: string, value: string) => void;
+  handleSave: (key: string, lang: string, value: string) => Promise<void>;
   handleStartEdit: (key: string, lang: string, currentValue: string) => void;
   setEditDraft: (text: string) => void;
   activeLangList: { code: string; label: string }[];

@@ -14,6 +14,9 @@ interface ExistingWaypoint {
 }
 
 interface Props {
+  visible?: boolean;
+  onSelect?: (coord: { latitude: number; longitude: number }) => void;
+  initialCoord?: { latitude: number; longitude: number };
   coord: { latitude: number; longitude: number } | null;
   onCoordChange: (coord: { latitude: number; longitude: number }) => void;
   onConfirm: () => void;

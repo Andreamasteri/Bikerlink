@@ -389,7 +389,7 @@ export default function PublicProfileScreen() {
                 })
               );
             } catch {}
-            router.navigate({ pathname: "/(tabs)/index" });
+            router.navigate({ pathname: "/(tabs)/index" } as any);
           }}
           onStartChat={handleStartChat}
           onCancelMatchRequest={handleCancelMatchRequest}

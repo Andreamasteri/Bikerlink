@@ -146,6 +146,14 @@ export default function TabLayout() {
     enabled: !!user && isZavorrina,
   });
 
+  const { data: meData } = useQuery({
+    queryKey: ["/api/users/me"],
+    enabled: !!user,
+  });
+  const renderCustomTabBar = (props: BottomTabBarProps) => <CustomTabBar {...(props as any)} tabBarHeight={tabBarHeight} tabBarPaddingBottom={tabBarPaddingBottom} />;
+  const tabBarPaddingBottom = insets.bottom;
+  const gpsTabHref: Href | null | undefined = undefined;
+
   const garageIsEmpty: boolean | undefined = isBikerOrCoppia
     ? (motorcyclesData === undefined ? undefined : Array.isArray(motorcyclesData) ? motorcyclesData.length === 0 : false)
     : isZavorrina
@@ -176,7 +184,7 @@ export default function TabLayout() {
     showFakeHomeGlobal,
     setShowFakeHomeGlobal,
     fakeHomeDontShowGlobal,
-    setDontShowAgain: setFakeHomeDontShowGlobal,
+    setFakeHomeDontShowGlobal,
   } = useLayoutGating(user, meData);
 
   // ── Stato disponibilità (per icona cromatica "Status") ──────────────────
@@ -192,8 +200,8 @@ export default function TabLayout() {
       <Tabs
         tabBar={renderCustomTabBar}
         screenOptions={{
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.textSecondary,
+          tabBarActiveTintColor: colors.accent as string,
+          tabBarInactiveTintColor: colors.textSecondary as string,
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,

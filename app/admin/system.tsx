@@ -187,12 +187,16 @@ export default function SystemScreen() {
     setPurgeConfirmText("");
     setIsPurging(true);
     try {
-      const body = await apiRequest("DELETE", "/api/admin/purge-non-admin-users", undefined, {
-        "X-Confirm-Purge": "PURGE-CONFIRMED",
+      const purgeUrl = new URL("/api/admin/purge-non-admin-users", getApiUrl());
+      const purgeRes = await fetch(purgeUrl.toString(), {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "X-Confirm-Purge": "PURGE-CONFIRMED" },
+        credentials: "include",
       });
+      const body = await purgeRes.json();
       Alert.alert(
         "Purga completata",
-        `Eliminati ${body.deletedUsers} utenti non-admin.\nLe sessioni sono state invalidate.\nVerrai reindirizzato al login.`,
+        `Eliminati ${(body as any).deletedUsers} utenti non-admin.\nLe sessioni sono state invalidate.\nVerrai reindirizzato al login.`,
         [
           {
             text: "OK",
@@ -366,7 +370,6 @@ export default function SystemScreen() {
         t={t}
         handleRefresh={handleRefresh}
         goToLogin={goToLogin}
-        isAdminError={isAdminError}
         topPadding={topPadding}
       />
     );
