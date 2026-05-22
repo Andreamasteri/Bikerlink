@@ -3,7 +3,6 @@ import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { View, ActivityIndicator, StyleSheet } from "react-native";
 import WebView from "react-native-webview";
-import type { WebViewMessageEvent } from "react-native-webview";
 import Colors from "@/constants/colors";
 import { useMapConfig } from "@/lib/map-context";
 import type { MapProvider } from "@/lib/map-tiles";
@@ -13,6 +12,7 @@ import { useLocationWatch } from "@/hooks/useLocationWatch";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { MapControls } from "@/components/map/MapControls";
 import { useMapStateSync } from "@/hooks/useMapStateSync";
+import { createMapMessageHandler } from "@/components/map/createMapMessageHandler";
 import type {
   MapUser, MapWorkshop, MapEasterEgg, MapSosRequest,
   ClubMapPin, EventMapPin, InteractiveMapProps, InteractiveMapHandle,
@@ -100,23 +100,14 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     inject("window.leafletBridge && window.leafletBridge.focusOn(" + userLocation.latitude + "," + userLocation.longitude + ",13)");
   }, [gpsFollowupEnabled, mapReady, userLocation, inject]);
 
-  const handleMessage = useCallback((event: WebViewMessageEvent) => {
-    try {
-      const msg = JSON.parse(event.nativeEvent.data) as { type: string; lat?: number; lng?: number; markerType?: string; id?: string; omsReady?: boolean; nearbyDistance?: number; error?: string };
-      if (msg.type === "omsStatus") {
-        console.log("[InteractiveMap] omsStatus", { omsReady: msg.omsReady, nearbyDistance: msg.nearbyDistance, error: msg.error });
-      } else if (msg.type === "mapReady") {
-        sendStartupBeacon("mapview_ready"); onReady?.(); setMapReady(true);
-      } else if (msg.type === "regionChange" && msg.lat != null && msg.lng != null) {
-        onRegionChangeComplete?.({ latitude: msg.lat, longitude: msg.lng });
-      } else if (msg.type === "markerPress") {
-        if (msg.markerType === "user") { const u = users.find((x) => x.id === msg.id); if (u) onUserPress?.(u); }
-        else if (msg.markerType === "club") { const c = clubPins.find((x) => x.id === msg.id); if (c) onClubPress?.(c); }
-        else if (msg.markerType === "event") { if (msg.id) onEventPress?.(msg.id); }
-        else if (msg.markerType === "egg") { const e = easterEggs.find((x) => x.id === msg.id); if (e) onEasterEggPress?.(e); }
-      }
-    } catch {}
-  }, [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete]);
+  const handleMessage = useCallback(
+    createMapMessageHandler({
+      users, clubPins, easterEggs,
+      onUserPress, onClubPress, onEventPress, onEasterEggPress,
+      onReady, onRegionChangeComplete, setMapReady,
+    }),
+    [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete],
+  );
 
   useImperativeHandle(ref, () => ({
     focusOnCoordinate: (coords: { latitude: number; longitude: number; userId?: string }) => {
