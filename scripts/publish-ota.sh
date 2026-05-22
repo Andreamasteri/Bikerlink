@@ -131,7 +131,23 @@ do_admin_login() {
 
 # ─── setup-token: genera token OTA e lo salva in .local/ota-token ─
 do_setup_token() {
+  # Non eliminare dist-ota se creato da un export precedente
+  KEEP_DIST=1
   mkdir -p "$STATE_DIR"
+
+  # Se il token file esiste ed è non-vuoto, saltiamo la generazione
+  if [ -f "$OTA_TOKEN_FILE" ] && [ -s "$OTA_TOKEN_FILE" ]; then
+    echo ""
+    echo "╔══════════════════════════════════════════════════╗"
+    echo "║  BikerLink OTA — Setup Token                     ║"
+    echo "╚══════════════════════════════════════════════════╝"
+    echo ""
+    echo "  ✔ Token già presente in $OTA_TOKEN_FILE — skip generazione."
+    echo "    Per rigenerarlo: rm $OTA_TOKEN_FILE && bash $0 setup-token"
+    echo ""
+    return 0
+  fi
+
   echo ""
   echo "╔══════════════════════════════════════════════════╗"
   echo "║  BikerLink OTA — Setup Token                     ║"

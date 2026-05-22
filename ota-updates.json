@@ -1400,7 +1400,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-22T09:13:30.176Z"
+  },
+  {
+    "updateNumber": 6,
+    "version": "48.6.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-6 rv10.0.0: Fix crash login Android: TypeError undefined is not a function (OTA-5)",
+    "note": "CURRENT_OTA_NUMBER=6. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "a6e2cbf9-038b-4a56-a1c3-0d3ca3141272",
+    "bundleUrl": "private/ota/ota-48.6.10-1779445528469.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "3c4bc76b3a0d699295cbb8479c28e72f18c7ec46",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-22T10:25:30.581Z"
   }
 ]

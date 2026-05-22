@@ -59,7 +59,7 @@ bash scripts/build-apk.sh production   # AAB Play Store
 - **Runtime Version**: `10.0.0` (ciclo corrente, APK v48) ← CICLO 10.x
 - **APK corrente**: versionCode **48**, versionName **48.13.10**
 - **APK precedente (ultima STABILE distribuita)**: versionCode 47, versionName 47.2.9, rv 9.0.0
-- **OTA corrente**: OTA-5 (ciclo 10.x)
+- **OTA corrente**: OTA-6 (ciclo 10.x)
 - **Updates URL**: `https://biker-link.replit.app/api/expo-updates`
 - **Admin email**: `admin@bikerlink.it`
 - **Admin password**: secret `BIKERLINK_ADMIN_PASSWORD`
@@ -447,12 +447,13 @@ Tutte e tre le risposte devono contenere `expo-protocol-version: 0`. Se manca su
   - OTA-13 (v47.13.9): testo "CIAOOTA" rosso profilo — **ULTIMA OTA CICLO 9**, releaseId: `4dde7100`
 - **Ciclo 10.x: OTA 0+ (rv 10.0.0) ← CORRENTE**
   - APK v48 (48.13.10): versionCode 48, runtimeVersion 10.0.0 — buildId: a5c14e8f
-  - CURRENT_OTA_NUMBER=5, __OTA_BUILD_TAG__="BL-OTA-5-cycle10"
+  - CURRENT_OTA_NUMBER=6, __OTA_BUILD_TAG__="BL-OTA-6-cycle10"
   - OTA-1 (v48.1.10): smoke test locale ciclo 10 post-migrazione SDK 56, releaseId: `959f72c5` — pubblicato contro localhost (non produzione)
   - OTA-2 (v48.2.10): pianificazione percorsi curvy, stile selezionabile, badge mappa, distanza/tempo, GraphHopper car fallback, hero landing admin, auto-migrazioni DB, releaseId: `bdffccc3` — **prima OTA reale in produzione**
   - OTA-3 (v48.3.10): Fix crash login: mock drizzle-orm callable proxy, pgTable non più undefined, releaseId: `93c41a67`
   - OTA-4 (v48.4.10): OTA-4: matching targetUserTypes+route crossing, file split 80+ moduli, compatibility badge, undo reject match, dedup requireAuth, fix TS profile.ts, releaseId: `644717ce`
   - OTA-5 (v48.5.10): Stabilità avvio + TypeScript 0 errori + migrazione schema + storage refactor, releaseId: `a940438b`
+  - OTA-6 (v48.6.10): Fix crash login Android: TypeError undefined is not a function (OTA-5), releaseId: `a6e2cbf9`
 
 ## REGOLA CRITICA — BARE WORKFLOW
 Il progetto ha `android/` committato → bare workflow. Modificare SEMPRE i file Android direttamente:

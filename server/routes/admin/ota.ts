@@ -362,13 +362,17 @@ router.post("/ota/token", async (req: Request, res: Response) => {
       expiresAt: expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) : null,
     }).returning();
 
-    await storage.createModeratorLog({
-      moderatorId: req.session.userId!,
-      action: "create_ota_token",
-      targetType: "ota_token",
-      targetId: String(row[0].id),
-      details: `Token creato: ${label}`,
-    });
+    try {
+      await storage.createModeratorLog({
+        moderatorId: req.session.userId!,
+        action: "create_ota_token",
+        targetType: "ota_token",
+        targetId: String(row[0].id),
+        details: `Token creato: ${label}`,
+      });
+    } catch (logErr) {
+      console.warn("[OTA] createModeratorLog non-fatal:", logErr);
+    }
 
     return res.status(201).json({ ...row[0], rawToken });
   } catch (err) {
