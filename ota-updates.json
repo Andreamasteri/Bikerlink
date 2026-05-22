@@ -1568,7 +1568,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-22T17:10:00.724Z"
+  },
+  {
+    "updateNumber": 12,
+    "version": "48.12.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-12 rv10.0.0: OTA-12: package updates SDK 56 patch (expo ~56.0.3, expo-location ~56.0.1, react ~19.2.6, reanimated, ai sdk) + fix qs vulnerability + Metro readiness poll start.sh",
+    "note": "CURRENT_OTA_NUMBER=12. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "cfd212f1-86ba-48a0-92dd-42a286d76b5b",
+    "bundleUrl": "private/ota/ota-48.12.10-1779474291192.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "7ca1592abd1dab228c9da4493fad4a558d1cf93f",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-22T18:24:54.540Z"
   }
 ]
