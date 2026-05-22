@@ -1596,7 +1596,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-22T18:24:54.540Z"
+  },
+  {
+    "updateNumber": 13,
+    "version": "48.13.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-13 rv10.0.0: Fix tab bar",
+    "note": "CURRENT_OTA_NUMBER=13. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "18651ae1-2d44-4aba-acf8-f66857fb9a3e",
+    "bundleUrl": "private/ota/ota-48.13.10-1779482314627.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "9065e224b122cfa3001f1abe0b7311641526d4b8",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-22T20:38:38.839Z"
   }
 ]
