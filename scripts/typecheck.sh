@@ -94,4 +94,15 @@ echo "All import checks passed."
 echo ""
 echo "Running client-undefined safety check..."
 bash "$(dirname "$0")/check-client-undefined.sh"
+CLIENT_UNDEFINED_EXIT=$?
+if [ $CLIENT_UNDEFINED_EXIT -ne 0 ]; then
+  exit $CLIENT_UNDEFINED_EXIT
+fi
+
+# ---------------------------------------------------------------------------
+# Run Sistema A — Version Alignment Check (controllo-incrociato protocol)
+# ---------------------------------------------------------------------------
+echo ""
+echo "Running Sistema A — version alignment check..."
+bash "$(dirname "$0")/check-version-alignment.sh"
 exit $?
