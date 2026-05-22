@@ -89,25 +89,39 @@ echo ""
 echo "All import checks passed."
 
 # ---------------------------------------------------------------------------
-# Full type check — covers scripts/, server/__tests__/, and all *.ts files
-# that are excluded from the per-project tsconfigs.  Uses the root tsconfig
-# (tsconfig.json) which includes "**/*.ts".
+# Full type check — runs three focused tsconfig scopes:
+#   1. scripts/tsconfig.json        → all scripts/*.ts files
+#   2. server/tsconfig.test.json    → server/__tests__/**
+#   3. tsconfig.json (root)         → full project (Expo + shared)
 # ---------------------------------------------------------------------------
-echo ""
-echo "Running full type check (npx tsc --noEmit)..."
-FULL_TSC_OUTPUT=$(npx tsc --noEmit 2>&1 || true)
-FULL_TSC_ERRORS=$(echo "$FULL_TSC_OUTPUT" | grep -E "error TS[0-9]+" || true)
-if [ -z "$FULL_TSC_ERRORS" ]; then
-  echo "  ✓ Full type check: no type errors found"
-else
-  COUNT=$(echo "$FULL_TSC_ERRORS" | wc -l | tr -d ' ')
-  echo "  ✗ Full type check: ${COUNT} type error(s) detected"
+
+run_full_typecheck() {
+  local label="$1"
+  local project="$2"
+
   echo ""
-  echo "$FULL_TSC_ERRORS" | sed 's/^/    /'
-  echo ""
-  echo "Fix the type errors above, then re-run: bash scripts/typecheck.sh"
-  exit 1
-fi
+  echo "Running full type check [${label}] (npx tsc --noEmit --project ${project})..."
+  local raw
+  raw=$(npx tsc --noEmit --project "${project}" 2>&1 || true)
+  local errors
+  errors=$(echo "$raw" | grep -E "error TS[0-9]+" || true)
+  if [ -z "$errors" ]; then
+    echo "  ✓ ${label}: no type errors found"
+  else
+    local count
+    count=$(echo "$errors" | wc -l | tr -d ' ')
+    echo "  ✗ ${label}: ${count} type error(s) detected"
+    echo ""
+    echo "$errors" | sed 's/^/    /'
+    echo ""
+    echo "Fix the type errors above, then re-run: bash scripts/typecheck.sh"
+    exit 1
+  fi
+}
+
+run_full_typecheck "Scripts"      "scripts/tsconfig.json"
+run_full_typecheck "Server Tests" "server/tsconfig.test.json"
+run_full_typecheck "Root"         "tsconfig.json"
 
 # ---------------------------------------------------------------------------
 # Run client-undefined safety check (guards against OTA-4 pattern)
