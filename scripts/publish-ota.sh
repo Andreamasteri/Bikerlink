@@ -838,7 +838,7 @@ do_publish() {
     HTTP_CODE="$HTTP_RESPONSE"
 
     if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "304" ]; then
-      echo "   ✔ Backend raggiungibile (HTTP $HTTP_CODE) — release in pending-approval"
+      echo "   ✔ Backend raggiungibile (HTTP $HTTP_CODE)"
       VERIFIED=1
       break
     else
