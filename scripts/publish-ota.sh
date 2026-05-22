@@ -983,16 +983,19 @@ do_publish() {
 
   echo ""
   echo "╔══════════════════════════════════════════════════════════════════╗"
-  echo "║  ✅ OTA-$NEXT_OTA pubblicata con successo!"
+  echo "║  ✅ OTA-$NEXT_OTA in admin-preview — test prima di distribuire  ║"
   echo "╠══════════════════════════════════════════════════════════════════╣"
   printf "║  %-20s: %-43s║\n" "Commit" "$GIT_COMMIT_SHORT"
   printf "║  %-20s: %-43s║\n" "Release ID" "$RELEASE_ID"
   printf "║  %-20s: %-43s║\n" "Bundle URL" "$BUNDLE_URL"
-  printf "║  %-20s: %-43s║\n" "Slot" "stable"
+  printf "║  %-20s: %-43s║\n" "Slot" "${PUBLISHED_SLOT:-admin-preview}"
+  printf "║  %-20s: %-43s║\n" "Approvata" "no — test admin richiesto"
   printf "║  %-20s: %-43s║\n" "Rollback storico" "bash scripts/rollback-ota.sh $((NEXT_OTA - 1))"
   echo "╚══════════════════════════════════════════════════════════════════╝"
   echo ""
-  echo "   Tutti gli utenti riceveranno l'aggiornamento al prossimo avvio."
+  echo "   ⚠ La release NON è ancora disponibile a tutti gli utenti."
+  echo "   Dopo il test admin, tocca [Distribuisci OTA] nell'app o usa:"
+  echo "   POST /api/admin/ota/$RELEASE_ID/distribute"
   echo ""
 }
 

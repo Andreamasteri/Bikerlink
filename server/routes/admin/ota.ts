@@ -334,6 +334,7 @@ router.post("/ota", async (req: Request, res: Response) => {
 });
 
 router.post("/ota/:id/publish", async (req: Request, res: Response) => {
+  if (!await assertAdminSession(req, res)) return;
   try {
     const id = paramStr(req.params.id);
     if (!id) return sendError(res, 400, "ID non valido");
@@ -341,15 +342,13 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
     const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
     if (!existing.length) return sendError(res, 404, "Release non trovata");
 
-    // Promuovi a 'admin-preview': l'admin testa prima di distribuire a tutti.
-    // Unica eccezione: slot già esplicito (canary, beta, ecc.) → lascialo invariato.
-    const existingSlot = existing[0].slot as string | null;
-    const promotedSlot = (existingSlot === "archived" || existingSlot === null) ? "admin-preview" : existingSlot;
-
+    // Promuovi SEMPRE a 'admin-preview': l'admin deve testare sul proprio
+    // dispositivo prima di distribuire a tutti gli utenti (slot=stable).
+    // Il flusso completo è: publish → admin-preview → [test] → distribute → stable.
     const [updated] = await db.update(otaReleases)
       .set({
         status: "active",
-        slot: promotedSlot,
+        slot: "admin-preview",
         approved: false,
         publishedAt: new Date(),
         updatedAt: new Date(),
@@ -367,6 +366,8 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
         details: `Release in admin-preview: v=${existing[0].version} RV=${existing[0].runtimeVersion ?? "-"}`,
       }).catch(() => {});
     }
+
+    sendOtaPendingApprovalPushToAdmins(id).catch(() => {});
 
     return res.json(updated);
   } catch (err) {
