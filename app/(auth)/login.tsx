@@ -18,7 +18,7 @@ import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
-import * as Location from "expo-location";
+import { loginSchema } from "@shared/validators";
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -39,6 +39,7 @@ export default function LoginScreen() {
     setIsSubmitting(true);
     let gpsCoords: { latitude: number; longitude: number } | undefined;
     try {
+      const Location = require('expo-location');
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status === "granted") {
         const pos = await Promise.race([
