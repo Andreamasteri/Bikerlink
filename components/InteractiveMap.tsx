@@ -12,7 +12,7 @@ import { LEAFLET_MAP_HTML } from "@/lib/leaflet-map-html";
 import { useLocationWatch } from "@/hooks/useLocationWatch";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { MapControls } from "@/components/map/MapControls";
-import { buildMapMarkersState } from "@/components/map/buildMapMarkersState";
+import { useMapStateSync } from "@/hooks/useMapStateSync";
 import type {
   MapUser, MapWorkshop, MapEasterEgg, MapSosRequest,
   ClubMapPin, EventMapPin, InteractiveMapProps, InteractiveMapHandle,
@@ -75,18 +75,12 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     return true;
   });
 
-  const buildAndPushState = useCallback(() => {
-    if (!mapReady) return;
-    const encoded = buildMapMarkersState({
-      mapsEnabled, resolvedProvider, userLocation, isAvailable, searchRadiusKm,
-      filteredUsers, workshops, eventPins, showEventPins, filterEvents,
-      clubPins, filterClubs, easterEggs, activeSosRequests,
-      realMeMarker, fakeMeMarker, currentUserId,
-    });
-    inject("window.leafletBridge && window.leafletBridge.updateState(" + encoded + ")");
-  }, [mapReady, mapsEnabled, resolvedProvider, userLocation, isAvailable, searchRadiusKm, filteredUsers, workshops, eventPins, showEventPins, filterEvents, clubPins, filterClubs, easterEggs, activeSosRequests, realMeMarker, fakeMeMarker, currentUserId, inject]);
-
-  useEffect(() => { buildAndPushState(); }, [buildAndPushState]);
+  useMapStateSync({
+    mapReady, inject, mapsEnabled, resolvedProvider, userLocation, isAvailable,
+    searchRadiusKm, filteredUsers, workshops, eventPins, showEventPins, filterEvents,
+    clubPins, filterClubs, easterEggs, activeSosRequests, realMeMarker, fakeMeMarker,
+    currentUserId,
+  });
 
   useEffect(() => {
     if (!mapReady || initialCenterDoneRef.current) return;
