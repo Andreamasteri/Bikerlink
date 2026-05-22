@@ -81,6 +81,10 @@ args = "file-conflict-guard"
 task = "workflow.run"
 args = "api-responses"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "version-alignment"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -213,12 +217,12 @@ isValidation = true
 name = "typecheck"
 author = "agent"
 
+[workflows.workflow.metadata]
+isValidation = true
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/typecheck.sh"
-
-[workflows.workflow.metadata]
-isValidation = true
 
 [[workflows.workflow]]
 name = "file-conflict-guard"
@@ -238,6 +242,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx tsx server/scripts/check-api-responses.ts"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "version-alignment"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-version-alignment.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
