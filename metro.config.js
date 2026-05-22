@@ -75,8 +75,19 @@ config.resolver.platforms = ["ios", "android", "web"];
 //   evaluate and export its Zod schemas even though drizzle-orm is mocked.
 //
 // INVARIANT: mocks/empty.js MUST remain a Proxy. Never revert it to `{}`.
-//   The automated check scripts/check-client-undefined.sh enforces this.
-//   It runs as the last step of scripts/typecheck.sh.
+//   The automated check scripts/check-client-undefined.sh enforces this and
+//   more — it runs five checks (A–E) as the last step of scripts/typecheck.sh:
+//     (A) No client file imports directly from server/ paths.          [FAIL]
+//     (B) Every named value imported client-side from @shared/* actually exists
+//         in the resolved shared file; SERVER_ONLY_PACKAGES imports in that
+//         file emit a warning (known case: schema files use drizzle-orm).
+//                                                               [FAIL/WARN]
+//     (C) mocks/empty.js is still a Proxy (guards this invariant).    [FAIL]
+//     (D) ALL shared/**/*.ts modules checked for top-level
+//         SERVER_ONLY_PACKAGES imports — warns (does not fail) since the
+//         known schema files are already protected by the Proxy mock.  [WARN]
+//     (E) Self-test — verifies Check B's grep correctly rejects a
+//         nonexistent symbol (regression guard).                        [FAIL]
 // =============================================================================
 const SERVER_ONLY_PACKAGES = [
   "pdfkit",
