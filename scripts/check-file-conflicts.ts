@@ -1,6 +1,5 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
-import * as readline from "readline";
 
 const ACTIVE_TASK_FILES = resolve(process.cwd(), ".local/active-task-files.txt");
 
@@ -49,20 +48,10 @@ async function readInputFiles(): Promise<string[]> {
   if (args.length > 0) {
     return args.map(normalizePath);
   }
-
-  // In non-interactive environments (CI, validation pipeline) stdin is never
-  // closed, so we must not block waiting for it when no args were provided.
-  if (!process.stdin.isTTY) {
-    return [];
-  }
-
-  const files: string[] = [];
-  const rl = readline.createInterface({ input: process.stdin, terminal: false });
-  for await (const line of rl) {
-    const trimmed = line.trim();
-    if (trimmed) files.push(normalizePath(trimmed));
-  }
-  return files;
+  // No args provided — nothing to check.
+  // Stdin reading is intentionally omitted: in non-interactive environments
+  // (CI, validation pipeline) stdin never closes, causing an infinite block.
+  return [];
 }
 
 async function main(): Promise<void> {
