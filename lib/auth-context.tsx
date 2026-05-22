@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { triggerOtaCheck } from "@/lib/ota-check";
+import { sendStartupBeacon } from "@/lib/startup-beacon";
 import {
   queryClient,
   apiRequest,
@@ -46,6 +47,7 @@ function useLoginMutation() {
       }
       const { sessionToken: _t, ...user } = response;
       queryClient.setQueryData(["/api/auth/me"], user);
+      sendStartupBeacon("auth_login_success", { userId: (user as any)?.id });
       AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
       // Clear the freshly-issued connect.sid cookie from the Android native jar
       if (Platform.OS === "android") {

@@ -7,6 +7,7 @@ import { useColors } from "@/hooks/useColors";
 import { Ionicons } from "@expo/vector-icons";
 import { subscribeOtaResult } from "@/lib/ota-check";
 import { t } from "@/lib/i18n";
+import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 const SAFETY_TIMEOUT_MS = 15_000;
 
@@ -24,15 +25,23 @@ export default function OtaGateScreen() {
     retry: 1,
   });
 
-  const navigate = () => {
+  const navigate = (reason: string) => {
     if (navigated.current) return;
     navigated.current = true;
+    sendStartupBeacon("ota_gate_navigate", { reason });
     router.replace("/(tabs)");
   };
 
   useEffect(() => {
+    sendStartupBeacon("ota_gate_mount");
+  }, []);
+
+  useEffect(() => {
+    if (gateData !== undefined) {
+      sendStartupBeacon("ota_gate_gate_data", { enabled: gateData?.enabled ?? null, hasError: !!gateError });
+    }
     if (gateData?.enabled === false || !!gateError) {
-      navigate();
+      navigate("gate_disabled_or_error");
     }
   }, [gateData?.enabled, gateError]);
 
@@ -42,23 +51,25 @@ export default function OtaGateScreen() {
     // che questa schermata sia montata. Per non far attendere l'utente i
     // 15s del safety timeout, navighiamo subito.
     if (__DEV__) {
-      navigate();
+      navigate("dev_mode");
       return;
     }
 
     const safetyTimer = setTimeout(() => {
       setStatus("Timeout — continuando...");
-      navigate();
+      sendStartupBeacon("ota_gate_timeout");
+      navigate("safety_timeout");
     }, SAFETY_TIMEOUT_MS);
 
     const unsub = subscribeOtaResult((result) => {
       clearTimeout(safetyTimer);
+      sendStartupBeacon("ota_gate_ota_result", { phase: result.phase });
       if (result.phase === "reload") {
         setStatus(t("ota.updating"));
         // fallback: reloadAsync non ritorna normalmente, ma se lo facesse navighiamo dopo 3s
-        setTimeout(() => navigate(), 3_000);
+        setTimeout(() => navigate("reload_fallback"), 3_000);
       } else {
-        navigate();
+        navigate("ota_result");
       }
     });
 

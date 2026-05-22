@@ -16,6 +16,7 @@ type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs
 import { useTabBadges } from "@/hooks/useTabBadges";
 import { TabIcon } from "@/components/TabIcons";
 import { GpsBanner } from "@/components/layout/GpsBanner";
+import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { SafetyOverlay } from "@/components/layout/SafetyOverlay";
 import { GarageReminderModal } from "@/components/layout/GarageReminderModal";
 import { FakeHomeIntroModal } from "@/components/layout/FakeHomeIntroModal";
@@ -58,6 +59,10 @@ export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoading } = useAuth();
+
+  useEffect(() => {
+    sendStartupBeacon("tabs_layout_mount", { hasUser: !!user, authLoading: isLoading });
+  }, []);
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const { taskbarStyle } = useTaskbarStyle();
   const { unreadCount, hasActiveMatches } = useTabBadges();

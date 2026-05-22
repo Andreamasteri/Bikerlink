@@ -93,6 +93,13 @@ function BackgroundRevocationBanner() {
 }
 
 function StartupGate({ ready, children }: { ready: boolean; children: React.ReactNode }) {
+  const beaconSent = useRef(false);
+  useEffect(() => {
+    if (ready && !beaconSent.current) {
+      beaconSent.current = true;
+      sendStartupBeacon("startup_gate_open");
+    }
+  }, [ready]);
   if (!ready) return null;
   return <>{children}</>;
 }
@@ -101,6 +108,24 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { isLoading } = useMapConfig();
   const { colors } = useTheme();
+  const beaconState = useRef<string>("");
+
+  useEffect(() => {
+    sendStartupBeacon("map_ready_gate_enter", { hasUser: !!user, mapLoading: isLoading });
+  }, []);
+
+  useEffect(() => {
+    if (user && isLoading) {
+      if (beaconState.current !== "loading") {
+        beaconState.current = "loading";
+        sendStartupBeacon("map_ready_gate_loading");
+      }
+    } else if (beaconState.current !== "pass") {
+      beaconState.current = "pass";
+      sendStartupBeacon("map_ready_gate_pass", { hasUser: !!user });
+    }
+  }, [user, isLoading]);
+
   if (user && isLoading) {
     return (
       <View style={[styles.mapGateLoader, { backgroundColor: colors.background }]}>
