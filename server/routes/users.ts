@@ -97,9 +97,14 @@ export function systemAccountConditions(usersTable: any) {
   return baseConditions(usersTable);
 }
 
+export const _discoveryCapabilities = {
+  mapFilterKey: "map_visibility_filter" as const,
+  coordTransforms: [fuzzedCoordsForViewer, fuzzedCoordsForViewer, fuzzedCoordsForViewer, fuzzedCoordsForViewer],
+};
+
 // Sub-routers
 router.use("/", profileRouter);
-router.use("/discovery", discoveryRouter);
+router.use("/", discoveryRouter);
 router.use("/", actionsRouter);
 router.use("/", miscRouter);
 

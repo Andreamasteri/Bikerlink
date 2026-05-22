@@ -281,6 +281,57 @@ router.delete("/:id/lastfm", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/match-summary", async (req: Request, res: Response) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = (page - 1) * limit;
+
+    const countResult = await db.execute(sql`
+      SELECT COUNT(*) as cnt FROM users
+      WHERE is_fake = false AND role NOT IN ('admin', 'moderator')
+    `);
+    const total = parseInt((countResult.rows[0] as any)?.cnt ?? "0", 10);
+
+    const usersResult = await db.execute(sql`
+      SELECT
+        u.id, u.nickname, u.avatar_url, u.user_type, u.role, u.status,
+        COALESCE(bb.cnt, 0)::text as bb_count,
+        COALESCE(bz.cnt, 0)::text as bz_count,
+        null as bb_counts
+      FROM users u
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) as cnt FROM biker_biker_matches m
+        WHERE m.biker_id_1 = u.id OR m.biker_id_2 = u.id
+      ) bb ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(*) as cnt FROM biker_zavorrina_matches m
+        WHERE m.biker_id = u.id OR m.zavorrina_id = u.id
+      ) bz ON true
+      WHERE u.is_fake = false AND u.role NOT IN ('admin', 'moderator')
+      ORDER BY u.nickname
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    const mappedUsers = (usersResult.rows as any[]).map((row) => ({
+      id: row.id,
+      nickname: row.nickname,
+      avatarUrl: row.avatar_url,
+      userType: row.user_type,
+      role: row.role,
+      status: row.status,
+      bbCount: parseInt(row.bb_count || "0", 10),
+      bzCount: parseInt(row.bz_count || "0", 10),
+      bbCounts: row.bb_counts,
+    }));
+
+    return res.json({ users: mappedUsers, total, page });
+  } catch (error) {
+    console.error("Admin match-summary error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 router.get("/:id/stats", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;

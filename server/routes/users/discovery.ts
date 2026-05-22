@@ -79,7 +79,10 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.get("/online-count", requireAuth, (req: Request, res: Response) => {
-  return res.json({ count: onlineTracker.countOnlineUsers() });
+  const countriesParam = req.query.countries
+    ? (req.query.countries as string).split(",").filter(Boolean)
+    : undefined;
+  return res.json({ count: onlineTracker.countOnlineUsers(countriesParam) });
 });
 
 router.get("/available-count", requireAuth, async (req: Request, res: Response) => {
@@ -102,6 +105,9 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     const requesterId = req.session.userId!;
     const lat = req.query.lat ? parseFloat(req.query.lat as string) : undefined;
     const lng = req.query.lng ? parseFloat(req.query.lng as string) : undefined;
+    const countriesParam = req.query.countries
+      ? (req.query.countries as string).split(",").filter(Boolean)
+      : undefined;
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
 
     const [offlineRandomSetting, showDistanceSetting, mapFilterSetting] = await Promise.all([
@@ -113,46 +119,55 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     const showDistanceInCounter = showDistanceSetting?.value === "true";
     const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
 
-    const onlineIdSet = new Set(onlineTracker.getOnlineUserIds());
+    const onlineIdSet = new Set(onlineTracker.getOnlineUserIds(countriesParam));
     const trackerAvailableIds = mapVisibilityFilter === "available_only"
-      ? [...onlineTracker.getAvailableBikerIds(), ...onlineTracker.getAvailableZavorrinaIds()]
-      : onlineTracker.getOnlineUserIds();
+      ? [...onlineTracker.getAvailableBikerIds(countriesParam), ...onlineTracker.getAvailableZavorrinaIds(countriesParam)]
+      : onlineTracker.getOnlineUserIds(countriesParam);
 
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const onlineResultsRaw = trackerAvailableIds.length > 0
-      ? await storage.getOnlineUsersList(lat, lng, trackerAvailableIds as string[])
+      ? await storage.getOnlineUsersList(since, lat, lng, countriesParam, trackerAvailableIds as string[])
       : [];
     const onlineResults = onlineResultsRaw.filter((r: any) => !blockedIds.has(r.user.id));
     let allResults = onlineResults;
 
     if (mapVisibilityFilter !== "online_only" && mapVisibilityFilter !== "available_only") {
-      const { db } = await import("../../db");
-      const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
-      const { eq, and, notInArray: notInArr } = await import("drizzle-orm");
-      const { sql: sqlTag } = await import("drizzle-orm");
-      const distanceExpr = lat != null && lng != null
-        ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
-        : sqlTag<number>`0`.as("distance");
-      const offlineResultsRaw = await db
-        .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
-        .from(profilesTable)
-        .innerJoin(usersTable, eq(usersTable.id, profilesTable.userId))
-        .where(and(
+      try {
+        const { db } = await import("../../db");
+        const { users: usersTable, userProfiles: profilesTable } = await import("@shared/schema");
+        const { eq, and, notInArray: notInArr, inArray: inArr } = await import("drizzle-orm");
+        const { sql: sqlTag } = await import("drizzle-orm");
+        const distanceExpr = lat != null && lng != null
+          ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
+          : sqlTag<number>`0`.as("distance");
+        const offlineConditions: any[] = [
           notInArr(usersTable.id, [requesterId, ...Array.from(blockedIds)]),
-          ...systemAccountConditions(usersTable)
-        ))
-        .orderBy(sqlTag`distance`)
-        .limit(50);
-      const offlineResults = offlineResultsRaw.map((r: any) => {
-        if (r.profile?.hideFromMap) return { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null };
-        const useOfflineCoords = globalOfflineRandomize && r.profile?.offlinePositionRandomize !== false;
-        const hasFuzzedCoords = r.profile?.lastOfflineLat != null && r.profile?.lastOfflineLng != null;
-        const offLat = (useOfflineCoords && hasFuzzedCoords) ? r.profile.lastOfflineLat : r.profile?.latitude;
-        const offLng = (useOfflineCoords && hasFuzzedCoords) ? r.profile.lastOfflineLng : r.profile?.longitude;
-        const offDist = (useOfflineCoords && hasFuzzedCoords) ? null : r.distance;
-        return { ...r, profile: { ...r.profile, latitude: offLat, longitude: offLng }, distance: offDist };
-      });
-      const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
-      allResults = [...allResults, ...offlineOnly];
+          ...systemAccountConditions(usersTable),
+        ];
+        if (countriesParam && countriesParam.length > 0) {
+          offlineConditions.push(inArr(usersTable.country, countriesParam));
+        }
+        const offlineResultsRaw = await db
+          .select({ user: usersTable, profile: profilesTable, distance: distanceExpr })
+          .from(profilesTable)
+          .innerJoin(usersTable, eq(usersTable.id, profilesTable.userId))
+          .where(and(...offlineConditions))
+          .orderBy(sqlTag`distance`)
+          .limit(50);
+        const offlineResults = offlineResultsRaw.map((r: any) => {
+          if (r.profile?.hideFromMap) return { ...r, profile: { ...r.profile, latitude: null, longitude: null }, distance: null };
+          const useOfflineCoords = globalOfflineRandomize && r.profile?.offlinePositionRandomize !== false;
+          const hasFuzzedCoords = r.profile?.lastOfflineLat != null && r.profile?.lastOfflineLng != null;
+          const offLat = (useOfflineCoords && hasFuzzedCoords) ? r.profile.lastOfflineLat : r.profile?.latitude;
+          const offLng = (useOfflineCoords && hasFuzzedCoords) ? r.profile.lastOfflineLng : r.profile?.longitude;
+          const offDist = (useOfflineCoords && hasFuzzedCoords) ? null : r.distance;
+          return { ...r, profile: { ...r.profile, latitude: offLat, longitude: offLng }, distance: offDist };
+        });
+        const offlineOnly = offlineResults.filter((r: any) => !onlineIdSet.has(r.user.id) && !blockedIds.has(r.user.id));
+        allResults = [...allResults, ...offlineOnly];
+      } catch (offlineErr) {
+        console.warn("[online-list] offline users query skipped:", (offlineErr as Error)?.message);
+      }
     }
     const motorcyclesMap: Record<string, any[]> = {};
     for (const item of allResults) {
