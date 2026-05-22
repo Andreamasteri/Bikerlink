@@ -48,17 +48,18 @@ KEEP_DIST=0
 usage() {
   cat <<EOF
 Uso:
-  $0 "messaggio"             # legacy: export + publish in sequenza (foreground)
-  $0 export "messaggio"      # stage 1: bump + Metro export + verifica (~80s)
-  $0 publish                 # stage 2: upload + create + publish + slot stable + verify + finalize (~30s)
-  $0 rollback                # ripristina lib/ota.ts e ota-updates.json dal backup
-  $0 setup-token             # genera token OTA e lo salva in .local/ota-token (una tantum)
-  $0 revoke-token            # revoca il token in .local/ota-token e lo elimina
+  $0 "messaggio"                          # legacy: export + publish in sequenza (foreground)
+  $0 export "messaggio"                   # stage 1: bump + Metro export + verifica (~80s)
+  $0 export "messaggio" "Note rilascio"   # stage 1 con note di rilascio separate
+  $0 publish                              # stage 2: upload + create + publish + slot stable + verify + finalize (~30s)
+  $0 rollback                             # ripristina lib/ota.ts e ota-updates.json dal backup
+  $0 setup-token                          # genera token OTA e lo salva in .local/ota-token (una tantum)
+  $0 revoke-token                         # revoca il token in .local/ota-token e lo elimina
 
 Flusso raccomandato (senza password nell'environment):
-  1. bash $0 setup-token     # una tantum: richiede email/password admin, salva token
-  2. bash $0 export "msg"    # esporta bundle
-  3. bash $0 publish         # pubblica — usa il token se .local/ota-token esiste
+  1. bash $0 setup-token                  # una tantum: richiede email/password admin, salva token
+  2. bash $0 export "msg" "Note cambio"   # esporta bundle (note opzionali)
+  3. bash $0 publish                      # pubblica — usa il token se .local/ota-token esiste
 
 Variabili d'ambiente richieste (solo se .local/ota-token non esiste):
   BIKERLINK_ADMIN_EMAIL      — email account admin
@@ -293,6 +294,7 @@ trap cleanup EXIT
 # ============================================================
 do_export() {
   local RELEASE_MESSAGE="${1:-}"
+  local RELEASE_NOTES="${2:-}"
   if [ -z "$RELEASE_MESSAGE" ]; then
     echo "Errore: messaggio di release richiesto per 'export'"
     usage
@@ -474,6 +476,7 @@ do_export() {
   RUNTIME_VERSION_V="$RUNTIME_VERSION" \
   VERSION_V="$VERSION" \
   RELEASE_MESSAGE_V="$RELEASE_MESSAGE" \
+  RELEASE_NOTES_V="$RELEASE_NOTES" \
   ORIG_OTA_NUMBER_V="$ORIG_OTA_NUMBER" \
   GIT_COMMIT_HASH_V="$GIT_COMMIT_HASH" \
   APK_BUILD_ID_V="$APK_BUILD_ID" \
@@ -490,6 +493,7 @@ do_export() {
       runtimeVersion: process.env.RUNTIME_VERSION_V,
       version: process.env.VERSION_V,
       releaseMessage: process.env.RELEASE_MESSAGE_V,
+      releaseNotes: process.env.RELEASE_NOTES_V || null,
       origOtaNumber: process.env.ORIG_OTA_NUMBER_V,
       gitCommitHash: process.env.GIT_COMMIT_HASH_V,
       apkBuildId: process.env.APK_BUILD_ID_V || null,
@@ -703,6 +707,7 @@ do_publish() {
   RUNTIME_VERSION=$(state_get runtimeVersion)
   VERSION=$(state_get version)
   RELEASE_MESSAGE=$(state_get releaseMessage)
+  RELEASE_NOTES=$(state_get releaseNotes 2>/dev/null || true)
   BUNDLE_FILE=$(state_get bundleFile)
   GIT_COMMIT_HASH=$(state_get gitCommitHash)
   GIT_COMMIT_SHORT="${GIT_COMMIT_HASH:0:12}"
@@ -776,7 +781,9 @@ do_publish() {
   # ─── Step H: Creazione release draft ──────────────────────
   echo "[H] Creazione release OTA (draft)..."
   local NOTES_JSON RV_JSON CREATE_RESPONSE RELEASE_ID
-  NOTES_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "OTA-$NEXT_OTA rv$RUNTIME_VERSION: $RELEASE_MESSAGE")
+  # Se sono state fornite note di rilascio separate, usarle; altrimenti usa il messaggio.
+  local EFFECTIVE_NOTES="${RELEASE_NOTES:-OTA-$NEXT_OTA rv$RUNTIME_VERSION: $RELEASE_MESSAGE}"
+  NOTES_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "$EFFECTIVE_NOTES")
   RV_JSON=$(node -e "process.stdout.write(JSON.stringify(process.argv[1]))" -- "$RUNTIME_VERSION")
   CREATE_RESPONSE=$(auth_curl -X POST "$BACKEND_URL/api/admin/ota" \
     -H "Content-Type: application/json" \
@@ -1019,7 +1026,7 @@ fi
 
 case "$COMMAND" in
   export)
-    do_export "${2:-}"
+    do_export "${2:-}" "${3:-}"
     ;;
   publish)
     do_publish

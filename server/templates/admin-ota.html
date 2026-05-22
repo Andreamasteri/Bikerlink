@@ -32,6 +32,7 @@
   table.releases th { color:#666; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; font-weight:600; }
   table.releases td.num { color:#fff; font-weight:500; }
   table.releases td.actions { text-align:right; white-space:nowrap; }
+  table.releases td.notes { color:#888; max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:default; }
   .badge { display:inline-block; font-size:10px; letter-spacing:1px; padding:2px 7px; border-radius:2px; text-transform:uppercase; font-weight:600; }
   .badge.stable { background:#0d2818; color:#22c55e; }
   .badge.test { background:#1e1a08; color:#eab308; }
@@ -91,9 +92,10 @@
 <section id="pending-approval-section" style="display:none">
   <div class="sec-label">⚠ in attesa di test admin</div>
   <div class="pending-box" id="pending-box">
-    <div>
+    <div style="flex:1;min-width:0">
       <div class="pending-num mono" id="pending-num">—</div>
       <div class="pending-meta" id="pending-meta"></div>
+      <div id="pending-notes" style="display:none;margin-top:8px;font-size:12px;color:#c9a43a;white-space:pre-wrap;word-break:break-word;max-width:600px;line-height:1.5"></div>
     </div>
     <button class="distribute" id="distribute-btn">✓ Distribuisci a tutti</button>
   </div>
@@ -119,7 +121,7 @@
   <div class="sec-label">OTA disponibili</div>
   <table class="releases">
     <thead>
-      <tr><th>OTA</th><th>data</th><th>stato</th><th>slot</th><th></th></tr>
+      <tr><th>OTA</th><th>data</th><th>stato</th><th>slot</th><th>note</th><th></th></tr>
     </thead>
     <tbody id="releases-body"></tbody>
   </table>
@@ -246,6 +248,13 @@
       $('pending-meta').textContent = 'pubblicato ' + fmtDate(pending.published_at || pending.created_at) +
         (pending.runtime_version ? '  ·  RV ' + pending.runtime_version : '') +
         '  ·  approved: ' + (pending.approved ? 'sì' : 'no');
+      var pendingNotesEl = $('pending-notes');
+      if (pending.release_notes) {
+        pendingNotesEl.textContent = pending.release_notes;
+        pendingNotesEl.style.display = '';
+      } else {
+        pendingNotesEl.style.display = 'none';
+      }
       $('distribute-btn').disabled = false;
       $('distribute-btn').onclick = function(){ doDistribute(pending); };
     } else {
@@ -299,7 +308,7 @@
     var body = $('releases-body');
     body.innerHTML = '';
     if (!state.releases.length) {
-      body.appendChild(el('tr',null,'<td colspan="5" class="empty-state">nessuna release</td>'));
+      body.appendChild(el('tr',null,'<td colspan="6" class="empty-state">nessuna release</td>'));
       return;
     }
     state.releases.forEach(function(r){
@@ -313,6 +322,15 @@
         ? '<span class="badge ' + slotLabel + '">' + slotLabel + '</span>'
         : '<span style="color:#555">' + slotLabel + '</span>';
       tr.appendChild(el('td', null, slotBadge));
+      var notesTd = el('td', {class:'notes'});
+      if (r.release_notes) {
+        notesTd.title = r.release_notes;
+        var notesText = r.release_notes.length > 60 ? r.release_notes.slice(0, 58) + '…' : r.release_notes;
+        notesTd.textContent = notesText;
+      } else {
+        notesTd.innerHTML = '<span style="color:#444">—</span>';
+      }
+      tr.appendChild(notesTd);
       var act = el('td', {class:'actions'});
       var isStable = r.slot === 'stable';
       if (!isStable) {
