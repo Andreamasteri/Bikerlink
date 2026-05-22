@@ -147,32 +147,59 @@ function useRegisterMutation() {
 function useLogoutMutation() {
   return useMutation({
     mutationFn: async () => {
-      // Await server-side session destruction first
-      await apiRequest("POST", "/api/auth/logout").catch(() => {});
-      // Clear Bearer token and had-session marker from AsyncStorage BEFORE
-      // resolving — this way, if the app is killed immediately after the user
-      // taps "Esci", the tokens are already gone and the session won't be
-      // restored on the next launch.
+      // 1. Wipe local credentials FIRST — before any network call.
+      //    If the app is force-killed immediately after this point, the Bearer
+      //    token and had-session marker are already gone; the session cannot
+      //    be restored on next launch.
       await Promise.allSettled([
         clearSessionToken(),
         AsyncStorage.removeItem(HAD_SESSION_KEY),
       ]);
-      // On Android, flush the connect.sid cookie from the native cookie jar
-      // so a stale server-side cookie can't re-authenticate the user.
+
+      // 2. Invalidate the server-side session. Errors are tracked explicitly
+      //    (not silently swallowed) so we can log the fallback path.
+      let serverLogoutFailed = false;
+      try {
+        await apiRequest("POST", "/api/auth/logout");
+      } catch {
+        serverLogoutFailed = true;
+        // Local credentials are already gone — the user is effectively logged
+        // out. The server session will expire naturally. We do NOT propagate
+        // the error so the mutation still resolves successfully for the caller.
+      }
+
+      // 3. On Android, flush the connect.sid cookie from the native cookie jar.
+      //    Awaited with a 3 s timeout so app termination cannot race this call
+      //    and leave a stale server-side cookie.
       if (Platform.OS === "android") {
-        fetch(new URL("/api/auth/clear-session-cookie", getApiUrl()).toString(), {
-          method: "POST",
-          credentials: "include",
-        }).catch(() => {});
+        try {
+          const controller = new AbortController();
+          const tid = setTimeout(() => controller.abort(), 3000);
+          await fetch(new URL("/api/auth/clear-session-cookie", getApiUrl()).toString(), {
+            method: "POST",
+            credentials: "include",
+            signal: controller.signal,
+          });
+          clearTimeout(tid);
+        } catch {
+          // Best-effort: if this fails the Bearer token is still gone, so the
+          // user cannot re-authenticate via the cookie alone.
+        }
+      }
+
+      if (serverLogoutFailed) {
+        // Explicit fallback notice: server session may linger until natural
+        // expiry, but client-side credentials are clean.
+        console.warn("[Auth] Server logout failed — local credentials cleared, server session will expire naturally.");
       }
     },
     onSuccess: () => {
-      // Tokens already wiped in mutationFn; just reset the in-memory cache.
+      // Credentials already wiped in mutationFn; reset the in-memory cache.
       queryClient.setQueryData(["/api/auth/me"], null);
     },
     onError: () => {
-      // Server call failed but we must still clear local credentials so the
-      // app never sends a stale Bearer on subsequent requests.
+      // Reached only if Promise.allSettled itself throws (extremely unlikely).
+      // Attempt cleanup as a last resort.
       Promise.allSettled([
         clearSessionToken(),
         AsyncStorage.removeItem(HAD_SESSION_KEY),
