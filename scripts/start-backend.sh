@@ -1,4 +1,6 @@
 #!/bin/bash
+# start-backend.sh — Avvia il backend Node.js con supervisione e crash recovery.
+# La build NON è più responsabilità di questo script: usare build-server.sh prima.
 
 PORT=5000
 MAX_RETRIES=10
@@ -50,73 +52,35 @@ fi
 
 echo $$ > "$LOCK_FILE"
 
-rm -f /tmp/start-backend.flock 2>/dev/null
-
+# ── kill_port: SIGTERM → attesa 2s → SIGKILL → verifica porta libera ─────────
 kill_port() {
-  pkill -9 -f "node.*server_dist" 2>/dev/null || true
-  pkill -9 -f "tsx server" 2>/dev/null || true
-
   local pids
   pids=$(lsof -ti:$PORT 2>/dev/null)
   if [ -n "$pids" ]; then
-    echo "Kill SIGKILL PID(s) su porta $PORT: $pids"
-    echo "$pids" | xargs kill -9 2>/dev/null || true
+    echo "kill_port: SIGTERM a PID(s) $pids su porta $PORT..."
+    echo "$pids" | xargs kill -TERM 2>/dev/null || true
+    sleep 2
+    pids=$(lsof -ti:$PORT 2>/dev/null)
+    if [ -n "$pids" ]; then
+      echo "kill_port: SIGKILL a PID(s) $pids (non hanno risposto a SIGTERM)"
+      echo "$pids" | xargs kill -9 2>/dev/null || true
+    fi
   fi
-  fuser -k -9 ${PORT}/tcp 2>/dev/null || true
 
-  for i in $(seq 1 15); do
-    if ! fuser ${PORT}/tcp >/dev/null 2>&1 && ! lsof -ti:$PORT >/dev/null 2>&1; then
-      echo "Porta $PORT libera dopo ${i}s"
+  for i in $(seq 1 10); do
+    if ! lsof -ti:$PORT >/dev/null 2>&1; then
+      echo "kill_port: porta $PORT libera dopo ${i}s"
       return 0
     fi
     sleep 1
   done
-  echo "Attenzione: porta $PORT ancora occupata dopo 15s"
+  echo "kill_port: attenzione — porta $PORT ancora occupata dopo 10s"
 }
-
-needs_rebuild() {
-  if [ ! -f "server_dist/index.js" ]; then
-    return 0
-  fi
-  local newest_src
-  newest_src=$(find server/ shared/ -name '*.ts' -newer server_dist/index.js 2>/dev/null | head -1)
-  if [ -n "$newest_src" ]; then
-    return 0
-  fi
-  return 1
-}
-
-if needs_rebuild; then
-  BUILD_MAX_RETRIES=3
-  BUILD_OK=0
-  for build_try in $(seq 1 $BUILD_MAX_RETRIES); do
-    echo "Compilazione TypeScript server (tentativo $build_try/$BUILD_MAX_RETRIES)..."
-    npx esbuild server/index.ts --platform=node --packages=external --bundle --format=cjs --outdir=server_dist --alias:@shared/schema=./shared/schema --alias:@shared/privacy-policy-it=./shared/privacy-policy-it
-    if [ $? -eq 0 ]; then
-      BUILD_OK=1
-      break
-    fi
-    echo "Compilazione fallita al tentativo $build_try"
-    if [ $build_try -lt $BUILD_MAX_RETRIES ]; then
-      echo "Attendo 5 secondi prima di riprovare..."
-      sleep 5
-    fi
-  done
-  if [ $BUILD_OK -ne 1 ]; then
-    echo "ERRORE: compilazione server fallita dopo $BUILD_MAX_RETRIES tentativi"
-    exit 1
-  fi
-  echo "Compilazione completata."
-else
-  echo "server_dist/index.js aggiornato — skip rebuild (risparmio ~3-5s)"
-fi
 
 for retry in $(seq 1 $MAX_RETRIES); do
-  echo "=== Tentativo $retry/$MAX_RETRIES ==="
+  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] === Tentativo $retry/$MAX_RETRIES ==="
   echo "Pulizia porta $PORT..."
   kill_port
-
-  sleep 3
 
   echo "Porta $PORT libera, avvio backend..."
   START_TIME=$(date +%s)
@@ -138,7 +102,7 @@ for retry in $(seq 1 $MAX_RETRIES); do
     continue
   fi
 
-  echo "Backend avviato con successo (PID: $SERVER_PID)"
+  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] Backend avviato con successo (PID: $SERVER_PID)"
 
   while true; do
     sleep 10

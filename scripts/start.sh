@@ -1,0 +1,93 @@
+#!/bin/bash
+# start.sh — Orchestratore sequenziale BikerLink.
+# Sequenza: [1/4] build → [2/4] backend → [3/4] health check → [4/4] frontend
+# Se un passo fallisce, lo script si ferma immediatamente con un messaggio chiaro.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+TOTAL_START=$(date +%s)
+
+log() {
+  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] $1"
+}
+
+elapsed_since() {
+  echo $(( $(date +%s) - $1 ))
+}
+
+fail() {
+  local step=$1
+  local msg=$2
+  local elapsed=$(elapsed_since $TOTAL_START)
+  log "[FAILED at step $step: $msg] — ${elapsed}s dall'avvio"
+  exit 1
+}
+
+cd "$PROJECT_ROOT"
+
+# ── Step 1/4: Build server ────────────────────────────────────────────────────
+STEP_START=$(date +%s)
+log "[1/4] Build server — avvio..."
+if ! bash "$SCRIPT_DIR/build-server.sh"; then
+  fail "1/4" "build-server.sh fallito"
+fi
+log "[1/4] Build server — completato in $(elapsed_since $STEP_START)s"
+
+# ── Step 2/4: Avvio backend ───────────────────────────────────────────────────
+STEP_START=$(date +%s)
+log "[2/4] Avvio backend — avvio..."
+bash "$SCRIPT_DIR/start-backend.sh" &
+BACKEND_PID=$!
+log "[2/4] Backend avviato in background (PID: $BACKEND_PID)"
+
+# ── Step 3/4: Health check polling ───────────────────────────────────────────
+STEP_START=$(date +%s)
+log "[3/4] Health check polling su /api/health — inizio..."
+
+HEALTH_URL="http://localhost:5000/api/health"
+MAX_HEALTH_SECS=120
+ATTEMPT=0
+HEALTHY=0
+
+# Backoff aggressivo: 300ms → 500ms → 1s fisso
+# Max 120s per attendere anche il completamento del boot (seed, engine, scheduler)
+DELAYS=(0.3 0.5 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1)
+
+while [ $ATTEMPT -lt ${#DELAYS[@]} ]; do
+  DELAY=${DELAYS[$ATTEMPT]}
+  sleep "$DELAY"
+
+  ELAPSED=$(elapsed_since $STEP_START)
+  if [ "$ELAPSED" -ge "$MAX_HEALTH_SECS" ]; then
+    break
+  fi
+
+  # Controlla sia lo status HTTP (deve essere 200) sia il body (status:ok, initializing:false)
+  HTTP_CODE=$(curl -s -o /tmp/health_body.txt -w "%{http_code}" --max-time 3 "$HEALTH_URL" 2>/dev/null || echo "000")
+  if [ "$HTTP_CODE" = "200" ] && grep -q '"status":"ok"' /tmp/health_body.txt 2>/dev/null; then
+    HEALTHY=1
+    break
+  fi
+
+  ATTEMPT=$((ATTEMPT + 1))
+done
+
+if [ "$HEALTHY" -ne 1 ]; then
+  fail "3/4" "backend non è healthy (HTTP 200 + status:ok) dopo ${MAX_HEALTH_SECS}s"
+fi
+
+log "[3/4] Backend healthy in $(elapsed_since $STEP_START)s"
+
+# ── Step 4/4: Avvio frontend ─────────────────────────────────────────────────
+STEP_START=$(date +%s)
+log "[4/4] Avvio frontend (Metro/Expo) — avvio..."
+bash "$SCRIPT_DIR/start-expo.sh" &
+log "[4/4] Frontend avviato in background"
+
+TOTAL_ELAPSED=$(elapsed_since $TOTAL_START)
+log "=== Avvio completato in ${TOTAL_ELAPSED}s ==="
+
+# Mantieni lo script attivo per propagare i segnali
+wait

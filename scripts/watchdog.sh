@@ -91,8 +91,18 @@ record_backend_crash_session() {
   return 0
 }
 
+WATCHDOG_RESTART_LOCK="/tmp/watchdog-backend-restart.lock"
+
 restart_backend() {
   log "CRASH RILEVATO: backend (porta $BACKEND_PORT) non risponde. Avvio riavvio..."
+
+  # Lock atomico: usa mkdir (atomico su Linux) per evitare doppio restart
+  if ! mkdir "$WATCHDOG_RESTART_LOCK" 2>/dev/null; then
+    log "[WATCHDOG] restart in progress, skipping"
+    return 0
+  fi
+  # Rimuovi il lock quando la funzione termina
+  trap 'rmdir "$WATCHDOG_RESTART_LOCK" 2>/dev/null || true' RETURN
 
   BACKEND_LOCK_FILE="/tmp/start-backend.lock"
   if [ -f "$BACKEND_LOCK_FILE" ]; then
@@ -104,13 +114,9 @@ restart_backend() {
     rm -f "$BACKEND_LOCK_FILE"
   fi
 
-  pkill -f "node server_dist/index.js" 2>/dev/null || true
-  pkill -f "tsx server" 2>/dev/null || true
-  lsof -ti:"$BACKEND_PORT" 2>/dev/null | xargs kill -9 2>/dev/null || true
-  sleep 2
   log "RIAVVIO AVVIATO: backend (porta $BACKEND_PORT)..."
   bash /home/runner/workspace/scripts/start-backend.sh >> "$LOG_FILE" 2>&1 &
-  log "RIAVVIO COMPLETATO: processo backend avviato in background"
+  log "RIAVVIO COMPLETATO: processo backend avviato in background (PID: $!)"
 }
 
 health_check() {

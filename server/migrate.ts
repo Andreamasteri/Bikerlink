@@ -1,8 +1,10 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as crypto from "crypto";
 import { pool } from "./db";
 
 const MIGRATIONS_DIR = path.resolve(process.cwd(), "migrations");
+const MIGRATIONS_HASH_CACHE = path.resolve(process.cwd(), "server_dist", ".migrations-hash");
 
 /**
  * PostgreSQL error codes that mean "this object already exists".
@@ -53,6 +55,33 @@ function splitStatements(sql: string): string[] {
     .split(/--> statement-breakpoint/g)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+/**
+ * Compute a hash of all migration filenames (sorted).
+ * This lets us skip the DB round-trip when no new migration files were added.
+ */
+function computeMigrationsHash(files: string[]): string {
+  return crypto.createHash("sha256").update(files.join("|")).digest("hex");
+}
+
+function readCachedHash(): string | null {
+  try {
+    if (!fs.existsSync(MIGRATIONS_HASH_CACHE)) return null;
+    return fs.readFileSync(MIGRATIONS_HASH_CACHE, "utf-8").trim();
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedHash(hash: string): void {
+  try {
+    const dir = path.dirname(MIGRATIONS_HASH_CACHE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(MIGRATIONS_HASH_CACHE, hash, "utf-8");
+  } catch {
+    // non-fatal: cache write failure is OK
+  }
 }
 
 /**
@@ -114,16 +143,27 @@ async function applyMigration(
 }
 
 export async function runMigrations(): Promise<void> {
+  const all = allMigrationFiles();
+  const currentHash = computeMigrationsHash(all);
+  const cachedHash = readCachedHash();
+
+  // Fast-skip: if migration file list hash matches cache, no new migrations exist.
+  // Avoids DB round-trip on every normal restart.
+  if (cachedHash === currentHash) {
+    console.log("[migrate] All migrations already applied — cache hit (schema hash unchanged).");
+    return;
+  }
+
   const client = await pool.connect();
   try {
     await ensureMigrationsTable(client);
 
-    const all = allMigrationFiles();
     const applied = await appliedMigrations(client);
     const pending = pendingFiles(all, applied);
 
     if (pending.length === 0) {
       console.log("[migrate] All migrations already applied — nothing to do.");
+      writeCachedHash(currentHash);
       return;
     }
 
@@ -148,6 +188,7 @@ export async function runMigrations(): Promise<void> {
     }
 
     console.log(`[migrate] Done — ${pending.length} migration(s) applied successfully.`);
+    writeCachedHash(currentHash);
   } finally {
     client.release();
   }

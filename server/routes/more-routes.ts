@@ -371,7 +371,10 @@ export function registerMoreRoutes(app: Express) {
   });
 
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", initializing: initState.initializing });
+    if (initState.initializing) {
+      return res.status(503).json({ status: "initializing", initializing: true });
+    }
+    res.json({ status: "ok", initializing: false });
   });
 
   app.get("/api/admin/uptime", requireAdmin, async (_req, res) => {

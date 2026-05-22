@@ -3,28 +3,45 @@ import { AppState } from "react-native";
 import { triggerOtaCheck } from "@/lib/ota-check";
 import { initOtaHardening } from "@/lib/ota-hardening";
 import { applyPendingOtaIfNeeded } from "@/lib/ota-startup";
+import { getApiUrl } from "@/lib/query-client";
+
+const HEALTH_POLL_MAX_ATTEMPTS = 10;
+const HEALTH_POLL_INTERVAL_MS = 500;
+
+async function waitForBackend(): Promise<void> {
+  const healthUrl = new URL("/api/health", getApiUrl()).toString();
+  for (let i = 0; i < HEALTH_POLL_MAX_ATTEMPTS; i++) {
+    try {
+      const res = await fetch(healthUrl, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) return;
+    } catch {
+      // non risponde ancora, continua polling
+    }
+    await new Promise((r) => setTimeout(r, HEALTH_POLL_INTERVAL_MS));
+  }
+  // Se il backend non risponde entro i tentativi massimi, procediamo comunque
+}
 
 export function OtaStartupChecker() {
   useEffect(() => {
-    // Task #1357 — hardening OTA: device-id, heartbeat, error-recovery listener.
     initOtaHardening().catch(() => {});
 
-    let timerHandle: ReturnType<typeof setTimeout> | null = null;
     let mounted = true;
 
     const doStartup = async () => {
-      // Fix: leggi il flag persistente scritto da ota-check.ts dopo ogni fetch.
-      // Se presente, significa che l'update era già stato scaricato nella sessione
-      // precedente ma reloadAsync() nel background listener non è scattato
-      // (comportamento inaffidabile su Android). Lo applichiamo subito, prima
-      // che l'utente veda qualsiasi schermata, senza aspettare 3 secondi.
+      // Il flag OTA_PENDING_KEY viene applicato immediatamente (cold start),
+      // prima di qualsiasi polling, come da specifica.
       const triggered = await applyPendingOtaIfNeeded(() => mounted);
-      if (triggered) return; // non schedula il check normale
+      if (triggered) return;
 
       if (!mounted) return;
-      timerHandle = setTimeout(() => {
-        triggerOtaCheck("startup");
-      }, 3000);
+
+      // Polling attivo su /api/health invece del delay fisso di 3s.
+      // Non appena il backend risponde, il check OTA viene eseguito subito.
+      await waitForBackend();
+
+      if (!mounted) return;
+      triggerOtaCheck("startup");
     };
 
     doStartup();
@@ -34,7 +51,6 @@ export function OtaStartupChecker() {
     });
     return () => {
       mounted = false;
-      if (timerHandle) clearTimeout(timerHandle);
       sub.remove();
     };
   }, []);
