@@ -22,6 +22,18 @@ function isAlreadyExistsError(err: unknown): boolean {
   return typeof code === "string" && ALREADY_EXISTS_CODES.has(code);
 }
 
+/**
+ * Bootstrap the migration-tracking table.
+ *
+ * This is the single necessary DDL exception in the boot path. The table
+ * cannot be tracked inside itself, so it must be created before the runner
+ * can query which migrations have already been applied.
+ *
+ * The canonical schema definition lives in migrations/0000_baseline.sql so
+ * that schema history remains a single source of truth. When 0000_baseline.sql
+ * is applied on a fresh DB it will hit the "already exists" SAVEPOINT guard
+ * and skip gracefully.
+ */
 async function ensureMigrationsTable(client: import("pg").PoolClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (

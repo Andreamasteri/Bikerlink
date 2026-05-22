@@ -186,52 +186,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     console.warn("[INIT] Phase 3 OTA cleanup (non-fatal):", e);
   }
 
-  // Schema column ensures (non-fatal)
-  try {
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_home_enabled BOOLEAN NOT NULL DEFAULT false`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS home_latitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS home_longitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_home_latitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_home_longitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_home_radius INTEGER NOT NULL DEFAULT 2`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS gps_precision INTEGER NOT NULL DEFAULT 100`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS offline_position_randomize BOOLEAN NOT NULL DEFAULT true`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_work_enabled BOOLEAN NOT NULL DEFAULT false`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_latitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS work_longitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_work_latitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_work_longitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_work_radius INTEGER NOT NULL DEFAULT 2`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_whatever_enabled BOOLEAN NOT NULL DEFAULT false`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS whatever_latitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS whatever_longitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_whatever_latitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_whatever_longitude DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS fake_whatever_radius INTEGER NOT NULL DEFAULT 2`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_offline_lat DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS last_offline_lng DOUBLE PRECISION`);
-    await db.execute(sql`ALTER TABLE user_music_tracks ADD COLUMN IF NOT EXISTS image_url TEXT`);
-    await db.execute(sql`ALTER TABLE user_music_tracks ADD COLUMN IF NOT EXISTS provider VARCHAR(20) NOT NULL DEFAULT 'spotify'`);
-    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS floating_widget_enabled BOOLEAN NOT NULL DEFAULT true`);
-    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_logout_at TIMESTAMP`);
-    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_app_close_at TIMESTAMP`);
-    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS expo_push_token TEXT`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS units_preference JSONB`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS notification_preferences JSONB NOT NULL DEFAULT '{"matches":true,"zoneProposals":true,"chat":true,"motoclub":true,"eventi":true}'::jsonb`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS map_filters JSONB`);
-    await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS push_notifications_enabled BOOLEAN NOT NULL DEFAULT true`);
-    await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS slot VARCHAR(32)`);
-    await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS promoted_at TIMESTAMP`);
-    await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS promoted_by VARCHAR(100)`);
-    await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS success_count INTEGER NOT NULL DEFAULT 0`);
-    await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS approved BOOLEAN NOT NULL DEFAULT false`);
-    await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP`);
-    await db.execute(sql`ALTER TABLE ota_releases ADD COLUMN IF NOT EXISTS approved_by VARCHAR(100)`);
-    await db.execute(sql`ALTER TABLE proposals ADD COLUMN IF NOT EXISTS target_user_types jsonb`);
-  } catch (e) {
-    console.warn("[INIT] Phase 3 schema extensions (non-fatal):", e);
-  }
-
   bootLog(3, TOTAL, "DB Init", "done");
 
   // ── Phase 4: Seed + Core services (FATAL — timeout → process.exit) ────────
