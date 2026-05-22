@@ -59,7 +59,7 @@ router.post("/:id/join", requireAuth, async (req: Request, res: Response) => {
     let convId = club.conversationId;
     const conversationWasNew = !convId;
     if (!convId) {
-      convId = await createClubConversation(clubId, club.name);
+      convId = await createClubConversation(clubId as string, club.name);
     }
     if (convId) {
       await addMemberToConversation(convId, userId);
@@ -67,7 +67,7 @@ router.post("/:id/join", requireAuth, async (req: Request, res: Response) => {
         const existingMembers = await db
           .select({ userId: motoClubMembers.userId })
           .from(motoClubMembers)
-          .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")));
+          .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.status, "active")));
         const participantRows = existingMembers
           .filter((m) => m.userId !== userId)
           .map((m) => ({ conversationId: convId as string, userId: m.userId }));

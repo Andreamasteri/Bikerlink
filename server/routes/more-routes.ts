@@ -217,7 +217,8 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/privacy-policy/export", async (_req, res) => {
     try {
-      const PDFDocument = require("pdfkit") as typeof import("pdfkit");
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const PDFDocument = require("pdfkit") as any;
       const publicDir = path.dirname(PRIVACY_EXPORT_PDF_PATH);
       if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
 

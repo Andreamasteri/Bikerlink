@@ -162,7 +162,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/assets/onboarding/:filename", async (req: Request, res: Response) => {
-    const { filename } = req.params;
+    const filename = req.params.filename as string;
     if (!/^\d{2}-[a-z0-9-]+\.png$/.test(filename)) {
       return res.status(400).send("Invalid filename");
     }

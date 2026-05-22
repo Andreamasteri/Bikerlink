@@ -116,6 +116,8 @@ export const rideTelemetry = pgTable("ride_telemetry", {
   leanDeg: real("lean_deg"),
   headingDeg: real("heading_deg"),
   gpsAccuracyM: real("gps_accuracy_m"),
+  sessionId: varchar("session_id", { length: 36 }),
+  matched: boolean("matched").notNull().default(false),
   sampledAt: timestamp("sampled_at").notNull().defaultNow(),
 }, (table) => [
   index("ride_telemetry_user_id_idx").on(table.userId),

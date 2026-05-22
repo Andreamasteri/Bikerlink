@@ -450,7 +450,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
       durationMinutes: Math.round(path.time / 60000),
       instructions: path.instructions ?? [],
       bikerScore: 0.8,
-      elevation: extractElevationProfile(path.points, path.points_encoded === false ? path.points.coordinates : undefined),
+      elevation: extractElevationProfile(path.points as any, (path as any).points_encoded === false ? (path.points as any).coordinates : undefined),
       warning: myStyleWarning,
     });
   } catch (err: any) {

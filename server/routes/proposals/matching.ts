@@ -211,7 +211,7 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
 router.post("/garage-matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const matchId = req.params.id;
+    const matchId = req.params.id as string;
     if (!matchId) return sendError(res, 400, "ID match mancante");
     const match = await storage.getGarageMatch(matchId);
     if (!match) {
@@ -235,7 +235,7 @@ router.post("/garage-matches/:id/accept", requireAuth, async (req: Request, res:
 router.post("/garage-matches/:id/reject", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const matchId = req.params.id;
+    const matchId = req.params.id as string;
     if (!matchId) return sendError(res, 400, "ID match mancante");
     const match = await storage.getGarageMatch(matchId);
     if (!match) {
@@ -259,7 +259,7 @@ router.post("/garage-matches/:id/reject", requireAuth, async (req: Request, res:
 router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const matchId = req.params.id;
+    const matchId = req.params.id as string;
 
     const match = await storage.getProposalMatch(matchId);
     if (!match) {
@@ -387,7 +387,7 @@ router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Respon
 router.post("/matches/:id/reject", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const matchId = req.params.id;
+    const matchId = req.params.id as string;
 
     const match = await storage.getProposalMatch(matchId);
     if (!match) {
@@ -507,7 +507,7 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
 router.post("/biker-matches/:id/accept", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const matchId = req.params.id;
+    const matchId = req.params.id as string;
     const match = await storage.getBikerBikerMatch(matchId);
     if (!match) return sendError(res, 404, "Match non trovato");
     if (match.biker1Id !== userId && match.biker2Id !== userId) return sendError(res, 403, "Non autorizzato");
@@ -523,7 +523,7 @@ router.post("/biker-matches/:id/accept", requireAuth, async (req: Request, res: 
 router.post("/biker-matches/:id/reject", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const matchId = req.params.id;
+    const matchId = req.params.id as string;
     const match = await storage.getBikerBikerMatch(matchId);
     if (!match) return sendError(res, 404, "Match non trovato");
     if (match.biker1Id !== userId && match.biker2Id !== userId) return sendError(res, 403, "Non autorizzato");
@@ -551,7 +551,7 @@ router.post("/trigger-matching", requireAuth, async (req: Request, res: Response
 router.delete("/garage-matches/:matchId", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const ok = await storage.resetGarageMatchToNew(req.params.matchId, userId);
+    const ok = await storage.resetGarageMatchToNew(req.params.matchId as string, userId);
     if (!ok) return sendError(res, 404, "Match non trovato o non autorizzato");
     return sendSuccess(res, { deleted: true });
   } catch (error) {

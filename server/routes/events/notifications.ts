@@ -55,11 +55,11 @@ export async function sendClubInvitesByIds(evt: Event, eventId: string, clubIds:
 export async function sendClubInvites(evt: Event, approvedEventId: string): Promise<void> {
   try {
     const conditions: any[] = [];
-    if (evt.autoInviteRegion) {
-      conditions.push(ilike(motoClubs.region, `%${evt.autoInviteRegion}%`));
+    if ((evt as any).autoInviteRegion) {
+      conditions.push(ilike(motoClubs.region, `%${(evt as any).autoInviteRegion}%`));
     }
-    if (evt.autoInviteBrand) {
-      conditions.push(ilike(motoClubs.brandName, `%${evt.autoInviteBrand}%`));
+    if ((evt as any).autoInviteBrand) {
+      conditions.push(ilike(motoClubs.brandName, `%${(evt as any).autoInviteBrand}%`));
     }
 
     const clubs = conditions.length > 0
@@ -84,7 +84,7 @@ export async function sendClubInvites(evt: Event, approvedEventId: string): Prom
             await storage.createNotification({
               userId: member.userId,
               title: "Evento per il tuo club!",
-              body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}". ${evt.autoInviteReason ?? ""}`.trim(),
+              body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}". ${(evt as any).autoInviteReason ?? ""}`.trim(),
               notificationType: "event_invite",
               referenceType: "event",
               referenceId: approvedEventId,

@@ -141,7 +141,7 @@ router.get("/shared-playlists", requireAuth, async (req: Request, res: Response)
 router.get("/shared-playlists/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const playlistId = parseInt(req.params.id, 10);
+    const playlistId = parseInt(req.params.id as string, 10);
     if (isNaN(playlistId)) {
       return sendError(res, 400, "ID non valido");
     }
@@ -172,7 +172,7 @@ router.get("/shared-playlists/:id", requireAuth, async (req: Request, res: Respo
 router.post("/merge-playlist/:playlistId", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const playlistId = parseInt(req.params.playlistId, 10);
+    const playlistId = parseInt(req.params.playlistId as string, 10);
     if (isNaN(playlistId)) {
       return sendError(res, 400, "ID playlist non valido");
     }

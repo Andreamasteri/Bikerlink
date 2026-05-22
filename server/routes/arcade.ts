@@ -41,7 +41,7 @@ router.post("/score", async (req: Request, res: Response) => {
     const [existing] = await db
       .select({ bestScore: max(arcadeScores.score) })
       .from(arcadeScores)
-      .where(and(eq(arcadeScores.userId, userId), eq(arcadeScores.game, game)));
+      .where(and(eq(arcadeScores.userId, userId), eq(arcadeScores.game, game as any)));
 
     if (existing?.bestScore !== null && existing?.bestScore !== undefined && score <= existing.bestScore) {
       return sendSuccess(res, { skipped: true });
@@ -49,7 +49,7 @@ router.post("/score", async (req: Request, res: Response) => {
 
     const [entry] = await db
       .insert(arcadeScores)
-      .values({ userId, game, score })
+      .values({ userId, game: game as any, score })
       .returning();
     return sendSuccess(res, { entry });
   } catch (err) {

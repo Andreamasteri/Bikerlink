@@ -1,5 +1,4 @@
 import { Router, type Request, type Response } from "express";
-import { sendSuccess } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 // @ts-ignore

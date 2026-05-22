@@ -175,7 +175,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
 router.get("/status/:userId", requireAuth, async (req: Request, res: Response) => {
   try {
     const currentUserId = req.session.userId!;
-    const targetUserId = req.params.userId;
+    const targetUserId = req.params.userId as string;
 
     if (currentUserId === targetUserId) {
       return res.json({ status: "self" });
@@ -228,7 +228,7 @@ router.get("/status/:userId", requireAuth, async (req: Request, res: Response) =
 router.post("/request/:userId", requireAuth, async (req: Request, res: Response) => {
   try {
     const currentUserId = req.session.userId!;
-    const targetUserId = req.params.userId;
+    const targetUserId = req.params.userId as string;
 
     if (currentUserId === targetUserId) {
       return sendError(res, 400, "Non puoi inviare una richiesta a te stesso");
@@ -339,7 +339,7 @@ router.post("/request/:userId", requireAuth, async (req: Request, res: Response)
 router.delete("/request/:userId", requireAuth, async (req: Request, res: Response) => {
   try {
     const currentUserId = req.session.userId!;
-    const targetUserId = req.params.userId;
+    const targetUserId = req.params.userId as string;
 
     const existing = await db
       .select()
@@ -384,7 +384,7 @@ router.delete("/request/:userId", requireAuth, async (req: Request, res: Respons
 router.post("/request/:requestId/accept", requireAuth, async (req: Request, res: Response) => {
   try {
     const currentUserId = req.session.userId!;
-    const { requestId } = req.params;
+    const requestId = req.params.requestId as string;
 
     const request = await db
       .select()
@@ -475,7 +475,7 @@ router.post("/request/:requestId/accept", requireAuth, async (req: Request, res:
 router.post("/request/:requestId/reject", requireAuth, async (req: Request, res: Response) => {
   try {
     const currentUserId = req.session.userId!;
-    const { requestId } = req.params;
+    const requestId = req.params.requestId as string;
 
     const request = await db
       .select()

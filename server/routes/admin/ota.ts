@@ -261,7 +261,7 @@ router.post("/ota/upload", otaUpload.single("bundle"), async (req: Request, res:
 
     const filename = `ota-${runtimeVersion}-${Date.now()}.js`;
     const objectPath = `private/ota/${filename}`;
-    await uploadBuffer(req.file.buffer, objectPath, "application/octet-stream");
+    await uploadBuffer(objectPath, req.file.buffer, "application/octet-stream");
 
     const [release] = await db.insert(otaReleases).values({
       version: `upload-${Date.now()}`,
@@ -273,7 +273,7 @@ router.post("/ota/upload", otaUpload.single("bundle"), async (req: Request, res:
       createdBy: req.session.userId ?? null,
     }).returning();
 
-    sendOtaPendingApprovalPushToAdmins(release.id, runtimeVersion, "android").catch(() => {});
+    sendOtaPendingApprovalPushToAdmins(release.id).catch(() => {});
     return res.status(201).json(release);
   } catch (error) {
     console.error("OTA upload error:", error);
@@ -351,24 +351,23 @@ router.post("/ota/token", async (req: Request, res: Response) => {
   try {
     const parsedToken = createOtaTokenSchema.safeParse(req.body);
     if (!parsedToken.success) return sendError(res, 400, parsedToken.error.issues[0].message);
-    const { name, expiresAt } = parsedToken.data;
+    const { label, expiresInDays } = parsedToken.data;
 
     const rawToken = `ota_${crypto.randomBytes(32).toString("hex")}`;
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
 
     const row = await db.insert(otaPublishTokens).values({
-      name,
+      label,
       tokenHash,
-      expiresAt: expiresAt ? new Date(expiresAt) : null,
-      createdBy: req.session.userId!,
+      expiresAt: expiresInDays ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) : null,
     }).returning();
 
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "create_ota_token",
       targetType: "ota_token",
-      targetId: row[0].id,
-      details: `Token creato: ${name}`,
+      targetId: String(row[0].id),
+      details: `Token creato: ${label}`,
     });
 
     return res.status(201).json({ ...row[0], rawToken });
@@ -403,7 +402,7 @@ router.delete("/ota/token/:id", async (req: Request, res: Response) => {
     const id = paramStr(req.params.id);
     if (!id) return sendError(res, 400, "ID non valido");
 
-    await db.update(otaPublishTokens).set({ revoked: true }).where(eq(otaPublishTokens.id, id));
+    await db.update(otaPublishTokens).set({ revoked: true }).where(eq(otaPublishTokens.id, parseInt(id)));
 
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
@@ -457,8 +456,7 @@ router.post("/ota/assign-slot", async (req: Request, res: Response) => {
   try {
     const parsed = assignOtaSlotSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const { updateId } = parsed.data;
-    void updateId;
+    void parsed.data;
     return sendSuccess(res);
   } catch (err) {
     return sendError(res, 500, "Errore assegnazione slot");

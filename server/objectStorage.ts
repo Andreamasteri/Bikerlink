@@ -22,8 +22,8 @@ export async function uploadBuffer(
 ): Promise<void> {
   const client = getClient();
   const result = await client.uploadFromBytes(objectPath, buffer, {
-    headers: { "Content-Type": contentType },
-  });
+    contentType,
+  } as any);
   if (!result.ok) {
     throw new Error(`Upload fallito per ${objectPath}: ${result.error?.message}`);
   }
@@ -55,7 +55,7 @@ export async function objectExists(objectPath: string): Promise<boolean> {
 
 export async function getPublicUrl(objectPath: string): Promise<string> {
   const client = getClient();
-  const bucket = await client.getBucket();
+  const bucket = await (client as any).getBucket();
   const file = bucket.file(objectPath);
   return file.publicUrl();
 }

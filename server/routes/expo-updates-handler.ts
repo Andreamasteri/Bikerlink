@@ -206,7 +206,7 @@ export function registerExpoUpdatesRoutes(app: Express) {
           const assignResult = await db.execute(sql`SELECT slot, expires_at FROM device_ota_assignments WHERE device_id = ${deviceId}`);
           if (assignResult.rows.length > 0) {
             const asgn = assignResult.rows[0];
-            const expired = asgn.expires_at && new Date(asgn.expires_at) <= new Date();
+            const expired = asgn.expires_at && new Date(asgn.expires_at as string) <= new Date();
             if (!expired) {
               assignedSlot = asgn.slot as string;
               hasSlotAssignment = true;

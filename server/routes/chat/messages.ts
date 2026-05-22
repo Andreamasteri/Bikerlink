@@ -36,7 +36,7 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const conversationId = req.params.id;
+    const conversationId = req.params.id as string;
     const rawLimit = parseInt(String(req.query.limit ?? "50"), 10);
     const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(rawLimit, 1), 100) : 50;
     const rawOffset = parseInt(String(req.query.offset ?? "0"), 10);
@@ -69,7 +69,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const id = req.params.id;
+    const id = req.params.id as string;
     const parsed = sendMessageSchema.safeParse(req.body);
     if (!parsed.success) {
       return sendError(res, 400, parsed.error.issues[0].message);
@@ -116,10 +116,10 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
       messageType,
       content: finalContent || null,
       imageUrl: imageUrl || null,
-      latitude: latitude ? String(latitude) : null,
-      longitude: longitude ? String(longitude) : null,
+      latitude: latitude != null ? Number(latitude) : null,
+      longitude: longitude != null ? Number(longitude) : null,
       isFiltered,
-      playlistId: playlistId ?? null,
+      playlistId: playlistId != null ? Number(playlistId) : null,
     });
 
     await storage.updateConversationTimestamp(id);

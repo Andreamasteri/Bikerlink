@@ -175,7 +175,7 @@ router.post("/", async (req: Request, res: Response) => {
       const existing = await storage.getConversations(userId);
       const contactThread = existing.find(c =>
         c.conversationType === "contact" &&
-        c.participantCount === 2
+        (c as any).participantCount === 2
       );
       if (contactThread) {
         const parts = await storage.getConversationParticipants(contactThread.id);
@@ -193,7 +193,7 @@ router.post("/", async (req: Request, res: Response) => {
     });
 
     const allParticipantIds = [...new Set([userId, ...(participantIds || [])])];
-    await Promise.all(allParticipantIds.map(id => storage.addConversationParticipant(conversation.id, id)));
+    await Promise.all(allParticipantIds.map(uid => storage.addConversationParticipant({ conversationId: conversation.id, userId: uid })));
 
     allParticipantIds.forEach(id => invalidateConvCache(id));
     return res.status(201).json(conversation);
@@ -208,7 +208,7 @@ router.post("/:id/read", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const conversationId = req.params.id;
+    const conversationId = req.params.id as string;
     await storage.updateConversationLastRead(conversationId, userId);
     invalidateConvCache(userId);
     return res.sendStatus(200);

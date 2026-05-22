@@ -138,7 +138,7 @@ router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Respon
     ).catch((err) => console.error("[EMAIL] Errore invio notifica GPS error:", err));
 
     storage.createGpsError({
-      userId: userId !== "unauthenticated" ? String(userId) : null,
+      userId: String(userId),
       routeId: body.routeId ? truncate(body.routeId, 36) : null,
       otaNumber: Number.isFinite(Number(body.otaNumber)) ? Number(body.otaNumber) : null,
       platform: truncate(body.platform ?? "unknown", 20),

@@ -30,7 +30,7 @@ function paramStr(v: string | string[] | undefined): string | null {
 async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string, mimetype: string): Promise<string> {
   const filename = `ad-${Date.now()}-${originalname}`;
   const objectPath = `public/ads/${filename}`;
-  await uploadBuffer(buffer, objectPath, mimetype);
+  await uploadBuffer(objectPath, buffer, mimetype);
   return `/api/ads/images/${filename}`;
 }
 
@@ -52,7 +52,7 @@ router.post("/bulk", adUpload.array("images", 10), async (req: Request, res: Res
   try {
     const parsedAb = adsBulkSchema.safeParse(req.body);
     if (!parsedAb.success) return sendError(res, 400, parsedAb.error.issues[0].message);
-    const { name, sponsor, linkUrl, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = parsedAb.data;
+    const { name, sponsor, linkUrl, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = parsedAb.data as any;
 
     const files = (req.files as Express.Multer.File[]) || [];
     const groupId = crypto.randomUUID();
@@ -117,9 +117,9 @@ router.post("/", adUpload.single("image"), async (req: Request, res: Response) =
       displayMode: "banner",
       description: description || null,
       targetUserType: targetUserType || "biker",
-      rotationDuration: rotationDuration ? parseInt(rotationDuration) : 10,
+      rotationDuration: rotationDuration ? parseInt(String(rotationDuration)) : 10,
       rotationMode: rotationMode || "sequential",
-      sortOrder: sortOrder ? parseInt(sortOrder) : 0,
+      sortOrder: sortOrder ? parseInt(String(sortOrder)) : 0,
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
       placement: placement || "all",
@@ -239,7 +239,7 @@ router.delete("/bulk-delete", async (req: Request, res: Response) => {
 
 router.put("/group/:groupId", async (req: Request, res: Response) => {
   try {
-    const { groupId } = req.params;
+    const groupId = req.params.groupId as string;
     const parsedGu = adsGroupUpdateSchema.safeParse(req.body);
     if (!parsedGu.success) return sendError(res, 400, parsedGu.error.issues[0].message);
     const { name, linkUrl, isActive } = parsedGu.data as any;

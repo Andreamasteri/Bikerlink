@@ -37,7 +37,7 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
 
     const user = await storage.getUser(userId);
     if (user && (user.userType === "zavorrina" || user.userType === "coppia")) {
-      triggerProposalProfileMatchingForZavorrina(userId).catch(e => console.error("[triggerMatchingForZavorrina error]", e));
+      triggerProposalProfileMatchingForZavorrina(userId);
     }
 
     return sendSuccess(res);

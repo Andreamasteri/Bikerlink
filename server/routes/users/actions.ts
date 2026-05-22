@@ -98,7 +98,7 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
       return sendError(res, 401, "Non autenticato");
     }
     const requesterId = req.session.userId;
-    const filename = req.params.filename;
+    const filename = req.params.filename as string;
     const photoUrl = `/api/users/photos/${filename}`;
 
     const [photoRow] = await db

@@ -103,7 +103,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
 
     const proposal = await storage.createProposal(proposalData);
 
-    (triggerProposalCreatedMatching(proposal.id) as any).catch((err: any) => {
+    (triggerProposalCreatedMatching as any)(proposal.id).catch((err: any) => {
       console.error("Async matching error for new proposal:", err);
     });
 

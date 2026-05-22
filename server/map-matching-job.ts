@@ -91,16 +91,16 @@ export async function runMapMatchingJob(): Promise<{
         const samples = await db
           .select({
             id: rideTelemetry.id,
-            lat: rideTelemetry.lat,
-            lon: rideTelemetry.lon,
-            leanAngle: rideTelemetry.leanAngle,
-            gforceX: rideTelemetry.gforceX,
-            gforceY: rideTelemetry.gforceY,
-            gforceZ: rideTelemetry.gforceZ,
+            lat: rideTelemetry.latDeg,
+            lon: rideTelemetry.lngDeg,
+            leanAngle: rideTelemetry.leanDeg,
+            gforceX: rideTelemetry.accelLateralG,
+            gforceY: rideTelemetry.accelLongG,
+            gforceZ: rideTelemetry.accelVertG,
           })
           .from(rideTelemetry)
           .where(and(eq(rideTelemetry.sessionId, sessionId), eq(rideTelemetry.matched, false)))
-          .orderBy(rideTelemetry.ts);
+          .orderBy(rideTelemetry.recordedAt);
 
         // Richiede almeno 2 punti GPS per il map matching
         if (samples.length < 2) {
@@ -112,7 +112,7 @@ export async function runMapMatchingJob(): Promise<{
           continue;
         }
 
-        const points: GHPoint[] = samples.map((s) => ({ lat: s.lat, lon: s.lon }));
+        const points: GHPoint[] = samples.map((s) => ({ lat: s.lat!, lon: s.lon! }));
 
         // Chiama il Map Matching API
         const matchResult = await mapMatch(points, "motorcycle");

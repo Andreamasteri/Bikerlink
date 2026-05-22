@@ -143,7 +143,7 @@ router.patch("/:id", async (req: Request, res: Response) => {
     const updates: { status?: string; internalNote?: string } = {};
     if (status !== undefined) updates.status = status;
     if (internalNote !== undefined) updates.internalNote = internalNote;
-    const ticket = await storage.updateFeedbackTicket(req.params.id, updates);
+    const ticket = await storage.updateFeedbackTicket(req.params.id as string, updates);
     if (!ticket) {
       return sendError(res, 404, "Ticket non trovato");
     }

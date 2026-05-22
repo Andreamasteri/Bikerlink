@@ -1,6 +1,8 @@
 export * from "./auth";
 export * from "./users";
 export * from "./matching";
+export { loginSchema } from "./auth";
+export { motorcycleSchema, updateUserSchema } from "./users";
 export * from "./ads";
 export * from "./conversations";
 export * from "./events";

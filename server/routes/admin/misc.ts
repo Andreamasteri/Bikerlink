@@ -77,7 +77,7 @@ router.put("/reports/:id/resolve", async (req: Request, res: Response) => {
     // Assuming resolveReport exists or using a generic update
     const [report] = await db.update(moderatorLogs)
         .set({ resolvedAt: new Date() })
-        .where(eq(moderatorLogs.id, parseInt(id)))
+        .where(eq(moderatorLogs.id, id as string))
         .returning();
     return res.json(report);
   } catch (error) {

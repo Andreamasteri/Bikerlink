@@ -13,7 +13,7 @@ router.get("/:id", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const [row] = await db.select({
       id: events.id,
@@ -70,7 +70,7 @@ router.put("/:id", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const { id } = req.params;
+    const id = req.params.id as string;
     const [existing] = await db.select().from(events).where(eq(events.id, id));
     if (!existing) return sendError(res, 404, "Evento non trovato");
 
@@ -101,7 +101,7 @@ router.put("/:id", async (req: Request, res: Response) => {
     const updates: Partial<InsertEvent> = { updatedAt: new Date() };
     if (title !== undefined) updates.title = title.trim();
     if (description !== undefined) updates.description = description ? description.trim() : null;
-    if (eventType !== undefined) updates.eventType = eventType;
+    if (eventType !== undefined) updates.eventType = eventType ?? undefined;
     if (body.locationName !== undefined) (updates as any).locationName = body.locationName ? body.locationName.trim() : null;
     if (latitude !== undefined) updates.latitude = latitude ?? null;
     if (longitude !== undefined) updates.longitude = longitude ?? null;

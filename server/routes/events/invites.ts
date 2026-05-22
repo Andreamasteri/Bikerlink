@@ -11,7 +11,7 @@ router.post("/:id/invite-user", async (req: Request, res: Response) => {
   try {
     const requesterId = requireAuth(req, res);
     if (!requesterId) return;
-    const eventId = req.params.id;
+    const eventId = req.params.id as string;
     const parsedIu = inviteUserToEventSchema.safeParse(req.body);
     if (!parsedIu.success) return sendError(res, 400, parsedIu.error.issues[0].message);
     const { userId: targetUserId } = parsedIu.data;
@@ -21,7 +21,7 @@ router.post("/:id/invite-user", async (req: Request, res: Response) => {
       title: events.title,
       organizerId: (events as any).organizerId, // Note: I saw organizerId in the original file at line 1101, but the schema snippet showed creatorId. Original code used organizerId at 1101.
       status: events.status,
-      eventDate: events.eventDate,
+      eventDate: (events as any).eventDate,
     }).from(events).where(eq(events.id, eventId)).limit(1);
     if (!event) return sendError(res, 404, "Evento non trovato");
 

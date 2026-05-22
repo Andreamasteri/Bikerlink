@@ -58,7 +58,7 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     const userId = requireAuth(req, res);
     if (!userId) return;
 
-    const { filename } = req.params;
+    const filename = req.params.filename as string;
     if (!filename || /[/\\.]\./.test(filename) || filename.includes("..")) {
       return sendError(res, 400, "Nome file non valido");
     }

@@ -77,6 +77,7 @@ export const moderatorLogs = pgTable("moderator_logs", {
   targetType: varchar("target_type", { length: 50 }).notNull(),
   targetId: varchar("target_id", { length: 36 }).notNull(),
   details: text("details"),
+  resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

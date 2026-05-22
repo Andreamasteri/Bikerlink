@@ -90,7 +90,7 @@ router.get("/preview/:code", async (req: Request, res: Response) => {
     const { code } = req.params;
     if (!code) return sendError(res, 400, "Codice mancante");
 
-    const invitation = await storage.getInvitationCode(code.toUpperCase());
+    const invitation = await storage.getInvitationCode((code as string).toUpperCase());
     if (!invitation || !invitation.isActive) {
       return sendError(res, 404, "Codice non valido");
     }

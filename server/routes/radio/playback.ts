@@ -37,7 +37,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
       signal: controller.signal,
       redirect: "manual",
       dispatcher: safeDispatcher,
-    } as Parameters<typeof fetch>[1]);
+    } as unknown as RequestInit);
 
     let finalResponse = upstream;
 
@@ -69,7 +69,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
           signal: controller2.signal,
           redirect: "manual",
           dispatcher: safeDispatcher,
-        } as Parameters<typeof fetch>[1]);
+        } as unknown as RequestInit);
         clearTimeout(timer2);
         if (finalResponse.status >= 300 && finalResponse.status < 400) {
           return res.status(400).json({ error: "Too many redirects" });

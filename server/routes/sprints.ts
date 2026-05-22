@@ -222,7 +222,7 @@ router.get("/leaderboard/rank/:userId", async (req: Request, res: Response) => {
     const requesterId = requireUserId(req, res);
     if (!requesterId) return;
 
-    const { userId } = req.params;
+    const userId = req.params.userId as string;
     if (!userId) return sendError(res, 400, "userId richiesto");
 
     const bestPerUser = db
@@ -244,7 +244,7 @@ router.get("/leaderboard/rank/:userId", async (req: Request, res: Response) => {
     const targetRow = await db
       .select({ sprint0to100Ms: bestPerUser.sprint0to100Ms, createdAt: bestPerUser.createdAt, id: bestPerUser.id })
       .from(bestPerUser)
-      .where(eq(bestPerUser.userId, userId))
+      .where(eq(bestPerUser.userId, userId!))
       .limit(1);
 
     if (targetRow.length === 0) {

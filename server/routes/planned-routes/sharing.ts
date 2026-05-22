@@ -16,7 +16,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
     const route = await storage.getPlannedRoute(id);
     if (!route) return sendError(res, 404, "Percorso non trovato");
 
-    const waypoints = (route.waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
+    const waypoints = ((route as any).waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
     const originWp = waypoints.find((wp) => wp.lat !== 0 && wp.lng !== 0);
     if (!originWp) return res.json({ bikers: [], count: 0 });
 
@@ -28,7 +28,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
       balanced: ["touring", "sport_touring", "naked", "adventure", "sport"],
       fast: ["sport", "sport_touring", "naked", "superbike"],
     };
-    const compatibleStyles = styleToRiderStyles[route.style ?? "balanced"] ?? [];
+    const compatibleStyles = styleToRiderStyles[(route as any).style ?? "balanced"] ?? [];
 
     const nearbyProfiles = await db.execute(sql`
       SELECT up.user_id, up.latitude, up.longitude, u.nickname, u.user_type,
@@ -82,12 +82,12 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
       matchScore: Math.round(Number(r.proximity_score ?? 0) + Number(r.style_score ?? 0) + Number(r.avail_score ?? 0)),
     }));
 
-    await storage.updatePlannedRoute(id, {
+    await (storage.updatePlannedRoute as any)(id, {
       metadata: {
-        ...(route.metadata as object ?? {}),
+        ...((route as any).metadata as object ?? {}),
         bikerCount: bikers.length,
         bikerUpdatedAt: new Date().toISOString(),
-      } as any,
+      },
     }).catch(() => {});
 
     return res.json({ bikers, count: bikers.length, routeId: id });
@@ -159,7 +159,7 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
       return sendError(res, 400, "GPX non valido: nessun waypoint o traccia trovata");
     }
 
-    const route = await storage.createPlannedRoute({
+    const route = await (storage.createPlannedRoute as any)({
       userId,
       title: gpxTitle,
       waypoints: finalWaypoints,
@@ -170,7 +170,7 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
       style: "balanced",
       visibility: visibility as any,
       isMultiDay: false,
-      metadata: { importedFromGpx: true, trackPointCount: trackPoints.length } as any,
+      metadata: { importedFromGpx: true, trackPointCount: trackPoints.length },
     });
 
     return res.status(201).json(route);
@@ -188,15 +188,15 @@ router.get("/:id/export.gpx", async (req: Request, res: Response) => {
   try {
     const route = await storage.getPlannedRoute(id);
     if (!route) return sendError(res, 404, "Non trovato");
-    if (route.userId !== userId && route.visibility !== "public") {
+    if (route.userId !== userId && (route as any).visibility !== "public") {
       return sendError(res, 403, "Non autorizzato");
     }
 
-    const waypoints = (route.waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
+    const waypoints = ((route as any).waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
     let trackPoints: [number, number][] = [];
 
-    if (route.polyline) {
-      trackPoints = decodePolyline(route.polyline);
+    if ((route as any).polyline) {
+      trackPoints = decodePolyline((route as any).polyline);
     } else if (waypoints.length) {
       trackPoints = waypoints.map((wp) => [wp.lat, wp.lng]);
     }

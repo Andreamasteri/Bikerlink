@@ -368,7 +368,7 @@ router.post("/api/custom-routes/import-gpx", async (req, res) => {
     if (!parsedGpx.success) {
       return res.status(400).json({ error: parsedGpx.error.issues[0].message });
     }
-    const { gpxContent, title } = parsedGpx.data;
+    const { gpxData: gpxContent, title } = parsedGpx.data;
 
     const points = parseGpxServer(gpxContent);
     if (points.length === 0) {

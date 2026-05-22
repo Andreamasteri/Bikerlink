@@ -42,7 +42,7 @@ publicMediaRouter.get("/", async (_req: Request, res: Response) => {
 publicMediaRouter.get("/file/:filename", async (req: Request, res: Response) => {
   try {
     const { downloadBuffer } = await import("../objectStorage");
-    const filename = decodeURIComponent(req.params.filename);
+    const filename = decodeURIComponent(req.params.filename as string);
 
     if (
       !SAFE_MEDIA_KEY_RE.test(filename) ||
@@ -105,7 +105,7 @@ adminMediaRouter.post("/", async (req: Request, res: Response) => {
 
 adminMediaRouter.put("/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const { type, titleIt, titleEn, url, thumbnailUrl, sortOrder } = req.body;
     if (type !== undefined && !validateType(type)) {
       return sendError(res, 400, "type deve essere 'pdf' o 'video'");
@@ -128,7 +128,7 @@ adminMediaRouter.put("/:id", async (req: Request, res: Response) => {
 
 adminMediaRouter.delete("/:id", async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     const [deleted] = await db.delete(mediaLibrary).where(eq(mediaLibrary.id, id)).returning();
     if (!deleted) return sendError(res, 404, "Elemento non trovato");
     return sendSuccess(res, undefined, "Eliminato");

@@ -46,7 +46,7 @@ router.put("/email-config", async (req: Request, res: Response) => {
   try {
     const parsedEc = emailConfigSchema.safeParse(req.body);
     if (!parsedEc.success) return sendError(res, 400, parsedEc.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("email_config", parsedEc.data);
+    const setting = await storage.upsertAppSetting("email_config", undefined, parsedEc.data);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio config email");
@@ -58,7 +58,7 @@ router.put("/disable-feature", async (req: Request, res: Response) => {
     const parsedDf = disableFeatureSchema.safeParse(req.body);
     if (!parsedDf.success) return sendError(res, 400, parsedDf.error.issues[0].message);
     const { key, disabled } = parsedDf.data;
-    const setting = await storage.upsertAppSetting(`disable_${key}`, disabled);
+    const setting = await storage.upsertAppSetting(`disable_${key}`, undefined, disabled);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore disabilitazione feature");
@@ -69,7 +69,7 @@ router.put("/toggle-protected", async (req: Request, res: Response) => {
   try {
     const parsedTp = toggleProtectedSchema.safeParse(req.body);
     if (!parsedTp.success) return sendError(res, 400, parsedTp.error.issues[0].message);
-    const { email, protected: isProt } = parsedTp.data;
+    void parsedTp.data;
     return sendSuccess(res);
   } catch (error) {
     return sendError(res, 500, "Errore toggle protetto");
@@ -79,7 +79,7 @@ router.put("/toggle-protected", async (req: Request, res: Response) => {
 router.put("/motoclub_include_zav", async (req: Request, res: Response) => {
   try {
     const val = req.body.value === true || req.body.value === "true";
-    const setting = await storage.upsertAppSetting("motoclub_include_zav", val);
+    const setting = await storage.upsertAppSetting("motoclub_include_zav", undefined, val);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio setting");
@@ -89,7 +89,7 @@ router.put("/motoclub_include_zav", async (req: Request, res: Response) => {
 router.put("/show_search_preference", async (req: Request, res: Response) => {
   try {
     const val = req.body.value === true || req.body.value === "true";
-    const setting = await storage.upsertAppSetting("show_search_preference", val);
+    const setting = await storage.upsertAppSetting("show_search_preference", undefined, val);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio setting");
@@ -99,7 +99,7 @@ router.put("/show_search_preference", async (req: Request, res: Response) => {
 router.put("/match_preferences_visible", async (req: Request, res: Response) => {
   try {
     const val = req.body.value === true || req.body.value === "true";
-    const setting = await storage.upsertAppSetting("match_preferences_visible", val);
+    const setting = await storage.upsertAppSetting("match_preferences_visible", undefined, val);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio setting");
@@ -109,7 +109,7 @@ router.put("/match_preferences_visible", async (req: Request, res: Response) => 
 router.put("/search_preference_locked", async (req: Request, res: Response) => {
   try {
     const val = req.body.value === true || req.body.value === "true";
-    const setting = await storage.upsertAppSetting("search_preference_locked", val);
+    const setting = await storage.upsertAppSetting("search_preference_locked", undefined, val);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio setting");
@@ -119,7 +119,7 @@ router.put("/search_preference_locked", async (req: Request, res: Response) => {
 router.put("/maps_enabled", async (req: Request, res: Response) => {
   try {
     const val = req.body.value === true || req.body.value === "true";
-    const setting = await storage.upsertAppSetting("maps_enabled", val);
+    const setting = await storage.upsertAppSetting("maps_enabled", undefined, val);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio setting");
@@ -129,7 +129,7 @@ router.put("/maps_enabled", async (req: Request, res: Response) => {
 router.put("/primal_user_enabled", async (req: Request, res: Response) => {
   try {
     const val = req.body.value === true || req.body.value === "true";
-    const setting = await storage.upsertAppSetting("primal_user_enabled", val);
+    const setting = await storage.upsertAppSetting("primal_user_enabled", undefined, val);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio setting");
@@ -140,7 +140,7 @@ router.put("/maps_provider", async (req: Request, res: Response) => {
   try {
     const parsed = mapsProviderSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("maps_provider", parsed.data.provider);
+    const setting = await storage.upsertAppSetting("maps_provider", parsed.data.value);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio provider mappe");
@@ -150,7 +150,7 @@ router.put("/maps_provider", async (req: Request, res: Response) => {
 router.put("/theme_user_switching_enabled", async (req: Request, res: Response) => {
   try {
     const val = req.body.value === true || req.body.value === "true";
-    const setting = await storage.upsertAppSetting("theme_user_switching_enabled", val);
+    const setting = await storage.upsertAppSetting("theme_user_switching_enabled", undefined, val);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio setting");
@@ -161,7 +161,7 @@ router.put("/theme_default", async (req: Request, res: Response) => {
   try {
     const parsed = themeDefaultSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("theme_default", parsed.data.theme);
+    const setting = await storage.upsertAppSetting("theme_default", parsed.data.value);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio tema");
@@ -181,7 +181,7 @@ router.put("/matching_countries", async (req: Request, res: Response) => {
   try {
     const parsed = matchingCountriesSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("matching_countries", parsed.data.countries);
+    const setting = await storage.upsertAppSetting("matching_countries", undefined, parsed.data.value);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio paesi");
@@ -201,7 +201,7 @@ router.put("/coordinates_max_age_seconds", async (req: Request, res: Response) =
   try {
     const parsed = coordinatesMaxAgeSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("coordinates_max_age_seconds", parsed.data.seconds);
+    const setting = await storage.upsertAppSetting("coordinates_max_age_seconds", undefined, parsed.data.value);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio max age");
@@ -210,10 +210,10 @@ router.put("/coordinates_max_age_seconds", async (req: Request, res: Response) =
 
 router.put("/:key", async (req: Request, res: Response) => {
   try {
-    const { key } = req.params;
+    const key = req.params.key as string;
     const parsed = genericSettingSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting(key, parsed.data.value);
+    const setting = await storage.upsertAppSetting(key, undefined, parsed.data.value);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio setting");
@@ -281,7 +281,7 @@ router.get("/floating-widget", async (_req: Request, res: Response) => {
 router.get("/show-distance-counter", async (_req: Request, res: Response) => {
   try {
     const setting = await storage.getAppSetting("show_distance_counter");
-    return res.json({ enabled: setting?.value === true });
+    return res.json({ enabled: setting?.value === "true" || setting?.valueJson === true });
   } catch (error) {
     return sendError(res, 500, "Errore lettura distance counter status");
   }
@@ -300,7 +300,7 @@ router.put("/native-version", async (req: Request, res: Response) => {
   try {
     const parsed = nativeVersionSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("native_version", parsed.data);
+    const setting = await storage.upsertAppSetting("native_version", undefined, parsed.data);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio native version");
@@ -380,7 +380,7 @@ router.put("/maintenance", async (req: Request, res: Response) => {
   try {
     const parsed = maintenanceSettingsSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("maintenance_settings", parsed.data);
+    const setting = await storage.upsertAppSetting("maintenance_settings", undefined, parsed.data);
     return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore salvataggio maintenance mode");
@@ -400,7 +400,7 @@ router.post("/landing-images", async (req: Request, res: Response) => {
   try {
     const images = req.body.images;
     if (!Array.isArray(images)) return sendError(res, 400, "Images deve essere un array");
-    const setting = await storage.upsertAppSetting("landing_images", images);
+    const setting = await storage.upsertAppSetting("landing_images", undefined, images);
     await bustLandingImagesCache();
     return res.json(setting);
   } catch (error) {

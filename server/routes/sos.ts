@@ -94,7 +94,7 @@ router.get("/my", async (req: Request, res: Response) => {
 router.put("/:id/cancel", async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const sosRequest = await storage.getSosRequest(req.params.id);
+    const sosRequest = await storage.getSosRequest(req.params.id as string);
 
     if (!sosRequest) {
       return sendError(res, 404, "Richiesta SOS non trovata");
@@ -117,7 +117,7 @@ router.put("/:id/cancel", async (req: Request, res: Response) => {
 router.put("/:id/accept", async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    const sosRequest = await storage.getSosRequest(req.params.id);
+    const sosRequest = await storage.getSosRequest(req.params.id as string);
 
     if (!sosRequest) {
       return sendError(res, 404, "Richiesta SOS non trovata");

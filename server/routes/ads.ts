@@ -155,7 +155,7 @@ export async function cleanupOrphanedAdImages(): Promise<void> {
 }
 
 router.get("/images/:filename", async (req: Request, res: Response) => {
-  const filename = req.params.filename;
+  const filename = req.params.filename as string;
   if (!filename || filename.includes("..") || filename.includes("/")) {
     return sendError(res, 400, "Nome file non valido");
   }

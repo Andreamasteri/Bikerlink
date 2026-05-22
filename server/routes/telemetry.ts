@@ -55,17 +55,16 @@ router.post("/batch", async (req: Request, res: Response) => {
       rows.push({
         userId,
         sessionId: session_id,
-        sessionType: resolvedType as "ride" | "trip" | "free",
-        ts: BigInt(Math.round(ts)),
-        lat,
-        lon,
+        recordedAt: new Date(ts),
+        latDeg: lat,
+        lngDeg: lon,
         speedKmh: s.speed_kmh != null && Number.isFinite(Number(s.speed_kmh)) ? Number(s.speed_kmh) : null,
-        leanAngle: s.lean_angle != null && Number.isFinite(Number(s.lean_angle)) ? Number(s.lean_angle) : null,
-        gforceX: s.gforce_x != null && Number.isFinite(Number(s.gforce_x)) ? Number(s.gforce_x) : null,
-        gforceY: s.gforce_y != null && Number.isFinite(Number(s.gforce_y)) ? Number(s.gforce_y) : null,
-        gforceZ: s.gforce_z != null && Number.isFinite(Number(s.gforce_z)) ? Number(s.gforce_z) : null,
-        heading: s.heading != null && Number.isFinite(Number(s.heading)) ? Number(s.heading) : null,
-        altitudeM: s.altitude_m != null && Number.isFinite(Number(s.altitude_m)) ? Number(s.altitude_m) : null,
+        leanDeg: s.lean_angle != null && Number.isFinite(Number(s.lean_angle)) ? Number(s.lean_angle) : null,
+        accelLateralG: s.gforce_x != null && Number.isFinite(Number(s.gforce_x)) ? Number(s.gforce_x) : null,
+        accelLongG: s.gforce_y != null && Number.isFinite(Number(s.gforce_y)) ? Number(s.gforce_y) : null,
+        accelVertG: s.gforce_z != null && Number.isFinite(Number(s.gforce_z)) ? Number(s.gforce_z) : null,
+        headingDeg: s.heading != null && Number.isFinite(Number(s.heading)) ? Number(s.heading) : null,
+        altM: s.altitude_m != null && Number.isFinite(Number(s.altitude_m)) ? Number(s.altitude_m) : null,
       });
     }
 

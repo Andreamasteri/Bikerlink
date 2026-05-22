@@ -181,7 +181,7 @@ router.delete("/entries/:id", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     const entry = await storage.getPhotoContestEntry(id);
     if (!entry) {
@@ -213,7 +213,7 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const filename = req.params.filename;
+    const filename = req.params.filename as string;
     // Basic filename sanity check to prevent path traversal
     if (!filename || filename.includes("/") || filename.includes("..")) {
       return res.status(400).end();

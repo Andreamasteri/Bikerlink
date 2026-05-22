@@ -168,7 +168,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
         const rideStart = allPoints[0];
         const userPlannedRoutes = await storage.getPlannedRoutes(userId);
         for (const pr of userPlannedRoutes) {
-          const wps = (pr.waypoints as Array<{ lat: number; lng: number }>) ?? [];
+          const wps = ((pr as any).waypoints as Array<{ lat: number; lng: number }>) ?? [];
           if (!wps.length) continue;
           const startWp = wps[0];
           if (!startWp?.lat || !startWp?.lng) continue;
@@ -185,14 +185,14 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
             // column and in metadata for historical audit.
             // IMPORTANT: do NOT overwrite bikerScore (planned curvature estimate);
             // realCurvatureScore is the post-ride validation measurement.
-            await storage.updatePlannedRoute(pr.id, {
+            await (storage.updatePlannedRoute as any)(pr.id, {
               realCurvatureScore,
               metadata: {
-                ...(pr.metadata as object ?? {}),
+                ...((pr as any).metadata as object ?? {}),
                 realCurvatureScore,
                 matchedRideId: id,
                 matchedAt: new Date().toISOString(),
-              } as any,
+              },
             });
             console.log(`[post-ride] Updated planned route ${pr.id} metadata.realCurvatureScore=${realCurvatureScore} from ride ${id}`);
             break;

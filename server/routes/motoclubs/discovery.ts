@@ -171,7 +171,7 @@ router.get("/map", requireAuth, async (req: Request, res: Response) => {
 
 router.get("/:id/stats", requireAuth, async (req: Request, res: Response) => {
   try {
-    const clubId = req.params.id;
+    const clubId = req.params.id as string;
     const members = await db.select({ userId: motoClubMembers.userId })
       .from(motoClubMembers)
       .where(and(eq(motoClubMembers.clubId, clubId), eq(motoClubMembers.status, "active")));
