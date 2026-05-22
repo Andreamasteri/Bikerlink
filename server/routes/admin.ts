@@ -330,6 +330,9 @@ async function checkOtaTokenMiddleware(req: Request, _res: Response, next: Funct
 
 // Registra il middleware OTA token PRIMA del gate requireAdmin globale
 router.use(checkOtaTokenMiddleware as any);
+// Gate di autorizzazione admin globale — protegge tutti gli endpoint di questo
+// router. Il bypass OTA token è gestito dentro requireAdmin stessa (riga 238).
+router.use(requireAdmin as any);
 
 // Retention massima righe ota_events — usato come limite per la query admin
 // di visualizzazione. Il cleanup hard è gestito da Phase 12.5 in server/index.ts
