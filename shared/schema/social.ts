@@ -142,6 +142,8 @@ export type FakeUserInteraction = typeof fakeUserInteractions.$inferSelect;
 export type InsertFakeUserInteraction = typeof fakeUserInteractions.$inferInsert;
 export type UserBlock = typeof userBlocks.$inferSelect;
 export type InsertUserBlock = typeof userBlocks.$inferInsert;
+export type UserFavorite = typeof userFavorites.$inferSelect;
+export type InsertUserFavorite = typeof userFavorites.$inferInsert;
 
 export const easterEggSchema = z.object({
   name: z.string().optional(),

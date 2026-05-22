@@ -32,10 +32,11 @@ export const coordinateHistory = pgTable("coordinate_history", {
 ]);
 
 export const arcadeGameEnum = pgEnum("arcade_game", [
-  "curve_king",
-  "sprint_hero",
-  "route_master",
-  "altitude_ace",
+  "endless_biker",
+  "traffic_racer",
+  "wheelie",
+  "tetris",
+  "space_invaders",
 ]);
 
 export const arcadeScores = pgTable("arcade_scores", {

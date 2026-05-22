@@ -46,6 +46,7 @@ export const proposals = pgTable("proposals", {
   extendToDestination: boolean("extend_to_destination").notNull().default(false),
   destinationSearchRadius: integer("destination_search_radius"),
   searchTypes: jsonb("search_types").$type<string[]>(),
+  targetUserTypes: jsonb("target_user_types").$type<string[]>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
@@ -112,6 +113,32 @@ export const proposalZoneNotifications = pgTable("proposal_zone_notifications", 
   index("proposal_zone_notif_proposal_idx").on(table.proposalId),
 ]);
 
+export const proposalProfileMatches = pgTable("proposal_profile_matches", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  proposalId: varchar("proposal_id", { length: 36 })
+    .notNull()
+    .references(() => proposals.id, { onDelete: "cascade" }),
+  bikerId: varchar("biker_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  zavarrinaId: varchar("zavorrina_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  distanceKm: doublePrecision("distance_km"),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("ppm_biker_id_idx").on(table.bikerId),
+  index("ppm_zavorrina_id_idx").on(table.zavarrinaId),
+  index("ppm_proposal_id_idx").on(table.proposalId),
+  uniqueIndex("ppm_proposal_zavorrina_unique_idx").on(table.proposalId, table.zavarrinaId),
+  uniqueIndex("ppm_biker_zavorrina_active_idx")
+    .on(table.bikerId, table.zavarrinaId)
+    .where(sql`${table.status} = 'new'`),
+]);
+
 export type Proposal = typeof proposals.$inferSelect;
 export type InsertProposal = typeof proposals.$inferInsert;
 export type ProposalParticipant = typeof proposalParticipants.$inferSelect;
@@ -120,3 +147,5 @@ export type ProposalMatch = typeof proposalMatches.$inferSelect;
 export type InsertProposalMatch = typeof proposalMatches.$inferInsert;
 export type ProposalZoneNotification = typeof proposalZoneNotifications.$inferSelect;
 export type InsertProposalZoneNotification = typeof proposalZoneNotifications.$inferInsert;
+export type ProposalProfileMatch = typeof proposalProfileMatches.$inferSelect;
+export type InsertProposalProfileMatch = typeof proposalProfileMatches.$inferInsert;
