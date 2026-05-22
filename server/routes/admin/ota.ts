@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { otaEvents, otaPublishTokens, otaReleases, deviceOtaAssignments } from "@shared/schema";
-import { otaErrorSchema, publishWithSlotSchema, createOtaTokenSchema, assignOtaSlotSchema, publishOtaReleaseSchema, otaAssignDeviceSchema, otaPromoteSchema, otaMarkBrokenSchema } from "@shared/validators";
+import { otaErrorSchema, publishWithSlotSchema, createOtaTokenSchema, assignOtaSlotSchema, publishOtaReleaseSchema, otaAssignDeviceSchema, otaPromoteSchema, otaMarkBrokenSchema, updateOtaNotesSchema } from "@shared/validators";
 import { sql, eq, and, or, isNull, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "../../objectStorage";
@@ -474,6 +474,41 @@ router.post("/ota/:id/approve", async (req: Request, res: Response) => {
     return res.json(updated);
   } catch (err) {
     return sendError(res, 500, "Errore approvazione release");
+  }
+});
+
+router.patch("/ota/:id/notes", async (req: Request, res: Response) => {
+  if (!await assertAdminSession(req, res)) return;
+  try {
+    const id = paramStr(req.params.id);
+    if (!id) return sendError(res, 400, "ID non valido");
+
+    const parsed = updateOtaNotesSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+
+    const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+    if (!existing.length) return sendError(res, 404, "Release non trovata");
+
+    const [updated] = await db.update(otaReleases)
+      .set({ releaseNotes: parsed.data.releaseNotes, updatedAt: new Date() })
+      .where(eq(otaReleases.id, id))
+      .returning();
+
+    const actorId = req.session.userId;
+    if (actorId) {
+      storage.createModeratorLog({
+        moderatorId: actorId,
+        action: "edit_ota_release_notes",
+        targetType: "ota_release",
+        targetId: id,
+        details: `Note aggiornate per v=${existing[0].version}`,
+      }).catch(() => {});
+    }
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("[OTA-NOTES] patch error:", err);
+    return sendError(res, 500, "Errore aggiornamento note");
   }
 });
 

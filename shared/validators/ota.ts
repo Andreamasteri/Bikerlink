@@ -73,6 +73,11 @@ export const otaMarkBrokenSchema = z.object({
 });
 export type OtaMarkBrokenInput = z.infer<typeof otaMarkBrokenSchema>;
 
+export const updateOtaNotesSchema = z.object({
+  releaseNotes: z.string().max(5000, "Le note non possono superare 5000 caratteri"),
+});
+export type UpdateOtaNotesInput = z.infer<typeof updateOtaNotesSchema>;
+
 export const coordinateHistorySettingsSchema = z.object({
   enabled: z.boolean().optional(),
   interval: z.union([z.number().int().min(5), z.string()]).optional(),

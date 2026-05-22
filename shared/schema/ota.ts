@@ -202,6 +202,7 @@ export const otaMarkBrokenSchema = z.object({
 });
 export type OtaMarkBrokenInput = z.infer<typeof otaMarkBrokenSchema>;
 
+
 export const coordinateHistorySettingsSchema = z.object({
   enabled: z.boolean().optional(),
   interval: z.union([z.number().int().min(5), z.string()]).optional(),
