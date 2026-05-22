@@ -1372,7 +1372,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-21T22:09:54.784Z"
+  },
+  {
+    "updateNumber": 5,
+    "version": "48.5.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-5 rv10.0.0: Stabilità avvio + TypeScript 0 errori + migrazione schema + storage refactor",
+    "note": "CURRENT_OTA_NUMBER=5. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "a940438b-4169-4a95-a855-2aa2dbf19125",
+    "bundleUrl": "private/ota/ota-48.5.10-1779441207040.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "bf5e8ddfd4945b4ce645b98a17216fe7c9c4d10a",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-22T09:13:30.176Z"
   }
 ]
