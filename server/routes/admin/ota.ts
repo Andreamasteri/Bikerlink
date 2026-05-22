@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { storage } from "../../storage";
-import { otaEvents, otaPublishTokens, otaReleases, otaErrorSchema, publishWithSlotSchema, createOtaTokenSchema, assignOtaSlotSchema, publishOtaReleaseSchema, otaAssignDeviceSchema, otaPromoteSchema, otaMarkBrokenSchema } from "@shared/schema";
+import { otaEvents, otaPublishTokens, otaReleases, deviceOtaAssignments, otaErrorSchema, publishWithSlotSchema, createOtaTokenSchema, assignOtaSlotSchema, publishOtaReleaseSchema, otaAssignDeviceSchema, otaPromoteSchema, otaMarkBrokenSchema } from "@shared/schema";
 import { sql, eq, and, or, isNull, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { uploadBuffer, objectExists, isValidOtaBundlePath, deleteObject } from "../../objectStorage";
@@ -324,19 +324,16 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
     const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
     if (!existing.length) return sendError(res, 404, "Release non trovata");
 
-    // Se la release è in slot='archived' (pending-approval) o senza slot,
-    // promuovila a 'stable' e auto-approva. Se ha già uno slot esplicito
-    // (canary, preview, ecc.) lascialo invariato — approvazione sospesa solo
-    // per il canale default/stable.
+    // Promuovi a 'admin-preview': l'admin testa prima di distribuire a tutti.
+    // Unica eccezione: slot già esplicito (canary, beta, ecc.) → lascialo invariato.
     const existingSlot = existing[0].slot as string | null;
-    const promotedSlot = (existingSlot === "archived" || existingSlot === null) ? "stable" : existingSlot;
-    const shouldAutoApprove = promotedSlot === "stable";
+    const promotedSlot = (existingSlot === "archived" || existingSlot === null) ? "admin-preview" : existingSlot;
 
     const [updated] = await db.update(otaReleases)
       .set({
         status: "active",
         slot: promotedSlot,
-        ...(shouldAutoApprove ? { approved: true, approvedAt: new Date() } : {}),
+        approved: false,
         publishedAt: new Date(),
         updatedAt: new Date(),
       })
@@ -350,7 +347,7 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
         action: "publish_ota_release",
         targetType: "ota_release",
         targetId: id,
-        details: `Release pubblicata: v=${existing[0].version} RV=${existing[0].runtimeVersion ?? "-"}`,
+        details: `Release in admin-preview: v=${existing[0].version} RV=${existing[0].runtimeVersion ?? "-"}`,
       }).catch(() => {});
     }
 
@@ -467,6 +464,102 @@ router.get("/ota/releases", async (_req: Request, res: Response) => {
     return res.json(releases);
   } catch (err) {
     return sendError(res, 500, "Errore lettura release");
+  }
+});
+
+router.get("/ota/pending-approval", async (_req: Request, res: Response) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT * FROM ota_releases
+      WHERE slot = 'admin-preview' AND status = 'active' AND approved = false
+      ORDER BY published_at DESC NULLS LAST, created_at DESC
+      LIMIT 1
+    `);
+    if (result.rows.length === 0) return res.json(null);
+    return res.json(result.rows[0]);
+  } catch (err) {
+    console.error("[OTA-PENDING-APPROVAL] error:", err);
+    return sendError(res, 500, "Errore lettura pending approval");
+  }
+});
+
+router.post("/ota/assign-admin-preview", async (req: Request, res: Response) => {
+  try {
+    const rawDeviceId = typeof req.body?.deviceId === "string" ? req.body.deviceId.trim().substring(0, 128) : null;
+    if (!rawDeviceId) return sendError(res, 400, "deviceId obbligatorio");
+
+    const pending = await db.execute(sql`
+      SELECT * FROM ota_releases
+      WHERE slot = 'admin-preview' AND status = 'active' AND approved = false
+      ORDER BY published_at DESC NULLS LAST, created_at DESC
+      LIMIT 1
+    `);
+    if (pending.rows.length === 0) return sendError(res, 404, "Nessuna OTA in attesa di approvazione admin");
+
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    await db.execute(sql`
+      INSERT INTO device_ota_assignments (device_id, slot, assigned_at, assigned_by, expires_at)
+      VALUES (${rawDeviceId}, 'admin-preview', NOW(), ${req.session.userId ?? null}, ${expiresAt.toISOString()})
+      ON CONFLICT (device_id) DO UPDATE
+        SET slot = 'admin-preview',
+            assigned_at = NOW(),
+            assigned_by = ${req.session.userId ?? null},
+            expires_at = ${expiresAt.toISOString()}
+    `);
+
+    storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "assign_admin_preview_device",
+      targetType: "ota_release",
+      targetId: String(pending.rows[0].id),
+      details: `Admin device ${rawDeviceId.substring(0, 16)}… assegnato a admin-preview`,
+    }).catch(() => {});
+
+    return sendSuccess(res, { release: pending.rows[0], expiresAt: expiresAt.toISOString() });
+  } catch (err) {
+    console.error("[OTA-ASSIGN-ADMIN-PREVIEW] error:", err);
+    return sendError(res, 500, "Errore assegnazione admin-preview");
+  }
+});
+
+router.post("/ota/:id/distribute", async (req: Request, res: Response) => {
+  try {
+    const id = paramStr(req.params.id);
+    if (!id) return sendError(res, 400, "ID non valido");
+
+    const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+    if (!existing.length) return sendError(res, 404, "Release non trovata");
+    if (existing[0].slot !== "admin-preview") {
+      return sendError(res, 400, `La release è nello slot '${existing[0].slot}', non admin-preview`);
+    }
+
+    const [updated] = await db.update(otaReleases)
+      .set({
+        slot: "stable",
+        approved: true,
+        approvedAt: new Date(),
+        approvedBy: req.session.userId ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(otaReleases.id, id))
+      .returning();
+
+    await db.execute(sql`
+      DELETE FROM device_ota_assignments WHERE slot = 'admin-preview'
+    `);
+
+    storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "distribute_ota_release",
+      targetType: "ota_release",
+      targetId: id,
+      details: `OTA distribuita a tutti: v=${existing[0].version} RV=${existing[0].runtimeVersion ?? "-"}`,
+    }).catch(() => {});
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("[OTA-DISTRIBUTE] error:", err);
+    return sendError(res, 500, "Errore distribuzione release");
   }
 });
 

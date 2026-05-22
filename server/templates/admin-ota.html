@@ -46,6 +46,13 @@
   button.danger:hover { background:#2a0e0e; color:#fff; border-color:#ef4444; }
   button.ok { border-color:#143820; color:#4ade80; }
   button.ok:hover { background:#0d2818; color:#fff; border-color:#22c55e; }
+  /* Zona 0 — pending admin-preview */
+  .pending-box { background:#0d0a00; border:1px solid #3d2e00; border-left:3px solid #f59e0b; padding:20px 24px; display:flex; align-items:flex-start; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+  .pending-label { font-size:10px; letter-spacing:2px; text-transform:uppercase; color:#a37100; margin-bottom:6px; }
+  .pending-num { font-size:28px; letter-spacing:2px; color:#f59e0b; font-weight:600; }
+  .pending-meta { font-size:11px; color:#7a6030; margin-top:4px; }
+  button.distribute { border-color:#2d5400; color:#86efac; background:#0a1a00; }
+  button.distribute:hover { background:#0d2818; color:#fff; border-color:#22c55e; }
   /* Footer log */
   footer { margin-top:60px; padding-top:20px; border-top:1px solid #1a1a1a; text-align:center; }
   footer button { background:transparent; border:none; color:#555; font-size:11px; letter-spacing:1px; padding:8px 16px; }
@@ -80,6 +87,17 @@
 </h1>
 
 <div id="error" class="error-msg" style="display:none"></div>
+
+<section id="pending-approval-section" style="display:none">
+  <div class="sec-label">⚠ in attesa di test admin</div>
+  <div class="pending-box" id="pending-box">
+    <div>
+      <div class="pending-num mono" id="pending-num">—</div>
+      <div class="pending-meta" id="pending-meta"></div>
+    </div>
+    <button class="distribute" id="distribute-btn">✓ Distribuisci a tutti</button>
+  </div>
+</section>
 
 <section>
   <div class="sec-label">stabile adesso</div>
@@ -219,6 +237,21 @@
   }
 
   function render(){
+    // Zona 0 — admin-preview pending approval
+    var pending = findBySlot('admin-preview');
+    var pendingSection = $('pending-approval-section');
+    if (pending) {
+      pendingSection.style.display = '';
+      $('pending-num').textContent = otaLabel(pending);
+      $('pending-meta').textContent = 'pubblicato ' + fmtDate(pending.published_at || pending.created_at) +
+        (pending.runtime_version ? '  ·  RV ' + pending.runtime_version : '') +
+        '  ·  approved: ' + (pending.approved ? 'sì' : 'no');
+      $('distribute-btn').disabled = false;
+      $('distribute-btn').onclick = function(){ doDistribute(pending); };
+    } else {
+      pendingSection.style.display = 'none';
+    }
+
     // Zona 1 — stable
     var stable = findBySlot('stable');
     var prev = findBySlot('previous-stable');
@@ -342,6 +375,12 @@
     if (!confirmAction('MARCA ROTTO: ' + otaLabel(r), r, 'verrà disattivato definitivamente')) return;
     try { await api('POST', '/api/admin/ota/mark-broken', { releaseId: r.id }); await load(); }
     catch(e){ showError('Mark broken fallito: ' + e.message); }
+  }
+  async function doDistribute(r){
+    if (!confirmAction('DISTRIBUISCI A TUTTI: ' + otaLabel(r), r, 'verrà promossa a stable e resa disponibile a tutti i device')) return;
+    $('distribute-btn').disabled = true;
+    try { await api('POST', '/api/admin/ota/' + r.id + '/distribute', {}); await load(); }
+    catch(e){ showError('Distribuzione fallita: ' + e.message); $('distribute-btn').disabled = false; }
   }
 
   // ── Log modal ────────────────────────────────────

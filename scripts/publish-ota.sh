@@ -807,24 +807,38 @@ do_publish() {
   fi
   echo "   ✔ Release pubblicata (status: active)"
 
-  # ─── Step I+: Verifica che la release sia in slot=stable ────
-  # Il publish endpoint ora auto-approva (slot=stable, approved=true) per le
-  # release in slot=archived. Verifichiamo che la risposta lo confermi.
+  # ─── Step I+: Verifica che la release sia in slot=admin-preview ────
+  # Il publish endpoint ora promuove a admin-preview (approved=false) per il
+  # test admin prima della distribuzione. Verifichiamo che la risposta lo confermi.
   local PUBLISHED_SLOT PUBLISHED_APPROVED
   PUBLISHED_SLOT=$(echo "$PUBLISH_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).slot ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
   PUBLISHED_APPROVED=$(echo "$PUBLISH_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).approved ? 'true' : 'false'); } catch { console.log('false'); } })" 2>/dev/null || true)
-  if [ "$PUBLISHED_SLOT" = "stable" ] && [ "$PUBLISHED_APPROVED" = "true" ]; then
-    echo "   ✔ Release auto-approvata (slot=stable, approved=true)"
+  if [ "$PUBLISHED_SLOT" = "admin-preview" ] && [ "$PUBLISHED_APPROVED" = "false" ]; then
+    echo "   ✔ Release in admin-preview (slot=admin-preview, approved=false)"
+    echo ""
+    echo "   ╔══════════════════════════════════════════════════════════╗"
+    echo "   ║  ⚠  OTA IN ATTESA DI TEST ADMIN                        ║"
+    echo "   ║                                                          ║"
+    echo "   ║  1. Apri BikerLink sul tuo dispositivo Android           ║"
+    echo "   ║  2. Vai in: Profilo → Admin → Sistema OTA                ║"
+    echo "   ║  3. Tocca  [Applica OTA]  per ricevere l'aggiornamento   ║"
+    echo "   ║  4. Testa l'app                                          ║"
+    echo "   ║  5. Tocca  [Distribuisci OTA]  per rilasciare a tutti    ║"
+    echo "   ║                                                          ║"
+    echo "   ║  Oppure usa il pannello web: /admin/ota                  ║"
+    echo "   ╚══════════════════════════════════════════════════════════╝"
+    echo ""
   else
-    echo "   ⚠ Attenzione: release non in slot=stable (slot=$PUBLISHED_SLOT, approved=$PUBLISHED_APPROVED)"
-    echo "     I device potrebbero non ricevere l'aggiornamento automaticamente."
-    echo "     Approvare manualmente dall'app → Profilo oppure verificare il backend."
+    echo "   ⚠ Attenzione: risposta inattesa (slot=$PUBLISHED_SLOT, approved=$PUBLISHED_APPROVED)"
+    echo "     Verificare il backend. Stato atteso: slot=admin-preview, approved=false"
   fi
 
-  # ─── Step J: Verifica live — OTA servita ai device ───────
-  # La release è ora slot=stable, approved=true: il backend deve rispondere 200
-  # con il manifest. Se risponde 204/noUpdateAvailable, potrebbe esserci un
-  # problema — ma accettiamo anche 204 e 304 come successo di raggiungibilità.
+  # ─── Step J: Verifica raggiungibilità backend ─────────────
+  # La release è in slot=admin-preview (non ancora distribuita).
+  # Verifichiamo solo che il backend risponda correttamente su /api/expo-updates.
+  # 200/204/304 sono tutti accettabili — 200 significa che esiste un update
+  # assegnato al device, 204 significa nessun update (normale per device senza
+  # assignment admin-preview). Non blocchiamo su 204 perché è lo stato atteso.
   echo "[J] Verifica raggiungibilità backend (backoff max 30s)..."
   local MAX_WAIT=30 WAIT_INTERVAL=5 ELAPSED=0 VERIFIED=0
   while [ $ELAPSED -le $MAX_WAIT ]; do

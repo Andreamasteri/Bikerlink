@@ -7,15 +7,17 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import otaUpdates from "@/ota-updates.json";
-import { runManualOtaCheck } from "@/lib/ota-check";
-import { getApiUrl } from "@/lib/query-client";
+import { runManualOtaCheck, triggerOtaCheck } from "@/lib/ota-check";
+import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
+import { getStableDeviceId } from "@/lib/device-id";
 
 import { OtaEventCard, OtaUpdate, OtaDbRelease } from "@/components/admin/ota/OtaEventCard";
 import { OtaFilters } from "@/components/admin/ota/OtaFilters";
@@ -89,6 +91,256 @@ interface SystemHealth {
   events: unknown[];
   otaErrors?: OtaErrorEntry[];
 }
+
+interface PendingOtaRelease {
+  id: string;
+  version: string;
+  runtime_version: string | null;
+  release_notes: string | null;
+  published_at: string | null;
+  created_at: string;
+  slot: string;
+  approved: boolean;
+}
+
+function PendingApprovalCard() {
+  const queryClient = useQueryClient();
+  const [isApplying, setIsApplying] = useState(false);
+  const [isDistributing, setIsDistributing] = useState(false);
+
+  const { data: pendingRelease, refetch: refetchPending } = useQuery<PendingOtaRelease | null>({
+    queryKey: ["/api/admin/ota/pending-approval"],
+    queryFn: async () => {
+      const res = await fetch(new URL("/api/admin/ota/pending-approval", getApiUrl()).toString(), {
+        headers: { ...(await authFetchHeaders()) },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  });
+
+  const handleApply = useCallback(async () => {
+    if (!pendingRelease) return;
+    if (Platform.OS === "web") {
+      Alert.alert("Non disponibile", "Usa il pannello web admin per applicare l'OTA su desktop.");
+      return;
+    }
+    setIsApplying(true);
+    try {
+      const deviceId = await getStableDeviceId();
+      const res = await fetch(new URL("/api/admin/ota/assign-admin-preview", getApiUrl()).toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+        credentials: "include",
+        body: JSON.stringify({ deviceId }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.message ?? `HTTP ${res.status}`);
+      }
+      Alert.alert(
+        "Dispositivo registrato",
+        "Questo dispositivo riceverà l'OTA admin-preview. L'app si aggiornerà adesso.",
+        [{ text: "OK", onPress: () => {
+          triggerOtaCheck("manual", { force: true, immediateReload: true }).catch(() => {});
+        }}],
+      );
+    } catch (e) {
+      Alert.alert("Errore", `Impossibile applicare OTA: ${String(e)}`);
+    } finally {
+      setIsApplying(false);
+    }
+  }, [pendingRelease]);
+
+  const handleDistribute = useCallback(async () => {
+    if (!pendingRelease) return;
+    Alert.alert(
+      "Distribuisci OTA",
+      `Distribuire la versione ${pendingRelease.version} a tutti i dispositivi?`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Distribuisci",
+          style: "destructive",
+          onPress: async () => {
+            setIsDistributing(true);
+            try {
+              const res = await fetch(
+                new URL(`/api/admin/ota/${pendingRelease.id}/distribute`, getApiUrl()).toString(),
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+                  credentials: "include",
+                },
+              );
+              if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error(json.message ?? `HTTP ${res.status}`);
+              }
+              Alert.alert("✓ OTA distribuita", "La versione è ora disponibile a tutti i dispositivi.");
+              refetchPending();
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+            } catch (e) {
+              Alert.alert("Errore", `Impossibile distribuire: ${String(e)}`);
+            } finally {
+              setIsDistributing(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [pendingRelease, refetchPending, queryClient]);
+
+  if (!pendingRelease) return null;
+
+  const publishedDate = pendingRelease.published_at
+    ? new Date(pendingRelease.published_at).toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "—";
+
+  return (
+    <View style={pendingStyles.card}>
+      <View style={pendingStyles.header}>
+        <Ionicons name="time-outline" size={18} color="#f59e0b" />
+        <Text style={pendingStyles.title}>OTA in attesa di test admin</Text>
+      </View>
+      <View style={pendingStyles.infoRow}>
+        <Text style={pendingStyles.version}>v{pendingRelease.version}</Text>
+        {pendingRelease.runtime_version && (
+          <Text style={pendingStyles.rv}>RV {pendingRelease.runtime_version}</Text>
+        )}
+      </View>
+      <Text style={pendingStyles.date}>Pubblicata: {publishedDate}</Text>
+      {pendingRelease.release_notes ? (
+        <Text style={pendingStyles.notes}>{pendingRelease.release_notes}</Text>
+      ) : null}
+      <Text style={pendingStyles.hint}>
+        Testa prima su questo dispositivo, poi distribuisci a tutti.
+      </Text>
+      <View style={pendingStyles.actions}>
+        <TouchableOpacity
+          style={[pendingStyles.btn, pendingStyles.btnApply, isApplying && { opacity: 0.6 }]}
+          onPress={handleApply}
+          disabled={isApplying || isDistributing}
+          testID="apply-admin-ota-btn"
+        >
+          {isApplying ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="phone-portrait-outline" size={14} color="#fff" />
+              <Text style={pendingStyles.btnText}>Applica OTA</Text>
+            </>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[pendingStyles.btn, pendingStyles.btnDistribute, isDistributing && { opacity: 0.6 }]}
+          onPress={handleDistribute}
+          disabled={isApplying || isDistributing}
+          testID="distribute-ota-btn"
+        >
+          {isDistributing ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="cloud-upload-outline" size={14} color="#fff" />
+              <Text style={pendingStyles.btnText}>Distribuisci OTA</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const pendingStyles = StyleSheet.create({
+  card: {
+    backgroundColor: "rgba(245, 158, 11, 0.10)",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: "#f59e0b",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  title: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#f59e0b",
+    flex: 1,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 4,
+  },
+  version: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    color: Colors.text,
+  },
+  rv: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    backgroundColor: Colors.surface,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  date: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
+  notes: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.text,
+    marginBottom: 8,
+    fontStyle: "italic",
+  },
+  hint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginBottom: 12,
+  },
+  actions: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  btn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  btnApply: {
+    backgroundColor: "#f59e0b",
+  },
+  btnDistribute: {
+    backgroundColor: "#22c55e",
+  },
+  btnText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+  },
+});
 
 const ROME_TZ = "Europe/Rome";
 
@@ -351,6 +603,8 @@ export default function OtaHistoryScreen() {
       ]}
       showsVerticalScrollIndicator={false}
     >
+      <PendingApprovalCard />
+
       <Text style={styles.summary}>{updates.length} aggiornamenti totali</Text>
 
       {updates.map((u) => {
