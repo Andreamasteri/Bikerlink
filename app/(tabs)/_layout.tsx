@@ -155,8 +155,56 @@ export default function TabLayout() {
     queryKey: ["/api/users/me"],
     enabled: !!user,
   });
-  const renderCustomTabBar = (props: BottomTabBarProps) => <CustomTabBar {...(props as any)} tabBarHeight={tabBarHeight} tabBarPaddingBottom={tabBarPaddingBottom} />;
   const tabBarPaddingBottom = insets.bottom;
+
+  const renderCustomTabBar = (props: BottomTabBarProps) => {
+    const { state, descriptors, navigation } = props;
+
+    const tabs: TabItem[] = state.routes
+      .filter((route) => {
+        const options = descriptors[route.key].options as any;
+        return typeof options.tabBarButton !== "function";
+      })
+      .map((route) => {
+        const descriptor = descriptors[route.key];
+        const options = descriptor.options as any;
+        const routeIndex = state.routes.indexOf(route);
+        const isFocused = state.index === routeIndex;
+
+        const onPress = () => {
+          const event = navigation.emit({
+            type: "tabPress",
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name, route.params as any);
+          }
+        };
+
+        const iconRenderer = options.tabBarIcon as
+          | ((args: { color: string; size: number; focused: boolean }) => React.ReactNode)
+          | undefined;
+
+        return {
+          name: route.name,
+          title: (options.title as string) || route.name,
+          icon: (color: string, size: number) =>
+            iconRenderer ? iconRenderer({ color, size, focused: isFocused }) : null,
+          isFocused,
+          onPress,
+        } satisfies TabItem;
+      });
+
+    return (
+      <CustomTabBar
+        tabs={tabs}
+        style={taskbarStyle}
+        tabBarHeight={tabBarHeight}
+        tabBarPaddingBottom={tabBarPaddingBottom}
+      />
+    );
+  };
   const gpsTabHref: Href | null | undefined = undefined;
 
   const garageIsEmpty: boolean | undefined = isBikerOrCoppia
