@@ -1134,6 +1134,12 @@ const es: Record<string, string> = {
   "nav.save_ride": "Guardar ruta",
   "nav.close": "Cerrar",
   "nav.then": "Luego:",
+
+  "compatibility.sheetTitle": "Compatibilidad del match",
+  "compatibility.bikerBikerExplanation": "Ambos sois bikers buscando un compañero de ruta. Este match surgió porque vuestras propuestas y perfiles de rider son mutuamente compatibles.",
+  "compatibility.garageExplanation": "Uno de vosotros tiene moto y el otro busca un paseo. Este Garage Match une a un biker con un pasajero según vuestras preferencias mutuas.",
+  "compatibility.genericExplanation": "Vuestras propuestas son compatibles: los tipos de usuario que buscáis coinciden con vuestros respectivos perfiles.",
+  "compatibility.closeBtn": "Entendido",
 };
 
 export default es;

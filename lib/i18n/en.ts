@@ -1182,6 +1182,12 @@ const en: Record<string, string> = {
   "nav.save_ride": "Save the ride",
   "nav.close": "Close",
   "nav.then": "Then:",
+
+  "compatibility.sheetTitle": "Match compatibility",
+  "compatibility.bikerBikerExplanation": "Both of you are bikers looking for a riding companion. This match was surfaced because your proposals and rider profiles are mutually compatible.",
+  "compatibility.garageExplanation": "One of you has a motorcycle and the other is looking for a ride. This Garage Match pairs a biker with a passenger based on your mutual preferences.",
+  "compatibility.genericExplanation": "Your proposals are compatible: the user types you are each looking for overlap with your respective profiles.",
+  "compatibility.closeBtn": "Got it",
 };
 
 export default en;

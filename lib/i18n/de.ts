@@ -1134,6 +1134,12 @@ const de: Record<string, string> = {
   "nav.save_ride": "Fahrt speichern",
   "nav.close": "Schließen",
   "nav.then": "Dann:",
+
+  "compatibility.sheetTitle": "Match-Kompatibilität",
+  "compatibility.bikerBikerExplanation": "Ihr seid beide Biker auf der Suche nach einem Fahrbegleiter. Dieses Match wurde angezeigt, weil eure Vorschläge und Fahrerprofile gegenseitig kompatibel sind.",
+  "compatibility.garageExplanation": "Einer von euch hat ein Motorrad und der andere sucht eine Mitfahrgelegenheit. Dieses Garage Match verbindet einen Biker mit einem Mitfahrer basierend auf euren gegenseitigen Vorlieben.",
+  "compatibility.genericExplanation": "Eure Vorschläge sind kompatibel: Die Nutzertypen, die ihr jeweils sucht, überschneiden sich mit euren Profilen.",
+  "compatibility.closeBtn": "Verstanden",
 };
 
 export default de;

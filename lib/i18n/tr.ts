@@ -1125,6 +1125,12 @@ const tr: Record<string, string> = {
   "nav.save_ride": "Sürüşü kaydet",
   "nav.close": "Kapat",
   "nav.then": "Sonra:",
+
+  "compatibility.sheetTitle": "Eşleşme uyumluluğu",
+  "compatibility.bikerBikerExplanation": "İkiniz de sürüş arkadaşı arayan bikersiniz. Bu eşleşme, önerilerinizin ve sürücü profillerinizin karşılıklı olarak uyumlu olması nedeniyle öne çıktı.",
+  "compatibility.garageExplanation": "Birinizin motosikleti var, diğeri yolculuk arıyor. Bu Garaj Eşleşmesi, karşılıklı tercihlerinize göre bir bikerı bir yolcuyla buluşturur.",
+  "compatibility.genericExplanation": "Önerileriniz uyumlu: aradığınız kullanıcı türleri ilgili profillerinizle örtüşüyor.",
+  "compatibility.closeBtn": "Anladım",
 };
 
 export default tr;

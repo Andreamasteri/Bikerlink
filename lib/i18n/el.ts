@@ -1125,6 +1125,12 @@ const el: Record<string, string> = {
   "nav.save_ride": "Αποθήκευση διαδρομής",
   "nav.close": "Κλείσιμο",
   "nav.then": "Έπειτα:",
+
+  "compatibility.sheetTitle": "Συμβατότητα αντιστοίχισης",
+  "compatibility.bikerBikerExplanation": "Και οι δύο σας είστε bikers που αναζητάτε συνοδοιπόρο. Αυτή η αντιστοίχιση εμφανίστηκε επειδή οι προτάσεις και τα προφίλ οδηγών σας είναι αμοιβαία συμβατά.",
+  "compatibility.garageExplanation": "Ο ένας από εσάς έχει μοτοσικλέτα και ο άλλος αναζητά διαδρομή. Αυτό το Garage Match συνδέει έναν biker με έναν επιβάτη βάσει των αμοιβαίων σας προτιμήσεων.",
+  "compatibility.genericExplanation": "Οι προτάσεις σας είναι συμβατές: οι τύποι χρηστών που αναζητά ο καθένας αλληλεπικαλύπτονται με τα αντίστοιχα προφίλ σας.",
+  "compatibility.closeBtn": "Κατάλαβα",
 };
 
 export default el;

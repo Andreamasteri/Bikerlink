@@ -1220,6 +1220,12 @@ const it: Record<string, string> = {
   "nav.save_ride": "Salva il giro",
   "nav.close": "Chiudi",
   "nav.then": "Poi:",
+
+  "compatibility.sheetTitle": "Compatibilità del match",
+  "compatibility.bikerBikerExplanation": "Siete entrambi biker in cerca di un compagno di viaggio. Questo match è emerso perché le vostre proposte e i profili da rider sono reciprocamente compatibili.",
+  "compatibility.garageExplanation": "Uno di voi ha una moto e l'altro cerca un passaggio. Questo Garage Match abbina un biker a un passeggero in base alle preferenze reciproche.",
+  "compatibility.genericExplanation": "Le vostre proposte sono compatibili: i tipi di utente che cercate si sovrappongono con i rispettivi profili.",
+  "compatibility.closeBtn": "Capito",
 };
 
 export default it;

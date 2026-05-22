@@ -1134,6 +1134,12 @@ const fr: Record<string, string> = {
   "nav.save_ride": "Sauvegarder le trajet",
   "nav.close": "Fermer",
   "nav.then": "Puis :",
+
+  "compatibility.sheetTitle": "Compatibilité du match",
+  "compatibility.bikerBikerExplanation": "Vous êtes tous les deux des bikers à la recherche d'un compagnon de route. Ce match est apparu car vos propositions et vos profils de rider sont mutuellement compatibles.",
+  "compatibility.garageExplanation": "L'un de vous a une moto et l'autre cherche un trajet. Ce Garage Match associe un biker à un passager selon vos préférences mutuelles.",
+  "compatibility.genericExplanation": "Vos propositions sont compatibles : les types d'utilisateurs que vous recherchez correspondent à vos profils respectifs.",
+  "compatibility.closeBtn": "Compris",
 };
 
 export default fr;
