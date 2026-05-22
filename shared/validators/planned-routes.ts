@@ -3,21 +3,20 @@ import { z } from "zod";
 export const savePlannedRouteSchema = z.object({
   title: z.string().min(1, "Titolo obbligatorio").max(200),
   description: z.string().max(5000).optional().nullable(),
-  fromAddress: z.string().max(500).optional().nullable(),
-  toAddress: z.string().max(500).optional().nullable(),
+  waypoints: z.array(z.unknown()).optional().nullable(),
+  polyline: z.string().optional().nullable(),
   distanceKm: z.number().optional().nullable(),
   durationMinutes: z.number().int().optional().nullable(),
-  waypointsJson: z.array(z.unknown()).optional().nullable(),
-  routePolyline: z.string().optional().nullable(),
-  gpxData: z.string().optional().nullable(),
-  isPublic: z.boolean().optional(),
-  isCurvy: z.boolean().optional(),
-  curvyScore: z.number().optional().nullable(),
-  elevationGain: z.number().optional().nullable(),
-  elevationLoss: z.number().optional().nullable(),
-  tags: z.array(z.string()).optional().nullable(),
-  extraJson: z.record(z.string(), z.unknown()).optional().nullable(),
-  sourceType: z.string().optional(),
+  bikerScore: z.number().optional().nullable(),
+  style: z.enum(["curvy", "balanced", "fast"]).optional(),
+  visibility: z.enum(["public", "friends", "private"]).optional(),
+  isMultiDay: z.boolean().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional().nullable(),
+  navigationSteps: z.array(z.unknown()).optional().nullable(),
+  elevationProfile: z.array(z.unknown()).optional().nullable(),
+  elevationGainM: z.number().int().optional().nullable(),
+  altitudeMinM: z.number().int().optional().nullable(),
+  altitudeMaxM: z.number().int().optional().nullable(),
 });
 export type SavePlannedRouteInput = z.infer<typeof savePlannedRouteSchema>;
 
@@ -27,8 +26,8 @@ export type UpdatePlannedRouteInput = z.infer<typeof updatePlannedRouteSchema>;
 export const updatePlannedRouteBodySchema = z.object({
   title: z.string().max(200).optional(),
   description: z.string().optional().nullable(),
-  isPublic: z.boolean().optional(),
-  tags: z.array(z.string()).optional().nullable(),
+  visibility: z.enum(["public", "friends", "private"]).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 }).passthrough();
 export type UpdatePlannedRouteBodyInput = z.infer<typeof updatePlannedRouteBodySchema>;
 

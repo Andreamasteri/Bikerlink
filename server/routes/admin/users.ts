@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { users, userLastfmSessions, userMusicTracks, userStatusSchema, userRoleSchema, userEmailAdminSchema, adminSetPasswordSchema, primalSchema } from "@shared/schema";
+import { users, userLastfmSessions, userMusicTracks } from "@shared/schema";
+import { userStatusSchema, userRoleSchema, userEmailAdminSchema, adminSetPasswordSchema, primalSchema } from "@shared/validators";
 import { eq, and, ne, sql } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { isProtectedUser } from "../../constants";

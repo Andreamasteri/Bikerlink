@@ -1,7 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { storage } from "../../storage";
-import { savePlannedRouteSchema, updatePlannedRouteBodySchema } from "@shared/schema";
+import { savePlannedRouteSchema, updatePlannedRouteBodySchema } from "@shared/validators";
 import { requireAuth } from "./utils";
 
 const router = Router();

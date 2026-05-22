@@ -1,7 +1,7 @@
 import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
-import { generateInvitationSchema } from "@shared/schema";
+import { generateInvitationSchema } from "@shared/validators";
 
 const router = Router();
 

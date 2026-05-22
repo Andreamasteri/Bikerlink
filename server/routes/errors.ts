@@ -3,7 +3,7 @@ import express, { Router, type Request, type Response, type NextFunction } from 
 import { sendEmail } from "../email";
 import { storage } from "../storage";
 import { getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { gpsErrorSchema } from "@shared/schema";
+import { gpsErrorSchema } from "@shared/validators";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 const router = Router();

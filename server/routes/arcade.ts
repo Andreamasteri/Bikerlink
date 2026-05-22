@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../db";
-import { arcadeScores, arcadeScoreSchema } from "@shared/schema";
+import { arcadeScores } from "@shared/schema";
+import { arcadeScoreSchema } from "@shared/validators";
 import { eq, sql, max, and } from "drizzle-orm";
 
 import { requireUserId } from "../lib/auth-middleware";

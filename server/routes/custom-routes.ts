@@ -2,7 +2,7 @@ import { Router } from "express";
 import { storage } from "../storage";
 import { allLimited } from "../lib/concurrency";
 import { haversineKm } from "../geo";
-import { createCustomRouteSchema, updateCustomRouteSchema, createWaypointSchema, updateWaypointSchema, gpxImportSchema } from "@shared/schema";
+import { createCustomRouteSchema, updateCustomRouteSchema, createWaypointSchema, updateWaypointSchema, gpxImportSchema } from "@shared/validators";
 
 const router = Router();
 

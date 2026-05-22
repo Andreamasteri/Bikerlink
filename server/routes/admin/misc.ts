@@ -2,7 +2,8 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { workshopSchema, easterEggSchema, easterEggBatchSchema, reportResolveSchema, adCampaigns as adCampaignsTable, moderatorLogs, motoClubs, motoClubRequests } from "@shared/schema";
+import { adCampaigns as adCampaignsTable, moderatorLogs, motoClubs, motoClubRequests } from "@shared/schema";
+import { workshopSchema, easterEggSchema, easterEggBatchSchema, reportResolveSchema } from "@shared/validators";
 import { eq, sql, desc, inArray } from "drizzle-orm";
 
 const router = Router();

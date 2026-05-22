@@ -3,7 +3,7 @@ import express, { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { sendEmail } from "../email";
 import { feedbackRateLimiter, getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { createFeedbackSchema, updateFeedbackTicketSchema } from "@shared/schema";
+import { createFeedbackSchema, updateFeedbackTicketSchema } from "@shared/validators";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 

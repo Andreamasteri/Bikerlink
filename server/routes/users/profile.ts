@@ -1,6 +1,6 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { storage } from "../../storage";
-import { updateUserMeSchema, updateProfileDynamicSchema, pushTokenSchema, ghostModeSchema, privacySettingsSchema, availabilitySchema } from "@shared/schema";
+import { updateUserMeSchema, updateProfileDynamicSchema, pushTokenSchema, ghostModeSchema, privacySettingsSchema, availabilitySchema } from "@shared/validators";
 import { onlineTracker } from "../../online-tracker";
 import { applyFakeZones, applyPositionFuzz, captureFirstAvailabilityLocation } from "../users";
 import { createRegionalClubInvite } from "../motoclubs/utils";

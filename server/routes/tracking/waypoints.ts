@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { addRoutePointsSchema } from "@shared/schema";
+import { addRoutePointsSchema } from "@shared/validators";
 import { sql as drizzleSql } from "drizzle-orm";
 
 import { requireUserId } from "../../lib/auth-middleware";

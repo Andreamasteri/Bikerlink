@@ -1,7 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
-import { createRouteSchema } from "@shared/schema";
+import { createRouteSchema } from "@shared/validators";
 import { requireUserId } from "../../lib/auth-middleware";
 
 const router = Router();

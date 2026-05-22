@@ -2,7 +2,7 @@ import { sendError } from "../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { allLimited } from "../lib/concurrency";
-import { createSosSchema } from "@shared/schema";
+import { createSosSchema } from "@shared/validators";
 import { requireAuth } from "../lib/auth-middleware";
 
 const router = Router();

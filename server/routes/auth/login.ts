@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import rateLimit from "express-rate-limit";
 // @ts-ignore
 import signature from "cookie-signature";
-import { loginSchema } from "@shared/schema";
+import { loginSchema } from "@shared/validators";
 import { storage } from "../../storage";
 import { onlineTracker } from "../../online-tracker";
 import { revokeSessionsByType } from "../../session-utils";

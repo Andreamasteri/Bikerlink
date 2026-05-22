@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { storage } from "../../storage";
 import { requireAuth, decodePolyline } from "./utils";
-import { hotelsSchema, segmentMultidaySchema } from "@shared/schema";
+import { hotelsSchema, segmentMultidaySchema } from "@shared/validators";
 import { haversineKm } from "../../geo";
 
 const router = Router();

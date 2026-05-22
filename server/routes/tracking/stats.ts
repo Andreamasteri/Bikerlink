@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
-import { routeStatsSchema, stopRouteSchema, updateRouteTitleSchema } from "@shared/schema";
+import { routeStatsSchema, stopRouteSchema, updateRouteTitleSchema } from "@shared/validators";
 import { haversineKm } from "../../geo";
 import { requireUserId } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";

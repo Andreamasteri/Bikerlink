@@ -1,7 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { requireAuth, decodePolyline, computeBikerScoreFromPoints } from "./utils";
-import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, weatherWaypointsSchema, poiRequestSchema } from "@shared/schema";
+import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, weatherWaypointsSchema, poiRequestSchema } from "@shared/validators";
 import { z } from "zod";
 import { generateObject, streamText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";

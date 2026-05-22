@@ -1,7 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
-import { sendMessageSchema } from "@shared/schema";
+import { sendMessageSchema } from "@shared/validators";
 import { invalidateConvCache } from "./utils";
 import { notifyChatEvent } from "../../chat-sse";
 import { handleNotifications, handleFakeReplies } from "./logic";

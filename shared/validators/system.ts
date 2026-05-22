@@ -48,6 +48,7 @@ export type EmailConfigInput = z.infer<typeof emailConfigSchema>;
 
 export const disableFeatureSchema = z.object({
   key: z.string().min(1, "Chiave obbligatoria"),
+  disabled: z.boolean().optional(),
 });
 export type DisableFeatureInput = z.infer<typeof disableFeatureSchema>;
 

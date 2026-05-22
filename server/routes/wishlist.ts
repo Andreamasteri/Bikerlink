@@ -4,7 +4,7 @@ import fs from "fs";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
 import { sendMatchPushNotifications } from "../push-notifications";
-import { updateWishlistSchema, uploadPhotoSchema, addWishlistMotoSchema, updateWishlistMotoSchema } from "@shared/schema";
+import { updateWishlistSchema, uploadPhotoSchema, addWishlistMotoSchema, updateWishlistMotoSchema } from "@shared/validators";
 
 import { requireAuth } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";

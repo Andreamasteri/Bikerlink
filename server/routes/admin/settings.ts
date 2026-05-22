@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { appSettings, emailConfigSchema, disableFeatureSchema, toggleProtectedSchema, booleanSettingValueSchema, stringSettingValueSchema, mapsProviderSchema, themeDefaultSchema, matchingCountriesSchema, coordinatesMaxAgeSchema, genericSettingSchema, maintenanceSettingsSchema, bgLocationSettingsSchema, coordinateHistorySettingsSchema, nativeVersionSchema, urlSettingSchema } from "@shared/schema";
+import { appSettings } from "@shared/schema";
+import { emailConfigSchema, disableFeatureSchema, toggleProtectedSchema, booleanSettingValueSchema, stringSettingValueSchema, mapsProviderSchema, themeDefaultSchema, matchingCountriesSchema, coordinatesMaxAgeSchema, genericSettingSchema, maintenanceSettingsSchema, bgLocationSettingsSchema, coordinateHistorySettingsSchema, nativeVersionSchema, urlSettingSchema } from "@shared/validators";
 import { eq, sql } from "drizzle-orm";
 import multer from "multer";
 import path from "path";

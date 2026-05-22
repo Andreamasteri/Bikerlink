@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import rateLimit, { MemoryStore } from "express-rate-limit";
-import { registerSchema } from "@shared/schema";
+import { registerSchema } from "@shared/validators";
 import { storage } from "../../storage";
 import { sendVerificationEmail, sendInvitationGiftEmail, sendNewUserNotificationEmail } from "../../email";
 import { createRegionalClubInvite } from "../motoclubs";
