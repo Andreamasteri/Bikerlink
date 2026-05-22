@@ -50,6 +50,12 @@ async function readInputFiles(): Promise<string[]> {
     return args.map(normalizePath);
   }
 
+  // In non-interactive environments (CI, validation pipeline) stdin is never
+  // closed, so we must not block waiting for it when no args were provided.
+  if (!process.stdin.isTTY) {
+    return [];
+  }
+
   const files: string[] = [];
   const rl = readline.createInterface({ input: process.stdin, terminal: false });
   for await (const line of rl) {
