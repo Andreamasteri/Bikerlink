@@ -1,6 +1,8 @@
 #!/bin/bash
 # start-backend.sh — Avvia il backend Node.js con supervisione e crash recovery.
-# La build NON è più responsabilità di questo script: usare build-server.sh prima.
+# Esegue build-server.sh prima di avviare il server (cache-aware, veloce su no-op).
+# Questo garantisce che server_dist/index.js sia sempre aggiornato dopo uno split
+# o qualsiasi modifica ai sorgenti server/ o shared/.
 
 PORT=5000
 MAX_RETRIES=10
@@ -51,6 +53,13 @@ if [ -f "$LOCK_FILE" ]; then
 fi
 
 echo $$ > "$LOCK_FILE"
+
+# ── Build server_dist/index.js (cache-aware: veloce se nessun file è cambiato) ──
+echo "[$(date '+%Y-%m-%dT%H:%M:%S')] Build server in corso (cache-aware)..."
+if ! bash "$(dirname "$0")/build-server.sh"; then
+  echo "[$(date '+%Y-%m-%dT%H:%M:%S')] ERRORE: build-server.sh fallita — impossibile avviare il backend"
+  exit 1
+fi
 
 # ── kill_port: SIGTERM → attesa 2s → SIGKILL → verifica porta libera ─────────
 kill_port() {

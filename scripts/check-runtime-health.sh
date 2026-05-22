@@ -24,7 +24,8 @@ set -uo pipefail
 
 QUIET=false
 PORT_TIMEOUT=5
-MAX_RETRIES=3
+MAX_RETRIES=12
+RETRY_SLEEP=2
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -91,7 +92,7 @@ check_port() {
     fi
     $QUIET || info "Tentativo ${attempt}/${MAX_RETRIES} fallito — porta ${port} non risponde"
     if [ $attempt -lt $MAX_RETRIES ]; then
-      sleep 1
+      sleep "${RETRY_SLEEP}"
     fi
   done
 
@@ -144,7 +145,7 @@ if [ "$BACKEND_UP" = true ]; then
 
     $QUIET || info "Tentativo ${attempt}/${MAX_RETRIES} — risposta inattesa: ${HTTP_RESPONSE:-<vuota>}"
     if [ $attempt -lt $MAX_RETRIES ]; then
-      sleep 1
+      sleep "${RETRY_SLEEP}"
     fi
   done
 
@@ -191,7 +192,7 @@ for log_dir in "${LOG_DIRS[@]}"; do
       [[ "$(basename "$logfile")" == healthcheck_* ]] && continue
       # Considera solo log modificati negli ultimi 10 minuti
       if [ -n "$(find "$logfile" -mmin -10 2>/dev/null)" ]; then
-        matches=$(grep -iE "FATAL" "$logfile" 2>/dev/null | tail -5 || true)
+        matches=$(grep -iE "FATAL" "$logfile" 2>/dev/null | grep -vE "ricerca FATAL|── Log recenti|FATAL trovati nei log|Nessun FATAL" | tail -5 || true)
         if [ -n "$matches" ]; then
           FATAL_FOUND=true
           while IFS= read -r line; do
