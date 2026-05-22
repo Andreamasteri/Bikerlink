@@ -160,11 +160,20 @@ export function useHomeMapState() {
     if (!pendingFocusCoords) return;
     const { lat, lng, userId, nickname } = pendingFocusCoords;
     setPendingFocusCoords(null);
-    const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
-    activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId });
-    if (!mapFullscreen && userId) {
-      setPendingHighlight({ lat, lng, userId });
+
+    if (mapFullscreen && !mapFullscreenReady) {
+      // Fullscreen is open but the WebView is not ready yet — defer the highlight
+      // so it is consumed by handleFullscreenMapReady once the map initialises.
+      if (userId) setPendingHighlight({ lat, lng, userId });
+    } else {
+      const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
+      activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId });
+      if (!mapFullscreen && userId) {
+        // Small map → fullscreen will pick this up via handleFullscreenMapReady
+        setPendingHighlight({ lat, lng, userId });
+      }
     }
+
     if (nickname) {
       setFocusToast(`Vista centrata su ${nickname}`);
       Animated.sequence([
@@ -173,7 +182,7 @@ export function useHomeMapState() {
         Animated.timing(focusToastAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
       ]).start(() => setFocusToast(null));
     }
-  }, [mapReady, pendingFocusCoords, focusLatParam, focusLngParam, mapFullscreen, focusToastAnim]);
+  }, [mapReady, pendingFocusCoords, focusLatParam, focusLngParam, mapFullscreen, mapFullscreenReady, focusToastAnim]);
 
   useEffect(() => {
     if (mapFullscreen) {
