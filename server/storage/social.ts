@@ -1,4 +1,4 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db } from "../db";
 import {
   workshops, workshopContacts, easterEggs, collectedEasterEggs, reports, moderatorLogs,
@@ -112,5 +112,10 @@ export class SocialStorage extends TrackingStorage {
   async clearModeratorLogs(): Promise<number> {
     const result = await db.delete(moderatorLogs).returning({ id: moderatorLogs.id });
     return result.length;
+  }
+
+  async getPendingReportsCount(): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)::int` }).from(reports).where(eq(reports.status, "pending"));
+    return result[0]?.count ?? 0;
   }
 }

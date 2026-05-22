@@ -1,13 +1,15 @@
-import { eq, and, or, sql, desc, asc, inArray } from "drizzle-orm";
+import { eq, and, or, sql, desc, asc, inArray, notInArray } from "drizzle-orm";
 import { db } from "../db";
 import { systemAccountConditions } from "../lib/system-account-filter";
 import {
   zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos,
   bikerZavarrinaMatches, users, userMotorcycles,
+  proposalProfileMatches,
   type ZavarrinaWishlist, type InsertZavarrinaWishlist,
   type ZavarrinaWishlistPhoto, type InsertZavarrinaWishlistPhoto,
   type ZavarrinaWishlistMoto, type InsertZavarrinaWishlistMoto,
   type BikerZavarrinaMatch, type InsertBikerZavarrinaMatch,
+  type ProposalProfileMatch, type InsertProposalProfileMatch,
 } from "@shared/schema";
 import { ContestStorage } from "./contest";
 
@@ -205,5 +207,36 @@ export class MatchingStorage extends ContestStorage {
       keys.add(`${r.bikerId}:${r.zavarrinaId}:${r.bikerMotorcycleId}:${r.wishlistMotoId}`);
     }
     return keys;
+  }
+
+  async getAllExistingProposalProfileMatchKeys(): Promise<Set<string>> {
+    const rows = await db.select({
+      proposalId: proposalProfileMatches.proposalId,
+      zavarrinaId: proposalProfileMatches.zavarrinaId,
+    }).from(proposalProfileMatches);
+    const keys = new Set<string>();
+    for (const r of rows) {
+      keys.add(`${r.proposalId}:${r.zavarrinaId}`);
+    }
+    return keys;
+  }
+
+  async getActedUponBikerZavarrinaPairs(): Promise<Set<string>> {
+    const rows = await db.select({
+      bikerId: bikerZavarrinaMatches.bikerId,
+      zavarrinaId: bikerZavarrinaMatches.zavarrinaId,
+    }).from(bikerZavarrinaMatches).where(
+      notInArray(bikerZavarrinaMatches.status, ["new"])
+    );
+    const pairs = new Set<string>();
+    for (const r of rows) {
+      pairs.add(`${r.bikerId}:${r.zavarrinaId}`);
+    }
+    return pairs;
+  }
+
+  async createProposalProfileMatch(data: InsertProposalProfileMatch): Promise<ProposalProfileMatch | null> {
+    const [match] = await db.insert(proposalProfileMatches).values(data).onConflictDoNothing().returning();
+    return match ?? null;
   }
 }
