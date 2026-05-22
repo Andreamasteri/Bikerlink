@@ -113,6 +113,11 @@ const SERVER_ONLY_PACKAGES = [
   "@replit/object-storage",
 ];
 
+const WEB_UNRESOLVABLE_PATTERNS = [
+  "react-native-reanimated/scripts/validate-worklets-version",
+  "react-native-reanimated/src/reanimated2/js-reanimated/JSReanimated",
+];
+
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (platform === "ios" || platform === "android") {
     const isServerOnly = SERVER_ONLY_PACKAGES.some(
@@ -126,12 +131,24 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     }
   }
 
+  if (platform === "web") {
+    const isWebUnresolvable = WEB_UNRESOLVABLE_PATTERNS.some(
+      (pattern) => moduleName === pattern || moduleName.startsWith(pattern + "/")
+    );
+    if (isWebUnresolvable) {
+      return {
+        filePath: path.join(__dirname, "mocks/empty.js"),
+        type: "sourceFile",
+      };
+    }
+  }
+
   return context.resolveRequest(context, moduleName, platform);
 };
 
 config.maxWorkers = 1;
 
-config.cacheVersion = "v9";
+config.cacheVersion = "v10";
 
 config.cacheStores = [
   new FileStore({ root: path.join(__dirname, ".metro-cache") }),
