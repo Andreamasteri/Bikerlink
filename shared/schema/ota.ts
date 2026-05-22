@@ -115,6 +115,20 @@ export type InsertOtaEvent = typeof otaEvents.$inferInsert;
 export type OtaPublishToken = typeof otaPublishTokens.$inferSelect;
 export type InsertOtaPublishToken = typeof otaPublishTokens.$inferInsert;
 
+export const otaStuckEvents = pgTable("ota_stuck_events", {
+  id: serial("id").primaryKey(),
+  deviceId: varchar("device_id", { length: 64 }).notNull(),
+  rollbackCount: integer("rollback_count").notNull().default(0),
+  stuckSessions: integer("stuck_sessions").notNull().default(0),
+  runtimeVersion: varchar("runtime_version", { length: 32 }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("ota_stuck_events_device_idx").on(table.deviceId),
+]);
+
+export type OtaStuckEvent = typeof otaStuckEvents.$inferSelect;
+export type InsertOtaStuckEvent = typeof otaStuckEvents.$inferInsert;
+
 export const otaErrorSchema = z.object({
   error: z.string().min(1, "error is required"),
   failCount: z.number().int().optional(),

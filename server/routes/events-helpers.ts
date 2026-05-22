@@ -63,11 +63,11 @@ export type EventRow = {
 
 export async function enrichEvent(evt: EventRow, requestingUserId: string | null) {
   const [imgs, participants] = await Promise.all([
-    db.select().from(eventImages).where(eq(eventImages.eventId, evt.id)).orderBy(asc((eventImages as any).sortOrder || eventImages.createdAt)),
+    db.select().from(eventImages).where(eq(eventImages.eventId, evt.id)).orderBy(asc(eventImages.sortOrder)),
     db.select({
       id: eventParticipants.id,
       userId: eventParticipants.userId,
-      participationStatus: (eventParticipants as any).participationStatus || eventParticipants.status,
+      participationStatus: eventParticipants.participationStatus,
       joinedAt: eventParticipants.joinedAt,
       nickname: users.nickname,
       photoUrl: users.avatarUrl,

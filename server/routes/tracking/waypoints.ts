@@ -2,9 +2,8 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { gpsRejectionStats, addRoutePointsSchema } from "@shared/schema";
+import { addRoutePointsSchema } from "@shared/schema";
 import { sql as drizzleSql } from "drizzle-orm";
-import { sendAdminGpsAlertPush } from "../../push-notifications";
 
 import { requireUserId } from "../../lib/auth-middleware";
 
@@ -30,7 +29,6 @@ router.post("/:id/points", async (req: Request, res: Response) => {
 
     const parsedPoints = addRoutePointsSchema.safeParse(req.body);
     if (!parsedPoints.success) {
-      // Check for invalid coordinates specifically to log GPS rejections before returning 400
       const rawPoints = Array.isArray(req.body?.points) ? req.body.points : [];
       const invalidPoints = rawPoints.filter(
         (p: any) =>
@@ -44,27 +42,19 @@ router.post("/:id/points", async (req: Request, res: Response) => {
         );
         (async () => {
           try {
-            // Log rejection to gpsRejectionStats
-            for (const p of invalidPoints) {
-              await db.insert(gpsRejectionStats)
-                .values({
-                  userId,
-                  routeId: id,
-                  rejectionType: "invalid_coordinates",
-                  lat: typeof p.latitude === "number" ? p.latitude : null,
-                  lng: typeof p.longitude === "number" ? p.longitude : null,
-                  speedKmh: typeof p.speedKmh === "number" ? p.speedKmh : null,
-                  accelG: typeof p.accelG === "number" ? p.accelG : null,
-                  tiltDeg: typeof p.tiltDeg === "number" ? p.tiltDeg : null,
-                  rejectedAt: new Date(),
-                });
-            }
-
-            // Optional: send push alert if there are many rejections
-            // Note: original code used a different schema for aggregation which is not in gpsRejectionStats
-            // We'll skip the aggregation/alert logic for now as it doesn't match the schema
+            await db.execute(
+              drizzleSql`
+                INSERT INTO gps_rejection_stats (user_id, device_id, rejection_count, last_rejected_payload, last_rejected_at, last_source)
+                VALUES (${userId}, 'unknown', 1, ${payload}, NOW(), 'api')
+                ON CONFLICT (user_id, device_id) DO UPDATE SET
+                  rejection_count = gps_rejection_stats.rejection_count + 1,
+                  last_rejected_payload = EXCLUDED.last_rejected_payload,
+                  last_rejected_at = EXCLUDED.last_rejected_at,
+                  last_source = EXCLUDED.last_source
+              `
+            );
           } catch (err) {
-            console.error("[tracking] gps_rejection_stats insert error:", err);
+            console.error("[tracking] gps_rejection_stats upsert error:", err);
           }
         })();
         return res.status(400).json({
@@ -78,20 +68,21 @@ router.post("/:id/points", async (req: Request, res: Response) => {
     const { points } = parsedPoints.data;
     const routePoints = points.map((p: any) => ({
       routeId: id as string,
-      latitude: p.latitude,
-      longitude: p.longitude,
+      latitude: p.latitude as number,
+      longitude: p.longitude as number,
       altitude: p.altitude ?? null,
       speedKmh: p.speedKmh ?? null,
-      accelG: typeof p.accelG === "number" && isFinite(p.accelG) ? p.accelG : null,
-      tiltDeg: typeof p.tiltDeg === "number" && isFinite(p.tiltDeg) ? p.tiltDeg : null,
+      accelG: p.accelG ?? null,
+      tiltDeg: p.tiltDeg ?? null,
       timestamp: p.timestamp ? new Date(p.timestamp) : new Date(),
     }));
 
-    const created = await storage.createRoutePoints(routePoints);
-    return res.status(201).json(created);
-  } catch (error) {
-    console.error("Add route points error:", error);
-    return sendError(res, 500, "Errore interno del server");
+    await storage.createRoutePoints(routePoints);
+
+    return res.json({ added: routePoints.length });
+  } catch (err) {
+    console.error("[tracking] add points error:", err);
+    return sendError(res, 500, "Errore aggiunta punti GPS");
   }
 });
 

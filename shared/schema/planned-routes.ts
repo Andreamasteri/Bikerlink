@@ -9,7 +9,6 @@ import {
   doublePrecision,
   jsonb,
   index,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { users } from "./users";
@@ -23,80 +22,63 @@ export const plannedRoutes = pgTable("planned_routes", {
     .references(() => users.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
-  fromAddress: text("from_address"),
-  toAddress: text("to_address"),
-  distanceKm: doublePrecision("distance_km"),
-  durationMinutes: integer("duration_minutes"),
-  waypointsJson: jsonb("waypoints_json"),
-  routePolyline: text("route_polyline"),
-  gpxData: text("gpx_data"),
-  isPublic: boolean("is_public").notNull().default(false),
-  isCurvy: boolean("is_curvy").notNull().default(false),
-  curvyScore: doublePrecision("curvy_score"),
-  elevationGain: doublePrecision("elevation_gain"),
-  elevationLoss: doublePrecision("elevation_loss"),
-  tags: jsonb("tags").$type<string[]>(),
-  extraJson: jsonb("extra_json"),
-  sourceType: varchar("source_type", { length: 30 }).notNull().default("manual"),
+  waypoints: jsonb("waypoints").$type<any[]>().default([]),
+  polyline: text("polyline"),
+  distanceKm: doublePrecision("distance_km").default(0),
+  durationMinutes: integer("duration_minutes").default(0),
+  bikerScore: doublePrecision("biker_score").default(0),
+  realCurvatureScore: doublePrecision("real_curvature_score"),
+  style: varchar("style", { length: 20 }).notNull().default("curvy"),
+  visibility: varchar("visibility", { length: 20 }).notNull().default("public"),
+  isMultiDay: boolean("is_multi_day").notNull().default(false),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  navigationSteps: jsonb("navigation_steps"),
+  elevationProfile: jsonb("elevation_profile"),
+  elevationGainM: integer("elevation_gain_m"),
+  altitudeMinM: integer("altitude_min_m"),
+  altitudeMaxM: integer("altitude_max_m"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("planned_routes_user_id_idx").on(table.userId),
-  index("planned_routes_is_public_idx").on(table.isPublic),
-  index("planned_routes_is_curvy_idx").on(table.isCurvy),
+  index("planned_routes_visibility_idx").on(table.visibility),
 ]);
 
-export const poiPhotos = pgTable("poi_photos", {
+
+export const routeWeatherCache = pgTable("route_weather_cache", {
   id: varchar("id", { length: 36 })
     .primaryKey()
     .default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 36 })
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  poiId: varchar("poi_id", { length: 36 }).notNull(),
-  poiType: varchar("poi_type", { length: 50 }).notNull().default("waypoint"),
-  photoUrl: text("photo_url").notNull(),
-  caption: text("caption"),
-  latitude: doublePrecision("latitude"),
-  longitude: doublePrecision("longitude"),
+  routeId: varchar("route_id", { length: 36 }).notNull(),
+  departureTime: timestamp("departure_time").notNull(),
+  weatherData: jsonb("weather_data").$type<Record<string, unknown>>().default({}),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
-  index("poi_photos_poi_idx").on(table.poiId, table.poiType),
-  index("poi_photos_user_id_idx").on(table.userId),
+  index("route_weather_cache_route_id_idx").on(table.routeId),
 ]);
-
-export const routeWeatherCache = pgTable("route_weather_cache", {
-  routeId: varchar("route_id", { length: 36 }).primaryKey(),
-  weatherData: jsonb("weather_data").notNull(),
-  fetchedAt: timestamp("fetched_at").notNull().defaultNow(),
-  expiresAt: timestamp("expires_at").notNull(),
-});
 
 export type PlannedRoute = typeof plannedRoutes.$inferSelect;
 export type InsertPlannedRoute = typeof plannedRoutes.$inferInsert;
-export type PoiPhoto = typeof poiPhotos.$inferSelect;
-export type InsertPoiPhoto = typeof poiPhotos.$inferInsert;
 export type RouteWeatherCache = typeof routeWeatherCache.$inferSelect;
 export type InsertRouteWeatherCache = typeof routeWeatherCache.$inferInsert;
 
 export const savePlannedRouteSchema = z.object({
   title: z.string().min(1, "Titolo obbligatorio").max(200),
   description: z.string().max(5000).optional().nullable(),
-  fromAddress: z.string().max(500).optional().nullable(),
-  toAddress: z.string().max(500).optional().nullable(),
+  waypoints: z.array(z.unknown()).optional().nullable(),
+  polyline: z.string().optional().nullable(),
   distanceKm: z.number().optional().nullable(),
   durationMinutes: z.number().int().optional().nullable(),
-  waypointsJson: z.array(z.unknown()).optional().nullable(),
-  routePolyline: z.string().optional().nullable(),
-  gpxData: z.string().optional().nullable(),
-  isPublic: z.boolean().optional(),
-  isCurvy: z.boolean().optional(),
-  curvyScore: z.number().optional().nullable(),
-  elevationGain: z.number().optional().nullable(),
-  elevationLoss: z.number().optional().nullable(),
-  tags: z.array(z.string()).optional().nullable(),
-  extraJson: z.record(z.string(), z.unknown()).optional().nullable(),
-  sourceType: z.string().optional(),
+  bikerScore: z.number().optional().nullable(),
+  style: z.enum(["curvy", "balanced", "fast"]).optional(),
+  visibility: z.enum(["public", "friends", "private"]).optional(),
+  isMultiDay: z.boolean().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional().nullable(),
+  navigationSteps: z.array(z.unknown()).optional().nullable(),
+  elevationProfile: z.array(z.unknown()).optional().nullable(),
+  elevationGainM: z.number().int().optional().nullable(),
+  altitudeMinM: z.number().int().optional().nullable(),
+  altitudeMaxM: z.number().int().optional().nullable(),
 });
 export type SavePlannedRouteInput = z.infer<typeof savePlannedRouteSchema>;
 
@@ -106,16 +88,16 @@ export type UpdatePlannedRouteInput = z.infer<typeof updatePlannedRouteSchema>;
 export const updatePlannedRouteBodySchema = z.object({
   title: z.string().max(200).optional(),
   description: z.string().optional().nullable(),
-  isPublic: z.boolean().optional(),
-  tags: z.array(z.string()).optional().nullable(),
+  visibility: z.enum(["public", "friends", "private"]).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional().nullable(),
 }).passthrough();
 export type UpdatePlannedRouteBodyInput = z.infer<typeof updatePlannedRouteBodySchema>;
 
 export const gpxImportSchema = z.object({
   title: z.string().max(200).optional().nullable(),
   description: z.string().max(5000).optional().nullable(),
-  isPublic: z.boolean().optional(),
-  tags: z.array(z.string()).optional().nullable(),
+  visibility: z.enum(["public", "friends", "private"]).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional().nullable(),
   gpxData: z.string().min(1, "gpxData è obbligatorio"),
 });
 export type GpxImportInput = z.infer<typeof gpxImportSchema>;
@@ -157,15 +139,6 @@ export const weatherWaypointsSchema = z.object({
 });
 export type WeatherWaypointsInput = z.infer<typeof weatherWaypointsSchema>;
 
-export const poiPhotoSchema = z.object({
-  poiId: z.string().min(1, "poiId obbligatorio"),
-  poiType: z.string().optional(),
-  imageBase64: z.string().min(1, "Immagine obbligatoria"),
-  caption: z.string().max(500).optional().nullable(),
-  latitude: z.number().finite().optional().nullable(),
-  longitude: z.number().finite().optional().nullable(),
-});
-export type PoiPhotoInput = z.infer<typeof poiPhotoSchema>;
 
 export const hotelsSchema = z.object({
   lat: z.number().finite("lat non valida"),

@@ -91,16 +91,16 @@ export async function runMapMatchingJob(): Promise<{
         const samples = await db
           .select({
             id: rideTelemetry.id,
-            lat: rideTelemetry.latDeg,
-            lon: rideTelemetry.lngDeg,
-            leanAngle: rideTelemetry.leanDeg,
-            gforceX: rideTelemetry.accelLateralG,
-            gforceY: rideTelemetry.accelLongG,
-            gforceZ: rideTelemetry.accelVertG,
+            lat: rideTelemetry.lat,
+            lon: rideTelemetry.lon,
+            leanAngle: rideTelemetry.leanAngle,
+            gforceX: rideTelemetry.gforceX,
+            gforceY: rideTelemetry.gforceY,
+            gforceZ: rideTelemetry.gforceZ,
           })
           .from(rideTelemetry)
           .where(and(eq(rideTelemetry.sessionId, sessionId), eq(rideTelemetry.matched, false)))
-          .orderBy(rideTelemetry.recordedAt);
+          .orderBy(rideTelemetry.ts);
 
         // Richiede almeno 2 punti GPS per il map matching
         if (samples.length < 2) {

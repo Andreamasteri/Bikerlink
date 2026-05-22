@@ -115,6 +115,16 @@ export const siteVisits = pgTable("site_visits", {
   index("site_visits_user_id_idx").on(table.userId),
 ]);
 
+export const newsletterSubscribers = pgTable("newsletter_subscribers", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 254 }).notNull().unique(),
+  notifyRides: boolean("notify_rides").notNull().default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type NewsletterSubscriber = typeof newsletterSubscribers.$inferSelect;
+export type InsertNewsletterSubscriber = typeof newsletterSubscribers.$inferInsert;
+
 export const appCrashLogs = pgTable("app_crash_logs", {
   id: varchar("id", { length: 36 })
     .primaryKey()

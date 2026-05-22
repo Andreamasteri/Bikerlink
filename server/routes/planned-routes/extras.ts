@@ -105,20 +105,20 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
   try {
     const route = await storage.getPlannedRoute(id);
     if (!route) return sendError(res, 404, "Percorso non trovato");
-    if (route.userId !== userId && !route.isPublic) {
+    if (route.userId !== userId && route.visibility !== "public") {
       return sendError(res, 403, "Non autorizzato");
     }
 
-    const meta = (route.extraJson ?? {}) as Record<string, unknown>;
+    const meta = (route.metadata ?? {}) as Record<string, unknown>;
     if (meta.elevationCache) {
       return res.json({ ...(meta.elevationCache as object), cached: true });
     }
 
     let rawPoints: [number, number][] = [];
-    if (route.routePolyline) {
-      rawPoints = decodePolyline(route.routePolyline);
+    if (route.polyline) {
+      rawPoints = decodePolyline(route.polyline);
     } else {
-      const wps = (route.waypointsJson as Array<{ lat: number; lng: number }>) ?? [];
+      const wps = (route.waypoints as Array<{ lat: number; lng: number }>) ?? [];
       rawPoints = wps.filter((wp) => wp.lat !== 0 || wp.lng !== 0).map((wp) => [wp.lat, wp.lng]);
     }
 
@@ -185,7 +185,7 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
     };
 
     storage.updatePlannedRoute(id, {
-      extraJson: { ...meta, elevationCache: payload },
+      metadata: { ...meta, elevationCache: payload },
     }).catch((err: unknown) => console.error("[elevation] cache save error:", err));
 
     return res.json(payload);

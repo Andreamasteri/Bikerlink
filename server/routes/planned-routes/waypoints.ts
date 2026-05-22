@@ -1,11 +1,12 @@
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { requireAuth, decodePolyline, computeBikerScoreFromPoints } from "./utils";
-import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, weatherWaypointsSchema, poiRequestSchema, poiPhotoSchema } from "@shared/schema";
+import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, weatherWaypointsSchema, poiRequestSchema } from "@shared/schema";
+import { z } from "zod";
 import { generateObject, streamText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { z } from "zod";
 import { haversineKm } from "../../geo";
+const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
 import { calculateRoute as ghCalculateRoute, isSelfHosted, ACTIVE_PROFILE } from "../../graphhopper-client";
 
 const router = Router();

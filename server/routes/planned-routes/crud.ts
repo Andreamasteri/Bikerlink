@@ -21,21 +21,20 @@ router.post("/", async (req: Request, res: Response) => {
       userId,
       title: body.title,
       description: body.description ?? null,
-      fromAddress: body.fromAddress ?? null,
-      toAddress: body.toAddress ?? null,
+      waypoints: body.waypoints ?? [],
+      polyline: body.polyline ?? null,
       distanceKm: body.distanceKm ?? 0,
       durationMinutes: body.durationMinutes ?? 0,
-      waypointsJson: body.waypointsJson ?? [],
-      routePolyline: body.routePolyline ?? null,
-      gpxData: body.gpxData ?? null,
-      isPublic: body.isPublic ?? true,
-      isCurvy: body.isCurvy ?? false,
-      curvyScore: body.curvyScore ?? 0,
-      elevationGain: body.elevationGain ?? 0,
-      elevationLoss: body.elevationLoss ?? 0,
-      tags: body.tags ?? [],
-      extraJson: body.extraJson ?? {},
-      sourceType: body.sourceType ?? "manual",
+      bikerScore: body.bikerScore ?? 0,
+      style: body.style ?? "curvy",
+      visibility: body.visibility ?? "public",
+      isMultiDay: body.isMultiDay ?? false,
+      metadata: body.metadata ?? {},
+      navigationSteps: body.navigationSteps ?? null,
+      elevationProfile: body.elevationProfile ?? null,
+      elevationGainM: body.elevationGainM ?? null,
+      altitudeMinM: body.altitudeMinM ?? null,
+      altitudeMaxM: body.altitudeMaxM ?? null,
     });
     return res.status(201).json(route);
   } catch (err) {
@@ -71,7 +70,7 @@ router.get("/:id", async (req: Request, res: Response) => {
   try {
     const route = await storage.getPlannedRoute(id);
     if (!route) return sendError(res, 404, "Percorso non trovato");
-    if (route.userId !== userId && !route.isPublic) {
+    if (route.userId !== userId && route.visibility !== "public") {
       return sendError(res, 403, "Accesso non consentito");
     }
     return res.json(route);

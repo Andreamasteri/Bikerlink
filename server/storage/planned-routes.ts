@@ -23,9 +23,9 @@ export class PlannedRoutesStorage extends SystemStorage {
       const intervalSetting = await this.getAppSetting("coordinate_history_interval");
       const intervalSec = intervalSetting?.value ? parseInt(intervalSetting.value, 10) : 30;
       const minInterval = isNaN(intervalSec) || intervalSec < 5 ? 30 : intervalSec;
-      const lastRecord = await db.select().from(coordinateHistory).where(eq(coordinateHistory.userId, userId)).orderBy(desc(coordinateHistory.recordedAt)).limit(1);
+      const lastRecord = await db.select().from(coordinateHistory).where(eq(coordinateHistory.userId, userId)).orderBy(desc(coordinateHistory.createdAt)).limit(1);
       if (lastRecord.length > 0) {
-        const elapsed = (Date.now() - new Date(lastRecord[0].recordedAt).getTime()) / 1000;
+        const elapsed = (Date.now() - new Date(lastRecord[0].createdAt).getTime()) / 1000;
         if (elapsed < minInterval) return null;
       }
       const [record] = await db.insert(coordinateHistory).values({ userId, latitude, longitude }).returning();
@@ -78,7 +78,7 @@ export class PlannedRoutesStorage extends SystemStorage {
   }
 
   async getPublicPlannedRoutes(limit = 50): Promise<PlannedRoute[]> {
-    return db.select().from(plannedRoutes).where(eq(plannedRoutes.isPublic, true)).orderBy(desc(plannedRoutes.createdAt)).limit(limit);
+    return db.select().from(plannedRoutes).where(eq(plannedRoutes.visibility, "public")).orderBy(desc(plannedRoutes.createdAt)).limit(limit);
   }
 
   async updatePlannedRoute(id: string, data: Partial<InsertPlannedRoute>): Promise<PlannedRoute | undefined> {
@@ -93,7 +93,10 @@ export class PlannedRoutesStorage extends SystemStorage {
   async upsertRouteWeatherCache(data: InsertRouteWeatherCache): Promise<RouteWeatherCache> {
     const [existing] = await db.select().from(routeWeatherCache).where(eq(routeWeatherCache.routeId, data.routeId)).limit(1);
     if (existing) {
-      const [updated] = await db.update(routeWeatherCache).set({ weatherData: data.weatherData, expiresAt: data.expiresAt }).where(eq(routeWeatherCache.routeId, data.routeId)).returning();
+      const [updated] = await db.update(routeWeatherCache)
+        .set({ weatherData: data.weatherData, departureTime: data.departureTime })
+        .where(eq(routeWeatherCache.routeId, data.routeId))
+        .returning();
       return updated;
     }
     const [created] = await db.insert(routeWeatherCache).values(data).returning();

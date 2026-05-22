@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import {
-
   pgTable,
   varchar,
   text,
@@ -10,7 +9,9 @@ import {
   doublePrecision,
   real,
   bigint,
+  serial,
   pgEnum,
+  primaryKey,
   index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
@@ -24,11 +25,11 @@ export const coordinateHistory = pgTable("coordinate_history", {
     .references(() => users.id, { onDelete: "cascade" }),
   latitude: doublePrecision("latitude").notNull(),
   longitude: doublePrecision("longitude").notNull(),
-  accuracy: doublePrecision("accuracy"),
-  recordedAt: timestamp("recorded_at").notNull().defaultNow(),
+  slot: integer("slot").notNull().default(1),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("coordinate_history_user_id_idx").on(table.userId),
-  index("coordinate_history_recorded_at_idx").on(table.recordedAt),
+  index("coordinate_history_created_at_idx").on(table.createdAt),
 ]);
 
 export const arcadeGameEnum = pgEnum("arcade_game", [
@@ -48,7 +49,6 @@ export const arcadeScores = pgTable("arcade_scores", {
     .references(() => users.id, { onDelete: "cascade" }),
   game: arcadeGameEnum("game").notNull(),
   score: integer("score").notNull(),
-  extras: text("extras"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("arcade_scores_user_game_idx").on(table.userId, table.game),
@@ -59,17 +59,14 @@ export const gpsErrors = pgTable("gps_errors", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 36 })
-    .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  errorMessage: text("error_message").notNull(),
-  stackTrace: text("stack_trace"),
-  otaNumber: integer("ota_number"),
-  timestamp: varchar("timestamp", { length: 40 }),
-  platform: varchar("platform", { length: 20 }),
-  deviceName: varchar("device_name", { length: 100 }),
-  osVersion: varchar("os_version", { length: 40 }),
-  context: varchar("context", { length: 100 }),
   routeId: varchar("route_id", { length: 36 }),
+  otaNumber: integer("ota_number"),
+  platform: varchar("platform", { length: 20 }),
+  osVersion: varchar("os_version", { length: 50 }),
+  context: varchar("context", { length: 200 }),
+  errorMessage: text("error_message"),
+  stackTrace: text("stack_trace"),
   speedKmh: doublePrecision("speed_kmh"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
@@ -78,79 +75,57 @@ export const gpsErrors = pgTable("gps_errors", {
 ]);
 
 export const gpsRejectionStats = pgTable("gps_rejection_stats", {
-  id: varchar("id", { length: 36 })
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  routeId: varchar("route_id", { length: 36 }),
-  rejectionType: varchar("rejection_type", { length: 50 }).notNull(),
-  lat: doublePrecision("lat"),
-  lng: doublePrecision("lng"),
-  speedKmh: doublePrecision("speed_kmh"),
-  accelG: doublePrecision("accel_g"),
-  tiltDeg: doublePrecision("tilt_deg"),
-  rejectedAt: timestamp("rejected_at").notNull().defaultNow(),
+  deviceId: varchar("device_id", { length: 128 }).notNull().default("unknown"),
+  platform: varchar("platform", { length: 20 }),
+  rejectionCount: integer("rejection_count").notNull().default(0),
+  lastOtaNumber: integer("last_ota_number"),
+  lastRejectedPayload: text("last_rejected_payload"),
+  lastRejectedAt: timestamp("last_rejected_at").notNull().defaultNow(),
+  lastSource: varchar("last_source", { length: 20 }),
 }, (table) => [
-  index("gps_rejection_stats_user_id_idx").on(table.userId),
-  index("gps_rejection_stats_route_id_idx").on(table.routeId),
+  primaryKey({ columns: [table.userId, table.deviceId], name: "gps_rejection_stats_pk" }),
+  index("gps_rejection_stats_count_idx").on(table.rejectionCount),
+  index("gps_rejection_stats_at_idx").on(table.lastRejectedAt),
 ]);
 
 export const rideTelemetry = pgTable("ride_telemetry", {
-  id: varchar("id", { length: 36 })
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
+  id: serial("id").primaryKey(),
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  routeId: varchar("route_id", { length: 36 }),
-  recordedAt: timestamp("recorded_at").notNull(),
-  latDeg: doublePrecision("lat_deg"),
-  lngDeg: doublePrecision("lng_deg"),
-  altM: real("alt_m"),
+  sessionId: varchar("session_id", { length: 36 }).notNull(),
+  sessionType: varchar("session_type", { length: 10 }).notNull().default("ride"),
+  ts: bigint("ts", { mode: "number" }).notNull(),
+  lat: doublePrecision("lat").notNull(),
+  lon: doublePrecision("lon").notNull(),
   speedKmh: real("speed_kmh"),
-  accelLateralG: real("accel_lateral_g"),
-  accelLongG: real("accel_long_g"),
-  accelVertG: real("accel_vert_g"),
-  leanDeg: real("lean_deg"),
-  headingDeg: real("heading_deg"),
-  gpsAccuracyM: real("gps_accuracy_m"),
-  sessionId: varchar("session_id", { length: 36 }),
+  leanAngle: real("lean_angle"),
+  gforceX: real("gforce_x"),
+  gforceY: real("gforce_y"),
+  gforceZ: real("gforce_z"),
+  heading: real("heading"),
+  altitudeM: real("altitude_m"),
   matched: boolean("matched").notNull().default(false),
-  sampledAt: timestamp("sampled_at").notNull().defaultNow(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index("ride_telemetry_user_id_idx").on(table.userId),
-  index("ride_telemetry_route_id_idx").on(table.routeId),
-  index("ride_telemetry_recorded_at_idx").on(table.recordedAt),
+  index("ride_telemetry_session_id_idx").on(table.sessionId),
+  index("ride_telemetry_ts_idx").on(table.ts),
 ]);
 
 export const segmentTelemetry = pgTable("segment_telemetry", {
-  id: varchar("id", { length: 36 })
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 36 })
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  routeId: varchar("route_id", { length: 36 }),
-  segmentStartAt: timestamp("segment_start_at").notNull(),
-  segmentEndAt: timestamp("segment_end_at").notNull(),
-  distanceKm: real("distance_km"),
-  durationSeconds: integer("duration_seconds"),
-  avgSpeedKmh: real("avg_speed_kmh"),
-  maxSpeedKmh: real("max_speed_kmh"),
-  avgLeanDeg: real("avg_lean_deg"),
-  maxLeanDeg: real("max_lean_deg"),
-  maxAccelLateralG: real("max_accel_lateral_g"),
-  maxAccelLongG: real("max_accel_long_g"),
-  altGainM: real("alt_gain_m"),
-  altLossM: real("alt_loss_m"),
-  curvyScore: real("curvy_score"),
-  totalPoints: bigint("total_points", { mode: "number" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  osmWayId: bigint("osm_way_id", { mode: "number" }).primaryKey(),
+  avgLeanAngle: doublePrecision("avg_lean_angle"),
+  maxLeanAngle: doublePrecision("max_lean_angle"),
+  avgGforce: doublePrecision("avg_gforce"),
+  sampleCount: integer("sample_count").notNull().default(0),
+  lastUpdated: timestamp("last_updated").notNull().defaultNow(),
+  curvyScore: doublePrecision("curvy_score"),
 }, (table) => [
-  index("segment_telemetry_user_id_idx").on(table.userId),
-  index("segment_telemetry_route_id_idx").on(table.routeId),
+  index("segment_telemetry_curvy_score_idx").on(table.curvyScore),
 ]);
 
 export type CoordinateHistory = typeof coordinateHistory.$inferSelect;

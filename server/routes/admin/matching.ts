@@ -17,7 +17,7 @@ router.get("/gps-errors", async (req: Request, res: Response) => {
 
 router.get("/gps-rejections", async (req: Request, res: Response) => {
   try {
-    const stats = await db.select().from(gpsRejectionStats).orderBy(desc(gpsRejectionStats.rejectedAt)).limit(100);
+    const stats = await db.select().from(gpsRejectionStats).orderBy(desc(gpsRejectionStats.lastRejectedAt)).limit(100);
     return res.json(stats);
   } catch (error) {
     return sendError(res, 500, "Errore lettura rifiuti GPS");

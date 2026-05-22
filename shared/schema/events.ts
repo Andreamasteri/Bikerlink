@@ -7,7 +7,6 @@ import {
   boolean,
   timestamp,
   doublePrecision,
-  jsonb,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -19,34 +18,33 @@ export const events = pgTable("events", {
   id: varchar("id", { length: 36 })
     .primaryKey()
     .default(sql`gen_random_uuid()`),
+  title: varchar("title", { length: 200 }).notNull(),
+  description: text("description"),
+  eventType: varchar("event_type", { length: 30 }).notNull().default("raduno"),
   creatorId: varchar("creator_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  clubId: varchar("club_id", { length: 36 })
-    .references(() => motoClubs.id, { onDelete: "set null" }),
-  title: varchar("title", { length: 200 }).notNull(),
-  description: text("description"),
-  eventType: varchar("event_type", { length: 50 }).notNull().default("general"),
-  status: varchar("status", { length: 20 }).notNull().default("active"),
+  locationName: varchar("location_name", { length: 300 }),
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
-  address: text("address"),
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date"),
+  eventDate: timestamp("event_date").notNull(),
+  eventTime: varchar("event_time", { length: 5 }),
+  isRecurring: boolean("is_recurring").notNull().default(false),
+  recurrenceInfo: text("recurrence_info"),
   maxParticipants: integer("max_participants"),
-  participantCount: integer("participant_count").notNull().default(0),
-  coverUrl: text("cover_url"),
-  isPublic: boolean("is_public").notNull().default(true),
-  isMultiday: boolean("is_multiday").notNull().default(false),
-  gpxUrl: text("gpx_url"),
-  routeGeojson: jsonb("route_geojson"),
-  waypoints: jsonb("waypoints"),
+  websiteUrl: varchar("website_url", { length: 500 }),
+  autoInviteReason: text("auto_invite_reason"),
+  autoInviteRegion: varchar("auto_invite_region", { length: 100 }),
+  autoInviteBrand: varchar("auto_invite_brand", { length: 100 }),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  rejectionReason: text("rejection_reason"),
+  approvedBy: varchar("approved_by", { length: 36 }),
+  approvedAt: timestamp("approved_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("events_creator_idx").on(table.creatorId),
-  index("events_club_idx").on(table.clubId),
-  index("events_start_date_idx").on(table.startDate),
+  index("events_start_date_idx").on(table.eventDate),
   index("events_status_idx").on(table.status),
 ]);
 
@@ -57,9 +55,9 @@ export const eventImages = pgTable("event_images", {
   eventId: varchar("event_id", { length: 36 })
     .notNull()
     .references(() => events.id, { onDelete: "cascade" }),
-  imageUrl: text("image_url").notNull(),
+  imageUrl: varchar("image_url", { length: 1000 }).notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
 }, (table) => [
   index("event_images_event_idx").on(table.eventId),
 ]);
@@ -74,7 +72,7 @@ export const eventParticipants = pgTable("event_participants", {
   userId: varchar("user_id", { length: 36 })
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  status: varchar("status", { length: 20 }).notNull().default("going"),
+  participationStatus: varchar("participation_status", { length: 20 }).notNull().default("going"),
   joinedAt: timestamp("joined_at").notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("event_participants_unique_idx").on(table.eventId, table.userId),
@@ -92,11 +90,7 @@ export const eventClubInvites = pgTable("event_club_invites", {
   clubId: varchar("club_id", { length: 36 })
     .notNull()
     .references(() => motoClubs.id, { onDelete: "cascade" }),
-  invitedBy: varchar("invited_by", { length: 36 })
-    .references(() => users.id, { onDelete: "set null" }),
-  status: varchar("status", { length: 20 }).notNull().default("pending"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  invitedAt: timestamp("invited_at").notNull().defaultNow(),
 }, (table) => [
   uniqueIndex("event_club_invites_unique_idx").on(table.eventId, table.clubId),
 ]);
@@ -114,18 +108,18 @@ export const createEventSchema = z.object({
   title: z.string().min(1, "Titolo obbligatorio").max(200),
   description: z.string().max(5000).optional().nullable(),
   eventType: z.string().optional().nullable(),
+  locationName: z.string().max(200).optional().nullable(),
   latitude: z.number().finite().optional().nullable(),
   longitude: z.number().finite().optional().nullable(),
-  address: z.string().max(500).optional().nullable(),
-  startDate: z.coerce.date(),
-  endDate: z.coerce.date().optional().nullable(),
+  eventDate: z.coerce.date(),
+  eventTime: z.string().max(20).optional().nullable(),
+  isRecurring: z.boolean().optional(),
+  recurrenceInfo: z.string().optional().nullable(),
   maxParticipants: z.number().int().positive().optional().nullable(),
-  isPublic: z.boolean().optional(),
-  isMultiday: z.boolean().optional(),
-  gpxUrl: z.string().optional().nullable(),
-  clubId: z.string().optional().nullable(),
-  coverUrl: z.string().optional().nullable(),
-  waypoints: z.array(z.unknown()).optional().nullable(),
+  websiteUrl: z.string().max(500).optional().nullable(),
+  autoInviteReason: z.string().optional().nullable(),
+  autoInviteRegion: z.string().max(100).optional().nullable(),
+  autoInviteBrand: z.string().max(100).optional().nullable(),
 });
 export type CreateEventInput = z.infer<typeof createEventSchema>;
 
