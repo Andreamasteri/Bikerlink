@@ -410,7 +410,7 @@ export function registerExpoUpdatesRoutes(app: Express) {
 
   app.post("/api/ota/stuck-event", async (req: Request, res: Response) => {
     try {
-      const { otaStuckEventSchema } = await import("@shared/schema");
+      const { otaStuckEventSchema } = await import("@shared/validators");
       const bodyParsed = otaStuckEventSchema.safeParse(req.body ?? {});
       if (!bodyParsed.success) {
         return sendError(res, 400, bodyParsed.error.issues[0]?.message ?? "Payload non valido");

@@ -124,6 +124,18 @@ run_full_typecheck "Server Tests" "server/tsconfig.test.json"
 run_full_typecheck "Root"         "tsconfig.json"
 
 # ---------------------------------------------------------------------------
+# Run schema-import guard (prevents server/routes from importing *Schema
+# identifiers from @shared/schema — they must come from @shared/validators)
+# ---------------------------------------------------------------------------
+echo ""
+echo "Running schema-import guard..."
+bash "$(dirname "$0")/check-schema-imports.sh"
+SCHEMA_IMPORT_EXIT=$?
+if [ $SCHEMA_IMPORT_EXIT -ne 0 ]; then
+  exit $SCHEMA_IMPORT_EXIT
+fi
+
+# ---------------------------------------------------------------------------
 # Run client-undefined safety check (guards against OTA-4 pattern)
 # ---------------------------------------------------------------------------
 echo ""

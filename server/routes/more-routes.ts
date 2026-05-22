@@ -459,7 +459,7 @@ export function registerMoreRoutes(app: Express) {
 
   app.post("/api/admin/client-error", async (req, res) => {
     try {
-      const { clientErrorReportSchema } = await import("@shared/schema");
+      const { clientErrorReportSchema } = await import("@shared/validators");
       const bodyParsed = clientErrorReportSchema.safeParse(req.body ?? {});
       if (!bodyParsed.success) {
         return sendError(res, 400, bodyParsed.error.issues[0]?.message ?? "Payload non valido");
