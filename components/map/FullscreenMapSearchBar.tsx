@@ -13,21 +13,22 @@ import Colors from "@/constants/colors";
 import FavoriteStar from "@/components/FavoriteStar";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import { useT } from "@/lib/language-context";
+import type { MapUser } from "@/components/InteractiveMap";
 
 type Props = {
   insetsTop: number;
   searchText: string;
   onSearch: (text: string) => void;
   onClearSearch: () => void;
-  searchResults: any[];
+  searchResults: MapUser[];
   searchLoading: boolean;
   showSearchResults: boolean;
-  onSearchResultPress: (u: any) => void;
+  onSearchResultPress: (u: MapUser) => void;
   onClose: () => void;
   currentUserFullId: string | null | undefined;
-  getUserIcon: (u: any) => any;
-  getUserColor: (u: any) => string;
-  getUserTypeLabel: (u: any) => string;
+  getUserIcon: (u: MapUser) => "people" | "person" | "bicycle";
+  getUserColor: (u: MapUser) => string;
+  getUserTypeLabel: (u: MapUser) => string;
 };
 
 export default function FullscreenMapSearchBar({
@@ -75,7 +76,7 @@ export default function FullscreenMapSearchBar({
             <Text style={styles.noResults}>{t("common.noResults")}</Text>
           ) : (
             <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
-              {searchResults.map((u: any) => (
+              {searchResults.map((u) => (
                 <TouchableOpacity
                   key={u.id}
                   style={styles.resultItem}
