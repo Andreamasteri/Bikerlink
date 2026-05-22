@@ -97,7 +97,10 @@
       <div class="pending-meta" id="pending-meta"></div>
       <div id="pending-notes" style="display:none;margin-top:8px;font-size:12px;color:#c9a43a;white-space:pre-wrap;word-break:break-word;max-width:600px;line-height:1.5"></div>
     </div>
-    <button class="distribute" id="distribute-btn">✓ Distribuisci a tutti</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="distribute" id="distribute-btn">✓ Distribuisci a tutti</button>
+      <button class="danger" id="discard-btn">✗ Scarta OTA</button>
+    </div>
   </div>
 </section>
 
@@ -257,6 +260,8 @@
       }
       $('distribute-btn').disabled = false;
       $('distribute-btn').onclick = function(){ doDistribute(pending); };
+      $('discard-btn').disabled = false;
+      $('discard-btn').onclick = function(){ doDiscardPending(pending); };
     } else {
       pendingSection.style.display = 'none';
     }
@@ -399,6 +404,12 @@
     $('distribute-btn').disabled = true;
     try { await api('POST', '/api/admin/ota/' + r.id + '/distribute', {}); await load(); }
     catch(e){ showError('Distribuzione fallita: ' + e.message); $('distribute-btn').disabled = false; }
+  }
+  async function doDiscardPending(r){
+    if (!confirmAction('SCARTA OTA: ' + otaLabel(r), r, 'verrà marcata come rotta e rimossa dal test admin')) return;
+    $('discard-btn').disabled = true;
+    try { await api('POST', '/api/admin/ota/' + r.id + '/mark-broken', {}); await load(); }
+    catch(e){ showError('Scarto fallito: ' + e.message); $('discard-btn').disabled = false; }
   }
 
   // ── Log modal ────────────────────────────────────

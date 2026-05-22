@@ -639,11 +639,64 @@ router.post("/ota/revert", async (req: Request, res: Response) => {
 });
 
 router.post("/ota/mark-broken", async (req: Request, res: Response) => {
+  if (!await assertAdminSession(req, res)) return;
   try {
     const parsed = otaMarkBrokenSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    return sendSuccess(res);
+    const releaseId = (parsed.data as { releaseId?: string }).releaseId;
+    if (!releaseId) return sendError(res, 400, "releaseId obbligatorio");
+    const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, releaseId)).limit(1);
+    if (!existing.length) return sendError(res, 404, "Release non trovata");
+    const [updated] = await db.update(otaReleases)
+      .set({ status: "broken", slot: "archived", updatedAt: new Date() })
+      .where(eq(otaReleases.id, releaseId))
+      .returning();
+    await db.execute(sql`
+      DELETE FROM device_ota_assignments WHERE slot = 'admin-preview'
+    `);
+    const actorId = req.session.userId;
+    if (actorId) {
+      storage.createModeratorLog({
+        moderatorId: actorId,
+        action: "mark_ota_broken",
+        targetType: "ota_release",
+        targetId: releaseId,
+        details: `Release marcata rotta: v=${existing[0].version}`,
+      }).catch(() => {});
+    }
+    return res.json(updated);
   } catch (err) {
+    return sendError(res, 500, "Errore segnalazione release");
+  }
+});
+
+router.post("/ota/:id/mark-broken", async (req: Request, res: Response) => {
+  if (!await assertAdminSession(req, res)) return;
+  try {
+    const id = paramStr(req.params.id);
+    if (!id) return sendError(res, 400, "ID non valido");
+    const existing = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+    if (!existing.length) return sendError(res, 404, "Release non trovata");
+    const [updated] = await db.update(otaReleases)
+      .set({ status: "broken", slot: "archived", updatedAt: new Date() })
+      .where(eq(otaReleases.id, id))
+      .returning();
+    await db.execute(sql`
+      DELETE FROM device_ota_assignments WHERE slot = 'admin-preview'
+    `);
+    const actorId = req.session.userId;
+    if (actorId) {
+      storage.createModeratorLog({
+        moderatorId: actorId,
+        action: "mark_ota_broken",
+        targetType: "ota_release",
+        targetId: id,
+        details: `Release marcata rotta da admin-preview: v=${existing[0].version}`,
+      }).catch(() => {});
+    }
+    return res.json(updated);
+  } catch (err) {
+    console.error("[OTA-MARK-BROKEN] error:", err);
     return sendError(res, 500, "Errore segnalazione release");
   }
 });

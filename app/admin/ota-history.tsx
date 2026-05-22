@@ -107,6 +107,7 @@ function PendingApprovalCard() {
   const queryClient = useQueryClient();
   const [isApplying, setIsApplying] = useState(false);
   const [isDistributing, setIsDistributing] = useState(false);
+  const [isDiscarding, setIsDiscarding] = useState(false);
 
   const { data: pendingRelease, refetch: refetchPending } = useQuery<PendingOtaRelease | null>({
     queryKey: ["/api/admin/ota/pending-approval"],
@@ -154,6 +155,45 @@ function PendingApprovalCard() {
       setIsApplying(false);
     }
   }, [pendingRelease]);
+
+  const handleDiscard = useCallback(async () => {
+    if (!pendingRelease) return;
+    Alert.alert(
+      "Scarta OTA",
+      `Scartare la versione ${pendingRelease.version}? Verrà marcata come rotta e rimossa dal test.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Scarta",
+          style: "destructive",
+          onPress: async () => {
+            setIsDiscarding(true);
+            try {
+              const res = await fetch(
+                new URL(`/api/admin/ota/${pendingRelease.id}/mark-broken`, getApiUrl()).toString(),
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+                  credentials: "include",
+                },
+              );
+              if (!res.ok) {
+                const json = await res.json().catch(() => ({}));
+                throw new Error(json.message ?? `HTTP ${res.status}`);
+              }
+              Alert.alert("OTA scartata", "La release è stata marcata come rotta.");
+              refetchPending();
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+            } catch (e) {
+              Alert.alert("Errore", `Impossibile scartare l'OTA: ${String(e)}`);
+            } finally {
+              setIsDiscarding(false);
+            }
+          },
+        },
+      ],
+    );
+  }, [pendingRelease, refetchPending, queryClient]);
 
   const handleDistribute = useCallback(async () => {
     if (!pendingRelease) return;
@@ -223,7 +263,7 @@ function PendingApprovalCard() {
         <TouchableOpacity
           style={[pendingStyles.btn, pendingStyles.btnApply, isApplying && { opacity: 0.6 }]}
           onPress={handleApply}
-          disabled={isApplying || isDistributing}
+          disabled={isApplying || isDistributing || isDiscarding}
           testID="apply-admin-ota-btn"
         >
           {isApplying ? (
@@ -238,7 +278,7 @@ function PendingApprovalCard() {
         <TouchableOpacity
           style={[pendingStyles.btn, pendingStyles.btnDistribute, isDistributing && { opacity: 0.6 }]}
           onPress={handleDistribute}
-          disabled={isApplying || isDistributing}
+          disabled={isApplying || isDistributing || isDiscarding}
           testID="distribute-ota-btn"
         >
           {isDistributing ? (
@@ -247,6 +287,21 @@ function PendingApprovalCard() {
             <>
               <Ionicons name="cloud-upload-outline" size={14} color="#fff" />
               <Text style={pendingStyles.btnText}>Distribuisci OTA</Text>
+            </>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[pendingStyles.btn, pendingStyles.btnDiscard, isDiscarding && { opacity: 0.6 }]}
+          onPress={handleDiscard}
+          disabled={isApplying || isDistributing || isDiscarding}
+          testID="discard-ota-btn"
+        >
+          {isDiscarding ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="trash-outline" size={14} color="#fff" />
+              <Text style={pendingStyles.btnText}>Scarta OTA</Text>
             </>
           )}
         </TouchableOpacity>
@@ -334,6 +389,9 @@ const pendingStyles = StyleSheet.create({
   },
   btnDistribute: {
     backgroundColor: "#22c55e",
+  },
+  btnDiscard: {
+    backgroundColor: "#ef4444",
   },
   btnText: {
     color: "#fff",
