@@ -85,6 +85,10 @@ args = "api-responses"
 task = "workflow.run"
 args = "version-alignment"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "healthcheck"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -253,6 +257,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/check-version-alignment.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "healthcheck"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-runtime-health.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
