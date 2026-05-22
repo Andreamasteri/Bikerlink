@@ -24,5 +24,5 @@ fi
 
 echo ""
 echo ">>> Processi terminati, lock rimossi."
-echo ">>> Riavvia il workflow 'Start Backend' per completare."
+echo ">>> Riavvia il workflow 'Start App' per completare."
 echo "============================================"
