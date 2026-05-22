@@ -194,7 +194,18 @@ else
   warn "Esegui 'npx expo-doctor@latest' per vedere i dettagli"
 fi
 
-# ── 4. Riepilogo finale ─────────────────────────────────────────────────────
+# ── 4. Runtime Health Check (Sistema B) ─────────────────────────────────────
+echo ""
+echo -e "  ${BOLD}─── Runtime Health (Sistema B) ─────────────────────────────${RESET}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if bash "$SCRIPT_DIR/check-runtime-health.sh" --quiet 2>/dev/null; then
+  ok "Runtime health: backend sano (VERDE)"
+else
+  error "Runtime health: backend NON sano (ROSSO) — verificare i processi live"
+fi
+
+# ── 5. Riepilogo finale ─────────────────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}────────────────────────────────────────────────────────────${RESET}"
 if [ "$CHANGED" = true ] || [ $WARNINGS -gt 0 ] || [ $ERRORS -gt 0 ]; then

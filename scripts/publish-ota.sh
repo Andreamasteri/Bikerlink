@@ -300,6 +300,28 @@ do_export() {
     usage
   fi
 
+  # ─── Guard: Runtime Health Check (Sistema B) ─────────────────
+  # Blocca il publish se il backend non è sano prima di qualsiasi modifica.
+  echo ""
+  echo "  [Health] Verifica runtime backend prima dell'export..."
+  local SCRIPT_DIR
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if ! bash "$SCRIPT_DIR/check-runtime-health.sh" --quiet; then
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║  ⛔ EXPORT BLOCCATO — Backend non sano (ESITO: ROSSO)   ║"
+    echo "╠══════════════════════════════════════════════════════════╣"
+    echo "║  Il check runtime ha rilevato almeno un problema        ║"
+    echo "║  bloccante. Correggere i processi e riprovare.          ║"
+    echo "║                                                          ║"
+    echo "║  Diagnostica dettagliata:                                ║"
+    echo "║    bash scripts/check-runtime-health.sh                 ║"
+    echo "╚══════════════════════════════════════════════════════════╝"
+    exit 1
+  fi
+  echo "  [Health] ✔ Backend sano — export autorizzato"
+  echo ""
+
   # ─── Guard: messaggio identico all'ultima OTA pubblicata ─────
   local DUP_CHECK
   DUP_CHECK=$(RELEASE_MSG_V="$RELEASE_MESSAGE" OTA_UPDATES_FILE_PATH="$OTA_UPDATES_FILE" node -e "
@@ -717,6 +739,31 @@ do_publish() {
     echo "Re-esportare con: bash $0 rollback && bash $0 export \"messaggio\""
     exit 1
   fi
+
+  # ─── Guard: Runtime Health Check (Sistema B) ─────────────────
+  # Gate definitivo prima della pubblicazione live: blocca se backend non sano.
+  echo ""
+  echo "  [Health] Verifica runtime backend prima del publish..."
+  local SCRIPT_DIR_PUB
+  SCRIPT_DIR_PUB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if ! bash "$SCRIPT_DIR_PUB/check-runtime-health.sh" --quiet; then
+    echo ""
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║  ⛔ PUBLISH BLOCCATO — Backend non sano (ESITO: ROSSO)  ║"
+    echo "╠══════════════════════════════════════════════════════════╣"
+    echo "║  Il check runtime ha rilevato almeno un problema        ║"
+    echo "║  bloccante. Correggere i processi e riprovare.          ║"
+    echo "║                                                          ║"
+    echo "║  Il bundle OTA-$NEXT_OTA è già esportato e può essere   ║"
+    echo "║  ripubblicato non appena il backend è sano:             ║"
+    echo "║    bash $0 publish                                  ║"
+    echo "║                                                          ║"
+    echo "║  Diagnostica dettagliata:                                ║"
+    echo "║    bash scripts/check-runtime-health.sh                 ║"
+    echo "╚══════════════════════════════════════════════════════════╝"
+    exit 1
+  fi
+  echo "  [Health] ✔ Backend sano — publish autorizzato"
 
   # Da qui ogni errore deve attivare rollback dei file locali
   ROLLBACK_NEEDED=1
