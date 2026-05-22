@@ -97,6 +97,7 @@
     "pdfkit": "^0.18.0",
     "pg": "^8.21.0",
     "picomatch": "^4.0.4",
+    "qs": "^6.15.2",
     "react": "^19.2.6",
     "react-native": "^0.85.3",
     "react-native-gesture-handler": "~2.31.0",
