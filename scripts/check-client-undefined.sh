@@ -39,7 +39,7 @@
 #   For @shared/X the resolver tries in order:
 #     1. shared/X.ts       — file wins when both file and directory exist
 #     2. shared/X/index.ts — fallback when only a directory exists
-#   Example: @shared/schema → shared/schema.ts  (NOT shared/schema/index.ts)
+#   Example: @shared/schema → shared/schema.ts  (file wins; directory index not used)
 #            @shared/privacy-policy-it → shared/privacy-policy-it.ts
 #
 # SERVER_ONLY_PACKAGES (loaded dynamically from metro.config.js — single source):
@@ -120,12 +120,12 @@ echo ""
 # @shared/X additions are automatically included without editing this script.
 #
 # Metro module resolution — file wins over directory:
-#   @shared/schema            → shared/schema.ts   (file, not shared/schema/index.ts)
+#   @shared/schema            → shared/schema.ts   (file wins; directory index not used)
 #   @shared/privacy-policy-it → shared/privacy-policy-it.ts
 #   @shared/event-types       → shared/event-types.ts
 #   @shared/X                 → shared/X.ts  (preferred) or shared/X/index.ts
 #
-# The barrel (shared/schema/index.ts) is irrelevant for client bundle resolution
+# The barrel (shared/db/index.ts) is irrelevant for client bundle resolution
 # because the FILE always wins when both file and directory exist (Metro rule).
 # Using the barrel for this check would silently pass any symbol because it
 # contains "export * from ..." lines that match everything.
@@ -328,7 +328,7 @@ echo ""
 # that Check B skips because they are not yet used by client code.
 #
 # This is a WARNING (not a failure). The known case — shared/schema.ts and
-# shared/schema/*.ts importing drizzle-orm/pg-core — is intentional (DB
+# shared/db/*.ts importing drizzle-orm/pg-core — is intentional (DB
 # schema definitions) and is already mitigated by the Proxy mock (Check C).
 # The warning surfaces any NEW unexpected server-only imports that might
 # appear in shared modules not yet covered by the Proxy mock mitigation.
