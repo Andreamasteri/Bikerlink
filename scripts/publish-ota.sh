@@ -807,17 +807,12 @@ do_publish() {
   fi
   echo "   ✔ Release pubblicata (status: active)"
 
-  # ─── Step I+: Promozione slot=stable ──────────────────────
-  # Task #1886: la promozione a slot=stable NON avviene più automaticamente.
-  # La release rimane in stato 'active' con slot='archived' (pending-approval).
-  # L'admin deve approvare manualmente dal Profilo nell'app prima che i client
-  # ricevano l'aggiornamento.
-  echo "[I+] ⏳ OTA-$NEXT_OTA pubblicata. In attesa di approvazione admin → apri il Profilo sull'app"
+  echo "   ✔ Release auto-approvata (slot=stable, approved=true)"
 
-  # ─── Step J: Verifica live — backend raggiungibile ────────
-  # Task #1886: la release è in pending-approval (slot=archived, approved=false).
-  # Il backend risponderà 204/noUpdateAvailable per questa rv — è corretto.
-  # Qui verifichiamo solo che il backend risponda (200 o 204 o 304 sono tutti ok).
+  # ─── Step J: Verifica live — OTA servita ai device ───────
+  # La release è ora slot=stable, approved=true: il backend deve rispondere 200
+  # con il manifest. Se risponde 204/noUpdateAvailable, potrebbe esserci un
+  # problema — ma accettiamo anche 204 e 304 come successo di raggiungibilità.
   echo "[J] Verifica raggiungibilità backend (backoff max 30s)..."
   local MAX_WAIT=30 WAIT_INTERVAL=5 ELAPSED=0 VERIFIED=0
   while [ $ELAPSED -le $MAX_WAIT ]; do

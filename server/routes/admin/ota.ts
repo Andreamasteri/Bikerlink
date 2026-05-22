@@ -325,7 +325,7 @@ router.post("/ota/:id/publish", async (req: Request, res: Response) => {
     if (!existing.length) return sendError(res, 404, "Release non trovata");
 
     const [updated] = await db.update(otaReleases)
-      .set({ status: "active", publishedAt: new Date(), updatedAt: new Date() })
+      .set({ status: "active", slot: "stable", approved: true, approvedAt: new Date(), publishedAt: new Date(), updatedAt: new Date() })
       .where(eq(otaReleases.id, id))
       .returning();
 

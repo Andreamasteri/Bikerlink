@@ -163,6 +163,28 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     console.warn("[INIT] Phase 3 retention seed (non-fatal):", e);
   }
 
+  // OTA auto-approve: promuovi a slot=stable le release active rimaste in slot=archived
+  // (catch-22 fix: il publish script impostava slot='archived' in attesa di approvazione manuale
+  //  che non poteva avvenire perché l'app crashava al login. Con l'approvazione sospesa,
+  //  qualsiasi release active deve essere immediatamente servita ai device.)
+  try {
+    const fixResult = await db.execute(sql`
+      UPDATE ota_releases
+      SET slot = 'stable', approved = true, approved_at = NOW(), updated_at = NOW()
+      WHERE status = 'active'
+        AND (slot = 'archived' OR slot IS NULL OR approved = false)
+      RETURNING id, version, runtime_version
+    `);
+    const fixedRows = fixResult.rows as any[];
+    if (fixedRows.length > 0) {
+      for (const row of fixedRows) {
+        console.log(`[INIT] Phase 3: auto-approved OTA release id=${row.id} v=${row.version} rv=${row.runtime_version}`);
+      }
+    }
+  } catch (e) {
+    console.warn("[INIT] Phase 3 OTA auto-approve (non-fatal):", e);
+  }
+
   // OTA stale release cleanup (non-fatal)
   try {
     const retentionDays = await getOtaRetentionDays();

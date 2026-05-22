@@ -220,14 +220,13 @@ export function registerExpoUpdatesRoutes(app: Express) {
       let release: Record<string, unknown> | null = null;
 
       if (hasSlotAssignment && assignedSlot) {
-        const slotApprovedFilter = assignedSlot === "stable" ? sql` AND approved = true` : sql``;
-        const slotResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = ${assignedSlot} AND status = 'active' AND runtime_version = ${effectiveRv}${slotApprovedFilter} ORDER BY published_at DESC LIMIT 1`);
+        const slotResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = ${assignedSlot} AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
         if (slotResult.rows.length > 0) {
           release = slotResult.rows[0] as Record<string, unknown>;
         } else {
           const reason = `slot=${assignedSlot} no active OTA`;
           await logEvent("fallback_to_stable", null, reason);
-          const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND approved = true AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
+          const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
           if (stableResult.rows.length > 0) {
             release = stableResult.rows[0] as Record<string, unknown>;
           } else {
@@ -235,7 +234,7 @@ export function registerExpoUpdatesRoutes(app: Express) {
           }
         }
       } else {
-        const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND approved = true AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
+        const stableResult = await db.execute(sql`SELECT * FROM ota_releases WHERE slot = 'stable' AND status = 'active' AND runtime_version = ${effectiveRv} ORDER BY published_at DESC LIMIT 1`);
         if (stableResult.rows.length > 0) {
           release = stableResult.rows[0] as Record<string, unknown>;
         } else {
