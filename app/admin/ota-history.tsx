@@ -241,6 +241,7 @@ function PendingApprovalCard() {
                 {
                   method: "POST",
                   headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+                  body: "{}",
                   credentials: "include",
                 },
               );
