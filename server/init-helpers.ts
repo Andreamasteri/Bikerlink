@@ -68,13 +68,3 @@ export async function initMissingClubConversations() {
   }
 }
 
-export const getOtaRetentionDays = async (): Promise<number> => {
-  try {
-    const setting = await storage.getAppSetting("ota_cleanup_retention_days");
-    if (setting?.value) {
-      const parsed = parseInt(setting.value, 10);
-      if (!isNaN(parsed) && parsed > 0) return parsed;
-    }
-  } catch { /* best-effort, fall back to default */ }
-  return 90;
-};

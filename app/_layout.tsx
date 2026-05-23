@@ -11,10 +11,7 @@ import { useUpdateCheck } from "@/hooks/useUpdateCheck";
 import AlwaysPermissionNotice from "@/components/AlwaysPermissionNotice";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Updates from "expo-updates";
-import { OTA_PENDING_KEY } from "@/lib/ota-check";
-import { initOtaHardening } from "@/lib/ota-hardening";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import OtaStuckScreen from "@/components/OtaStuckScreen";
 import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -46,8 +43,6 @@ import { RootProviders } from "@/components/RootProviders";
 import { AppStateHandler } from "@/components/layout/AppStateHandler";
 import { BackgroundNotificationHandler } from "@/components/layout/BackgroundNotificationHandler";
 import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
-import { OtaStartupChecker } from "@/components/layout/OtaStartupChecker";
-
 SplashScreen.preventAutoHideAsync();
 
 function GpsAlwaysGate({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -197,7 +192,6 @@ function RootLayoutNav() {
       <Stack.Screen name="moderator" options={{ headerShown: false }} />
       <Stack.Screen name="contest" options={{ headerShown: false }} />
       <Stack.Screen name="privacy-policy" options={{ headerShown: false }} />
-      <Stack.Screen name="ota-gate" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="feedback/index" options={{ headerShown: true, headerTitle: "Feedback", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
       <Stack.Screen name="notifications" options={{ headerShown: true, headerTitle: "Notifiche", headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.text }} />
       <Stack.Screen name="sprint-history" options={{ headerShown: false }} />
@@ -223,7 +217,7 @@ function reportClientError(error: Error, componentStack: string) {
 }
 
 export default function RootLayout() {
-  const { ready, otaStuck, setOtaStuck, fontsLoaded, fontError } = useAppBootstrap();
+  const { ready, fontsLoaded, fontError } = useAppBootstrap();
 
   useEffect(() => {
     type ErrorHandler = (error: Error, isFatal?: boolean) => void;
@@ -258,11 +252,8 @@ export default function RootLayout() {
   return (
     <RootProviders 
       reportClientError={reportClientError}
-      isStuck={ready && otaStuck === true}
-      renderStuckScreen={() => <OtaStuckScreen onCleared={() => setOtaStuck(false)} />}
     >
       <StartupGate ready={ready}>
-        <OtaStartupChecker />
         <NativeUpdateChecker />
         <MapReadyGate>
           <AppStateHandler />

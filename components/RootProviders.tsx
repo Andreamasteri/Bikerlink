@@ -27,42 +27,36 @@ function ChatSseGate({ children }: { children: React.ReactNode }) {
 interface RootProvidersProps {
   children: React.ReactNode;
   reportClientError: (error: Error, componentStack: string) => void;
-  renderStuckScreen: () => React.ReactNode;
-  isStuck: boolean;
 }
 
 export function RootProviders({ 
   children, 
-  reportClientError, 
-  renderStuckScreen,
-  isStuck 
+  reportClientError,
 }: RootProvidersProps) {
   return (
     <ErrorBoundary onError={reportClientError}>
       <ThemeProvider>
         <LanguageProvider>
           <QueryClientProvider client={queryClient}>
-            {isStuck ? renderStuckScreen() : (
-              <AuthProvider>
-                <ChatSseGate>
-                  <MapSettingsProvider>
-                    <TaskbarStyleProvider>
-                      <UnitsProvider>
-                        <LocationProvider>
-                          <PlayerProvider>
-                            <FloatingWidgetProvider>
-                              <GestureHandlerRootView style={{ flex: 1 }}>
-                                {children}
-                              </GestureHandlerRootView>
-                            </FloatingWidgetProvider>
-                          </PlayerProvider>
-                        </LocationProvider>
-                      </UnitsProvider>
-                    </TaskbarStyleProvider>
-                  </MapSettingsProvider>
-                </ChatSseGate>
-              </AuthProvider>
-            )}
+            <AuthProvider>
+              <ChatSseGate>
+                <MapSettingsProvider>
+                  <TaskbarStyleProvider>
+                    <UnitsProvider>
+                      <LocationProvider>
+                        <PlayerProvider>
+                          <FloatingWidgetProvider>
+                            <GestureHandlerRootView style={{ flex: 1 }}>
+                              {children}
+                            </GestureHandlerRootView>
+                          </FloatingWidgetProvider>
+                        </PlayerProvider>
+                      </LocationProvider>
+                    </UnitsProvider>
+                  </TaskbarStyleProvider>
+                </MapSettingsProvider>
+              </ChatSseGate>
+            </AuthProvider>
           </QueryClientProvider>
         </LanguageProvider>
       </ThemeProvider>

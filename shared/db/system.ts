@@ -375,7 +375,6 @@ export type PublishWithSlotInput = z.infer<typeof publishWithSlotSchema>;
 export const gpsErrorSchema = z.object({
   errorMessage: z.string().min(1, "errorMessage è obbligatorio").max(2000),
   stackTrace: z.string().max(5000).nullable().optional(),
-  otaNumber: z.number().optional(),
   timestamp: z.string().max(40).optional(),
   platform: z.string().max(20).optional(),
   deviceName: z.string().max(100).nullable().optional(),
@@ -385,3 +384,13 @@ export const gpsErrorSchema = z.object({
   speedKmh: z.number().nullable().optional(),
 });
 export type GpsErrorInput = z.infer<typeof gpsErrorSchema>;
+
+export const serverRestarts = pgTable("server_restarts", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  reason: varchar("reason", { length: 50 }).notNull().default("restart"),
+});
+export type ServerRestart = typeof serverRestarts.$inferSelect;
+export type InsertServerRestart = typeof serverRestarts.$inferInsert;

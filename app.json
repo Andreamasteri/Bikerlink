@@ -136,13 +136,7 @@
       "typedRoutes": true
     },
     "updates": {
-      "url": "https://biker-link.replit.app/api/expo-updates",
-      "enabled": true,
-      "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "ON_ERROR_RECOVERY",
-      "requestHeaders": {
-        "expo-device-id": "extra-params"
-      }
+      "enabled": false
     },
     "runtimeVersion": "10.0.0",
     "extra": {

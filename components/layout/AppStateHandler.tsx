@@ -12,7 +12,6 @@ import {
   stopBackgroundLocationTask,
   isBackgroundLocationSupported,
 } from "@/lib/background-location-task";
-import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import Constants from "expo-constants";
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
@@ -21,7 +20,7 @@ async function sendHeartbeat() {
   try {
     const appVersion = Constants.expoConfig?.version ?? "0.0.0";
     const platform = Platform.OS;
-    await apiRequest("POST", "/api/auth/heartbeat", { appVersion, platform, otaNumber: CURRENT_OTA_NUMBER });
+    await apiRequest("POST", "/api/auth/heartbeat", { appVersion, platform });
   } catch {}
 }
 

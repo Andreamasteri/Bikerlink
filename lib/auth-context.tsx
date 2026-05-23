@@ -2,7 +2,6 @@ import React, { createContext, useContext, useMemo, useState, useEffect, useRef,
 import { Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { triggerOtaCheck } from "@/lib/ota-check";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import {
   queryClient,
@@ -56,9 +55,6 @@ function useLoginMutation() {
           credentials: "include",
         }).catch(() => {});
       }
-      // Force OTA check after login (bypass cooldown). Small delay to avoid
-      // blocking login UX. If a new OTA is available it will fetch + reload.
-      triggerOtaCheck("login", { force: true, delayMs: 1500 }).catch(() => {});
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0] as string;
@@ -140,8 +136,6 @@ function useRegisterMutation() {
           credentials: "include",
         }).catch(() => {});
       }
-      // Force OTA check after register (bypass cooldown).
-      triggerOtaCheck("register", { force: true, delayMs: 1500 }).catch(() => {});
     },
   });
 }

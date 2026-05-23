@@ -2,7 +2,6 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 
 // Note: CURRENT_APP_VERSION should be imported or passed as prop. 
 // In the original file it was used but not defined in the snippet I saw, 
@@ -99,17 +98,14 @@ export const UserCard: React.FC<UserCardProps> = ({
         </Text>
         {(() => {
           const hasVer = !!item.lastAppVersion && item.lastAppVersion !== "unknown";
-          const hasOta = item.lastOtaNumber != null;
-          if (!hasVer && !hasOta) {
-            return <Text style={styles.versionMissing}>v— / OTA —</Text>;
+          if (!hasVer) {
+            return <Text style={styles.versionMissing}>v—</Text>;
           }
           const verOk = item.lastAppVersion === currentAppVersion;
-          const otaOk = item.lastOtaNumber === CURRENT_OTA_NUMBER;
-          const allOk = verOk && otaOk;
-          const color = allOk ? Colors.success : Colors.error;
+          const color = verOk ? Colors.success : Colors.error;
           return (
-            <Text style={[styles.versionBadge, { color, textDecorationLine: allOk ? "none" : "underline" as const }]}>
-              {hasVer ? `v${item.lastAppVersion}` : "v—"} / {hasOta ? `OTA-${item.lastOtaNumber}` : "OTA —"}
+            <Text style={[styles.versionBadge, { color, textDecorationLine: verOk ? "none" : "underline" as const }]}>
+              {`v${item.lastAppVersion}`}
             </Text>
           );
         })()}

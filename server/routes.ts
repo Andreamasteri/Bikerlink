@@ -55,7 +55,6 @@ import { db } from "./db";
 import { users, userFavorites } from "@shared/db";
 import { ilike, eq, and, sql } from "drizzle-orm";
 import { onlineTracker } from "./online-tracker";
-import { registerExpoUpdatesRoutes } from "./routes/expo-updates-handler";
 import { registerClientSettingsRoutes } from "./routes/client-settings";
 import { registerMoreRoutes } from "./routes/more-routes";
 
@@ -406,29 +405,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return handleMusicMatch(req, res);
   });
 
-  registerExpoUpdatesRoutes(app);
-
-  app.get("/admin/ota", async (req: Request, res: Response) => {
-    try {
-      const userId = (req as any).session?.userId;
-      if (!userId) {
-        res.status(401).setHeader("Content-Type", "text/html; charset=utf-8");
-        return res.send('<html><body style="background:#000;color:#888;font-family:sans-serif;padding:40px;text-align:center"><h1>401</h1><p>Sessione admin richiesta.</p></body></html>');
-      }
-      const user = await storage.getUser(userId);
-      if (!user || user.role !== "admin") {
-        res.status(403).setHeader("Content-Type", "text/html; charset=utf-8");
-        return res.send('<html><body style="background:#000;color:#888;font-family:sans-serif;padding:40px;text-align:center"><h1>403</h1><p>Accesso riservato agli admin.</p></body></html>');
-      }
-      const templatePath = path.resolve(process.cwd(), "server", "templates", "admin-ota.html");
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "no-store");
-      return res.sendFile(templatePath);
-    } catch (err) {
-      console.error("[admin/ota] error:", err);
-      return res.status(500).send("Errore interno");
-    }
-  });
 
   app.get("/admin/visitatori", async (req: Request, res: Response) => {
     try {

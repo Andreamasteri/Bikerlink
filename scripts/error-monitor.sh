@@ -83,83 +83,6 @@ check_recent_crashes() {
   touch /tmp/em_last_crash_check 2>/dev/null
 }
 
-# ── Check 3: OTA mismatch produzione (ogni 10 cicli, ~5 min) ────────────────
-check_ota_mismatch() {
-  local OTA_JSON="ota-updates.json"
-  [ -f "$OTA_JSON" ] || return 0
-  [ -f "app.json" ] || return 0
-
-  # Legge runtimeVersion corrente da app.json e l'ultima entry published da
-  # ota-updates.json (array piatto, filtrato per runtimeVersion + status=published).
-  local EXPECTED_RV EXPECTED_ID EXPECTED_OTA
-  local META
-  META=$(node -e "
-    try {
-      const fs = require('fs');
-      const rv = JSON.parse(fs.readFileSync('app.json','utf8'))?.expo?.runtimeVersion ?? '';
-      if (!rv) { console.log('ERROR:no_rv'); process.exit(0); }
-      const data = JSON.parse(fs.readFileSync('$OTA_JSON','utf8'));
-      const published = data.filter(e =>
-        typeof e.updateNumber === 'number' &&
-        e.runtimeVersion === rv &&
-        e.status === 'published'
-      );
-      if (published.length === 0) { console.log('NO_PUBLISHED:rv=' + rv); process.exit(0); }
-      const last = published[published.length - 1];
-      console.log('OK:rv=' + rv + ':ota=' + last.updateNumber + ':id=' + (last.releaseId ?? ''));
-    } catch(e) { console.log('ERROR:' + e.message.replace(/\n/g,' ')); }
-  " 2>/dev/null || echo "ERROR:node_failed")
-
-  if [[ "$META" == ERROR:* ]]; then
-    return 0
-  fi
-  if [[ "$META" == NO_PUBLISHED:* ]]; then
-    return 0
-  fi
-
-  EXPECTED_RV=$(echo "$META" | grep -o 'rv=[^:]*' | head -1 | cut -d= -f2)
-  EXPECTED_OTA=$(echo "$META" | grep -o 'ota=[^:]*' | head -1 | cut -d= -f2)
-  EXPECTED_ID=$(echo "$META" | grep -o 'id=.*' | head -1 | cut -d= -f2)
-
-  [ -z "$EXPECTED_RV" ] && return 0
-
-  local HTTP_RESPONSE HTTP_BODY HTTP_CODE SERVED_ID
-  HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" \
-    -H "expo-runtime-version: $EXPECTED_RV" \
-    -H "expo-platform: android" \
-    -H "expo-protocol-version: 1" \
-    --max-time 10 \
-    "$PROD_HOST/api/expo-updates" 2>/dev/null || echo -e "\nCURL_FAILED")
-  HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
-  HTTP_CODE=$(echo "$HTTP_RESPONSE" | tail -1)
-
-  if [ "$HTTP_CODE" = "CURL_FAILED" ] || [ -z "$HTTP_CODE" ]; then
-    return 0
-  fi
-
-  if [ "$HTTP_CODE" != "200" ]; then
-    # 204/304 = no update available; altri codici = errore transiente
-    return 0
-  fi
-
-  # Estrae il releaseId (UUID) dal body — funziona sia con JSON puro che con
-  # multipart/mixed (Expo Protocol v1)
-  SERVED_ID=$(echo "$HTTP_BODY" \
-    | grep -oE '"id"[[:space:]]*:[[:space:]]*"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"' \
-    | head -1 \
-    | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' \
-    || echo "")
-
-  if [ -z "$SERVED_ID" ]; then
-    return 0
-  fi
-
-  if [ -n "$EXPECTED_ID" ] && [ "$SERVED_ID" != "$EXPECTED_ID" ]; then
-    log "WARN_OTA_MISMATCH: produzione serve id=$SERVED_ID, atteso OTA-${EXPECTED_OTA} id=$EXPECTED_ID (rv=$EXPECTED_RV)"
-  else
-    log "OTA_OK: produzione serve OTA-${EXPECTED_OTA} rv=$EXPECTED_RV id=$SERVED_ID"
-  fi
-}
 
 # ── Check 4: Last.fm route produzione (ogni 10 cicli, ~5 min) ─────────────────
 check_lastfm_prod() {
@@ -195,7 +118,6 @@ log "  Intervallo:   ${CHECK_INTERVAL}s"
 log "  Log:          $LOG_FILE"
 log "  Checks/ciclo: backend, backend-crashes"
 log "  Check Last.fm produzione: ogni 10 cicli (~5 min)"
-log "  Check OTA mismatch produzione: ogni 10 cicli (~5 min)"
 log "============================================"
 
 run_all_checks
@@ -211,9 +133,6 @@ while true; do
     check_lastfm_prod
   fi
 
-  if [ $((CYCLE % 10)) -eq 0 ]; then
-    check_ota_mismatch
-  fi
 
   if [ $((CYCLE % 20)) -eq 0 ]; then
     rotate_log

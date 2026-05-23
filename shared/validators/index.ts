@@ -7,7 +7,6 @@ export * from "./ads";
 export * from "./conversations";
 export * from "./events";
 export * from "./motoclubs";
-export * from "./ota";
 export * from "./planned-routes";
 export * from "./social";
 export * from "./sos";

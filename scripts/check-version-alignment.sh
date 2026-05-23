@@ -6,7 +6,6 @@
 #    - app.json          (expo.version, expo.android.versionCode, expo.runtimeVersion)
 #    - build.gradle      (versionCode, versionName)
 #    - strings.xml       (expo_runtime_version)
-#    - publish-ota.sh    (hardcoded build e ciclo nella formula VERSION)
 #
 #  Fa parte del protocollo "controllo-incrociato" — Sistema A (analisi statica).
 #  Produce output strutturato compatibile con la firma di completamento.
@@ -151,48 +150,6 @@ else
   fi
 fi
 
-# ── 4. Leggi publish-ota.sh ──────────────────────────────────────────────────
-OTA_SCRIPT="scripts/publish-ota.sh"
-$QUIET || echo ""
-$QUIET || echo -e "  ${BOLD}─── scripts/publish-ota.sh ──────────────────────────────────${RESET}"
-
-if [ ! -f "$OTA_SCRIPT" ]; then
-  warning "$OTA_SCRIPT non trovato — skip controllo formula VERSION"
-else
-  # Cerca la riga: local VERSION="48.${NEXT_OTA}.10"
-  OTA_VERSION_LINE=$(grep -oP 'local VERSION="[^"]*"' "$OTA_SCRIPT" | head -1 || echo "")
-
-  if [ -z "$OTA_VERSION_LINE" ]; then
-    warning "$OTA_SCRIPT: riga 'local VERSION=...' non trovata"
-  else
-    ok "publish-ota.sh  $OTA_VERSION_LINE"
-
-    # Estrai il primo numero (build/versionCode)
-    OTA_BUILD=$(echo "$OTA_VERSION_LINE" | grep -oP '"(\d+)\.' | grep -oP '\d+' | head -1 || echo "")
-    # Estrai il terzo numero (ciclo runtimeVersion), formato: .<NEXT_OTA>.<ciclo>"
-    OTA_CICLO=$(echo "$OTA_VERSION_LINE" | grep -oP '\.\d+"\s*$' | grep -oP '\d+' | head -1 || echo "")
-
-    if [ -z "$OTA_BUILD" ]; then
-      warning "publish-ota.sh: impossibile estrarre il numero build dalla formula VERSION"
-    elif [ -n "$APP_VERSION_CODE" ] && [ "$OTA_BUILD" != "$APP_VERSION_CODE" ]; then
-      blocker "publish-ota.sh: numero build nella formula ($OTA_BUILD) ≠ app.json versionCode ($APP_VERSION_CODE)"
-    elif [ -n "$APP_VERSION_CODE" ]; then
-      ok "publish-ota.sh build number allineato ($OTA_BUILD)"
-    fi
-
-    if [ -z "$OTA_CICLO" ]; then
-      warning "publish-ota.sh: impossibile estrarre il numero ciclo dalla formula VERSION"
-    elif [ -n "$APP_RUNTIME" ]; then
-      # Il ciclo è il major della runtimeVersion (es. "10.0.0" → "10")
-      RUNTIME_MAJOR=$(echo "$APP_RUNTIME" | cut -d. -f1)
-      if [ "$OTA_CICLO" != "$RUNTIME_MAJOR" ]; then
-        blocker "publish-ota.sh: ciclo nella formula ($OTA_CICLO) ≠ major di runtimeVersion ($RUNTIME_MAJOR) da app.json ($APP_RUNTIME)"
-      else
-        ok "publish-ota.sh ciclo allineato ($OTA_CICLO == rv major $RUNTIME_MAJOR)"
-      fi
-    fi
-  fi
-fi
 
 # ── 5. Riepilogo e firma di completamento ─────────────────────────────────────
 $QUIET || echo ""

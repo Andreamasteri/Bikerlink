@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Platform } from "react-native";
 import {
   Inter_400Regular,
   Inter_500Medium,
@@ -8,7 +7,6 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import * as SplashScreen from "expo-splash-screen";
-import { isOtaStuck } from "@/lib/ota-stuck";
 import { sendStartupBeacon, recoverLastBeacon } from "@/lib/startup-beacon";
 
 export function useAppBootstrap() {
@@ -20,7 +18,6 @@ export function useAppBootstrap() {
   });
 
   const [ready, setReady] = useState(false);
-  const [otaStuck, setOtaStuck] = useState<boolean | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -30,17 +27,7 @@ export function useAppBootstrap() {
   }, []);
 
   useEffect(() => {
-    const forceReady = async () => {
-      if (!__DEV__) {
-        try {
-          const stuck = await isOtaStuck();
-          setOtaStuck(stuck);
-        } catch {
-          setOtaStuck(false);
-        }
-      } else {
-        setOtaStuck(false);
-      }
+    const forceReady = () => {
       setReady(true);
       SplashScreen.hideAsync().catch(() => {});
     };
@@ -56,5 +43,5 @@ export function useAppBootstrap() {
     return () => clearTimeout(timeout);
   }, [fontsLoaded, fontError]);
 
-  return { ready, otaStuck, setOtaStuck, fontsLoaded, fontError };
+  return { ready, fontsLoaded, fontError };
 }

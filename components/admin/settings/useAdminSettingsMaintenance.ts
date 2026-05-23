@@ -24,92 +24,6 @@ export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => 
     onError: (e: Error) => Alert.alert("Errore sync", e.message),
   });
 
-  const { data: otaGateData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/ota-gate-enabled"],
-  });
-  const otaGateEnabled = otaGateData?.enabled === true;
-
-  const otaGateMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/ota_gate_enabled", baseUrl);
-      const res = await fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: enabled ? "true" : "false" }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/ota-gate-enabled"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-    },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
-  });
-
-  const { data: otaWaitData } = useQuery<{ seconds: number }>({
-    queryKey: ["/api/settings/ota-wait-seconds"],
-  });
-  const [otaWaitInput, setOtaWaitInput] = useState("");
-  useEffect(() => {
-    if (otaWaitData?.seconds != null && otaWaitInput === "") {
-      setOtaWaitInput(String(otaWaitData.seconds));
-    }
-  }, [otaWaitData]);
-
-  const otaWaitMutation = useMutation({
-    mutationFn: async (seconds: number) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/ota_wait_seconds", baseUrl);
-      const res = await fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: String(seconds) }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/ota-wait-seconds"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      Alert.alert("Successo", "Attesa OTA aggiornata");
-    },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
-  });
-
-  const { data: otaRetentionData } = useQuery<{ days: number }>({
-    queryKey: ["/api/settings/ota-retention-days"],
-  });
-  const [otaRetentionInput, setOtaRetentionInput] = useState("");
-  useEffect(() => {
-    if (otaRetentionData?.days != null && otaRetentionInput === "") {
-      setOtaRetentionInput(String(otaRetentionData.days));
-    }
-  }, [otaRetentionData]);
-
-  const otaRetentionMutation = useMutation({
-    mutationFn: async (days: number) => {
-      const baseUrl = getApiUrl();
-      const url = new URL("/api/admin/settings/ota_retention_days", baseUrl);
-      const res = await fetch(url.toString(), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ value: String(days) }),
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error(await res.text());
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/settings/ota-retention-days"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
-      Alert.alert("Successo", "Ritenzione OTA aggiornata");
-    },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
-  });
 
   const [emailConfigModalVisible, setEmailConfigModalVisible] = useState(false);
   const [emailConfigAdminPass, setEmailConfigAdminPass] = useState("");
@@ -191,15 +105,6 @@ export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => 
   return {
     syncStatus,
     syncMutation,
-    otaGateEnabled,
-    otaGateMutation,
-    otaWaitInput,
-    setOtaWaitInput,
-    otaWaitMutation,
-    otaWaitPending: otaWaitMutation.isPending,
-    otaRetentionInput,
-    setOtaRetentionInput,
-    otaRetentionMutation,
     emailConfigModalVisible,
     setEmailConfigModalVisible,
     emailConfigAdminPass,

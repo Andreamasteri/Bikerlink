@@ -13,7 +13,7 @@ import { runMigrations } from "./migrate";
 import { setupMiddleware, setupStaticRoutes } from "./middleware";
 import { registerAllRoutes } from "./route-mounter";
 import { setupErrorHandler } from "./error-handler";
-import { initMissingClubConversations, getOtaRetentionDays } from "./init-helpers";
+import { initMissingClubConversations } from "./init-helpers";
 
 // ── Phase timeout helper ─────────────────────────────────────────────────────
 // Fatal phases: timeout rejects → propagates → process.exit(1)
@@ -134,79 +134,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
   // ── Phase 3: DB Init (non-fatal sub-steps) ────────────────────────────────
   bootLog(3, TOTAL, "DB Init", "start");
-
-  // OTA event cleanup (non-fatal)
-  try {
-    const cleanupResult = await db.execute(sql`
-      DELETE FROM ota_events 
-      WHERE runtime_version IS NULL 
-         OR runtime_version = ''
-         OR runtime_version = 'dirty-rv'
-      RETURNING id
-    `);
-    const deletedCount = cleanupResult.rowCount ?? 0;
-    if (deletedCount > 0) {
-      console.log(`[INIT] Phase 3 dirty-rv cleanup: deleted ${deletedCount} row(s)`);
-    }
-  } catch (e) {
-    console.warn("[INIT] Phase 3 dirty-rv cleanup (non-fatal):", e);
-  }
-
-  // OTA retention seed (non-fatal)
-  try {
-    const existing = await storage.getAppSetting("ota_cleanup_retention_days");
-    if (!existing) {
-      await storage.upsertAppSetting("ota_cleanup_retention_days", "90");
-      console.log("[INIT] Phase 3: ota_cleanup_retention_days seeded");
-    }
-  } catch (e) {
-    console.warn("[INIT] Phase 3 retention seed (non-fatal):", e);
-  }
-
-  // OTA auto-approve: promuovi a slot=stable le release active rimaste in slot=archived
-  // (catch-22 fix: il publish script impostava slot='archived' in attesa di approvazione manuale
-  //  che non poteva avvenire perché l'app crashava al login. Con l'approvazione sospesa,
-  //  qualsiasi release active deve essere immediatamente servita ai device.)
-  try {
-    const fixResult = await db.execute(sql`
-      UPDATE ota_releases
-      SET slot = 'stable', approved = true, approved_at = NOW(), updated_at = NOW()
-      WHERE status = 'active'
-        AND slot = 'archived'
-      RETURNING id, version, runtime_version
-    `);
-    const fixedRows = fixResult.rows as any[];
-    if (fixedRows.length > 0) {
-      for (const row of fixedRows) {
-        console.log(`[INIT] Phase 3: auto-approved OTA release id=${row.id} v=${row.version} rv=${row.runtime_version}`);
-      }
-    }
-  } catch (e) {
-    console.warn("[INIT] Phase 3 OTA auto-approve (non-fatal):", e);
-  }
-
-  // OTA stale release cleanup (non-fatal)
-  try {
-    const retentionDays = await getOtaRetentionDays();
-    const cleanupResult = await db.execute(sql`
-      DELETE FROM ota_releases
-      WHERE status IN ('superseded', 'draft')
-        AND published_at < NOW() - (${String(retentionDays)} || ' days')::INTERVAL
-      RETURNING id, version, status, published_at, bundle_path
-    `);
-    const deletedRows = cleanupResult.rows as any[];
-    if (deletedRows.length > 0) {
-      console.log(`[INIT] Phase 3: removed ${deletedRows.length} stale OTA release(s)`);
-      const { deleteObject } = await import("./objectStorage");
-      for (const row of deletedRows) {
-        if (row.bundle_path) {
-          try { await deleteObject(row.bundle_path); } catch {}
-        }
-      }
-    }
-  } catch (e) {
-    console.warn("[INIT] Phase 3 OTA cleanup (non-fatal):", e);
-  }
 
   bootLog(3, TOTAL, "DB Init", "done");
 

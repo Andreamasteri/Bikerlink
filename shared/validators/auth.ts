@@ -32,17 +32,6 @@ export const loginSchema = z.object({
 });
 export type LoginInput = z.infer<typeof loginSchema>;
 
-export const otaStuckEventSchema = z.object({
-  deviceId: z.string().max(64).optional(),
-  rollbackCount: z.number().int().min(0).max(1000).optional(),
-  stuckSessions: z.number().int().min(0).optional(),
-  runtimeVersion: z
-    .string()
-    .max(32)
-    .regex(/^\d+\.\d+\.\d+$/, "runtimeVersion deve essere semver (es. 8.0.0)")
-    .optional(),
-});
-export type OtaStuckEventInput = z.infer<typeof otaStuckEventSchema>;
 
 export const clientErrorReportSchema = z.object({
   message: z.string().max(2000).optional(),

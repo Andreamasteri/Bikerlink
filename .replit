@@ -55,14 +55,6 @@ args = "Clean Metro"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Publish OTA"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "ota-token-safety"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "typecheck"
 
 [[workflows.workflow.tasks]]
@@ -168,28 +160,6 @@ waitForPort = 8081
 
 [workflows.workflow.metadata]
 outputType = "console"
-
-[[workflows.workflow]]
-name = "Publish OTA"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/publish-ota.sh setup-token && bash scripts/publish-ota.sh publish"
-
-[[workflows.workflow]]
-name = "ota-token-safety"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/check-ota-token-safety.sh"
-
-[workflows.workflow.metadata]
-isValidation = true
 
 [[workflows.workflow]]
 name = "typecheck"

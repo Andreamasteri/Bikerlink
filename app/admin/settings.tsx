@@ -18,7 +18,6 @@ import { AppSettingsSection } from "@/components/admin/settings/AppSettingsSecti
 import { ThemeSection } from "@/components/admin/settings/ThemeSection";
 import { GeneralToggleSection } from "@/components/admin/settings/GeneralToggleSection";
 import { UptimeSection } from "@/components/admin/settings/UptimeSection";
-import { OtaGateSection } from "@/components/admin/settings/OtaGateSection";
 import { HomeMessageSection } from "@/components/admin/settings/HomeMessageSection";
 import { SyncSection } from "@/components/admin/settings/SyncSection";
 import { MapStyleSection } from "@/components/admin/settings/MapStyleSection";
@@ -210,20 +209,6 @@ export default function AdminSettings() {
           onUptimeToggle={state.handleUptimeToggle}
         />
 
-        <OtaGateSection
-          otaGateEnabled={state.otaGateEnabled}
-          onOtaGateToggle={(val) => state.otaGateMutation.mutate(val)}
-          otaGatePending={state.otaGateMutation.isPending}
-          otaWaitInput={state.otaWaitInput}
-          setOtaWaitInput={state.setOtaWaitInput}
-          onOtaWaitSave={() => state.otaWaitMutation.mutate(parseInt(state.otaWaitInput, 10))}
-          otaWaitPending={state.otaWaitPending}
-          otaRetentionInput={state.otaRetentionInput}
-          setOtaRetentionInput={state.setOtaRetentionInput}
-          onOtaRetentionSave={() => state.otaRetentionMutation.mutate(parseInt(state.otaRetentionInput, 10))}
-          otaRetentionPending={state.otaRetentionMutation.isPending}
-          otaRetentionSuccess={state.otaRetentionMutation.isSuccess}
-        />
 
         <SyncSection
           syncStatus={state.syncStatus}

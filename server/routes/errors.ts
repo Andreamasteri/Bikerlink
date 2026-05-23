@@ -53,7 +53,6 @@ function truncate(s: unknown, max: number): string {
 function buildErrorEmailHtml(payload: {
   errorMessage: string;
   stackTrace?: string | null;
-  otaNumber: number | string;
   timestamp: string;
   platform: string;
   deviceName?: string | null;
@@ -71,7 +70,6 @@ function buildErrorEmailHtml(payload: {
       <div style="background: #1a1a2e; border-radius: 12px; padding: 24px; color: #fff;">
         <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
           <tr><td style="color:#aaa; padding: 6px 0; width: 140px;">Timestamp</td><td style="color:#fff;">${esc(payload.timestamp)}</td></tr>
-          <tr><td style="color:#aaa; padding: 6px 0;">OTA</td><td style="color:#FF6B35; font-weight: bold;">${esc(payload.otaNumber)}</td></tr>
           <tr><td style="color:#aaa; padding: 6px 0;">Piattaforma</td><td style="color:#fff;">${esc(payload.platform)}</td></tr>
           <tr><td style="color:#aaa; padding: 6px 0;">Dispositivo</td><td style="color:#fff;">${esc(payload.deviceName)}</td></tr>
           <tr><td style="color:#aaa; padding: 6px 0;">OS Version</td><td style="color:#fff;">${esc(payload.osVersion)}</td></tr>
@@ -106,7 +104,6 @@ router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Respon
     const body = bodyParsed.data;
     const errorMessage = truncate(body.errorMessage, MAX_STRING_LEN);
     const stackTrace = body.stackTrace ? truncate(body.stackTrace, MAX_STACK_LEN) : null;
-    const otaNumber = Number.isFinite(Number(body.otaNumber)) ? Number(body.otaNumber) : "?";
     const timestamp = typeof body.timestamp === "string" ? truncate(body.timestamp, 40) : new Date().toISOString();
     const platform = truncate(body.platform ?? "unknown", 20);
     const deviceName = body.deviceName ? truncate(body.deviceName, 100) : null;
@@ -119,7 +116,6 @@ router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Respon
       level: "ERROR",
       source: "gps",
       context,
-      otaNumber,
       timestamp,
       platform,
       deviceName,
@@ -133,14 +129,13 @@ router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Respon
 
     sendEmail(
       ADMIN_EMAIL,
-      `[BikerLink] Errore GPS — OTA-${otaNumber} — ${platform}`,
+      `[BikerLink] Errore GPS — ${platform}`,
       buildErrorEmailHtml({ ...logEntry, userId: String(userId) })
     ).catch((err) => console.error("[EMAIL] Errore invio notifica GPS error:", err));
 
     storage.createGpsError({
       userId: String(userId),
       routeId: body.routeId ? truncate(body.routeId, 36) : null,
-      otaNumber: Number.isFinite(Number(body.otaNumber)) ? Number(body.otaNumber) : null,
       platform: truncate(body.platform ?? "unknown", 20),
       osVersion: osVersion,
       context: context,

@@ -12,7 +12,6 @@ export * from "./system";
 export * from "./matching";
 export * from "./sos";
 export * from "./motoclubs";
-export * from "./ota";
 export * from "./music";
 export * from "./events";
 export * from "./gps";

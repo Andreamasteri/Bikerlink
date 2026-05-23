@@ -18,7 +18,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useNavigation, useRouter } from "expo-router";
 import Constants from "expo-constants";
-import otaUpdatesRaw from "@/ota-updates.json";
 import { getApiUrl, authFetchHeaders, silentAuthRecheck, apiRequest } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { evaluateUpdateOutcome, type UpdateOutcome } from "@/lib/semver";
@@ -56,24 +55,6 @@ import {
   type VersionDistribution,
 } from "@/components/admin/system/systemUtils";
 
-interface OtaUpdateEntry {
-  updateNumber: number;
-  channel: string;
-  message: string;
-  publishedAt?: string;
-  runtimeVersion: string;
-  platforms: string[];
-  jsEngine: string;
-  note?: string;
-  updateGroupId: string;
-  androidUpdateId: string | null;
-  iosUpdateId: string | null;
-  commitBase: string;
-  easDashboard: string;
-  status: string;
-}
-
-const otaUpdates: OtaUpdateEntry[] = otaUpdatesRaw as any as OtaUpdateEntry[];
 
 function outcomeMeta(o: UpdateOutcome, t: (key: string) => string): { label: string; color: string; icon: keyof typeof Ionicons.glyphMap } {
   if (o === "force") return { label: "Force update richiesto", color: "#FF4444", icon: "alert-circle" };
@@ -302,14 +283,7 @@ export default function SystemScreen() {
 
   const mergedEvents = useMemo<SystemEvent[]>(() => {
     const backendEvents: SystemEvent[] = data?.events ?? [];
-    const otaEvents: SystemEvent[] = otaUpdates
-      .filter((entry) => !!entry.publishedAt)
-      .map((entry) => ({
-        timestamp: entry.publishedAt ? new Date(entry.publishedAt).toISOString() : new Date().toISOString(),
-        message: `OTA-${entry.updateNumber}: ${entry.message}`,
-        type: "OTA_PUBLISHED",
-      }));
-    return [...backendEvents, ...otaEvents].sort((a, b) => {
+    return [...backendEvents].sort((a, b) => {
       const ta = new Date(a.timestamp).getTime();
       const tb = new Date(b.timestamp).getTime();
       if (isNaN(ta) && isNaN(tb)) return 0;

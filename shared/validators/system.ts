@@ -211,7 +211,6 @@ export type PublishWithSlotInput = z.infer<typeof publishWithSlotSchema>;
 export const gpsErrorSchema = z.object({
   errorMessage: z.string().min(1, "errorMessage è obbligatorio").max(2000),
   stackTrace: z.string().max(5000).nullable().optional(),
-  otaNumber: z.number().optional(),
   timestamp: z.string().max(40).optional(),
   platform: z.string().max(20).optional(),
   deviceName: z.string().max(100).nullable().optional(),
@@ -221,3 +220,17 @@ export const gpsErrorSchema = z.object({
   speedKmh: z.number().nullable().optional(),
 });
 export type GpsErrorInput = z.infer<typeof gpsErrorSchema>;
+
+export const coordinateHistorySettingsSchema = z.object({
+  enabled: z.boolean().optional(),
+  interval: z.union([z.number().int().min(5), z.string()]).optional(),
+  maxRecords: z.union([z.number().int().min(1), z.string()]).optional(),
+  mode: z.enum(["all", "selected"]).optional(),
+  selectedUsers: z.array(z.string()).optional(),
+}).passthrough();
+export type CoordinateHistorySettingsInput = z.infer<typeof coordinateHistorySettingsSchema>;
+
+export const telemetryTargetKmSchema = z.object({
+  target_km: z.union([z.number().int().min(10).max(100000), z.string()]),
+});
+export type TelemetryTargetKmInput = z.infer<typeof telemetryTargetKmSchema>;

@@ -1,5 +1,4 @@
 import { Platform } from "react-native";
-import { CURRENT_OTA_NUMBER } from "@/lib/ota";
 import { getApiUrl } from "@/lib/query-client";
 
 export async function logGpsError(
@@ -15,7 +14,6 @@ export async function logGpsError(
     const payload = {
       errorMessage: err.message || String(error),
       stackTrace: err.stack || null,
-      otaNumber: CURRENT_OTA_NUMBER,
       timestamp: new Date().toISOString(),
       platform: Platform.OS,
       osVersion: String(Platform.Version),
