@@ -10,6 +10,50 @@ config.server = {
   ...config.server,
   enhanceMiddleware: (metroMiddleware) => {
     return (req, res, next) => {
+      const WEB_SUPPRESSED_HTML =
+        "<!DOCTYPE html>" +
+        "<html lang='it'><head><meta charset='utf-8'>" +
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>" +
+        "<title>BikerLink</title><style>" +
+        "*{margin:0;padding:0;box-sizing:border-box;}" +
+        "body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;" +
+        "background:#111;color:#fff;display:flex;align-items:center;" +
+        "justify-content:center;min-height:100vh;text-align:center;padding:24px;}" +
+        "h1{font-size:28px;font-weight:700;margin-bottom:12px;}" +
+        "p{color:#aaa;font-size:16px;margin-bottom:32px;}" +
+        "a{display:inline-block;background:#FF6B00;color:#fff;text-decoration:none;" +
+        "padding:14px 32px;border-radius:12px;font-weight:600;font-size:16px;}" +
+        "</style></head><body>" +
+        "<div><h1>BikerLink</h1><p>Solo app mobile.</p>" +
+        "</div></body></html>";
+
+      if (req.url) {
+        const urlPath = req.url.split("?")[0];
+        const isWebBundle =
+          req.url.includes(".bundle") && req.url.includes("platform=web");
+        const isWebHtmlPage =
+          (urlPath === "/" || urlPath === "/index.html") &&
+          !req.url.includes("platform=android") &&
+          !req.url.includes("platform=ios");
+
+        if (isWebBundle) {
+          res.writeHead(200, {
+            "Content-Type": "application/javascript; charset=utf-8",
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+            "Clear-Site-Data": '"cache"',
+          });
+          res.end("/* BikerLink web preview disabled */");
+          return;
+        }
+
+        if (isWebHtmlPage) {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+          res.end(WEB_SUPPRESSED_HTML);
+          return;
+        }
+      }
       if (req.url && (req.url.startsWith("/api/") || req.url.startsWith("/uploads/"))) {
         const proxyReq = http.request(
           {
