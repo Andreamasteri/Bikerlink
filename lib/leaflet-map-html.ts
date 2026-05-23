@@ -12,6 +12,55 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 .leaflet-control-attribution { font-size: 8px !important; opacity: 0.4; }
 .labels-hidden .nick-label { display: none !important; }
 .spiderified .nick-label { display: none !important; }
+#speed-legend {
+  position: absolute;
+  bottom: 28px;
+  left: 8px;
+  z-index: 1000;
+  background: rgba(20,20,20,0.86);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 10px;
+  padding: 4px 9px;
+  display: none;
+  flex-direction: column;
+  gap: 3px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.55);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#speed-legend.visible { display: flex; }
+#speed-legend.collapsed .legend-rows { display: none; }
+#legend-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+  color: rgba(255,255,255,0.55);
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 2px 0 1px;
+}
+#legend-arrow { font-size: 8px; display: inline-block; transition: transform 0.15s; }
+#speed-legend.collapsed #legend-arrow { transform: rotate(-90deg); }
+.legend-rows { display: flex; flex-direction: column; gap: 3px; padding-bottom: 3px; }
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #f0f0f0;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(255,255,255,0.55);
+}
 @keyframes bl-pulse-ring {
   0%   { transform: scale(0.2); opacity: 0.9; }
   100% { transform: scale(3.5); opacity: 0; }
@@ -40,6 +89,14 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 </head>
 <body>
 <div id="map"></div>
+<div id="speed-legend">
+  <div id="legend-toggle">SPEED <span id="legend-arrow">&#9660;</span></div>
+  <div class="legend-rows">
+    <div class="legend-row"><div class="legend-dot" style="background:#4A90D9"></div>&#x1F3D9; City</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#E53935"></div>&#x1F6E3; Highway</div>
+    <div class="legend-row"><div class="legend-dot" style="background:#43A047"></div>&#x26F0; Mountain</div>
+  </div>
+</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 /* OverlappingMarkerSpiderfier-Leaflet — embedded inline (Task #1077).
@@ -77,6 +134,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   var pulseLayer = L.layerGroup().addTo(map);
   var userDotMarker = null;
   var userPositions = {};
+  var speedProfileUserPositions = [];
 
   /* Spiderfier: apre a ventaglio i marker biker sovrapposti.
      nearbyDistance allineato alla dimensione effettiva delle icone (30px ~
@@ -128,10 +186,41 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     error: omsLoadError
   });
 
+  /* ── Speed legend: viewport-aware visibility + collapsible toggle ── */
+  function updateLegendVisibility() {
+    var legendEl = document.getElementById("speed-legend");
+    if (!legendEl) return;
+    if (speedProfileUserPositions.length === 0) {
+      legendEl.classList.remove("visible");
+      return;
+    }
+    var bounds = map.getBounds();
+    var anyInView = speedProfileUserPositions.some(function(pos) {
+      return bounds.contains([pos.lat, pos.lng]);
+    });
+    if (anyInView) {
+      legendEl.classList.add("visible");
+    } else {
+      legendEl.classList.remove("visible");
+    }
+  }
+
+  (function() {
+    var legendEl = document.getElementById("speed-legend");
+    if (legendEl) {
+      legendEl.addEventListener("click", function() {
+        legendEl.classList.toggle("collapsed");
+      });
+    }
+  })();
+
   map.on("moveend", function() {
     var c = map.getCenter();
     postMsg({ type: "regionChange", lat: c.lat, lng: c.lng });
+    updateLegendVisibility();
   });
+
+  map.on("zoomend", updateLegendVisibility);
 
   /* ── SVG icons ────────────────────────────────────────────────────── */
   var SVG = {
@@ -377,6 +466,12 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
           addMarker(u.lat, u.lng, html, [90, totalH], [45, 35], null, omsData);
         }
       });
+
+      /* Speed legend — update positions and recheck viewport visibility */
+      speedProfileUserPositions = (m.users || [])
+        .filter(function(u) { return !!u.speedProfile; })
+        .map(function(u) { return { lat: u.lat, lng: u.lng }; });
+      updateLegendVisibility();
 
       /* Workshops — wrench icon, orange */
       (m.workshops || []).forEach(function(ws) {
