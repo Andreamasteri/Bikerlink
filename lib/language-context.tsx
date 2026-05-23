@@ -89,8 +89,6 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, lang).catch(() => {});
   }, []);
 
-  if (!loaded) return null;
-
   return (
     <LanguageContext.Provider value={{ language, setLanguage, renderKey }}>
       {children}
