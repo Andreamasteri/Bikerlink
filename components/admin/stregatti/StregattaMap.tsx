@@ -18,6 +18,8 @@ interface RiderPosition {
   lat: number;
   lng: number;
   isMoving: boolean;
+  currentSpeedKph: number | null;
+  speedProfile: "city" | "highway" | "mountain" | null;
 }
 
 interface MotionStatus {
@@ -27,6 +29,8 @@ interface MotionStatus {
   restingNow: number;
   lastCycleAt: string | null;
   totalCycles: number;
+  speedDistribution?: { city: number; highway: number; mountain: number };
+  averageSpeedKph?: number;
 }
 
 interface StregattaMapProps {
@@ -62,6 +66,22 @@ const MAP_HTML = `<!DOCTYPE html>
 
     var markers = [];
 
+    /* Speed-profile colour map:
+       city=#4A90D9 (blue), highway=#E53935 (red), mountain=#43A047 (green) */
+    function profileColor(profile) {
+      if (profile === 'city')     return { fill: '#4A90D9', stroke: '#82B4E8' };
+      if (profile === 'highway')  return { fill: '#E53935', stroke: '#F08080' };
+      if (profile === 'mountain') return { fill: '#43A047', stroke: '#80C883' };
+      return { fill: '#5A5A7A', stroke: '#7070A0' };
+    }
+
+    function profileLabel(profile) {
+      if (profile === 'city')     return '🏙 Città';
+      if (profile === 'highway')  return '🛣 Autostrada';
+      if (profile === 'mountain') return '⛰ Montagna';
+      return 'Fermo';
+    }
+
     function updateMarkers(positions) {
       markers.forEach(function(m) { map.removeLayer(m); });
       markers = [];
@@ -69,14 +89,20 @@ const MAP_HTML = `<!DOCTYPE html>
       positions.forEach(function(p) {
         if (p.lat == null || p.lng == null) return;
         var moving = p.isMoving;
+        var col = moving ? profileColor(p.speedProfile) : { fill: '#5A5A7A', stroke: '#7070A0' };
         var circle = L.circleMarker([p.lat, p.lng], {
           radius: moving ? 6 : 4,
-          fillColor: moving ? '#FF6B35' : '#5A5A7A',
-          color: moving ? '#FF9060' : '#7070A0',
+          fillColor: col.fill,
+          color: col.stroke,
           weight: 1,
           opacity: 0.9,
           fillOpacity: moving ? 0.9 : 0.6
         }).addTo(map);
+        if (moving && p.currentSpeedKph != null) {
+          var label = profileLabel(p.speedProfile) + ' · ' + p.currentSpeedKph + ' km/h';
+          circle.bindTooltip(label, { permanent: false, direction: 'top', className: '' });
+          circle.on('click', function() { this.openTooltip(); });
+        }
         markers.push(circle);
       });
     }
@@ -145,17 +171,19 @@ export function StregattaMap({
     <View style={styles.container}>
       <View style={styles.statsBar}>
         <View style={styles.statItem}>
-          <View style={[styles.dot, { backgroundColor: "#FF6B35" }]} />
+          <View style={[styles.dot, { backgroundColor: "#4A90D9" }]} />
           <Text style={styles.statText}>{movingNow} in moto</Text>
         </View>
         <View style={styles.statItem}>
           <View style={[styles.dot, { backgroundColor: "#5A5A7A" }]} />
           <Text style={styles.statText}>{restingNow} fermi</Text>
         </View>
-        <View style={styles.statItem}>
-          <Ionicons name="people" size={13} color={Colors.textSecondary} />
-          <Text style={styles.statText}>{totalFakeUsers} totali</Text>
-        </View>
+        {motionEnabled && motionStatus?.averageSpeedKph != null && motionStatus.averageSpeedKph > 0 && (
+          <View style={styles.statItem}>
+            <Ionicons name="speedometer-outline" size={13} color={Colors.textSecondary} />
+            <Text style={styles.statText}>{motionStatus.averageSpeedKph} km/h</Text>
+          </View>
+        )}
         <TouchableOpacity style={styles.refreshBtn} onPress={() => refetch()}>
           {isLoading ? (
             <ActivityIndicator size="small" color={Colors.accent} />
@@ -164,6 +192,20 @@ export function StregattaMap({
           )}
         </TouchableOpacity>
       </View>
+      {motionEnabled && motionStatus?.speedDistribution && movingNow > 0 && (
+        <View style={styles.profileBar}>
+          <View style={[styles.profileChip, { backgroundColor: "#4A90D9" }]}>
+            <Text style={styles.profileChipText}>🏙 {motionStatus.speedDistribution.city}</Text>
+          </View>
+          <View style={[styles.profileChip, { backgroundColor: "#E53935" }]}>
+            <Text style={styles.profileChipText}>🛣 {motionStatus.speedDistribution.highway}</Text>
+          </View>
+          <View style={[styles.profileChip, { backgroundColor: "#43A047" }]}>
+            <Text style={styles.profileChipText}>⛰ {motionStatus.speedDistribution.mountain}</Text>
+          </View>
+          <Text style={styles.profileBarHint}>· tap marker per velocità</Text>
+        </View>
+      )}
 
       <View style={styles.mapWrapper}>
         <WebView
@@ -246,6 +288,32 @@ const styles = StyleSheet.create({
   refreshBtn: {
     marginLeft: "auto" as any,
     padding: 4,
+  },
+  profileBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    backgroundColor: Colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    gap: 8,
+  },
+  profileChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  profileChipText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: "#fff",
+  },
+  profileBarHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    marginLeft: 4,
   },
   mapWrapper: {
     flex: 1,

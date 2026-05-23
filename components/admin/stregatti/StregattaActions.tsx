@@ -18,6 +18,8 @@ interface MotionStatus {
   restingNow: number;
   lastCycleAt: string | null;
   totalCycles: number;
+  speedDistribution?: { city: number; highway: number; mountain: number };
+  averageSpeedKph?: number;
 }
 
 interface BboxData {
@@ -163,6 +165,27 @@ export function StregattaActions({
                 {motionStatus.movingNow} / {motionStatus.totalFakeUsers} in moto
               </Text>
             </View>
+            {motionEnabled && motionStatus.averageSpeedKph != null && motionStatus.averageSpeedKph > 0 && (
+              <View style={styles.motionStatRow}>
+                <Ionicons name="speedometer-outline" size={12} color={Colors.textSecondary} />
+                <Text style={styles.motionStatText}>
+                  Velocità media: {motionStatus.averageSpeedKph} km/h
+                </Text>
+              </View>
+            )}
+            {motionEnabled && motionStatus.speedDistribution && motionStatus.movingNow > 0 && (
+              <View style={styles.speedDistRow}>
+                <View style={[styles.speedChip, { backgroundColor: "#4A90D9" }]}>
+                  <Text style={styles.speedChipText}>🏙 {motionStatus.speedDistribution.city}</Text>
+                </View>
+                <View style={[styles.speedChip, { backgroundColor: "#E53935" }]}>
+                  <Text style={styles.speedChipText}>🛣 {motionStatus.speedDistribution.highway}</Text>
+                </View>
+                <View style={[styles.speedChip, { backgroundColor: "#43A047" }]}>
+                  <Text style={styles.speedChipText}>⛰ {motionStatus.speedDistribution.mountain}</Text>
+                </View>
+              </View>
+            )}
             <View style={styles.motionStatRow}>
               <Ionicons name="time-outline" size={12} color={Colors.textSecondary} />
               <Text style={styles.motionStatText}>
@@ -350,6 +373,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: Colors.textSecondary,
+  },
+  speedDistRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 2,
+    marginBottom: 2,
+  },
+  speedChip: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  speedChipText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: "#fff",
   },
   gridContainer: {
     flexDirection: "row",

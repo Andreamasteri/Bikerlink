@@ -677,6 +677,25 @@ export async function setMotionEnabled(enabled: boolean): Promise<void> {
   }
 }
 
+/**
+ * Returns a per-user speed snapshot for all currently-moving fake users.
+ * Used by the nearby users API to enrich map markers with live telemetry.
+ */
+export function getUserSpeedMap(): Map<string, { currentSpeedKph: number; speedProfile: SpeedProfile }> {
+  const result = new Map<string, { currentSpeedKph: number; speedProfile: SpeedProfile }>();
+  if (!_enabled) return result;
+  for (const [userId, s] of _userStates.entries()) {
+    const slot = s.schedule[s.currentSlotIdx];
+    if (slot && slot.kind === "drive") {
+      result.set(userId, {
+        currentSpeedKph: Math.round(s.currentSpeedKph),
+        speedProfile: s.speedProfile,
+      });
+    }
+  }
+  return result;
+}
+
 export function getMotionStatus() {
   let movingCount = 0;
   const profileCounts: Record<SpeedProfile, number> = { city: 0, highway: 0, mountain: 0 };
@@ -725,6 +744,8 @@ export interface RiderPosition {
   lat: number;
   lng: number;
   isMoving: boolean;
+  currentSpeedKph: number | null;
+  speedProfile: SpeedProfile | null;
 }
 
 export function getPositions(): RiderPosition[] {
@@ -739,6 +760,8 @@ export function getPositions(): RiderPosition[] {
       lat: state.lat + state.offsetLat,
       lng: state.lng + state.offsetLng,
       isMoving,
+      currentSpeedKph: isMoving ? Math.round(state.currentSpeedKph) : null,
+      speedProfile: isMoving ? state.speedProfile : null,
     });
   }
   return out;

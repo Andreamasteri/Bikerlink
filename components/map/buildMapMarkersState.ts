@@ -44,6 +44,8 @@ export function buildMapMarkersState(p: BuildMapMarkersStateParams): string {
         nickname: u.nickname,
         country: u.country ?? null,
         isCurrentUser: p.currentUserId != null && u.id === p.currentUserId,
+        currentSpeedKph: u.currentSpeedKph ?? null,
+        speedProfile: u.speedProfile ?? null,
       })),
       workshops: p.workshops.map((ws) => ({
         id: ws.id,

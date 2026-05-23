@@ -224,6 +224,8 @@ export default function FakeUsersAdmin() {
     restingNow: number;
     lastCycleAt: string | null;
     totalCycles: number;
+    speedDistribution: { city: number; highway: number; mountain: number };
+    averageSpeedKph: number;
   }>({
     queryKey: ["/api/admin/stregatti/motion/status"],
     refetchInterval: 35_000,

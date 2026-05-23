@@ -165,7 +165,12 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     );
   }
 
-  function getUserColor(userType, sex) {
+  function getUserColor(userType, sex, speedProfile) {
+    /* If moving with a known speed profile, colour-code by profile:
+       city = #4A90D9 (blue), highway = #E53935 (red), mountain = #43A047 (green) */
+    if (speedProfile === "city")    return "#4A90D9";
+    if (speedProfile === "highway") return "#E53935";
+    if (speedProfile === "mountain") return "#43A047";
     if (userType === "coppia") return "#FF6600";
     if (sex === "F") return "#E91E8C";
     if (sex === "M") return "#4A90D9";
@@ -300,13 +305,31 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
         addMarker(sos.lat, sos.lng, sosHtml, [80, 24], [40, 24], null);
       });
 
+      /* Speed-profile badge (shown below the dot for moving fake users) */
+      function getSpeedBadgeHtml(speedProfile, speedKph) {
+        if (!speedProfile || speedKph == null) return "";
+        var label = speedProfile === "city" ? "🏙 " + speedKph + " km/h"
+          : speedProfile === "highway" ? "🛣 " + speedKph + " km/h"
+          : "⛰ " + speedKph + " km/h";
+        var bg = speedProfile === "city" ? "#4A90D9"
+          : speedProfile === "highway" ? "#E53935"
+          : "#43A047";
+        return "<div style=\\"margin-top:2px;background:" + bg + ";" +
+          "padding:1px 5px;border-radius:7px;font-size:9px;font-weight:800;color:#fff;" +
+          "letter-spacing:0.3px;box-shadow:0 1px 3px rgba(0,0,0,0.45);" +
+          "border:1px solid rgba(255,255,255,0.85);white-space:nowrap;\\">" +
+          label + "</div>";
+      }
+
       /* Users — registrati con OMS per spiderfy su sovrapposizione */
       (m.users || []).forEach(function(u) {
         userPositions[u.id] = { lat: u.lat, lng: u.lng };
-        var color = getUserColor(u.userType, u.sex);
+        var color = getUserColor(u.userType, u.sex, u.speedProfile);
         var svg = getUserSvg(u.userType, u.sex);
         var omsData = { type: "user", id: u.id, nickname: u.nickname || "" };
         var globalChip = getGlobalCountryChip(u.country);
+        var speedBadge = getSpeedBadgeHtml(u.speedProfile, u.currentSpeedKph);
+        var hasSpeed = !!speedBadge;
         var html;
         if (u.isCurrentUser) {
           html = "<div style=\\"display:flex;flex-direction:column;align-items:center;\\">" +
@@ -324,6 +347,8 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
             "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8);" +
             "white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;" +
             "text-align:center;\\">" + safeNick2 + "</div>";
+          // label(20px) + badge(30px) + chip(~18px) [+ speed(~18px)] = ~68-86px totale
+          var totalH2 = hasSpeed ? 86 : 68;
           html = "<div style=\\"display:flex;flex-direction:column;align-items:center;\\">" +
             labelHtml2 +
             iconBadge(color, svg, 30) +
@@ -331,10 +356,9 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
             "padding:1px 5px;border-radius:7px;font-size:9px;font-weight:800;color:#fff;" +
             "letter-spacing:0.4px;box-shadow:0 1px 3px rgba(0,0,0,0.45);" +
             "border:1px solid rgba(255,255,255,0.85);white-space:nowrap;\\">" +
-            globalChip.label + "</div></div>";
-          // label(20px) + badge(30px) + chip(~18px) = ~68px totale
-          // anchor orizzontale=45, verticale=label(20)+metà badge(15)=35 dal top
-          addMarker(u.lat, u.lng, html, [90, 68], [45, 35], null, omsData);
+            globalChip.label + "</div>" +
+            speedBadge + "</div>";
+          addMarker(u.lat, u.lng, html, [90, totalH2], [45, 35], null, omsData);
         } else {
           // Fumetto nickname sopra il badge
           var rawNick = u.nickname || "";
@@ -345,12 +369,12 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
             "box-shadow:0 1px 4px rgba(0,0,0,0.4);border:1.5px solid rgba(255,255,255,0.8);" +
             "white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;" +
             "text-align:center;\\">" + safeNick + "</div>";
+          // iconSize [90, 50/68]: larghezza fissa 90px
+          // iconAnchor [45, 35]: centro della pallina sul punto geografico
+          var totalH = hasSpeed ? 68 : 50;
           html = "<div style=\\"display:flex;flex-direction:column;align-items:center;\\">" +
-            labelHtml + iconBadge(color, svg, 30) + "</div>";
-          // iconSize [90, 50]: larghezza fissa 90px, altezza ~50px (label ~20px + badge 30px)
-          // iconAnchor [45, 35]: centro orizzontale=45, verticale=label(20)+metà badge(15)=35
-          // → il centro della pallina circolare è esattamente sul punto geografico
-          addMarker(u.lat, u.lng, html, [90, 50], [45, 35], null, omsData);
+            labelHtml + iconBadge(color, svg, 30) + speedBadge + "</div>";
+          addMarker(u.lat, u.lng, html, [90, totalH], [45, 35], null, omsData);
         }
       });
 

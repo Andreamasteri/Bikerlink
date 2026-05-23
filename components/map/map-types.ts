@@ -7,6 +7,8 @@ export interface MapUser {
   region?: string | null;
   latitude: number;
   longitude: number;
+  currentSpeedKph?: number | null;
+  speedProfile?: "city" | "highway" | "mountain" | null;
 }
 
 export interface MapWorkshop {
