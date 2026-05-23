@@ -18,7 +18,6 @@ interface GpsRejectionStat {
   platform: string | null;
   nickname: string | null;
   email: string | null;
-  lastOtaNumber: number | null;
   rejectionCount: number;
   lastRejectedPayload: string | null;
   lastRejectedAt: string;
@@ -95,11 +94,6 @@ function RejectionCard({ item, alertThreshold }: { item: GpsRejectionStat; alert
         {item.platform && (
           <Text style={[styles.metaChip, { color: colors.textSecondary, borderColor: colors.border }]}>
             {item.platform}
-          </Text>
-        )}
-        {item.lastOtaNumber != null && (
-          <Text style={[styles.metaChip, { color: colors.textSecondary, borderColor: colors.border }]}>
-            OTA-{item.lastOtaNumber}
           </Text>
         )}
         {item.lastSource && (

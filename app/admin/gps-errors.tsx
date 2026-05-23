@@ -17,7 +17,6 @@ interface GpsError {
   id: string;
   userId: string | null;
   routeId: string | null;
-  otaNumber: number | null;
   platform: string | null;
   osVersion: string | null;
   context: string | null;
@@ -57,9 +56,6 @@ function ErrorCard({ item }: { item: GpsError }) {
     >
       <View style={styles.cardHeader}>
         <View style={styles.cardHeaderLeft}>
-          <Text style={[styles.otaLabel, { color: colors.accent }]}>
-            OTA-{item.otaNumber ?? "?"}
-          </Text>
           <Text style={[styles.platformLabel, { color: colors.textSecondary }]}>
             {item.platform ?? "?"} {item.osVersion ?? ""}
           </Text>

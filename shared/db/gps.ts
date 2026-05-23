@@ -61,7 +61,6 @@ export const gpsErrors = pgTable("gps_errors", {
   userId: varchar("user_id", { length: 36 })
     .references(() => users.id, { onDelete: "cascade" }),
   routeId: varchar("route_id", { length: 36 }),
-  otaNumber: integer("ota_number"),
   platform: varchar("platform", { length: 20 }),
   osVersion: varchar("os_version", { length: 50 }),
   context: varchar("context", { length: 200 }),
@@ -81,7 +80,6 @@ export const gpsRejectionStats = pgTable("gps_rejection_stats", {
   deviceId: varchar("device_id", { length: 128 }).notNull().default("unknown"),
   platform: varchar("platform", { length: 20 }),
   rejectionCount: integer("rejection_count").notNull().default(0),
-  lastOtaNumber: integer("last_ota_number"),
   lastRejectedPayload: text("last_rejected_payload"),
   lastRejectedAt: timestamp("last_rejected_at").notNull().defaultNow(),
   lastSource: varchar("last_source", { length: 20 }),

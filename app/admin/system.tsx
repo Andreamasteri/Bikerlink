@@ -33,13 +33,11 @@ import { ServerRestartSection } from "@/components/admin/system/ServerRestartSec
 import { DatabaseSection } from "@/components/admin/system/DatabaseSection";
 import { LogItem } from "@/components/admin/system/LogItem";
 import { NativeVersionConfig } from "@/components/admin/system/NativeVersionConfig";
-import { VersionDistributionSection } from "@/components/admin/system/VersionDistributionSection";
 import { PurgeConfirmationModal } from "@/components/admin/system/PurgeConfirmationModal";
 import { SystemErrorDisplay } from "@/components/admin/system/SystemErrorDisplay";
 import { SystemLoadingDisplay } from "@/components/admin/system/SystemLoadingDisplay";
 import { RecentEventsSection } from "@/components/admin/system/RecentEventsSection";
 
-import { UpdateVerificationSection } from "@/components/admin/system/UpdateVerificationSection";
 import {
   AdminFetchError,
   isAdminError,
@@ -52,7 +50,6 @@ import {
   type SystemHealth,
   type RestartHistory,
   type NativeVersionConfigData,
-  type VersionDistribution,
 } from "@/components/admin/system/systemUtils";
 
 
@@ -78,16 +75,6 @@ export default function SystemScreen() {
 
   const { data: nativeVerData, refetch: refetchNativeVer, isFetching: isFetchingNativeVer } = useQuery<NativeVersionConfigData>({
     queryKey: ["/api/settings/native-version"],
-  });
-
-  const {
-    data: versionDist,
-    isLoading: isLoadingDist,
-    isFetching: isFetchingDist,
-    refetch: refetchDist,
-  } = useQuery<VersionDistribution>({
-    queryKey: ["/api/admin/settings/version-distribution"],
-    refetchInterval: 60000,
   });
 
   const installedVersion = Constants.expoConfig?.version ?? "0.0.0";
@@ -413,25 +400,6 @@ export default function SystemScreen() {
               t={t}
             />
 
-            <UpdateVerificationSection
-              installedVersion={installedVersion}
-              platformLabel={platformLabel}
-              installedPlatform={installedPlatform}
-              nativeVerData={nativeVerData}
-              checkOutcome={checkOutcome}
-              outcomeMeta={outcomeMeta}
-              isRechecking={isRechecking}
-              isFetchingNativeVer={isFetchingNativeVer}
-              handleForceRecheck={handleForceRecheck}
-              t={t}
-            />
-
-            <VersionDistributionSection
-              versionDist={versionDist}
-              isFetchingDist={isFetchingDist}
-              refetchDist={refetchDist}
-              platformLabel={platformLabel}
-            />
           </>
         }
       />

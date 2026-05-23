@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Pressable, Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
-import OtaPanel from "@/components/profile/OtaPanel";
 import type { TaskbarStyle } from "@/lib/taskbar-style-context";
 
 interface ProfileActionsBarProps {
@@ -96,7 +95,6 @@ export const ProfileActionsBar: React.FC<ProfileActionsBarProps> = ({
         {isAdmin && (
           <MenuItem icon="shield" label="Pannello Admin" onPress={() => router.push("/admin" as any)} color={Colors.accent} />
         )}
-        <OtaPanel isAdmin={isAdmin} />
         {(isModerator || isAdmin) && (
           <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as any)} color={Colors.warning} />
         )}

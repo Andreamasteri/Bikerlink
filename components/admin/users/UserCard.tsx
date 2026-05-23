@@ -21,7 +21,6 @@ export interface AdminUser {
   createdAt: string;
   lastLoginAt?: string | null;
   lastAppVersion?: string | null;
-  lastOtaNumber?: number | null;
   isFake?: boolean;
   isPrimal?: boolean;
   hasLastfmData?: boolean;
