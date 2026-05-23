@@ -16,7 +16,6 @@ import { useRouter } from "expo-router";
 import { useMutation } from "@tanstack/react-query";
 import { getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
-import { t } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
 
 export default function BugReportScreen() {

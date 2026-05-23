@@ -15,7 +15,7 @@ router.get("/workshops", async (_req: Request, res: Response) => {
   try {
     const workshops = await storage.getWorkshops();
     return res.json(workshops);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura officine");
   }
 });
@@ -26,7 +26,7 @@ router.post("/workshops", async (req: Request, res: Response) => {
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const workshop = await storage.createWorkshop(parsed.data as any);
     return res.status(201).json(workshop);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore creazione officina");
   }
 });
@@ -36,7 +36,7 @@ router.get("/easter-eggs", async (_req: Request, res: Response) => {
   try {
     const eggs = await storage.getEasterEggs();
     return res.json(eggs);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura easter eggs");
   }
 });
@@ -47,7 +47,7 @@ router.post("/easter-eggs", async (req: Request, res: Response) => {
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const egg = await storage.createEasterEgg(parsed.data as any);
     return res.status(201).json(egg);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore creazione easter egg");
   }
 });
@@ -57,7 +57,7 @@ router.get("/campaigns", async (_req: Request, res: Response) => {
   try {
     const campaigns = await storage.getAllCampaigns();
     return res.json(campaigns);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura campagne");
   }
 });
@@ -67,7 +67,7 @@ router.get("/reports", async (req: Request, res: Response) => {
   try {
     const reports = await storage.getReports();
     return res.json(reports);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura segnalazioni");
   }
 });
@@ -83,7 +83,7 @@ router.put("/reports/:id/resolve", async (req: Request, res: Response) => {
         .where(eq(moderatorLogs.id, id as string))
         .returning();
     return res.json(report);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore risoluzione segnalazione");
   }
 });
@@ -93,7 +93,7 @@ router.get("/motoclubs", async (_req: Request, res: Response) => {
   try {
     const clubs = await db.select().from(motoClubs);
     return res.json(clubs);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura motoclub");
   }
 });
@@ -102,7 +102,7 @@ router.get("/motoclubs/requests", async (_req: Request, res: Response) => {
   try {
     const requests = await db.select().from(motoClubRequests).where(eq(motoClubRequests.status, "pending"));
     return res.json(requests);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura richieste motoclub");
   }
 });
@@ -112,7 +112,7 @@ router.get("/logs", async (_req: Request, res: Response) => {
   try {
     const logs = await storage.getModeratorLogs();
     return res.json(logs);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura log");
   }
 });
@@ -121,7 +121,7 @@ router.get("/moderator-logs", async (req: Request, res: Response) => {
   try {
     const logs = await storage.getModeratorLogs();
     return res.json({ logs, total: logs.length });
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura log moderatori");
   }
 });
@@ -135,7 +135,7 @@ router.post("/mass-seed-fake-users", async (_req: Request, res: Response) => {
       console.error("[mass-seed] background error:", e);
     });
     return sendSuccess(res, { status: "started" });
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore avvio mass seed");
   }
 });
@@ -144,7 +144,7 @@ router.get("/mass-seed-status", async (_req: Request, res: Response) => {
   try {
     const status = await getMassSeedStatus();
     return sendSuccess(res, status as unknown as Record<string, unknown>);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura stato mass seed");
   }
 });

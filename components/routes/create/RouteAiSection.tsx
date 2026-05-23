@@ -1,7 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
 
 interface RouteAiSectionProps {
   t: (key: string) => string;

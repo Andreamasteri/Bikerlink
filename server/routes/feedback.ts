@@ -12,9 +12,9 @@ const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 // roughly 10x the natural ticket size while still being trivially cheap
 // to parse on every spammed request.
 const FEEDBACK_BODY_LIMIT = "16kb";
-const FEEDBACK_SUBJECT_MAX_LEN = 200;
-const FEEDBACK_MESSAGE_MAX_LEN = 4000;
-const ALLOWED_TICKET_TYPES = new Set(["bug", "suggestion", "feedback", "other"]);
+const _FEEDBACK_SUBJECT_MAX_LEN = 200;
+const _FEEDBACK_MESSAGE_MAX_LEN = 4000;
+const _ALLOWED_TICKET_TYPES = new Set(["bug", "suggestion", "feedback", "other"]);
 const feedbackJson = express.json({ limit: FEEDBACK_BODY_LIMIT });
 
 const TICKET_TYPE_LABELS: Record<string, string> = {

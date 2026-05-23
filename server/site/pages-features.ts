@@ -2,7 +2,6 @@ import {
   type PageMeta,
   breadcrumbsJsonLd,
 } from "./render";
-import { COMP_SECTION } from "./pages-shared";
 
 export function buildFeatures(
   baseUrl: string,

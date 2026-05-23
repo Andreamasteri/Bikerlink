@@ -2,7 +2,6 @@ import { useState, useRef, useCallback } from "react";
 import { Alert } from "react-native";
 import { apiRequest } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
-import { RouteRecord } from "../../components/tracking/useTrackingState";
 
 export function useTrackingStats() {
   const t = useT();
@@ -34,7 +33,7 @@ export function useTrackingStats() {
           try {
             await apiRequest("DELETE", `/api/routes/${id}`);
             refetchRecords();
-          } catch (e) {
+          } catch (_e) {
             Alert.alert(t("common.error"), t("tracking.deleteError"));
           }
         },

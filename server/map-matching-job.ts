@@ -22,14 +22,13 @@
  */
 
 import { db } from "./db";
-import { rideTelemetry, segmentTelemetry } from "@shared/db";
+import { rideTelemetry } from "@shared/db";
 import { eq, sql, and } from "drizzle-orm";
 import { mapMatch, isSelfHosted, GHPoint } from "./graphhopper-client";
 import { storage } from "./storage";
-import { haversineKm } from "./geo";
 
 const LAST_RUN_KEY = "map_matching_last_run";
-const JOB_RUNNING_KEY = "map_matching_job_running";
+const _JOB_RUNNING_KEY = "map_matching_job_running";
 
 let isRunning = false;
 

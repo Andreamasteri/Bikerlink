@@ -132,7 +132,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
       ridingStyle: ridingStyle ?? null,
     });
 
-    let matches: any[] = [];
+    const matches: any[] = [];
     if (ridingStyle) {
       const bikerMotos = await storage.findMatchingBikerMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
       for (const bikerMoto of bikerMotos) {

@@ -1,4 +1,4 @@
-import { eq, and, or, sql, desc, asc, inArray } from "drizzle-orm";
+import { eq, and, or, sql, asc, inArray } from "drizzle-orm";
 import { db } from "../db";
 import {
   bikerBikerMatches, userBlocks, users,

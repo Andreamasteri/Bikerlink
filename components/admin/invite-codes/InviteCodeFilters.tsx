@@ -16,7 +16,7 @@ export function InviteCodeFilters({
   setSearchQuery,
   showActiveOnly,
   setShowActiveOnly,
-  t,
+  t: _t,
 }: InviteCodeFiltersProps) {
   return (
     <View style={styles.container}>

@@ -51,6 +51,7 @@
     "connect-pg-simple": "^10.0.0",
     "docx": "^9.6.1",
     "drizzle-orm": "^0.45.2",
+    "eslint-plugin-unused-imports": "^4.4.1",
     "expo": "~56.0.3",
     "expo-application": "~56.0.0",
     "expo-asset": "~56.0.1",

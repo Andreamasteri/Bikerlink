@@ -1,6 +1,6 @@
 import { getApiUrl } from "@/lib/query-client";
 import { Ionicons } from "@expo/vector-icons";
-import { Waypoint, Style, DrivingProfile, RouteResult, WeatherWaypoint, AiPreviewItem } from "./types";
+import { Waypoint, Style, DrivingProfile, RouteResult, WeatherWaypoint } from "./types";
 
 export async function geocode(q: string): Promise<any[]> {
   const url = new URL("/api/planned-routes/geocode", getApiUrl());

@@ -93,7 +93,7 @@ function getUserColor(userType: string): string {
 export default function ProposalDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const _insets = useSafeAreaInsets();
   const { user } = useAuth();
   const t = useT();
   const locale = useLocale();

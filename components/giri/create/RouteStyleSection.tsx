@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useColors } from "@/hooks/useColors";
 
 type Style = "direct" | "fast" | "balanced" | "curvy" | "extra_curvy";

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import { Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 

@@ -75,7 +75,7 @@ export function PdfDocumentAdminSection({
   downloadEndpoint,
   uploadEndpoint,
 }: PdfDocumentAdminSectionProps) {
-  const t = useT();
+  const _t = useT();
   const [uploading, setUploading] = useState(false);
 
   const { data: fileInfo, refetch } = useQuery<{

@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Platform,
   Modal,
-  TextInput,
   ActivityIndicator,
   Alert,
 } from "react-native";
@@ -167,7 +165,7 @@ export default function FakeUsersAdmin() {
   const PAGE_SIZE = 50;
   const {
     data: usersData,
-    isLoading,
+    isLoading: _isLoading,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,

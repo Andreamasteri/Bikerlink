@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, FlatList, ActivityIndicator } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { Campaign, AdCard } from "./AdCard";
@@ -80,7 +80,7 @@ export function AdGroupList({
     <FlatList
       ref={flatListRef}
       data={listItems}
-      keyExtractor={(item, index) => (item.type === "groupHeader" ? `group-${item.groupId}` : `ad-${item.data.id}`)}
+      keyExtractor={(item, _index) => (item.type === "groupHeader" ? `group-${item.groupId}` : `ad-${item.data.id}`)}
       renderItem={renderItem}
       contentContainerStyle={styles.listContent}
       onRefresh={onRefresh}

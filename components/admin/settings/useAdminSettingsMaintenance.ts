@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Alert } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
-import { getApiUrl, queryClient, apiRequest } from "@/lib/query-client";
+import { queryClient, apiRequest } from "@/lib/query-client";
 
 export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => string) {
   const { data: syncStatus, refetch: refetchSyncStatus } = useQuery<{

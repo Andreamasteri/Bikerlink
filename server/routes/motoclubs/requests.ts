@@ -24,7 +24,7 @@ router.get("/invites", requireAuth, async (req: Request, res: Response) => {
       .where(and(eq(motoClubInvites.userId, userId), eq(motoClubInvites.status, "pending")));
 
     return res.json(invites.map(r => ({ ...r.invite, club: r.club })));
-  } catch (e) {
+  } catch (_e) {
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -77,8 +77,8 @@ router.put("/invites/:id/respond", requireAuth, async (req: Request, res: Respon
     }
 
     return sendSuccess(res, undefined, response === "accepted" ? "Sei entrato nel club!" : "Invito rifiutato");
-  } catch (e) {
-    console.error("[PUT /invites/:id/respond]", e);
+  } catch (_e) {
+    console.error("[PUT /invites/:id/respond]", _e);
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -102,7 +102,7 @@ router.post("/request", requireAuth, async (req: Request, res: Response) => {
     } as any).returning();
 
     return res.status(201).json(request);
-  } catch (e) {
+  } catch (_e) {
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -174,11 +174,11 @@ router.post("/creation-request", requireAuth, async (req: Request, res: Response
         <li><strong>Request ID:</strong> ${request.id}</li>
       </ul>
       <p>Vai al pannello admin per approvare o rifiutare.</p>`
-    ).catch(e => console.error("[creation-request] email error:", e));
+    ).catch(_e => console.error("[creation-request] email error:", _e));
 
     return res.status(201).json({ success: true, requestId: request.id });
-  } catch (e) {
-    console.error("[POST /creation-request]", e);
+  } catch (_e) {
+    console.error("[POST /creation-request]", _e);
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -200,7 +200,7 @@ router.get("/creation-request/status", requireAuth, async (req: Request, res: Re
       createdAt: request.createdAt,
       reviewNote: request.reviewNote,
     });
-  } catch (e) {
+  } catch (_e) {
     return sendError(res, 500, "Errore interno");
   }
 });

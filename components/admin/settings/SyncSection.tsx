@@ -33,7 +33,7 @@ export function SyncSection({
   onSyncNow,
   syncPending,
 }: SyncSectionProps) {
-  const t = useT();
+  const _t = useT();
 
   return (
     <RNView style={styles.paidCard}>

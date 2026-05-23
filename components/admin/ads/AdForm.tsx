@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Switch, Platform } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Switch } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";

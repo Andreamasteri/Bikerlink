@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef } from "react";
 import { AppState, type AppStateStatus } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
 

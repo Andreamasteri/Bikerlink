@@ -1,12 +1,10 @@
 import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   Alert,
   RefreshControl,
-  Pressable,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -63,7 +61,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const { user, logoutMutation } = useAuth();
-  const router = useRouter();
+  const _router = useRouter();
   const t = useT();
   const locale = useLocale();
   const { taskbarStyle, setTaskbarStyle } = useTaskbarStyle();

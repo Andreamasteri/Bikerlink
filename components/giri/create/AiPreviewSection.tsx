@@ -1,9 +1,9 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, TextInput } from "react-native";
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 
-import { AiPreviewState, AiPreviewItem } from "./types";
+import { AiPreviewState } from "./types";
 
 interface AiPreviewSectionProps {
   aiPreview: AiPreviewState | null;
@@ -27,7 +27,7 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
   handleConfirmPreview,
   setMode,
   pillRoleColor,
-  pillRoleLabel,
+  pillRoleLabel: _pillRoleLabel,
 }) => {
   const colors = useColors();
   if (!aiPreview) return null;

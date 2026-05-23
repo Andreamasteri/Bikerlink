@@ -1,45 +1,13 @@
 import express, { Router, type Request, type Response } from "express";
 import rateLimit from "express-rate-limit";
-import multer from "multer";
-import crypto from "crypto";
-import { haversineKm } from "../geo";
-import fs from "fs";
-import path from "path";
-import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, ShadingType, AlignmentType, TextRun, HeightRule } from "docx";
-import bcrypt from "bcryptjs";
-import { uploadBuffer, objectExists, deleteObject } from "../objectStorage";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { storage } from "../storage";
 import { db } from "../db";
-import { getTrustedClientIp } from "../lib/abuse-rate-limit";
-import { motoClubs, motoClubRequests, motoClubMembers, motoClubInvites, zavarrinaWishlists, zavarrinaWishlistMotos, conversations, conversationParticipants, messages, feedbackTickets, moderatorLogs, users, userProfiles, userMotorcycles, bikerZavarrinaMatches, bikerBikerMatches, serverRestarts, appSettings, userMusicTracks, userLastfmSessions, userPlaylistSnapshots, adCampaigns as adCampaignsTable, matchPreferences, gpsRejectionStats, siteVisits, rideTelemetry, routes } from "@shared/db";
-import { createAdCampaignSchema, createInviteCodeSchema, upsertSettingSchema, emailConfigSchema, disableFeatureSchema, toggleProtectedSchema, booleanSettingValueSchema, stringSettingValueSchema, mapsProviderSchema, clientErrorSchema, startupBeaconSchema, verifyPasswordSchema, userStatusSchema, userRoleSchema, userEmailAdminSchema, adminSetPasswordSchema, primalSchema, workshopSchema, easterEggSchema, easterEggBatchSchema, reportResolveSchema, emailTestSchema, emailRateLimitResetSchema, themeDefaultSchema, matchingCountriesSchema, coordinatesMaxAgeSchema, genericSettingSchema, adsBulkSchema, adsCreateSchema, adsUpdateSchema, adsBulkDeleteSchema, adsGroupUpdateSchema, stregattaSchema, stregattaToggleSchema, rejectNoteSchema, simulateActivitySchema, updateInvitationCodeAdminSchema, enabledSchema, backupFrequencySchema, reconcileClubInvitesSchema, translationKeySchema, coordinateHistorySettingsSchema, bgLocationSettingsSchema, privacyRulesSchema, nativeVersionSchema, urlSettingSchema, maintenanceSettingsSchema, curvyScoreWeightsSchema, telemetryTargetKmSchema } from "@shared/validators";
-import { DEFAULT_PREFS } from "./match-preferences";
-import { createClubInvitesForMoto } from "./motoclubs";
-import { eq, and, ne, desc, sql, count, notExists, inArray, notInArray, lte, isNull, or, ilike } from "drizzle-orm";
-import { sendEmail, sendEmailDetailed, getEmailDiagnostics } from "../email";
-import {
-  verifyEmailStore,
-  resendVerificationStore,
-  verifyAttempts,
-  clearVerifyAttempts,
-  VERIFY_EMAIL_WINDOW_MS,
-  VERIFY_EMAIL_MAX,
-  RESEND_VERIFICATION_WINDOW_MS,
-  RESEND_VERIFICATION_MAX,
-  VERIFY_MAX_ATTEMPTS,
-  VERIFY_ATTEMPT_WINDOW_MS,
-} from "./auth";
-import { MOTORCYCLES, pickRandomN, getMotoYear } from "../mass-seed-data";
-import { getLastMatchingCycleMeta, runBikerBikerMatching, runWishlistMatching, runMatchingForUser, triggerMatchingRun } from "../matching-engine";
-import { isProtectedUser, PROTECTED_EMAILS } from "../constants";
-import { closeSseClient } from "../chat-sse";
-import { SERVER_START_TIME, uptimeState } from "../uptime";
-import { downloadBuffer } from "../objectStorage";
-import { revokeAllUserSessions } from "../session-utils";
-import { cacheAdImage } from "./ads";
-import { allSettledLimited } from "../lib/concurrency";
-import { bustLandingImagesCache } from "../site/routes";
+import { motoClubs, motoClubMembers } from "@shared/db";
+import { clientErrorSchema, startupBeaconSchema } from "@shared/validators";
+import { eq } from "drizzle-orm";
+
+
 
 const router = Router();
 
@@ -48,7 +16,7 @@ const router = Router();
  * Returns null when the value is an array or missing so the caller can
  * respond with 400 instead of silently coercing bad input.
  */
-function paramStr(v: string | string[] | undefined): string | null {
+function _paramStr(v: string | string[] | undefined): string | null {
   return typeof v === "string" ? v : null;
 }
 
@@ -146,7 +114,7 @@ interface ClubAssignStats {
   failed: number;
 }
 
-async function assignFakeUserToClubs(userId: string): Promise<ClubAssignStats> {
+async function _assignFakeUserToClubs(userId: string): Promise<ClubAssignStats> {
   const stats: ClubAssignStats = { assigned: 0, skipped: 0, failed: 0 };
   try {
     const approvedClubs = await db.select({ id: motoClubs.id }).from(motoClubs).where(eq(motoClubs.isApproved, true));
@@ -178,7 +146,7 @@ async function assignFakeUserToClubs(userId: string): Promise<ClubAssignStats> {
   return stats;
 }
 
-function requireAdmin(req: Request, res: Response, next: Function) {
+function _requireAdmin(req: Request, res: Response, next: Function) {
   const path = req.originalUrl || req.url;
   // Ultimi 6 char del sessionId per la diagnostica (no PII, no leak completo).
   const sid = req.sessionID ? `…${req.sessionID.slice(-6)}` : "none";

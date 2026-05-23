@@ -4,13 +4,12 @@ import { storage } from "../storage";
 import {
   users, userProfiles, userMotorcycles, zavarrinaWishlists, zavarrinaWishlistMotos,
   conversations, conversationParticipants, messages,
-  type User,
 } from "@shared/db";
 import { eq, sql, inArray } from "drizzle-orm";
 import {
   EUROPEAN_ZONES, MOTORCYCLES,
-  randOffset, randBirthYear, pickRandom, pickRandomN, getMotoYear, getBio, getWelcomeMessage,
-  distributeUniformly, generateUniqueNickname, generateUniqueEmail,
+  randOffset, pickRandom, pickRandomN, getMotoYear, getBio, getWelcomeMessage,
+  distributeUniformly,
 } from "../mass-seed-data";
 
 export const SEED_TAG = "mass_seed_5k_v1";

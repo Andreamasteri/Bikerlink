@@ -9,7 +9,6 @@ import {
   doublePrecision,
   jsonb,
   index,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 

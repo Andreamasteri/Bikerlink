@@ -1,4 +1,4 @@
-import { eq, and, or, sql, desc, asc, inArray } from "drizzle-orm";
+import { eq, and, or, sql, desc, asc } from "drizzle-orm";
 import { db } from "../db";
 import {
   routes, routePoints, customRoutes, customRouteWaypoints, gpsErrors, bikerBikerMatches,
@@ -70,7 +70,7 @@ export class TrackingStorage extends ProposalsStorage {
     return db.select().from(customRoutes).where(eq(customRoutes.visibility, "public")).orderBy(desc(customRoutes.createdAt));
   }
 
-  async getFriendsCustomRoutes(userId: string): Promise<CustomRoute[]> {
+  async getFriendsCustomRoutes(_userId: string): Promise<CustomRoute[]> {
     return db.select().from(customRoutes).where(eq(customRoutes.visibility, "friends")).orderBy(desc(customRoutes.createdAt));
   }
 

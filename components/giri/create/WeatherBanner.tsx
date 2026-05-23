@@ -13,7 +13,7 @@ interface WeatherBannerProps {
   colors: any;
 }
 
-function weatherIcon(code: number): keyof typeof Ionicons.glyphMap {
+function _weatherIcon(code: number): keyof typeof Ionicons.glyphMap {
   if (code === 0) return "sunny-outline";
   if (code <= 3) return "partly-sunny-outline";
   if (code <= 59) return "rainy-outline";

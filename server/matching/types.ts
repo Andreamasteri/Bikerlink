@@ -1,5 +1,4 @@
 import { 
-  type Proposal, 
   matchPreferences 
 } from "@shared/db";
 

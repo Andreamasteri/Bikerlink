@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
-  Alert,
 
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
@@ -18,7 +17,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
-import { t } from "@/lib/i18n";
 
 interface ModerationPhoto {
   id: string;

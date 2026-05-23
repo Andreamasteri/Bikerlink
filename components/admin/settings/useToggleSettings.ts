@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Alert } from "react-native";
 import { getApiUrl, queryClient } from "@/lib/query-client";
 

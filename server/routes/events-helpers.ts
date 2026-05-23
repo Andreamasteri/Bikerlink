@@ -3,7 +3,6 @@ import { type Request, type Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import {
-  events,
   eventImages,
   eventParticipants,
   users,

@@ -38,9 +38,9 @@ interface ContestResponse {
 }
 
 export default function ContestScreen() {
-  const router = useRouter();
+  const _router = useRouter();
   const t = useT();
-  const [showUpload, setShowUpload] = useState(false);
+  const [_showUpload, setShowUpload] = useState(false);
   const [caption, setCaption] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -67,10 +67,10 @@ export default function ContestScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/contest/entries"] });
     },
-    onError: (error: Error) => {
-      const msg = error.message.includes(":")
-        ? error.message.split(":").slice(1).join(":").trim()
-        : error.message;
+    onError: (_error: Error) => {
+      const msg = _error.message.includes(":")
+        ? _error.message.split(":").slice(1).join(":").trim()
+        : _error.message;
       try {
         const parsed = JSON.parse(msg);
         Alert.alert(t("common.error"), parsed.message || t("contest.cannotVote"));
@@ -110,7 +110,7 @@ export default function ContestScreen() {
       setCaption("");
       setSelectedImage(null);
     },
-    onError: (error: Error) => {
+    onError: (_error: Error) => {
       Alert.alert("Errore", "Impossibile caricare la foto");
     },
   });

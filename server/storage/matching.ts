@@ -5,7 +5,7 @@ import {
   zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos,
   bikerZavarrinaMatches, users, userMotorcycles,
   proposalProfileMatches,
-  type ZavarrinaWishlist, type InsertZavarrinaWishlist,
+  type ZavarrinaWishlist,
   type ZavarrinaWishlistPhoto, type InsertZavarrinaWishlistPhoto,
   type ZavarrinaWishlistMoto, type InsertZavarrinaWishlistMoto,
   type BikerZavarrinaMatch, type InsertBikerZavarrinaMatch,

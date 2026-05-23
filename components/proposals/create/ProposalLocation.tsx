@@ -45,7 +45,7 @@ export const ProposalLocation = ({
   handleAddStop,
   handleRemoveStop,
 }: ProposalLocationProps) => {
-  const t = useT();
+  const _t = useT();
 
   return (
     <View>

@@ -5,7 +5,7 @@ type Props = ScrollViewProps & { bottomOffset?: number; keyboardShouldPersistTap
 export function KeyboardAwareScrollViewCompat({
   children,
   keyboardShouldPersistTaps = "handled",
-  bottomOffset,
+  bottomOffset: _bottomOffset,
   ...props
 }: Props) {
   return (

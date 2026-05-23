@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import {
   View,
   Text,
@@ -52,7 +52,7 @@ interface RouteDetail {
 
 export default function RouteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const _router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { distanceUnit, speedUnit, timeFormat } = useUnits();
@@ -119,7 +119,7 @@ export default function RouteDetailScreen() {
   const hasSensorData = pts.some((p) => p.accelG != null || p.tiltDeg != null);
   const speedUnitLabel = convertSpeed(0, speedUnit).label;
 
-  const region = hasPoints
+  const _region = hasPoints
     ? {
         latitude: pts[Math.floor(pts.length / 2)].latitude,
         longitude: pts[Math.floor(pts.length / 2)].longitude,

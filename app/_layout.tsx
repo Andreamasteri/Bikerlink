@@ -1,9 +1,8 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useRouter, useRootNavigationState } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/query-client";
-import { Platform, AppState, ActivityIndicator, View, Text, StyleSheet, Linking } from "react-native";
+import { Platform, ActivityIndicator, View, Text, StyleSheet } from "react-native";
 import NativeUpdateChecker from "@/components/NativeUpdateChecker";
 import MatchPopupAlert from "@/components/MatchPopupAlert";
 import UpdateNudgeModal from "@/components/UpdateNudgeModal";
@@ -12,25 +11,15 @@ import AlwaysPermissionNotice from "@/components/AlwaysPermissionNotice";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Updates from "expo-updates";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { queryClient } from "@/lib/query-client";
-import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { ChatSseProvider } from "@/lib/chat-sse-provider";
-import { LocationProvider, useLocationGate } from "@/lib/location-context";
-import { LanguageProvider, useLanguage } from "@/lib/language-context";
-import { MapSettingsProvider, useMapConfig } from "@/lib/map-context";
-import { TaskbarStyleProvider } from "@/lib/taskbar-style-context";
-import { ThemeProvider, useTheme } from "@/lib/theme-context";
-import { UnitsProvider } from "@/lib/units-context";
-import { PlayerProvider } from "@/lib/player-context";
-import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
+import { useAuth } from "@/lib/auth-context";
+import { useLocationGate } from "@/lib/location-context";
+import { useLanguage } from "@/lib/language-context";
+import { useMapConfig } from "@/lib/map-context";
+import { useTheme } from "@/lib/theme-context";
 import FloatingWidget from "@/components/FloatingWidget";
 import UptimeWidget from "@/components/UptimeWidget";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
-import { initCrashLogger, resetCrashLogger, markClean } from "@/lib/crash-logger";
 import {
   stopBackgroundLocationTask,
 } from "@/lib/background-location-task";
@@ -161,15 +150,6 @@ function UpdateNudgeWrapper() {
   return <UpdateNudgeModal onDismiss={() => setDismissed(true)} />;
 }
 
-function ChatSseGate({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  return (
-    <ChatSseProvider enabled={!!user}>
-      {children}
-    </ChatSseProvider>
-  );
-}
-
 function RootLayoutNav() {
   const { colors } = useTheme();
   return (
@@ -222,7 +202,7 @@ function reportClientError(error: Error, componentStack: string) {
 }
 
 export default function RootLayout() {
-  const { ready, fontsLoaded, fontError } = useAppBootstrap();
+  const { ready, fontsLoaded: _fontsLoaded, fontError: _fontError } = useAppBootstrap();
 
   useEffect(() => {
     type ErrorHandler = (error: Error, isFatal?: boolean) => void;

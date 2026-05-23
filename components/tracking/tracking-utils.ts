@@ -1,5 +1,4 @@
 import { SpeedUnit, DistanceUnit } from "@/lib/units-context";
-import { formatDistance, formatSpeed } from "@/lib/units";
 import Colors from "@/constants/colors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { buildLeafletPostRideHtml } from "@/lib/leaflet-route-map-html";
@@ -82,7 +81,7 @@ export async function loadBatteryDrainStats(): Promise<BatteryDrainStats> {
   try {
     const raw = await AsyncStorage.getItem(BATTERY_DRAIN_STATS_KEY);
     if (raw) return normalizeBatteryDrainStats(JSON.parse(raw));
-  } catch (e) {
+  } catch (_e) {
     // console.warn("[BikerLink] loadBatteryDrainStats error:", e);
   }
   return { easy: [], medium: [], race: [] };
@@ -97,7 +96,7 @@ export async function appendBatteryDrainSample(
   const updated: BatteryDrainStats = { ...stats, [profile]: arr };
   try {
     await AsyncStorage.setItem(BATTERY_DRAIN_STATS_KEY, JSON.stringify(updated));
-  } catch (e) {
+  } catch (_e) {
     // console.warn("[BikerLink] appendBatteryDrainSample persist error:", e);
   }
   return updated;

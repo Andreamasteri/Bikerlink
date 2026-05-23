@@ -8,7 +8,6 @@ import {
   ScrollView,
   ActivityIndicator,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import Colors from "@/constants/colors";
 import { MOTORCYCLE_BRANDS } from "@/lib/motorcycle-data";

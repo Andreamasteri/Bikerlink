@@ -16,10 +16,8 @@ import { queryClient, apiRequest, ServerBusyError } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 
-import { FilterPanel } from "@/components/match/FilterPanel";
 import { MatchHeader } from "@/components/match/MatchHeader";
 import { GarageMatchCard, BikerBikerMatchCard, MatchCardFull, ProposalProfileMatchCard } from "@/components/match/MatchCard";
-import { MatchList } from "@/components/match/MatchList";
 import { TabBar, TabKey } from "@/components/match/TabBar";
 
 import { MatchEmptyState } from "@/components/match/tabs/MatchEmptyState";

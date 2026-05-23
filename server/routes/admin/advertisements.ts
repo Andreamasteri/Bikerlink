@@ -3,11 +3,11 @@ import { storage } from "../../storage";
 import { db } from "../../db";
 import { adCampaigns as adCampaignsTable } from "@shared/db";
 import { adsBulkSchema, adsCreateSchema, adsUpdateSchema, adsBulkDeleteSchema, adsGroupUpdateSchema } from "@shared/validators";
-import { eq, inArray, sql } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { objectExists, uploadBuffer } from "../../objectStorage";
+import { uploadBuffer } from "../../objectStorage";
 import { cacheAdImage } from "../ads";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import crypto from "crypto";
@@ -35,7 +35,7 @@ async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string
   return `/api/ads/images/${filename}`;
 }
 
-async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[]): Promise<void> {
+async function deleteAdImageIfUnreferenced(_filename: string, _excludeIds: string[]): Promise<void> {
   // Logic from admin.ts would go here
 }
 

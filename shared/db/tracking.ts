@@ -8,7 +8,6 @@ import {
   timestamp,
   doublePrecision,
   index,
-  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { users } from "./users";

@@ -1,12 +1,11 @@
 import { db } from "./db";
-import { sql, eq, and } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { 
   motoClubs, 
   motoClubMembers, 
   conversations, 
   conversationParticipants 
 } from "@shared/db";
-import { storage } from "./storage";
 
 export async function initMissingClubConversations() {
   try {

@@ -1,15 +1,14 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Alert, Animated } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import { 
   Waypoint, Style, DrivingProfile, Mode, RouteResult, 
-  WeatherWaypoint, AiPreviewState, AiPreviewItem, 
-  UserMotorcycle, MyStyleProfile, COMPASS_DIRECTIONS 
+  WeatherWaypoint, AiPreviewState, AiPreviewItem, COMPASS_DIRECTIONS 
 } from "./types";
 import { calcRoute, parseAI, clientFallbackAiParse, fetchWeatherPreview } from "./api";
 

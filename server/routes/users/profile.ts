@@ -1,4 +1,4 @@
-import { Router, type Request, type Response, type NextFunction } from "express";
+import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { updateUserMeSchema, updateProfileDynamicSchema, pushTokenSchema, ghostModeSchema, privacySettingsSchema, availabilitySchema } from "@shared/validators";
 import { onlineTracker } from "../../online-tracker";

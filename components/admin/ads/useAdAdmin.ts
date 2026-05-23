@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { Alert, BackHandler, Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
@@ -395,7 +395,7 @@ export function useAdAdmin() {
           failed += data.failed ?? 0;
           if (data.failedFiles?.length) failedNames.push(...data.failedFiles);
         }
-      } catch (err) {
+      } catch (_err) {
         failed += chunk.length;
       }
       setBulkProgress({ current: Math.min(chunkStart + CHUNK_SIZE, totalImages), total: totalImages });

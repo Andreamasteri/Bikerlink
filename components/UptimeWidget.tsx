@@ -29,7 +29,7 @@ export default function UptimeWidget() {
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const posRef = useRef({ x: 0, y: 0 });
   const startPosRef = useRef({ x: 0, y: 0 });
-  const [tick, setTick] = useState(0);
+  const [_tick, setTick] = useState(0);
   const fetchTimeRef = useRef<number>(Date.now());
 
   const { data } = useQuery<UptimeData>({

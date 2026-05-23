@@ -7,7 +7,6 @@ import {
   ScrollView,
   Modal,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";

@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import Svg, { Path, Defs, LinearGradient, Stop, Polyline, Line, Text as SvgText } from "react-native-svg";
+import Svg, { Path, Defs, LinearGradient, Stop, Polyline } from "react-native-svg";
 import { useColors } from "@/hooks/useColors";
 
 interface ElevationPoint {

@@ -87,7 +87,7 @@ export function StregattaActions({
   isForcingMatching,
   isResettingMatches,
   totalCount,
-  t,
+  t: _t,
 }: StregattaActionsProps) {
   const motionEnabled = motionStatus?.enabled ?? false;
   const bboxEnabled = bboxData?.enabled ?? true;

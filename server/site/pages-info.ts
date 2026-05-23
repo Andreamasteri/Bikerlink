@@ -3,7 +3,6 @@ import {
   organizationJsonLd,
   breadcrumbsJsonLd,
 } from "./render";
-import { COMP_SECTION } from "./pages-shared";
 
 export function buildAbout(baseUrl: string): { meta: PageMeta; body: string } {
   const meta: PageMeta = {

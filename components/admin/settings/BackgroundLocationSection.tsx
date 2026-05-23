@@ -1,10 +1,8 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Switch, ActivityIndicator, Alert } from "react-native";
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Switch, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { getApiUrl, queryClient } from "@/lib/query-client";
 
 const styles = StyleSheet.create({
   accordionPanel: {

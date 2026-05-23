@@ -7,7 +7,6 @@ import {
   conversations,
   conversationParticipants,
   messages,
-  users,
 } from "@shared/db";
 import { eq, and, ne, sql, desc, or, ilike } from "drizzle-orm";
 import { sendMotoclubPushNotifications } from "../../push-notifications";
@@ -182,7 +181,7 @@ export async function createRegionalClubInvite(userId: string, region: string): 
   }
 }
 
-export async function createClubInvitesForMoto(userId: string, brand: string, model: string) {
+export async function createClubInvitesForMoto(userId: string, brand: string, _model: string) {
   try {
     const user = await storage.getUser(userId);
     if (!user) return;

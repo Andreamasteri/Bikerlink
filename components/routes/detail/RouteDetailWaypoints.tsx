@@ -63,7 +63,7 @@ export default function RouteDetailWaypoints({
 
 function WaypointCard({
   waypoint,
-  index,
+  index: _index,
   isLast,
   waypointTypeLabels,
   waypointTypeIcons,

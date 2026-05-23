@@ -21,7 +21,7 @@ export function LastfmLoginModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  const t = useT();
+  const _t = useT();
   const [username, setUsername] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

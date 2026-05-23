@@ -2,7 +2,6 @@ import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Linking } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import RouteDetailMapComponent from "@/components/RouteDetailMap";
-import Colors from "@/constants/colors";
 
 interface Waypoint {
   id: string;

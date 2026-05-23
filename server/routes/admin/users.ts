@@ -23,13 +23,13 @@ router.get("/", async (_req: Request, res: Response) => {
       ...sessionsRows.map((r) => r.userId),
       ...tracksRows.map((r) => r.userId),
     ]);
-    const safeUsers = usersList.map(({ password, ...u }) => ({
+    const safeUsers = usersList.map(({ password: _password, ...u }) => ({
       ...u,
       hasLastfmData: lastfmUserIds.has(u.id),
     }));
     return res.json(safeUsers);
-  } catch (error) {
-    console.error("Admin get users error:", error);
+  } catch (_error) {
+    console.error("Admin get users error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -108,8 +108,8 @@ router.put("/:id/status", async (req: Request, res: Response) => {
     }
     const { password: _, ...safeUser } = user;
     return res.json(safeUser);
-  } catch (error) {
-    console.error("Admin update user status error:", error);
+  } catch (_error) {
+    console.error("Admin update user status error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -138,8 +138,8 @@ router.put("/:id/role", async (req: Request, res: Response) => {
     });
     const { password: _, ...safeUser } = user;
     return res.json(safeUser);
-  } catch (error) {
-    console.error("Admin update user role error:", error);
+  } catch (_error) {
+    console.error("Admin update user role error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -168,8 +168,8 @@ router.put("/:id/email", async (req: Request, res: Response) => {
     });
     const { password: _, ...safeUser } = user;
     return res.json(safeUser);
-  } catch (error) {
-    console.error("Admin update user email error:", error);
+  } catch (_error) {
+    console.error("Admin update user email error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -209,8 +209,8 @@ router.put("/:id/password", async (req: Request, res: Response) => {
     });
     const { password: _, ...safeUser } = user;
     return res.json(safeUser);
-  } catch (error) {
-    console.error("Admin update user password error:", error);
+  } catch (_error) {
+    console.error("Admin update user password error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -234,8 +234,8 @@ router.put("/:id/primal", async (req: Request, res: Response) => {
     });
     const { password: _, ...safeUser } = user;
     return res.json(safeUser);
-  } catch (error) {
-    console.error("Admin update user primal status error:", error);
+  } catch (_error) {
+    console.error("Admin update user primal status error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -257,8 +257,8 @@ router.delete("/:id", async (req: Request, res: Response) => {
       details: `Utente eliminato: ${targetUser.nickname}`,
     });
     return sendSuccess(res, undefined, "Utente eliminato");
-  } catch (error) {
-    console.error("Admin delete user error:", error);
+  } catch (_error) {
+    console.error("Admin delete user error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -276,8 +276,8 @@ router.delete("/:id/lastfm", async (req: Request, res: Response) => {
       details: "Dati Last.fm (sessioni e brani) eliminati",
     });
     return sendSuccess(res, undefined, "Dati Last.fm eliminati");
-  } catch (error) {
-    console.error("Admin clear lastfm data error:", error);
+  } catch (_error) {
+    console.error("Admin clear lastfm data error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -327,8 +327,8 @@ router.get("/match-summary", async (req: Request, res: Response) => {
     }));
 
     return res.json({ users: mappedUsers, total, page });
-  } catch (error) {
-    console.error("Admin match-summary error:", error);
+  } catch (_error) {
+    console.error("Admin match-summary error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -337,7 +337,7 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     return res.json({ userId: id, stats: {} });
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura statistiche");
   }
 });
@@ -346,7 +346,7 @@ router.get("/:id/geo-insights", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     return res.json({ userId: id, insights: [] });
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura geo-insights");
   }
 });
@@ -356,7 +356,7 @@ router.get("/:userId/sessions", async (req: Request, res: Response) => {
     const userId = req.params.userId;
     const sessions = await db.execute(sql`SELECT sid, sess->'userId' as user_id, expire FROM session WHERE sess->>'userId' = ${userId}`);
     return res.json(sessions.rows);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura sessioni");
   }
 });
@@ -366,7 +366,7 @@ router.delete("/:userId/sessions/:sid", async (req: Request, res: Response) => {
     const sid = req.params.sid;
     await db.execute(sql`DELETE FROM session WHERE sid = ${sid}`);
     return sendSuccess(res);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore eliminazione sessione");
   }
 });

@@ -1,8 +1,8 @@
 import { storage } from "../storage";
 import { db } from "../db";
 import { haversineDistance } from "../geo";
-import { proposalZoneNotifications, users, userProfiles, proposals, type Proposal } from "@shared/db";
-import { and, eq, isNotNull, gt, desc } from "drizzle-orm";
+import { proposalZoneNotifications, users, userProfiles, type Proposal } from "@shared/db";
+import { and, eq, isNotNull, gt } from "drizzle-orm";
 import { sendMatchPushNotifications } from "../push-notifications";
 import it from "../../lib/i18n/it";
 import { 

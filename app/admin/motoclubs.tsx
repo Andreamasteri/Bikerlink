@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, Text, StyleSheet, FlatList,
   Alert, 
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";

@@ -48,7 +48,7 @@ router.post("/hotels", async (req: Request, res: Response) => {
   const { lat, lng, radius = 10000 } = parsedHotels.data;
 
   try {
-    const results: any[] = [];
+    const _results: any[] = [];
     const query = `[out:json][timeout:25];(node["tourism"="hotel"](around:${radius},${lat},${lng});way["tourism"="hotel"](around:${radius},${lat},${lng}););out body;>;out skel qt;`;
     const resp = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",

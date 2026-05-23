@@ -8,7 +8,6 @@ import {
   Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Colors from "@/constants/colors";
 
 const { width: W, height: H } = Dimensions.get("window");
 const GROUND_Y = H * 0.7;
@@ -35,7 +34,7 @@ interface Props {
 
 export default function EndlessBiker({ onGameOver }: Props) {
   const insets = useSafeAreaInsets();
-  const [running, setRunning] = useState(true);
+  const [_running, setRunning] = useState(true);
   const [score, setScore] = useState(0);
   const [isDucking, setIsDucking] = useState(false);
 

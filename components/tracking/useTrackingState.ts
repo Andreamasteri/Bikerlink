@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Alert, Animated, AppState, AppStateStatus } from "react-native";
+import { Alert, Animated, AppState } from "react-native";
 import * as Location from "expo-location";
 import { DeviceMotion } from "expo-sensors";
 import { VolumeManager } from "react-native-volume-manager";
 import * as Battery from "expo-battery";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
 
 import { useT } from "@/lib/language-context";
 import { useUnits } from "@/lib/units-context";
@@ -164,7 +163,7 @@ export function useTrackingState() {
 
   const handsOffDismissedForRideRef = useRef(false);
   const totalGpsPointsRef = useRef(0);
-  const [isTabFocused, setIsTabFocused] = useState(true);
+  const [isTabFocused, _setIsTabFocused] = useState(true);
   const isTabFocusedRef = useRef(isTabFocused);
 
   // Sync refs
@@ -355,7 +354,7 @@ export function useTrackingState() {
     }
     refs.timerRef.current = setInterval(() => {
       if (stats.isPausedRef.current) return;
-      const now = Date.now(); let activeMs = now - stats.startTimeRef.current - stats.pausedMsRef.current;
+      const now = Date.now(); const activeMs = now - stats.startTimeRef.current - stats.pausedMsRef.current;
       stats.setDisplayIdleMs(stats.idleMsRef.current + (stats.idleStartRef.current ? now - stats.idleStartRef.current : 0));
       stats.setTotalMs(activeMs);
       if (now - stats.lastAvgSpeedUpdateRef.current > 5000) {

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, TouchableOpacity, Image } from "react-native";
+import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
@@ -29,7 +29,7 @@ export function MatchList({
   getEmptyTitle,
   getEmptyDesc,
 }: MatchListProps) {
-  const t = useT();
+  const _t = useT();
 
   if (isServerBusy) {
     return (

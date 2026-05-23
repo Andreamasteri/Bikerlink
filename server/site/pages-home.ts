@@ -1,9 +1,7 @@
 import {
   type PageMeta,
   organizationJsonLd,
-  breadcrumbsJsonLd,
 } from "./render";
-import { COMP_SECTION } from "./pages-shared";
 
 // ── HOME PAGE-SPECIFIC CSS ─────────────────────────────────────────────────────
 const HOME_CSS = `<style>

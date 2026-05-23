@@ -24,7 +24,7 @@ interface ProfileDetailActionsProps {
 }
 
 export const ProfileDetailActions: React.FC<ProfileDetailActionsProps> = ({
-  id,
+  id: _id,
   isSelf,
   isBlocked,
   publicRoutesCount,

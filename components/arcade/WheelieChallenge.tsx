@@ -8,7 +8,6 @@ import {
   Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Colors from "@/constants/colors";
 
 const { width: W } = Dimensions.get("window");
 const ZONE_CENTER = 0.5;

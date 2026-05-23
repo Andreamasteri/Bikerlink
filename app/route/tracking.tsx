@@ -39,7 +39,7 @@ const FREQUENCY_OPTIONS = [
 
 export default function TrackingScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const _insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
   const { logs: debugLogs, clearLogs: clearDebugLogs, logFetch } = useApiDebugLog();

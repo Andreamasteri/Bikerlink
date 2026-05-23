@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
@@ -17,7 +17,7 @@ import FavoriteStar from "@/components/FavoriteStar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { InteractiveMapHandle } from "@/components/InteractiveMap";
 
-type MapUserRef = {
+type _MapUserRef = {
   mapRef: React.RefObject<InteractiveMapHandle>;
   fullscreenMapRef: React.RefObject<InteractiveMapHandle>;
   mapFullscreen: boolean;

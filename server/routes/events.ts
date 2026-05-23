@@ -3,7 +3,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
 import { haversineKm } from "../geo";
 import { db } from "../db";
-import { events, eventImages, eventParticipants, users, type InsertEvent } from "@shared/db";
+import { events, eventImages, users, type InsertEvent } from "@shared/db";
 import { createEventSchema } from "@shared/validators";
 import {
   eq,
@@ -12,14 +12,12 @@ import {
   sql,
   count,
   gte,
-  lte,
   systemAccountConditions,
   requireAuth,
   isAdminOrModUser,
   enrichEvent,
   type EventRow,
 } from "./events-helpers";
-import { allLimited } from "../lib/concurrency";
 import { sendNewEventNotificationEmail } from "../email";
 import path from "path";
 

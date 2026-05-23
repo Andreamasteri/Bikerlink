@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { AppState, Platform } from "react-native";
 import * as Location from "expo-location";
 import { useAuth } from "@/lib/auth-context";

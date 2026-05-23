@@ -1,14 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
-  View,
-  Text,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Modal,
   Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -17,7 +13,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
-import type { AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -47,7 +42,7 @@ export default function RegisterScreen() {
   const { data: emailVerifData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/email-verification"],
   });
-  const emailVerifEnabled = emailVerifData?.enabled === true;
+  const _emailVerifEnabled = emailVerifData?.enabled === true;
 
   const { data: phoneFieldData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/phone-field-enabled"],

@@ -89,7 +89,7 @@ function parseDateAndTime(dateStr: string, timeStr: string): Date | null {
 
 export default function CreateProposalScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const _insets = useSafeAreaInsets();
   const { user } = useAuth();
   const t = useT();
 

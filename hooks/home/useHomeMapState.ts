@@ -57,7 +57,7 @@ export function useHomeMapState() {
   const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const lastFocusParamRef = useRef<string | null>(null);
   const [pendingFocusCoords, setPendingFocusCoords] = useState<{ lat: number; lng: number; userId?: string; nickname?: string } | null>(null);
-  const [pendingHighlight, setPendingHighlight] = useState<{ lat: number; lng: number; userId: string } | null>(null);
+  const [_pendingHighlight, setPendingHighlight] = useState<{ lat: number; lng: number; userId: string } | null>(null);
   const [focusToast, setFocusToast] = useState<string | null>(null);
   const focusToastAnim = useRef(new Animated.Value(0)).current;
 
@@ -72,7 +72,7 @@ export function useHomeMapState() {
     filterZavorrina,
     filterClubs,
     filterEvents,
-    filtersLoaded,
+    filtersLoaded: _filtersLoaded,
     toggleFilterBiker,
     toggleFilterZavorrina,
     toggleFilterClubs,

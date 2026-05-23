@@ -17,7 +17,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { type AppLanguage } from "@/lib/i18n";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
@@ -72,7 +71,7 @@ export default function EditProfileScreen() {
   const params = useLocalSearchParams();
   const { user, logoutMutation } = useAuth();
   const { language, setLanguage } = useLanguage();
-  const { speedUnit, setSystem } = useUnits();
+  const { speedUnit: _speedUnit, setSystem: _setSystem } = useUnits();
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],

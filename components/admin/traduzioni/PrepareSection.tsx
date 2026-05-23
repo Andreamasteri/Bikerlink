@@ -15,7 +15,7 @@ export function PrepareSection({
   prepareStatus,
   prepareResult,
   onPrepare,
-  t,
+  t: _t,
 }: PrepareSectionProps) {
   return (
     <View style={styles.card}>

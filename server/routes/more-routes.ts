@@ -4,9 +4,9 @@ import fs from "node:fs";
 import multer from "multer";
 import { storage } from "../storage";
 import { db } from "../db";
-import { users, userFavorites, serverRestarts } from "@shared/db";
+import { serverRestarts } from "@shared/db";
 import { PRIVACY_POLICY_IT } from "@shared/privacy-policy-it";
-import { eq, sql, desc, count } from "drizzle-orm";
+import { sql, desc, count } from "drizzle-orm";
 import { triggerMatchingRun, triggerMatchingForUser } from "../matching-engine";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { initState } from "../init-state";
@@ -217,7 +217,7 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/privacy-policy/export", async (_req, res) => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+       
       const PDFDocument = require("pdfkit") as any;
       const publicDir = path.dirname(PRIVACY_EXPORT_PDF_PATH);
       if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });

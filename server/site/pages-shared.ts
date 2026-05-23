@@ -1,8 +1,5 @@
-import {
-  type PageMeta,
-  organizationJsonLd,
-  breadcrumbsJsonLd,
-} from "./render";
+
+
 
 // SVG icon helpers (Feather-style, inline)
 export const icon = {

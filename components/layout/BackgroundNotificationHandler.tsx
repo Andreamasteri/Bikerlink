@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from "react";
-import { Linking, Platform } from "react-native";
+import { useEffect, useRef } from "react";
+import { Linking } from "react-native";
 import { useRouter, useRootNavigationState } from "expo-router";
 
 let Notifications: typeof import("expo-notifications") | null = null;

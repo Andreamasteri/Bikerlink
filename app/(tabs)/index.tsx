@@ -5,6 +5,9 @@ import {
   ActivityIndicator,
   ScrollView,
   Animated,
+  TouchableOpacity,
+  Linking,
+  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { queryClient } from "@/lib/query-client";
@@ -106,8 +109,8 @@ export default function MapScreen() {
     handleSearchResultPress,
     handleLocateUser,
     myAds,
-    focusToast,
-    focusToastAnim,
+    focusToast: _focusToast,
+    focusToastAnim: _focusToastAnim,
     handleFullscreenMapReady,
   } = useHomeMapState();
 

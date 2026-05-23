@@ -2,7 +2,6 @@ import { Router, type Request, type Response } from "express";
 import { db, pool } from "../db";
 import {
   roadHazards,
-  roadHazardConfirms,
   RECURRING_TYPES,
   HAZARD_LABELS,
   HAZARD_ICONS,

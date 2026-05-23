@@ -9,15 +9,11 @@ declare global {
 }
 import { createServer, type Server } from "node:http";
 import path from "node:path";
-import fs from "node:fs";
 import crypto from "node:crypto";
-import { initState } from "./init-state";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
-import multer from "multer";
 import { pool } from "./db";
 import { storage } from "./storage";
-import { getTrustedClientIp } from "./lib/abuse-rate-limit";
 import internalRouter from "./routes/_internal";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
@@ -51,10 +47,9 @@ import errorsRoutes from "./routes/errors";
 import sprintsRoutes from "./routes/sprints";
 // import roadHazardsRoutes from "./routes/road-hazards"; // disabled pre-deploy
 import { publicMediaRouter, adminMediaRouter } from "./routes/media-library";
-import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
-import { users, userFavorites } from "@shared/db";
-import { ilike, eq, and, sql } from "drizzle-orm";
+import { userFavorites } from "@shared/db";
+import { eq, and } from "drizzle-orm";
 import { onlineTracker } from "./online-tracker";
 import { registerClientSettingsRoutes } from "./routes/client-settings";
 import { registerMoreRoutes } from "./routes/more-routes";

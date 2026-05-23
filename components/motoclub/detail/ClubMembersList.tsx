@@ -15,7 +15,7 @@ export interface Member {
   country: string | null;
 }
 
-interface ClubMembersListProps {
+interface _ClubMembersListProps {
   members: Member[];
   totalCount: number;
   currentUserId?: string;

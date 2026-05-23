@@ -1,7 +1,6 @@
 import React from "react";
 import { View, Text, Modal, KeyboardAvoidingView, Pressable, Image, TextInput, ActivityIndicator, Platform, StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
-import { useT } from "@/lib/language-context";
 
 const sosLaunchIcon = require("@/assets/images/sos-launch-icon.png");
 
@@ -16,8 +15,8 @@ export function SosModal({
   setCustomRadius,
   onSubmit,
   isPending,
-  location,
-  t,
+  location: _location,
+  t: _t,
 }: {
   visible: boolean;
   onClose: () => void;

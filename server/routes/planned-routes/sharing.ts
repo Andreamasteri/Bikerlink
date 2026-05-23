@@ -1,7 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { storage } from "../../storage";
-import { requireAuth, decodePolyline, escapeXml, computeBikerScoreFromPoints } from "./utils";
+import { requireAuth, decodePolyline, escapeXml } from "./utils";
 import { plannedGpxImportSchema } from "@shared/validators";
 import { haversineKm } from "../../geo";
 

@@ -1,6 +1,5 @@
-import React, { useMemo, useEffect, useState } from "react";
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React from "react";
+import { View, Text, StyleSheet, FlatList } from "react-native";
 import Colors from "@/constants/colors";
 import { LogItem } from "./LogItem";
 import { formatTimestamp, eventIcon, eventLabel, type SystemEvent } from "./systemUtils";

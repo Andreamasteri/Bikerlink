@@ -23,7 +23,7 @@ export const AiSection: React.FC<AiSectionProps> = ({
   aiResult,
   aiSummary,
 }) => {
-  const t = useT();
+  const _t = useT();
 
   return (
     <View style={styles.card}>

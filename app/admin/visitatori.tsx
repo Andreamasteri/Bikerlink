@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, FlatList, Switch } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, FlatList, Switch } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

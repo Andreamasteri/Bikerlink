@@ -67,7 +67,7 @@ export default function CreateRouteScreen() {
   const [waypoints, setWaypoints] = useState<LocalWaypoint[]>([]);
   const [mapOpen, setMapOpen] = useState(false);
   const [pendingCoord, setPendingCoord] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [editingWaypointIndex, setEditingWaypointIndex] = useState<number | null>(null);
+  const [_editingWaypointIndex, setEditingWaypointIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!mapOpen) return;

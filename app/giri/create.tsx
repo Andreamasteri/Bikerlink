@@ -2,7 +2,7 @@ import React, { useMemo, useEffect } from "react";
 import { View, ScrollView } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
 import { getTileConfig } from "@/lib/map-tiles";
@@ -33,7 +33,7 @@ import { useRouteMapLogic } from "@/components/giri/create/useRouteMapLogic";
 import { useGiriCreateStyles } from "@/components/giri/create/styles";
 
 import { 
-  STYLE_LEVELS, COMPASS_DIRECTIONS, Waypoint, RouteResult, 
+  STYLE_LEVELS, COMPASS_DIRECTIONS, RouteResult, 
   UserMotorcycle, MyStyleProfile 
 } from "@/components/giri/create/types";
 import { calcRoute } from "@/components/giri/create/api";
@@ -58,7 +58,7 @@ export default function GiriCreateScreen() {
     avoidHighways, setAvoidHighways, avoidTolls, setAvoidTolls,
     avoidFerries, setAvoidFerries, avoidUnpaved, setAvoidUnpaved,
     visibility, setVisibility, selectedMotoId, setSelectedMotoId,
-    fuelLevel, setFuelLevel, waypoints, setWaypoints,
+    fuelLevel, setFuelLevel, waypoints, setWaypoints: _setWaypoints,
     wpInputs, wpSuggestions,
     routeResult, setRouteResult, calculating, setCalculating,
     dismissedWarnings, setDismissedWarnings,

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, FlatList } from "react-native
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getCurrentLocale } from "@/lib/i18n";
-import { Club, ClubAvatar, UserClub } from "./MotoClubCard";
+import { Club, ClubAvatar } from "./MotoClubCard";
 
 export type Invite = {
   id: string;

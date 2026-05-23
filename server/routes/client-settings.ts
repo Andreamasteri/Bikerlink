@@ -476,7 +476,7 @@ export function registerClientSettingsRoutes(app: Express) {
         return sendError(res, 401, "Non autenticato");
       }
       const userId: string = req.session.userId;
-      const { latitude, longitude, altitude, accuracy, timestamp, activeRouteId, isSosActive, isGhostMode } = req.body;
+      const { latitude, longitude, altitude, accuracy: _accuracy, timestamp, activeRouteId, isSosActive: _isSosActive, isGhostMode: _isGhostMode } = req.body;
       if (typeof latitude !== "number" || typeof longitude !== "number") {
         return sendError(res, 400, "Coordinate non valide");
       }

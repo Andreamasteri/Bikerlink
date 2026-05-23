@@ -2,14 +2,12 @@ import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
   FlatList,
   Image,
-  TextInput,
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -59,7 +57,7 @@ export default function MusicScreen() {
 
   const [pendingAddId, setPendingAddId] = useState<string | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [isConnecting, _setIsConnecting] = useState(false);
   const [searchNeedsReconnect, setSearchNeedsReconnect] = useState(false);
 
   const [lastfmModalVisible, setLastfmModalVisible] = useState(false);

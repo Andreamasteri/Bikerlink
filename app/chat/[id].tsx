@@ -69,7 +69,7 @@ export default function ChatConversationScreen() {
   const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const _insets = useSafeAreaInsets();
   const { user } = (require("@/lib/auth-context")).useAuth();
   const userId = user?.id || "";
   const [inputText, setInputText] = useState("");

@@ -8,7 +8,7 @@ import Colors from "@/constants/colors";
 // likely it's imported from somewhere or defined at the top.
 // Checking the snippet again... it was used at line 469.
 // It seems I missed where it was defined. Let me check the top of the file again.
-const CURRENT_APP_VERSION = "1.0.0"; // Placeholder, will check later if it's imported.
+const _CURRENT_APP_VERSION = "1.0.0"; // Placeholder, will check later if it's imported.
 
 export interface AdminUser {
   id: string;

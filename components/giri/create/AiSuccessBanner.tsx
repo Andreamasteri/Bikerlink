@@ -8,7 +8,7 @@ interface AiSuccessBannerProps {
 }
 
 export const AiSuccessBanner: React.FC<AiSuccessBannerProps> = ({ onDismiss }) => {
-  const colors = useColors();
+  const _colors = useColors();
   
   return (
     <View style={styles.aiSuccessBanner}>

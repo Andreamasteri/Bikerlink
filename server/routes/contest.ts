@@ -89,8 +89,8 @@ router.get("/entries", async (req: Request, res: Response) => {
     if (!userId) return;
 
     const now = new Date();
-    let weekNumber = parseInt(req.query.week as string) || getWeekNumber(now);
-    let year = parseInt(req.query.year as string) || now.getFullYear();
+    const weekNumber = parseInt(req.query.week as string) || getWeekNumber(now);
+    const year = parseInt(req.query.year as string) || now.getFullYear();
 
     const entries = await storage.getPhotoContestEntries(weekNumber, year);
 
@@ -129,7 +129,7 @@ router.post("/entries/:id/vote", async (req: Request, res: Response) => {
 
     const { id } = req.params;
 
-    const entries = await storage.getPhotoContestEntries(0, 0);
+    const _entries = await storage.getPhotoContestEntries(0, 0);
     let entry = null;
     const allEntries = await storage.getPhotoContestEntries(
       getWeekNumber(new Date()),

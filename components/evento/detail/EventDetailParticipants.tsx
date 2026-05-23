@@ -1,6 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import EventParticipantsComponent from "@/components/eventi/EventParticipants";

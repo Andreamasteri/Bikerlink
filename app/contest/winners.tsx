@@ -61,7 +61,7 @@ function WinnerItem({ item, index }: { item: PhotoWinner; index: number }) {
 }
 
 export default function WinnersScreen() {
-  const insets = useSafeAreaInsets();
+  const _insets = useSafeAreaInsets();
 
   const { data, isLoading, refetch } = useQuery<PhotoWinner[]>({
     queryKey: ["/api/contest/winners"],

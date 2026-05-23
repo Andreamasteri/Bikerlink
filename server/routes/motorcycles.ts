@@ -77,7 +77,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         .where(and(eq(userMotorcycles.userId, userId), ne(userMotorcycles.id, motorcycle.id)));
     }
 
-    let matches: any[] = [];
+    const matches: any[] = [];
     if (ridingStyle) {
       const wishlistMotos = await storage.findMatchingWishlistMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
       for (const wm of wishlistMotos) {

@@ -6,8 +6,6 @@ import { useTheme } from "@/lib/theme-context";
 import { useT } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 
-import { ManualAdminSection } from "@/components/admin/settings/ManualAdminSection";
-import { PdfDocumentAdminSection } from "@/components/admin/settings/PdfDocumentAdminSection";
 import { EmailStatusCard } from "@/components/admin/settings/EmailStatusCard";
 import { MatchingEngineSection } from "@/components/admin/settings/MatchingEngineSection";
 import { CoordinateHistorySection } from "@/components/admin/settings/CoordinateHistorySection";
@@ -22,7 +20,6 @@ import { HomeMessageSection } from "@/components/admin/settings/HomeMessageSecti
 import { SyncSection } from "@/components/admin/settings/SyncSection";
 import { MapStyleSection } from "@/components/admin/settings/MapStyleSection";
 import { useAdminSettingsState } from "@/components/admin/settings/useAdminSettingsState";
-import Colors from "@/constants/colors";
 
 export default function AdminSettings() {
   const t = useT();

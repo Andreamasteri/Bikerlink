@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
-import { storage } from "../../storage";
 import { motoClubs, motoClubMembers, motoClubInvites, users, conversationParticipants } from "@shared/db";
 import { eq, and, sql } from "drizzle-orm";
 import { systemAccountConditions } from "../../lib/system-account-filter";
@@ -23,7 +22,7 @@ router.get("/me/clubs", requireAuth, async (req: Request, res: Response) => {
       .where(and(eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")));
 
     return res.json(clubs.map(r => ({ ...r.club, joinedAt: r.member.joinedAt, role: r.member.role })));
-  } catch (e) {
+  } catch (_e) {
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -84,8 +83,8 @@ router.post("/:id/join", requireAuth, async (req: Request, res: Response) => {
     await notifyTopMembersOfNewJoin(clubId as string, userId, club.name);
 
     return sendSuccess(res, undefined, "Sei entrato nel club");
-  } catch (e) {
-    console.error("[POST /motoclubs/:id/join]", e);
+  } catch (_e) {
+    console.error("[POST /motoclubs/:id/join]", _e);
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -105,7 +104,7 @@ router.post("/:id/leave", requireAuth, async (req: Request, res: Response) => {
     }
 
     return sendSuccess(res, undefined, "Hai lasciato il club");
-  } catch (e) {
+  } catch (_e) {
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -170,7 +169,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
     }));
 
     return res.json({ ...club, hasPendingLocationProposal, members, memberCount: members.length });
-  } catch (e) {
+  } catch (_e) {
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -244,8 +243,8 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
 
     const total = Number(totalCount);
     return res.json({ ...club, hasPendingLocationProposal, members: memberships, totalCount: total, hasMore: offset + limit < total });
-  } catch (e) {
-    console.error("[GET /:id/detail]", e);
+  } catch (_e) {
+    console.error("[GET /:id/detail]", _e);
     return sendError(res, 500, "Errore interno");
   }
 });

@@ -87,7 +87,7 @@ export default function CustomRouteDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
 
   const { data: route, isLoading } = useQuery<CustomRouteDetail>({
     queryKey: ["/api/custom-routes", id],

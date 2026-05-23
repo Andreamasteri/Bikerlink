@@ -1,6 +1,6 @@
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
-import { requireAuth, decodePolyline, computeBikerScoreFromPoints } from "./utils";
+import { requireAuth, computeBikerScoreFromPoints } from "./utils";
 import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, weatherWaypointsSchema, poiRequestSchema } from "@shared/validators";
 import { z } from "zod";
 import { generateObject, streamText } from "ai";
@@ -334,8 +334,8 @@ router.post("/calculate", async (req: Request, res: Response) => {
     isRoundTrip,
     roundTripDirection,
     headingDeg,
-    language,
-  } = parsedCalc.data;
+  language: _language,
+} = parsedCalc.data;
 
   const DIRECTION_DEGREES: Record<string, number> = {
     N: 0, NE: 45, E: 90, SE: 135, S: 180, SO: 225, O: 270, NO: 315,
@@ -532,7 +532,7 @@ router.post("/poi-photo", async (req: Request, res: Response) => {
 
   const parsedPhoto = poiPhotoSchema.safeParse(req.body);
   if (!parsedPhoto.success) return sendError(res, 400, parsedPhoto.error.issues[0].message);
-  const { poiId } = parsedPhoto.data;
+  const { poiId: _poiId } = parsedPhoto.data;
 
   try {
     return res.json({ photoUrl: null });

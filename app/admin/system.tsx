@@ -1,16 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  View,
-  Text,
-  FlatList,
   StyleSheet,
   TouchableOpacity,
   Platform,
   ActivityIndicator,
-  TextInput,
   Alert,
-  Modal,
-  KeyboardAvoidingView,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -22,8 +16,6 @@ import { getApiUrl, authFetchHeaders, silentAuthRecheck, apiRequest } from "@/li
 import { useAuth } from "@/lib/auth-context";
 import { evaluateUpdateOutcome, type UpdateOutcome } from "@/lib/semver";
 import {
-  triggerSoftPreview,
-  triggerForcedPreview,
   forceRecheck,
 } from "@/components/NativeUpdateChecker";
 import { useT } from "@/lib/language-context";
@@ -31,7 +23,6 @@ import { useT } from "@/lib/language-context";
 import { SystemStatusCard } from "@/components/admin/system/SystemStatusCard";
 import { ServerRestartSection } from "@/components/admin/system/ServerRestartSection";
 import { DatabaseSection } from "@/components/admin/system/DatabaseSection";
-import { LogItem } from "@/components/admin/system/LogItem";
 import { NativeVersionConfig } from "@/components/admin/system/NativeVersionConfig";
 import { PurgeConfirmationModal } from "@/components/admin/system/PurgeConfirmationModal";
 import { SystemErrorDisplay } from "@/components/admin/system/SystemErrorDisplay";
@@ -43,9 +34,6 @@ import {
   isAdminError,
   formatDuration,
   formatTimestamp,
-  eventIcon,
-  eventLabel,
-  platformLabel,
   type SystemEvent,
   type SystemHealth,
   type RestartHistory,
@@ -73,7 +61,7 @@ export default function SystemScreen() {
   const [nativeIosUrl, setNativeIosUrl] = useState("");
   const [savingNative, setSavingNative] = useState(false);
 
-  const { data: nativeVerData, refetch: refetchNativeVer, isFetching: isFetchingNativeVer } = useQuery<NativeVersionConfigData>({
+  const { data: nativeVerData, refetch: refetchNativeVer, isFetching: _isFetchingNativeVer } = useQuery<NativeVersionConfigData>({
     queryKey: ["/api/settings/native-version"],
   });
 
@@ -130,7 +118,7 @@ export default function SystemScreen() {
   const saveNativeVersion = useCallback(async () => {
     setSavingNative(true);
     try {
-      const res = await apiRequest("PUT", "/api/admin/settings/native-version", {
+      const _res = await apiRequest("PUT", "/api/admin/settings/native-version", {
         android: { latestVersion: nativeAndroidLatest, minVersion: nativeAndroidMin, storeUrl: nativeAndroidUrl },
         ios: { latestVersion: nativeIosLatest, minVersion: nativeIosMin, storeUrl: nativeIosUrl },
       });
@@ -144,7 +132,7 @@ export default function SystemScreen() {
 
   const router = useRouter();
   const { sessionExpired, logoutMutation, user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const _isAdmin = user?.role === "admin";
 
   const executePurge = useCallback(async () => {
     if (purgeConfirmText.trim().toUpperCase() !== "PURGA") {
@@ -413,7 +401,7 @@ export default function SystemScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const _styles = StyleSheet.create({
   center: {
     flex: 1,
     alignItems: "center",

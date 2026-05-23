@@ -1,6 +1,5 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
-import { storage } from "../../storage";
 import { db } from "../../db";
 import { users, events } from "@shared/db";
 import { eq, asc, desc, requireAdminOrMod, allLimited, enrichEvent, count } from "../events-helpers";

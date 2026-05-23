@@ -77,7 +77,7 @@ export function NavigationMap({
   );
 }
 
-const styles = (colors: any) =>
+const styles = (_colors: any) =>
   StyleSheet.create({
     mapContainer: {
       flex: 1,

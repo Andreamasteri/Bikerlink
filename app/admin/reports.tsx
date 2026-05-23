@@ -25,7 +25,7 @@ export default function AdminReports() {
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<FilterStatus>("pending");
 
-  const queryKey = filter === "all" ? ["/api/admin/reports"] : ["/api/admin/reports", `?status=${filter}`];
+  const _queryKey = filter === "all" ? ["/api/admin/reports"] : ["/api/admin/reports", `?status=${filter}`];
 
   const { data: reports = [], isLoading } = useQuery<Report[]>({
     queryKey: ["/api/admin/reports"],

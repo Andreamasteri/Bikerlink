@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 
 interface Waypoint { lat: number; lng: number; name?: string; }

@@ -50,7 +50,7 @@ const LanguageContext = createContext<LanguageContextType>({
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<AppLanguage>(getAppLanguage());
   const [renderKey, setRenderKey] = useState(0);
-  const [loaded, setLoaded] = useState(false);
+  const [_loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     // Fallback chain: stored preference → device locale → Italian

@@ -36,7 +36,7 @@ interface RouteMapModalProps {
 }
 
 export function RouteMapModal({
-  visible, onClose, onCloseAll, points, tileUrl, tileMaxZoom,
+  visible, onClose, onCloseAll: _onCloseAll, points, tileUrl, tileMaxZoom,
   totalKm, maxSpeed, totalMs, distanceUnit, speedUnit, insets, loading, routeId,
 }: RouteMapModalProps) {
   const t = useT();

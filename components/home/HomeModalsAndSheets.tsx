@@ -1,8 +1,4 @@
 import React from "react";
-import { View } from "react-native";
-import { useAuth } from "@/lib/auth-context";
-import { useT } from "@/lib/language-context";
-import { queryClient } from "@/lib/query-client";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import UserListSheet from "@/components/map/UserListSheet";
@@ -73,12 +69,12 @@ export const HomeModalsAndSheets: React.FC<HomeModalsAndSheetsProps> = ({
   showZavorrinaList,
   setShowZavorrinaList,
   showOfflineOnline,
-  setShowOfflineOnline,
+  setShowOfflineOnline: _setShowOfflineOnline,
   onlineListQuery,
   bikerListQuery,
   zavListQuery,
   offlineCountdown,
-  startOfflineTimer,
+  startOfflineTimer: _startOfflineTimer,
   handleLocateUser,
   
   selectedUser,

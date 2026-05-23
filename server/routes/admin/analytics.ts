@@ -2,7 +2,7 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { users, moderatorLogs, siteVisits } from "@shared/db";
+import { users, siteVisits } from "@shared/db";
 import { sql, desc } from "drizzle-orm";
 
 const router = Router();
@@ -29,8 +29,8 @@ router.get("/", async (_req: Request, res: Response) => {
       },
       timestamp: new Date().toISOString(),
     });
-  } catch (error) {
-    console.error("Admin get analytics error:", error);
+  } catch (_error) {
+    console.error("Admin get analytics error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -45,7 +45,7 @@ router.get("/export-csv", async (_req: Request, res: Response) => {
     res.setHeader("Content-Type", "text/csv");
     res.setHeader("Content-Disposition", "attachment; filename=users_export.csv");
     return res.send(csv);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore export CSV");
   }
 });
@@ -53,8 +53,8 @@ router.get("/export-csv", async (_req: Request, res: Response) => {
 router.get("/users-list", async (_req: Request, res: Response) => {
   try {
     const usersList = await storage.getAllUsers();
-    return res.json(usersList.map(({ password, ...u }) => u));
-  } catch (error) {
+    return res.json(usersList.map(({ password: _password, ...u }) => u));
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura utenti");
   }
 });
@@ -63,8 +63,8 @@ router.get("/active-users", async (req: Request, res: Response) => {
   try {
     const days = parseInt(String(req.query.days ?? "30"), 10) || 30;
     const active = await db.select().from(users).where(sql`last_login_at >= NOW() - INTERVAL '${sql.raw(days.toString())} days'`);
-    return res.json(active.map(({ password, ...u }) => u));
-  } catch (error) {
+    return res.json(active.map(({ password: _password, ...u }) => u));
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura utenti attivi");
   }
 });
@@ -72,8 +72,8 @@ router.get("/active-users", async (req: Request, res: Response) => {
 router.get("/online-now", async (_req: Request, res: Response) => {
   try {
     const online = await db.select().from(users).where(sql`last_login_at >= NOW() - INTERVAL '5 minutes'`);
-    return res.json(online.map(({ password, ...u }) => u));
-  } catch (error) {
+    return res.json(online.map(({ password: _password, ...u }) => u));
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura utenti online");
   }
 });
@@ -81,7 +81,7 @@ router.get("/online-now", async (_req: Request, res: Response) => {
 router.get("/ad-clicks", async (_req: Request, res: Response) => {
   try {
     return res.json({ clicks: [] });
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura click pubblicità");
   }
 });
@@ -90,7 +90,7 @@ router.get("/pending-reports", async (_req: Request, res: Response) => {
   try {
     const reports = await storage.getReports();
     return res.json(reports.filter(r => !r.resolvedAt));
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura segnalazioni pendenti");
   }
 });
@@ -99,7 +99,7 @@ router.get("/site-visits/summary", async (_req: Request, res: Response) => {
   try {
     const result = await db.execute(sql`SELECT page_path, COUNT(*) as visits FROM site_visits GROUP BY page_path ORDER BY visits DESC`);
     return res.json(result.rows);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura visite sito");
   }
 });
@@ -109,7 +109,7 @@ router.get("/site-visits", async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(String(req.query.limit ?? "100"), 10) || 100, 1000);
     const visits = await db.select().from(siteVisits).orderBy(desc(siteVisits.createdAt)).limit(limit);
     return res.json(visits);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura visite sito");
   }
 });

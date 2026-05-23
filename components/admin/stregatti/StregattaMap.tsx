@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 import { WebView } from "react-native-webview";
 import { useQuery } from "@tanstack/react-query";

@@ -18,8 +18,8 @@ router.get("/", async (req: Request, res: Response) => {
     const type = String(req.query.type ?? "tutti");
     const result = await storage.getFakeUserStats(limit, offset, type);
     return res.json(result);
-  } catch (error) {
-    console.error("Admin get stregatti error:", error);
+  } catch (_error) {
+    console.error("Admin get stregatti error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -28,7 +28,7 @@ router.post("/", async (req: Request, res: Response) => {
   try {
     const parsedSt = stregattaSchema.safeParse(req.body);
     if (!parsedSt.success) return sendError(res, 400, parsedSt.error.issues[0].message);
-    const { nickname, userType, sex, coupleSexConfig, birthYear, region, bio, moto, wishlistDescription, wishlistMotos } = parsedSt.data as any;
+    const { nickname, userType, sex, coupleSexConfig, birthYear, region, _bio, _moto, _wishlistDescription, _wishlistMotos } = parsedSt.data as any;
     const existingNickname = await storage.getUserByNickname(nickname);
     if (existingNickname) {
       return sendError(res, 409, "Nickname già in uso");
@@ -54,8 +54,8 @@ router.post("/", async (req: Request, res: Response) => {
       lastLoginAt: new Date(),
     });
     return res.status(201).json(user);
-  } catch (error) {
-    console.error("Admin create stregatto error:", error);
+  } catch (_error) {
+    console.error("Admin create stregatto error:", _error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
@@ -67,7 +67,7 @@ router.put("/toggle-all", async (req: Request, res: Response) => {
       lastLoginAt: online ? new Date() : sql`last_login_at` 
     }).where(eq(users.isFake, true));
     return sendSuccess(res);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore toggle globale");
   }
 });
@@ -79,7 +79,7 @@ router.delete("/", async (req: Request, res: Response) => {
       await storage.deleteUser(f.id);
     }
     return sendSuccess(res, { deleted: fakes.length });
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore eliminazione globale");
   }
 });
@@ -88,7 +88,7 @@ router.post("/wake-all", async (_req: Request, res: Response) => {
   try {
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.isFake, true));
     return sendSuccess(res);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore wake all");
   }
 });
@@ -96,7 +96,7 @@ router.post("/wake-all", async (_req: Request, res: Response) => {
 router.post("/distribute-to-clubs", async (_req: Request, res: Response) => {
   try {
     return sendSuccess(res);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore distribuzione");
   }
 });
@@ -106,7 +106,7 @@ router.post("/distribute-to-clubs", async (_req: Request, res: Response) => {
 router.get("/motion/positions", (_req: Request, res: Response) => {
   try {
     return res.json(getPositions());
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura posizioni");
   }
 });
@@ -120,7 +120,7 @@ router.get("/motion/speeds", (_req: Request, res: Response) => {
       speedProfile: data.speedProfile,
     }));
     return res.json(payload);
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura velocità");
   }
 });
@@ -128,7 +128,7 @@ router.get("/motion/speeds", (_req: Request, res: Response) => {
 router.get("/motion/status", (_req: Request, res: Response) => {
   try {
     return res.json(getMotionStatus());
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura stato motion");
   }
 });
@@ -141,8 +141,8 @@ router.post("/motion/toggle", async (req: Request, res: Response) => {
     }
     await setMotionEnabled(enabled);
     return res.json(getMotionStatus());
-  } catch (error) {
-    console.error("[MOTION] toggle error:", error);
+  } catch (_error) {
+    console.error("[MOTION] toggle error:", _error);
     return sendError(res, 500, "Errore toggle motion");
   }
 });
@@ -150,7 +150,7 @@ router.post("/motion/toggle", async (req: Request, res: Response) => {
 router.get("/motion/bbox", (_req: Request, res: Response) => {
   try {
     return res.json(getBoundingBox());
-  } catch (error) {
+  } catch (_error) {
     return sendError(res, 500, "Errore lettura bounding box");
   }
 });
@@ -166,8 +166,8 @@ router.put("/motion/bbox", async (req: Request, res: Response) => {
     if (typeof enabled === "boolean") patch.enabled = enabled;
     await setBoundingBox(patch);
     return res.json(getBoundingBox());
-  } catch (error) {
-    console.error("[MOTION] bbox update error:", error);
+  } catch (_error) {
+    console.error("[MOTION] bbox update error:", _error);
     return sendError(res, 500, "Errore aggiornamento bounding box");
   }
 });

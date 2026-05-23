@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Modal, ScrollView, Pressable, StyleSheet } from "react-native";
+import { View, Text, Modal, ScrollView, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { EdgeInsets } from "react-native-safe-area-context";

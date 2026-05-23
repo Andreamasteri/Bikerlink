@@ -10,7 +10,6 @@ import {
   Image,
   Modal,
   Pressable,
-  TextInput,
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";

@@ -8,7 +8,7 @@ interface AiFallbackBannerProps {
 }
 
 export const AiFallbackBanner: React.FC<AiFallbackBannerProps> = ({ onDismiss }) => {
-  const colors = useColors();
+  const _colors = useColors();
   
   return (
     <View style={styles.aiFallbackBanner}>

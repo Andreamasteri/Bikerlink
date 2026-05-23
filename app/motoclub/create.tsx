@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
 
   Alert,
-  FlatList,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -17,7 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
-import { getApiUrl, apiRequest } from "@/lib/query-client";
+import { getApiUrl } from "@/lib/query-client";
 import LeafletPickerMap from "@/components/LeafletPickerMap";
 import { t } from "@/lib/i18n";
 

@@ -6,7 +6,6 @@ import { sendStartupBeacon } from "@/lib/startup-beacon";
 import {
   queryClient,
   apiRequest,
-  getQueryFn,
   getApiUrl,
   setSessionToken,
   clearSessionToken,

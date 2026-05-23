@@ -8,7 +8,6 @@ import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 import { initUptimeTracking, startMetroMonitor, stopMetroMonitor } from "./uptime";
 import { matchEnrichmentSemaphore, MATCH_ENRICHMENT_GLOBAL_LIMIT } from "./lib/concurrency";
-import { storage } from "./storage";
 import { runMigrations } from "./migrate";
 import { setupMiddleware, setupStaticRoutes } from "./middleware";
 import { registerAllRoutes } from "./route-mounter";

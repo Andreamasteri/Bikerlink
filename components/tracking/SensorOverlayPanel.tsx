@@ -1,7 +1,6 @@
 import React from "react";
 import { View, Text } from "react-native";
 import { MountAxisCalibration } from "@/components/MountCalibWizard";
-import { useColors } from "@/hooks/useColors";
 
 interface SensorOverlayPanelProps {
   currentG: number;
@@ -27,7 +26,7 @@ export function SensorOverlayPanel({
   currentTiltDeg,
   maxAccelG,
   mountAxisCalib,
-  sensorsEnabled,
+  sensorsEnabled: _sensorsEnabled,
   colors,
   styles: s,
   t,

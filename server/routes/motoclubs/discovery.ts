@@ -1,8 +1,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
-import { storage } from "../../storage";
-import { motoClubs, motoClubMembers, users, userMotorcycles, routes } from "@shared/db";
+import { motoClubs, motoClubMembers, users, routes } from "@shared/db";
 import { eq, and, desc, sql, or, ilike } from "drizzle-orm";
 import { systemAccountConditions } from "../../lib/system-account-filter";
 import { allLimited } from "../../lib/concurrency";
@@ -16,7 +15,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const { type, search, country, region, language } = req.query as Record<string, string>;
 
-    let query = db.select({
+    const _query = db.select({
       club: motoClubs,
       memberCount: sql<number>`(select count(*) from moto_club_members m where m.club_id = moto_clubs.id and m.status = 'active')::int`,
     }).from(motoClubs).where(eq(motoClubs.isApproved, true));
@@ -72,8 +71,8 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     }
 
     return res.json(result);
-  } catch (e) {
-    console.error("[GET /motoclubs]", e);
+  } catch (_e) {
+    console.error("[GET /motoclubs]", _e);
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -90,7 +89,7 @@ router.get("/featured", requireAuth, async (_req: Request, res: Response) => {
       .limit(1);
 
     return res.json(club ? { ...club.club, memberCount: club.memberCount } : null);
-  } catch (e) {
+  } catch (_e) {
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -163,8 +162,8 @@ router.get("/map", requireAuth, async (req: Request, res: Response) => {
     }
 
     return res.json(result);
-  } catch (e) {
-    console.error("[GET /motoclubs/map]", e);
+  } catch (_e) {
+    console.error("[GET /motoclubs/map]", _e);
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -192,7 +191,7 @@ router.get("/:id/stats", requireAuth, async (req: Request, res: Response) => {
       totalRides: stats[0]?.totalRides ?? 0,
       memberCount: members.length,
     });
-  } catch (e) {
+  } catch (_e) {
     return sendError(res, 500, "Errore interno");
   }
 });
@@ -216,8 +215,8 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     }).from(motoClubs).where(and(eq(motoClubs.id, clubId as string), eq(motoClubs.isApproved, true))).limit(1);
     if (!club) return sendError(res, 404, "Club non trovato");
     return res.json(club);
-  } catch (e) {
-    console.error("Public club error:", e);
+  } catch (_e) {
+    console.error("Public club error:", _e);
     return sendError(res, 500, "Errore interno");
   }
 });

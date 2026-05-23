@@ -1,6 +1,4 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { StyleSheet } from "react-native";
 import Colors from "@/constants/colors";
 
 export const TABLE_LANGS = [

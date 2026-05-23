@@ -4,8 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
-  ActivityIndicator,
   Modal,
   Pressable,
 } from "react-native";
@@ -690,7 +688,7 @@ export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onRej
   );
 }
 
-export function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress, onRemove, isPending, t, locale }: {
+export function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress: _onChatPress, onRemove, isPending, t, locale }: {
   match: any;
   currentUserId: string;
   onAccept: () => void;

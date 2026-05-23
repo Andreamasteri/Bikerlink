@@ -1,5 +1,5 @@
 import React from "react";
-import { View, ActivityIndicator, Text, Pressable, StyleSheet } from "react-native";
+import { View, ActivityIndicator, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import InteractiveMap, { type InteractiveMapHandle } from "@/components/InteractiveMap";

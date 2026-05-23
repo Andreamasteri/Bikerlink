@@ -1,25 +1,15 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import {
-  View,
   Text,
-  StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
-import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
-import { StepCard, StepStatus } from "@/components/admin/traduzioni/StepCard";
-import { LangCheckbox } from "@/components/admin/traduzioni/LangCheckbox";
-import { TranslationFilters } from "@/components/admin/traduzioni/TranslationFilters";
-import { TranslationTable } from "@/components/admin/traduzioni/TranslationTable";
+import { StepStatus } from "@/components/admin/traduzioni/StepCard";
 import { CellState } from "@/components/admin/traduzioni/TranslationRow";
 
 import { AiSection } from "@/components/admin/traduzioni/AiSection";
@@ -31,7 +21,7 @@ import { RestartSection } from "@/components/admin/traduzioni/RestartSection";
 import { LiveTableSection } from "@/components/admin/traduzioni/LiveTableSection";
 import { traduzioniStyles as styles } from "@/components/admin/traduzioni/styles";
 
-const LANGS = [
+const _LANGS = [
   { code: "en", label: "EN — Inglese" },
   { code: "de", label: "DE — Tedesco" },
   { code: "es", label: "ES — Spagnolo" },
@@ -366,7 +356,7 @@ export default function TraduzioniScreen() {
     );
   }
 
-  async function handleWebFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+  async function _handleWebFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setImportFileName(file.name);

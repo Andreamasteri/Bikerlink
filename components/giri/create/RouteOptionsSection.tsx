@@ -4,7 +4,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { useColors } from "@/hooks/useColors";
 
-type CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
+type _CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
 
 interface RouteOptionsSectionProps {
   isRoundTrip: boolean;

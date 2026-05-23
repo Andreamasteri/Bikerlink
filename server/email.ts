@@ -5,8 +5,7 @@ import {
   createTransporter,
   classifyEmailError,
   recordEmailSendStatus,
-  getEmailDiagnostics,
-  maskEmail
+  getEmailDiagnostics
 } from "./email/templates";
 
 export { EmailErrorCode, EmailSendResult, EmailDiagnostics };

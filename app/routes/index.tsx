@@ -58,7 +58,7 @@ function visibilityIcon(v: Visibility): React.ComponentProps<typeof Ionicons>["n
 export default function RoutesListScreen() {
   const t = useT();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user: _user } = useAuth();
   const insets = useSafeAreaInsets();
   const [togglingId, setTogglingId] = useState<string | null>(null);
 

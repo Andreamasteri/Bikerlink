@@ -61,7 +61,7 @@ export default function FullscreenMapModal({
   showHazardReportButton = false,
   getUserTypeLabel,
 }: Props) {
-  const t = useT();
+  const _t = useT();
 
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose}>

@@ -4,7 +4,7 @@ import { haversineDistance } from "../geo";
 import { routes, routePoints, users } from "@shared/db";
 import { and, avg, eq, isNotNull } from "drizzle-orm";
 import { sendMatchPushNotifications } from "../push-notifications";
-import { loadMatchPreferencesMap, bothPrefsEnabled, prefEnabled } from "./filters";
+import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
 import { routeProfileOf } from "./scoring";
 
 export async function runDistanceMatching(): Promise<number> {

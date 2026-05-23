@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { Animated } from "react-native";
-import * as Location from "expo-location";
 
 export function useBackgroundTask() {
   const bgTrackingActiveRef = useRef(false);

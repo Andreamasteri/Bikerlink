@@ -2,6 +2,7 @@ const { defineConfig } = require('eslint/config');
 const tsParser = require('@typescript-eslint/parser');
 const tsPlugin = require('@typescript-eslint/eslint-plugin');
 const reactHooksPlugin = require('eslint-plugin-react-hooks');
+const unusedImportsPlugin = require('eslint-plugin-unused-imports');
 
 module.exports = defineConfig([
   {
@@ -39,15 +40,21 @@ module.exports = defineConfig([
     plugins: {
       "@typescript-eslint": tsPlugin,
       "react-hooks": reactHooksPlugin,
+      "unused-imports": unusedImportsPlugin,
     },
     rules: {
       // ── variabili inutilizzate ──────────────────────────────
       "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": [
+      "@typescript-eslint/no-unused-vars": "off",
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
         "warn",
         {
-          argsIgnorePattern: "^_",
+          vars: "all",
           varsIgnorePattern: "^_",
+          args: "after-used",
+          argsIgnorePattern: "^_",
+          caughtErrors: "all",
           caughtErrorsIgnorePattern: "^_",
         },
       ],
@@ -83,14 +90,20 @@ module.exports = defineConfig([
     },
     plugins: {
       "@typescript-eslint": tsPlugin,
+      "unused-imports": unusedImportsPlugin,
     },
     rules: {
       "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": [
+      "@typescript-eslint/no-unused-vars": "off",
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
         "warn",
         {
-          argsIgnorePattern: "^_",
+          vars: "all",
           varsIgnorePattern: "^_",
+          args: "after-used",
+          argsIgnorePattern: "^_",
+          caughtErrors: "all",
           caughtErrorsIgnorePattern: "^_",
         },
       ],

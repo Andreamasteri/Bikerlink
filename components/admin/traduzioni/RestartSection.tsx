@@ -15,7 +15,7 @@ export function RestartSection({
   restartStatus,
   restartResult,
   onRestart,
-  t,
+  t: _t,
 }: RestartSectionProps) {
   return (
     <View style={styles.card}>

@@ -1,7 +1,6 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { haversineKm } from "../geo";
-import { isSystemAccount } from "../lib/system-account-filter";
 import profileRouter from "./users/profile";
 import discoveryRouter from "./users/discovery";
 import actionsRouter from "./users/actions";

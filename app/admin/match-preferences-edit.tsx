@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ import {
 export default function AdminMatchPreferencesEditScreen() {
   const { userId, nickname } = useLocalSearchParams<{ userId: string; nickname?: string }>();
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const _router = useRouter();
   const queryClient = useQueryClient();
 
   const queryKey = ["/api/admin/users", userId, "match-preferences"];

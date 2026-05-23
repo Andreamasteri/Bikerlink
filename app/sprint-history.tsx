@@ -19,7 +19,7 @@ import { useUnits } from "@/lib/units-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
 
-function formatSprintTime(ms: number): string {
+function _formatSprintTime(ms: number): string {
   return (ms / 1000).toFixed(3) + "s";
 }
 

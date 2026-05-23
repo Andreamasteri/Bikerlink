@@ -1,7 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { updateLocationSchema } from "@shared/validators";
-import { onlineTracker } from "../../online-tracker";
 import { applyFakeZones, applyPositionFuzz, fuzzedCoordsForViewer, isPositionFuzzed } from "../users";
 import { triggerProposalProfileMatchingForZavorrina } from "../../matching-engine";
 

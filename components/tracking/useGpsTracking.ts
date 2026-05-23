@@ -1,6 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from "react";
-import * as Location from "expo-location";
-import { logGpsError } from "@/lib/gps-logger";
+import { useState, useRef } from "react";
 
 export interface GpsPoint {
   latitude: number;

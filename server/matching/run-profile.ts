@@ -5,7 +5,6 @@ import {
   users,
   userProfiles,
   proposals,
-  proposalProfileMatches,
   type Proposal,
 } from "@shared/db";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";

@@ -9,7 +9,6 @@ import {
   RefreshControl,
   Platform,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -105,7 +104,7 @@ function ProposalCard({ item, onPress, t, locale }: { item: ProposalItem; onPres
       })
     : null;
 
-  const creatorColor =
+  const _creatorColor =
     item.creatorUserType === "biker" ? Colors.maleIcon
     : item.creatorUserType === "zavorrina" ? Colors.femaleIcon
     : Colors.accent;
@@ -196,13 +195,13 @@ const HUB_SECTIONS = [
 
 export default function ProposalsScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const _insets = useSafeAreaInsets();
+  const { user: _user } = useAuth();
   const t = useT();
   const locale = useLocale();
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeHub, setActiveHub] = useState<"proposte" | "giri" | "percorsi" | "pianificati">("proposte");
-  const [mountCalib, setMountCalib] = useState<MountAxisCalibration | null>(null);
+  const [_mountCalib, setMountCalib] = useState<MountAxisCalibration | null>(null);
   const [showMountCalibWizard, setShowMountCalibWizard] = useState(false);
 
   useEffect(() => {

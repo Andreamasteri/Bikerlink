@@ -5,7 +5,7 @@ import Colors from "@/constants/colors";
 import { FakeZoneCoordPanel, MapTarget } from "./FakeZoneCoordPanel";
 
 export function PrivacyPositionSettings({
-  t,
+  t: _t,
   colors,
   privacyExpanded,
   setPrivacyExpanded,

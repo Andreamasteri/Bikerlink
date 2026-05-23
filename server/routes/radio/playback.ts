@@ -74,7 +74,7 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
         if (finalResponse.status >= 300 && finalResponse.status < 400) {
           return res.status(400).json({ error: "Too many redirects" });
         }
-      } catch (err2) {
+      } catch (_err2) {
         clearTimeout(timer2);
         if (!res.headersSent) {
           return res.status(502).json({ error: "Cannot connect to redirected stream" });
