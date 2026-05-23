@@ -18,6 +18,7 @@ import multer from "multer";
 import { pool } from "./db";
 import { storage } from "./storage";
 import { getTrustedClientIp } from "./lib/abuse-rate-limit";
+import internalRouter from "./routes/_internal";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
 import motorcycleRoutes from "./routes/motorcycles";
@@ -73,6 +74,10 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.set("trust proxy", 1);
+
+  // Internal tool routes — token auth only, no session, mounted before the Bearer bridge.
+  app.use("/api/_internal", internalRouter);
+
   const PgStore = connectPgSimple(session);
   const SESSION_MAX_AGE_MS = 365 * 24 * 60 * 60 * 1000; // 1 anno
 
