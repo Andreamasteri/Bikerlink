@@ -38,6 +38,8 @@ BikerLink is a React Native (Expo SDK 55) mobile application designed to connect
 ## User Preferences
 I prefer detailed explanations and iterative development. Ask before making major changes. Do not make changes to folder `node_modules`. Do not make changes to file `package-lock.json`.
 
+**Debug errori strani — Prima azione obbligatoria**: svuotare la cache e riavviare (Metro cache, workflow, ecc.) PRIMA di qualsiasi altra analisi o modifica al codice.
+
 ## Protocollo Gestione Errori
 
 Quando il Build agent incontra un errore (compilazione, runtime, typecheck, test, API, crash) o un warning bloccante o un fallimento silenzioso (es. migrazione saltata senza eccezione), deve fermarsi e produrre obbligatoriamente una **scheda strutturata**:
