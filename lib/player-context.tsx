@@ -88,6 +88,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const sleepTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const radioTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadGenRef = useRef(0);
+  const loadAndPlayRef = useRef<((track: PlayerTrack, trackIndex: number) => Promise<void>) | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -151,7 +152,7 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       playerRef.current?.remove();
       playerRef.current = null;
     };
-  }, []);
+  }, [isPlayingRef]);
 
   useEffect(() => {
     if (sleepTimerRef.current) clearTimeout(sleepTimerRef.current);
@@ -233,12 +234,12 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
         }
       } else if (mode === "queue" || isShuffledRef.current || idx < q.length - 1) {
         const nextIdx = getNextIndex(q, idx);
-        loadAndPlay(q[nextIdx], nextIdx);
+        loadAndPlayRef.current?.(q[nextIdx], nextIdx);
       } else {
         setIsPlaying(false);
       }
     }
-  }, [getNextIndex, repeatModeRef, queueRef, queueIndexRef, isShuffledRef]);
+  }, [getNextIndex, repeatModeRef, queueRef, queueIndexRef, isShuffledRef, isPlayingRef]);
 
   const destroyPlayer = useCallback(() => {
     if (radioTimeoutRef.current) {
@@ -334,6 +335,10 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
       Alert.alert("Riproduzione non riuscita", msg);
     }
   }, [onPlaybackStatus, destroyPlayer]);
+
+  useEffect(() => {
+    loadAndPlayRef.current = loadAndPlay;
+  }, [loadAndPlay]);
 
   const play = useCallback(() => {
     userPausedRef.current = false;
