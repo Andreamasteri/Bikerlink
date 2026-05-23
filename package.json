@@ -41,6 +41,8 @@
     "@types/nodemailer": "^8.0.0",
     "@types/sharp": "^0.31.1",
     "@types/supertest": "^7.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.59.4",
+    "@typescript-eslint/parser": "^8.59.4",
     "@xmldom/xmldom": "^0.9.10",
     "ai": "^6.0.190",
     "archiver": "^8.0.0",

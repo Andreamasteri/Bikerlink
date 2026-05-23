@@ -58,6 +58,10 @@ function makeState(
     headingRad: 0,
     offsetLat: 0,
     offsetLng: 0,
+    transitionPhase: null,
+    transitionCyclesLeft: 0,
+    transitionTotalCycles: 0,
+    rampStartSpeedKph: 0,
     ...overrides,
   };
 }

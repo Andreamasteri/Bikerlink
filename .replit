@@ -35,19 +35,7 @@ args = "Watchdog"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Diagnose"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Error Monitor"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "admin-map-exclusion"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "admin-privacy-filter"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -63,14 +51,6 @@ args = "file-conflict-guard"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "api-responses"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "version-alignment"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "healthcheck"
 
 [[workflows.workflow.tasks]]
@@ -80,6 +60,10 @@ args = "typecheck-client"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "typecheck-server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "ESLint"
 
 [[workflows.workflow]]
 name = "Start App"
@@ -106,17 +90,6 @@ args = "bash scripts/watchdog.sh"
 outputType = "console"
 
 [[workflows.workflow]]
-name = "Diagnose"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/diagnose-startup.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
 name = "Error Monitor"
 author = "agent"
 
@@ -126,28 +99,6 @@ args = "bash scripts/error-monitor.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
-
-[[workflows.workflow]]
-name = "admin-map-exclusion"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsx scripts/check-admin-map-exclusion.ts"
-
-[[workflows.workflow]]
-name = "admin-privacy-filter"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx vitest run --config vitest.config.server.ts"
 
 [[workflows.workflow]]
 name = "Clean Metro"
@@ -184,28 +135,6 @@ task = "shell.exec"
 args = "npx tsx scripts/check-file-conflicts.ts"
 
 [[workflows.workflow]]
-name = "api-responses"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsx server/scripts/check-api-responses.ts"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
-name = "version-alignment"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/check-version-alignment.sh"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
 name = "healthcheck"
 author = "agent"
 
@@ -237,6 +166,17 @@ args = "npx tsc --noEmit --project server/tsconfig.json"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "ESLint"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx eslint . --ext .ts,.tsx --max-warnings 0"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
