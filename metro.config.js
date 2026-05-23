@@ -53,7 +53,7 @@ config.resolver.blockList = [
   /.*\.sh$/,
 ];
 
-config.resolver.platforms = ["ios", "android", "web"];
+config.resolver.platforms = ["ios", "android"];
 
 // =============================================================================
 // OTA-4 POST-MORTEM — "TypeError: undefined is not a function" in handleLogin
@@ -113,29 +113,12 @@ const SERVER_ONLY_PACKAGES = [
   "@replit/object-storage",
 ];
 
-const WEB_UNRESOLVABLE_PATTERNS = [
-  "react-native-reanimated/scripts/validate-worklets-version",
-  "react-native-reanimated/src/reanimated2/js-reanimated/JSReanimated",
-];
-
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (platform === "ios" || platform === "android") {
     const isServerOnly = SERVER_ONLY_PACKAGES.some(
       (pkg) => moduleName === pkg || moduleName.startsWith(pkg + "/")
     );
     if (isServerOnly) {
-      return {
-        filePath: path.join(__dirname, "mocks/empty.js"),
-        type: "sourceFile",
-      };
-    }
-  }
-
-  if (platform === "web") {
-    const isWebUnresolvable = WEB_UNRESOLVABLE_PATTERNS.some(
-      (pattern) => moduleName === pattern || moduleName.startsWith(pattern + "/")
-    );
-    if (isWebUnresolvable) {
       return {
         filePath: path.join(__dirname, "mocks/empty.js"),
         type: "sourceFile",

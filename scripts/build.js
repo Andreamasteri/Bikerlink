@@ -566,86 +566,8 @@ async function main() {
     metroProcess = null;
   }
 
-  console.log("Building web export...");
-  try {
-    await buildWebExport(domain);
-    console.log("Web export complete!");
-  } catch (err) {
-    console.error("Web export failed (non-fatal):", err.message);
-  }
-
-  // Crea static-build/index.html come marker di production e SPA fallback.
-  // Il server controlla questo file per sapere se è in production mode e
-  // per servire il SPA fallback su rotte sconosciute.
-  const webIndexSrc = path.join("static-build", "web", "index.html");
-  const staticIndexDest = path.join("static-build", "index.html");
-  try {
-    if (fs.existsSync(webIndexSrc)) {
-      fs.copyFileSync(webIndexSrc, staticIndexDest);
-      console.log("static-build/index.html creato (da web export)");
-    } else {
-      // Fallback: minimal marker file (il server genera comunque la landing page dinamicamente)
-      fs.writeFileSync(
-        staticIndexDest,
-        "<!DOCTYPE html><html lang=\"it\"><head><meta charset=\"utf-8\"><title>BikerLink</title><meta http-equiv=\"refresh\" content=\"0;url=/\"></head><body></body></html>"
-      );
-      console.log("static-build/index.html creato (marker fallback)");
-    }
-  } catch (err) {
-    console.error("Errore creazione static-build/index.html (non-fatal):", err.message);
-  }
-
   console.log("Full build complete!");
   process.exit(0);
-}
-
-function buildWebExport(domain) {
-  return new Promise((resolve, reject) => {
-    const env = {
-      ...process.env,
-      EXPO_PUBLIC_DOMAIN: domain,
-      EXPO_NO_INSPECTOR_PROXY: "1",
-      REACT_NATIVE_DEVTOOLS_DISABLE: "1",
-    };
-    const child = spawn("npx", ["expo", "export", "--platform", "web", "--output-dir", "static-build/web"], {
-      stdio: ["ignore", "pipe", "pipe"],
-      env,
-    });
-
-    let stderr = "";
-    if (child.stdout) {
-      child.stdout.on("data", (data) => {
-        const output = data.toString().trim();
-        if (output) console.log(`[WebExport] ${output}`);
-      });
-    }
-    if (child.stderr) {
-      child.stderr.on("data", (data) => {
-        const output = data.toString().trim();
-        if (output) {
-          console.error(`[WebExport] ${output}`);
-          stderr += output + "\n";
-        }
-      });
-    }
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`expo export exited with code ${code}: ${stderr}`));
-      }
-    });
-
-    child.on("error", (err) => {
-      reject(err);
-    });
-
-    setTimeout(() => {
-      child.kill();
-      reject(new Error("Web export timed out after 120 seconds"));
-    }, 120000);
-  });
 }
 
 main().catch((error) => {

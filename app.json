@@ -54,12 +54,7 @@
       }
     },
     "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://replit.com/"
-        }
-      ],
+      "expo-router",
       [
         "expo-splash-screen",
         {
@@ -140,9 +135,6 @@
     },
     "runtimeVersion": "10.0.0",
     "extra": {
-      "router": {
-        "origin": "https://replit.com/"
-      },
       "eas": {
         "projectId": "a25192d7-72e5-46af-97d0-2d38ed9b78e3"
       }
