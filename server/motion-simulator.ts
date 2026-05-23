@@ -80,6 +80,19 @@ interface UserMotionState {
   /** Small positional offset within a convoy (~±0.001°) */
   offsetLat: number;
   offsetLng: number;
+  /**
+   * Ramp transition sub-state:
+   * - "ramp-out": rider is entering a rest stop, decelerating over several cycles
+   * - "ramp-in":  rider is leaving a rest stop, accelerating up to cruising speed
+   * - null: no active ramp
+   */
+  transitionPhase: "ramp-out" | "ramp-in" | null;
+  /** Cycles remaining in the current ramp */
+  transitionCyclesLeft: number;
+  /** Total cycles planned for the current ramp (used to compute fractional speed) */
+  transitionTotalCycles: number;
+  /** Speed at the moment ramp-out began — used as the 100% reference for the decline */
+  rampStartSpeedKph: number;
 }
 
 // ── Bounding Box ─────────────────────────────────────────────────────────────
@@ -235,14 +248,34 @@ function randSpeedForProfile(profile: SpeedProfile): number {
   return rand(cfg.minKph, cfg.maxKph);
 }
 
-/** Assign a fresh speed profile, heading, and speed to a user entering a new drive slot. */
-function assignFreshDriveParams(state: UserMotionState): void {
+/**
+ * Compute how many ramp cycles to use for a transition into `slot`.
+ * The ramp is capped so it cannot consume more than the slot's full duration.
+ */
+function rampCycles(slot: Slot): number {
+  const maxFromSlot = Math.floor(slot.durationMs / MOTION_CRON_INTERVAL_MS);
+  const desired = randInt(3, 5);
+  return Math.max(1, Math.min(desired, maxFromSlot));
+}
+
+/**
+ * Assign a fresh speed profile, heading, and speed to a user entering a new drive slot.
+ * Starts a ramp-in so the rider accelerates from rest up to cruising speed.
+ */
+function assignFreshDriveParams(state: UserMotionState, driveSlot: Slot): void {
   state.speedProfile = pickSpeedProfile();
   state.headingRad = randHeading();
   state.offsetLat = 0;
   state.offsetLng = 0;
-  state.currentSpeedKph = randSpeedForProfile(state.speedProfile);
+  // The ramp-in target is the full cruising speed; actual speed starts at 0
   state.targetSpeedKph  = randSpeedForProfile(state.speedProfile);
+  state.currentSpeedKph = 0;
+  // Begin ramp-in transition
+  const cycles = rampCycles(driveSlot);
+  state.transitionPhase      = "ramp-in";
+  state.transitionTotalCycles = cycles;
+  state.transitionCyclesLeft  = cycles;
+  state.rampStartSpeedKph    = 0;
 }
 
 /**
@@ -321,15 +354,15 @@ function formConvoysForNewSlot(newDriveUsers: UserMotionState[]): void {
  * heading is reflected so the user bounces back instead of escaping the box.
  * The returned `headingUsed` incorporates any reflection so fixed-heading
  * (highway) riders persist the corrected bearing on the next cycle.
+ *
+ * NOTE: the caller is responsible for updating state.currentSpeedKph
+ * (via stepSpeed or ramp logic) before invoking this function.
  */
 function applyDelta(
   lat: number,
   lng: number,
   state: UserMotionState,
 ): { lat: number; lng: number; headingUsed: number } {
-  // Advance speed smoothly before computing the displacement
-  stepSpeed(state);
-
   const cfg = SPEED_PROFILES[state.speedProfile];
   const intervalSeconds = MOTION_CRON_INTERVAL_MS / 1000;
 
@@ -417,6 +450,10 @@ async function loadFakeUsers(): Promise<void> {
       headingRad: randHeading(),
       offsetLat: 0,
       offsetLng: 0,
+      transitionPhase: null,
+      transitionCyclesLeft: 0,
+      transitionTotalCycles: 0,
+      rampStartSpeedKph: 0,
     });
   }
 
@@ -470,12 +507,21 @@ async function runCycleInner(): Promise<void> {
   for (const state of _userStates.values()) {
     const newIdx = resolveSlotIdx(state, nowMs);
     if (newIdx !== state.currentSlotIdx) {
+      const prevSlot = state.schedule[state.currentSlotIdx];
       state.currentSlotIdx = newIdx;
       const newSlot = state.schedule[newIdx];
+
       if (newSlot.kind === "drive") {
-        // Entering a new drive slot — assign fresh speed profile and heading
-        assignFreshDriveParams(state);
+        // Entering a new drive slot — assign fresh speed/heading and start ramp-in
+        assignFreshDriveParams(state, newSlot);
         newDriveUsers.push(state);
+      } else if (newSlot.kind === "rest" && prevSlot?.kind === "drive") {
+        // Leaving a drive slot → entering rest: start deceleration ramp-out
+        const cycles = rampCycles(newSlot);
+        state.transitionPhase       = "ramp-out";
+        state.transitionTotalCycles  = cycles;
+        state.transitionCyclesLeft   = cycles;
+        state.rampStartSpeedKph     = state.currentSpeedKph;
       }
     }
   }
@@ -485,13 +531,49 @@ async function runCycleInner(): Promise<void> {
     formConvoysForNewSlot(newDriveUsers);
   }
 
-  // Step 3: compute and apply physics-based deltas for all currently-in-drive users
+  // Step 3: compute and apply physics-based deltas for moving users.
+  //
+  // A user moves if they are:
+  //   a) in a drive slot (normal cruise or ramp-in acceleration), or
+  //   b) in a rest slot but still in ramp-out (decelerating to a stop).
   const movingIds: string[] = [];
   const updates: Array<{ userId: string; lat: number; lng: number }> = [];
 
   for (const state of _userStates.values()) {
     const slot = state.schedule[state.currentSlotIdx];
-    if (!slot || slot.kind !== "drive") continue;
+    if (!slot) continue;
+
+    if (slot.kind === "drive") {
+      if (state.transitionPhase === "ramp-in") {
+        // Accelerate linearly from 0 to targetSpeedKph over transitionTotalCycles
+        const cyclesDone = state.transitionTotalCycles - state.transitionCyclesLeft + 1;
+        state.currentSpeedKph = state.targetSpeedKph * (cyclesDone / state.transitionTotalCycles);
+        state.transitionCyclesLeft--;
+        if (state.transitionCyclesLeft <= 0) {
+          state.transitionPhase = null;
+          state.currentSpeedKph = state.targetSpeedKph;
+        }
+      } else {
+        // Normal cruise: smooth speed variation within the profile
+        stepSpeed(state);
+      }
+    } else if (slot.kind === "rest") {
+      if (state.transitionPhase === "ramp-out") {
+        // Decelerate linearly from rampStartSpeedKph to 0 over transitionTotalCycles
+        state.currentSpeedKph =
+          state.rampStartSpeedKph * (state.transitionCyclesLeft / state.transitionTotalCycles);
+        state.transitionCyclesLeft--;
+        if (state.transitionCyclesLeft <= 0) {
+          state.transitionPhase = null;
+          state.currentSpeedKph = 0;
+        }
+      } else {
+        // Fully at rest — no movement
+        continue;
+      }
+    } else {
+      continue;
+    }
 
     const effectiveLat = state.lat + state.offsetLat;
     const effectiveLng = state.lng + state.offsetLng;
