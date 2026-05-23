@@ -1652,7 +1652,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-23T03:36:18.506Z"
+  },
+  {
+    "updateNumber": 15,
+    "version": "48.15.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-15 rv10.0.0: Pin segnalazioni interattivi con commenti utenti (#2115)",
+    "note": "CURRENT_OTA_NUMBER=15. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "a6725a42-2a77-46d8-8ed5-0652f834747e",
+    "bundleUrl": "private/ota/ota-48.15.10-1779539621740.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "1c4df7536cce66ac742712ee846327f4dc494c5c",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-23T12:33:46.766Z"
   }
 ]
