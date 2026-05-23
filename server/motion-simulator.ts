@@ -129,6 +129,7 @@ export async function setBoundingBox(patch: Partial<BoundingBox>): Promise<void>
 let _enabled = false;
 let _timer: ReturnType<typeof setInterval> | null = null;
 let _userStates = new Map<string, UserMotionState>();
+let _nicknames = new Map<string, string>();
 let _lastCycleAt: Date | null = null;
 let _totalCycles = 0;
 
@@ -412,6 +413,7 @@ async function loadFakeUsers(): Promise<void> {
   const rows = await db
     .select({
       id: users.id,
+      nickname: users.nickname,
       lat: userProfiles.latitude,
       lng: userProfiles.longitude,
     })
@@ -431,8 +433,10 @@ async function loadFakeUsers(): Promise<void> {
 
   const nowMs = Date.now();
   const newStates = new Map<string, UserMotionState>();
+  const newNicknames = new Map<string, string>();
 
   for (const row of rows) {
+    if (row.nickname) newNicknames.set(row.id, row.nickname);
     const lat = row.lat ?? rand(37, 47); // fallback: Italy bounding box
     const lng = row.lng ?? rand(7, 18);
     const schedule = generateSchedule();
@@ -460,6 +464,7 @@ async function loadFakeUsers(): Promise<void> {
   }
 
   _userStates = newStates;
+  _nicknames = newNicknames;
 
   // Resolve initial slot indices
   const nowMs2 = Date.now();
@@ -741,6 +746,7 @@ export function stopMotionSimulator(): void {
 
 export interface RiderPosition {
   userId: string;
+  nickname: string | null;
   lat: number;
   lng: number;
   isMoving: boolean;
@@ -757,6 +763,7 @@ export function getPositions(): RiderPosition[] {
     const isMoving = _enabled && !!slot && slot.kind === "drive";
     out.push({
       userId: state.userId,
+      nickname: _nicknames.get(state.userId) ?? null,
       lat: state.lat + state.offsetLat,
       lng: state.lng + state.offsetLng,
       isMoving,

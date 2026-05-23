@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 interface RiderPosition {
   userId: string;
+  nickname: string | null;
   lat: number;
   lng: number;
   isMoving: boolean;
@@ -70,7 +71,7 @@ const MAP_HTML = `<!DOCTYPE html>
       maxZoom: 19
     }).addTo(map);
 
-    /* markerMap: userId -> { circle, isMoving, speedProfile } */
+    /* markerMap: userId -> { circle, isMoving, speedProfile, nickname } */
     var markerMap = {};
 
     /* Speed-profile colour map */
@@ -112,12 +113,13 @@ const MAP_HTML = `<!DOCTYPE html>
         }).addTo(map);
 
         if (moving && p.currentSpeedKph != null) {
-          var label = profileLabel(p.speedProfile) + ' · ' + p.currentSpeedKph + ' km/h';
+          var nick = (p.nickname && p.nickname.trim()) ? p.nickname : null;
+          var label = (nick ? nick + ' · ' : '') + profileLabel(p.speedProfile) + ' · ' + p.currentSpeedKph + ' km/h';
           circle.bindTooltip(label, { permanent: false, direction: 'top' });
           circle.on('click', function() { this.openTooltip(); });
         }
 
-        markerMap[p.userId] = { circle: circle, isMoving: moving, speedProfile: p.speedProfile };
+        markerMap[p.userId] = { circle: circle, isMoving: moving, speedProfile: p.speedProfile, nickname: p.nickname || null };
       });
     }
 
@@ -146,7 +148,8 @@ const MAP_HTML = `<!DOCTYPE html>
             color: col.stroke,
             fillOpacity: 0.9
           });
-          var label = profileLabel(s.speedProfile) + ' · ' + s.currentSpeedKph + ' km/h';
+          var nick = (entry.nickname && entry.nickname.trim()) ? entry.nickname : null;
+          var label = (nick ? nick + ' · ' : '') + profileLabel(s.speedProfile) + ' · ' + s.currentSpeedKph + ' km/h';
           entry.circle.unbindTooltip();
           entry.circle.bindTooltip(label, { permanent: false, direction: 'top' });
           entry.circle.on('click', function() { this.openTooltip(); });
