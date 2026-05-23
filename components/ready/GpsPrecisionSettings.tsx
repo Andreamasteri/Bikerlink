@@ -21,13 +21,13 @@ export function GpsPrecisionSettings({
   privacyMutation: any;
 }) {
   return (
-    <View style={[styles.settingCard, { backgroundColor: colors.surface, marginTop: 80 }]}>
+    <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
       <Pressable style={styles.accordionHeader} onPress={() => setGpsPrecisionExpanded(v => !v)}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Ionicons name="navigate-outline" size={18} color={Colors.accent} />
           <View style={{ flex: 1, paddingRight: 8 }}>
             <Text style={styles.accordionTitle}>Precisione GPS Tracking</Text>
-            <Text style={styles.privacyRowDesc} numberOfLines={1}>
+            <Text style={styles.privacyRowDesc}>
               {gpsOptions.find((o) => o.key === gpsPrecision)?.label ?? gpsPrecision}
             </Text>
           </View>
@@ -83,7 +83,7 @@ export function GpsPrecisionSettings({
 const styles = StyleSheet.create({
   settingCard: {
     borderRadius: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 4,
   },
   accordionHeader: {
@@ -113,7 +113,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderRadius: 10,
-    padding: 12,
+    padding: 8,
   },
   gpsOptionLabel: {
     fontSize: 14,

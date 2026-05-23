@@ -78,7 +78,7 @@ export function PrivacyPositionSettings({
   openMapPicker: (target: MapTarget, lat?: number | null, lng?: number | null) => void;
 }) {
   return (
-    <View style={[styles.settingCard, { backgroundColor: colors.surface, marginTop: 50 }]}>
+    <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
       <Pressable style={styles.accordionHeader} onPress={() => setPrivacyExpanded((v) => !v)}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Ionicons name="shield-outline" size={18} color={Colors.accent} />

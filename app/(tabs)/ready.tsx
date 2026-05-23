@@ -188,53 +188,58 @@ export default function ReadyToRideScreen() {
             privacyMutation={privacyMutation as any}
           />
 
-          <PrivacyPositionSettings
-            t={t}
-            colors={colors}
-            privacyExpanded={privacyExpanded}
-            setPrivacyExpanded={setPrivacyExpanded}
-            positionFuzz={positionFuzz}
-            setPositionFuzz={setPositionFuzz}
-            positionFuzzKm={positionFuzzKm}
-            setPositionFuzzKm={setPositionFuzzKm}
-            fakeHomeEnabled={fakeHomeEnabled}
-            setFakeHomeEnabled={setFakeHomeEnabled}
-            homeLatitude={homeLatitude}
-            homeLongitude={homeLongitude}
-            fakeHomeLatitude={fakeHomeLatitude}
-            fakeHomeLongitude={fakeHomeLongitude}
-            fakeHomeRadius={fakeHomeRadius}
-            setFakeHomeRadius={setFakeHomeRadius}
-            fakeWorkEnabled={fakeWorkEnabled}
-            setFakeWorkEnabled={setFakeWorkEnabled}
-            workLatitude={workLatitude}
-            workLongitude={workLongitude}
-            fakeWorkLatitude={fakeWorkLatitude}
-            fakeWorkLongitude={fakeWorkLongitude}
-            fakeWorkRadius={fakeWorkRadius}
-            setFakeWorkRadius={setFakeWorkRadius}
-            fakeWhateverEnabled={fakeWhateverEnabled}
-            setFakeWhateverEnabled={setFakeWhateverEnabled}
-            whateverLatitude={whateverLatitude}
-            whateverLongitude={whateverLongitude}
-            fakeWhateverLatitude={fakeWhateverLatitude}
-            fakeWhateverLongitude={fakeWhateverLongitude}
-            fakeWhateverRadius={fakeWhateverRadius}
-            setFakeWhateverRadius={setFakeWhateverRadius}
-            privacyMutation={privacyMutation}
-            pickFromGPS={pickFromGPS}
-            openMapPicker={openMapPicker}
-          />
-
-          <GpsPrecisionSettings
-            colors={colors}
-            gpsPrecisionExpanded={gpsPrecisionExpanded}
-            setGpsPrecisionExpanded={setGpsPrecisionExpanded}
-            gpsOptions={gpsOptions}
-            gpsPrecision={gpsPrecision}
-            setGpsPrecision={setGpsPrecision}
-            privacyMutation={privacyMutation}
-          />
+          <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
+            <View style={{ flex: 1 }}>
+              <PrivacyPositionSettings
+                t={t}
+                colors={colors}
+                privacyExpanded={privacyExpanded}
+                setPrivacyExpanded={setPrivacyExpanded}
+                positionFuzz={positionFuzz}
+                setPositionFuzz={setPositionFuzz}
+                positionFuzzKm={positionFuzzKm}
+                setPositionFuzzKm={setPositionFuzzKm}
+                fakeHomeEnabled={fakeHomeEnabled}
+                setFakeHomeEnabled={setFakeHomeEnabled}
+                homeLatitude={homeLatitude}
+                homeLongitude={homeLongitude}
+                fakeHomeLatitude={fakeHomeLatitude}
+                fakeHomeLongitude={fakeHomeLongitude}
+                fakeHomeRadius={fakeHomeRadius}
+                setFakeHomeRadius={setFakeHomeRadius}
+                fakeWorkEnabled={fakeWorkEnabled}
+                setFakeWorkEnabled={setFakeWorkEnabled}
+                workLatitude={workLatitude}
+                workLongitude={workLongitude}
+                fakeWorkLatitude={fakeWorkLatitude}
+                fakeWorkLongitude={fakeWorkLongitude}
+                fakeWorkRadius={fakeWorkRadius}
+                setFakeWorkRadius={setFakeWorkRadius}
+                fakeWhateverEnabled={fakeWhateverEnabled}
+                setFakeWhateverEnabled={setFakeWhateverEnabled}
+                whateverLatitude={whateverLatitude}
+                whateverLongitude={whateverLongitude}
+                fakeWhateverLatitude={fakeWhateverLatitude}
+                fakeWhateverLongitude={fakeWhateverLongitude}
+                fakeWhateverRadius={fakeWhateverRadius}
+                setFakeWhateverRadius={setFakeWhateverRadius}
+                privacyMutation={privacyMutation}
+                pickFromGPS={pickFromGPS}
+                openMapPicker={openMapPicker}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <GpsPrecisionSettings
+                colors={colors}
+                gpsPrecisionExpanded={gpsPrecisionExpanded}
+                setGpsPrecisionExpanded={setGpsPrecisionExpanded}
+                gpsOptions={gpsOptions}
+                gpsPrecision={gpsPrecision}
+                setGpsPrecision={setGpsPrecision}
+                privacyMutation={privacyMutation}
+              />
+            </View>
+          </View>
         </View>
 
         {sosEnabled && (
