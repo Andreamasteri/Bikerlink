@@ -24,7 +24,7 @@ import GiriScreen from "@/app/(tabs)/giri";
 import {
   MountAxisCalibration,
   MountCalibWizard,
-  loadMountCalibration,
+  loadMountCalibration
 } from "@/components/MountCalibWizard";
 
 interface ProposalItem {
@@ -63,7 +63,7 @@ const SEARCH_TYPE_I18N: Record<string, string> = {
   find_a_guest: "proposals.searchType.findPassenger",
   hitcher: "Hitcher",
   hitchhiker: "HitchHiker",
-  find_a_biker: "FindABiker",
+  find_a_biker: "FindABiker"
 };
 
 function getTypeIcon(type: string): { name: keyof typeof Ionicons.glyphMap; color: string; dual?: boolean } {
@@ -100,7 +100,7 @@ function ProposalCard({ item, onPress, t, locale }: { item: ProposalItem; onPres
   const typeInfo = getTypeIcon(item.proposalType);
   const scheduledDate = item.scheduledAt
     ? new Date(item.scheduledAt).toLocaleDateString(locale, {
-        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
       })
     : null;
 
@@ -216,11 +216,11 @@ export default function ProposalsScreen() {
   const { data: proposals, isLoading, refetch, isRefetching } = useQuery<ProposalItem[]>({ queryKey });
 
   const { data: matches } = useQuery<any[]>({
-    queryKey: ["/api/proposals/matches"],
+    queryKey: ["/api/proposals/matches"]
   });
 
   const { data: propProfileMatches } = useQuery<any[]>({
-    queryKey: ["/api/proposals/proposal-profile-matches"],
+    queryKey: ["/api/proposals/proposal-profile-matches"]
   });
 
   const pendingMatchCount = (matches || []).filter((m: any) => m.status === "pending").length;
@@ -386,20 +386,20 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
-    minHeight: 48,
+    minHeight: 48
   },
   hubBtnActive: {
     borderColor: Colors.accent,
-    backgroundColor: Colors.accent + "18",
+    backgroundColor: Colors.accent + "18"
   },
   hubText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: Colors.textSecondary,
-    textAlign: "center",
+    textAlign: "center"
   },
   hubTextActive: {
-    color: Colors.accent,
+    color: Colors.accent
   },
   filterRow: { flexDirection: "row", flexWrap: "wrap", padding: 6, paddingHorizontal: 8, gap: 4 },
   filterBtn: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surface, paddingVertical: 6, paddingHorizontal: 10, borderRadius: 16, height: 32 },
@@ -440,8 +440,8 @@ const styles = StyleSheet.create({
     ...Platform.select({
       ios: { shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 4 },
       android: {},
-      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.3)" },
-    }),
+      web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.3)" }
+    })
   },
   matchBannerCard: {
     flexDirection: "row" as const,
@@ -452,12 +452,12 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: Colors.accent + "30",
+    borderColor: Colors.accent + "30"
   },
   matchBannerText: {
     flex: 1,
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.accent,
-  },
+    color: Colors.accent
+  }
 });

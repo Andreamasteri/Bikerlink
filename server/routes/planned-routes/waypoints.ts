@@ -342,8 +342,8 @@ router.post("/calculate", async (req: Request, res: Response) => {
     isRoundTrip,
     roundTripDirection,
     headingDeg,
-  language: _language,
-} = parsedCalc.data;
+    language: _language,
+  } = parsedCalc.data;
 
   const DIRECTION_DEGREES: Record<string, number> = {
     N: 0, NE: 45, E: 90, SE: 135, S: 180, SO: 225, O: 270, NO: 315,

@@ -5,7 +5,7 @@ import {
   RECURRING_TYPES,
   HAZARD_LABELS,
   HAZARD_ICONS,
-  createHazardSchema,
+  createHazardSchema
 } from "@shared/db";
 import { eq, and, isNull, or, gt, desc } from "drizzle-orm";
 import { requireUserId } from "../lib/auth-middleware";
@@ -113,16 +113,16 @@ router.get("/:id", async (req: Request, res: Response) => {
       text: r.text,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
-      nickname: r.nickname ?? "Utente",
+      nickname: r.nickname ?? "Utente"
     }));
 
     return sendSuccess(res, {
       hazard: {
         ...hazard,
         label: HAZARD_LABELS[hazard.type as keyof typeof HAZARD_LABELS] ?? hazard.type,
-        icon: HAZARD_ICONS[hazard.type as keyof typeof HAZARD_ICONS] ?? "⚠️",
+        icon: HAZARD_ICONS[hazard.type as keyof typeof HAZARD_ICONS] ?? "⚠️"
       },
-      comments,
+      comments
     });
   } catch (error) {
     console.error("[road-hazards] GET /:id error:", error);
@@ -195,7 +195,7 @@ router.post("/", async (req: Request, res: Response) => {
       lng,
       description,
       isApproved: !recurring,
-      expiresAt,
+      expiresAt
     }).returning();
 
     return res.status(201).json({ success: true, hazard });
@@ -249,7 +249,7 @@ router.post("/:id/confirm", async (req: Request, res: Response) => {
       .update(roadHazards)
       .set({
         confirmCount: newCount,
-        ...(shouldApprove ? { isApproved: true } : {}),
+        ...(shouldApprove ? { isApproved: true } : {})
       })
       .where(eq(roadHazards.id, hazardId));
 

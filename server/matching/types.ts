@@ -1,5 +1,5 @@
 import { 
-  matchPreferences 
+  type matchPreferences 
 } from "@shared/db";
 
 export type MatchPrefRow = typeof matchPreferences.$inferSelect;

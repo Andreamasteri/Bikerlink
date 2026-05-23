@@ -17,7 +17,7 @@ export async function createClubConversation(clubId: string, clubName: string) {
 
   const [conv] = await db.insert(conversations).values({
     conversationType: "motoclub",
-    title: `Club ${clubName}`,
+    title: `Club ${clubName}`
   }).returning();
 
   await db.update(motoClubs)
@@ -30,7 +30,7 @@ export async function createClubConversation(clubId: string, clubName: string) {
 export async function addMemberToConversation(conversationId: string, userId: string) {
   await db.insert(conversationParticipants).values({
     conversationId,
-    userId,
+    userId
   }).onConflictDoNothing();
 }
 
@@ -50,7 +50,7 @@ export async function notifyTopMembersOfNewJoin(clubId: string, newUserId: strin
     const convId = club[0].conversationId;
     const topSenders = await db.select({
       senderId: messages.senderId,
-      count: sql<number>`count(*)::int`,
+      count: sql<number>`count(*)::int`
     })
       .from(messages)
       .where(and(eq(messages.conversationId, convId), ne(messages.senderId, newUserId)))
@@ -67,7 +67,7 @@ export async function notifyTopMembersOfNewJoin(clubId: string, newUserId: strin
         body: `${nickname} è entrato nel tuo club`,
         notificationType: "motoclub_join",
         referenceType: "motoclub",
-        referenceId: clubId,
+        referenceId: clubId
       });
     }
 
@@ -75,7 +75,7 @@ export async function notifyTopMembersOfNewJoin(clubId: string, newUserId: strin
     sendMotoclubPushNotifications(topSenderIds, {
       title: `Nuovo membro in ${clubName}!`,
       body: `${nickname} è entrato nel tuo club`,
-      clubId,
+      clubId
     }).catch(() => {});
   } catch (e) {
     console.error("[notifyTopMembers error]", e);
@@ -143,12 +143,12 @@ export async function createRegionalClubInvite(userId: string, region: string): 
         body: `Sei stato invitato nel club "${regionalClub.name}"`,
         notificationType: "motoclub_invite",
         referenceType: "motoclub",
-        referenceId: regionalClub.id,
+        referenceId: regionalClub.id
       });
       sendMotoclubPushNotifications([userId], {
         title: "Invito al club regionale",
         body: `Sei stato invitato nel club "${regionalClub.name}"`,
-        clubId: regionalClub.id,
+        clubId: regionalClub.id
       }).catch(() => {});
       return;
     }
@@ -157,7 +157,7 @@ export async function createRegionalClubInvite(userId: string, region: string): 
       .values({ clubId: regionalClub.id, userId, status: "active" })
       .onConflictDoUpdate({
         target: [motoClubMembers.clubId, motoClubMembers.userId],
-        set: { status: "active", joinedAt: new Date(), updatedAt: new Date() },
+        set: { status: "active", joinedAt: new Date(), updatedAt: new Date() }
       });
 
     let convId = regionalClub.conversationId;
@@ -174,7 +174,7 @@ export async function createRegionalClubInvite(userId: string, region: string): 
       body: `Benvenuto nel club regionale "${regionalClub.name}" 🏍️`,
       notificationType: "motoclub_invite",
       referenceType: "motoclub",
-      referenceId: regionalClub.id,
+      referenceId: regionalClub.id
     });
   } catch (e) {
     console.error("[createRegionalClubInvite error]", e);
@@ -244,12 +244,12 @@ export async function createClubInvitesForMoto(userId: string, brand: string, _m
           body: `Sei stato invitato nel club "${club.name}"`,
           notificationType: "motoclub_invite",
           referenceType: "motoclub",
-          referenceId: club.id,
+          referenceId: club.id
         });
         sendMotoclubPushNotifications([userId], {
           title: "Invito al club",
           body: `Sei stato invitato nel club "${club.name}"`,
-          clubId: club.id,
+          clubId: club.id
         }).catch(() => {});
         continue;
       }
@@ -258,7 +258,7 @@ export async function createClubInvitesForMoto(userId: string, brand: string, _m
         .values({ clubId: club.id, userId, status: "active" })
         .onConflictDoUpdate({
           target: [motoClubMembers.clubId, motoClubMembers.userId],
-          set: { status: "active", joinedAt: new Date(), updatedAt: new Date() },
+          set: { status: "active", joinedAt: new Date(), updatedAt: new Date() }
         });
 
       let convId = club.conversationId;
@@ -275,7 +275,7 @@ export async function createClubInvitesForMoto(userId: string, brand: string, _m
         body: `Benvenuto nel club "${club.name}" — hai una ${brand} 🏍️`,
         notificationType: "motoclub_invite",
         referenceType: "motoclub",
-        referenceId: club.id,
+        referenceId: club.id
       });
     }
   } catch (e) {

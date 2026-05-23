@@ -75,7 +75,7 @@ const EMPTY_FORM: FormState = {
   isRecurring: false,
   recurrenceInfo: "",
   maxParticipants: "",
-  websiteUrl: "",
+  websiteUrl: ""
 };
 
 function toFormState(evt: EventDTO): FormState {
@@ -91,7 +91,7 @@ function toFormState(evt: EventDTO): FormState {
     isRecurring: evt.isRecurring,
     recurrenceInfo: evt.recurrenceInfo ?? "",
     maxParticipants: evt.maxParticipants ? String(evt.maxParticipants) : "",
-    websiteUrl: evt.websiteUrl ?? "",
+    websiteUrl: evt.websiteUrl ?? ""
   };
 }
 
@@ -116,7 +116,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
 
   const { data: clubsList = [] } = useQuery<ClubItem[]>({
     queryKey: ["/api/events/clubs-list"],
-    enabled: visible,
+    enabled: visible
   });
 
   React.useEffect(() => {
@@ -177,7 +177,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
         recurrenceInfo: form.isRecurring ? form.recurrenceInfo.trim() || undefined : undefined,
         maxParticipants: maxP && maxP > 0 ? maxP : undefined,
         websiteUrl: form.websiteUrl.trim() || undefined,
-        selectedClubIds: inviteClubsEnabled ? selectedClubIds : [],
+        selectedClubIds: inviteClubsEnabled ? selectedClubIds : []
       };
 
       let evt: EventDTO;
@@ -199,7 +199,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
           const imgRes = await fetch(`${getApiUrl()}/api/events/${evt.id}/images`, {
             method: "POST",
             body: formData,
-            credentials: "include",
+            credentials: "include"
           });
           if (!imgRes.ok) {
             console.warn("[EventForm] Upload immagine fallito:", imgRes.status);
@@ -221,7 +221,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
     },
     onError: (err: Error) => {
       Alert.alert("Errore", err.message || "Impossibile salvare l'evento");
-    },
+    }
   });
 
   const handleSubmit = () => {
@@ -374,7 +374,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.background
   },
   header: {
     flexDirection: "row",
@@ -384,15 +384,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.border,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.surface
   },
   closeBtn: {
-    padding: 4,
+    padding: 4
   },
   headerTitle: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 17,
-    color: Colors.text,
+    color: Colors.text
   },
   saveBtn: {
     backgroundColor: Colors.accent,
@@ -400,23 +400,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     minWidth: 70,
-    alignItems: "center",
+    alignItems: "center"
   },
   saveBtnDisabled: {
-    opacity: 0.6,
+    opacity: 0.6
   },
   saveBtnText: {
     fontFamily: "Inter_700Bold",
     fontSize: 14,
-    color: "#000",
+    color: "#000"
   },
   scroll: {
-    flex: 1,
+    flex: 1
   },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    gap: 4,
+    gap: 4
   },
   successScreen: {
     flex: 1,
@@ -424,31 +424,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 32,
-    gap: 16,
+    gap: 16
   },
   successTitle: {
     fontFamily: "Inter_700Bold",
     fontSize: 24,
     color: Colors.text,
-    textAlign: "center",
+    textAlign: "center"
   },
   successBody: {
     fontFamily: "Inter_400Regular",
     fontSize: 15,
     color: Colors.textSecondary,
     textAlign: "center",
-    lineHeight: 22,
+    lineHeight: 22
   },
   successBtn: {
     marginTop: 8,
     backgroundColor: Colors.accent,
     paddingHorizontal: 40,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 12
   },
   successBtnText: {
     fontFamily: "Inter_700Bold",
     fontSize: 16,
-    color: "#000",
-  },
+    color: "#000"
+  }
 });

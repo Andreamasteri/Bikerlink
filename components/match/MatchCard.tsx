@@ -4,6 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
+
   Modal,
   Pressable,
 } from "react-native";
@@ -29,7 +30,7 @@ export const SEARCH_TYPE_I18N: Record<string, string> = {
   find_a_guest: "proposals.searchType.findPassenger",
   hitcher: "Hitcher",
   hitchhiker: "HitchHiker",
-  find_a_biker: "FindABiker",
+  find_a_biker: "FindABiker"
 };
 
 const TARGET_TYPE_I18N: Record<string, string> = {
@@ -37,7 +38,7 @@ const TARGET_TYPE_I18N: Record<string, string> = {
   zavorrina: "proposal.targetZavorrina",
   hitchhiker: "proposal.targetHitchhiker",
   hitcher: "proposal.targetHotcher",
-  coppia: "userType.coppia",
+  coppia: "userType.coppia"
 };
 
 function getTargetLabel(types: string[] | null | undefined, t: (k: string) => string): string | null {
@@ -78,7 +79,7 @@ function CompatibilitySheet({
   onClose,
   label,
   explanation,
-  t,
+  t
 }: {
   visible: boolean;
   onClose: () => void;
@@ -126,7 +127,7 @@ const sheetStyles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "flex-end",
+    justifyContent: "flex-end"
   },
   sheet: {
     backgroundColor: Colors.surface,
@@ -135,17 +136,17 @@ const sheetStyles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 40,
     paddingTop: 12,
-    alignItems: "center",
+    alignItems: "center"
   },
   grabber: {
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: Colors.border,
-    marginBottom: 20,
+    marginBottom: 20
   },
   iconRow: {
-    marginBottom: 12,
+    marginBottom: 12
   },
   iconCircle: {
     width: 60,
@@ -153,14 +154,14 @@ const sheetStyles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: Colors.accent + "18",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
   },
   title: {
     fontSize: 20,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
     marginBottom: 14,
-    textAlign: "center",
+    textAlign: "center"
   },
   badgeRow: {
     flexDirection: "row",
@@ -170,12 +171,12 @@ const sheetStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
-    marginBottom: 16,
+    marginBottom: 16
   },
   badgeLabel: {
     fontSize: 14,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.accent,
+    color: Colors.accent
   },
   explanation: {
     fontSize: 15,
@@ -183,19 +184,19 @@ const sheetStyles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: "center",
     lineHeight: 22,
-    marginBottom: 24,
+    marginBottom: 24
   },
   closeBtn: {
     backgroundColor: Colors.accent,
     borderRadius: 12,
     paddingVertical: 12,
-    paddingHorizontal: 40,
+    paddingHorizontal: 40
   },
   closeBtnText: {
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.background,
-  },
+    color: Colors.background
+  }
 });
 
 function CompatibilityBadge({ myTargets, theirTargets, t }: {
@@ -252,14 +253,14 @@ const compatBadgeStyles = StyleSheet.create({
     paddingVertical: 4,
     backgroundColor: Colors.accent + "14",
     borderRadius: 8,
-    alignSelf: "flex-start",
+    alignSelf: "flex-start"
   },
   text: {
     fontSize: 12,
     fontFamily: "Inter_500Medium",
     color: Colors.accent,
-    flexShrink: 1,
-  },
+    flexShrink: 1
+  }
 });
 
 export const SUPERMATCH_COLOR = "#FF8C00";
@@ -271,11 +272,11 @@ const sharedStyles = StyleSheet.create({
     padding: 10,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: Colors.accent + "30",
+    borderColor: Colors.accent + "30"
   },
   matchCardAccepted: {
     borderColor: Colors.success + "50",
-    backgroundColor: Colors.success + "08",
+    backgroundColor: Colors.success + "08"
   },
   matchCardSupermatch: {
     backgroundColor: "#FF8C001F",
@@ -283,45 +284,45 @@ const sharedStyles = StyleSheet.create({
     borderWidth: 2,
     padding: 10,
     borderRadius: 12,
-    marginBottom: 8,
+    marginBottom: 8
   },
   matchCardDimmed: {
     opacity: 0.6,
-    borderColor: Colors.border,
+    borderColor: Colors.border
   },
   matchStatusRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 10
   },
   statusLabel: {
     fontSize: 17,
     fontFamily: "Inter_600SemiBold",
-    flex: 1,
+    flex: 1
   },
   matchDate: {
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
+    color: Colors.textSecondary
   },
   removeBtn: {
     marginLeft: 4,
-    padding: 2,
+    padding: 2
   },
   matchUserInfo: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 10
   },
   matchNickname: {
     fontSize: 20,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_700Bold"
   },
   matchUserType: {
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
+    color: Colors.textSecondary
   },
   chatBtn: {
     flexDirection: "row",
@@ -332,47 +333,47 @@ const sharedStyles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     marginTop: 4,
-    marginBottom: 8,
+    marginBottom: 8
   },
   chatBtnText: {
     color: Colors.background,
     fontSize: 16,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_700Bold"
   },
   matchProposals: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 8
   },
   proposalMini: {
     flex: 1,
     backgroundColor: Colors.background,
     borderRadius: 10,
-    padding: 10,
+    padding: 10
   },
   proposalMiniLabel: {
     fontSize: 14,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
-    marginBottom: 4,
+    marginBottom: 4
   },
   proposalMiniTitle: {
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
+    color: Colors.text
   },
   infoRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    marginTop: 4,
+    marginTop: 4
   },
   infoText: {
     flex: 1,
     fontSize: 16,
     fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
+    color: Colors.textSecondary
+  }
 });
 
 export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, onRemove, isPending, t, locale }: {
@@ -405,7 +406,7 @@ export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onCh
 
   const createdDate = match.createdAt
     ? new Date(match.createdAt).toLocaleDateString(locale, {
-        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
       })
     : null;
 
@@ -521,7 +522,7 @@ export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, 
 
   const createdDate = match.createdAt
     ? new Date(match.createdAt).toLocaleDateString(locale, {
-        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
       })
     : null;
 
@@ -611,7 +612,7 @@ export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onRej
 
   const createdDate = match.createdAt
     ? new Date(match.createdAt).toLocaleDateString(locale, {
-        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
       })
     : null;
 
@@ -718,13 +719,13 @@ export function MatchCardFull({ match, currentUserId, onAccept, onReject, onChat
 
   const scheduledDate = otherProposal?.scheduledAt
     ? new Date(otherProposal.scheduledAt).toLocaleDateString(locale, {
-        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
       })
     : null;
 
   const createdDate = match.createdAt
     ? new Date(match.createdAt).toLocaleDateString(locale, {
-        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
+        day: "numeric", month: "short", hour: "2-digit", minute: "2-digit"
       })
     : null;
 

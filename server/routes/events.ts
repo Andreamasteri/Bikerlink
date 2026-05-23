@@ -12,11 +12,12 @@ import {
   sql,
   count,
   gte,
+  lte,
   systemAccountConditions,
   requireAuth,
   isAdminOrModUser,
   enrichEvent,
-  type EventRow,
+  type EventRow
 } from "./events-helpers";
 import { sendNewEventNotificationEmail } from "../email";
 import path from "path";
@@ -134,7 +135,7 @@ router.get("/", async (req: Request, res: Response) => {
       approvedBy: events.approvedBy,
       approvedAt: events.approvedAt,
       createdAt: events.createdAt,
-      updatedAt: events.updatedAt,
+      updatedAt: events.updatedAt
     })
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
@@ -177,7 +178,7 @@ router.post("/", async (req: Request, res: Response) => {
     }
     const {
       title, description, eventType, latitude, longitude,
-      maxParticipants,
+      maxParticipants
     } = parsedEvent.data;
     const body = req.body as Record<string, unknown>;
     const selectedClubIds = Array.isArray(req.body?.selectedClubIds) ? req.body.selectedClubIds as string[] : [];
@@ -238,7 +239,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     return res.status(201).json({
       event: newEvent,
-      message: "Evento creato e pubblicato con successo!",
+      message: "Evento creato e pubblicato con successo!"
     });
   } catch (err) {
     console.error("[events] POST / error:", err);

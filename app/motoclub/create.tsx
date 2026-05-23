@@ -39,7 +39,7 @@ export default function CreateMotoclub() {
     latitude: 45.4642,
     longitude: 9.19,
     latitudeDelta: 5,
-    longitudeDelta: 5,
+    longitudeDelta: 5
   });
   const [pin, setPin] = useState<{ latitude: number; longitude: number } | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
@@ -57,12 +57,12 @@ export default function CreateMotoclub() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
 
   const { data: clubs = [] } = useQuery<Club[]>({
-    queryKey: ["/api/motoclubs"],
+    queryKey: ["/api/motoclubs"]
   });
 
   const { data: searchResults = [] } = useQuery<UserResult[]>({
     queryKey: [`/api/users/search?q=${encodeURIComponent(debouncedSearch)}`],
-    enabled: debouncedSearch.length >= 2,
+    enabled: debouncedSearch.length >= 2
   });
 
   const handleSearchChange = useCallback((text: string) => {
@@ -100,13 +100,13 @@ export default function CreateMotoclub() {
         latitude: pin?.latitude,
         longitude: pin?.longitude,
         inviteRadiusKm: useRadius ? parseInt(radiusKm, 10) : undefined,
-        inviteUserIds: useManual ? selectedUsers.map((u) => u.id) : undefined,
+        inviteUserIds: useManual ? selectedUsers.map((u) => u.id) : undefined
       };
       const res = await globalThis.fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: t("motoclub.createError") }));
@@ -115,7 +115,7 @@ export default function CreateMotoclub() {
       return res.json();
     },
     onSuccess: () => setSubmitted(true),
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", e.message)
   });
 
   const canNext = () => {
@@ -421,17 +421,17 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 16, paddingVertical: 12,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
+    borderBottomWidth: 1, borderBottomColor: Colors.border
   },
   backBtn: { width: 40, alignItems: "flex-start" },
   headerTitle: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.text },
   stepsRow: {
-    flexDirection: "row", alignItems: "center", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 4,
+    flexDirection: "row", alignItems: "center", paddingHorizontal: 24, paddingTop: 16, paddingBottom: 4
   },
   stepItem: { flex: 1, flexDirection: "row", alignItems: "center" },
   stepDot: {
     width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: Colors.border,
-    alignItems: "center", justifyContent: "center", backgroundColor: Colors.surface,
+    alignItems: "center", justifyContent: "center", backgroundColor: Colors.surface
   },
   stepDotActive: { borderColor: Colors.accent, backgroundColor: Colors.accent },
   stepNum: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textSecondary },
@@ -446,16 +446,16 @@ const styles = StyleSheet.create({
   textInput: {
     backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: Colors.border,
     paddingHorizontal: 14, paddingVertical: 12, color: Colors.text,
-    fontFamily: "Inter_400Regular", fontSize: 15,
+    fontFamily: "Inter_400Regular", fontSize: 15
   },
   radioRow: {
     flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
-    backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, marginBottom: 10,
+    backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, marginBottom: 10
   },
   radioRowSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "10" },
   radioCircle: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Colors.border,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center", justifyContent: "center"
   },
   radioCircleSelected: { borderColor: Colors.accent },
   radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.accent },
@@ -469,14 +469,14 @@ const styles = StyleSheet.create({
   map: { flex: 1, borderRadius: 12, overflow: "hidden", margin: 0, minHeight: 280 },
   mapWebFallback: {
     height: 180, backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
-    alignItems: "center", justifyContent: "center", padding: 16, gap: 10,
+    alignItems: "center", justifyContent: "center", padding: 16, gap: 10
   },
   mapWebText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary },
   coordRow: { flexDirection: "row", width: "100%" },
   locationBtn: {
     flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10,
     padding: 10, borderRadius: 8, borderWidth: 1, borderColor: Colors.accent + "60",
-    backgroundColor: Colors.accent + "10",
+    backgroundColor: Colors.accent + "10"
   },
   locationBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.accent },
   coordText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 8 },
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   checkRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 8 },
   checkbox: {
     width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.border,
-    alignItems: "center", justifyContent: "center",
+    alignItems: "center", justifyContent: "center"
   },
   checkboxChecked: { borderColor: Colors.accent, backgroundColor: Colors.accent },
   checkLabel: { fontFamily: "Inter_500Medium", fontSize: 15, color: Colors.text },
@@ -494,27 +494,27 @@ const styles = StyleSheet.create({
   radiusInput: {
     width: 64, borderWidth: 1, borderColor: Colors.accent, borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 6, textAlign: "center",
-    color: Colors.text, fontFamily: "Inter_600SemiBold", fontSize: 15, backgroundColor: Colors.surface,
+    color: Colors.text, fontFamily: "Inter_600SemiBold", fontSize: 15, backgroundColor: Colors.surface
   },
   searchDropdown: {
     backgroundColor: Colors.surface, borderRadius: 10, borderWidth: 1, borderColor: Colors.border,
-    marginTop: 4,
+    marginTop: 4
   },
   searchItem: {
     flexDirection: "row", alignItems: "center", gap: 10, padding: 10,
-    borderBottomWidth: 1, borderBottomColor: Colors.border,
+    borderBottomWidth: 1, borderBottomColor: Colors.border
   },
   searchItemText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text, flex: 1 },
   selectedUsersBox: {
     marginTop: 12, backgroundColor: Colors.surface, borderRadius: 10,
-    borderWidth: 1, borderColor: Colors.border, padding: 10,
+    borderWidth: 1, borderColor: Colors.border, padding: 10
   },
   selectedUsersTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
   selectedUserRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 4 },
   selectedUserName: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.text, flex: 1 },
   noInviteText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, fontStyle: "italic", marginTop: 10 },
   summaryCard: {
-    backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 12,
+    backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border, padding: 16, gap: 12
   },
   summaryRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   summaryLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textSecondary, width: 90 },
@@ -522,20 +522,20 @@ const styles = StyleSheet.create({
   summaryNote: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary, marginTop: 16, lineHeight: 18 },
   submitBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10,
-    backgroundColor: Colors.accent, borderRadius: 12, padding: 16, marginTop: 24,
+    backgroundColor: Colors.accent, borderRadius: 12, padding: 16, marginTop: 24
   },
   submitBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
   footer: { paddingHorizontal: 16, paddingTop: 10 },
   nextBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: Colors.accent, borderRadius: 12, padding: 16,
+    backgroundColor: Colors.accent, borderRadius: 12, padding: 16
   },
   nextBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
   successBox: {
-    flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 16,
+    flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32, gap: 16
   },
   successTitle: { fontFamily: "Inter_700Bold", fontSize: 24, color: Colors.text },
   successDesc: { fontFamily: "Inter_400Regular", fontSize: 15, color: Colors.textSecondary, textAlign: "center", lineHeight: 22 },
   doneBtn: { backgroundColor: Colors.accent, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 14, marginTop: 8 },
-  doneBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
+  doneBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" }
 });

@@ -213,7 +213,7 @@ export function buildLeafletPostRideHtml(
   accentColor: string,
   points: Array<{ lat: number; lng: number }>
 ): string {
-  const pointsJson = JSON.stringify(points);
+  const _pointsJson = JSON.stringify(points);
 
   return `<!DOCTYPE html>
 <html>
@@ -269,8 +269,8 @@ export function buildLeafletCurvatureGradientHtml(
   points: Array<{ lat: number; lng: number }>,
   offlineTileBasePath?: string | null
 ): string {
-  const pointsJson = JSON.stringify(points);
-  const offlinePathJs = offlineTileBasePath
+  const _pointsJson = JSON.stringify(points);
+  const _offlinePathJs = offlineTileBasePath
     ? JSON.stringify(offlineTileBasePath)
     : "null";
   return `<!DOCTYPE html>
@@ -368,21 +368,21 @@ export function buildLeafletRouteMapHtml(
   tileUrl: string,
   tileMaxZoom: number,
   waypoints: RouteWaypoint[],
-  accentColor: string = "#FF6600",
+  _accentColor: string = "#FF6600",
   typeColors?: Record<string, string>,
   showMarkers: boolean = true,
   trackPoints?: Array<{ lat: number; lng: number; speedKmh?: number | null }>
 ): string {
-  const waypointsJson = JSON.stringify(waypoints);
+  const _waypointsJson = JSON.stringify(waypoints);
   const resolvedTypeColors: Record<string, string> = {};
   for (const w of waypoints) {
     resolvedTypeColors[w.waypointType] =
       (typeColors && typeColors[w.waypointType]) || getWaypointColor(w.waypointType);
   }
-  const colorsJson = JSON.stringify(resolvedTypeColors);
-  const showMarkersJs = showMarkers ? "true" : "false";
+  const _colorsJson = JSON.stringify(resolvedTypeColors);
+  const _showMarkersJs = showMarkers ? "true" : "false";
   const polylinePoints = trackPoints ?? waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
-  const polylineJson = JSON.stringify(polylinePoints);
+  const _polylineJson = JSON.stringify(polylinePoints);
 
   return `<!DOCTYPE html>
 <html>

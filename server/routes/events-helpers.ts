@@ -5,12 +5,12 @@ import { db } from "../db";
 import {
   eventImages,
   eventParticipants,
-  users,
+  users
 } from "@shared/db";
 import {
   eq,
   and,
-  asc,
+  asc
 } from "drizzle-orm";
 import { systemAccountConditions } from "../lib/system-account-filter";
 
@@ -69,7 +69,7 @@ export async function enrichEvent(evt: EventRow, requestingUserId: string | null
       participationStatus: eventParticipants.participationStatus,
       joinedAt: eventParticipants.joinedAt,
       nickname: users.nickname,
-      photoUrl: users.avatarUrl,
+      photoUrl: users.avatarUrl
     })
       .from(eventParticipants)
       .leftJoin(users, eq(users.id, eventParticipants.userId))
@@ -96,8 +96,8 @@ export async function enrichEvent(evt: EventRow, requestingUserId: string | null
       userId: p.userId,
       nickname: p.nickname,
       photoUrl: p.photoUrl,
-      participationStatus: p.participationStatus,
-    })),
+      participationStatus: p.participationStatus
+    }))
   };
 }
 

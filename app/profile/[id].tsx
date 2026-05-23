@@ -48,7 +48,7 @@ export default function PublicProfileScreen() {
   const isSelf = user?.id === id;
 
   const { data: marketplaceData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/marketplace-enabled"],
+    queryKey: ["/api/settings/marketplace-enabled"]
   });
   const marketplaceEnabled = marketplaceData?.enabled !== false;
 
@@ -56,24 +56,24 @@ export default function PublicProfileScreen() {
     queryKey: ["/api/sprints/leaderboard/rank", id],
     queryFn: async () => {
       const res = await fetch(new URL(`/api/sprints/leaderboard/rank/${id}`, baseUrl).toString(), {
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) return { rank: null, sprint0to100Ms: null };
       return res.json();
     },
-    enabled: !!id,
+    enabled: !!id
   });
 
   const { data: routesData } = useQuery<{ routes: { id: string }[] }>({
     queryKey: ["/api/users", id, "custom-routes"],
     queryFn: async () => {
       const res = await fetch(new URL(`/api/users/${id}/custom-routes`, baseUrl).toString(), {
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) return { routes: [] };
       return res.json();
     },
-    enabled: !!id,
+    enabled: !!id
   });
   const publicRoutesCount = routesData?.routes?.length ?? 0;
 
@@ -81,12 +81,12 @@ export default function PublicProfileScreen() {
     queryKey: ["/api/users", id, "public"],
     queryFn: async () => {
       const res = await fetch(new URL(`/api/users/${id}/public`, baseUrl).toString(), {
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) throw new Error(t("profile.loadError"));
       return res.json();
     },
-    enabled: !!id,
+    enabled: !!id
   });
 
   React.useEffect(() => {
@@ -122,12 +122,12 @@ export default function PublicProfileScreen() {
     queryKey: ["/api/friends/status", id],
     queryFn: async () => {
       const res = await fetch(new URL(`/api/friends/status/${id}`, baseUrl).toString(), {
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) return { status: "none" };
       return res.json();
     },
-    enabled: !!id && !!user && !isSelf,
+    enabled: !!id && !!user && !isSelf
   });
 
   const sendMatchRequestMutation = useMutation({
@@ -141,7 +141,7 @@ export default function PublicProfileScreen() {
     },
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile inviare la richiesta");
-    },
+    }
   });
 
   const cancelMatchRequestMutation = useMutation({
@@ -155,7 +155,7 @@ export default function PublicProfileScreen() {
     },
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile annullare la richiesta");
-    },
+    }
   });
 
   const handleCancelMatchRequest = () => {
@@ -167,7 +167,7 @@ export default function PublicProfileScreen() {
         {
           text: "Annulla richiesta",
           style: "destructive",
-          onPress: () => cancelMatchRequestMutation.mutate(),
+          onPress: () => cancelMatchRequestMutation.mutate()
         },
       ]
     );
@@ -201,7 +201,7 @@ export default function PublicProfileScreen() {
     },
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile bloccare l'utente");
-    },
+    }
   });
 
   const unblockMutation = useMutation({
@@ -215,7 +215,7 @@ export default function PublicProfileScreen() {
     },
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile sbloccare l'utente");
-    },
+    }
   });
 
   const reportMutation = useMutation({
@@ -228,7 +228,7 @@ export default function PublicProfileScreen() {
     },
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile inviare la segnalazione");
-    },
+    }
   });
 
   const handleBlockUser = () => {
@@ -241,7 +241,7 @@ export default function PublicProfileScreen() {
         {
           text: "Blocca",
           style: "destructive",
-          onPress: () => blockMutation.mutate(),
+          onPress: () => blockMutation.mutate()
         },
       ]
     );
@@ -256,7 +256,7 @@ export default function PublicProfileScreen() {
         { text: t("common.cancel"), style: "cancel" },
         {
           text: "Sblocca",
-          onPress: () => unblockMutation.mutate(),
+          onPress: () => unblockMutation.mutate()
         },
       ]
     );
@@ -282,7 +282,7 @@ export default function PublicProfileScreen() {
     try {
       const res = await apiRequest("POST", "/api/chat/conversations", {
         conversationType: "private",
-        participantIds: [id],
+        participantIds: [id]
       });
       const conv = await res.json();
       router.push(`/chat/${conv.id}` as any);
@@ -334,7 +334,7 @@ export default function PublicProfileScreen() {
             >
               <Ionicons name="ellipsis-vertical" size={22} color={Colors.text} />
             </TouchableOpacity>
-          ) : undefined,
+          ) : undefined
         }}
       />
       <ScrollView
@@ -384,7 +384,7 @@ export default function PublicProfileScreen() {
                   lng: profile.longitude,
                   ts: Date.now(),
                   userId: id,
-                  nickname: profile.nickname,
+                  nickname: profile.nickname
                 })
               );
             } catch {
@@ -484,12 +484,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: Colors.surface,
     borderWidth: 1,
-    borderColor: Colors.accentRed + "50",
+    borderColor: Colors.accentRed + "50"
   },
   sprintRankText: {
     fontSize: 13,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
+    color: Colors.text
   },
   section: { paddingHorizontal: 20, marginTop: 16 },
   sectionTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.accent, marginBottom: 8 },
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 16,
     borderWidth: 1,
-    borderColor: Colors.accent,
+    borderColor: Colors.accent
   },
   routesButtonText: { fontSize: 15, fontWeight: "600" as const, color: Colors.accent },
   chatButton: {
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 16,
     marginHorizontal: 20,
-    marginTop: 16,
+    marginTop: 16
   },
   chatButtonText: { fontSize: 16, fontWeight: "700" as const, color: Colors.background },
   blockButton: {
@@ -535,13 +535,13 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginTop: 12,
     borderWidth: 1,
-    borderColor: Colors.error,
+    borderColor: Colors.error
   },
   unblockButton: {
-    borderColor: Colors.textSecondary,
+    borderColor: Colors.textSecondary
   },
   blockButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.5
   },
   blockButtonText: { fontSize: 15, fontWeight: "600" as const, color: Colors.error },
   avatarImage: { width: 96, height: 96, borderRadius: 48 },
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.92)",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "center"
   },
   photoModalImage: { width: "100%", height: "80%" },
   photoModalClose: {
@@ -559,19 +559,19 @@ const styles = StyleSheet.create({
     right: 20,
     backgroundColor: "rgba(0,0,0,0.5)",
     borderRadius: 20,
-    padding: 6,
+    padding: 6
   },
   menuOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
+    justifyContent: "flex-end"
   },
   menuSheet: {
     backgroundColor: Colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 12,
-    paddingHorizontal: 0,
+    paddingHorizontal: 0
   },
   menuHandle: {
     width: 36,
@@ -579,15 +579,15 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: Colors.border,
     alignSelf: "center",
-    marginBottom: 16,
+    marginBottom: 16
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
     gap: 14,
     paddingVertical: 16,
-    paddingHorizontal: 24,
+    paddingHorizontal: 24
   },
   menuItemText: { fontSize: 16, fontFamily: "Inter_500Medium" },
-  menuDivider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 },
+  menuDivider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 }
 });

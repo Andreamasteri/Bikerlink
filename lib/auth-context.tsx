@@ -10,7 +10,7 @@ import {
   setSessionToken,
   clearSessionToken,
   initSessionToken,
-  authFetchHeaders,
+  authFetchHeaders
 } from "@/lib/query-client";
 import type { User } from "@shared/db";
 
@@ -51,14 +51,14 @@ function useLoginMutation() {
       if (Platform.OS === "android") {
         fetch(new URL("/api/auth/clear-session-cookie", getApiUrl()).toString(), {
           method: "POST",
-          credentials: "include",
+          credentials: "include"
         }).catch(() => {});
       }
       queryClient.invalidateQueries({
         predicate: (query) => {
           const key = query.queryKey[0] as string;
           return key !== "/api/auth/me";
-        },
+        }
       });
       (async () => {
         try {
@@ -70,7 +70,7 @@ function useLoginMutation() {
         let profileLng: number | null = null;
         try {
           const profile = await queryClient.fetchQuery<{ latitude?: number | null; longitude?: number | null }>({
-            queryKey: ["/api/users/profile"],
+            queryKey: ["/api/users/profile"]
           });
           if (profile?.latitude != null && profile?.longitude != null) {
             profileLat = Number(profile.latitude);
@@ -91,11 +91,11 @@ function useLoginMutation() {
               url.searchParams.set("lng", nearbyLng.toString());
               const res = await fetch(url.toString(), {
                 headers: authFetchHeaders(),
-                credentials: "include",
+                credentials: "include"
               });
               if (!res.ok) return [];
               return res.json();
-            },
+            }
           });
         } catch {
           // no-op: nearby fetching best-effort
@@ -104,7 +104,7 @@ function useLoginMutation() {
           // no-op: matching trigger best-effort
         });
       })();
-    },
+    }
   });
 }
 
@@ -140,10 +140,10 @@ function useRegisterMutation() {
       if (Platform.OS === "android") {
         fetch(new URL("/api/auth/clear-session-cookie", getApiUrl()).toString(), {
           method: "POST",
-          credentials: "include",
+          credentials: "include"
         }).catch(() => {});
       }
-    },
+    }
   });
 }
 
@@ -176,7 +176,7 @@ function useLogoutMutation() {
           await fetch(new URL("/api/auth/clear-session-cookie", getApiUrl()).toString(), {
             method: "POST",
             credentials: "include",
-            signal: controller.signal,
+            signal: controller.signal
           });
           clearTimeout(tid);
         } catch {
@@ -201,7 +201,7 @@ function useLogoutMutation() {
         AsyncStorage.removeItem(HAD_SESSION_KEY),
       ]).catch(() => {});
       queryClient.setQueryData(["/api/auth/me"], null);
-    },
+    }
   });
 }
 
@@ -231,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const baseUrl = getApiUrl();
           fetch(new URL("/api/auth/clear-session-cookie", baseUrl).toString(), {
             method: "POST",
-            credentials: "include",
+            credentials: "include"
           }).catch(() => {});
         }
         setStorageChecked(true);
@@ -252,7 +252,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       res = await fetch(url.toString(), {
         headers: authFetchHeaders(),
         credentials: "include",
-        signal,
+        signal
       });
     } catch (err: unknown) {
       // AbortError = query was cancelled, re-throw as-is
@@ -293,7 +293,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!hadSessionRef.current) return false;
       return failureCount < 3;
     },
-    retryDelay: (attempt) => RETRY_DELAYS[attempt] ?? 10000,
+    retryDelay: (attempt) => RETRY_DELAYS[attempt] ?? 10000
   });
 
   // Clear sessionExpired whenever the user becomes authenticated
@@ -323,7 +323,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isReconnecting,
       loginMutation,
       registerMutation,
-      logoutMutation,
+      logoutMutation
     }),
     [userQuery.data, userQuery.isLoading, storageChecked, sessionExpired, isReconnecting, loginMutation, registerMutation, logoutMutation]
   );

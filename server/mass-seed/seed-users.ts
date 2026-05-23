@@ -114,7 +114,7 @@ export function buildSpecs(): UserSpec[] {
           lat: zone.lat,
           lng: zone.lng,
           spokenLanguages: zone.spokenLanguages,
-          specKey: `${cat.userType}_${cat.sex}_${csc}_${zone.region}_${catIndex}`,
+          specKey: `${cat.userType}_${cat.sex}_${csc}_${zone.region}_${catIndex}`
         });
         catIndex++;
       }
@@ -146,7 +146,7 @@ export async function ensureOfficialAccount(): Promise<string> {
     region: "Lombardia",
     birthYear: 2000,
     emailVerified: false,
-    eulaAccepted: false,
+    eulaAccepted: false
   });
   return user.id;
 }
@@ -203,7 +203,7 @@ export async function cleanupOldSeedUsers(logError: (context: string, err: unkno
 
 export async function reconcileExistingUsers(officialId: string, logError: (context: string, err: unknown) => void): Promise<void> {
   const taggedUsers = await db.select({
-    id: users.id, userType: users.userType, sex: users.sex, nickname: users.nickname,
+    id: users.id, userType: users.userType, sex: users.sex, nickname: users.nickname
   })
     .from(users)
     .where(eq(users.invitationCode, SEED_TAG));
@@ -238,7 +238,7 @@ export async function reconcileExistingUsers(officialId: string, logError: (cont
 
   const taggedUserConvRows = await db.select({
     convId: conversationParticipants.conversationId,
-    userId: conversationParticipants.userId,
+    userId: conversationParticipants.userId
   })
     .from(conversationParticipants)
     .where(inArray(conversationParticipants.userId, taggedIds));
@@ -262,7 +262,7 @@ export async function reconcileExistingUsers(officialId: string, logError: (cont
         latitude: zone.lat + randOffset(),
         longitude: zone.lng + randOffset(),
         maxPickupDistance: 20 + Math.floor(Math.random() * 80),
-        bio: getBio(u.userType, u.sex),
+        bio: getBio(u.userType, u.sex)
       });
     }
     if (u.userType === "biker" || u.userType === "coppia") {
@@ -277,7 +277,7 @@ export async function reconcileExistingUsers(officialId: string, logError: (cont
             year: getMotoYear(),
             displacement: moto.displacement,
             motorcycleType: moto.type,
-            ridingStyle: moto.style,
+            ridingStyle: moto.style
           });
         }
       }
@@ -310,7 +310,7 @@ export async function reconcileExistingUsers(officialId: string, logError: (cont
         brand: m.brand,
         model: m.model,
         motorcycleType: m.type,
-        ridingStyle: m.style,
+        ridingStyle: m.style
       }));
       await db.insert(zavarrinaWishlistMotos).values(wishlistMotoValues);
     } catch (err: unknown) {
@@ -338,7 +338,7 @@ export async function reconcileExistingUsers(officialId: string, logError: (cont
           conversationId: conv.id,
           senderId: officialId,
           content: getWelcomeMessage(u.userType, u.sex),
-          messageType: "text",
+          messageType: "text"
         });
       }
       if (participantRows.length > 0) {

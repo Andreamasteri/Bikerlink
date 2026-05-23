@@ -13,6 +13,7 @@ import * as Updates from "expo-updates";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useAuth } from "@/lib/auth-context";
+
 import { useLocationGate } from "@/lib/location-context";
 import { useLanguage } from "@/lib/language-context";
 import { useMapConfig } from "@/lib/map-context";

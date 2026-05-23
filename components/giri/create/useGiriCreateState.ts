@@ -89,7 +89,7 @@ export function useGiriCreateState(language?: string) {
       setIsImportingGpx(true);
       const result = await DocumentPicker.getDocumentAsync({
         type: ["application/gpx+xml", "application/octet-stream", "*/*"],
-        copyToCacheDirectory: true,
+        copyToCacheDirectory: true
       });
       if (result.canceled || !result.assets?.[0]) return;
       const asset = result.assets[0];
@@ -100,7 +100,7 @@ export function useGiriCreateState(language?: string) {
       const resp = await fetch(url.toString(), {
         method: "POST", credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gpxContent, title: guessedTitle || undefined }),
+        body: JSON.stringify({ gpxContent, title: guessedTitle || undefined })
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
@@ -135,7 +135,7 @@ export function useGiriCreateState(language?: string) {
 
       const initialItems: AiPreviewItem[] = rawLocations.map((loc) => ({
         role: loc.role, name: loc.name, editedName: loc.name,
-        lat: 0, lng: 0, geocoding: !!loc.name, resolved: false,
+        lat: 0, lng: 0, geocoding: !!loc.name, resolved: false
       }));
 
       const preview: AiPreviewState = {
@@ -146,7 +146,7 @@ export function useGiriCreateState(language?: string) {
         isMultiDay: result.isMultiDay ?? false,
         daysEstimate: result.daysEstimate ?? 2,
         avoidHighways: result.avoidHighways ?? false,
-        items: initialItems,
+        items: initialItems
       };
       setAiPreview(preview);
       setMode("ai-preview");
@@ -235,7 +235,7 @@ export function useGiriCreateState(language?: string) {
   const handleConfirmPreview = async () => {
     if (!aiPreview) return;
     const newWps: Waypoint[] = aiPreview.items.map((item) => ({
-      lat: item.lat, lng: item.lng, name: item.editedName || item.name,
+      lat: item.lat, lng: item.lng, name: item.editedName || item.name
     }));
     const newInputs = newWps.map((wp) => wp.name);
     setTitle(aiPreview.title);
@@ -356,7 +356,7 @@ export function useGiriCreateState(language?: string) {
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
       router.replace(`/giri/${data.id}` as any);
     },
-    onError: () => Alert.alert("Errore", "Impossibile salvare il giro."),
+    onError: () => Alert.alert("Errore", "Impossibile salvare il giro.")
   });
 
   const handleSave = () => {
@@ -385,8 +385,8 @@ export function useGiriCreateState(language?: string) {
       metadata: {
         avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, daysCount, maxHoursPerDay,
         isRoundTrip, roundTripHours, headingDeg,
-        motorcycleId: selectedMotoId, fuelStopsNeeded,
-      },
+        motorcycleId: selectedMotoId, fuelStopsNeeded
+      }
     });
   };
 

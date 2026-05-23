@@ -74,28 +74,28 @@ export default function ProfileScreen() {
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],
-    enabled: !!user,
+    enabled: !!user
   });
   const profile = profileQuery.data;
 
   const { data: adminWidgetData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/floating-widget"],
     staleTime: 60_000,
-    enabled: !!user,
+    enabled: !!user
   });
   const adminWidgetEnabled = adminWidgetData?.enabled !== false;
 
   const { data: donationData } = useQuery<{ enabled: boolean; text: string; paypalEmail: string }>({
-    queryKey: ["/api/settings/donation"],
+    queryKey: ["/api/settings/donation"]
   });
 
   const { data: showSearchPrefData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/show-search-preference"],
+    queryKey: ["/api/settings/show-search-preference"]
   });
   const showSearchPref = showSearchPrefData?.enabled === true;
 
   const { data: searchPrefLockedData } = useQuery<{ locked: boolean }>({
-    queryKey: ["/api/settings/search-preference-locked"],
+    queryKey: ["/api/settings/search-preference-locked"]
   });
   const searchPrefLocked = searchPrefLockedData?.locked === true;
 
@@ -109,7 +109,7 @@ export default function ProfileScreen() {
   }>({
     queryKey: ["/api/telemetry/stats"],
     enabled: !!user,
-    staleTime: 60_000,
+    staleTime: 60_000
   });
 
   const searchPreference = profile?.profile?.searchPreference ?? "both";
@@ -136,7 +136,7 @@ export default function ProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
-    onError: (error: Error) => Alert.alert("Errore", error.message),
+    onError: (error: Error) => Alert.alert("Errore", error.message)
   });
 
   const uploadPhotoMutation = useMutation({
@@ -151,7 +151,7 @@ export default function ProfileScreen() {
       const res = await globalThis.fetch(url.toString(), {
         method: "POST",
         body: formData,
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) {
         const text = await res.text();
@@ -169,26 +169,26 @@ export default function ProfileScreen() {
         // no-op: msg is already set as fallback
       }
       Alert.alert("Errore caricamento foto", msg);
-    },
+    }
   });
 
   const deletePhotoMutation = useMutation({
     mutationFn: async (photoId: string) => {
       await apiRequest("DELETE", `/api/users/me/photos/${photoId}`);
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] })
   });
 
   const cancelDeletionMutation = useMutation({
     mutationFn: async () => { await apiRequest("POST", "/api/users/me/cancel-deletion"); },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] })
   });
 
   const searchPreferenceMutation = useMutation({
     mutationFn: async (value: "bikers" | "zavorrine" | "both") => {
       await apiRequest("PUT", "/api/users/profile/dynamic", { searchPreference: value });
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/users/me"] })
   });
 
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
@@ -353,6 +353,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
-  },
+    backgroundColor: Colors.background
+  }
 });

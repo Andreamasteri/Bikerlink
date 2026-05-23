@@ -44,7 +44,7 @@ function makeState(
   currentSpeedKph: number,
   overrides: Partial<UserMotionState> = {},
 ): UserMotionState {
-  const cfg = SPEED_PROFILES[profile];
+  const _cfg = SPEED_PROFILES[profile];
   return {
     userId: "test-user",
     lat: 45,

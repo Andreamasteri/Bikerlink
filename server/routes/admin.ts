@@ -8,7 +8,6 @@ import { clientErrorSchema, startupBeaconSchema } from "@shared/validators";
 import { eq } from "drizzle-orm";
 
 
-
 const router = Router();
 
 /**
@@ -58,7 +57,7 @@ const startupBeaconLimiter = rateLimit({
   max: 30,
   message: { message: "Too many startup beacons" },
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders: false
 });
 
 
@@ -68,7 +67,7 @@ const clientErrorLimiter = rateLimit({
   max: 30,
   message: { received: true },
   standardHeaders: true,
-  legacyHeaders: false,
+  legacyHeaders: false
 });
 
 const BEACON_DATA_MAX_KEYS = 20;
@@ -127,7 +126,7 @@ async function _assignFakeUserToClubs(userId: string): Promise<ClubAssignStats> 
           clubId: club.id,
           userId,
           role: "member",
-          status: "active",
+          status: "active"
         }).onConflictDoNothing().returning({ id: motoClubMembers.id });
         if (result.length > 0) {
           stats.assigned++;
@@ -192,7 +191,7 @@ router.post("/client-error", clientErrorLimiter, clientErrorJson, (req: Request,
       platform: platform || "unknown",
       appVersion: appVersion || "unknown",
       isFatal: !!isFatal,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     }));
     return res.json({ received: true });
   } catch {
@@ -214,7 +213,7 @@ router.post("/startup-beacon", startupBeaconLimiter, startupBeaconJson, (req: Re
       recovered: !!recovered,
       platform: platform ? String(platform).substring(0, 16) : undefined,
       data: sanitizeBeaconData(rest as Record<string, unknown>),
-      receivedAt: new Date().toISOString(),
+      receivedAt: new Date().toISOString()
     };
     startupBeacons.push(entry);
     if (startupBeacons.length > BEACONS_MAX) startupBeacons.splice(0, startupBeacons.length - BEACONS_MAX);

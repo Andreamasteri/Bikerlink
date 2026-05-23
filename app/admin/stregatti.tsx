@@ -7,7 +7,7 @@ import {
   FlatList,
   Modal,
   ActivityIndicator,
-  Alert,
+  Alert
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -110,7 +110,7 @@ export default function FakeUsersAdmin() {
   const [showDesiredBrandPicker, setShowDesiredBrandPicker] = useState(false);
 
   const { data: chatbotData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/chatbot-enabled"],
+    queryKey: ["/api/settings/chatbot-enabled"]
   });
   const chatbotEnabled = chatbotData?.enabled !== false;
 
@@ -122,18 +122,18 @@ export default function FakeUsersAdmin() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ value: enabled ? "true" : "false" }),
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/chatbot-enabled"] });
-    },
+    }
   });
 
   const { data: fakeUsersEnabledData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/fake-users-enabled"],
+    queryKey: ["/api/settings/fake-users-enabled"]
   });
   const allEnabled = fakeUsersEnabledData?.enabled !== false;
 
@@ -145,7 +145,7 @@ export default function FakeUsersAdmin() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled, adminPassword }),
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) {
         const err = await res.json().catch(() => {
@@ -159,7 +159,7 @@ export default function FakeUsersAdmin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/fake-users-enabled"] });
-    },
+    }
   });
 
   const PAGE_SIZE = 50;
@@ -168,7 +168,7 @@ export default function FakeUsersAdmin() {
     isLoading: _isLoading,
     isFetchingNextPage,
     hasNextPage,
-    fetchNextPage,
+    fetchNextPage
   } = useInfiniteQuery<FakeUsersPage>({
     queryKey: ["/api/admin/stregatti", filter],
     queryFn: async ({ pageParam = 0 }) => {
@@ -182,7 +182,7 @@ export default function FakeUsersAdmin() {
     },
     getNextPageParam: (lastPage, allPages) => lastPage.hasMore ? allPages.length : undefined,
     initialPageParam: 0,
-    retry: 1,
+    retry: 1
   });
 
   const users: FakeUser[] = usersData?.pages.flatMap(p => p.users) ?? [];
@@ -191,17 +191,17 @@ export default function FakeUsersAdmin() {
 
   const toggleAvailableMutation = useMutation({
     mutationFn: (id: string) => apiRequest("PUT", `/api/admin/stregatti/${id}/toggle-available`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] })
   });
 
   const toggleOnlineMutation = useMutation({
     mutationFn: (id: string) => apiRequest("PUT", `/api/admin/stregatti/${id}/toggle-online`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] })
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest("DELETE", `/api/admin/stregatti/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] })
   });
 
   const deleteAllMutation = useMutation({
@@ -209,7 +209,7 @@ export default function FakeUsersAdmin() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/fake-users-enabled"] });
-    },
+    }
   });
 
   const [massSeedRunning, setMassSeedRunning] = useState(false);
@@ -229,7 +229,7 @@ export default function FakeUsersAdmin() {
     averageSpeedKph: number;
   }>({
     queryKey: ["/api/admin/stregatti/motion/status"],
-    refetchInterval: 35_000,
+    refetchInterval: 35_000
   });
 
   const { data: bboxData, refetch: refetchBbox } = useQuery<{
@@ -239,7 +239,7 @@ export default function FakeUsersAdmin() {
     lngMax: number;
     enabled: boolean;
   }>({
-    queryKey: ["/api/admin/stregatti/motion/bbox"],
+    queryKey: ["/api/admin/stregatti/motion/bbox"]
   });
 
   const toggleMotionMutation = useMutation({
@@ -249,12 +249,12 @@ export default function FakeUsersAdmin() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ enabled }),
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: () => refetchMotionStatus(),
+    onSuccess: () => refetchMotionStatus()
   });
 
   const updateBboxMutation = useMutation({
@@ -264,17 +264,17 @@ export default function FakeUsersAdmin() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
-        credentials: "include",
+        credentials: "include"
       });
       if (!res.ok) throw new Error(await res.text());
       return res.json();
     },
-    onSuccess: () => refetchBbox(),
+    onSuccess: () => refetchBbox()
   });
 
   const wakeAllMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/stregatti/wake-all", {}),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] })
   });
 
   const forceMatchingMutation = useMutation({
@@ -284,21 +284,21 @@ export default function FakeUsersAdmin() {
       const zav = data?.zavarrina ?? 0;
       const total = bb + zav;
       Alert.alert("Successo", total === 0 ? t("admin.noNewMatch") : `${bb} biker-biker + ${zav} zavarrina match creati`);
-    },
+    }
   });
 
   const resetMatchesMutation = useMutation({
     mutationFn: () => apiRequest("DELETE", "/api/admin/reset-matches", {}),
     onSuccess: (data: any) => {
       Alert.alert("Successo", `${data?.deleted ?? 0} match biker-biker eliminati`);
-    },
+    }
   });
 
   const distributeMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/stregatti/distribute-to-clubs", {}),
     onSuccess: (data: any) => {
       Alert.alert("Successo", `${data?.usersProcessed ?? "?"} utenti distribuiti (${data?.assigned ?? 0} assegnazioni)`);
-    },
+    }
   });
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -369,7 +369,7 @@ export default function FakeUsersAdmin() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       setCreateModalVisible(false);
       resetForm();
-    },
+    }
   });
 
   const resetForm = () => {
@@ -412,14 +412,14 @@ export default function FakeUsersAdmin() {
         type: formMotoType,
         displacement: parseInt(formDisplacement) || null,
         year: parseInt(formMotoYear) || null,
-        ridingStyle: formRidingStyle,
+        ridingStyle: formRidingStyle
       },
       wishlist: {
         description: formWishlistDesc,
         desiredBrand: formDesiredBrand,
         desiredModel: formDesiredModel,
-        desiredMotoType: formDesiredMotoType,
-      },
+        desiredMotoType: formDesiredMotoType
+      }
     });
   };
 
@@ -471,7 +471,7 @@ export default function FakeUsersAdmin() {
           } finally {
             setDeletingChats(false);
           }
-        },
+        }
       },
     ]);
   };
@@ -656,7 +656,7 @@ export default function FakeUsersAdmin() {
             { enabled: !!pendingToggleVal, adminPassword: togglePwdInput },
             {
               onSuccess: () => setTogglePwdVisible(false),
-              onError: (e) => setTogglePwdError(e.message),
+              onError: (e) => setTogglePwdError(e.message)
             }
           );
         }}
@@ -673,7 +673,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.border
   },
   tabBtn: {
     flex: 1,
@@ -683,18 +683,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 6,
     borderBottomWidth: 2,
-    borderBottomColor: "transparent",
+    borderBottomColor: "transparent"
   },
   tabBtnActive: {
-    borderBottomColor: Colors.accent,
+    borderBottomColor: Colors.accent
   },
   tabBtnText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: Colors.textSecondary
   },
   tabBtnTextActive: {
-    color: Colors.accent,
+    color: Colors.accent
   },
   tabBadge: {
     backgroundColor: "#FF6B35",
@@ -702,12 +702,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 1,
     minWidth: 18,
-    alignItems: "center",
+    alignItems: "center"
   },
   tabBadgeText: {
     fontFamily: "Inter_700Bold",
     fontSize: 10,
-    color: "#fff",
+    color: "#fff"
   },
   content: { padding: 16 },
   title: { fontFamily: "Inter_700Bold", fontSize: 24, color: Colors.text, marginBottom: 16 },
@@ -732,5 +732,5 @@ const styles = StyleSheet.create({
   confirmCancelBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.textSecondary },
   confirmDeleteBtn: { flex: 1, paddingVertical: 12, borderRadius: 12, backgroundColor: Colors.error, alignItems: "center" },
   confirmDeleteBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
-  errorText: { color: Colors.error, fontSize: 12 },
+  errorText: { color: Colors.error, fontSize: 12 }
 });

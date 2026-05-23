@@ -179,7 +179,7 @@ const MAP_HTML = `<!DOCTYPE html>
 export function StregattaMap({
   motionStatus,
   onToggleMotion,
-  isTogglingMotion,
+  isTogglingMotion
 }: StregattaMapProps) {
   const webViewRef = useRef<WebView>(null);
   const mapReadyRef = useRef(false);
@@ -194,7 +194,7 @@ export function StregattaMap({
       return res.json();
     },
     refetchInterval: 30_000,
-    staleTime: 25_000,
+    staleTime: 25_000
   });
 
   const { data: speeds, dataUpdatedAt: speedsUpdatedAt } = useQuery<RiderSpeed[]>({
@@ -207,7 +207,7 @@ export function StregattaMap({
     },
     refetchInterval: 30_000,
     staleTime: 25_000,
-    enabled: motionStatus?.enabled ?? false,
+    enabled: motionStatus?.enabled ?? false
   });
 
   const injectPositions = useCallback((pos: RiderPosition[]) => {
@@ -346,7 +346,7 @@ export function StregattaMap({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.background
   },
   statsBar: {
     flexDirection: "row",
@@ -356,26 +356,26 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    gap: 12,
+    gap: 12
   },
   statItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
+    gap: 5
   },
   dot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: 4
   },
   statText: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: Colors.textSecondary
   },
   refreshBtn: {
     marginLeft: "auto" as any,
-    padding: 4,
+    padding: 4
   },
   profileBar: {
     flexDirection: "row",
@@ -385,30 +385,30 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
-    gap: 8,
+    gap: 8
   },
   profileChip: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 8,
+    borderRadius: 8
   },
   profileChipText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
-    color: "#fff",
+    color: "#fff"
   },
   profileBarHint: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
     color: Colors.textSecondary,
-    marginLeft: 4,
+    marginLeft: 4
   },
   mapWrapper: {
-    flex: 1,
+    flex: 1
   },
   webView: {
     flex: 1,
-    backgroundColor: "#12121f",
+    backgroundColor: "#12121f"
   },
   controlBar: {
     flexDirection: "row",
@@ -418,40 +418,40 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: Colors.surface,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.border
   },
   controlLeft: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    flex: 1,
+    flex: 1
   },
   controlLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: Colors.textSecondary
   },
   cycleText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: Colors.textSecondary
   },
   toggleBtn: {
     paddingHorizontal: 18,
     paddingVertical: 8,
     borderRadius: 20,
     minWidth: 72,
-    alignItems: "center",
+    alignItems: "center"
   },
   toggleBtnOn: {
-    backgroundColor: "#5A5A7A",
+    backgroundColor: "#5A5A7A"
   },
   toggleBtnOff: {
-    backgroundColor: "#FF6B35",
+    backgroundColor: "#FF6B35"
   },
   toggleBtnText: {
     fontFamily: "Inter_700Bold",
     fontSize: 13,
-    color: "#fff",
-  },
+    color: "#fff"
+  }
 });

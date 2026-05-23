@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
+  ScrollView
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -30,7 +30,7 @@ export function EditLocation({
   region,
   setRegion,
   showRegionPicker,
-  setShowRegionPicker,
+  setShowRegionPicker
 }: EditLocationProps) {
   const t = useT();
 
@@ -169,22 +169,22 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.border
   },
   groupTitle: {
     fontSize: 16,
     fontWeight: "600" as const,
     color: Colors.text,
-    marginBottom: 16,
+    marginBottom: 16
   },
   field: {
-    marginBottom: 16,
+    marginBottom: 16
   },
   fieldLabel: {
     fontSize: 14,
     color: Colors.textSecondary,
     marginBottom: 8,
-    fontWeight: "500" as const,
+    fontWeight: "500" as const
   },
   selectInput: {
     flexDirection: "row",
@@ -195,11 +195,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.border
   },
   selectText: {
     fontSize: 16,
-    color: Colors.text,
+    color: Colors.text
   },
   pickerList: {
     marginTop: 8,
@@ -207,23 +207,23 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
-    overflow: "hidden",
+    overflow: "hidden"
   },
   pickerItem: {
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border + "44",
+    borderBottomColor: Colors.border + "44"
   },
   pickerItemSelected: {
-    backgroundColor: Colors.accent + "12",
+    backgroundColor: Colors.accent + "12"
   },
   pickerItemText: {
     fontSize: 15,
-    color: Colors.text,
+    color: Colors.text
   },
   pickerItemTextSelected: {
     color: Colors.accent,
-    fontWeight: "600" as const,
-  },
+    fontWeight: "600" as const
+  }
 });

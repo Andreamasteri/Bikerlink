@@ -65,7 +65,7 @@ export function SummaryModal({
   setRouteMapVisible,
   onPublish,
   onDelete,
-  t,
+  t
 }: SummaryModalProps) {
   return (
     <Modal
@@ -216,25 +216,25 @@ const styles = StyleSheet.create({
   summaryOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.85)",
-    justifyContent: "flex-end",
+    justifyContent: "flex-end"
   },
   summaryModal: {
     backgroundColor: Colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: 40
   },
   summaryTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 20,
-    gap: 10,
+    gap: 10
   },
   summaryTitle: {
     fontSize: 22,
     fontFamily: "Inter_700Bold",
-    color: Colors.text,
+    color: Colors.text
   },
   liveRunBadge: {
     backgroundColor: Colors.success + "20",
@@ -242,12 +242,12 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: Colors.success + "40",
+    borderColor: Colors.success + "40"
   },
   liveRunText: {
     fontSize: 10,
     fontFamily: "Inter_700Bold",
-    color: Colors.success,
+    color: Colors.success
   },
   rideTitleInput: {
     backgroundColor: Colors.surface,
@@ -259,15 +259,15 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.border
   },
   statsRow: {
     flexDirection: "row",
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 10
   },
   statCardPlaceholder: {
-    flex: 1,
+    flex: 1
   },
   summaryRecordBadge: {
     flex: 1,
@@ -278,12 +278,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFD700" + "20",
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: "#FFD700" + "40",
+    borderColor: "#FFD700" + "40"
   },
   summaryRecordText: {
     color: "#FFD700",
     fontSize: 14,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_700Bold"
   },
   summaryRouteBtn: {
     flexDirection: "row",
@@ -295,12 +295,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginTop: 10,
     borderWidth: 1,
-    borderColor: Colors.accent + "30",
+    borderColor: Colors.accent + "30"
   },
   summaryRouteBtnText: {
     color: Colors.accent,
     fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold"
   },
   summaryNote: {
     color: Colors.textSecondary,
@@ -309,11 +309,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 20,
     marginBottom: 30,
-    lineHeight: 18,
+    lineHeight: 18
   },
   summaryActions: {
     flexDirection: "row",
-    gap: 10,
+    gap: 10
   },
   summaryPublishBtn: {
     flex: 2,
@@ -323,12 +323,12 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: Colors.accent,
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 14
   },
   summaryPublishText: {
     color: "#ffffff",
     fontSize: 15,
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_700Bold"
   },
   summaryDeleteBtn: {
     width: 48,
@@ -338,10 +338,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#ef4444" + "15",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#ef4444" + "30",
+    borderColor: "#ef4444" + "30"
   },
   summaryDeleteText: {
-    display: "none",
+    display: "none"
   },
   summaryCloseBtn: {
     flex: 1,
@@ -351,11 +351,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: Colors.border,
+    borderColor: Colors.border
   },
   summaryCloseText: {
     color: Colors.textSecondary,
     fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-  },
+    fontFamily: "Inter_600SemiBold"
+  }
 });

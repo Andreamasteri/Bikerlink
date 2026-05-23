@@ -106,7 +106,7 @@ export default function ModeratorPhotosScreen() {
   const webTopInset = 0;
 
   const { data: photos, isLoading } = useQuery<ModerationPhoto[]>({
-    queryKey: ["/api/moderator/photos"],
+    queryKey: ["/api/moderator/photos"]
   });
 
   const approveMutation = useMutation({
@@ -115,7 +115,7 @@ export default function ModeratorPhotosScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/moderator/photos"] });
-    },
+    }
   });
 
   const rejectMutation = useMutation({
@@ -124,7 +124,7 @@ export default function ModeratorPhotosScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/moderator/photos"] });
-    },
+    }
   });
 
   const handleApprove = (id: string, type: string) => {
@@ -184,7 +184,7 @@ export default function ModeratorPhotosScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.background
   },
   header: {
     flexDirection: "row",
@@ -193,71 +193,71 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.border
   },
   headerTitle: {
     fontSize: 18,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
+    color: Colors.text
   },
   headerActions: {
     flexDirection: "row",
-    gap: 4,
+    gap: 4
   },
   headerActionBtn: {
-    padding: 4,
+    padding: 4
   },
   center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 16,
+    gap: 16
   },
   emptyText: {
     fontSize: 16,
     color: Colors.textSecondary,
-    fontFamily: "Inter_500Medium",
+    fontFamily: "Inter_500Medium"
   },
   list: {
     padding: 16,
-    gap: 16,
+    gap: 16
   },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
     overflow: "hidden",
-    marginBottom: 16,
+    marginBottom: 16
   },
   photo: {
     width: "100%",
-    height: 250,
+    height: 250
   },
   cardInfo: {
     padding: 12,
-    gap: 6,
+    gap: 6
   },
   typeBadge: {
     alignSelf: "flex-start",
     backgroundColor: Colors.accent + "30",
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: 8
   },
   typeBadgeText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: Colors.accent,
-    textTransform: "uppercase" as const,
+    textTransform: "uppercase" as const
   },
   caption: {
     fontSize: 14,
     color: Colors.text,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "Inter_400Regular"
   },
   dateText: {
     fontSize: 12,
     color: Colors.textSecondary,
-    fontFamily: "Inter_400Regular",
+    fontFamily: "Inter_400Regular"
   },
   actions: {
     flexDirection: "row",
@@ -265,19 +265,19 @@ const styles = StyleSheet.create({
     gap: 32,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: Colors.border
   },
   approveBtn: {
-    padding: 8,
+    padding: 8
   },
   rejectBtn: {
-    padding: 8,
+    padding: 8
   },
   rejectInputContainer: {
     padding: 12,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    gap: 8,
+    gap: 8
   },
   rejectInput: {
     backgroundColor: Colors.surfaceLight,
@@ -286,19 +286,19 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     color: Colors.text,
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
+    fontSize: 14
   },
   rejectActions: {
     flexDirection: "row",
     justifyContent: "flex-end",
-    gap: 12,
+    gap: 12
   },
   cancelBtn: {
-    padding: 8,
+    padding: 8
   },
   confirmRejectBtn: {
     backgroundColor: Colors.error,
     borderRadius: 8,
-    padding: 8,
-  },
+    padding: 8
+  }
 });

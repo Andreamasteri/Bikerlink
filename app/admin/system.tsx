@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
+
   StyleSheet,
   TouchableOpacity,
   Platform,
@@ -37,7 +38,7 @@ import {
   type SystemEvent,
   type SystemHealth,
   type RestartHistory,
-  type NativeVersionConfigData,
+  type NativeVersionConfigData
 } from "@/components/admin/system/systemUtils";
 
 
@@ -120,7 +121,7 @@ export default function SystemScreen() {
     try {
       const _res = await apiRequest("PUT", "/api/admin/settings/native-version", {
         android: { latestVersion: nativeAndroidLatest, minVersion: nativeAndroidMin, storeUrl: nativeAndroidUrl },
-        ios: { latestVersion: nativeIosLatest, minVersion: nativeIosMin, storeUrl: nativeIosUrl },
+        ios: { latestVersion: nativeIosLatest, minVersion: nativeIosMin, storeUrl: nativeIosUrl }
       });
       Alert.alert("Salvato", "Configurazione versioni native aggiornata.");
     } catch (e: any) {
@@ -147,7 +148,7 @@ export default function SystemScreen() {
       const purgeRes = await fetch(purgeUrl.toString(), {
         method: "DELETE",
         headers: { "Content-Type": "application/json", "X-Confirm-Purge": "PURGE-CONFIRMED" },
-        credentials: "include",
+        credentials: "include"
       });
       const body = await purgeRes.json();
       Alert.alert(
@@ -161,7 +162,7 @@ export default function SystemScreen() {
                 // no-op: proceed to login even if logout fails
               }
               router.replace("/(auth)/login");
-            },
+            }
           },
         ]
       );
@@ -184,7 +185,7 @@ export default function SystemScreen() {
           onPress: () => {
             setPurgeConfirmText("");
             setPurgeModalVisible(true);
-          },
+          }
         },
       ]
     );
@@ -196,7 +197,7 @@ export default function SystemScreen() {
       fetch(url.toString(), {
         headers: authFetchHeaders(),
         credentials: "include",
-        signal,
+        signal
       });
 
     let res: Response;
@@ -252,12 +253,12 @@ export default function SystemScreen() {
     retry: (count, e) => {
       if (isAdminError(e) && (e.code === "session_expired" || e.code === "forbidden")) return false;
       return count < 2;
-    },
+    }
   });
 
   const { data: restartHistory } = useQuery<RestartHistory>({
     queryKey: ["/api/admin/restart-history"],
-    refetchInterval: 60000,
+    refetchInterval: 60000
   });
 
   const mergedEvents = useMemo<SystemEvent[]>(() => {
@@ -299,7 +300,7 @@ export default function SystemScreen() {
             <Ionicons name="refresh" size={22} color={Colors.accent} />
           )}
         </TouchableOpacity>
-      ),
+      )
     });
   }, [navigation, handleRefresh, isFetching]);
 
@@ -372,12 +373,12 @@ export default function SystemScreen() {
               android={{
                 latestVersion: nativeAndroidLatest,
                 minVersion: nativeAndroidMin,
-                storeUrl: nativeAndroidUrl,
+                storeUrl: nativeAndroidUrl
               }}
               ios={{
                 latestVersion: nativeIosLatest,
                 minVersion: nativeIosMin,
-                storeUrl: nativeIosUrl,
+                storeUrl: nativeIosUrl
               }}
               setNativeAndroidLatest={setNativeAndroidLatest}
               setNativeAndroidMin={setNativeAndroidMin}
@@ -407,29 +408,29 @@ const _styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: Colors.background,
-    gap: 12,
+    gap: 12
   },
   loadingText: {
     color: Colors.textMuted ?? "#888",
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
+    fontSize: 14
   },
   errorText: {
     color: "#FF4444",
     fontFamily: "Inter_500Medium",
     fontSize: 15,
-    textAlign: "center",
+    textAlign: "center"
   },
   retryBtn: {
     marginTop: 8,
     paddingHorizontal: 20,
     paddingVertical: 8,
     backgroundColor: Colors.accent,
-    borderRadius: 8,
+    borderRadius: 8
   },
   retryBtnText: {
     color: "#fff",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-  },
+    fontSize: 14
+  }
 });

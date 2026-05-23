@@ -46,7 +46,7 @@ export async function runProposalToProfileMatching(
       .select({
         userId: users.id,
         lat: userProfiles.latitude,
-        lng: userProfiles.longitude,
+        lng: userProfiles.longitude
       })
       .from(userProfiles)
       .innerJoin(users, eq(users.id, userProfiles.userId))
@@ -92,7 +92,7 @@ export async function runProposalToProfileMatching(
           bikerId: proposal.userId,
           zavarrinaId: zav.userId,
           distanceKm: Math.round(distKm * 10) / 10,
-          status: "new",
+          status: "new"
         });
 
         if (created) {
@@ -107,7 +107,7 @@ export async function runProposalToProfileMatching(
               body,
               notificationType: "proposal_match",
               referenceType: "proposal_profile_match",
-              referenceId: created.id,
+              referenceId: created.id
             });
             await storage.createNotification({
               userId: zav.userId,
@@ -115,7 +115,7 @@ export async function runProposalToProfileMatching(
               body,
               notificationType: "proposal_match",
               referenceType: "proposal_profile_match",
-              referenceId: created.id,
+              referenceId: created.id
             });
           } catch (notifErr) {
             console.error("[ProposalProfileMatching] Error sending notifications:", notifErr);

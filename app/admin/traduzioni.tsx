@@ -250,7 +250,7 @@ export default function TraduzioniScreen() {
       if (canShare) {
         await Sharing.shareAsync(filePath, {
           mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          dialogTitle: t("admin.saveWord"),
+          dialogTitle: t("admin.saveWord")
         });
         setDocxResult({ ok: true, msg: "File Word pronto da condividere" });
       } else {
@@ -328,7 +328,7 @@ export default function TraduzioniScreen() {
     const resp = await fetch(url.toString(), {
       method: "POST",
       credentials: "include",
-      body: formData,
+      body: formData
     });
     let payload: ImportResponse | null = null;
     try {
@@ -381,7 +381,7 @@ export default function TraduzioniScreen() {
       const picked = await DocumentPicker.getDocumentAsync({
         type: [DOCX_MIME, "application/octet-stream", "*/*"],
         multiple: false,
-        copyToCacheDirectory: true,
+        copyToCacheDirectory: true
       });
       if (picked.canceled || !picked.assets || picked.assets.length === 0) {
         setImportStatus("idle");
@@ -395,7 +395,7 @@ export default function TraduzioniScreen() {
       setImportFileName(fileName);
 
       const base64 = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: FileSystem.EncodingType.Base64,
+        encoding: FileSystem.EncodingType.Base64
       });
       const arrayBuffer = base64ToArrayBuffer(base64);
       const blob = new Blob([arrayBuffer], { type: DOCX_MIME });

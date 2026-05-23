@@ -22,7 +22,7 @@ export async function sendEmailDetailed(to: string, subject: string, html: strin
       errorCode: "no-credentials",
       error: "Credenziali Gmail non configurate (né in DB app_settings né in env GMAIL_USER/GMAIL_APP_PASSWORD).",
       recipient: to,
-      source: "none",
+      source: "none"
     };
     await recordEmailSendStatus(result);
     return result;
@@ -33,14 +33,14 @@ export async function sendEmailDetailed(to: string, subject: string, html: strin
       from: `"BikerLink" <${t.creds.user}>`,
       to,
       subject,
-      html,
+      html
     });
     console.log(`[EMAIL] Email inviata a ${to}: ${subject} (msgId=${info.messageId})`);
     const result: EmailSendResult = {
       ok: true,
       messageId: info.messageId,
       recipient: to,
-      source: t.creds.source,
+      source: t.creds.source
     };
     await recordEmailSendStatus(result);
     return result;
@@ -53,7 +53,7 @@ export async function sendEmailDetailed(to: string, subject: string, html: strin
       error: cls.message,
       smtpResponse: cls.smtpResponse,
       recipient: to,
-      source: t.creds.source,
+      source: t.creds.source
     };
     await recordEmailSendStatus(result);
     return result;

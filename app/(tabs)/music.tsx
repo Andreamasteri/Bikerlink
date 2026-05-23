@@ -30,7 +30,7 @@ import {
   LibraryTrack,
   MusicMatch,
   SharedPlaylistEntry,
-  ChatConversation,
+  ChatConversation
 } from "@/components/music/types";
 
 import { BraniTab } from "@/components/music/BraniTab";
@@ -71,13 +71,13 @@ export default function MusicScreen() {
 
   const statusQuery = useQuery<{ connected: boolean; displayName?: string; username?: string; trackCount: number }>({
     queryKey: [`${apiPrefix}/status`],
-    staleTime: 60_000,
+    staleTime: 60_000
   });
 
   const conversationsQuery = useQuery<ChatConversation[]>({
     queryKey: ["/api/chat/conversations"],
     enabled: sendModalVisible,
-    staleTime: 30_000,
+    staleTime: 30_000
   });
 
   const handleSendPlaylist = useCallback(async (conv: ChatConversation) => {
@@ -87,7 +87,7 @@ export default function MusicScreen() {
     try {
       const res = await apiRequest("POST", `${apiPrefix}/share-playlist`, {
         toUserId: otherUser.id,
-        conversationId: conv.id,
+        conversationId: conv.id
       });
       const body = await res.json();
       if (!res.ok) {
@@ -133,7 +133,7 @@ export default function MusicScreen() {
           albumName: t.albumName ?? null,
           imageUrl: t.imageUrl ?? null,
           popularity: 0,
-          addedAt: "",
+          addedAt: ""
         }));
         setPlaylistOverride({ nickname: data.fromUser.nickname, tracks: mapped });
         setActiveTab("brani");
@@ -185,11 +185,11 @@ export default function MusicScreen() {
       return res.json();
     },
     enabled: debouncedQuery.length >= 2 && activeTab === "brani",
-    staleTime: 30_000,
+    staleTime: 30_000
   });
 
   const tracksQuery = useQuery<{ tracks: LibraryTrack[] }>({
-    queryKey: [`${apiPrefix}/tracks`],
+    queryKey: [`${apiPrefix}/tracks`]
   });
 
   const matchQuery = useQuery<{ matches: MusicMatch[] }>({
@@ -204,12 +204,12 @@ export default function MusicScreen() {
       if (!res.ok) throw new Error(`${res.status}`);
       return res.json();
     },
-    enabled: false,
+    enabled: false
   });
 
   const sharedPlaylistsQuery = useQuery<{ playlists: SharedPlaylistEntry[] }>({
     queryKey: [`${apiPrefix}/shared-playlists`],
-    enabled: activeTab === "ricevute",
+    enabled: activeTab === "ricevute"
   });
 
   const addTrackMutation = useMutation({
@@ -224,7 +224,7 @@ export default function MusicScreen() {
     onError: (err: Error) => {
       Alert.alert(t("music.error"), err.message ?? t("music.addTrackError"));
     },
-    onSettled: () => setPendingAddId(null),
+    onSettled: () => setPendingAddId(null)
   });
 
   const removeTrackMutation = useMutation({
@@ -239,7 +239,7 @@ export default function MusicScreen() {
     onError: (err: Error) => {
       Alert.alert(t("music.error"), err.message ?? t("music.removeTrackError2"));
     },
-    onSettled: () => setPendingRemoveId(null),
+    onSettled: () => setPendingRemoveId(null)
   });
 
   const mergePlaylistMutation = useMutation({
@@ -254,7 +254,7 @@ export default function MusicScreen() {
     },
     onError: (err: Error) => {
       Alert.alert(t("music.error"), err.message);
-    },
+    }
   });
 
   const disconnectMutation = useMutation({
@@ -268,7 +268,7 @@ export default function MusicScreen() {
     },
     onError: (err: Error) => {
       Alert.alert(t("music.error"), err.message ?? "Impossibile disconnettere");
-    },
+    }
   });
 
   const handleDisconnect = useCallback(() => {

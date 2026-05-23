@@ -98,12 +98,12 @@ export default function GiriCreateScreen() {
   }, [compassDirLabel]);
 
   const { data: motorcycles = [] } = useQuery<UserMotorcycle[]>({
-    queryKey: ["/api/motorcycles"],
+    queryKey: ["/api/motorcycles"]
   });
 
   const { data: myStyleProfile } = useQuery<MyStyleProfile>({
     queryKey: ["/api/planned-routes/my-style-profile"],
-    staleTime: 5 * 60 * 1000,
+    staleTime: 5 * 60 * 1000
   });
 
   useRouteMapLogic({
@@ -111,7 +111,7 @@ export default function GiriCreateScreen() {
     webviewRef,
     waypoints,
     lastFittedWaypointSig,
-    bikerScoreAnim,
+    bikerScoreAnim
   });
 
   useEffect(() => {

@@ -47,16 +47,16 @@ export default function AdminMotoclubs() {
   const [showAllRequests, setShowAllRequests] = useState(false);
 
   const { data: requests = [], isLoading: loadingReqs } = useQuery<ClubRequest[]>({
-    queryKey: ["/api/admin/motoclubs/requests"],
+    queryKey: ["/api/admin/motoclubs/requests"]
   });
 
   const { data: clubs = [], isLoading: loadingClubs } = useQuery<Club[]>({
-    queryKey: ["/api/admin/motoclubs"],
+    queryKey: ["/api/admin/motoclubs"]
   });
 
   const { data: pendingLocations = [], isLoading: loadingLocations } = useQuery<PendingLocation[]>({
     queryKey: ["/api/motoclubs/map/pending-locations"],
-    enabled: tab === "sedi",
+    enabled: tab === "sedi"
   });
 
   const approveLocationMutation = useMutation({
@@ -68,7 +68,7 @@ export default function AdminMotoclubs() {
       queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/map/pending-locations"] });
       queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/map"] });
     },
-    onError: () => Alert.alert("Errore", "Impossibile approvare la sede"),
+    onError: () => Alert.alert("Errore", "Impossibile approvare la sede")
   });
 
   const rejectLocationMutation = useMutation({
@@ -79,7 +79,7 @@ export default function AdminMotoclubs() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/motoclubs/map/pending-locations"] });
     },
-    onError: () => Alert.alert("Errore", "Impossibile rifiutare la sede"),
+    onError: () => Alert.alert("Errore", "Impossibile rifiutare la sede")
   });
 
   const systemRequests = useMemo(() => requests.filter((r) => !r.requestedBy), [requests]);
@@ -122,7 +122,7 @@ export default function AdminMotoclubs() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/motoclubs/requests"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/motoclubs"] });
     },
-    onError: () => Alert.alert("Errore", "Impossibile approvare la richiesta"),
+    onError: () => Alert.alert("Errore", "Impossibile approvare la richiesta")
   });
 
   const rejectMutation = useMutation({
@@ -135,7 +135,7 @@ export default function AdminMotoclubs() {
       setRejectModal(null);
       setRejectNote("");
     },
-    onError: () => Alert.alert("Errore", "Impossibile rifiutare la richiesta"),
+    onError: () => Alert.alert("Errore", "Impossibile rifiutare la richiesta")
   });
 
   const deleteMutation = useMutation({
@@ -143,7 +143,7 @@ export default function AdminMotoclubs() {
       await apiRequest("DELETE", `/api/admin/motoclubs/${id}`);
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/motoclubs"] }),
-    onError: () => Alert.alert("Errore", "Impossibile eliminare il club"),
+    onError: () => Alert.alert("Errore", "Impossibile eliminare il club")
   });
 
   function handleApprove(req: ClubRequest) {
@@ -275,5 +275,5 @@ export default function AdminMotoclubs() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   emptyWrap: { alignItems: "center", marginTop: 60, gap: 12 },
-  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary },
+  emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary }
 });
