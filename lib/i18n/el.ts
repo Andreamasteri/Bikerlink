@@ -53,8 +53,8 @@ const el: Record<string, string> = {
   "proposals.hub.headerTitle": "Διαδρομές & Απόδοση",
   "proposals.hub.proposalsRequests": "Προτάσεις &\nΑιτήματα",
   "proposals.hub.ridesPerformance": "Διαδρομές &\nΑπόδοση",
-  "proposals.hub.myRoutes": "Οι Διαδρομές\nμου",
-  "proposals.hub.myRides": "Σχεδιασμένες\nΔιαδρομές",
+  "proposals.hub.myRoutes": "Αρχείο\nΔιαδρομών",
+  "proposals.hub.myRides": "Route\nPlanning",
 
   "proposals.title": "Προτάσεις",
   "proposals.create": "Δημιουργία πρότασης",

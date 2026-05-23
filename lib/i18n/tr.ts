@@ -53,8 +53,8 @@ const tr: Record<string, string> = {
   "proposals.hub.headerTitle": "Turlar ve Performans",
   "proposals.hub.proposalsRequests": "Teklifler ve\nİstekler",
   "proposals.hub.ridesPerformance": "Turlar ve\nPerformans",
-  "proposals.hub.myRoutes": "Benim\nRotalarım",
-  "proposals.hub.myRides": "Planlı\nSürüşler",
+  "proposals.hub.myRoutes": "Rota\nArşivi",
+  "proposals.hub.myRides": "Route\nPlanning",
 
   "proposals.title": "Teklifler",
   "proposals.create": "Teklif oluştur",

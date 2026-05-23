@@ -99,7 +99,7 @@ export const HomeMapSection: React.FC<HomeMapSectionProps> = ({
 
 const styles = StyleSheet.create({
   mapContainer: {
-    height: 300,
+    height: 220,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 20,

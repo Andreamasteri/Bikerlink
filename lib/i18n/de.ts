@@ -53,8 +53,8 @@ const de: Record<string, string> = {
   "proposals.hub.headerTitle": "Touren & Performance",
   "proposals.hub.proposalsRequests": "Vorschläge &\nAnfragen",
   "proposals.hub.ridesPerformance": "Touren &\nPerformance",
-  "proposals.hub.myRoutes": "Meine\nRouten",
-  "proposals.hub.myRides": "Geplante\nTouren",
+  "proposals.hub.myRoutes": "Routen\nArchiv",
+  "proposals.hub.myRides": "Route\nPlanning",
 
   "proposals.title": "Vorschläge",
   "proposals.create": "Vorschlag erstellen",

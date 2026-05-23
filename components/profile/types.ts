@@ -15,6 +15,7 @@ export interface ProfileData {
   isPrimal?: boolean;
   floatingWidgetEnabled?: boolean;
   deletionRequestedAt?: string;
+  gpsPrecision?: string;
   profile?: {
     isAvailable: boolean;
     bio?: string;

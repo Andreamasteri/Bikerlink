@@ -64,7 +64,10 @@ export default function PrivacyPanel({ profileData }: Props) {
       setFakeHomeLongitude(p.fakeHomeLongitude ?? null);
       setFakeHomeRadius(p.fakeHomeRadius ?? 2);
     }
-  }, [profileData?.profile]);
+    if (profileData?.gpsPrecision) {
+      setGpsPrecision(profileData.gpsPrecision);
+    }
+  }, [profileData?.profile, profileData?.gpsPrecision]);
 
   const repushLocationForPrivacy = useCallback(async () => {
     try {
@@ -173,105 +176,108 @@ export default function PrivacyPanel({ profileData }: Props) {
 
   return (
     <>
-      <View style={styles.section}>
-        <Pressable
-          style={styles.accordionHeader}
-          onPress={() => setPrivacyExpanded((v) => !v)}
-        >
-          <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Privacy & Posizione</Text>
-          <Ionicons
-            name={privacyExpanded ? "chevron-up" : "chevron-down"}
-            size={18}
-            color={Colors.textSecondary}
-          />
-        </Pressable>
-
-        {privacyExpanded && (
-          <View style={{ paddingTop: 8 }}>
-            <PrivacySettingsSection
-              hideFromMap={hideFromMap}
-              onHideFromMapChange={(val) => {
-                setHideFromMap(val);
-                privacyMutation.mutate({ hideFromMap: val });
-              }}
-              positionFuzz={positionFuzz}
-              onPositionFuzzChange={(val) => {
-                setPositionFuzz(val);
-                privacyMutation.mutate({ positionFuzz: val });
-              }}
-              positionFuzzKm={positionFuzzKm}
-              onPositionFuzzKmChange={setPositionFuzzKm}
-              onPositionFuzzKmEndEditing={() => privacyMutation.mutate({ positionFuzzKm })}
+      <View style={styles.rowContainer}>
+        {/* LEFT — Privacy & Posizione */}
+        <View style={styles.card}>
+          <Pressable
+            style={styles.accordionHeader}
+            onPress={() => setPrivacyExpanded((v) => !v)}
+          >
+            <Text style={styles.cardTitle}>Privacy &{"\n"}Posizione</Text>
+            <Ionicons
+              name={privacyExpanded ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={Colors.textSecondary}
             />
+          </Pressable>
 
-            <FakeHomeSection
-              fakeHomeEnabled={fakeHomeEnabled}
-              onFakeHomeEnabledChange={(val) => {
-                setFakeHomeEnabled(val);
-                privacyMutation.mutate({ fakeHomeEnabled: val });
-              }}
-              homeLatitude={homeLatitude}
-              homeLongitude={homeLongitude}
-              fakeHomeLatitude={fakeHomeLatitude}
-              fakeHomeLongitude={fakeHomeLongitude}
-              fakeHomeRadius={fakeHomeRadius}
-              onFakeHomeRadiusChange={setFakeHomeRadius}
-              onFakeHomeRadiusEndEditing={() => privacyMutation.mutate({ fakeHomeRadius })}
-              onPickCoord={pickCoordFromGPS}
-              onOpenMapPicker={openMapPicker}
-            />
+          {privacyExpanded && (
+            <View style={{ paddingTop: 8 }}>
+              <PrivacySettingsSection
+                hideFromMap={hideFromMap}
+                onHideFromMapChange={(val) => {
+                  setHideFromMap(val);
+                  privacyMutation.mutate({ hideFromMap: val });
+                }}
+                positionFuzz={positionFuzz}
+                onPositionFuzzChange={(val) => {
+                  setPositionFuzz(val);
+                  privacyMutation.mutate({ positionFuzz: val });
+                }}
+                positionFuzzKm={positionFuzzKm}
+                onPositionFuzzKmChange={setPositionFuzzKm}
+                onPositionFuzzKmEndEditing={() => privacyMutation.mutate({ positionFuzzKm })}
+              />
 
-            {/* GPS Precision */}
-            <View style={[styles.privacyRow, { borderBottomWidth: 0, marginTop: 8 }]}>
-              <Pressable
-                style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
-                onPress={() => setGpsPrecisionExpanded((v) => !v)}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.privacyLabel}>Precisione GPS</Text>
-                  <Text style={styles.privacyDesc}>
-                    {GPS_PRECISION_OPTIONS.find((o) => o.value === gpsPrecision)?.label ?? gpsPrecision}
-                  </Text>
-                </View>
-                <Ionicons
-                  name={gpsPrecisionExpanded ? "chevron-up" : "chevron-down"}
-                  size={16}
-                  color={Colors.textSecondary}
-                />
-              </Pressable>
+              <FakeHomeSection
+                fakeHomeEnabled={fakeHomeEnabled}
+                onFakeHomeEnabledChange={(val) => {
+                  setFakeHomeEnabled(val);
+                  privacyMutation.mutate({ fakeHomeEnabled: val });
+                }}
+                homeLatitude={homeLatitude}
+                homeLongitude={homeLongitude}
+                fakeHomeLatitude={fakeHomeLatitude}
+                fakeHomeLongitude={fakeHomeLongitude}
+                fakeHomeRadius={fakeHomeRadius}
+                onFakeHomeRadiusChange={setFakeHomeRadius}
+                onFakeHomeRadiusEndEditing={() => privacyMutation.mutate({ fakeHomeRadius })}
+                onPickCoord={pickCoordFromGPS}
+                onOpenMapPicker={openMapPicker}
+              />
             </View>
-            {gpsPrecisionExpanded && (
-              <View style={{ marginBottom: 8 }}>
-                {GPS_PRECISION_OPTIONS.map((opt) => (
-                  <Pressable
-                    key={opt.value}
+          )}
+        </View>
+
+        {/* RIGHT — Precisione GPS Tracking */}
+        <View style={styles.card}>
+          <Pressable
+            style={styles.accordionHeader}
+            onPress={() => setGpsPrecisionExpanded((v) => !v)}
+          >
+            <Text style={styles.cardTitle}>Precisione{"\n"}GPS Tracking</Text>
+            <Ionicons
+              name={gpsPrecisionExpanded ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={Colors.textSecondary}
+            />
+          </Pressable>
+
+          <Text style={styles.currentValueText}>
+            {GPS_PRECISION_OPTIONS.find((o) => o.value === gpsPrecision)?.label ?? gpsPrecision}
+          </Text>
+
+          {gpsPrecisionExpanded && (
+            <View style={{ marginTop: 6 }}>
+              {GPS_PRECISION_OPTIONS.map((opt) => (
+                <Pressable
+                  key={opt.value}
+                  style={[
+                    styles.gpsPrecisionOption,
+                    gpsPrecision === opt.value && styles.gpsPrecisionOptionActive,
+                  ]}
+                  onPress={() => {
+                    setGpsPrecision(opt.value);
+                    privacyMutation.mutate({ gpsPrecision: opt.value });
+                    setGpsPrecisionExpanded(false);
+                  }}
+                >
+                  <Text
                     style={[
-                      styles.gpsPrecisionOption,
-                      gpsPrecision === opt.value && styles.gpsPrecisionOptionActive,
+                      styles.gpsPrecisionLabel,
+                      gpsPrecision === opt.value && { color: Colors.accent },
                     ]}
-                    onPress={() => {
-                      setGpsPrecision(opt.value);
-                      privacyMutation.mutate({ gpsPrecision: opt.value });
-                      setGpsPrecisionExpanded(false);
-                    }}
                   >
-                    <Text
-                      style={[
-                        styles.gpsPrecisionLabel,
-                        gpsPrecision === opt.value && { color: Colors.accent },
-                      ]}
-                    >
-                      {opt.label}
-                    </Text>
-                    {gpsPrecision === opt.value && (
-                      <Ionicons name="checkmark" size={16} color={Colors.accent} />
-                    )}
-                  </Pressable>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
+                    {opt.label}
+                  </Text>
+                  {gpsPrecision === opt.value && (
+                    <Ionicons name="checkmark" size={16} color={Colors.accent} />
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
       </View>
 
       <Modal
@@ -342,50 +348,46 @@ export default function PrivacyPanel({ profileData }: Props) {
 }
 
 const styles = StyleSheet.create({
-  section: {
-    backgroundColor: Colors.card,
-    borderRadius: 16,
+  rowContainer: {
+    flexDirection: "row",
     marginHorizontal: 16,
     marginTop: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    gap: 8,
+    alignItems: "flex-start",
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-    marginBottom: 12,
+  card: {
+    flex: 1,
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   accordionHeader: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  privacyRow: {
-    flexDirection: "row",
     alignItems: "flex-start",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    justifyContent: "space-between",
+    gap: 4,
   },
-  privacyLabel: {
-    fontSize: 14,
+  cardTitle: {
+    flex: 1,
+    fontSize: 13,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
-    marginBottom: 4,
+    lineHeight: 18,
   },
-  privacyDesc: {
-    fontSize: 12,
+  currentValueText: {
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
-    lineHeight: 16,
+    marginTop: 4,
+    lineHeight: 15,
   },
   gpsPrecisionOption: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
     borderRadius: 8,
     marginBottom: 2,
   },
@@ -393,8 +395,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent + "18",
   },
   gpsPrecisionLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     color: Colors.text,
+    flex: 1,
   },
 });
