@@ -48,7 +48,7 @@ import eventsRoutes from "./routes/events";
 import arcadeRoutes from "./routes/arcade";
 import errorsRoutes from "./routes/errors";
 import sprintsRoutes from "./routes/sprints";
-import roadHazardsRoutes from "./routes/road-hazards";
+// import roadHazardsRoutes from "./routes/road-hazards"; // disabled pre-deploy
 import { publicMediaRouter, adminMediaRouter } from "./routes/media-library";
 import { triggerMatchingRun, triggerMatchingForUser } from "./matching-engine";
 import { db } from "./db";
@@ -256,7 +256,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/arcade", arcadeRoutes);
   app.use("/api/errors", errorsRoutes);
   app.use("/api/sprints", sprintsRoutes);
-  app.use("/api/road-hazards", roadHazardsRoutes);
+  // app.use("/api/road-hazards", roadHazardsRoutes); // disabled pre-deploy
   app.use("/api/media", publicMediaRouter);
   app.use("/api/admin/media", adminMediaRouter);
 

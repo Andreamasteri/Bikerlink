@@ -1,12 +1,8 @@
 import React, { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Platform } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { View, ActivityIndicator, StyleSheet } from "react-native";
 import WebView from "react-native-webview";
-import { HazardReportSheet } from "@/components/map/HazardReportSheet";
-import { HazardDetailSheet } from "@/components/map/HazardDetailSheet";
 import Colors from "@/constants/colors";
 import { useMapConfig } from "@/lib/map-context";
 import type { MapProvider } from "@/lib/map-tiles";
@@ -21,15 +17,6 @@ import type {
   MapUser, MapWorkshop, MapEasterEgg, MapSosRequest,
   ClubMapPin, EventMapPin, InteractiveMapProps, InteractiveMapHandle,
 } from "@/components/map/map-types";
-
-interface HazardPin {
-  id: string;
-  type: string;
-  lat: number;
-  lng: number;
-  confirmCount: number;
-  description?: string | null;
-}
 
 export type { MapUser, MapWorkshop, MapEasterEgg, MapSosRequest, ClubMapPin, InteractiveMapHandle };
 
@@ -50,13 +37,9 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [hazardSheetOpen, setHazardSheetOpen] = useState(false);
-  const [hazardDetailId, setHazardDetailId] = useState<string | null>(null);
   const initialCenterDoneRef = useRef(false);
   const gpsCenterDoneRef = useRef(false);
   const { userLocation, locationLoading } = useLocationWatch();
-  const insets = useSafeAreaInsets();
-
   useEffect(() => { sendStartupBeacon("interactive_map_mount"); }, []);
 
   const today = new Date().toISOString().substring(0, 10);
@@ -99,23 +82,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     currentUserId,
   });
 
-  const hazardsQuery = useQuery<{ hazards: HazardPin[] }>({
-    queryKey: ["/api/road-hazards"],
-    refetchInterval: 60_000,
-    staleTime: 30_000,
-  });
-  const hazardPins = hazardsQuery.data?.hazards ?? [];
-
-  useEffect(() => {
-    if (!mapReady) return;
-    const json = JSON.stringify(hazardPins);
-    inject(
-      "window.leafletBridge && window.leafletBridge.updateHazards(" +
-        JSON.stringify(json) +
-        ")"
-    );
-  }, [mapReady, hazardPins, inject]);
-
   useEffect(() => {
     if (!mapReady || initialCenterDoneRef.current) return;
     if (initialCenterOverride) {
@@ -138,7 +104,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     createMapMessageHandler({
       users, clubPins, easterEggs,
       onUserPress, onClubPress, onEventPress, onEasterEggPress,
-      onHazardPress: (id) => setHazardDetailId(id),
       onReady, onRegionChangeComplete, setMapReady,
     }),
     [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete],
@@ -158,10 +123,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   }, [userLocation, inject]);
 
   const showDayNightButton = mapsEnabled && (resolvedProvider === "carto_light" || resolvedProvider === "carto_dark");
-
-  const hazardBtnBottom = Platform.OS === "web"
-    ? 34 + 16
-    : insets.bottom + 16;
 
   return (
     <View style={styles.container}>
@@ -197,24 +158,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         isDayNightPending={saveMapStyleMutation.isPending}
         onCenterOnUser={centerOnUser} onToggleDayNight={handleToggleDayNight}
       />
-      {showHazardReportButton && (
-        <TouchableOpacity
-          style={[styles.hazardBtn, { bottom: hazardBtnBottom }]}
-          onPress={() => setHazardSheetOpen(true)}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="warning" size={22} color="#fff" />
-        </TouchableOpacity>
-      )}
-      <HazardReportSheet
-        visible={hazardSheetOpen}
-        onClose={() => setHazardSheetOpen(false)}
-        userLocation={userLocation}
-      />
-      <HazardDetailSheet
-        hazardId={hazardDetailId}
-        onClose={() => setHazardDetailId(null)}
-      />
     </View>
   );
 });
@@ -227,20 +170,5 @@ const styles = StyleSheet.create({
   loadingOverlay: {
     position: "absolute", top: 16, right: 16,
     backgroundColor: Colors.surface, borderRadius: 20, padding: 8,
-  },
-  hazardBtn: {
-    position: "absolute",
-    left: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: "#E65100",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    elevation: 6,
   },
 });

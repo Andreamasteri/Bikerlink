@@ -10,7 +10,6 @@ interface MapMessageHandlerOptions {
   onClubPress?: (club: ClubMapPin) => void;
   onEventPress?: (id: string) => void;
   onEasterEggPress?: (egg: MapEasterEgg) => void;
-  onHazardPress?: (id: string) => void;
   onReady?: () => void;
   onRegionChangeComplete?: (coords: { latitude: number; longitude: number }) => void;
   setMapReady: (ready: boolean) => void;
@@ -54,8 +53,6 @@ export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
         } else if (msg.markerType === "egg") {
           const e = opts.easterEggs.find((x) => x.id === msg.id);
           if (e) opts.onEasterEggPress?.(e);
-        } else if (msg.markerType === "hazard") {
-          if (msg.id) opts.onHazardPress?.(msg.id);
         }
       }
     } catch {}
