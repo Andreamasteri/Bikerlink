@@ -65,6 +65,10 @@ args = "typecheck-server"
 task = "workflow.run"
 args = "ESLint"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "eslint"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -177,6 +181,17 @@ outputType = "console"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx eslint . --ext .ts,.tsx --max-warnings 9999"
+
+[[workflows.workflow]]
+name = "eslint"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/eslint-hooks-check.sh"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"

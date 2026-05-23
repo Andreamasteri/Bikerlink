@@ -10,6 +10,26 @@ La pubblicazione OTA è un'operazione separata e dedicata, eseguita **solo su is
 
 **Regola**: se un task include modifiche al codice e l'utente non ha esplicitamente detto "pubblica anche l'OTA" come istruzione separata, il task termina **senza** pubblicare alcuna OTA. L'agente deve proporre la pubblicazione OTA come follow-up distinto, non eseguirla autonomamente.
 
+## Policy ESLint CI — Gate Obbligatorio (Ratchet)
+
+La regola `react-hooks/exhaustive-deps` è impostata su **`"warn"`** in `eslint.config.js`. Il gate CI usa un meccanismo **ratchet**: fallisce se il conteggio delle violazioni **aumenta** rispetto alla baseline, impedendo regressioni pur non bloccando il lavoro sul debito tecnico esistente.
+
+### File chiave
+- `eslint.config.js` — configurazione ESLint (flat config ESLint v9)
+- `scripts/eslint-hooks-check.sh` — script ratchet CI
+- `.eslint-hooks-baseline` — numero corrente di violazioni accettate (baseline)
+
+### Gate CI registrato
+Validation command `eslint` (comando: `bash scripts/eslint-hooks-check.sh`) è registrato nella piattaforma Replit. Viene eseguito automaticamente alla chiusura del task.
+
+### Regole operative
+1. **Non aumentare le violazioni**: il gate blocca il task se il conteggio supera la baseline.
+2. **Quando si riducono le violazioni**: eseguire `bash scripts/eslint-hooks-check.sh --update-baseline` per aggiornare `.eslint-hooks-baseline` al nuovo valore più basso (direzione: riduzione progressiva del debito).
+3. **Per silenziare un caso legittimo**: usare `// eslint-disable-next-line react-hooks/exhaustive-deps` con commento che spiega il motivo tecnico.
+4. **Violazioni `exhaustive-deps`** causano bug di stale closure in produzione — non aggiungerne di nuove.
+
+---
+
 ## Anti-pattern dell'agente — leggere prima di lavorare
 
 1. **Gerarchia delle fonti di verità per le dipendenze native**: per dichiarare che una libreria nativa Android non è nell'APK, NON basta verificare `package.json` o gli `import` nel codice JS. Le dipendenze transitive di Expo (es. `expo-camera` tira ML Kit Barcode, `expo-notifications` tira Firebase Cloud Messaging) finiscono nell'APK senza apparire in `package.json`. La sola fonte di verità è il `.apk` compilato (o il gradle dependency tree).
