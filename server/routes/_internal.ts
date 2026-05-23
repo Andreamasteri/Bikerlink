@@ -2,6 +2,11 @@ import { Router, type Request, type Response } from "express";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { db } from "../db";
+import { messages, conversations } from "@shared/db/conversations";
+import { users } from "@shared/db/users";
+import { proposals } from "@shared/db/proposals";
+import { eq, gte, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -12,7 +17,6 @@ function timingSafeCompare(a: string, b: string): boolean {
     const bufA = Buffer.from(a, "utf-8");
     const bufB = Buffer.from(b, "utf-8");
     if (bufA.length !== bufB.length) {
-      // Still run timingSafeEqual on same-length buffers to avoid timing leak on length
       const padded = Buffer.alloc(bufA.length);
       bufB.copy(padded, 0, 0, Math.min(bufB.length, bufA.length));
       crypto.timingSafeEqual(bufA, padded);
@@ -71,6 +75,145 @@ router.get("/tasks-export", (req: Request, res: Response) => {
   res.setHeader("Cache-Control", "no-store");
   res.setHeader("X-Export-File", path.basename(filePath));
   return res.send(content);
+});
+
+router.get("/chat-export", async (req: Request, res: Response) => {
+  if (!requireExportToken(req, res)) return;
+
+  try {
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    const dateLabel = now.toLocaleDateString("it-IT", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
+    });
+    const timeLabel = now.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+
+    const [todayMessages, newUsers, newProposals, totalUsers, totalMessages] = await Promise.all([
+      db
+        .select({
+          id: messages.id,
+          content: messages.content,
+          messageType: messages.messageType,
+          createdAt: messages.createdAt,
+          senderNickname: users.nickname,
+          senderType: users.userType,
+          conversationId: messages.conversationId,
+          conversationType: conversations.conversationType,
+          conversationTitle: conversations.title,
+        })
+        .from(messages)
+        .innerJoin(users, eq(messages.senderId, users.id))
+        .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+        .where(gte(messages.createdAt, todayStart))
+        .orderBy(messages.createdAt),
+
+      db
+        .select({
+          id: users.id,
+          nickname: users.nickname,
+          userType: users.userType,
+          region: users.region,
+          createdAt: users.createdAt,
+          isFake: users.isFake,
+        })
+        .from(users)
+        .where(gte(users.createdAt, todayStart))
+        .orderBy(users.createdAt),
+
+      db
+        .select({
+          id: proposals.id,
+          proposalType: proposals.proposalType,
+          status: proposals.status,
+          createdAt: proposals.createdAt,
+        })
+        .from(proposals)
+        .where(gte(proposals.createdAt, todayStart)),
+
+      db.select({ count: sql<number>`count(*)::int` }).from(users),
+      db.select({ count: sql<number>`count(*)::int` }).from(messages),
+    ]);
+
+    const lines: string[] = [];
+
+    lines.push(`# BikerLink — Attività del giorno`);
+    lines.push(`**${dateLabel}** — generato alle ${timeLabel}`);
+    lines.push(``);
+
+    lines.push(`## Riepilogo`);
+    lines.push(`| Metrica | Oggi | Totale |`);
+    lines.push(`|---------|------|--------|`);
+    lines.push(`| Nuovi utenti | ${newUsers.length} | ${totalUsers[0]?.count ?? "?"} |`);
+    lines.push(`| Messaggi inviati | ${todayMessages.length} | ${totalMessages[0]?.count ?? "?"} |`);
+    lines.push(`| Nuovi match/proposte | ${newProposals.length} | — |`);
+    lines.push(``);
+
+    lines.push(`## Nuovi utenti (${newUsers.length})`);
+    if (newUsers.length === 0) {
+      lines.push(`_Nessun nuovo utente oggi._`);
+    } else {
+      lines.push(`| Ora | Nickname | Tipo | Regione | Fake |`);
+      lines.push(`|-----|----------|------|---------|------|`);
+      for (const u of newUsers) {
+        const ora = new Date(u.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+        lines.push(`| ${ora} | ${u.nickname} | ${u.userType} | ${u.region ?? "—"} | ${u.isFake ? "✓" : ""} |`);
+      }
+    }
+    lines.push(``);
+
+    lines.push(`## Nuove proposte/match (${newProposals.length})`);
+    if (newProposals.length === 0) {
+      lines.push(`_Nessuna proposta oggi._`);
+    } else {
+      lines.push(`| Ora | Tipo | Stato |`);
+      lines.push(`|-----|------|-------|`);
+      for (const p of newProposals) {
+        const ora = new Date(p.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+        lines.push(`| ${ora} | ${p.proposalType ?? "—"} | ${p.status ?? "—"} |`);
+      }
+    }
+    lines.push(``);
+
+    lines.push(`## Messaggi di oggi (${todayMessages.length})`);
+    if (todayMessages.length === 0) {
+      lines.push(`_Nessun messaggio oggi._`);
+    } else {
+      const byConv = new Map<string, typeof todayMessages>();
+      for (const m of todayMessages) {
+        const key = m.conversationId;
+        if (!byConv.has(key)) byConv.set(key, []);
+        byConv.get(key)!.push(m);
+      }
+
+      for (const [, msgs] of byConv) {
+        const first = msgs[0];
+        const convLabel = first.conversationTitle
+          ? `"${first.conversationTitle}"`
+          : `[${first.conversationType}]`;
+        lines.push(`### Conversazione ${convLabel} — ${msgs.length} msg`);
+        for (const m of msgs) {
+          const ora = new Date(m.createdAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+          const testo = m.messageType !== "text"
+            ? `_(${m.messageType})_`
+            : (m.content ?? "").replace(/\n/g, " ").slice(0, 300);
+          lines.push(`- **${ora}** [${m.senderNickname}] ${testo}`);
+        }
+        lines.push(``);
+      }
+    }
+
+    const markdown = lines.join("\n");
+
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Export-Date", now.toISOString());
+    return res.send(markdown);
+  } catch (err) {
+    console.error("[chat-export] Errore:", err);
+    return res.status(500).json({ message: "Errore interno durante l'export" });
+  }
 });
 
 export default router;
