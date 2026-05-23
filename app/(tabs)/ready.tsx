@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, ScrollView, ActivityIndicator, Alert } from "react-native";
+import { View, StyleSheet, ScrollView, ActivityIndicator, Alert, useWindowDimensions } from "react-native";
 import Colors from "@/constants/colors";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
@@ -24,6 +24,7 @@ import { useReadyState } from "@/hooks/useReadyState";
 export default function ReadyToRideScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth } = useWindowDimensions();
   const sosEnabled = useSetting("sosEnabled");
 
   const {
@@ -188,8 +189,11 @@ export default function ReadyToRideScreen() {
             privacyMutation={privacyMutation as any}
           />
 
-          <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
-            <View style={{ flex: 1 }}>
+          <View style={[
+            styles.accordionRow,
+            screenWidth < 360 && styles.accordionRowNarrow,
+          ]}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <PrivacyPositionSettings
                 t={t}
                 colors={colors}
@@ -228,7 +232,7 @@ export default function ReadyToRideScreen() {
                 openMapPicker={openMapPicker}
               />
             </View>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <GpsPrecisionSettings
                 colors={colors}
                 gpsPrecisionExpanded={gpsPrecisionExpanded}
@@ -302,5 +306,14 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 8,
     alignItems: "center",
+  },
+  accordionRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "flex-start",
+    alignSelf: "stretch",
+  },
+  accordionRowNarrow: {
+    flexDirection: "column",
   },
 });
