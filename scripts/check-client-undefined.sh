@@ -200,6 +200,10 @@ for module_suffix in "${!seen_modules[@]}"; do
       for name in $names; do
         clean_name=$(echo "$name" | sed 's/ as .*//' | tr -d ' ')
         [ -z "$clean_name" ] && continue
+        # Skip the bare 'type' keyword: inline type imports like
+        #   { type HazardType } are split by word into 'type' + 'HazardType'.
+        # 'type' itself is a TS keyword, not an exported symbol — skip it.
+        [ "$clean_name" = "type" ] && continue
 
         # Check the resolved file for a concrete export of this symbol.
         # Matches: export const|function|class|type|interface|enum <name>
@@ -207,7 +211,10 @@ for module_suffix in "${!seen_modules[@]}"; do
         # Also follows one level of "export * from './sub'" barrel re-exports
         # so that split barrel modules (e.g. shared/validators/index.ts) are
         # verified correctly without requiring explicit re-declarations.
-        _EXPORT_GREP="^export (const|function|class|type|interface|enum|abstract class) ${clean_name}[ <({=]|^export \{[^}]*\b${clean_name}\b[^}]*\}"
+        #
+        # NOTE: [ <({=:] includes ':' to match typed constants such as:
+        #   export const FOO: SomeType = ...   (type annotation after name)
+        _EXPORT_GREP="^export (const|function|class|type|interface|enum|abstract class) ${clean_name}[ <({=:]|^export \{[^}]*\b${clean_name}\b[^}]*\}"
         _found_export=false
         if grep -qE "$_EXPORT_GREP" "$resolved_file" 2>/dev/null; then
           _found_export=true
