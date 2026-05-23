@@ -272,28 +272,10 @@ function requireAdmin(req: Request, res: Response, next: Function) {
 }
 
 // Task #1770 — OTA token middleware: valida Bearer token per i 3 endpoint di publish.
-// Viene applicato PRIMA di router.use(requireAdmin) per i soli path OTA di scrittura.
-// Se il token è valido, imposta req.otaTokenAuthenticated = true; requireAdmin lo rispetta.
-const OTA_PUBLISH_PATHS: Array<RegExp | string> = [
-  // POST /ota  (create release)
-  /^\/ota\/?$/,
-  // POST /ota/:id/publish
-  /^\/ota\/[^/]+\/publish\/?$/,
-  // POST /ota/assign-slot
-  /^\/ota\/assign-slot\/?$/,
-];
-
-function matchOtaPublishPath(method: string, url: string): boolean {
-  if (method !== "POST") return false;
-  const pathname = url.split("?")[0];
-  return OTA_PUBLISH_PATHS.some((p) =>
-    typeof p === "string" ? pathname === p : p.test(pathname)
-  );
-}
-
+// Se il token è valido, imposta req.otaTokenAuthenticated = true; requireAdmin e
+// assertAdminSession lo rispettano. Scoped all'admin router — nessun filtro per path.
 async function checkOtaTokenMiddleware(req: Request, _res: Response, next: Function) {
   try {
-    if (!matchOtaPublishPath(req.method, req.url)) return next();
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) return next();
     const rawToken = authHeader.substring(7).trim();

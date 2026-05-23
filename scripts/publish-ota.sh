@@ -799,30 +799,34 @@ do_publish() {
     fs.writeFileSync(process.env.STATE_FILE_PATH, JSON.stringify(s, null, 2) + '\n');
   "
 
-  # ─── Step G: Autenticazione (token o login) ───────────────
-  # Se esiste .local/ota-token, usa quello al posto del login email/password.
+  # ─── Step G: Autenticazione (token + session login) ──────────
+  # Il token OTA viene usato per POST /ota (create).
+  # Il session cookie viene usato per POST /ota/:id/publish che richiede
+  # assertAdminSession (session-based auth).
   local OTA_TOKEN="" SESSION_COOKIE="" AUTH_HEADER=""
   if [ -f "$OTA_TOKEN_FILE" ]; then
     OTA_TOKEN=$(cat "$OTA_TOKEN_FILE")
     if [ -n "$OTA_TOKEN" ]; then
-      echo "[G] Token OTA trovato in $OTA_TOKEN_FILE — skip login."
+      echo "[G] Token OTA trovato in $OTA_TOKEN_FILE."
       AUTH_HEADER="Authorization: Bearer $OTA_TOKEN"
     fi
   fi
-  if [ -z "$OTA_TOKEN" ]; then
-    echo "[G] Login admin su $BACKEND_URL..."
-    require_admin_creds
-    SESSION_COOKIE=$(do_admin_login "$ADMIN_EMAIL" "$ADMIN_PASSWORD") || exit 1
-    echo "   ✔ Autenticato"
-  fi
+  # Session login: sempre necessario per il publish endpoint (assertAdminSession).
+  echo "[G] Login admin su $BACKEND_URL per session auth..."
+  require_admin_creds
+  SESSION_COOKIE=$(do_admin_login "$ADMIN_EMAIL" "$ADMIN_PASSWORD") || exit 1
+  echo "   ✔ Autenticato (session)"
 
-  # Helper: aggiunge auth header corretto alla chiamata curl
+  # auth_curl: usa token OTA (per create); session_curl: usa cookie (per publish).
   auth_curl() {
     if [ -n "$OTA_TOKEN" ]; then
       curl -s -H "$AUTH_HEADER" -H "X-Forwarded-Proto: https" "$@"
     else
       curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" "$@"
     fi
+  }
+  session_curl() {
+    curl -s -H "Cookie: $SESSION_COOKIE" -H "X-Forwarded-Proto: https" "$@"
   }
 
   # ─── Step H: Creazione release draft ──────────────────────
@@ -851,9 +855,10 @@ do_publish() {
   "
 
   # ─── Step I: Pubblicazione release ────────────────────────
+  # Usa session_curl (cookie admin) perché assertAdminSession richiede req.session.userId.
   echo "[I] Pubblicazione release..."
   local PUBLISH_RESPONSE PUBLISH_STATUS
-  PUBLISH_RESPONSE=$(auth_curl -X POST "$BACKEND_URL/api/admin/ota/$RELEASE_ID/publish")
+  PUBLISH_RESPONSE=$(session_curl -X POST "$BACKEND_URL/api/admin/ota/$RELEASE_ID/publish")
   PUBLISH_STATUS=$(echo "$PUBLISH_RESPONSE" | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{ try { console.log(JSON.parse(d).status ?? ''); } catch { console.log(''); } })" 2>/dev/null || true)
   if [ "$PUBLISH_STATUS" != "active" ]; then
     echo "   ERRORE pubblicazione: $PUBLISH_RESPONSE"

@@ -1624,7 +1624,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-22T20:38:38.839Z"
+  },
+  {
+    "updateNumber": 14,
+    "version": "48.14.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-14 rv10.0.0: Multi-fix: match screen, map refactor, OTA admin-preview, badge compatibilita",
+    "note": "CURRENT_OTA_NUMBER=14. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "9c440a14-93b8-42f9-99b2-fa2ffc27914d",
+    "bundleUrl": "private/ota/ota-48.14.10-1779507373822.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "33a4b1a464f0bd1439f4d3ecbcb36bd69e71fe7d",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-23T03:36:18.506Z"
   }
 ]

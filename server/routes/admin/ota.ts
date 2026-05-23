@@ -24,6 +24,7 @@ function paramStr(v: string | string[] | undefined): string | null {
 }
 
 async function assertAdminSession(req: Request, res: Response): Promise<boolean> {
+  if ((req as any).otaTokenAuthenticated === true) return true;
   if (!req.session?.userId) {
     sendError(res, 401, "Non autenticato");
     return false;
