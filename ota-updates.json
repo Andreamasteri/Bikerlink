@@ -1680,7 +1680,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-23T12:33:46.766Z"
+  },
+  {
+    "updateNumber": 16,
+    "version": "48.16.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-16 rv10.0.0: OTA-16: fix bundle content (CURRENT_OTA_NUMBER=16, pin segnalazioni interattivi con commenti)",
+    "note": "CURRENT_OTA_NUMBER=16. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "92ef0e8c-8ccb-4e04-b1f3-1459dd0f6e30",
+    "bundleUrl": "private/ota/ota-48.16.10-1779548470176.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "d0c7e92ab1dedc253c7d3cd9531ee41231866f5d",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-23T15:01:15.507Z"
   }
 ]
