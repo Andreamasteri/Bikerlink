@@ -25,7 +25,7 @@ export function useHomeMapState() {
   const { focusLat: focusLatParam, focusLng: focusLngParam } = useLocalSearchParams<{ focusLat?: string; focusLng?: string }>();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const t = useT();
-  const { positionReady: contextPositionReady, requestPermission, locationPermissionDenied, locationPermissionPrompt } = useLocationGate();
+  const { positionReady: contextPositionReady, requestPermission } = useLocationGate();
 
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [mapFullscreenReady, setMapFullscreenReady] = useState(false);
@@ -467,8 +467,6 @@ export function useHomeMapState() {
     t,
     contextPositionReady,
     requestPermission,
-    locationPermissionDenied,
-    locationPermissionPrompt,
     mapFullscreen,
     setMapFullscreen,
     mapFullscreenReady,
