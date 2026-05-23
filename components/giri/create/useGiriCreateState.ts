@@ -416,7 +416,9 @@ export function useGiriCreateState(language?: string) {
       setWpInputs(newInputs);
       setRouteResult(null);
       setWeatherPreview(null);
-    } catch {}
+    } catch {
+      // no-op: ignore reverse geocoding failures on map tap
+    }
   };
 
   return {

@@ -119,7 +119,9 @@ export function AdminMotoClubUserCreationCard({ item, onApprove, onReject, isApp
   const Colors_warning = "#F59E0B"; // Matches typical warning color used in original
   const isPending = item.status === "pending";
   let inviteCount = 0;
-  try { inviteCount = item.inviteUserIds ? JSON.parse(item.inviteUserIds).length : 0; } catch {}
+  try { inviteCount = item.inviteUserIds ? JSON.parse(item.inviteUserIds).length : 0; } catch {
+    // no-op: fallback to 0 if JSON is malformed
+  }
   
   return (
     <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: Colors_warning }]}>

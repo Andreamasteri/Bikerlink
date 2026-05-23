@@ -137,7 +137,9 @@ export function useHomeMapState() {
           const lng = parseFloat(parsed.lng);
           if (isNaN(lat) || isNaN(lng)) return;
           setPendingFocusCoords({ lat, lng, userId: parsed.userId, nickname: parsed.nickname });
-        } catch {}
+        } catch {
+          // no-op: ignore JSON parsing or storage read errors
+        }
       })();
     }, [])
   );
@@ -219,7 +221,9 @@ export function useHomeMapState() {
         if (!location && webPhonePositionStatus !== "live") {
           setShowLocationNudge(true);
         }
-      } catch {}
+      } catch {
+        // no-op: ignore storage read failures for location nudge
+      }
     })();
   }, [locationLoading, location, webPhonePositionStatus]);
 
@@ -235,9 +239,13 @@ export function useHomeMapState() {
             return;
           }
         }
-      } catch {}
+      } catch {
+        // no-op: ignore JSON parsing or storage read errors
+      }
       setSelectedCountries(["IT"]);
-      try { await AsyncStorage.setItem("map_area_countries", JSON.stringify(["IT"])); } catch {}
+      try { await AsyncStorage.setItem("map_area_countries", JSON.stringify(["IT"])); } catch {
+        // no-op: ignore storage write failures
+      }
       setCountriesLoaded(true);
     })();
   }, []);
@@ -245,7 +253,9 @@ export function useHomeMapState() {
   const { invalidateCountryQueries } = mapData;
   const saveCountries = useCallback(async (countries: string[]) => {
     setSelectedCountries(countries);
-    try { await AsyncStorage.setItem("map_area_countries", JSON.stringify(countries)); } catch {}
+    try { await AsyncStorage.setItem("map_area_countries", JSON.stringify(countries)); } catch {
+      // no-op: ignore storage write failures
+    }
     invalidateCountryQueries();
   }, [invalidateCountryQueries]);
 
@@ -372,7 +382,9 @@ export function useHomeMapState() {
             else Alert.alert(t("home.easterEggTitle"), data.message || t("home.easterEggCongrats"));
             queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
           })
-          .catch(() => {})
+          .catch(() => {
+            // no-op: ignore egg collection failures
+          })
           .finally(() => { autoCollectingRef.current.delete(egg.id); });
       });
     }
@@ -404,18 +416,24 @@ export function useHomeMapState() {
       setSelectedUserProposals((Array.isArray(allProposals) ? allProposals : []).filter(
         (p: any) => p.userId === mapUser.id && p.status === "active"
       ));
-    } catch {}
+    } catch {
+      // no-op: ignore user public detail fetch failures
+    }
     setDetailLoading(false);
   }, []);
 
   const handleEasterEggPress = useCallback((egg: any) => { setSelectedEgg(egg); }, []);
 
   const handleAdClick = useCallback(async (ad: any) => {
-    try { await apiRequest("POST", `/api/ads/${ad.id}/click`); } catch {}
+    try { await apiRequest("POST", `/api/ads/${ad.id}/click`); } catch {
+      // no-op: ignore ad click logging failures
+    }
     if (ad.linkUrl) {
       let url = ad.linkUrl.trim();
       if (!/^https?:\/\//i.test(url)) url = "https://" + url;
-      try { await Linking.openURL(url); } catch {}
+      try { await Linking.openURL(url); } catch {
+        // no-op: ignore browser opening failures
+      }
     }
   }, []);
 
@@ -428,7 +446,9 @@ export function useHomeMapState() {
       const res = await apiRequest("GET", `/api/users/search?q=${encodeURIComponent(text.trim())}`);
       const data = await res.json();
       setSearchResults(data.filter((u: any) => u.id !== user?.id));
-    } catch {}
+    } catch {
+      // no-op: ignore user search failures
+    }
     setSearchLoading(false);
   }, [user?.id]);
 

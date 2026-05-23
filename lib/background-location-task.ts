@@ -59,7 +59,9 @@ export async function stopBackgroundLocationTask(): Promise<void> {
     if (isRunning) {
       await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK_NAME);
     }
-  } catch {}
+  } catch {
+    // no-op: best-effort stopping location task
+  }
 }
 
 async function getCachedSettings(): Promise<{
@@ -78,7 +80,9 @@ async function getCachedSettings(): Promise<{
         if (cached) return JSON.parse(cached);
       }
     }
-  } catch {}
+  } catch {
+    // no-op: cache retrieval is best-effort
+  }
   return null;
 }
 
@@ -106,7 +110,9 @@ async function fetchAndCacheSettings(domain: string): Promise<{
       await AsyncStorage.setItem(SETTINGS_CACHE_TS_KEY, String(Date.now()));
       return data;
     }
-  } catch {}
+  } catch {
+    // no-op: settings fetching is best-effort, fallback used
+  }
   return defaults;
 }
 
@@ -162,5 +168,6 @@ TaskManager.defineTask(
       }),
     });
   } catch {
+    // no-op: background location update is best-effort
   }
 });

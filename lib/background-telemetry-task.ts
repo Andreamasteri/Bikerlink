@@ -63,7 +63,9 @@ export async function stopTelemetryBackgroundTask(): Promise<void> {
     if (isRunning) {
       await Location.stopLocationUpdatesAsync(TASK_TELEMETRY);
     }
-  } catch {}
+  } catch {
+    // no-op: best-effort stopping telemetry task
+  }
 }
 
 /** Reads and clears the AsyncStorage buffer written by the background task. */
@@ -75,6 +77,7 @@ export async function drainBackgroundTelemetryBuffer(): Promise<BgTelemetrySampl
     await AsyncStorage.removeItem(BG_TELEMETRY_BUFFER_KEY);
     return samples;
   } catch {
+    // no-op: buffer recovery is best-effort
     return [];
   }
 }
@@ -122,6 +125,8 @@ TaskManager.defineTask(
         buffer.splice(0, buffer.length - BG_BUFFER_MAX);
       }
       await AsyncStorage.setItem(BG_TELEMETRY_BUFFER_KEY, JSON.stringify(buffer));
-    } catch {}
+    } catch {
+      // no-op: telemetry collection is best-effort
+    }
   }
 );

@@ -150,7 +150,10 @@ export default function FakeUsersAdmin() {
         credentials: "include",
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({ message: "Errore" }));
+        const err = await res.json().catch(() => {
+          // no-op: fallback to default error object
+          return { message: "Errore" };
+        });
         throw new Error(err.message);
       }
       return res.json();
@@ -322,7 +325,9 @@ export default function FakeUsersAdmin() {
         stopPolling();
         queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       }
-    } catch {}
+    } catch {
+      // no-op: silent failure during polling
+    }
   };
 
   useEffect(() => {
@@ -333,7 +338,9 @@ export default function FakeUsersAdmin() {
         const data = await res.json();
         setMassSeedRunning(data.running);
         if (data.running) pollRef.current = setInterval(pollStatus, 3000);
-      } catch {}
+      } catch {
+        // no-op: ignore initial status check failures
+      }
     };
     checkStatus();
     return stopPolling;

@@ -113,7 +113,9 @@ export function ContestEntryCard({
   if (entry.performanceData) {
     try {
       perfData = JSON.parse(entry.performanceData);
-    } catch {}
+    } catch {
+      // no-op: fallback to null if performance data is malformed
+    }
   }
 
   const photoUri = resolvePhotoUrl(entry.photoUrl);

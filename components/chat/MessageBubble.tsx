@@ -91,7 +91,9 @@ function PlaylistBubble({ message, isOwn }: { message: ChatMessage; isOwn: boole
       const parsed = JSON.parse(message.content);
       if (parsed.playlistId) playlistId = parsed.playlistId;
     }
-  } catch {}
+  } catch {
+    // no-op: fallback if message content is not valid JSON
+  }
 
   const iconColor = isOwn ? "#fff" : MUSIC_ACCENT;
   const textColor = isOwn ? "#fff" : Colors.text;

@@ -235,7 +235,9 @@ export default function GiriDetailScreen() {
         );
         setStreetViewTip(false);
       }
-    } catch {}
+    } catch {
+      // no-op: silent failure for invalid JSON in message
+    }
   };
 
   const handleLoadWeather = async () => {
@@ -396,7 +398,9 @@ export default function GiriDetailScreen() {
         message: `Guarda questo giro su BikerLink: ${route.title}\n${route.distanceKm}km, Score: ${Math.round(route.bikerScore * 100)}%`,
         url: `${process.env.EXPO_PUBLIC_DOMAIN}/giri/${route.id}`,
       });
-    } catch {}
+    } catch {
+      // no-op: ignore share failures
+    }
   };
 
   const s = styles(colors);

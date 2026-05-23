@@ -67,7 +67,9 @@ export default function LeafletPickerMap({
         if (msg.type === "coordPicked" && msg.lat != null && msg.lng != null) {
           onCoordPicked({ latitude: msg.lat, longitude: msg.lng });
         }
-      } catch {}
+      } catch {
+        // no-op: ignore malformed bridge messages
+      }
     },
     [onCoordPicked]
   );

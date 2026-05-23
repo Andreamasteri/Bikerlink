@@ -21,7 +21,9 @@ async function sendHeartbeat() {
     const appVersion = Constants.expoConfig?.version ?? "0.0.0";
     const platform = Platform.OS;
     await apiRequest("POST", "/api/auth/heartbeat", { appVersion, platform });
-  } catch {}
+  } catch {
+    // no-op: ignore heartbeat failures
+  }
 }
 
 export function AppStateHandler() {
@@ -75,10 +77,13 @@ export function AppStateHandler() {
                 latitude: loc.coords.latitude,
                 longitude: loc.coords.longitude,
               });
-            } catch {}
+            } catch {
+              // no-op: ignore location update failures in foreground watcher
+            }
           }
         );
       } catch {
+        // no-op: ignore GPS permission or watcher failures
       } finally {
         nativeWatcherStartingRef.current = false;
       }
@@ -166,11 +171,15 @@ export function AppStateHandler() {
             intervalSeconds = settings.intervalSeconds || 30;
             notificationText = settings.notificationText || notificationText;
           }
-        } catch {}
+        } catch {
+          // no-op: use default settings if fetch fails
+        }
 
         await startBackgroundLocationTask(intervalSeconds, notificationText);
         sendStartupBeacon("bg_location_task_started");
-      } catch {}
+      } catch {
+        // no-op: ignore background task start failures
+      }
     }
 
     maybeStartBgTask();

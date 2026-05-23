@@ -82,7 +82,9 @@ export default function PrivacyPanel({ profileData }: Props) {
           longitude: loc.coords.longitude,
         });
       }
-    } catch {}
+    } catch {
+      // no-op: ignore failures when repushing location for privacy settings
+    }
   }, []);
 
   const privacyMutation = useMutation({

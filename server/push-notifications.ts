@@ -300,7 +300,8 @@ export async function getGpsRejectionThreshold(): Promise<number> {
       const parsed = parseInt(row.value, 10);
       if (Number.isFinite(parsed) && parsed > 0) return parsed;
     }
-  } catch {
+  } catch (err) {
+    console.warn("[Push] Failed to get GPS rejection threshold:", err);
   }
   return 100;
 }

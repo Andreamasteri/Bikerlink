@@ -136,6 +136,7 @@ export default function ClubDetailScreen() {
       setExtraMembers((prev) => [...prev, ...data.members]);
       setNextOffset((prev) => prev + PAGE_SIZE);
     } catch {
+      // no-op: silent failure for loading more members
     } finally {
       setLoadingMore(false);
     }

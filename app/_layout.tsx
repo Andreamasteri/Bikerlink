@@ -212,8 +212,12 @@ function reportClientError(error: Error, componentStack: string) {
         platform: Platform.OS,
         appVersion: `rv${Updates.runtimeVersion || "?"}`,
       }),
-    }).catch(() => {});
-  } catch {}
+    }).catch(() => {
+      // no-op: silent failure for reporting error
+    });
+  } catch {
+    // no-op: general safety for error reporting
+  }
 }
 
 export default function RootLayout() {
@@ -242,8 +246,12 @@ export default function RootLayout() {
             appVersion: `rv${Updates.runtimeVersion || "?"}`,
             isFatal: !!isFatal,
           }),
-        }).catch(() => {});
-      } catch {}
+        }).catch(() => {
+          // no-op: silent failure for global error reporting
+        });
+      } catch {
+        // no-op: general safety for global error reporting
+      }
       if (prev) prev(error, isFatal);
     });
     return () => { if (prev) errorUtils.setGlobalHandler?.(prev); };

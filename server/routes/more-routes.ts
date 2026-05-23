@@ -419,7 +419,9 @@ export function registerMoreRoutes(app: Express) {
         }
         events.reverse();
       }
-    } catch {}
+    } catch {
+      // no-op: ignore system health event log read failures
+    }
 
     res.json({
       backendStartedAt: SERVER_START_TIME,
@@ -474,7 +476,8 @@ export function registerMoreRoutes(app: Express) {
         timestamp: new Date().toISOString(),
       }));
       return res.json({ received: true });
-    } catch {
+    } catch (err) {
+      console.error("[CLIENT-ERROR] Failed to process error report:", err);
       res.status(200).json({ received: true });
     }
   });

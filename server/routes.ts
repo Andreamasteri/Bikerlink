@@ -133,7 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!user || user.status !== "active") {
           if (user) onlineTracker.setOffline(userId);
           return req.session.destroy(() => {
-            try { res.clearCookie("connect.sid", { path: "/" }); } catch {}
+            try { res.clearCookie("connect.sid", { path: "/" }); } catch { /* no-op: cookie clear failure */ }
             const reason = !user ? "user-not-found" : `status-${user.status}`;
             return res.status(401).json({ message: "Sessione non più valida", reason });
           });
@@ -161,7 +161,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
         }
-      } catch {}
+      } catch (err) {
+        console.warn("[routes] Auth middleware user check failed:", err);
+      }
     }
     next();
   });
@@ -476,7 +478,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const a = Buffer.from(pageToken);
         const b = Buffer.from(provided.padEnd(pageToken.length, "\0").substring(0, pageToken.length));
         valid = a.length === b.length && crypto.timingSafeEqual(a, b) && provided === pageToken;
-      } catch {
+      } catch (err) {
+        console.warn("[routes] Apple review token timing safe equal failed:", err);
         valid = false;
       }
     }

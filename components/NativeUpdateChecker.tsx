@@ -100,7 +100,8 @@ export default function NativeUpdateChecker() {
         } else {
           emit({ visible: false, isForced: false, storeUrl: sUrl });
         }
-      } catch {
+      } catch (err) {
+        console.warn("[NativeUpdateChecker] Failed to check for updates:", err);
       }
     };
 

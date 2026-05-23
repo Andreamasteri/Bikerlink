@@ -63,7 +63,9 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
       } else if (__DEV__ && msg.type === "trackingCoordError") {
         console.warn("[LeafletTrackingMap] malformed location payload:", JSON.stringify(msg));
       }
-    } catch {}
+    } catch {
+      // no-op: ignore malformed bridge messages
+    }
   }, [pushUpdate]);
 
   return (

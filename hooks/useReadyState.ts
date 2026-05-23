@@ -161,7 +161,9 @@ export function useReadyState() {
     onSuccess: (enabled: boolean) => {
       invalidateOnlineQueries();
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-      AsyncStorage.setItem("user_ghost_mode", enabled ? "true" : "false").catch(() => {});
+      AsyncStorage.setItem("user_ghost_mode", enabled ? "true" : "false").catch(() => {
+        // no-op: ignore storage write failures
+      });
     },
     onError: () => {
       Alert.alert(t("common.error"), t("ride.ghostModeNotAvailable"));
@@ -181,7 +183,9 @@ export function useReadyState() {
           longitude: loc.coords.longitude,
         });
       }
-    } catch {}
+    } catch {
+      // no-op: ignore location update failures in repushLocation
+    }
   }, []);
 
   const privacyMutation = useMutation({

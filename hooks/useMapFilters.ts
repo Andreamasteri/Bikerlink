@@ -43,7 +43,9 @@ export function useMapFilters({ user, isAuthenticated }: UseMapFiltersProps) {
           if (typeof parsed.clubs === "boolean") setFilterClubs(parsed.clubs);
           if (typeof parsed.events === "boolean") setFilterEvents(parsed.events);
         }
-      } catch {}
+      } catch {
+        // no-op: ignore storage read or JSON parsing failures
+      }
       setFiltersLoaded(true);
     })();
   }, []);
@@ -67,16 +69,22 @@ export function useMapFilters({ user, isAuthenticated }: UseMapFiltersProps) {
       AsyncStorage.setItem(
         "map_filters",
         JSON.stringify({ biker: nextBiker, zavorrina: nextZav, clubs: nextClubs, events: nextEvents })
-      ).catch(() => {});
+      ).catch(() => {
+        // no-op: ignore storage write failures
+      });
     }
   }, [filtersLoaded, user]);
 
   const persistMapFilters = useCallback(
     (payload: { biker: boolean; zavorrina: boolean; clubs: boolean; events: boolean }) => {
-      AsyncStorage.setItem("map_filters", JSON.stringify(payload)).catch(() => {});
+      AsyncStorage.setItem("map_filters", JSON.stringify(payload)).catch(() => {
+        // no-op: ignore storage write failures
+      });
       serverFiltersAppliedRef.current = true;
       if (!isAuthenticated) return;
-      apiRequest("PUT", "/api/users/me", { mapFilters: payload }).catch(() => {});
+      apiRequest("PUT", "/api/users/me", { mapFilters: payload }).catch(() => {
+        // no-op: ignore server update failures for map filters
+      });
     },
     [isAuthenticated]
   );

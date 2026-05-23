@@ -38,8 +38,12 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
       if (status !== "granted") return null;
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       const coords: Coords = { latitude: loc.coords.latitude, longitude: loc.coords.longitude };
-      try { await AsyncStorage.setItem("map_last_gps", JSON.stringify(coords)); } catch {}
-      try { await apiRequest("PUT", "/api/users/location", coords); } catch {}
+      try { await AsyncStorage.setItem("map_last_gps", JSON.stringify(coords)); } catch {
+        // no-op: ignore storage write failures
+      }
+      try { await apiRequest("PUT", "/api/users/location", coords); } catch {
+        // no-op: ignore location update failures
+      }
       return coords;
     } catch {
       return null;
@@ -63,7 +67,9 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
               if (!cancelled) { setLocation({ latitude: parsed.latitude, longitude: parsed.longitude }); setLocationLoading(false); }
             }
           }
-        } catch {}
+        } catch {
+          // no-op: ignore JSON parsing or storage read errors
+        }
 
         sendStartupBeacon("fetch_gps_start");
 
@@ -93,12 +99,16 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
               savedMobilePos = { latitude: data.latitude, longitude: data.longitude, source: data.source ?? null };
               if (!cancelled) setWebMobilePosition({ latitude: data.latitude, longitude: data.longitude });
             }
-          } catch {}
+          } catch {
+            // no-op: ignore position fetch failures on web
+          }
           try {
             const lastPosRes = await apiRequest("GET", "/api/users/my-last-position");
             const lastPosData = await lastPosRes.json();
             if (!cancelled) setWebPhonePositionStatus(lastPosData?.available ? "live" : "stale");
-          } catch {}
+          } catch {
+            // no-op: ignore last position status fetch failures on web
+          }
           if (savedMobilePos?.source === "live") {
             if (!cancelled) { setLocation({ latitude: savedMobilePos.latitude, longitude: savedMobilePos.longitude }); setLocationLoading(false); }
             return;

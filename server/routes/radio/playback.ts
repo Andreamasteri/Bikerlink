@@ -120,7 +120,8 @@ router.get("/stream", requireAuth, async (req: Request, res: Response) => {
           if (!res.writable) break;
           res.write(Buffer.from(value));
         }
-      } catch {
+      } catch (err) {
+        console.warn("[radio] Pump stream error:", err);
       } finally {
         res.end();
       }

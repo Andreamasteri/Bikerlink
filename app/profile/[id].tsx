@@ -388,7 +388,9 @@ export default function PublicProfileScreen() {
                   nickname: profile.nickname,
                 })
               );
-            } catch {}
+            } catch {
+              // no-op: last profile cache is best-effort
+            }
             router.navigate({ pathname: "/(tabs)/index" } as any);
           }}
           onStartChat={handleStartChat}

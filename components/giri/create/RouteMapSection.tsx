@@ -37,7 +37,9 @@ export const RouteMapSection: React.FC<RouteMapSectionProps> = ({
             try {
               const msg = JSON.parse(e.nativeEvent.data);
               if (msg.type === "tap") onMapTap(msg.lat, msg.lng);
-            } catch {}
+            } catch {
+              // no-op: ignore malformed bridge messages
+            }
           }}
         />
         <View style={s.mapHintBadge}>

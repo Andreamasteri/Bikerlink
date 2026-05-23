@@ -235,7 +235,9 @@ export default function TraduzioniScreen() {
       if (data && typeof data === "object" && "message" in data && typeof (data as { message: unknown }).message === "string") {
         return (data as { message: string }).message;
       }
-    } catch {}
+    } catch {
+      // no-op: return fallback message
+    }
     return t("admin.downloadError");
   }
 
@@ -344,7 +346,9 @@ export default function TraduzioniScreen() {
       if (parsed && typeof parsed === "object") {
         payload = parsed as ImportResponse;
       }
-    } catch {}
+    } catch {
+      // no-op: payload stays null
+    }
     if (!resp.ok || !payload?.ok) {
       const errMsg =
         (payload && typeof payload.message === "string" && payload.message) ||

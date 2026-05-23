@@ -187,7 +187,7 @@ export async function syncProdToDev(): Promise<{ ok: boolean; error?: string }> 
     return { ok: false, error: errMsg };
   } finally {
     isSyncing = false;
-    try { fs.unlinkSync(tmpSql); } catch {}
+    try { fs.unlinkSync(tmpSql); } catch (err) { console.warn("[sync-service] Failed to remove temp SQL file:", tmpSql, err); }
   }
 }
 

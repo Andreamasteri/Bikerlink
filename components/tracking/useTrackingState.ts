@@ -113,9 +113,13 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
               activityType: Location.ActivityType.AutomotiveNavigation,
             }).catch(() => {});
           }
-        } catch {}
+        } catch {
+          // no-op: ignore background notification config load failures
+        }
       }
-    } catch {}
+    } catch {
+      // no-op: ignore background location task failures
+    }
   });
 }
 const IDLE_THRESHOLD_KMH = 2;

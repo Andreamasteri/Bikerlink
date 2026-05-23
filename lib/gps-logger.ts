@@ -25,6 +25,10 @@ export async function logGpsError(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-    }).catch(() => {});
-  } catch {}
+    }).catch(() => {
+      // no-op: error reporting best-effort
+    });
+  } catch {
+    // no-op: general safety for error reporting
+  }
 }

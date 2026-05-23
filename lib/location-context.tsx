@@ -147,7 +147,9 @@ export function LocationProvider({ children }: { children: React.ReactNode }) {
       if (data?.latitude != null && data?.longitude != null) {
         return { latitude: data.latitude, longitude: data.longitude, source: data.source ?? null };
       }
-    } catch {}
+    } catch {
+      // no-op: last position recovery is best-effort
+    }
     return null;
   }, []);
 

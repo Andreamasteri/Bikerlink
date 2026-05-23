@@ -158,12 +158,16 @@ router.delete("/me/photos/:id", requireAuth, async (req: Request, res: Response)
     const photoUrl = photo.photoUrl;
     if (photoUrl.startsWith("/api/users/photos/")) {
       const filename = photoUrl.replace("/api/users/photos/", "");
-      try { await deleteObject(`public/photos/${filename}`); } catch {}
+      try { await deleteObject(`public/photos/${filename}`); } catch (err) {
+        console.warn(`[users] Failed to delete photo object public/photos/${filename}:`, err);
+      }
     } else if (photoUrl.startsWith("/uploads/photos/")) {
       try {
         const filePath = path.join(process.cwd(), photoUrl);
         if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
-      } catch {}
+      } catch (err) {
+        console.warn(`[users] Failed to delete local photo file ${photoUrl}:`, err);
+      }
     }
 
     await storage.deleteUserPhoto(photoId);

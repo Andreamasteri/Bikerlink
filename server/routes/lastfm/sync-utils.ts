@@ -33,7 +33,8 @@ export async function syncLastfmTracks(userId: string, sessionKey: string, usern
         .slice(0, 3)
         .map((tag) => tag.name ?? "")
         .filter(Boolean);
-    } catch {
+    } catch (err) {
+      console.warn(`[Last.fm] Failed to fetch tags for artist ${artistName}:`, err);
     }
 
     const LASTFM_PLACEHOLDER = "2a96cbd8b46e442fc41c2b86b821562f";
@@ -57,7 +58,8 @@ export async function syncLastfmTracks(userId: string, sessionKey: string, usern
         })
         .onConflictDoNothing();
       synced++;
-    } catch {
+    } catch (err) {
+      console.warn(`[Last.fm] Failed to sync track ${trackName} for user ${userId}:`, err);
     }
   }
 
@@ -102,7 +104,8 @@ export async function syncLastfmTracks(userId: string, sessionKey: string, usern
               })
               .onConflictDoNothing();
             synced++;
-          } catch {
+          } catch (err) {
+            console.warn(`[Last.fm] Failed to restore track ${st.trackName} from snapshot for user ${userId}:`, err);
           }
         }
         console.log(`[Last.fm] syncLastfmTracks: 0 from API, restored ${synced} tracks from snapshot for user ${userId}`);

@@ -94,7 +94,9 @@ export default function NotificationsPanel({ serverPushEnabled, serverNotifPrefs
       setPushNotificationsEnabled(!next);
       try {
         await AsyncStorage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, !next ? "true" : "false");
-      } catch {}
+      } catch {
+        // no-op: ignore secondary storage failures during error handling
+      }
     } finally {
       setPushTogglePending(false);
     }

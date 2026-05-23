@@ -52,7 +52,9 @@ export async function setSessionToken(token: string | null | undefined): Promise
   _tokenInitialized = true;
   try {
     await AsyncStorage.setItem(SESSION_TOKEN_KEY, token);
-  } catch {}
+  } catch {
+    // no-op: token persistence is best-effort
+  }
 }
 
 /** Rimuove il token (logout). */
@@ -61,7 +63,9 @@ export async function clearSessionToken(): Promise<void> {
   _tokenInitialized = true;
   try {
     await AsyncStorage.removeItem(SESSION_TOKEN_KEY);
-  } catch {}
+  } catch {
+    // no-op: token removal is best-effort
+  }
 }
 
 function buildAuthHeaders(extra?: Record<string, string>): Record<string, string> {
@@ -148,7 +152,9 @@ async function throwIfResNotOk(res: Response) {
     try {
       const json = JSON.parse(text);
       if (typeof json.message === "string") errorMessage = json.message;
-    } catch {}
+    } catch {
+      // no-op: fallback to default error message
+    }
     throw new Error(errorMessage ?? `${res.status}: ${text}`);
   }
 }

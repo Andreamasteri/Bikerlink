@@ -210,7 +210,7 @@ export async function getCurvyScoreStats(): Promise<{
     if (lastRunStatsSetting?.value) {
       lastRunStats = JSON.parse(lastRunStatsSetting.value);
     }
-  } catch {}
+  } catch { /* no-op: invalid JSON in settings */ }
 
   return {
     totalSegments,

@@ -28,7 +28,9 @@ try {
   const maps = require("react-native-maps");
   MapView = maps.default;
   Marker = maps.Marker;
-} catch {}
+} catch {
+  // no-op: react-native-maps is optional or handled via fallback
+}
 
 interface EventFormProps {
   visible: boolean;

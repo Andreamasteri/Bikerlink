@@ -32,7 +32,7 @@ export class OnlineTracker {
 
   private triggerOffline(userId: string): void {
     if (this.offlineCallback) {
-      try { this.offlineCallback(userId); } catch {}
+      try { this.offlineCallback(userId); } catch { /* no-op: offline callback failure */ }
     }
   }
 

@@ -261,7 +261,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     try {
       const vid = parseVisitorCookie(req);
       if (vid) recordVisit({ req, visitorId: vid, event: "register", userId: user.id, path: "/api/auth/register" });
-    } catch {}
+    } catch { /* no-op: visitor tracking failure */ }
 
     const { password: _, ...safeUser } = user;
     return res.status(201).json({ ...safeUser, giftMessage: invitationGiftMessage, sessionToken: buildSessionToken(req.sessionID) });

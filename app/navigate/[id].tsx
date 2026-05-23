@@ -37,7 +37,9 @@ async function saveRouteToCache(route: PlannedRoute): Promise<void> {
       `${ROUTE_CACHE_PREFIX}${route.id}`,
       JSON.stringify(route)
     );
-  } catch {}
+  } catch {
+    // no-op: route caching is best-effort
+  }
 }
 
 async function loadRouteFromCache(id: string): Promise<PlannedRoute | null> {
@@ -46,6 +48,7 @@ async function loadRouteFromCache(id: string): Promise<PlannedRoute | null> {
     if (!raw) return null;
     return JSON.parse(raw) as PlannedRoute;
   } catch {
+    // no-op: cache retrieval is best-effort
     return null;
   }
 }
@@ -379,7 +382,9 @@ export default function NavigateScreen() {
     try {
       const data = JSON.parse(event.nativeEvent.data);
       if (data.type === "mapReady") setMapReady(true);
-    } catch {}
+    } catch {
+      // no-op: silent failure for invalid JSON from map bridge
+    }
   }, []);
 
   const handleOpenInGoogleMaps = () => {

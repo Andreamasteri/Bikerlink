@@ -95,7 +95,7 @@ export async function runWishlistMatching(): Promise<number> {
     const countriesSetting = await storage.getAppSetting("matching_countries");
     let matchingCountries: string[] | undefined;
     if (countriesSetting?.value) {
-      try { matchingCountries = JSON.parse(countriesSetting.value); } catch {}
+      try { matchingCountries = JSON.parse(countriesSetting.value); } catch { /* no-op: fallback to default if JSON is invalid */ }
       if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = undefined;
     }
 

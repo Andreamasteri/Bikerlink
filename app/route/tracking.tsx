@@ -141,7 +141,9 @@ export default function TrackingScreen() {
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
       });
-    } catch {}
+    } catch {
+      // no-op: location tracking best-effort
+    }
   };
 
 
@@ -254,12 +256,16 @@ export default function TrackingScreen() {
             pts: pendingPointsRef.current,
           });
           pendingPointsRef.current = [];
-        } catch {}
+        } catch {
+          // no-op: points remain in ref and will be retried
+        }
       }
 
       try {
         await stopMutation.mutateAsync(routeId);
-      } catch {}
+      } catch {
+        // no-op: server tracking will time out naturally
+      }
 
       router.replace(`/route/${routeId}` as any);
     }
@@ -314,7 +320,9 @@ export default function TrackingScreen() {
               onPress={() => {
                 try {
                   Location.enableNetworkProviderAsync?.();
-                } catch {}
+                } catch {
+                  // no-op: best-effort opening settings
+                }
               }}
             >
               <Text style={styles.permButtonText}>Apri Impostazioni</Text>

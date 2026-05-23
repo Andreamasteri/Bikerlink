@@ -6,7 +6,9 @@ import { useAuth } from "@/lib/auth-context";
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
   Notifications = require("expo-notifications");
-} catch {}
+} catch {
+  // no-op: notifications module might not be available
+}
 
 const NOTIF_ID = "bikerlink-background-badge";
 
@@ -31,31 +33,41 @@ async function scheduleBackgroundNotif(chat: number, notif: number) {
       },
       trigger: null,
     });
-  } catch {}
+  } catch {
+    // no-op: background notification scheduling is best-effort
+  }
 }
 
 async function dismissBackgroundNotif() {
   if (!Notifications) return;
   try {
     await Notifications.dismissNotificationAsync(NOTIF_ID);
-  } catch {}
+  } catch {
+    // no-op: dismissing background notif is best-effort
+  }
   try {
     await Notifications.cancelScheduledNotificationAsync(NOTIF_ID);
-  } catch {}
+  } catch {
+    // no-op: cancelling scheduled background notif is best-effort
+  }
 }
 
 async function setAppBadge(count: number) {
   if (!Notifications || Platform.OS !== "ios") return;
   try {
     await Notifications.setBadgeCountAsync(count);
-  } catch {}
+  } catch {
+    // no-op: setting app badge is best-effort
+  }
 }
 
 async function clearAppBadge() {
   if (!Notifications || Platform.OS !== "ios") return;
   try {
     await Notifications.setBadgeCountAsync(0);
-  } catch {}
+  } catch {
+    // no-op: clearing app badge is best-effort
+  }
 }
 
 interface FloatingWidgetContextType {
@@ -134,7 +146,9 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
             enableLights: false,
           });
         }
-      } catch {}
+      } catch {
+        // no-op: notification channel creation is best-effort
+      }
     }
 
     requestPermission();

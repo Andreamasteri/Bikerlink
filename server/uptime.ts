@@ -35,7 +35,7 @@ export function appendUptimeLog(line: string) {
     ensureLogsDir();
     const ts = new Date().toISOString();
     fs.appendFileSync(UPTIME_LOG, `${ts} ${line}\n`, "utf-8");
-  } catch {}
+  } catch (err) { console.warn("[uptime] Failed to write uptime log:", err); }
 }
 
 function readLastStartTime(): number | null {
@@ -54,7 +54,7 @@ function writeStartTime(ts: number) {
   try {
     ensureLogsDir();
     fs.writeFileSync(STATE_FILE, JSON.stringify({ startedAt: ts }), "utf-8");
-  } catch {}
+  } catch (err) { console.warn("[uptime] Failed to write start-time state file:", err); }
 }
 
 export function initUptimeTracking() {

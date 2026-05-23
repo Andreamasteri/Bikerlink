@@ -98,7 +98,9 @@ export default function VerifyEmailScreen() {
       const msg = err?.message || translate("auth.verifyError");
       const cleaned = msg.replace(/^\d+:\s*/, "");
       let finalMsg = cleaned;
-      try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {}
+      try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {
+        // no-op: cleaned is already set as fallback
+      }
       setError(friendlyError(finalMsg));
     } finally {
       setIsVerifying(false);
@@ -117,7 +119,9 @@ export default function VerifyEmailScreen() {
       const msg = err?.message || translate("auth.sendError");
       const cleaned = msg.replace(/^\d+:\s*/, "");
       let finalMsg = cleaned;
-      try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {}
+      try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {
+        // no-op: cleaned is already set as fallback
+      }
       setError(friendlyError(finalMsg));
     } finally {
       setIsResending(false);

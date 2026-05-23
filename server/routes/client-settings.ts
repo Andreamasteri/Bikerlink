@@ -20,7 +20,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("email_verification_enabled");
       res.json({ enabled: setting?.value === "true" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting (false default):", err);
       res.json({ enabled: false });
     }
   });
@@ -29,7 +30,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("ads_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -38,7 +40,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("syneco_branding_visible");
       res.json({ visible: setting?.value === "true" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch syneco_branding_visible:", err);
       res.json({ visible: false });
     }
   });
@@ -47,7 +50,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("chatbot_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -56,7 +60,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("fake_users_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -65,7 +70,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("sos_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -74,7 +80,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("phone_sensors_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -83,7 +90,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("custom_routes_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -92,7 +100,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("auto_matching_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -101,7 +110,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("music_match_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -110,7 +120,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("music_export_playlist_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -119,7 +130,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("music_import_playlist_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -128,7 +140,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("primal_user_enabled");
       res.json({ enabled: setting?.value === "true" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting (false default):", err);
       res.json({ enabled: false });
     }
   });
@@ -137,7 +150,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("paypal_email");
       res.json({ email: setting?.value || "" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch paypal email:", err);
       res.json({ email: "" });
     }
   });
@@ -146,7 +160,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("ghost_mode_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -155,7 +170,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("marketplace_enabled");
       res.json({ enabled: setting?.value === "true" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting (false default):", err);
       res.json({ enabled: false });
     }
   });
@@ -174,7 +190,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("motoclub_include_zav");
       res.json({ enabled: setting?.value === "true" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting (false default):", err);
       res.json({ enabled: false });
     }
   });
@@ -183,7 +200,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("motoclub_user_creation_enabled");
       res.json({ enabled: setting?.value === "true" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting (false default):", err);
       res.json({ enabled: false });
     }
   });
@@ -192,7 +210,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("show_search_preference");
       res.json({ enabled: setting?.value === "true" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting (false default):", err);
       res.json({ enabled: false });
     }
   });
@@ -232,7 +251,8 @@ export function registerClientSettingsRoutes(app: Express) {
       const setting = await storage.getAppSetting("coordinates_max_age_seconds");
       const seconds = setting?.value ? parseInt(setting.value, 10) : 300;
       res.json({ seconds: isNaN(seconds) || seconds < 10 ? 300 : seconds });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch coordinates_max_age_seconds:", err);
       res.json({ seconds: 300 });
     }
   });
@@ -242,7 +262,8 @@ export function registerClientSettingsRoutes(app: Express) {
       const setting = await storage.getAppSetting("profile_refetch_interval");
       const seconds = setting?.value ? parseInt(setting.value, 10) : 30;
       res.json({ seconds: isNaN(seconds) || seconds < 5 ? 30 : seconds });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch profile_refetch_interval:", err);
       res.json({ seconds: 30 });
     }
   });
@@ -256,7 +277,8 @@ export function registerClientSettingsRoutes(app: Express) {
       const userSwitchingEnabled = switchingSetting?.value === "true";
       const defaultTheme = defaultSetting?.value || "attuale";
       res.json({ userSwitchingEnabled, defaultTheme });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch theme settings:", err);
       res.json({ userSwitchingEnabled: false, defaultTheme: "attuale" });
     }
   });
@@ -272,7 +294,8 @@ export function registerClientSettingsRoutes(app: Express) {
         .where(ilike(users.nickname, `%${q.trim()}%`))
         .limit(30);
       return res.json(results);
-    } catch {
+    } catch (err) {
+      console.error("[client-settings] User search failed:", err);
       return sendError(res, 500, "Errore interno");
     }
   });
@@ -282,7 +305,8 @@ export function registerClientSettingsRoutes(app: Express) {
       const setting = await storage.getAppSetting("phone_field_enabled");
       const enabled = setting?.value === "true";
       res.json({ enabled });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch phone_field_enabled:", err);
       res.json({ enabled: false });
     }
   });
@@ -292,7 +316,8 @@ export function registerClientSettingsRoutes(app: Express) {
       const setting = await storage.getAppSetting("user_available_on_login");
       const enabled = setting?.value !== "false";
       res.json({ enabled });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -308,7 +333,8 @@ export function registerClientSettingsRoutes(app: Express) {
         enabled: enabledSetting?.value === "true",
         text: textSetting?.value || "",
       });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch home-message settings:", err);
       res.json({ enabled: false, text: "" });
     }
   });
@@ -325,7 +351,8 @@ export function registerClientSettingsRoutes(app: Express) {
         text: textSetting?.value || "",
         paypalEmail: paypalSetting?.value || "",
       });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch donation settings:", err);
       res.json({ enabled: false, text: "", paypalEmail: "" });
     }
   });
@@ -352,7 +379,8 @@ export function registerClientSettingsRoutes(app: Express) {
           storeUrl: iosUrl?.value || "https://apps.apple.com/app/bikerlink",
         },
       });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch native-version settings:", err);
       return res.json({
         android: { latestVersion: "1.0.0", minVersion: "1.0.0", storeUrl: "https://play.google.com/store/apps/details?id=com.bikerlink.app" },
         ios: { latestVersion: "1.0.0", minVersion: "1.0.0", storeUrl: "https://apps.apple.com/app/bikerlink" },
@@ -372,9 +400,10 @@ export function registerClientSettingsRoutes(app: Express) {
       let list: string[] = [];
       try {
         list = JSON.parse(listSetting?.value || "[]");
-      } catch {}
+      } catch { /* no-op: invalid JSON in splash list */ }
       res.json({ mode, message, list });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch splash settings:", err);
       res.json({ mode: "single", message: "", list: [] });
     }
   });
@@ -389,7 +418,8 @@ export function registerClientSettingsRoutes(app: Express) {
         enabled: enabledSetting?.value !== "false",
         provider: providerSetting?.value || "carto_light",
       });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch maps settings:", err);
       res.json({ enabled: true, provider: "carto_light" });
     }
   });
@@ -398,7 +428,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("maps_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });
@@ -456,7 +487,9 @@ export function registerClientSettingsRoutes(app: Express) {
           await storage.updateUserProfile(userId, profileUpdate);
         }
         storage.saveCoordinateHistory(userId, latitude, longitude).catch(() => {});
-      } catch {}
+      } catch {
+        // no-op: ignore background location profile update failures
+      }
 
       if (activeRouteId && typeof activeRouteId === "string") {
         try {
@@ -472,7 +505,9 @@ export function registerClientSettingsRoutes(app: Express) {
             };
             await storage.createRoutePoints([point]);
           }
-        } catch {}
+        } catch {
+          // no-op: ignore background location route point creation failures
+        }
       }
 
       return sendSuccess(res);
@@ -486,7 +521,8 @@ export function registerClientSettingsRoutes(app: Express) {
     try {
       const setting = await storage.getAppSetting("floating_widget_enabled");
       res.json({ enabled: setting?.value !== "false" });
-    } catch {
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch setting:", err);
       res.json({ enabled: true });
     }
   });

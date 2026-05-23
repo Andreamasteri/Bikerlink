@@ -30,20 +30,26 @@ export async function loadMountCalibration(): Promise<MountAxisCalibration | nul
   try {
     const raw = await AsyncStorage.getItem(MOUNT_CALIB_KEY);
     if (raw) return JSON.parse(raw) as MountAxisCalibration;
-  } catch {}
+  } catch {
+    // no-op: return null if storage fails
+  }
   return null;
 }
 
 export async function saveMountCalibration(c: MountAxisCalibration): Promise<void> {
   try {
     await AsyncStorage.setItem(MOUNT_CALIB_KEY, JSON.stringify(c));
-  } catch {}
+  } catch {
+    // no-op: ignore storage failures during save
+  }
 }
 
 export async function clearMountCalibration(): Promise<void> {
   try {
     await AsyncStorage.removeItem(MOUNT_CALIB_KEY);
-  } catch {}
+  } catch {
+    // no-op: ignore storage failures during clear
+  }
 }
 
 // ─── Axis computation ─────────────────────────────────────────────────────────

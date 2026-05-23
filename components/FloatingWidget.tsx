@@ -63,7 +63,9 @@ export default function FloatingWidget() {
           const clampedY = Math.max(insets.top + 8, Math.min(y, height - WIDGET_SIZE - 8));
           positionRef.current = { x: clampedX, y: clampedY };
           pan.setValue({ x: clampedX, y: clampedY });
-        } catch {}
+        } catch {
+          // no-op: fallback to default position if JSON is malformed
+        }
       }
       setPositionLoaded(true);
     });

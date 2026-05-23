@@ -157,7 +157,9 @@ export default function SynecoAd({ displayMode = "banner", queryKey = "/api/ads/
         if (canOpen) {
           await Linking.openURL(campaign.linkUrl);
         }
-      } catch {}
+      } catch {
+        // no-op: ignore link opening failures
+      }
     }
   };
 

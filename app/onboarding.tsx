@@ -9,7 +9,9 @@ import { ONBOARDING_STORAGE_KEY } from "@/constants/onboarding";
 async function markOnboardingComplete() {
   try {
     await AsyncStorage.setItem(ONBOARDING_STORAGE_KEY, "true");
-  } catch {}
+  } catch {
+    // no-op: onboarding completion persists on next attempt
+  }
 }
 
 export default function OnboardingScreen() {

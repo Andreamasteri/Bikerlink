@@ -37,7 +37,7 @@ export async function getMassSeedStatus(): Promise<MassSeedStatus> {
           return { ...massSeedStatus, created: saved, total: 5000 };
         }
       }
-    } catch {}
+    } catch { /* no-op: setting might not exist */ }
   }
   return { ...massSeedStatus };
 }

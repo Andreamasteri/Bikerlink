@@ -8,7 +8,9 @@ import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
   Notifications = require("expo-notifications");
-} catch {}
+} catch {
+  // no-op: expo-notifications is optional or missing
+}
 
 export function PushTokenRegistrar() {
   const { user } = useAuth();
@@ -36,7 +38,9 @@ export function PushTokenRegistrar() {
         if (!pushEnabled) {
           try {
             await apiRequest("PUT", "/api/users/me/push-token", { token: null });
-          } catch {}
+          } catch {
+            // no-op: ignore failures when clearing token
+          }
           return;
         }
 
@@ -62,7 +66,9 @@ export function PushTokenRegistrar() {
         if (!token) return;
 
         await apiRequest("PUT", "/api/users/me/push-token", { token });
-      } catch {}
+      } catch {
+        // no-op: ignore push token registration failures
+      }
     })();
   }, [user?.id]);
 

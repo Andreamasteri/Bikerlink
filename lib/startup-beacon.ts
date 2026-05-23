@@ -24,10 +24,16 @@ export function sendStartupBeacon(step: string, data?: Record<string, unknown>):
       body: JSON.stringify(payload),
     })
       .then(() => {
-        AsyncStorage.setItem(BEACON_SENT_KEY, payloadStr).catch(() => {});
+        AsyncStorage.setItem(BEACON_SENT_KEY, payloadStr).catch(() => {
+          // no-op: beacon sent status persistence best-effort
+        });
       })
-      .catch(() => {});
-  } catch {}
+      .catch(() => {
+        // no-op: beacon sending best-effort
+      });
+  } catch {
+    // no-op: general safety for beacon sending
+  }
 }
 
 export async function recoverLastBeacon(): Promise<void> {
@@ -45,9 +51,17 @@ export async function recoverLastBeacon(): Promise<void> {
         body: JSON.stringify({ ...payload, recovered: true }),
       })
         .then(() => {
-          AsyncStorage.setItem(BEACON_SENT_KEY, last).catch(() => {});
+          AsyncStorage.setItem(BEACON_SENT_KEY, last).catch(() => {
+            // no-op: beacon recovery status persistence best-effort
+          });
         })
-        .catch(() => {});
-    } catch {}
-  } catch {}
+        .catch(() => {
+          // no-op: beacon recovery best-effort
+        });
+    } catch {
+      // no-op: safety for beacon recovery
+    }
+  } catch {
+    // no-op: safety for beacon data retrieval
+  }
 }

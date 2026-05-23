@@ -103,6 +103,7 @@ export default function WelcomeScreen() {
         }
       }
     } catch {
+      // no-op: privacy policy loading best-effort
     } finally {
       if (timeout !== undefined) clearTimeout(timeout);
     }

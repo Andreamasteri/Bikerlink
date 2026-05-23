@@ -194,7 +194,9 @@ export default function EditProfileScreen() {
       try {
         const parsed = JSON.parse(msg);
         if (parsed?.message) msg = parsed.message;
-      } catch {}
+      } catch {
+        // no-op: msg is already set as fallback
+      }
       Alert.alert(t("common.error"), msg);
     },
   });
@@ -244,7 +246,9 @@ export default function EditProfileScreen() {
           setReplacingSlot(existingPhotoId);
           try {
             await apiRequest("DELETE", `/api/users/me/photos/${existingPhotoId}`);
-          } catch {}
+          } catch {
+            // no-op: proceeding with replacement even if delete fails
+          }
         }
         uploadPhotoMutation.mutate(uri, {
           onSettled: () => setReplacingSlot(null),

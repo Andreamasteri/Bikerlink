@@ -64,7 +64,9 @@ function useLoginMutation() {
       (async () => {
         try {
           await queryClient.fetchQuery({ queryKey: ["/api/settings/maps"] });
-        } catch {}
+        } catch {
+          // no-op: settings fetching best-effort
+        }
         let profileLat: number | null = null;
         let profileLng: number | null = null;
         try {
@@ -75,7 +77,9 @@ function useLoginMutation() {
             profileLat = Number(profile.latitude);
             profileLng = Number(profile.longitude);
           }
-        } catch {}
+        } catch {
+          // no-op: profile fetching best-effort
+        }
         const nearbyLat = profileLat ?? 41.9028;
         const nearbyLng = profileLng ?? 12.4964;
         try {
@@ -94,8 +98,12 @@ function useLoginMutation() {
               return res.json();
             },
           });
-        } catch {}
-        apiRequest("POST", "/api/matching/trigger").catch(() => {});
+        } catch {
+          // no-op: nearby fetching best-effort
+        }
+        apiRequest("POST", "/api/matching/trigger").catch(() => {
+          // no-op: matching trigger best-effort
+        });
       })();
     },
   });

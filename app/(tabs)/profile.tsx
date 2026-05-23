@@ -166,7 +166,9 @@ export default function ProfileScreen() {
       try {
         const parsed = JSON.parse(msg);
         if (parsed?.message) msg = parsed.message;
-      } catch {}
+      } catch {
+        // no-op: msg is already set as fallback
+      }
       Alert.alert("Errore caricamento foto", msg);
     },
   });
@@ -195,7 +197,9 @@ export default function ProfileScreen() {
       async (uri) => {
         if (existingPhotoId) {
           setReplacingSlot(existingPhotoId);
-          try { await apiRequest("DELETE", `/api/users/me/photos/${existingPhotoId}`); } catch {}
+          try { await apiRequest("DELETE", `/api/users/me/photos/${existingPhotoId}`); } catch {
+            // no-op: slot replacement proceeds even if delete fails
+          }
         }
         uploadPhotoMutation.mutate(uri, { onSettled: () => setReplacingSlot(null) });
       },

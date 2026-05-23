@@ -81,7 +81,9 @@ async function writeQueue(queue: CrashLogEntry[]): Promise<void> {
   try {
     const trimmed = queue.slice(-MAX_QUEUE);
     await AsyncStorage.setItem(QUEUE_KEY, JSON.stringify(trimmed));
-  } catch {}
+  } catch {
+    // no-op: crash queue persistence is best-effort
+  }
 }
 
 export async function enqueueCrashEntry(entry: CrashLogEntry): Promise<void> {
@@ -94,7 +96,9 @@ async function saveCurrentSession(): Promise<void> {
   if (!_currentSession) return;
   try {
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(_currentSession));
-  } catch {}
+  } catch {
+    // no-op: session metadata persistence is best-effort
+  }
 }
 
 export async function markClean(): Promise<void> {
@@ -141,7 +145,9 @@ export async function flushQueue(): Promise<void> {
     if (offset > 0) {
       await writeQueue(others);
     }
-  } catch {}
+  } catch {
+    // no-op: flush failure means logs remain in queue
+  }
 }
 
 export async function initCrashLogger(userId: string): Promise<void> {
@@ -153,7 +159,9 @@ export async function initCrashLogger(userId: string): Promise<void> {
   try {
     const raw = await AsyncStorage.getItem(SESSION_KEY);
     if (raw) prevSession = JSON.parse(raw) as CrashSessionMeta;
-  } catch {}
+  } catch {
+    // no-op: previous session recovery is best-effort
+  }
 
   if (prevSession) {
     const crashType: CrashType = prevSession.clean

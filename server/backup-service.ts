@@ -190,8 +190,8 @@ export async function backupDatabase(): Promise<{ path: string; name: string; si
     return { path: objectPath, name: fileName, size: buf.length };
   } finally {
     isBackingUp = false;
-    try { fs.unlinkSync(tmpSql); } catch {}
-    try { fs.unlinkSync(tmpGz); } catch {}
+    try { fs.unlinkSync(tmpSql); } catch { /* no-op: cleanup cleanup */ }
+    try { fs.unlinkSync(tmpGz); } catch { /* no-op: cleanup cleanup */ }
   }
 }
 
@@ -232,7 +232,7 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
     return { path: objectPath, name: fileName, size: zipBuffer.length };
   } finally {
     isBackingUp = false;
-    try { fs.unlinkSync(tmpZip); } catch {}
+    try { fs.unlinkSync(tmpZip); } catch { /* no-op: cleanup cleanup */ }
   }
 }
 

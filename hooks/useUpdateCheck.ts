@@ -35,7 +35,9 @@ export function useUpdateCheck(): { needsUpdate: boolean } {
         if (!cancelled && compareSemver(local, latest) < 0) {
           setNeedsUpdate(true);
         }
-      } catch {}
+      } catch {
+        // no-op: ignore version check failures
+      }
     }
 
     check();

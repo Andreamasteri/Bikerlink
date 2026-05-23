@@ -40,7 +40,7 @@ export async function downloadBuffer(objectPath: string): Promise<Buffer> {
     throw new Error(`Download fallito per ${objectPath}: ${result.error?.message}`);
   }
   const buffer = readFileSync(tmpPath);
-  try { unlinkSync(tmpPath); } catch {}
+  try { unlinkSync(tmpPath); } catch { /* no-op: cleanup cleanup */ }
   return buffer;
 }
 

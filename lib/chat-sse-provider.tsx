@@ -75,11 +75,15 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
               try {
                 const evt: ChatSseEvent = JSON.parse(data);
                 listenersRef.current.forEach(fn => fn(evt));
-              } catch {}
+              } catch {
+                // no-op: silent failure for invalid JSON in SSE data
+              }
             }
           }
         }
-      } catch {}
+      } catch {
+        // no-op: SSE connection closed or failed, reconnect logic handles it
+      }
       streamActiveRef.current = false;
       if (!aborted) reconnectTimer = setTimeout(connect, 4000);
     }

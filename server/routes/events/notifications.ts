@@ -35,7 +35,9 @@ export async function sendClubInvitesByIds(evt: Event, eventId: string, clubIds:
               referenceId: eventId,
             });
             notifiedMemberIds.push(member.userId);
-          } catch {}
+          } catch (err) {
+            console.warn(`[events] Failed to create notification for user ${member.userId}:`, err);
+          }
         }));
 
         if (notifiedMemberIds.length > 0) {
@@ -43,9 +45,13 @@ export async function sendClubInvitesByIds(evt: Event, eventId: string, clubIds:
             title: "Evento per il tuo club!",
             body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}".`,
             eventId,
-          }).catch(() => {});
+          }).catch((err) => {
+            console.warn("[events] Failed to send push notifications:", err);
+          });
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`[events] Failed to process invites for club ${clubId}:`, err);
+      }
     }
   } catch (err) {
     console.error("[events] sendClubInvitesByIds error:", err);
@@ -90,7 +96,9 @@ export async function sendClubInvites(evt: Event, approvedEventId: string): Prom
               referenceId: approvedEventId,
             });
             notifiedMemberIds.push(member.userId);
-          } catch {}
+          } catch (err) {
+            console.warn(`[events] Failed to create notification for user ${member.userId}:`, err);
+          }
         }));
 
         if (notifiedMemberIds.length > 0) {
@@ -98,9 +106,13 @@ export async function sendClubInvites(evt: Event, approvedEventId: string): Prom
             title: "Evento per il tuo club!",
             body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}".`,
             eventId: approvedEventId,
-          }).catch(() => {});
+          }).catch((err) => {
+            console.warn("[events] Failed to send push notifications (auto-invite):", err);
+          });
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`[events] Failed to process auto-invite for club ${club.id}:`, err);
+      }
     }
   } catch (err) {
     console.error("[events] sendClubInvites error:", err);

@@ -78,7 +78,9 @@ export function useAdAdmin() {
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements/image-health"] });
       }, 3000);
-    } catch {}
+    } catch {
+      // no-op: ignore health check failures
+    }
   }
 
   const campaigns = activeTab === "tutti" ? allCampaigns : allCampaigns.filter((c) => c.targetUserType === activeTab);

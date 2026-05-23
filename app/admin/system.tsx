@@ -169,7 +169,9 @@ export default function SystemScreen() {
           {
             text: "OK",
             onPress: async () => {
-              try { await logoutMutation.mutateAsync(); } catch {}
+              try { await logoutMutation.mutateAsync(); } catch {
+                // no-op: proceed to login even if logout fails
+              }
               router.replace("/(auth)/login");
             },
           },
@@ -239,7 +241,9 @@ export default function SystemScreen() {
       try {
         const body = (await res.json()) as { reason?: string };
         reason = body?.reason;
-      } catch {}
+      } catch {
+        // no-op: reason stays undefined
+      }
       throw new AdminFetchError(
         res.status === 401 ? "session_expired" : "forbidden",
         res.status === 401 ? "session_expired" : "forbidden",
@@ -320,7 +324,9 @@ export default function SystemScreen() {
 
   if (error || !data) {
     const goToLogin = async () => {
-      try { await logoutMutation.mutateAsync(); } catch {}
+      try { await logoutMutation.mutateAsync(); } catch {
+        // no-op: proceed to login even if logout fails
+      }
       router.replace("/(auth)/login");
     };
 

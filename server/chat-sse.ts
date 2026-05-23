@@ -11,7 +11,7 @@ export function addSseClient(userId: string, res: Response): string {
   const connId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const existing = sseClients.get(userId);
   if (existing) {
-    try { existing.res.end(); } catch {}
+    try { existing.res.end(); } catch { /* no-op: intentional silent close */ }
   }
   sseClients.set(userId, { res, connId });
   return connId;
@@ -27,7 +27,7 @@ export function removeSseClient(userId: string, connId: string): void {
 export function closeSseClient(userId: string): void {
   const entry = sseClients.get(userId);
   if (entry) {
-    try { entry.res.end(); } catch {}
+    try { entry.res.end(); } catch { /* no-op: intentional silent close */ }
     sseClients.delete(userId);
   }
 }

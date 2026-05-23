@@ -31,7 +31,8 @@ router.post("/", async (req: Request, res: Response) => {
             durationSeconds,
           } as any);
         }
-      } catch {
+      } catch (err) {
+        console.warn(`[tracking] Failed to cleanup/auto-stop route ${r.id}:`, err);
       }
     }
 

@@ -21,7 +21,9 @@ function namespacedId(source: string, id: string | number): string {
 }
 
 function updateServerSeenTimestamp(): void {
-  apiRequest("PUT", "/api/users/me/match-seen", {}).catch(() => {});
+  apiRequest("PUT", "/api/users/me/match-seen", {}).catch(() => {
+    // no-op: ignore server update failures for match seen status
+  });
 }
 
 function isAfterBaseline(item: MatchItem, baseline: Date): boolean {
@@ -68,14 +70,24 @@ export function useNewMatchAlert() {
         let loadedInit: string[] = [];
 
         if (rawSeen) {
-          try { loadedSeen = JSON.parse(rawSeen) as string[]; } catch {}
+          try {
+            loadedSeen = JSON.parse(rawSeen) as string[];
+          } catch {
+            // no-op: ignore JSON parsing failures for seen match IDs
+          }
         }
         if (rawInit) {
-          try { loadedInit = JSON.parse(rawInit) as string[]; } catch {}
+          try {
+            loadedInit = JSON.parse(rawInit) as string[];
+          } catch {
+            // no-op: ignore JSON parsing failures for initialized sources
+          }
         }
 
         if (loadedInit.length > 0 && loadedSeen.length === 0) {
-          AsyncStorage.removeItem(initKey).catch(() => {});
+          AsyncStorage.removeItem(initKey).catch(() => {
+            // no-op: ignore storage removal failures
+          });
           loadedInit = [];
         }
 
@@ -83,11 +95,15 @@ export function useNewMatchAlert() {
         loadedInit.forEach((s) => initializedSources.current.add(s));
         setSeenLoaded(true);
       })
-      .catch(() => setSeenLoaded(true));
+      .catch(() => {
+        setSeenLoaded(true);
+      });
   }, [userId]);
 
   const persistSeen = useCallback(() => {
-    AsyncStorage.setItem(SEEN_KEY, JSON.stringify([...seenRef.current])).catch(() => {});
+    AsyncStorage.setItem(SEEN_KEY, JSON.stringify([...seenRef.current])).catch(() => {
+      // no-op: ignore storage write failures
+    });
   }, []);
 
   const persistInit = useCallback(() => {
@@ -95,7 +111,9 @@ export function useNewMatchAlert() {
     AsyncStorage.setItem(
       `${INIT_KEY_PREFIX}${userId}`,
       JSON.stringify([...initializedSources.current])
-    ).catch(() => {});
+    ).catch(() => {
+      // no-op: ignore storage write failures
+    });
   }, [userId]);
 
   const maybeSyncToServer = useCallback(() => {

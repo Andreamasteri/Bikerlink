@@ -11,7 +11,7 @@ export function addSessionSseClient(userId: string, res: Response): string {
   const connId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const existing = sessionSseClients.get(userId);
   if (existing) {
-    try { existing.res.end(); } catch {}
+    try { existing.res.end(); } catch (err) { console.warn("[session-sse] Failed to close displaced connection for userId:", userId, err); }
   }
   sessionSseClients.set(userId, { res, connId });
   return connId;
@@ -29,7 +29,7 @@ export function notifySessionDisplaced(userId: string): void {
   if (!entry) return;
   try {
     entry.res.write(`event: session_displaced\ndata: {}\n\n`);
-  } catch {}
-  try { entry.res.end(); } catch {}
+  } catch (err) { console.warn("[session-sse] Failed to write session_displaced event for userId:", userId, err); }
+  try { entry.res.end(); } catch (err) { console.warn("[session-sse] Failed to end response for userId:", userId, err); }
   sessionSseClients.delete(userId);
 }

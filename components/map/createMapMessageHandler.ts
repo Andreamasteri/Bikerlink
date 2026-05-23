@@ -55,6 +55,8 @@ export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
           if (e) opts.onEasterEggPress?.(e);
         }
       }
-    } catch {}
+    } catch {
+      // no-op: ignore malformed bridge messages
+    }
   };
 }

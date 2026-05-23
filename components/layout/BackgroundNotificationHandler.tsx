@@ -5,7 +5,9 @@ import { useRouter, useRootNavigationState } from "expo-router";
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
   Notifications = require("expo-notifications");
-} catch {}
+} catch {
+  // no-op: expo-notifications is optional or missing
+}
 
 function navigateFromNotifData(data: { type?: string; unreadChat?: number } | undefined, router: ReturnType<typeof useRouter>) {
   if (data?.type === "match") {
@@ -72,7 +74,9 @@ export function BackgroundNotificationHandler() {
             const data = lastResponse.notification.request.content.data as { type?: string; unreadChat?: number } | undefined;
             handleNavData(data);
           }
-        } catch {}
+        } catch {
+          // no-op: ignore failures to get last notification response
+        }
       })();
     }
 
@@ -89,7 +93,9 @@ export function BackgroundNotificationHandler() {
           const data = response.notification.request.content.data as { type?: string; unreadChat?: number } | undefined;
           handleNavData(data);
         });
-      } catch {}
+      } catch {
+        // no-op: ignore listener registration failures
+      }
     }
 
     const linkingSub = Linking.addEventListener("url", ({ url }) => {

@@ -108,7 +108,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
     try {
       const vid = parseVisitorCookie(req);
       if (vid) recordVisit({ req, visitorId: vid, event: "login", userId: user.id, path: "/api/auth/login" });
-    } catch {}
+    } catch { /* no-op: visitor tracking failure */ }
 
     const userProfile = await storage.getUserProfile(user.id).catch(() => null);
     const isGhost = userRecord?.ghostMode ?? false;
