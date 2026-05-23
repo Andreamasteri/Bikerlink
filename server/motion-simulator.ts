@@ -566,3 +566,27 @@ export function stopMotionSimulator(): void {
     _timer = null;
   }
 }
+
+export interface RiderPosition {
+  userId: string;
+  lat: number;
+  lng: number;
+  isMoving: boolean;
+}
+
+export function getPositions(): RiderPosition[] {
+  const nowMs = Date.now();
+  const out: RiderPosition[] = [];
+  for (const state of _userStates.values()) {
+    const slotIdx = resolveSlotIdx(state, nowMs);
+    const slot = state.schedule[slotIdx];
+    const isMoving = _enabled && !!slot && slot.kind === "drive";
+    out.push({
+      userId: state.userId,
+      lat: state.lat + state.offsetLat,
+      lng: state.lng + state.offsetLng,
+      isMoving,
+    });
+  }
+  return out;
+}

@@ -7,7 +7,7 @@ import { eq, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { setMotionEnabled, getMotionStatus } from "../../motion-simulator";
+import { setMotionEnabled, getMotionStatus, getPositions } from "../../motion-simulator";
 
 const router = Router();
 
@@ -102,6 +102,14 @@ router.post("/distribute-to-clubs", async (_req: Request, res: Response) => {
 });
 
 // ── Motion simulator endpoints ────────────────────────────────────────────────
+
+router.get("/motion/positions", (_req: Request, res: Response) => {
+  try {
+    return res.json(getPositions());
+  } catch (error) {
+    return sendError(res, 500, "Errore lettura posizioni");
+  }
+});
 
 router.get("/motion/status", (_req: Request, res: Response) => {
   try {

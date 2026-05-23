@@ -1,0 +1,301 @@
+import React, { useRef, useCallback, useEffect } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
+import { WebView } from "react-native-webview";
+import { useQuery } from "@tanstack/react-query";
+import { getApiUrl } from "@/lib/query-client";
+import Colors from "@/constants/colors";
+import { Ionicons } from "@expo/vector-icons";
+
+interface RiderPosition {
+  userId: string;
+  lat: number;
+  lng: number;
+  isMoving: boolean;
+}
+
+interface MotionStatus {
+  enabled: boolean;
+  totalFakeUsers: number;
+  movingNow: number;
+  restingNow: number;
+  lastCycleAt: string | null;
+  totalCycles: number;
+}
+
+interface StregattaMapProps {
+  motionStatus: MotionStatus | null;
+  onToggleMotion: (val: boolean) => void;
+  isTogglingMotion: boolean;
+}
+
+const MAP_HTML = `<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #map { width: 100%; height: 100%; background: #12121f; }
+    .leaflet-container { background: #12121f; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map', {
+      zoomControl: true,
+      attributionControl: false
+    }).setView([42.5, 12.5], 6);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd',
+      maxZoom: 19
+    }).addTo(map);
+
+    var markers = [];
+
+    function updateMarkers(positions) {
+      markers.forEach(function(m) { map.removeLayer(m); });
+      markers = [];
+      if (!positions || positions.length === 0) return;
+      positions.forEach(function(p) {
+        if (p.lat == null || p.lng == null) return;
+        var moving = p.isMoving;
+        var circle = L.circleMarker([p.lat, p.lng], {
+          radius: moving ? 6 : 4,
+          fillColor: moving ? '#FF6B35' : '#5A5A7A',
+          color: moving ? '#FF9060' : '#7070A0',
+          weight: 1,
+          opacity: 0.9,
+          fillOpacity: moving ? 0.9 : 0.6
+        }).addTo(map);
+        markers.push(circle);
+      });
+    }
+
+    window.updateMarkers = updateMarkers;
+    window.initMap = updateMarkers;
+  </script>
+</body>
+</html>`;
+
+export function StregattaMap({
+  motionStatus,
+  onToggleMotion,
+  isTogglingMotion,
+}: StregattaMapProps) {
+  const webViewRef = useRef<WebView>(null);
+  const mapReadyRef = useRef(false);
+  const pendingPositionsRef = useRef<RiderPosition[] | null>(null);
+
+  const { data: positions, isLoading, refetch, dataUpdatedAt } = useQuery<RiderPosition[]>({
+    queryKey: ["/api/admin/stregatti/motion/positions"],
+    queryFn: async () => {
+      const url = new URL("/api/admin/stregatti/motion/positions", getApiUrl());
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("Errore caricamento posizioni");
+      return res.json();
+    },
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+  });
+
+  const injectPositions = useCallback((pos: RiderPosition[]) => {
+    if (!webViewRef.current) return;
+    const js = `window.updateMarkers(${JSON.stringify(pos)}); true;`;
+    webViewRef.current.injectJavaScript(js);
+  }, []);
+
+  useEffect(() => {
+    if (!positions) return;
+    if (mapReadyRef.current) {
+      injectPositions(positions);
+    } else {
+      pendingPositionsRef.current = positions;
+    }
+  }, [dataUpdatedAt]);
+
+  const handleMapLoad = useCallback(() => {
+    mapReadyRef.current = true;
+    const toInject = pendingPositionsRef.current ?? positions ?? [];
+    pendingPositionsRef.current = null;
+    injectPositions(toInject);
+  }, [positions, injectPositions]);
+
+  const movingNow = motionStatus?.movingNow ?? 0;
+  const totalFakeUsers = motionStatus?.totalFakeUsers ?? 0;
+  const restingNow = motionStatus?.restingNow ?? 0;
+  const motionEnabled = motionStatus?.enabled ?? false;
+
+  const formatLastCycle = (iso: string | null): string => {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  };
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.statsBar}>
+        <View style={styles.statItem}>
+          <View style={[styles.dot, { backgroundColor: "#FF6B35" }]} />
+          <Text style={styles.statText}>{movingNow} in moto</Text>
+        </View>
+        <View style={styles.statItem}>
+          <View style={[styles.dot, { backgroundColor: "#5A5A7A" }]} />
+          <Text style={styles.statText}>{restingNow} fermi</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Ionicons name="people" size={13} color={Colors.textSecondary} />
+          <Text style={styles.statText}>{totalFakeUsers} totali</Text>
+        </View>
+        <TouchableOpacity style={styles.refreshBtn} onPress={() => refetch()}>
+          {isLoading ? (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          ) : (
+            <Ionicons name="refresh" size={16} color={Colors.accent} />
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.mapWrapper}>
+        <WebView
+          ref={webViewRef}
+          source={{ html: MAP_HTML }}
+          style={styles.webView}
+          onLoad={handleMapLoad}
+          javaScriptEnabled
+          domStorageEnabled
+          originWhitelist={["*"]}
+          scrollEnabled={false}
+          bounces={false}
+        />
+      </View>
+
+      <View style={styles.controlBar}>
+        <View style={styles.controlLeft}>
+          <Ionicons
+            name="navigate"
+            size={16}
+            color={motionEnabled ? "#FF6B35" : Colors.textSecondary}
+          />
+          <Text style={[styles.controlLabel, motionEnabled && { color: "#FF6B35" }]}>
+            {motionEnabled ? "Simulatore attivo" : "Simulatore pauso"}
+          </Text>
+          {motionStatus?.lastCycleAt && (
+            <Text style={styles.cycleText}>
+              · ciclo {formatLastCycle(motionStatus.lastCycleAt)}
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[styles.toggleBtn, motionEnabled ? styles.toggleBtnOn : styles.toggleBtnOff]}
+          onPress={() => onToggleMotion(!motionEnabled)}
+          disabled={isTogglingMotion}
+        >
+          {isTogglingMotion ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.toggleBtnText}>
+              {motionEnabled ? "Pausa" : "Avvia"}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  statsBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    gap: 12,
+  },
+  statItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  refreshBtn: {
+    marginLeft: "auto" as any,
+    padding: 4,
+  },
+  mapWrapper: {
+    flex: 1,
+  },
+  webView: {
+    flex: 1,
+    backgroundColor: "#12121f",
+  },
+  controlBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: Colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  controlLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  controlLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  cycleText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  toggleBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 20,
+    minWidth: 72,
+    alignItems: "center",
+  },
+  toggleBtnOn: {
+    backgroundColor: "#5A5A7A",
+  },
+  toggleBtnOff: {
+    backgroundColor: "#FF6B35",
+  },
+  toggleBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: "#fff",
+  },
+});

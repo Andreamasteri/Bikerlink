@@ -26,6 +26,7 @@ import { StregattaFilters, StregattaFilterType } from "@/components/admin/strega
 import { StregattaActions } from "@/components/admin/stregatti/StregattaActions";
 import { StregattaChatModal } from "@/components/admin/stregatti/StregattaChatModal";
 import { StregattaModals } from "@/components/admin/stregatti/StregattaModals";
+import { StregattaMap } from "@/components/admin/stregatti/StregattaMap";
 import { COUNTRIES_DATA, getRegionsForCountry } from "@/components/admin/stregatti/countriesData";
 
 interface FakeUser {
@@ -64,10 +65,13 @@ interface ChatMessage {
   createdAt: string;
 }
 
+type AdminTab = "lista" | "mappa";
+
 export default function FakeUsersAdmin() {
   const t = useT();
   const insets = useSafeAreaInsets();
 
+  const [activeTab, setActiveTab] = useState<AdminTab>("lista");
   const flatListRef = useRef<FlatList<FakeUser>>(null);
   const [filter, setFilter] = useState<StregattaFilterType>("tutti");
   const [deleteAllConfirmVisible, setDeleteAllConfirmVisible] = useState(false);
@@ -441,6 +445,35 @@ export default function FakeUsersAdmin() {
 
   return (
     <View style={styles.container}>
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === "lista" && styles.tabBtnActive]}
+          onPress={() => setActiveTab("lista")}
+        >
+          <Ionicons name="list" size={16} color={activeTab === "lista" ? Colors.accent : Colors.textSecondary} />
+          <Text style={[styles.tabBtnText, activeTab === "lista" && styles.tabBtnTextActive]}>Lista</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabBtn, activeTab === "mappa" && styles.tabBtnActive]}
+          onPress={() => setActiveTab("mappa")}
+        >
+          <Ionicons name="map" size={16} color={activeTab === "mappa" ? Colors.accent : Colors.textSecondary} />
+          <Text style={[styles.tabBtnText, activeTab === "mappa" && styles.tabBtnTextActive]}>Mappa Live</Text>
+          {(motionStatus?.movingNow ?? 0) > 0 && (
+            <View style={styles.tabBadge}>
+              <Text style={styles.tabBadgeText}>{motionStatus!.movingNow}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {activeTab === "mappa" ? (
+        <StregattaMap
+          motionStatus={motionStatus ?? null}
+          onToggleMotion={(v) => toggleMotionMutation.mutate(v)}
+          isTogglingMotion={toggleMotionMutation.isPending}
+        />
+      ) : (
       <FlatList
         ref={flatListRef}
         data={users}
@@ -500,6 +533,7 @@ export default function FakeUsersAdmin() {
         onEndReachedThreshold={0.5}
         ListFooterComponent={isFetchingNextPage ? <ActivityIndicator color={Colors.accent} /> : null}
       />
+      )}
 
       {/* Modals */}
       <Modal visible={createModalVisible} animationType="slide" transparent>
@@ -599,6 +633,46 @@ export default function FakeUsersAdmin() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  tabBar: {
+    flexDirection: "row",
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  tabBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    gap: 6,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+  },
+  tabBtnActive: {
+    borderBottomColor: Colors.accent,
+  },
+  tabBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.textSecondary,
+  },
+  tabBtnTextActive: {
+    color: Colors.accent,
+  },
+  tabBadge: {
+    backgroundColor: "#FF6B35",
+    borderRadius: 10,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    minWidth: 18,
+    alignItems: "center",
+  },
+  tabBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: "#fff",
+  },
   content: { padding: 16 },
   title: { fontFamily: "Inter_700Bold", fontSize: 24, color: Colors.text, marginBottom: 16 },
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" },
