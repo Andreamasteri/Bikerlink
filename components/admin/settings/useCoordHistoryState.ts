@@ -26,6 +26,7 @@ export function useCoordHistoryState(isAdmin: boolean, t: (k: string) => string,
     if (coordHistorySettings?.maxRecords != null && chMaxRecordsInput === "") {
       setChMaxRecordsInput(String(coordHistorySettings.maxRecords));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coordHistorySettings]);
 
   const coordHistoryMutation = useMutation({

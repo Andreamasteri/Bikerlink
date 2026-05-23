@@ -129,6 +129,7 @@ export default function Tetris({ onGameOver }: Props) {
     const speed = Math.max(200, 800 - (level - 1) * 80);
     timerRef.current = setInterval(drop, speed);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

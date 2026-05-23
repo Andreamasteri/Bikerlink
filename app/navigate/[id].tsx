@@ -213,6 +213,7 @@ export default function NavigateScreen() {
       setHasPermission(true);
     })();
     return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Start GPS watch when permission granted and route loaded
@@ -375,7 +376,6 @@ export default function NavigateScreen() {
         Speech.speak(t("nav.announce.arrived"), { language: locale });
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [polylinePoints, route, mapReady, isFinished, locale, t]);
 
   const handleMapMessage = useCallback((event: any) => {
@@ -433,7 +433,6 @@ export default function NavigateScreen() {
       return idx < polylinePoints.length ? polylinePoints[idx] : polylinePoints[0];
     });
     return buildNavigationMapHtml(TILE_CONFIG.urlTemplate, polylinePoints, stepPoints);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [polylinePoints, route?.navigationSteps]);
 
   // ── Loading ────────────────────────────────────────────────────────────────

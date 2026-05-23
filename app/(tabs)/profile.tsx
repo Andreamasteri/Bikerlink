@@ -126,6 +126,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     if (profile) setLocalFloatingWidget(profile.floatingWidgetEnabled !== false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.floatingWidgetEnabled]);
 
   const floatingWidgetMutation = useMutation({
@@ -221,6 +222,7 @@ export default function ProfileScreen() {
       { text: t("common.cancel"), style: "cancel" },
       { text: t("profile.logout"), style: "destructive", onPress: doLogout },
     ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [t]);
 
   const currentUserType = profile?.userType ?? user?.userType ?? "biker";

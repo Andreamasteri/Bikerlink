@@ -53,6 +53,7 @@ export const WishlistSection: React.FC<WishlistSectionProps> = ({
     if (wishlist?.description && !description) {
       setDescription(wishlist.description);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wishlist]);
 
   const descMutation = useMutation({

@@ -138,6 +138,7 @@ export default function EndlessBiker({ onGameOver }: Props) {
 
     frameRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const isDuckGestureRef = useRef(false);

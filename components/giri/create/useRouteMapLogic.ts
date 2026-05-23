@@ -27,6 +27,7 @@ export const useRouteMapLogic = ({
       tension: 60,
       friction: 10,
     }).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeResult?.bikerScore]);
 
   // ── Inject curvature gradient into WebView whenever routeResult updates ───
@@ -50,5 +51,6 @@ export const useRouteMapLogic = ({
     const ptsJson = JSON.stringify(pts);
     const js = `(function(){ if(typeof window.updateRouteWithCurvature==='function'){ window.updateRouteWithCurvature(${ptsJson}, ${shouldFit}); } })(); true;`;
     webviewRef.current.injectJavaScript(js);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeResult?.encoded, routeResult?.rawPoints, waypoints]);
 };

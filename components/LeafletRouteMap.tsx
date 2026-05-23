@@ -30,7 +30,7 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
   useEffect(() => {
     fadeAnim.setValue(0);
     setSkeletonVisible(true);
-  }, [html]);
+  }, [html, fadeAnim]);
 
   const handleLoadEnd = () => {
     Animated.timing(fadeAnim, {

@@ -295,7 +295,7 @@ export default function NotificationsScreen() {
         },
       ]
     );
-  }, [deleteAllMutation]);
+  }, [deleteAllMutation, t]);
 
   const handleItemPress = useCallback((item: AppNotification) => {
     if (item.notificationType === "direct_match_request") {

@@ -112,6 +112,7 @@ export function HazardDetailSheet({ hazardId, onClose }: HazardDetailSheetProps)
 
   React.useEffect(() => {
     setCommentText(myExistingComment ? myExistingComment.text : "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hazardId, myExistingComment?.id]);
 
   const visible = !!hazardId;

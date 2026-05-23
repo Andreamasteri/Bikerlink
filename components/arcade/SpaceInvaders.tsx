@@ -231,6 +231,7 @@ export default function SpaceInvaders({ onGameOver }: Props) {
 
     frameRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const shipBottom = SHIP_BOTTOM_OFFSET + insets.bottom;

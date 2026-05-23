@@ -73,6 +73,7 @@ export function useMapFilters({ user, isAuthenticated }: UseMapFiltersProps) {
         // no-op: ignore storage write failures
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtersLoaded, user]);
 
   const persistMapFilters = useCallback(

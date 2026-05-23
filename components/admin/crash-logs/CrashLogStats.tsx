@@ -15,7 +15,7 @@ export function CrashLogStats({ stats }: { stats: CrashStatsResponse }) {
   const totalJs = stats.byType.crash_js ?? 0;
   const grandTotal = totalSystem + totalJs;
 
-  const rawTrend = stats.dailyTrend ?? [];
+  const rawTrend = React.useMemo(() => stats.dailyTrend ?? [], [stats.dailyTrend]);
 
   const trend: DayTrend[] = React.useMemo(() => {
     const map: Record<string, DayTrend> = {};

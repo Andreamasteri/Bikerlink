@@ -101,6 +101,7 @@ export default function WheelieChallenge({ onGameOver }: Props) {
 
     frameRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const indicatorX = angleRef.current * (W - 40) + 20;

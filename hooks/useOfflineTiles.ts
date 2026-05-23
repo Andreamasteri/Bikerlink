@@ -51,6 +51,7 @@ export function useOfflineTiles(
     if (!points.length || status !== "none") return;
     const bbox = calcBoundingBox(points);
     setEstimate(estimateDownload(bbox));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [points.length, status]);
 
   const startDownload = useCallback(async () => {

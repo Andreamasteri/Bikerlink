@@ -107,6 +107,7 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     sendStartupBeacon("map_ready_gate_enter", { hasUser: !!user, mapLoading: isLoading });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

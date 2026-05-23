@@ -118,6 +118,7 @@ export function useReadyState() {
     setFakeWhateverLongitude(p.fakeWhateverLongitude ?? null);
     setFakeWhateverRadius(p.fakeWhateverRadius ?? 2);
     setGpsPrecision(p.gpsPrecision ?? "balanced");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [(meData as any)?.profile]);
 
   const invalidateOnlineQueries = () => {

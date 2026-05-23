@@ -230,11 +230,13 @@ export function StregattaMap({
     } else {
       pendingPositionsRef.current = positions;
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dataUpdatedAt]);
 
   useEffect(() => {
     if (!speeds || !mapReadyRef.current) return;
     injectSpeeds(speeds);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [speedsUpdatedAt]);
 
   const handleMapLoad = useCallback(() => {

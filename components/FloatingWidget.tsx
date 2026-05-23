@@ -69,6 +69,7 @@ export default function FloatingWidget() {
       }
       setPositionLoaded(true);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const panResponder = useRef(

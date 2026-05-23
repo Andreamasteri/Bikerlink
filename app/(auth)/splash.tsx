@@ -142,6 +142,7 @@ export default function SplashAnimatedScreen() {
     }, 3000);
 
     return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const displayMessage = splashMessage || t("app.tagline");

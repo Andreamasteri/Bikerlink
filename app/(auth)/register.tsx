@@ -100,6 +100,7 @@ export default function RegisterScreen() {
       setShowPrivacyModal(true);
       setPrivacyModalSeen(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step]);
 
   useEffect(() => {

@@ -24,6 +24,7 @@ export function useBgLocationState(isAdmin: boolean, t: (k: string) => string) {
     if (bgLocationSettings?.notificationText != null && bgNotificationTextInput === "") {
       setBgNotificationTextInput(bgLocationSettings.notificationText);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bgLocationSettings]);
 
   const bgLocationMutation = useMutation({

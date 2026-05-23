@@ -61,6 +61,7 @@ export function SharedPlaylistCard({
     } finally {
       setDownloadingTrack(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePreview = useCallback(async () => {
@@ -116,7 +117,7 @@ export function SharedPlaylistCard({
     } else {
       await doPlay();
     }
-  }, [item.tracks, playQueue, playerAvailable, currentTrack, isPlaying]);
+  }, [item.tracks, playQueue, playerAvailable, currentTrack, isPlaying, t]);
 
   return (
     <View style={styles.playlistCard}>

@@ -100,6 +100,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     inject("window.leafletBridge && window.leafletBridge.focusOn(" + userLocation.latitude + "," + userLocation.longitude + ",13)");
   }, [gpsFollowupEnabled, mapReady, userLocation, inject]);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleMessage = useCallback(
     createMapMessageHandler({
       users, clubPins, easterEggs,

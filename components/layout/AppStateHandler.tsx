@@ -145,6 +145,7 @@ export function AppStateHandler() {
       markClean().catch(() => {});
       resetCrashLogger();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {

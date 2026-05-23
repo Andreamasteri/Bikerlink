@@ -72,7 +72,7 @@ export default function ArcadeScreen() {
     } else if (params.tab === "hof") {
       setHubTab("hof");
     }
-  }, [params.tab, params.game]);
+  }, [params.tab, params.game, GAMES]);
 
   const { data: myScores } = useQuery<Record<string, number>>({
     queryKey: ["/api/arcade/my-scores"],

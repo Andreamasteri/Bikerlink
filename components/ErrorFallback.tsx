@@ -92,6 +92,7 @@ export function ErrorFallback({
         timerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canAutoRetry, autoRetryCount]);
 
   const handleRetryNow = () => {

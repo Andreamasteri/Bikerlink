@@ -171,12 +171,14 @@ export default function GiriDetailScreen() {
     if (route && !matchBikers && !matchLoading) {
       handleFindBikers();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route?.id]);
 
   React.useEffect(() => {
     if (route?.isMultiDay && !hotels && !hotelsLoading) {
       handleLoadHotels();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route?.id, route?.isMultiDay]);
 
   const deleteMutation = useMutation({

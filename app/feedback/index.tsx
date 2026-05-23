@@ -11,7 +11,7 @@ export default function FeedbackRedirect() {
     } else {
       router.replace("/feedback/feature" as any);
     }
-  }, [type]);
+  }, [type, router]);
 
   return null;
 }

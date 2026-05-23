@@ -182,7 +182,7 @@ export default function ChatScreen() {
 
   const handleDeleteConversation = useCallback((convId: string) => {
     deleteConversationMutation.mutate(convId);
-  }, []);
+  }, [deleteConversationMutation]);
 
   const handleFriendPress = useCallback(
     (friend: FriendItem) => {

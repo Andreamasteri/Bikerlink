@@ -34,7 +34,7 @@ export function MatchCard({ match }: { match: MusicMatch }) {
     } finally {
       setChatLoading(false);
     }
-  }, [match.user.id, router, localQueryClient]);
+  }, [match.user.id, router, localQueryClient, t]);
 
   return (
     <View style={styles.matchCard}>

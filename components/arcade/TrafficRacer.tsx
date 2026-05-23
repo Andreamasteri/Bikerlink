@@ -142,6 +142,7 @@ export default function TrafficRacer({ onGameOver }: Props) {
 
     frameRef.current = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(frameRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const playerX = playerLane * LANE_W + (LANE_W - PLAYER_W) / 2;

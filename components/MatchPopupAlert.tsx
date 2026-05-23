@@ -101,6 +101,7 @@ export default function MatchPopupAlert() {
         timerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const handlePress = () => {

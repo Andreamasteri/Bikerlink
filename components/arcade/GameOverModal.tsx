@@ -37,6 +37,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         useNativeDriver: true,
       }).start();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNewRecord]);
 
   return (

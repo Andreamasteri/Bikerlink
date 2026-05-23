@@ -67,6 +67,7 @@ export function LibraryTab({ onPlayTrack }: LibraryTabProps) {
     if (permission?.granted) {
       loadAssets();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permission?.granted]);
 
   const pickFile = useCallback(async () => {

@@ -86,6 +86,7 @@ export default function WelcomeScreen() {
         }),
       ]),
     ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoading, isAuthenticated]);
 
   const handlePrivacyPress = async () => {

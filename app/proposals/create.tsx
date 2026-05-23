@@ -140,6 +140,7 @@ export default function CreateProposalScreen() {
       setGpsSource("profile");
     }
     fetchLiveLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchLiveLocation = useCallback(async () => {
@@ -159,7 +160,7 @@ export default function CreateProposalScreen() {
     } finally {
       setGpsLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
   const isZavorrina = user?.userType === "zavorrina";

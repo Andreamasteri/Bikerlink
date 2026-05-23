@@ -108,7 +108,7 @@ export default function MusicScreen() {
     } finally {
       setSendingToConv(null);
     }
-  }, [currentUser, router, apiPrefix]);
+  }, [currentUser, router, apiPrefix, t]);
 
   useEffect(() => {
     if (tabParam === "ricevute" || tabParam === "match" || tabParam === "brani" || tabParam === "telefono") {
@@ -143,6 +143,7 @@ export default function MusicScreen() {
       .catch(() => {
         Alert.alert(t("music.playlistUnavailable"), t("music.playlistUnavailableMsg"));
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlistIdParam]);
 
   useEffect(() => {
@@ -281,7 +282,7 @@ export default function MusicScreen() {
         { text: t("music.disconnectBtn"), style: "destructive", onPress: () => disconnectMutation.mutate() },
       ]
     );
-  }, [disconnectMutation]);
+  }, [disconnectMutation, t]);
 
   const toggleCriteria = useCallback((c: string) => {
     setMatchCriteria((prev) => {

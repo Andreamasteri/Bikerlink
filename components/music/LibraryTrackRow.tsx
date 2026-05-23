@@ -82,7 +82,7 @@ export function LibraryTrackRow({
     } finally {
       setLoadingPreview(false);
     }
-  }, [track, playTrack, playerAvailable]);
+  }, [track, playTrack, playerAvailable, t]);
 
   const isThisPlaying =
     currentTrack?.title === track.trackName &&

@@ -182,7 +182,7 @@ export default function SystemScreen() {
     } finally {
       setIsPurging(false);
     }
-  }, [purgeConfirmText, logoutMutation, router]);
+  }, [purgeConfirmText, logoutMutation, router, t]);
 
   const handlePurgeNonAdminUsers = useCallback(() => {
     Alert.alert(
@@ -200,7 +200,7 @@ export default function SystemScreen() {
         },
       ]
     );
-  }, []);
+  }, [t]);
 
   const fetchSystemHealth = useCallback(async (signal?: AbortSignal): Promise<SystemHealth> => {
     const url = new URL("/api/admin/system-health", getApiUrl());

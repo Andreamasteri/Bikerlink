@@ -88,7 +88,7 @@ export default function RouteDetailScreen() {
     return formatDateTime(dateStr, locale, timeFormat);
   };
 
-  const pts = route?.points || [];
+  const pts = useMemo(() => route?.points || [], [route?.points]);
   const mappedPoints = useMemo(
     () => pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude, speedKmh: p.speedKmh ?? null })),
     [pts]

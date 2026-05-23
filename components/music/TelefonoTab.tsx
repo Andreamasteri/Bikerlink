@@ -59,6 +59,7 @@ export function TelefonoTab() {
 
   useEffect(() => {
     if (permission?.granted) loadAssets();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permission?.granted]);
 
   const handlePlayTrack = useCallback((asset: any) => {

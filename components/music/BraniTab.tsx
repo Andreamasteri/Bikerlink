@@ -149,7 +149,7 @@ export function BraniTab({
     } else {
       await doPlay();
     }
-  }, [displayedLibrary, playQueue, playerAvailable, currentTrack, isPlaying]);
+  }, [displayedLibrary, playQueue, playerAvailable, currentTrack, isPlaying, t]);
 
   if (isConnected === null) {
     return (

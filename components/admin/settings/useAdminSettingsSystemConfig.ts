@@ -12,6 +12,7 @@ export function useAdminSettingsSystemConfig(isAdmin: boolean, t: (k: string) =>
     if (refetchIntervalData?.seconds != null && refetchIntervalInput === "") {
       setRefetchIntervalInput(String(refetchIntervalData.seconds));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refetchIntervalData]);
 
   const { data: coordMaxAgeData } = useQuery<{ value: number }>({
@@ -23,6 +24,7 @@ export function useAdminSettingsSystemConfig(isAdmin: boolean, t: (k: string) =>
     if (coordMaxAgeData?.value != null && coordMaxAgeInput === "") {
       setCoordMaxAgeInput(String(coordMaxAgeData.value));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coordMaxAgeData]);
 
   const refetchIntervalMutation = useMutation({

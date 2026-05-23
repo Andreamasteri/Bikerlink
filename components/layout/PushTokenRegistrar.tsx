@@ -70,6 +70,7 @@ export function PushTokenRegistrar() {
         // no-op: ignore push token registration failures
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
   return null;

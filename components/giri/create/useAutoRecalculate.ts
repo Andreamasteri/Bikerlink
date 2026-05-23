@@ -55,5 +55,6 @@ export const useAutoRecalculate = ({
       }
     }, 500);
     return () => { if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waypoints, style, drivingProfile, avoidHighways, avoidTolls, isRoundTrip, roundTripHours, headingDeg, mode]);
 };

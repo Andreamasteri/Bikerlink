@@ -55,6 +55,7 @@ function AdBannerItem({ campaign, onPress }: { campaign: AdCampaign; onPress: ()
       -1,
       false
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const accentStyle = useAnimatedStyle(() => ({
