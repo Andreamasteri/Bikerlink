@@ -22,6 +22,12 @@ interface RiderPosition {
   speedProfile: "city" | "highway" | "mountain" | null;
 }
 
+interface RiderSpeed {
+  userId: string;
+  currentSpeedKph: number;
+  speedProfile: "city" | "highway" | "mountain";
+}
+
 interface MotionStatus {
   enabled: boolean;
   totalFakeUsers: number;
@@ -64,10 +70,10 @@ const MAP_HTML = `<!DOCTYPE html>
       maxZoom: 19
     }).addTo(map);
 
-    var markers = [];
+    /* markerMap: userId -> { circle, isMoving, speedProfile } */
+    var markerMap = {};
 
-    /* Speed-profile colour map:
-       city=#4A90D9 (blue), highway=#E53935 (red), mountain=#43A047 (green) */
+    /* Speed-profile colour map */
     function profileColor(profile) {
       if (profile === 'city')     return { fill: '#4A90D9', stroke: '#82B4E8' };
       if (profile === 'highway')  return { fill: '#E53935', stroke: '#F08080' };
@@ -76,16 +82,22 @@ const MAP_HTML = `<!DOCTYPE html>
     }
 
     function profileLabel(profile) {
-      if (profile === 'city')     return '🏙 Città';
-      if (profile === 'highway')  return '🛣 Autostrada';
-      if (profile === 'mountain') return '⛰ Montagna';
+      if (profile === 'city')     return '\\uD83C\\uDFD9 Città';
+      if (profile === 'highway')  return '\\uD83D\\uDEE3 Autostrada';
+      if (profile === 'mountain') return '\\u26F0 Montagna';
       return 'Fermo';
     }
 
+    /* Full markers rebuild — called on initial load and when positions change */
     function updateMarkers(positions) {
-      markers.forEach(function(m) { map.removeLayer(m); });
-      markers = [];
+      /* Remove old markers */
+      Object.values(markerMap).forEach(function(entry) {
+        map.removeLayer(entry.circle);
+      });
+      markerMap = {};
+
       if (!positions || positions.length === 0) return;
+
       positions.forEach(function(p) {
         if (p.lat == null || p.lng == null) return;
         var moving = p.isMoving;
@@ -98,16 +110,65 @@ const MAP_HTML = `<!DOCTYPE html>
           opacity: 0.9,
           fillOpacity: moving ? 0.9 : 0.6
         }).addTo(map);
+
         if (moving && p.currentSpeedKph != null) {
           var label = profileLabel(p.speedProfile) + ' · ' + p.currentSpeedKph + ' km/h';
-          circle.bindTooltip(label, { permanent: false, direction: 'top', className: '' });
+          circle.bindTooltip(label, { permanent: false, direction: 'top' });
           circle.on('click', function() { this.openTooltip(); });
         }
-        markers.push(circle);
+
+        markerMap[p.userId] = { circle: circle, isMoving: moving, speedProfile: p.speedProfile };
+      });
+    }
+
+    /*
+     * Lightweight speed-only update — called every 30 s.
+     * Updates marker colour and tooltip in-place without touching positions.
+     * speeds: Array<{ userId, currentSpeedKph, speedProfile }>
+     */
+    function updateSpeeds(speeds) {
+      if (!speeds || speeds.length === 0) return;
+
+      /* Build a lookup for quick access */
+      var lookup = {};
+      speeds.forEach(function(s) { lookup[s.userId] = s; });
+
+      Object.keys(markerMap).forEach(function(uid) {
+        var entry = markerMap[uid];
+        var s = lookup[uid];
+
+        if (s) {
+          /* User is now moving — update colour and tooltip */
+          var col = profileColor(s.speedProfile);
+          entry.circle.setStyle({
+            radius: 6,
+            fillColor: col.fill,
+            color: col.stroke,
+            fillOpacity: 0.9
+          });
+          var label = profileLabel(s.speedProfile) + ' · ' + s.currentSpeedKph + ' km/h';
+          entry.circle.unbindTooltip();
+          entry.circle.bindTooltip(label, { permanent: false, direction: 'top' });
+          entry.circle.on('click', function() { this.openTooltip(); });
+          entry.isMoving = true;
+          entry.speedProfile = s.speedProfile;
+        } else if (entry.isMoving) {
+          /* User was moving but is now resting — dim the marker */
+          entry.circle.setStyle({
+            radius: 4,
+            fillColor: '#5A5A7A',
+            color: '#7070A0',
+            fillOpacity: 0.6
+          });
+          entry.circle.unbindTooltip();
+          entry.isMoving = false;
+          entry.speedProfile = null;
+        }
       });
     }
 
     window.updateMarkers = updateMarkers;
+    window.updateSpeeds  = updateSpeeds;
     window.initMap = updateMarkers;
   </script>
 </body>
@@ -134,9 +195,28 @@ export function StregattaMap({
     staleTime: 25_000,
   });
 
+  const { data: speeds, dataUpdatedAt: speedsUpdatedAt } = useQuery<RiderSpeed[]>({
+    queryKey: ["/api/admin/stregatti/motion/speeds"],
+    queryFn: async () => {
+      const url = new URL("/api/admin/stregatti/motion/speeds", getApiUrl());
+      const res = await fetch(url.toString(), { credentials: "include" });
+      if (!res.ok) throw new Error("Errore caricamento velocità");
+      return res.json();
+    },
+    refetchInterval: 30_000,
+    staleTime: 25_000,
+    enabled: motionStatus?.enabled ?? false,
+  });
+
   const injectPositions = useCallback((pos: RiderPosition[]) => {
     if (!webViewRef.current) return;
     const js = `window.updateMarkers(${JSON.stringify(pos)}); true;`;
+    webViewRef.current.injectJavaScript(js);
+  }, []);
+
+  const injectSpeeds = useCallback((sp: RiderSpeed[]) => {
+    if (!webViewRef.current) return;
+    const js = `window.updateSpeeds(${JSON.stringify(sp)}); true;`;
     webViewRef.current.injectJavaScript(js);
   }, []);
 
@@ -149,6 +229,11 @@ export function StregattaMap({
     }
   }, [dataUpdatedAt]);
 
+  useEffect(() => {
+    if (!speeds || !mapReadyRef.current) return;
+    injectSpeeds(speeds);
+  }, [speedsUpdatedAt]);
+
   const handleMapLoad = useCallback(() => {
     mapReadyRef.current = true;
     const toInject = pendingPositionsRef.current ?? positions ?? [];
@@ -157,7 +242,6 @@ export function StregattaMap({
   }, [positions, injectPositions]);
 
   const movingNow = motionStatus?.movingNow ?? 0;
-  const totalFakeUsers = motionStatus?.totalFakeUsers ?? 0;
   const restingNow = motionStatus?.restingNow ?? 0;
   const motionEnabled = motionStatus?.enabled ?? false;
 

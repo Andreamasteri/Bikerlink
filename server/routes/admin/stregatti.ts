@@ -7,7 +7,7 @@ import { eq, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { setMotionEnabled, getMotionStatus, getPositions, getBoundingBox, setBoundingBox } from "../../motion-simulator";
+import { setMotionEnabled, getMotionStatus, getPositions, getBoundingBox, setBoundingBox, getUserSpeedMap } from "../../motion-simulator";
 
 const router = Router();
 
@@ -108,6 +108,20 @@ router.get("/motion/positions", (_req: Request, res: Response) => {
     return res.json(getPositions());
   } catch (error) {
     return sendError(res, 500, "Errore lettura posizioni");
+  }
+});
+
+router.get("/motion/speeds", (_req: Request, res: Response) => {
+  try {
+    const speedMap = getUserSpeedMap();
+    const payload = Array.from(speedMap.entries()).map(([userId, data]) => ({
+      userId,
+      currentSpeedKph: data.currentSpeedKph,
+      speedProfile: data.speedProfile,
+    }));
+    return res.json(payload);
+  } catch (error) {
+    return sendError(res, 500, "Errore lettura velocità");
   }
 });
 
