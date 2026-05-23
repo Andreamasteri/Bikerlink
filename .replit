@@ -69,6 +69,10 @@ args = "ESLint"
 task = "workflow.run"
 args = "eslint"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "apostrophe-check"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -192,6 +196,17 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/eslint-hooks-check.sh"
+
+[[workflows.workflow]]
+name = "apostrophe-check"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-script-apostrophes.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
