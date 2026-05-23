@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { Client } from "@replit/object-storage";
-import { readFileSync } from "fs";
 
 const [, , bundlePath, version] = process.argv;
 if (!bundlePath || !version) {
@@ -12,8 +11,7 @@ const client = new Client();
 const filename = `ota-${version}-${Date.now()}.js`;
 const objectPath = `private/ota/${filename}`;
 
-const buffer = readFileSync(bundlePath);
-const result = await client.uploadFromBytes(objectPath, buffer, {
+const result = await client.uploadFromFilename(objectPath, bundlePath, {
   headers: { "Content-Type": "application/javascript" },
 });
 

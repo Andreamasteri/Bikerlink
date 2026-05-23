@@ -1708,7 +1708,35 @@
     "apkVersionCode": null,
     "apkVersionName": null,
     "apkUrl": null,
-    "status": "published",
+    "status": "superseded",
     "publishedAt": "2026-05-23T15:01:15.507Z"
+  },
+  {
+    "updateNumber": 17,
+    "version": "48.17.10",
+    "cycle": "10.x",
+    "channel": "preview",
+    "platform": "android",
+    "message": "OTA-17 rv10.0.0: OTA-17: fix upload bundle (uploadFromFilename), pin segnalazioni interattivi con commenti",
+    "note": "CURRENT_OTA_NUMBER=17. Pubblicato da publish-ota.sh (2-stage).",
+    "runtimeVersion": "10.0.0",
+    "jsEngine": "hermes",
+    "platforms": [
+      "android"
+    ],
+    "releaseId": "4ee513c6-a005-49ed-8fc1-6fcd90e7d679",
+    "bundleUrl": "private/ota/ota-48.17.10-1779549416600.js",
+    "updateGroupId": null,
+    "androidUpdateId": null,
+    "iosUpdateId": null,
+    "commitBase": "cd482d8cfc2b2c432e2a616ab15a2d31783d75f2",
+    "easDashboard": null,
+    "apkBuildId": null,
+    "apkBuildDashboard": null,
+    "apkVersionCode": null,
+    "apkVersionName": null,
+    "apkUrl": null,
+    "status": "published",
+    "publishedAt": "2026-05-23T15:17:01.644Z"
   }
 ]

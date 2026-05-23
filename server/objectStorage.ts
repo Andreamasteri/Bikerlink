@@ -1,4 +1,7 @@
 import { Client } from "@replit/object-storage";
+import { readFileSync, unlinkSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 let _client: Client | null = null;
 
@@ -31,12 +34,14 @@ export async function uploadBuffer(
 
 export async function downloadBuffer(objectPath: string): Promise<Buffer> {
   const client = getClient();
-  const result = await client.downloadAsBytes(objectPath);
+  const tmpPath = join(tmpdir(), `ota-dl-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`);
+  const result = await client.downloadToFilename(objectPath, tmpPath);
   if (!result.ok) {
     throw new Error(`Download fallito per ${objectPath}: ${result.error?.message}`);
   }
-  const chunks = result.value as Buffer[];
-  return Buffer.concat(chunks);
+  const buffer = readFileSync(tmpPath);
+  try { unlinkSync(tmpPath); } catch {}
+  return buffer;
 }
 
 export async function deleteObject(objectPath: string): Promise<void> {
