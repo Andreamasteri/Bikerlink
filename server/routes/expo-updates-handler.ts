@@ -199,6 +199,7 @@ export function registerExpoUpdatesRoutes(app: Express) {
         }
       }
       const deviceId = rawDeviceId?.substring(0, 128) || null;
+      console.log(`[expo-updates] device-id resolved: "${deviceId ?? "null"}" (expo-device-id="${(req.headers["expo-device-id"] as string | undefined) ?? ""}" expo-installation-id="${(req.headers["expo-installation-id"] as string | undefined) ?? ""}")`);
       let assignedSlot: string | null = null;
       let hasSlotAssignment = false;
       if (deviceId) {
@@ -210,11 +211,18 @@ export function registerExpoUpdatesRoutes(app: Express) {
             if (!expired) {
               assignedSlot = asgn.slot as string;
               hasSlotAssignment = true;
+            } else {
+              console.log(`[expo-updates] assignment for device "${deviceId}" expired at ${asgn.expires_at}`);
             }
+          } else {
+            console.log(`[expo-updates] no assignment found for device "${deviceId}"`);
           }
         } catch (e) {
           console.error("[expo-updates] assignment lookup failed:", e);
         }
+      }
+      if (hasSlotAssignment) {
+        console.log(`[expo-updates] device "${deviceId}" assigned to slot "${assignedSlot}"`);
       }
 
       let release: Record<string, unknown> | null = null;

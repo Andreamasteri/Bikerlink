@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import * as Updates from "expo-updates";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -132,23 +133,50 @@ function PendingApprovalCard() {
     setIsApplying(true);
     try {
       const deviceId = await getStableDeviceId();
+      // Also send the Expo-internal installation ID — this is what expo-updates SDK
+      // sends in the `expo-device-id` / `expo-installation-id` request header when it
+      // calls /api/expo-updates. The server must save THIS id in device_ota_assignments
+      // so the slot lookup matches. The custom deviceId is kept for diagnostics/heartbeat.
+      const expoInstallationId: string | undefined = (Updates as { installationId?: string }).installationId ?? undefined;
       const res = await fetch(new URL("/api/admin/ota/assign-admin-preview", getApiUrl()).toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
         credentials: "include",
-        body: JSON.stringify({ deviceId }),
+        body: JSON.stringify({ deviceId, expoInstallationId }),
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         throw new Error(json.message ?? `HTTP ${res.status}`);
       }
-      Alert.alert(
-        "Dispositivo registrato",
-        "Questo dispositivo riceverà l'OTA admin-preview. L'app si aggiornerà adesso.",
-        [{ text: "OK", onPress: () => {
-          triggerOtaCheck("manual", { force: true, immediateReload: true }).catch(() => {});
-        }}],
-      );
+      // Keep the loading spinner active while the OTA check runs.
+      // triggerOtaCheck with immediateReload:true will call Updates.reloadAsync()
+      // which terminates the app — if it returns without reloading, show the result.
+      const result = await triggerOtaCheck("manual", { force: true, immediateReload: true });
+      if (result.phase === "reload") {
+        // reloadAsync returned — app should be restarting, nothing more to do.
+        return;
+      }
+      if (result.skipped === "dev") {
+        Alert.alert(
+          "Registrato (solo produzione)",
+          "Il device è stato registrato per admin-preview. L'OTA check è disabilitato in modalità sviluppo — testa su un build produzione.",
+        );
+      } else if (result.phase === "no-update") {
+        Alert.alert(
+          "Nessun aggiornamento rilevato",
+          `Il server non ha restituito OTA-preview per questo dispositivo.\n\nPhase: ${result.phase}\n\nVerifica i log del server ([expo-updates] device-id resolved) per confrontare il device ID salvato con quello nei log.`,
+        );
+      } else if (!result.ok) {
+        Alert.alert(
+          "Errore OTA check",
+          `Phase: ${result.phase}\n${result.error ?? "Errore sconosciuto"}`,
+        );
+      } else {
+        Alert.alert(
+          "Aggiornamento in attesa",
+          `L'aggiornamento è stato scaricato (${result.phase}). L'app si riavvierà quando vai in background.`,
+        );
+      }
     } catch (e) {
       Alert.alert("Errore", `Impossibile applicare OTA: ${String(e)}`);
     } finally {

@@ -545,6 +545,15 @@ router.post("/ota/assign-admin-preview", async (req: Request, res: Response) => 
     const rawDeviceId = typeof req.body?.deviceId === "string" ? req.body.deviceId.trim().substring(0, 128) : null;
     if (!rawDeviceId) return sendError(res, 400, "deviceId obbligatorio");
 
+    // expoInstallationId is the UUID that expo-updates SDK sends in the
+    // `expo-device-id` / `expo-installation-id` request header when calling
+    // /api/expo-updates. Saving this as a separate row ensures the slot lookup
+    // in expo-updates-handler matches even if the Expo-internal ID differs
+    // from the app's custom device ID (they are different UUIDs).
+    const rawExpoInstallationId = typeof req.body?.expoInstallationId === "string"
+      ? req.body.expoInstallationId.trim().substring(0, 128)
+      : null;
+
     const pending = await db.execute(sql`
       SELECT * FROM ota_releases
       WHERE slot = 'admin-preview' AND status = 'active' AND approved = false
@@ -554,22 +563,45 @@ router.post("/ota/assign-admin-preview", async (req: Request, res: Response) => 
     if (pending.rows.length === 0) return sendError(res, 404, "Nessuna OTA in attesa di approvazione admin");
 
     const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
+    const actorId = req.session.userId ?? null;
+
+    // Save the app's custom device ID (used for heartbeat/diagnostics).
     await db.execute(sql`
       INSERT INTO device_ota_assignments (device_id, slot, assigned_at, assigned_by, expires_at)
-      VALUES (${rawDeviceId}, 'admin-preview', NOW(), ${req.session.userId ?? null}, ${expiresAt.toISOString()})
+      VALUES (${rawDeviceId}, 'admin-preview', NOW(), ${actorId}, ${expiresAt.toISOString()})
       ON CONFLICT (device_id) DO UPDATE
         SET slot = 'admin-preview',
             assigned_at = NOW(),
-            assigned_by = ${req.session.userId ?? null},
+            assigned_by = ${actorId},
             expires_at = ${expiresAt.toISOString()}
     `);
+
+    // Also save the Expo-internal installation ID if provided — this is the UUID
+    // that expo-updates SDK includes in expo-device-id / expo-installation-id headers.
+    // Without this row the slot lookup in expo-updates-handler never finds the device.
+    if (rawExpoInstallationId && rawExpoInstallationId !== rawDeviceId) {
+      await db.execute(sql`
+        INSERT INTO device_ota_assignments (device_id, slot, assigned_at, assigned_by, expires_at)
+        VALUES (${rawExpoInstallationId}, 'admin-preview', NOW(), ${actorId}, ${expiresAt.toISOString()})
+        ON CONFLICT (device_id) DO UPDATE
+          SET slot = 'admin-preview',
+              assigned_at = NOW(),
+              assigned_by = ${actorId},
+              expires_at = ${expiresAt.toISOString()}
+      `);
+      console.log(`[OTA-ASSIGN-ADMIN-PREVIEW] saved expoInstallationId "${rawExpoInstallationId.substring(0, 16)}…" → admin-preview`);
+    } else if (!rawExpoInstallationId) {
+      console.warn("[OTA-ASSIGN-ADMIN-PREVIEW] expoInstallationId not provided — expo-updates slot lookup may fail if Expo SDK device ID differs from custom deviceId");
+    }
+
+    console.log(`[OTA-ASSIGN-ADMIN-PREVIEW] deviceId "${rawDeviceId.substring(0, 16)}…" → admin-preview, expiresAt=${expiresAt.toISOString()}`);
 
     storage.createModeratorLog({
       moderatorId: req.session.userId!,
       action: "assign_admin_preview_device",
       targetType: "ota_release",
       targetId: String(pending.rows[0].id),
-      details: `Admin device ${rawDeviceId.substring(0, 16)}… assegnato a admin-preview`,
+      details: `Admin device ${rawDeviceId.substring(0, 16)}… assegnato a admin-preview${rawExpoInstallationId ? ` (expoId: ${rawExpoInstallationId.substring(0, 16)}…)` : ""}`,
     }).catch(() => {});
 
     return sendSuccess(res, { release: pending.rows[0], expiresAt: expiresAt.toISOString() });
