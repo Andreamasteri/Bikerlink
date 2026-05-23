@@ -7,7 +7,7 @@ import { storage as appStorage } from "../storage";
 import { sendSuccess, sendError } from "../lib/api-response";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  const sess = (req as any).session as { userId?: string };
+  const sess = req.session as { userId?: string };
   if (!sess?.userId) return sendError(res, 401, "Non autenticato");
   const user = await appStorage.getUser(sess.userId);
   if (!user || user.role !== "admin") return sendError(res, 403, "Accesso non autorizzato");

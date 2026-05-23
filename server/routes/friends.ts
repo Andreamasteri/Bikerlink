@@ -327,8 +327,8 @@ router.post("/request/:userId", requireAuth, async (req: Request, res: Response)
     });
 
     return sendSuccess(res, { requestId: newRequest.id });
-  } catch (error: any) {
-    if (error?.code === "23505") {
+  } catch (error: unknown) {
+    if ((error as { code?: string })?.code === "23505") {
       return sendError(res, 409, "Richiesta già in attesa");
     }
     console.error("Send match request error:", error);
@@ -423,8 +423,8 @@ router.post("/request/:requestId/accept", requireAuth, async (req: Request, res:
           motorcycleBrand: "direct",
           status: "accepted",
         });
-      } catch (insertErr: any) {
-        if (insertErr?.code !== "23505") {
+      } catch (insertErr: unknown) {
+        if ((insertErr as { code?: string })?.code !== "23505") {
           throw insertErr;
         }
         await tx

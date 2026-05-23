@@ -77,7 +77,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         .where(and(eq(userMotorcycles.userId, userId), ne(userMotorcycles.id, motorcycle.id)));
     }
 
-    const matches: any[] = [];
+    const matches: Array<{ zavarrinaNickname: string | undefined; brand: string; model: string; ridingStyle: string }> = [];
     if (ridingStyle) {
       const wishlistMotos = await storage.findMatchingWishlistMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
       for (const wm of wishlistMotos) {
@@ -161,7 +161,7 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
         .where(and(eq(userMotorcycles.userId, userId), ne(userMotorcycles.id, motoId)));
     }
 
-    const motorcycle = await storage.updateUserMotorcycle(motoId, updateData as any);
+    const motorcycle = await storage.updateUserMotorcycle(motoId, updateData as Partial<import("@shared/db").InsertUserMotorcycle>);
     return res.json(motorcycle);
   } catch (error) {
     console.error("Update motorcycle error:", error);

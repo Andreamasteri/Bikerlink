@@ -19,22 +19,22 @@ router.get("/", async (req: Request, res: Response) => {
       eventType: events.eventType,
       creatorId: events.creatorId,
       creatorNickname: users.nickname,
-      locationName: (events as any).locationName,
+      locationName: events.locationName,
       latitude: events.latitude,
       longitude: events.longitude,
-      eventDate: (events as any).eventDate,
-      eventTime: (events as any).eventTime,
-      isRecurring: (events as any).isRecurring,
-      recurrenceInfo: (events as any).recurrenceInfo,
+      eventDate: events.eventDate,
+      eventTime: events.eventTime,
+      isRecurring: events.isRecurring,
+      recurrenceInfo: events.recurrenceInfo,
       maxParticipants: events.maxParticipants,
-      websiteUrl: (events as any).websiteUrl,
-      autoInviteReason: (events as any).autoInviteReason,
-      autoInviteRegion: (events as any).autoInviteRegion,
-      autoInviteBrand: (events as any).autoInviteBrand,
+      websiteUrl: events.websiteUrl,
+      autoInviteReason: events.autoInviteReason,
+      autoInviteRegion: events.autoInviteRegion,
+      autoInviteBrand: events.autoInviteBrand,
       status: events.status,
-      rejectionReason: (events as any).rejectionReason,
-      approvedBy: (events as any).approvedBy,
-      approvedAt: (events as any).approvedAt,
+      rejectionReason: events.rejectionReason,
+      approvedBy: events.approvedBy,
+      approvedAt: events.approvedAt,
       createdAt: events.createdAt,
       updatedAt: events.updatedAt,
     })
@@ -43,7 +43,7 @@ router.get("/", async (req: Request, res: Response) => {
       .where(eq(events.creatorId, userId))
       .orderBy(desc(events.createdAt));
 
-    const enriched = await allLimited(rows.map((r) => () => enrichEvent(r as any, userId)));
+    const enriched = await allLimited(rows.map((r) => () => enrichEvent(r, userId)));
     return res.json(enriched);
   } catch (err) {
     console.error("[events] GET /my error:", err);

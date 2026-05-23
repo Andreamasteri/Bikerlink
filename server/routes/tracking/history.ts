@@ -5,7 +5,7 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 
 const router = Router();
 
-type RawPoint = { latitude: number; longitude: number; [key: string]: any };
+type RawPoint = { latitude: number; longitude: number; [key: string]: unknown };
 
 function perpendicularDistance(p: RawPoint, a: RawPoint, b: RawPoint): number {
   const dx = b.longitude - a.longitude;
@@ -118,7 +118,7 @@ router.post("/:id/like", async (req: Request, res: Response) => {
 
     const updated = await storage.updateRoute(id, {
       likes: (route.likes || 0) + 1,
-    } as any);
+    });
 
     return res.json(updated);
   } catch (error) {

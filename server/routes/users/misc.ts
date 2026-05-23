@@ -29,9 +29,9 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
     }
     const updateData = { latitude: fLat, longitude: fLng, coordinatesUpdatedAt: new Date() };
     if (existingProfile) {
-      await storage.updateUserProfile(userId, updateData as any);
+      await storage.updateUserProfile(userId, updateData);
     } else {
-      await storage.createUserProfile({ userId, ...updateData } as any);
+      await storage.createUserProfile({ userId, ...updateData } as import("@shared/db").InsertUserProfile);
     }
 
     const user = await storage.getUser(userId);
@@ -49,14 +49,14 @@ router.put("/location", requireAuth, async (req: Request, res: Response) => {
 router.post("/app-close", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    await storage.updateUser(userId, { lastAppCloseAt: new Date() } as any);
+    await storage.updateUser(userId, { lastAppCloseAt: new Date() });
     const profile = await storage.getUserProfile(userId);
     if (profile?.offlinePositionRandomize !== false && profile?.latitude != null && profile?.longitude != null) {
       const fuzzed = applyPositionFuzz(profile.latitude, profile.longitude, 20);
       await storage.updateUserProfile(userId, {
         lastOfflineLat: fuzzed.lat,
         lastOfflineLng: fuzzed.lng,
-      } as any);
+      });
     }
     return sendSuccess(res);
   } catch (error) {

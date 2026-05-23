@@ -28,7 +28,7 @@ router.post("/", async (req: Request, res: Response) => {
   try {
     const parsedSt = stregattaSchema.safeParse(req.body);
     if (!parsedSt.success) return sendError(res, 400, parsedSt.error.issues[0].message);
-    const { nickname, userType, sex, coupleSexConfig, birthYear, region, _bio, _moto, _wishlistDescription, _wishlistMotos } = parsedSt.data as any;
+    const { nickname, userType, sex, coupleSexConfig, birthYear, region, bio: _bio, moto: _moto, wishlistDescription: _wishlistDescription, wishlistMotos: _wishlistMotos, country: countryField } = parsedSt.data;
     const existingNickname = await storage.getUserByNickname(nickname);
     if (existingNickname) {
       return sendError(res, 409, "Nickname già in uso");
@@ -36,7 +36,7 @@ router.post("/", async (req: Request, res: Response) => {
     const email = `fake_${nickname.toLowerCase().replace(/[^a-z0-9]/g, "")}@fakeuser.bikerlink.it`;
     const fakeSecret = crypto.randomBytes(32).toString("base64url");
     const hashedPassword = await bcrypt.hash(fakeSecret, 10);
-    const country = (parsedSt.data as any).country || "IT";
+    const country = countryField || "IT";
     const user = await storage.createUser({
       nickname,
       email,
@@ -44,7 +44,7 @@ router.post("/", async (req: Request, res: Response) => {
       userType,
       sex: sex || null,
       coupleSexConfig: coupleSexConfig || null,
-      birthYear: birthYear || null,
+      birthYear: birthYear != null ? Number(birthYear) : null,
       region: region || null,
       country,
       isFake: true,

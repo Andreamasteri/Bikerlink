@@ -187,8 +187,8 @@ export interface IStorage {
   incrementPhoneSharedCount(conversationId: string, userId: string): Promise<void>;
   countAvailableBikers(countries?: string[]): Promise<number>;
   countAvailableZavorrine(countries?: string[]): Promise<number>;
-  getAvailableBikersList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]>;
-  getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]>;
+  getAvailableBikersList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: import("@shared/db").User; profile: import("@shared/db").UserProfile; distance: number }>>;
+  getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: import("@shared/db").User; profile: import("@shared/db").UserProfile; distance: number }>>;
   getMotorcyclePhotos(motorcycleId: string): Promise<MotorcyclePhoto[]>;
   getMotorcyclePhoto(id: string): Promise<MotorcyclePhoto | undefined>;
   addMotorcyclePhoto(data: InsertMotorcyclePhoto): Promise<MotorcyclePhoto>;
@@ -216,8 +216,8 @@ export interface IStorage {
   resetGarageMatchToNew(id: string, userId: string): Promise<boolean>;
   deleteRejectedGarageMatches(userId: string): Promise<number>;
   deleteNewGarageMatches(userId: string): Promise<number>;
-  getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]>;
-  getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]>;
+  getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: import("@shared/db").ZavarrinaWishlistMoto; userId: string }[]>;
+  getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: import("@shared/db").UserMotorcycle; userId: string }[]>;
   findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined>;
   getAllExistingBikerZavarrinaMatchKeys(): Promise<Set<string>>;
   getAllExistingProposalMatchKeys(): Promise<Set<string>>;
@@ -240,12 +240,12 @@ export interface IStorage {
   cancelUserDeletion(userId: string): Promise<void>;
   deleteUser(userId: string): Promise<void>;
   recordFakeUserInteraction(fakeUserId: string, realUserId: string, interactionType: string): Promise<void>;
-  getFakeUserStats(limit?: number, offset?: number, type?: string): Promise<{ users: any[]; total: number; hasMore: boolean; stats: { total: number; biker: number; zavorrina: number; coppia: number } }>;
+  getFakeUserStats(limit?: number, offset?: number, type?: string): Promise<{ users: unknown[]; total: number; hasMore: boolean; stats: { total: number; biker: number; zavorrina: number; coppia: number } }>;
   getFakeUsers(): Promise<User[]>;
   deleteFakeUser(id: string): Promise<void>;
   deleteAllFakeUsers(): Promise<number>;
   toggleFakeZavorrineAvailability(): Promise<void>;
-  getFakeUserConversations(fakeUserId: string): Promise<any[]>;
+  getFakeUserConversations(fakeUserId: string): Promise<import("@shared/db").Conversation[]>;
   getCustomRoutes(userId: string): Promise<CustomRoute[]>;
   getPublicCustomRoutes(): Promise<CustomRoute[]>;
   getFriendsCustomRoutes(userId: string): Promise<CustomRoute[]>;
@@ -287,8 +287,8 @@ export interface IStorage {
   deletePlannedRoute(id: string): Promise<void>;
   upsertRouteWeatherCache(data: InsertRouteWeatherCache): Promise<RouteWeatherCache>;
   getRouteWeatherCache(routeId: string): Promise<RouteWeatherCache | undefined>;
-  getOnlineUsersList(since: Date, lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]>;
-  getAvailableUsersList(lat?: number, lng?: number): Promise<any[]>;
+  getOnlineUsersList(since: Date, lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: import("@shared/db").User; profile: import("@shared/db").UserProfile | null; distance: number }>>;
+  getAvailableUsersList(lat?: number, lng?: number): Promise<Array<{ user: import("@shared/db").User; profile: import("@shared/db").UserProfile; distance: number }>>;
   getAllExistingProposalProfileMatchKeys(): Promise<Set<string>>;
   getActedUponBikerZavarrinaPairs(): Promise<Set<string>>;
   createProposalProfileMatch(data: InsertProposalProfileMatch): Promise<ProposalProfileMatch | null>;

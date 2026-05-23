@@ -334,12 +334,12 @@ export function getFakeBotReply(content: string, conversationId: string, ctx: Fa
   return reply;
 }
 
-export async function handleNotifications(conversationId: string, senderId: string, message: any, participants: any[]) {
+export async function handleNotifications(conversationId: string, senderId: string, message: { messageType: string; content?: string }, participants: Array<{ userId: string }>) {
   const { messageType, content: finalContent } = message;
   const conversation = await storage.getConversation(conversationId);
   const senderUser = await storage.getUser(senderId);
 
-  let motoclubMeta: any = null;
+  let motoclubMeta: { id: string; name: string } | null = null;
   if (conversation?.conversationType === "motoclub") {
     const clubRow = await db
       .select({ id: motoClubs.id, name: motoClubs.name })
@@ -420,7 +420,7 @@ export async function handleNotifications(conversationId: string, senderId: stri
   }
 }
 
-export async function handleFakeReplies(conversationId: string, senderId: string, finalContent: string, participants: any[]) {
+export async function handleFakeReplies(conversationId: string, senderId: string, finalContent: string, participants: Array<{ userId: string }>) {
   const conversation = await storage.getConversation(conversationId);
   if (conversation?.conversationType === "motoclub") {
     const chatbotSetting = await storage.getAppSetting("chatbot_enabled");

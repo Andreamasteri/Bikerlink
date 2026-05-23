@@ -12,15 +12,14 @@ import { sendSuccess, sendError } from "../lib/api-response";
 import { initState } from "../init-state";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  const session = (req as any).session as { userId?: string };
-  if (!session?.userId) {
+  if (!req.session?.userId) {
     return sendError(res, 401, "Non autenticato");
   }
-  const user = await storage.getUser(session.userId);
+  const user = await storage.getUser(req.session.userId);
   if (!user || user.role !== "admin") {
     return sendError(res, 403, "Accesso non autorizzato");
   }
-  (req as any).adminUser = user;
+  (req as { adminUser?: typeof user }).adminUser = user;
   next();
 }
 
@@ -111,7 +110,7 @@ export function registerMoreRoutes(app: Express) {
     const user = await storage.getUser(req.session.userId);
     if (!user || user.role !== "admin") return sendError(res, 403, "Accesso non autorizzato");
 
-    manualUpload.single("file")(req, res, (err: any) => {
+    manualUpload.single("file")(req, res, err => {
       if (err) return sendError(res, 400, err.message || "Errore upload");
       if (!req.file) return sendError(res, 400, "Nessun file caricato");
       const stats = fs.statSync(MANUAL_PATH);
@@ -180,7 +179,7 @@ export function registerMoreRoutes(app: Express) {
     const user = await storage.getUser(req.session.userId);
     if (!user || user.role !== "admin") return sendError(res, 403, "Accesso non autorizzato");
 
-    eulaUpload.single("file")(req, res, (err: any) => {
+    eulaUpload.single("file")(req, res, err => {
       if (err) return sendError(res, 400, err.message || "Errore upload");
       if (!req.file) return sendError(res, 400, "Nessun file caricato");
       const stats = fs.statSync(EULA_PDF_PATH);
@@ -217,7 +216,7 @@ export function registerMoreRoutes(app: Express) {
 
   app.get("/api/privacy-policy/export", async (_req, res) => {
     try {
-       
+      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any
       const PDFDocument = require("pdfkit") as any;
       const publicDir = path.dirname(PRIVACY_EXPORT_PDF_PATH);
       if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
@@ -263,7 +262,7 @@ export function registerMoreRoutes(app: Express) {
     const user = await storage.getUser(req.session.userId);
     if (!user || user.role !== "admin") return sendError(res, 403, "Accesso non autorizzato");
 
-    privacyUpload.single("file")(req, res, (err: any) => {
+    privacyUpload.single("file")(req, res, err => {
       if (err) return sendError(res, 400, err.message || "Errore upload");
       if (!req.file) return sendError(res, 400, "Nessun file caricato");
       const stats = fs.statSync(PRIVACY_PDF_PATH);

@@ -126,7 +126,7 @@ const COUNTRY_GEO: Record<string, { name: string; lat: number; lon: number }> = 
 };
 
 // Cache for community stats (recomputed every 5 min).
-let statsCache: { ts: number; payload: any } | null = null;
+let statsCache: { ts: number; payload: unknown } | null = null;
 const STATS_TTL_MS = 5 * 60 * 1000;
 
 async function getCommunityStats() {

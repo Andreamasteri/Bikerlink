@@ -4,6 +4,7 @@ import { storage } from "../../storage";
 import { requireAuth, decodePolyline, escapeXml } from "./utils";
 import { plannedGpxImportSchema } from "@shared/validators";
 import { haversineKm } from "../../geo";
+import type { InsertPlannedRoute } from "@shared/db";
 
 const router = Router();
 
@@ -16,7 +17,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
     const route = await storage.getPlannedRoute(id);
     if (!route) return sendError(res, 404, "Percorso non trovato");
 
-    const waypoints = ((route as any).waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
+    const waypoints = (route.waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
     const originWp = waypoints.find((wp) => wp.lat !== 0 && wp.lng !== 0);
     if (!originWp) return res.json({ bikers: [], count: 0 });
 
@@ -28,7 +29,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
       balanced: ["touring", "sport_touring", "naked", "adventure", "sport"],
       fast: ["sport", "sport_touring", "naked", "superbike"],
     };
-    const compatibleStyles = styleToRiderStyles[(route as any).style ?? "balanced"] ?? [];
+    const compatibleStyles = styleToRiderStyles[route.style ?? "balanced"] ?? [];
 
     const nearbyProfiles = await db.execute(sql`
       SELECT up.user_id, up.latitude, up.longitude, u.nickname, u.user_type,
@@ -70,7 +71,8 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
       LIMIT 15
     `);
 
-    const bikers = nearbyProfiles.rows.map((r: any) => ({
+    type BikerRow = { user_id: string; nickname: string; user_type: string; avatar_url: string | null; riding_style: string | null; is_available: boolean; latitude: number; longitude: number; proximity_score: number; style_score: number; avail_score: number };
+    const bikers = (nearbyProfiles.rows as BikerRow[]).map((r) => ({
       userId: r.user_id,
       nickname: r.nickname,
       userType: r.user_type,
@@ -82,9 +84,9 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
       matchScore: Math.round(Number(r.proximity_score ?? 0) + Number(r.style_score ?? 0) + Number(r.avail_score ?? 0)),
     }));
 
-    await (storage.updatePlannedRoute as any)(id, {
+    await storage.updatePlannedRoute(id, {
       metadata: {
-        ...((route as any).metadata as object ?? {}),
+        ...(route.metadata as object ?? {}),
         bikerCount: bikers.length,
         bikerUpdatedAt: new Date().toISOString(),
       },
@@ -159,7 +161,7 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
       return sendError(res, 400, "GPX non valido: nessun waypoint o traccia trovata");
     }
 
-    const route = await (storage.createPlannedRoute as any)({
+    const routeData: InsertPlannedRoute = {
       userId,
       title: gpxTitle,
       waypoints: finalWaypoints,
@@ -168,10 +170,12 @@ router.post("/import-gpx", async (req: Request, res: Response) => {
       durationMinutes: Math.round(distanceKm / 70 * 60),
       bikerScore: 0.5,
       style: "balanced",
-      visibility: visibility as any,
+      visibility,
       isMultiDay: false,
       metadata: { importedFromGpx: true, trackPointCount: trackPoints.length },
-    });
+    };
+
+    const route = await storage.createPlannedRoute(routeData);
 
     return res.status(201).json(route);
   } catch (err) {
@@ -188,15 +192,15 @@ router.get("/:id/export.gpx", async (req: Request, res: Response) => {
   try {
     const route = await storage.getPlannedRoute(id);
     if (!route) return sendError(res, 404, "Non trovato");
-    if (route.userId !== userId && (route as any).visibility !== "public") {
+    if (route.userId !== userId && route.visibility !== "public") {
       return sendError(res, 403, "Non autorizzato");
     }
 
-    const waypoints = ((route as any).waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
+    const waypoints = (route.waypoints as Array<{ lat: number; lng: number; name?: string }>) ?? [];
     let trackPoints: [number, number][] = [];
 
-    if ((route as any).polyline) {
-      trackPoints = decodePolyline((route as any).polyline);
+    if (route.polyline) {
+      trackPoints = decodePolyline(route.polyline);
     } else if (waypoints.length) {
       trackPoints = waypoints.map((wp) => [wp.lat, wp.lng]);
     }

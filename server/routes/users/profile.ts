@@ -5,6 +5,7 @@ import { onlineTracker } from "../../online-tracker";
 import { applyFakeZones, applyPositionFuzz, captureFirstAvailabilityLocation } from "../users";
 import { createRegionalClubInvite } from "../motoclubs/utils";
 import { triggerProposalProfileMatchingForZavorrina } from "../../matching-engine";
+import type { InsertUser, InsertUserProfile } from "@shared/db";
 
 import { requireAuth } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";
@@ -66,7 +67,7 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
       return sendError(res, 400, parsed.error.issues[0].message);
     }
     const b = parsed.data;
-    const userUpdate: Record<string, unknown> = {};
+    const userUpdate: Partial<InsertUser> = {};
     if (b.nickname !== undefined) userUpdate.nickname = b.nickname;
     if (b.phone !== undefined) userUpdate.phone = b.phone;
     if (b.sex !== undefined) userUpdate.sex = b.sex;
@@ -80,22 +81,22 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
     if (Object.keys(userUpdate).length > 0) {
       if (userUpdate.nickname) {
         const reservedNicknames = ["admin", "administrator", "administrators", "amministratore", "amministratori", "mod", "moderator", "moderatore"];
-        if (reservedNicknames.includes((userUpdate.nickname as string).toLowerCase())) {
+        if (reservedNicknames.includes(userUpdate.nickname.toLowerCase())) {
           return sendError(res, 400, "Nickname non disponibile");
         }
-        const existing = await storage.getUserByNickname(userUpdate.nickname as string);
+        const existing = await storage.getUserByNickname(userUpdate.nickname);
         if (existing && existing.id !== userId) {
           return sendError(res, 409, "Nickname già in uso");
         }
       }
-      await storage.updateUser(userId, userUpdate as any);
+      await storage.updateUser(userId, userUpdate);
 
       if (b.region !== undefined && typeof userUpdate.region === "string" && userUpdate.region.trim()) {
         createRegionalClubInvite(userId, userUpdate.region).catch((e) => console.error("[auto-join region error]", e));
       }
     }
 
-    const profileUpdate: Record<string, unknown> = {};
+    const profileUpdate: Partial<InsertUserProfile> = {};
     if (b.bio !== undefined) profileUpdate.bio = b.bio;
     if (b.maxPickupDistance !== undefined) profileUpdate.maxPickupDistance = b.maxPickupDistance;
     if (b.latitude !== undefined) profileUpdate.latitude = b.latitude;
@@ -142,9 +143,9 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
         profileUpdate.longitude = fuzzed.lng;
       }
       if (existingProfileMe) {
-        await storage.updateUserProfile(userId, profileUpdate as any);
+        await storage.updateUserProfile(userId, profileUpdate);
       } else {
-        await storage.createUserProfile({ userId, ...profileUpdate } as any);
+        await storage.createUserProfile({ userId, ...profileUpdate } as InsertUserProfile);
       }
     }
 
@@ -195,7 +196,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     if (!parsedDyn.success) return sendError(res, 400, parsedDyn.error.issues[0].message);
     const { isAvailable, latitude, longitude, searchPreference, preferredMapStyle, emailChatNotifications, notificationPreferences, pushNotificationsEnabled } = parsedDyn.data;
     const existingProfile = await storage.getUserProfile(userId);
-    const updateData: Record<string, unknown> = {};
+    const updateData: Partial<InsertUserProfile> = {};
     if (typeof isAvailable === "boolean") updateData.isAvailable = isAvailable;
     if (latitude !== undefined || longitude !== undefined) {
       let fLat = latitude;
@@ -237,13 +238,13 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     }
 
     if (isAvailable === true) {
-      await storage.updateUser(userId, { ghostMode: false } as any);
+      await storage.updateUser(userId, { ghostMode: false });
       onlineTracker.setGhostMode(userId, false);
       await captureFirstAvailabilityLocation(userId, latitude, longitude, existingProfile?.latitude, existingProfile?.longitude);
     }
 
     if (existingProfile) {
-      const profile = await storage.updateUserProfile(userId, updateData as any);
+      const profile = await storage.updateUserProfile(userId, updateData);
       if (typeof isAvailable === "boolean") onlineTracker.setAvailability(userId, isAvailable);
 
       const user = await storage.getUser(userId);
@@ -253,7 +254,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
 
       return res.json(profile);
     } else {
-      const profile = await storage.createUserProfile({ userId, ...updateData } as any);
+      const profile = await storage.createUserProfile({ userId, ...updateData } as InsertUserProfile);
       if (typeof isAvailable === "boolean") onlineTracker.setAvailability(userId, isAvailable);
 
       const user = await storage.getUser(userId);
@@ -272,7 +273,7 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
 router.put("/me/match-seen", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
-    await storage.updateUser(userId, { lastSeenMatchAt: new Date() } as any);
+    await storage.updateUser(userId, { lastSeenMatchAt: new Date() });
     return sendSuccess(res);
   } catch (error) {
     console.error("Match seen update error:", error);
@@ -313,7 +314,7 @@ router.put("/me/ghost-mode", requireAuth, async (req: Request, res: Response) =>
     if (ghostModeSetting?.value !== "true") {
       return sendError(res, 403, "Ghost mode is currently disabled by administrator.");
     }
-    await storage.updateUser(userId, { ghostMode: enabled } as any);
+    await storage.updateUser(userId, { ghostMode: enabled });
     onlineTracker.setGhostMode(userId, enabled);
     return sendSuccess(res, { enabled });
   } catch (error) {
@@ -330,11 +331,11 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     const { hideFromMap, hideOnlineStatus, hideLastSeen, hideDistance, positionFuzz, positionFuzzKm, fakeHomeEnabled, fakeHomeLatitude, fakeHomeLongitude, fakeHomeRadius, fakeWorkEnabled, fakeWorkLatitude, fakeWorkLongitude, fakeWorkRadius, fakeWhateverEnabled, fakeWhateverLatitude, fakeWhateverLongitude, fakeWhateverRadius, offlinePositionRandomize } = parsed.data;
 
     const existing = await storage.getUserProfile(userId);
-    const updateData: Record<string, any> = {};
+    const updateData: Partial<InsertUserProfile> = {};
     if (hideFromMap !== undefined) updateData.hideFromMap = hideFromMap;
-    if (hideOnlineStatus !== undefined) updateData.hideOnlineStatus = hideOnlineStatus;
-    if (hideLastSeen !== undefined) updateData.hideLastSeen = hideLastSeen;
-    if (hideDistance !== undefined) updateData.hideDistance = hideDistance;
+    if (hideOnlineStatus !== undefined) updateData.hideOnlineStatus = (hideOnlineStatus as boolean | null) ?? undefined;
+    if (hideLastSeen !== undefined) updateData.hideLastSeen = (hideLastSeen as boolean | null) ?? undefined;
+    if (hideDistance !== undefined) updateData.hideDistance = (hideDistance as boolean | null) ?? undefined;
     if (positionFuzz !== undefined) updateData.positionFuzz = positionFuzz;
     if (positionFuzzKm !== undefined) updateData.positionFuzzKm = positionFuzzKm;
     if (offlinePositionRandomize !== undefined) updateData.offlinePositionRandomize = offlinePositionRandomize;
@@ -342,22 +343,22 @@ router.put("/me/privacy", requireAuth, async (req: Request, res: Response) => {
     if (fakeHomeEnabled !== undefined) updateData.fakeHomeEnabled = fakeHomeEnabled;
     if (fakeHomeLatitude !== undefined) updateData.homeLatitude = fakeHomeLatitude;
     if (fakeHomeLongitude !== undefined) updateData.homeLongitude = fakeHomeLongitude;
-    if (fakeHomeRadius !== undefined) updateData.fakeHomeRadius = fakeHomeRadius;
+    if (fakeHomeRadius !== undefined) updateData.fakeHomeRadius = fakeHomeRadius ?? undefined;
 
     if (fakeWorkEnabled !== undefined) updateData.fakeWorkEnabled = fakeWorkEnabled;
     if (fakeWorkLatitude !== undefined) updateData.workLatitude = fakeWorkLatitude;
     if (fakeWorkLongitude !== undefined) updateData.workLongitude = fakeWorkLongitude;
-    if (fakeWorkRadius !== undefined) updateData.fakeWorkRadius = fakeWorkRadius;
+    if (fakeWorkRadius !== undefined) updateData.fakeWorkRadius = fakeWorkRadius ?? undefined;
 
     if (fakeWhateverEnabled !== undefined) updateData.fakeWhateverEnabled = fakeWhateverEnabled;
     if (fakeWhateverLatitude !== undefined) updateData.whateverLatitude = fakeWhateverLatitude;
     if (fakeWhateverLongitude !== undefined) updateData.whateverLongitude = fakeWhateverLongitude;
-    if (fakeWhateverRadius !== undefined) updateData.fakeWhateverRadius = fakeWhateverRadius;
+    if (fakeWhateverRadius !== undefined) updateData.fakeWhateverRadius = fakeWhateverRadius ?? undefined;
 
     if (existing) {
       await storage.updateUserProfile(userId, updateData);
     } else {
-      await storage.createUserProfile({ userId, ...updateData } as any);
+      await storage.createUserProfile({ userId, ...updateData } as InsertUserProfile);
     }
     return sendSuccess(res);
   } catch (error) {
@@ -373,7 +374,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
     const { isAvailable, latitude, longitude } = parsed.data;
     const existing = await storage.getUserProfile(userId);
-    const updateData: Record<string, any> = { isAvailable };
+    const updateData: Partial<InsertUserProfile> = { isAvailable };
     if (latitude != null && longitude != null) {
       let fLat = latitude;
       let fLng = longitude;
@@ -392,7 +393,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     }
 
     if (isAvailable === true) {
-      await storage.updateUser(userId, { ghostMode: false } as any);
+      await storage.updateUser(userId, { ghostMode: false });
       onlineTracker.setGhostMode(userId, false);
       await captureFirstAvailabilityLocation(userId, latitude, longitude, existing?.latitude, existing?.longitude);
     }
@@ -400,7 +401,7 @@ router.put("/me/availability", requireAuth, async (req: Request, res: Response) 
     if (existing) {
       await storage.updateUserProfile(userId, updateData);
     } else {
-      await storage.createUserProfile({ userId, ...updateData } as any);
+      await storage.createUserProfile({ userId, ...updateData } as InsertUserProfile);
     }
 
     const user = await storage.getUser(userId);

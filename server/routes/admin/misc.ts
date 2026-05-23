@@ -24,7 +24,7 @@ router.post("/workshops", async (req: Request, res: Response) => {
   try {
     const parsed = workshopSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const workshop = await storage.createWorkshop(parsed.data as any);
+    const workshop = await storage.createWorkshop(parsed.data as import("@shared/db").InsertWorkshop);
     return res.status(201).json(workshop);
   } catch (_error) {
     return sendError(res, 500, "Errore creazione officina");
@@ -45,7 +45,7 @@ router.post("/easter-eggs", async (req: Request, res: Response) => {
   try {
     const parsed = easterEggSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const egg = await storage.createEasterEgg(parsed.data as any);
+    const egg = await storage.createEasterEgg(parsed.data as import("@shared/db").InsertEasterEgg);
     return res.status(201).json(egg);
   } catch (_error) {
     return sendError(res, 500, "Errore creazione easter egg");

@@ -50,7 +50,7 @@ router.get("/conversations/:id/messages", async (req: Request, res: Response) =>
     const messages = await storage.getMessages(conversationId, limit, offset);
     const senderIds = [...new Set(messages.map((m) => m.senderId))];
     const senders = await storage.getUsersByIds(senderIds);
-    const senderMap = new Map(senders.filter(Boolean).map((s: any) => [s.id, { id: s.id, nickname: s.nickname, avatarUrl: s.avatarUrl, userType: s.userType }]));
+    const senderMap = new Map(senders.filter(Boolean).map((s) => [s!.id, { id: s!.id, nickname: s!.nickname, avatarUrl: s!.avatarUrl, userType: s!.userType }]));
 
     const messagesWithSender = messages.map((m) => ({
       ...m,
@@ -125,7 +125,7 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
     await storage.updateConversationTimestamp(id);
     participants.forEach(p => invalidateConvCache(p.userId));
 
-    await handleNotifications(id, userId, message, participants);
+    await handleNotifications(id, userId, { messageType: message.messageType, content: message.content ?? undefined }, participants);
     await handleFakeReplies(id, userId, finalContent || "", participants);
 
     const sender = await storage.getUser(userId);

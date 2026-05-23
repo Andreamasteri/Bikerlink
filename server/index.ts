@@ -143,7 +143,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     let skipSeed = false;
     try {
       const countResult = await db.execute(sql`SELECT COUNT(*) as cnt FROM users`);
-      const cnt = Number((countResult.rows[0] as any)?.cnt ?? 0);
+      const cnt = Number(((countResult.rows[0] as { cnt?: unknown })?.cnt) ?? 0);
       if (cnt > 100) {
         console.log(`[INIT] Phase 4: ${cnt} users found — skipping auto-seed`);
         skipSeed = true;
@@ -182,7 +182,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
         const { eq: eqSnap } = await import("drizzle-orm");
         const usersWithTracks = await db.execute(sql`SELECT DISTINCT user_id FROM user_music_tracks`);
         let saved = 0;
-        for (const row of usersWithTracks.rows as any[]) {
+        for (const row of usersWithTracks.rows as { user_id: string }[]) {
           const tracks = await db.select().from(umt).where(eqSnap(umt.userId, row.user_id));
           if (tracks.length === 0) continue;
           const tracksJson = tracks.map((t) => ({

@@ -4,6 +4,7 @@ import { db } from "../../db";
 import { motoClubs, eventClubInvites, motoClubMembers, type Event } from "@shared/db";
 import { eq, ilike, and, allLimited } from "../events-helpers";
 import { sendEventiPushNotifications } from "../../push-notifications";
+import type { SQL } from "drizzle-orm";
 
 const router = Router();
 
@@ -60,12 +61,12 @@ export async function sendClubInvitesByIds(evt: Event, eventId: string, clubIds:
 
 export async function sendClubInvites(evt: Event, approvedEventId: string): Promise<void> {
   try {
-    const conditions: any[] = [];
-    if ((evt as any).autoInviteRegion) {
-      conditions.push(ilike(motoClubs.region, `%${(evt as any).autoInviteRegion}%`));
+    const conditions: SQL<unknown>[] = [];
+    if (evt.autoInviteRegion) {
+      conditions.push(ilike(motoClubs.region, `%${evt.autoInviteRegion}%`));
     }
-    if ((evt as any).autoInviteBrand) {
-      conditions.push(ilike(motoClubs.brandName, `%${(evt as any).autoInviteBrand}%`));
+    if (evt.autoInviteBrand) {
+      conditions.push(ilike(motoClubs.brandName, `%${evt.autoInviteBrand}%`));
     }
 
     const clubs = conditions.length > 0
@@ -90,7 +91,7 @@ export async function sendClubInvites(evt: Event, approvedEventId: string): Prom
             await storage.createNotification({
               userId: member.userId,
               title: "Evento per il tuo club!",
-              body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}". ${(evt as any).autoInviteReason ?? ""}`.trim(),
+              body: `Il tuo club "${club.name}" è stato invitato all'evento "${evt.title}". ${evt.autoInviteReason ?? ""}`.trim(),
               notificationType: "event_invite",
               referenceType: "event",
               referenceId: approvedEventId,

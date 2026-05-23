@@ -21,7 +21,7 @@ router.post("/", async (req: Request, res: Response) => {
       userId,
       title: body.title,
       description: body.description ?? null,
-      waypoints: body.waypoints ?? [],
+      waypoints: (body.waypoints ?? []) as Array<{ lat: number; lng: number; name?: string }>,
       polyline: body.polyline ?? null,
       distanceKm: body.distanceKm ?? 0,
       durationMinutes: body.durationMinutes ?? 0,

@@ -48,21 +48,25 @@ router.post("/hotels", async (req: Request, res: Response) => {
   const { lat, lng, radius = 10000 } = parsedHotels.data;
 
   try {
-    const _results: any[] = [];
+    type HotelElement = { lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: { name?: string; stars?: string; phone?: string; website?: string } };
+    type OverpassResponse = { elements?: HotelElement[] };
+
     const query = `[out:json][timeout:25];(node["tourism"="hotel"](around:${radius},${lat},${lng});way["tourism"="hotel"](around:${radius},${lat},${lng}););out body;>;out skel qt;`;
     const resp = await fetch("https://overpass-api.de/api/interpreter", {
       method: "POST",
       body: "data=" + encodeURIComponent(query),
     });
-    const data = await resp.json() as any;
-    const elements = (data.elements ?? []).filter((e: any) => e.lat || (e.center && e.center.lat)).map((e: any) => ({
-      name: e.tags?.name || "Hotel",
-      lat: e.lat || e.center.lat,
-      lng: e.lon || e.center.lon,
-      stars: e.tags?.stars,
-      phone: e.tags?.phone,
-      website: e.tags?.website,
-    }));
+    const data = await resp.json() as OverpassResponse;
+    const elements = (data.elements ?? [])
+      .filter((e) => e.lat || (e.center && e.center.lat))
+      .map((e) => ({
+        name: e.tags?.name || "Hotel",
+        lat: e.lat || e.center!.lat,
+        lng: e.lon || e.center!.lon,
+        stars: e.tags?.stars,
+        phone: e.tags?.phone,
+        website: e.tags?.website,
+      }));
 
     return res.json({ days: [{ waypoint: `${lat},${lng}`, hotels: elements.slice(0, 5) }] });
   } catch (err) {
@@ -80,7 +84,8 @@ router.post("/segment-multiday", async (req: Request, res: Response) => {
   const { waypoints } = parsedSmd.data;
 
   try {
-    const days: any[] = [];
+    type DaySegment = { day: number; waypoints: typeof waypoints; estimatedKm: number; estimatedMinutes: number; endPoint: (typeof waypoints)[number]; isFeasible: boolean };
+    const days: DaySegment[] = [];
     days.push({
       day: 1,
       waypoints: waypoints,
@@ -146,15 +151,18 @@ router.get("/:id/elevation", async (req: Request, res: Response) => {
     const locationsStr = sampled.map(([lat, lng]) => `${lat.toFixed(5)},${lng.toFixed(5)}`).join("|");
     const topoUrl = `https://api.opentopodata.org/v1/srtm90m?locations=${locationsStr}`;
 
+    type TopoResult = { elevation?: number };
+    type TopoResponse = { status: string; results?: TopoResult[] };
+
     let elevations: number[];
     try {
       const topoResp = await fetch(topoUrl, {
         headers: { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" },
       });
       if (!topoResp.ok) throw new Error(`OpenTopoData ${topoResp.status}`);
-      const topoData = await topoResp.json() as any;
+      const topoData = await topoResp.json() as TopoResponse;
       if (topoData.status !== "OK") throw new Error("OpenTopoData status: " + topoData.status);
-      elevations = (topoData.results as any[]).map((r: any) => Math.round(r.elevation ?? 0));
+      elevations = (topoData.results ?? []).map((r) => Math.round(r.elevation ?? 0));
     } catch (err) {
       console.error("[elevation] OpenTopoData error:", err);
       return sendError(res, 502, "Dati altimetrici non disponibili al momento");

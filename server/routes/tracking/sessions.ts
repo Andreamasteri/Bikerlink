@@ -29,7 +29,7 @@ router.post("/", async (req: Request, res: Response) => {
             status: "completed",
             stoppedAt,
             durationSeconds,
-          } as any);
+          });
         }
       } catch (err) {
         console.warn(`[tracking] Failed to cleanup/auto-stop route ${r.id}:`, err);
@@ -66,7 +66,7 @@ router.get("/", async (req: Request, res: Response) => {
 
     const userRoutes = await storage.getRoutes(userId);
     const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
-    const filtered = userRoutes.filter((r: any) => {
+    const filtered = userRoutes.filter((r) => {
       const isOrphan =
         r.status === "active" &&
         (r.totalDistanceKm === null || r.totalDistanceKm === undefined || r.totalDistanceKm === 0) &&

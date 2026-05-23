@@ -105,7 +105,7 @@ export class MatchingStorage extends ContestStorage {
     return results;
   }
 
-  async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: any; userId: string }[]> {
+  async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: import("@shared/db").ZavarrinaWishlistMoto; userId: string }[]> {
     const baseCondition = and(...systemAccountConditions(users))!;
     const condition = countries && countries.length > 0 ? and(baseCondition, inArray(users.country, countries)) : baseCondition;
     return db.select({ wishlistMoto: zavarrinaWishlistMotos, userId: zavarrinaWishlists.userId })
@@ -115,7 +115,7 @@ export class MatchingStorage extends ContestStorage {
       .where(condition);
   }
 
-  async getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: any; userId: string }[]> {
+  async getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: import("@shared/db").UserMotorcycle; userId: string }[]> {
     const baseCondition = and(or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!, ...systemAccountConditions(users))!;
     const condition = countries && countries.length > 0 ? and(baseCondition, inArray(users.country, countries)) : baseCondition;
     const results = await db.select({ motorcycle: userMotorcycles, userId: userMotorcycles.userId })

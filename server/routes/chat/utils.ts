@@ -1,6 +1,6 @@
 export const CONV_CACHE_TTL_MS = 15_000;
 export const CONV_CACHE_MAX_SIZE = 500;
-export interface ConvCacheEntry { data: any[]; expiresAt: number }
+export interface ConvCacheEntry { data: unknown[]; expiresAt: number }
 export const convCache = new Map<string, ConvCacheEntry>();
 
 export function convCacheKey(userId: string, limit: number, offset: number) { 

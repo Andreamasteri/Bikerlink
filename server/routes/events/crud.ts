@@ -22,22 +22,22 @@ router.get("/:id", async (req: Request, res: Response) => {
       eventType: events.eventType,
       creatorId: events.creatorId,
       creatorNickname: users.nickname,
-      locationName: (events as any).locationName,
+      locationName: events.locationName,
       latitude: events.latitude,
       longitude: events.longitude,
-      eventDate: (events as any).eventDate,
-      eventTime: (events as any).eventTime,
-      isRecurring: (events as any).isRecurring,
-      recurrenceInfo: (events as any).recurrenceInfo,
+      eventDate: events.eventDate,
+      eventTime: events.eventTime,
+      isRecurring: events.isRecurring,
+      recurrenceInfo: events.recurrenceInfo,
       maxParticipants: events.maxParticipants,
-      websiteUrl: (events as any).websiteUrl,
-      autoInviteReason: (events as any).autoInviteReason,
-      autoInviteRegion: (events as any).autoInviteRegion,
-      autoInviteBrand: (events as any).autoInviteBrand,
+      websiteUrl: events.websiteUrl,
+      autoInviteReason: events.autoInviteReason,
+      autoInviteRegion: events.autoInviteRegion,
+      autoInviteBrand: events.autoInviteBrand,
       status: events.status,
-      rejectionReason: (events as any).rejectionReason,
-      approvedBy: (events as any).approvedBy,
-      approvedAt: (events as any).approvedAt,
+      rejectionReason: events.rejectionReason,
+      approvedBy: events.approvedBy,
+      approvedAt: events.approvedAt,
       createdAt: events.createdAt,
       updatedAt: events.updatedAt,
     })
@@ -95,25 +95,24 @@ router.put("/:id", async (req: Request, res: Response) => {
       maxParticipants,
     } = parsedUpdate.data;
 
-    // Use any for fields that might be missing in some schema versions but were in original code
-    const body = req.body;
+    const body = req.body as Record<string, unknown>;
 
     const updates: Partial<InsertEvent> = { updatedAt: new Date() };
     if (title !== undefined) updates.title = title.trim();
     if (description !== undefined) updates.description = description ? description.trim() : null;
     if (eventType !== undefined) updates.eventType = eventType ?? undefined;
-    if (body.locationName !== undefined) (updates as any).locationName = body.locationName ? body.locationName.trim() : null;
+    if (body.locationName !== undefined) updates.locationName = body.locationName ? String(body.locationName).trim() : null;
     if (latitude !== undefined) updates.latitude = latitude ?? null;
     if (longitude !== undefined) updates.longitude = longitude ?? null;
-    if (body.eventDate !== undefined) (updates as any).eventDate = body.eventDate;
-    if (body.eventTime !== undefined) (updates as any).eventTime = body.eventTime ? body.eventTime.trim() : null;
-    if (body.isRecurring !== undefined) (updates as any).isRecurring = Boolean(body.isRecurring);
-    if (body.recurrenceInfo !== undefined) (updates as any).recurrenceInfo = body.recurrenceInfo ? body.recurrenceInfo.trim() : null;
+    if (body.eventDate !== undefined) updates.eventDate = body.eventDate ? new Date(body.eventDate as string) : undefined;
+    if (body.eventTime !== undefined) updates.eventTime = body.eventTime ? String(body.eventTime).trim() : null;
+    if (body.isRecurring !== undefined) updates.isRecurring = Boolean(body.isRecurring);
+    if (body.recurrenceInfo !== undefined) updates.recurrenceInfo = body.recurrenceInfo ? String(body.recurrenceInfo).trim() : null;
     if (maxParticipants !== undefined) updates.maxParticipants = maxParticipants ?? null;
-    if (body.websiteUrl !== undefined) (updates as any).websiteUrl = body.websiteUrl ? body.websiteUrl.trim() : null;
-    if (body.autoInviteReason !== undefined) (updates as any).autoInviteReason = body.autoInviteReason ? body.autoInviteReason.trim() : null;
-    if (body.autoInviteRegion !== undefined) (updates as any).autoInviteRegion = body.autoInviteRegion ? body.autoInviteRegion.trim() : null;
-    if (body.autoInviteBrand !== undefined) (updates as any).autoInviteBrand = body.autoInviteBrand ? body.autoInviteBrand.trim() : null;
+    if (body.websiteUrl !== undefined) updates.websiteUrl = body.websiteUrl ? String(body.websiteUrl).trim() : null;
+    if (body.autoInviteReason !== undefined) updates.autoInviteReason = body.autoInviteReason ? String(body.autoInviteReason).trim() : null;
+    if (body.autoInviteRegion !== undefined) updates.autoInviteRegion = body.autoInviteRegion ? String(body.autoInviteRegion).trim() : null;
+    if (body.autoInviteBrand !== undefined) updates.autoInviteBrand = body.autoInviteBrand ? String(body.autoInviteBrand).trim() : null;
 
     const [updated] = await db.update(events).set(updates).where(eq(events.id, id)).returning();
 

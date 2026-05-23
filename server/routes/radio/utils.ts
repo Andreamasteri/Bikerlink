@@ -286,6 +286,7 @@ export function isPrivateIP(ip: string): boolean {
 
 export const safeDispatcher = new Agent({
   connect: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     lookup: (hostname: string, options: any, callback: any) => {
       dnsPromises.lookup(hostname, { all: true, verbatim: true })
         .then(addrs => {

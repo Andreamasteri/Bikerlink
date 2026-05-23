@@ -12,6 +12,7 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 import { parseVisitorCookie, recordVisit } from "../../lib/visitor-tracking";
 import { createRegionalClubInvite } from "../motoclubs";
 import { addSessionSseClient, removeSessionSseClient } from "../../session-sse";
+import type { InsertUser, InsertUserProfile } from "@shared/db";
 
 function buildSessionToken(sessionID: string): string {
   const secret = process.env.SESSION_SECRET;
@@ -66,11 +67,11 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       return sendError(res, 401, "Credenziali non valide");
     }
 
-    const updateData: Record<string, unknown> = { lastLoginAt: new Date() };
+    const updateData: Partial<InsertUser> = { lastLoginAt: new Date() };
     if (!user.firstLoginAt) {
       updateData.firstLoginAt = new Date();
     }
-    await storage.updateUser(user.id, updateData as any);
+    await storage.updateUser(user.id, updateData);
 
     const effectiveRegion = user.region;
     const effectiveCountry = user.country;
@@ -85,7 +86,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       });
     }
     if (typeof loginLat === "number" && typeof loginLng === "number") {
-      storage.upsertUserProfile(user.id, { latitude: loginLat, longitude: loginLng, coordinatesUpdatedAt: new Date() } as any).catch(() => {});
+      storage.upsertUserProfile(user.id, { latitude: loginLat, longitude: loginLng, coordinatesUpdatedAt: new Date() } as Partial<InsertUserProfile>).catch(() => {});
     }
 
     const sessionType: "mobile" | "web" =
@@ -152,7 +153,7 @@ router.post("/logout", (req: Request, res: Response) => {
     }
     if (userId) {
       onlineTracker.setOffline(userId);
-      storage.updateUser(userId, { lastLogoutAt: new Date() } as any).catch(() => {});
+      storage.updateUser(userId, { lastLogoutAt: new Date() }).catch(() => {});
     }
     res.clearCookie("connect.sid");
     return sendSuccess(res, undefined, "Logout effettuato");

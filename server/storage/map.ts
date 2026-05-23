@@ -1,4 +1,4 @@
-import { eq, and, or, sql, gte, inArray } from "drizzle-orm";
+import { eq, and, or, sql, gte, inArray, type SQL } from "drizzle-orm";
 import { db } from "../db";
 import { systemAccountConditions } from "../lib/system-account-filter";
 import { maskHiddenLocationRows } from "./users";
@@ -10,7 +10,7 @@ import { PlannedRoutesStorage } from "./planned-routes";
 
 export class MapStorage extends PlannedRoutesStorage {
   async getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
-    const conditions: any[] = [
+    const conditions: SQL<unknown>[] = [
       eq(users.status, "active"),
       eq(users.isFake, false),
       ...systemAccountConditions(users),
@@ -39,7 +39,7 @@ export class MapStorage extends PlannedRoutesStorage {
   }
 
   async countOnlineUsers(since: Date, countries?: string[]): Promise<number> {
-    const conditions: any[] = [eq(users.status, "active"), eq(users.isFake, false), gte(users.lastLoginAt, since), eq(users.ghostMode, false), ...systemAccountConditions(users)];
+    const conditions: SQL<unknown>[] = [eq(users.status, "active"), eq(users.isFake, false), gte(users.lastLoginAt, since), eq(users.ghostMode, false), ...systemAccountConditions(users)];
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(and(...conditions));
     return result[0]?.count ?? 0;
@@ -51,11 +51,11 @@ export class MapStorage extends PlannedRoutesStorage {
     return result[0]?.count ?? 0;
   }
 
-  async getOnlineUsersList(since: Date, lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]> {
+  async getOnlineUsersList(since: Date, lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: User; profile: UserProfile | null; distance: number }>> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
-    const conditions: any[] = [eq(users.status, "active"), eq(users.isFake, false), eq(users.ghostMode, false), ...systemAccountConditions(users)];
+    const conditions: SQL<unknown>[] = [eq(users.status, "active"), eq(users.isFake, false), eq(users.ghostMode, false), ...systemAccountConditions(users)];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
     } else if (!onlineIds) {
@@ -71,7 +71,7 @@ export class MapStorage extends PlannedRoutesStorage {
     return maskHiddenLocationRows(results);
   }
 
-  async getAvailableUsersList(lat?: number, lng?: number): Promise<any[]> {
+  async getAvailableUsersList(lat?: number, lng?: number): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
@@ -86,9 +86,9 @@ export class MapStorage extends PlannedRoutesStorage {
 
   async countAvailableBikers(countries?: string[]): Promise<number> {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const conditions: any[] = [
+    const conditions: SQL<unknown>[] = [
       eq(users.status, "active"), eq(userProfiles.isAvailable, true),
-      or(eq(users.userType, "biker"), eq(users.userType, "coppia")),
+      or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!,
       eq(users.ghostMode, false), ...systemAccountConditions(users),
       gte(users.lastLoginAt, fifteenMinutesAgo),
     ];
@@ -99,7 +99,7 @@ export class MapStorage extends PlannedRoutesStorage {
 
   async countAvailableZavorrine(countries?: string[]): Promise<number> {
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const conditions: any[] = [
+    const conditions: SQL<unknown>[] = [
       eq(users.status, "active"), eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"), eq(users.ghostMode, false),
       ...systemAccountConditions(users), gte(users.lastLoginAt, fifteenMinutesAgo),
@@ -109,13 +109,13 @@ export class MapStorage extends PlannedRoutesStorage {
     return result[0]?.count ?? 0;
   }
 
-  async getAvailableBikersList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]> {
+  async getAvailableBikersList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
-    const conditions: any[] = [
+    const conditions: SQL<unknown>[] = [
       eq(users.status, "active"), eq(users.isFake, false), eq(userProfiles.isAvailable, true),
-      or(eq(users.userType, "biker"), eq(users.userType, "coppia")), eq(users.ghostMode, false), ...systemAccountConditions(users),
+      or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!, eq(users.ghostMode, false), ...systemAccountConditions(users),
     ];
     if (onlineIds && onlineIds.length > 0) conditions.push(inArray(users.id, onlineIds));
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
@@ -123,11 +123,11 @@ export class MapStorage extends PlannedRoutesStorage {
     return maskHiddenLocationRows(rows);
   }
 
-  async getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<any[]> {
+  async getAvailableZavorrinaList(lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
-    const conditions: any[] = [
+    const conditions: SQL<unknown>[] = [
       eq(users.status, "active"), eq(users.isFake, false), eq(userProfiles.isAvailable, true),
       eq(users.userType, "zavorrina"), eq(users.ghostMode, false), ...systemAccountConditions(users),
     ];

@@ -292,7 +292,8 @@ router.get("/match-summary", async (req: Request, res: Response) => {
       SELECT COUNT(*) as cnt FROM users
       WHERE is_fake = false AND role NOT IN ('admin', 'moderator')
     `);
-    const total = parseInt((countResult.rows[0] as any)?.cnt ?? "0", 10);
+    type CountRow = { cnt?: string };
+    const total = parseInt(((countResult.rows[0] as CountRow)?.cnt) ?? "0", 10);
 
     const usersResult = await db.execute(sql`
       SELECT
@@ -314,7 +315,8 @@ router.get("/match-summary", async (req: Request, res: Response) => {
       LIMIT ${limit} OFFSET ${offset}
     `);
 
-    const mappedUsers = (usersResult.rows as any[]).map((row) => ({
+    type UserRow = { id: string; nickname: string; avatar_url: string | null; user_type: string | null; role: string; status: string; bb_count: string; bz_count: string; bb_counts: null };
+    const mappedUsers = (usersResult.rows as UserRow[]).map((row) => ({
       id: row.id,
       nickname: row.nickname,
       avatarUrl: row.avatar_url,

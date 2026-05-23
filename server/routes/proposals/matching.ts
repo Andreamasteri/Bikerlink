@@ -338,7 +338,7 @@ router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Respon
       }
     }
 
-    const updated = await storage.updateProposalMatch(matchId, updateData as any);
+    const updated = await storage.updateProposalMatch(matchId, updateData);
 
     if (newAcceptedByUser1 && newAcceptedByUser2) {
       try {
@@ -397,7 +397,7 @@ router.post("/matches/:id/reject", requireAuth, async (req: Request, res: Respon
       return sendError(res, 403, "Non autorizzato");
     }
 
-    const updated = await storage.updateProposalMatch(matchId, { status: "rejected" } as any);
+    const updated = await storage.updateProposalMatch(matchId, { status: "rejected" });
     return res.json(updated);
   } catch (error) {
     console.error("Reject match error:", error);

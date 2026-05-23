@@ -55,7 +55,7 @@ import { registerClientSettingsRoutes } from "./routes/client-settings";
 import { registerMoreRoutes } from "./routes/more-routes";
 
 async function requireAdmin(req: Request, res: Response, next: NextFunction) {
-  const session = (req as any).session as { userId?: string };
+  const session = req.session as { userId?: string };
   if (!session?.userId) {
     return res.status(401).json({ message: "Non autenticato" });
   }
@@ -63,7 +63,7 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!user || user.role !== "admin") {
     return res.status(403).json({ message: "Accesso non autorizzato" });
   }
-  (req as any).adminUser = user;
+  (req as Request & { adminUser?: unknown }).adminUser = user;
   next();
 }
 
@@ -119,7 +119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
 
-  app.use(async (req: any, res: any, next: any) => {
+  app.use(async (req: Request, res: Response, next: NextFunction) => {
     if (req.session?.userId) {
       const userId: string = req.session.userId;
       const foundInTracker = onlineTracker.touch(userId);
@@ -152,7 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (user.lastLoginAt) {
             const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
             if (new Date(user.lastLoginAt) < fiveMinAgo) {
-              await storage.updateUser(userId, { lastLoginAt: new Date() } as any);
+              await storage.updateUser(userId, { lastLoginAt: new Date() });
             }
           }
         }
@@ -410,7 +410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/admin/visitatori", async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).session?.userId;
+      const userId = (req.session as { userId?: string })?.userId;
       if (!userId) {
         res.status(401).setHeader("Content-Type", "text/html; charset=utf-8");
         return res.send('<html><body style="background:#000;color:#888;font-family:sans-serif;padding:40px;text-align:center"><h1>401</h1><p>Sessione admin richiesta.</p></body></html>');

@@ -26,7 +26,7 @@ export async function uploadBuffer(
   const client = getClient();
   const result = await client.uploadFromBytes(objectPath, buffer, {
     contentType,
-  } as any);
+  } as Record<string, string>);
   if (!result.ok) {
     throw new Error(`Upload fallito per ${objectPath}: ${result.error?.message}`);
   }
@@ -60,6 +60,7 @@ export async function objectExists(objectPath: string): Promise<boolean> {
 
 export async function getPublicUrl(objectPath: string): Promise<string> {
   const client = getClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bucket = await (client as any).getBucket();
   const file = bucket.file(objectPath);
   return file.publicUrl();
@@ -90,7 +91,7 @@ export async function listObjects(prefix: string): Promise<StorageFile[]> {
     return [];
   }
   const objects = result.value ?? [];
-  return objects.map((obj: any) => ({
+  return objects.map((obj: { name: string; size?: number; createdAt?: { toISOString?: () => string } }) => ({
     name: obj.name as string,
     size: obj.size ?? 0,
     createdTime: obj.createdAt?.toISOString?.() ?? new Date().toISOString(),

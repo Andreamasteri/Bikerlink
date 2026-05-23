@@ -52,8 +52,7 @@ router.post("/:id/participants", requireAuth, async (req: Request, res: Response
     const participant = await storage.addProposalParticipant({
       proposalId,
       userId,
-      ...(({ status: "joined" } as any)),
-    });
+    } as import("@shared/db").InsertProposalParticipant);
 
     return res.json(participant);
   } catch (error) {

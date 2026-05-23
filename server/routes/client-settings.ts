@@ -470,7 +470,7 @@ export function registerClientSettingsRoutes(app: Express) {
     }
   });
 
-  app.post("/api/location/bg-update", async (req: any, res) => {
+  app.post("/api/location/bg-update", async (req: Request, res: Response) => {
     try {
       if (!req.session?.userId) {
         return sendError(res, 401, "Non autenticato");
@@ -481,7 +481,7 @@ export function registerClientSettingsRoutes(app: Express) {
         return sendError(res, 400, "Coordinate non valide");
       }
       try {
-        const profileUpdate: any = { latitude, longitude, coordinatesUpdatedAt: new Date() };
+        const profileUpdate = { latitude, longitude, coordinatesUpdatedAt: new Date() };
         const existing = await storage.getUserProfile(userId);
         if (existing) {
           await storage.updateUserProfile(userId, profileUpdate);
@@ -495,12 +495,12 @@ export function registerClientSettingsRoutes(app: Express) {
         try {
           const route = await storage.getRoute(activeRouteId);
           if (route && route.userId === userId && route.status === "active") {
-            const point: any = {
+            const point = {
               routeId: activeRouteId,
               latitude,
               longitude,
               altitude: typeof altitude === "number" ? altitude : null,
-              speedKmh: null,
+              speedKmh: null as number | null,
               timestamp: timestamp ? new Date(timestamp) : new Date(),
             };
             await storage.createRoutePoints([point]);

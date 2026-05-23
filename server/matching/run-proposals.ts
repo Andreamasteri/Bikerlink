@@ -35,8 +35,8 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
         if (!areCompatible(p1, p2)) continue;
 
         const isBikerBikerProposal =
-          ((p1 as any).authorUserType ?? "biker") === "biker" &&
-          ((p2 as any).authorUserType ?? "biker") === "biker";
+          ((p1 as { authorUserType?: string }).authorUserType ?? "biker") === "biker" &&
+          ((p2 as { authorUserType?: string }).authorUserType ?? "biker") === "biker";
         if (isBikerBikerProposal) {
           if (!bothPrefsEnabled(proposalPrefsMap, p1.userId, p2.userId, "bikerBikerDistance")) continue;
         } else {

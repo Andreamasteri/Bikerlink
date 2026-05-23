@@ -59,8 +59,8 @@ router.get("/images/:filename", async (req: Request, res: Response) => {
     const [parent] = await db
       .select({ status: events.status, creatorId: events.creatorId })
       .from(eventImages)
-      .innerJoin(events, eq(events.id, (eventImages as any).eventId))
-      .where(eq((eventImages as any).imageUrl, imageUrl))
+      .innerJoin(events, eq(events.id, eventImages.eventId))
+      .where(eq(eventImages.imageUrl, imageUrl))
       .limit(1);
 
     if (!parent) {
@@ -104,10 +104,10 @@ router.get("/", async (req: Request, res: Response) => {
       conditions.push(eq(events.eventType, type));
     }
     if (from) {
-      conditions.push(sql`${(events as any).eventDate} >= ${new Date(from)}`);
+      conditions.push(gte(events.eventDate, new Date(from)));
     }
     if (to) {
-      conditions.push(sql`${(events as any).eventDate} <= ${new Date(to)}`);
+      conditions.push(lte(events.eventDate, new Date(to)));
     }
 
     const rows: EventRow[] = await db.select({
@@ -117,29 +117,29 @@ router.get("/", async (req: Request, res: Response) => {
       eventType: events.eventType,
       creatorId: events.creatorId,
       creatorNickname: users.nickname,
-      locationName: (events as any).locationName,
+      locationName: events.locationName,
       latitude: events.latitude,
       longitude: events.longitude,
-      eventDate: (events as any).eventDate,
-      eventTime: (events as any).eventTime,
-      isRecurring: (events as any).isRecurring,
-      recurrenceInfo: (events as any).recurrenceInfo,
+      eventDate: events.eventDate,
+      eventTime: events.eventTime,
+      isRecurring: events.isRecurring,
+      recurrenceInfo: events.recurrenceInfo,
       maxParticipants: events.maxParticipants,
-      websiteUrl: (events as any).websiteUrl,
-      autoInviteReason: (events as any).autoInviteReason,
-      autoInviteRegion: (events as any).autoInviteRegion,
-      autoInviteBrand: (events as any).autoInviteBrand,
+      websiteUrl: events.websiteUrl,
+      autoInviteReason: events.autoInviteReason,
+      autoInviteRegion: events.autoInviteRegion,
+      autoInviteBrand: events.autoInviteBrand,
       status: events.status,
-      rejectionReason: (events as any).rejectionReason,
-      approvedBy: (events as any).approvedBy,
-      approvedAt: (events as any).approvedAt,
+      rejectionReason: events.rejectionReason,
+      approvedBy: events.approvedBy,
+      approvedAt: events.approvedAt,
       createdAt: events.createdAt,
       updatedAt: events.updatedAt,
     })
       .from(events)
       .leftJoin(users, eq(users.id, events.creatorId))
       .where(and(...conditions, ...systemAccountConditions(users)))
-      .orderBy(asc((events as any).eventDate));
+      .orderBy(asc(events.eventDate));
 
     let filtered = rows;
     if (lat && lng && radius) {
@@ -179,7 +179,7 @@ router.post("/", async (req: Request, res: Response) => {
       title, description, eventType, latitude, longitude,
       maxParticipants,
     } = parsedEvent.data;
-    const body = req.body;
+    const body = req.body as Record<string, unknown>;
     const selectedClubIds = Array.isArray(req.body?.selectedClubIds) ? req.body.selectedClubIds as string[] : [];
 
     const todayStart = new Date();
@@ -195,7 +195,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const creator = await storage.getUser(userId);
 
-    const insertData: Partial<InsertEvent> = {
+    const insertData: InsertEvent = {
       title: title.trim(),
       description: description ? description.trim() || null : null,
       eventType: eventType || "raduno",
@@ -206,23 +206,20 @@ router.post("/", async (req: Request, res: Response) => {
       status: "approved",
       createdAt: new Date(),
       updatedAt: new Date(),
+      locationName: body.locationName ? String(body.locationName).trim() : null,
+      eventDate: body.eventDate ? new Date(body.eventDate as string) : new Date(),
+      eventTime: body.eventTime ? String(body.eventTime).trim() || null : null,
+      isRecurring: Boolean(body.isRecurring),
+      recurrenceInfo: body.recurrenceInfo ? String(body.recurrenceInfo).trim() || null : null,
+      websiteUrl: body.websiteUrl ? String(body.websiteUrl).trim() || null : null,
+      autoInviteReason: (body.autoInviteReason as string | null | undefined) ?? null,
+      autoInviteRegion: (body.autoInviteRegion as string | null | undefined) ?? null,
+      autoInviteBrand: (body.autoInviteBrand as string | null | undefined) ?? null,
+      approvedAt: new Date(),
+      approvedBy: userId,
     };
 
-    // Use any for missing fields in some schema versions
-    const anyData = insertData as any;
-    anyData.locationName = (body as any).locationName?.trim();
-    anyData.eventDate = body.eventDate ? new Date(body.eventDate) : new Date();
-    anyData.eventTime = body.eventTime ? body.eventTime.trim() || null : null;
-    anyData.isRecurring = Boolean(body.isRecurring);
-    anyData.recurrenceInfo = body.recurrenceInfo ? body.recurrenceInfo.trim() || null : null;
-    anyData.websiteUrl = body.websiteUrl ? body.websiteUrl.trim() || null : null;
-    anyData.autoInviteReason = body.autoInviteReason ?? null;
-    anyData.autoInviteRegion = body.autoInviteRegion ?? null;
-    anyData.autoInviteBrand = body.autoInviteBrand ?? null;
-    anyData.approvedAt = new Date();
-    anyData.approvedBy = userId;
-
-    const [newEvent] = await db.insert(events).values(anyData as any).returning();
+    const [newEvent] = await db.insert(events).values(insertData).returning();
 
     const clubIds = Array.isArray(selectedClubIds) ? (selectedClubIds as string[]) : [];
     if (clubIds.length > 0) {
@@ -233,9 +230,9 @@ router.post("/", async (req: Request, res: Response) => {
 
     sendNewEventNotificationEmail({
       title: newEvent.title,
-      eventType: (newEvent as any).eventType,
-      eventDate: (newEvent as any).eventDate ? new Date((newEvent as any).eventDate).toLocaleDateString("it-IT") : "N/D",
-      locationName: (newEvent as any).locationName || "N/D",
+      eventType: newEvent.eventType,
+      eventDate: newEvent.eventDate ? new Date(newEvent.eventDate).toLocaleDateString("it-IT") : "N/D",
+      locationName: newEvent.locationName || "N/D",
       creatorNickname: creator?.nickname ?? "Utente",
     }).catch((e) => console.warn("[events] email notification error:", e));
 

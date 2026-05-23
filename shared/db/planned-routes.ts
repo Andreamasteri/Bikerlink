@@ -22,7 +22,7 @@ export const plannedRoutes = pgTable("planned_routes", {
     .references(() => users.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 200 }).notNull(),
   description: text("description"),
-  waypoints: jsonb("waypoints").$type<any[]>().default([]),
+  waypoints: jsonb("waypoints").$type<Array<{ lat: number; lng: number; name?: string }>>().default([]),
   polyline: text("polyline"),
   distanceKm: doublePrecision("distance_km").default(0),
   durationMinutes: integer("duration_minutes").default(0),

@@ -196,8 +196,8 @@ export async function autoSeedFakeUsers() {
           ridingStyle: biker.ridingStyle,
         });
         seedSuccessCount++;
-      } catch (err: any) {
-        console.error(`Failed to seed biker "${biker.nickname}":`, err.message);
+      } catch (err: unknown) {
+        console.error(`Failed to seed biker "${biker.nickname}":`, (err as Error)?.message ?? err);
       }
     }
 
@@ -255,8 +255,8 @@ export async function autoSeedFakeUsers() {
           });
         }
         seedSuccessCount++;
-      } catch (err: any) {
-        console.error(`Failed to seed zavorrina "${zav.nickname}":`, err.message);
+      } catch (err: unknown) {
+        console.error(`Failed to seed zavorrina "${zav.nickname}":`, (err as Error)?.message ?? err);
       }
     }
 
@@ -306,8 +306,8 @@ export async function autoSeedFakeUsers() {
           ridingStyle: coppia.ridingStyle,
         });
         seedSuccessCount++;
-      } catch (err: any) {
-        console.error(`Failed to seed coppia "${coppia.nickname}":`, err.message);
+      } catch (err: unknown) {
+        console.error(`Failed to seed coppia "${coppia.nickname}":`, (err as Error)?.message ?? err);
       }
     }
 

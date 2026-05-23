@@ -92,14 +92,15 @@ router.post("/request", requireAuth, async (req: Request, res: Response) => {
     }
     const { name, clubType, brandName, modelName } = parsedReq.data;
 
+    if (!name) return sendError(res, 400, "Nome obbligatorio");
     const [request] = await db.insert(motoClubRequests).values({
-      name,
-      clubType,
+      name: name as string,
+      clubType: clubType ?? "generic",
       brandName: brandName ?? null,
       modelName: modelName ?? null,
       requestedBy: userId,
       status: "pending",
-    } as any).returning();
+    }).returning();
 
     return res.status(201).json(request);
   } catch (_e) {
@@ -141,7 +142,7 @@ router.post("/creation-request", requireAuth, async (req: Request, res: Response
       longitude: longitude ?? null,
       inviteRadiusKm: inviteRadiusKm ?? null,
       inviteUserIds: inviteUserIds && inviteUserIds.length > 0 ? JSON.stringify(inviteUserIds) : null,
-    } as any).returning();
+    }).returning();
 
     await db.insert(feedbackTickets).values({
       userId,

@@ -164,8 +164,8 @@ async function seedFakeUsers() {
       });
 
       console.log(`Created biker "${biker.nickname}" (${biker.region})`);
-    } catch (err: any) {
-      console.error(`Failed to create biker "${biker.nickname}":`, err.message);
+    } catch (err: unknown) {
+      console.error(`Failed to create biker "${biker.nickname}":`, (err as Error)?.message ?? err);
     }
   }
 
@@ -225,8 +225,8 @@ async function seedFakeUsers() {
       }
 
       console.log(`Created zavorrina "${zav.nickname}" (${zav.region})`);
-    } catch (err: any) {
-      console.error(`Failed to create zavorrina "${zav.nickname}":`, err.message);
+    } catch (err: unknown) {
+      console.error(`Failed to create zavorrina "${zav.nickname}":`, (err as Error)?.message ?? err);
     }
   }
 
@@ -278,8 +278,8 @@ async function seedFakeUsers() {
       });
 
       console.log(`Created coppia "${coppia.nickname}" (${coppia.region})`);
-    } catch (err: any) {
-      console.error(`Failed to create coppia "${coppia.nickname}":`, err.message);
+    } catch (err: unknown) {
+      console.error(`Failed to create coppia "${coppia.nickname}":`, (err as Error)?.message ?? err);
     }
   }
 

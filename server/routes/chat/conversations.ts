@@ -176,7 +176,7 @@ router.post("/", async (req: Request, res: Response) => {
       const existing = await storage.getConversations(userId);
       const contactThread = existing.find(c =>
         c.conversationType === "contact" &&
-        (c as any).participantCount === 2
+        (c as { participantCount?: number }).participantCount === 2
       );
       if (contactThread) {
         const parts = await storage.getConversationParticipants(contactThread.id);

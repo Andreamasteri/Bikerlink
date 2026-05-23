@@ -7,7 +7,7 @@ import {
 import { SosStorage } from "./sos";
 
 export class FakeUsersStorage extends SosStorage {
-  async getFakeUserStats(limit = 50, offset = 0, type = "tutti"): Promise<{ users: any[]; total: number; hasMore: boolean; stats: { total: number; biker: number; zavorrina: number; coppia: number } }> {
+  async getFakeUserStats(limit = 50, offset = 0, type = "tutti"): Promise<{ users: unknown[]; total: number; hasMore: boolean; stats: { total: number; biker: number; zavorrina: number; coppia: number } }> {
     const baseCondition = and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`);
     const typeCondition = type !== "tutti"
       ? and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`, eq(users.userType, type))
@@ -106,7 +106,7 @@ export class FakeUsersStorage extends SosStorage {
     }
   }
 
-  async getFakeUserConversations(fakeUserId: string): Promise<any[]> {
+  async getFakeUserConversations(fakeUserId: string): Promise<import("@shared/db").Conversation[]> {
     const participantRows = await db.select().from(conversationParticipants).where(eq(conversationParticipants.userId, fakeUserId));
     if (participantRows.length === 0) return [];
     const convIds = participantRows.map(p => p.conversationId);

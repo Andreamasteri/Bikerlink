@@ -20,9 +20,9 @@ router.post("/:id/invite-user", async (req: Request, res: Response) => {
     const [event] = await db.select({
       id: events.id,
       title: events.title,
-      organizerId: (events as any).organizerId, // Note: I saw organizerId in the original file at line 1101, but the schema snippet showed creatorId. Original code used organizerId at 1101.
+      creatorId: events.creatorId,
       status: events.status,
-      eventDate: (events as any).eventDate,
+      eventDate: events.eventDate,
     }).from(events).where(eq(events.id, eventId)).limit(1);
     if (!event) return sendError(res, 404, "Evento non trovato");
 
@@ -38,7 +38,7 @@ router.post("/:id/invite-user", async (req: Request, res: Response) => {
     if (!requester) return sendError(res, 404, "Utente non trovato");
 
     const isOrganizerOrAdmin =
-      event.organizerId === requesterId ||
+      event.creatorId === requesterId ||
       requester.role === "admin" ||
       requester.role === "moderator";
     if (!isOrganizerOrAdmin) {

@@ -20,10 +20,13 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       memberCount: sql<number>`(select count(*) from moto_club_members m where m.club_id = moto_clubs.id and m.status = 'active')::int`,
     }).from(motoClubs).where(eq(motoClubs.isApproved, true));
 
-    const conditions: any[] = [eq(motoClubs.isApproved, true)];
+    const conditions: import("drizzle-orm").SQL<unknown>[] = [eq(motoClubs.isApproved, true)];
 
     if (type) conditions.push(eq(motoClubs.clubType, type));
-    if (search) conditions.push(or(ilike(motoClubs.name, `%${search}%`), ilike(motoClubs.brandName, `%${search}%`), ilike(motoClubs.modelName, `%${search}%`)));
+    if (search) {
+      const searchCondition = or(ilike(motoClubs.name, `%${search}%`), ilike(motoClubs.brandName, `%${search}%`), ilike(motoClubs.modelName, `%${search}%`));
+      if (searchCondition) conditions.push(searchCondition);
+    }
 
     const clubs = await db.select({
       club: motoClubs,

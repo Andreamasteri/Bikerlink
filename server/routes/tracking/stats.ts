@@ -133,7 +133,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
       await storage.updateUserProfile(userId, {
         totalKm: (profile.totalKm || 0) + totalDistanceKm,
         totalRides: (profile.totalRides || 0) + 1,
-      } as any);
+      });
     }
 
     // Async post-ride map-matching: compute real curvature score from GPS points
@@ -168,7 +168,7 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
         const rideStart = allPoints[0];
         const userPlannedRoutes = await storage.getPlannedRoutes(userId);
         for (const pr of userPlannedRoutes) {
-          const wps = ((pr as any).waypoints as Array<{ lat: number; lng: number }>) ?? [];
+          const wps = (pr.waypoints as Array<{ lat: number; lng: number }>) ?? [];
           if (!wps.length) continue;
           const startWp = wps[0];
           if (!startWp?.lat || !startWp?.lng) continue;
@@ -185,10 +185,9 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
             // column and in metadata for historical audit.
             // IMPORTANT: do NOT overwrite bikerScore (planned curvature estimate);
             // realCurvatureScore is the post-ride validation measurement.
-            await (storage.updatePlannedRoute as any)(pr.id, {
-              realCurvatureScore,
+            await storage.updatePlannedRoute(pr.id, {
               metadata: {
-                ...((pr as any).metadata as object ?? {}),
+                ...(pr.metadata as object ?? {}),
                 realCurvatureScore,
                 matchedRideId: id,
                 matchedAt: new Date().toISOString(),
@@ -233,7 +232,7 @@ router.patch("/:id/stats", async (req: Request, res: Response) => {
       return sendError(res, 400, parsedStats.error.issues[0].message);
     }
     const { totalDistanceKm, maxSpeedKmh, avgSpeedKmh, maxAltitude, idleTimeSeconds } = parsedStats.data;
-    const updates: any = {};
+    const updates: Partial<import("@shared/db").InsertRoute> = {};
     if (totalDistanceKm !== undefined) updates.totalDistanceKm = totalDistanceKm;
     if (maxSpeedKmh !== undefined) updates.maxSpeedKmh = maxSpeedKmh;
     if (avgSpeedKmh !== undefined) updates.avgSpeedKmh = avgSpeedKmh;

@@ -63,7 +63,7 @@ router.post("/forgot-password", forgotPasswordLimiter, async (req: Request, res:
       try {
         await storage.createPasswordResetToken(user.id, code, expiresAt);
         break;
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (attempt === 4) throw e;
       }
     }
@@ -130,7 +130,7 @@ router.post("/reset-password", resetPasswordLimiter, async (req: Request, res: R
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
-    await storage.updateUser(user.id, { password: hashedPassword } as any);
+    await storage.updateUser(user.id, { password: hashedPassword });
     await storage.markPasswordResetTokenUsedById(resetToken.id);
 
     req.session.userId = user.id;
@@ -171,7 +171,7 @@ router.post("/resend-reset-code", resendResetLimiter, async (req: Request, res: 
       try {
         await storage.createPasswordResetToken(user.id, code, expiresAt);
         break;
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (attempt === 4) throw e;
       }
     }

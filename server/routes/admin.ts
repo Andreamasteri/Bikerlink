@@ -170,7 +170,7 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
       console.warn(`[admin-auth] 403 reason=not-active path=${path} sid=${sid} userId=${user.id} status=${user.status}`);
       return sendError(res, 403, "Account non attivo.");
     }
-    (req as any).currentUser = user;
+    (req as Request & { currentUser?: unknown }).currentUser = user;
     next();
   }).catch((err) => {
     console.error(`[admin-auth] 500 reason=db-error path=${path} sid=${sid} userId=${req.session.userId}`, err);

@@ -188,7 +188,7 @@ export function registerAllRoutes(app: express.Application) {
   // AI Trip Planner page
   const pianificaPath = path.resolve(process.cwd(), "server", "templates", "pianifica.html");
   app.get("/pianifica", (req, res) => {
-    const userId = (req.session as any)?.userId as string | undefined;
+    const userId = (req.session as { userId?: string })?.userId;
     if (!userId) {
       return res.redirect(302, "/accedi?next=/pianifica");
     }

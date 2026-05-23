@@ -1,9 +1,15 @@
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
-import { requireAuth, computeBikerScoreFromPoints } from "./utils";
-import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, weatherWaypointsSchema, poiRequestSchema } from "@shared/validators";
+import { requireAuth, decodePolyline, computeBikerScoreFromPoints } from "./utils";
+import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, poiRequestSchema } from "@shared/validators";
 import { z } from "zod";
 import { generateObject, streamText } from "ai";
+const weatherWaypointsSchema = z.object({
+  routeId: z.string().optional(),
+  waypoints: z.array(z.object({ lat: z.number().finite(), lng: z.number().finite(), name: z.string().optional() })).min(1).max(8),
+  departureIso: z.string().optional(),
+  avgSpeedKmh: z.number().optional(),
+});
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { haversineKm } from "../../geo";
 const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
@@ -39,8 +45,8 @@ async function fetchWeatherForWaypoints(
   waypoints: Array<{ lat: number; lng: number; name?: string }>,
   departure: Date,
   avgSpeedKmh: number = 70
-): Promise<any[]> {
-  const results: any[] = [];
+): Promise<unknown[]> {
+  const results: unknown[] = [];
 
   const cumulativeKm: number[] = [0];
   for (let i = 1; i < waypoints.length; i++) {
@@ -71,7 +77,7 @@ async function fetchWeatherForWaypoints(
 
       const resp = await fetch(url.toString());
       if (!resp.ok) { results.push(null); continue; }
-      const data = await resp.json() as any;
+      const data = await resp.json() as Record<string, { temperature_2m?: number[]; precipitation_probability?: number[]; wind_speed_10m?: number[]; weathercode?: number[]; temperature_2m_max?: number[]; temperature_2m_min?: number[]; precipitation_sum?: number[]; wind_speed_10m_max?: number[] } | undefined>;
       const hourly = data.hourly ?? {};
       const daily = data.daily ?? {};
       const clampedHour = Math.min(hour, (hourly.temperature_2m?.length ?? 1) - 1);
@@ -145,12 +151,13 @@ const routeSchema = z.object({
   notes: z.string(),
 });
 
-function geminiErrorMessage(err: any): { httpStatus: number; message: string } {
-  if (err.name === "AbortError") {
+function geminiErrorMessage(err: unknown): { httpStatus: number; message: string } {
+  const e = err as { name?: string; message?: string; status?: number; statusCode?: number; code?: number };
+  if (e.name === "AbortError") {
     return { httpStatus: 504, message: "Il servizio AI ha impiegato troppo tempo, riprova tra qualche secondo" };
   }
-  const msg = (err?.message ?? "").toLowerCase();
-  const status = err?.status ?? err?.statusCode ?? err?.code;
+  const msg = (e?.message ?? "").toLowerCase();
+  const status = e?.status ?? e?.statusCode ?? e?.code;
   const isRateLimit = status === 429 || msg.includes("429") || msg.includes("quota") || msg.includes("rate limit") || msg.includes("resource_exhausted");
   if (isRateLimit) {
     return { httpStatus: 429, message: "Troppe richieste AI: limite di utilizzo raggiunto, riprova tra qualche minuto" };
@@ -231,10 +238,10 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
     clearTimeout(timeout);
     req.off("close", onClose);
     return res.json(object);
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(timeout);
     req.off("close", onClose);
-    console.error("[AI parse] error:", err?.message ?? err);
+    console.error("[AI parse] error:", (err as Error)?.message ?? err);
     const { httpStatus, message } = geminiErrorMessage(err);
     return res.status(httpStatus).json({ message });
   }
@@ -284,14 +291,14 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
     clearTimeout(timeout);
     req.off("close", onClose);
 
-    let parsed: any = null;
+    let parsed: unknown = null;
     try { parsed = routeSchema.parse(JSON.parse(fullText)); } catch { /* keep null */ }
     res.write(`event: done\ndata: ${JSON.stringify({ parsed })}\n\n`);
     res.end();
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(timeout);
     req.off("close", onClose);
-    console.error("[AI stream] error:", err?.message ?? err);
+    console.error("[AI stream] error:", (err as Error)?.message ?? err);
     const { message } = geminiErrorMessage(err);
     res.write(`event: error\ndata: ${JSON.stringify({ message })}\n\n`);
     res.end();
@@ -304,7 +311,8 @@ router.get("/geocode", async (req: Request, res: Response) => {
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=it`;
     const resp = await fetch(url, { headers: { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" } });
-    const data = await resp.json() as any[];
+    type NominatimResult = { display_name: string; lat: string; lon: string };
+    const data = await resp.json() as NominatimResult[];
     return res.json(data.map((r) => ({
       name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon),
     })));
@@ -371,7 +379,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
   let myStyleWarning: string | null = null;
 
   try {
-    const body: any = {
+    const body: Record<string, unknown> = {
       points: effectiveWaypoints.map((wp) => [wp.lng, wp.lat]),
       profile: ACTIVE_PROFILE,
       instructions: true,
@@ -442,7 +450,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
       body.custom_model = { priority };
     }
 
-    const ghResult = await ghCalculateRoute(body);
+    const ghResult = await ghCalculateRoute(body as unknown as import("../../graphhopper-client").RouteRequest);
     const path = ghResult.paths[0];
 
     return res.json({
@@ -451,11 +459,11 @@ router.post("/calculate", async (req: Request, res: Response) => {
       durationMinutes: Math.round(path.time / 60000),
       instructions: path.instructions ?? [],
       bikerScore: 0.8,
-      elevation: extractElevationProfile(path.points as any, (path as any).points_encoded === false ? (path.points as any).coordinates : undefined),
+      elevation: extractElevationProfile(path.points as string, (path as { points_encoded?: boolean; points?: { coordinates?: number[][] } }).points_encoded === false ? (path.points as { coordinates?: number[][] })?.coordinates : undefined),
       warning: myStyleWarning,
     });
-  } catch (err: any) {
-    console.error("[GraphHopper] error:", err?.message ?? err);
+  } catch (err: unknown) {
+    console.error("[GraphHopper] error:", (err as Error)?.message ?? err);
     return res.json(buildFallbackRoute(effectiveWaypoints));
   }
 });
@@ -466,7 +474,7 @@ router.post("/weather", async (req: Request, res: Response) => {
 
   const parsedWp = weatherWaypointsSchema.safeParse(req.body);
   if (!parsedWp.success) return sendError(res, 400, parsedWp.error.issues[0].message);
-  const { waypoints, departureIso, avgSpeedKmh } = parsedWp.data as any;
+  const { waypoints, departureIso, avgSpeedKmh } = parsedWp.data;
 
   try {
     const departure = departureIso ? new Date(departureIso) : new Date();
@@ -508,13 +516,14 @@ router.post("/poi", async (req: Request, res: Response) => {
     });
 
     if (!resp.ok) throw new Error("Overpass API error");
-    const data = await resp.json() as any;
+    type OverpassElement = { id: string; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
+    const data = await resp.json() as { elements?: OverpassElement[] };
 
-    const results = (data.elements ?? []).filter((e: any) => e.lat || (e.center && e.center.lat)).map((e: any) => ({
+    const results = (data.elements ?? []).filter((e) => e.lat || (e.center && e.center.lat)).map((e) => ({
       id: e.id,
       name: e.tags?.name || category,
-      lat: e.lat || e.center.lat,
-      lng: e.lon || e.center.lon,
+      lat: e.lat || e.center!.lat,
+      lng: e.lon || e.center!.lon,
       category,
       tags: e.tags,
     }));
@@ -556,11 +565,12 @@ router.post("/poi-search", async (req: Request, res: Response) => {
       method: "POST",
       body: "data=" + encodeURIComponent(overpassQuery),
     });
-    const data = await resp.json() as any;
-    const results = (data.elements ?? []).filter((e: any) => e.lat || (e.center && e.center.lat)).map((e: any) => ({
+    type OverpassNode = { lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
+    const data = await resp.json() as { elements?: OverpassNode[] };
+    const results = (data.elements ?? []).filter((e) => e.lat || (e.center && e.center.lat)).map((e) => ({
       name: e.tags?.name || "POI",
-      lat: e.lat || e.center.lat,
-      lng: e.lon || e.center.lon,
+      lat: e.lat || e.center!.lat,
+      lng: e.lon || e.center!.lon,
     }));
     return res.json(results);
   } catch (err) {

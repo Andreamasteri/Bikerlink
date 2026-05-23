@@ -22,7 +22,7 @@ function resolveVisibility(visibility: unknown, isPublic: unknown): Visibility {
 
 router.get("/api/custom-routes", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const featureSetting = await storage.getAppSetting("custom_routes_enabled");
@@ -61,14 +61,14 @@ router.get("/api/custom-routes", async (req, res) => {
     const publicRoutes = await allLimited(publicAndFriends.map((r) => () => enrichRoute(r)));
 
     res.json({ disabled: false, myRoutes, publicRoutes });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 
 router.post("/api/custom-routes", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const featureSetting = await storage.getAppSetting("custom_routes_enabled");
@@ -92,14 +92,14 @@ router.post("/api/custom-routes", async (req, res) => {
     });
 
     res.json(route);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 
 router.get("/api/custom-routes/:id", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const route = await storage.getCustomRoute(req.params.id);
@@ -132,14 +132,14 @@ router.get("/api/custom-routes/:id", async (req, res) => {
       isMine: route.userId === userId,
       creatorNickname: creator?.nickname || "Sconosciuto",
     });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 
 router.put("/api/custom-routes/:id", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const route = await storage.getCustomRoute(req.params.id);
@@ -173,14 +173,14 @@ router.put("/api/custom-routes/:id", async (req, res) => {
     const updated = await storage.updateCustomRoute(req.params.id, updateFields);
 
     res.json(updated);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 
 router.delete("/api/custom-routes/:id", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const route = await storage.getCustomRoute(req.params.id);
@@ -189,14 +189,14 @@ router.delete("/api/custom-routes/:id", async (req, res) => {
 
     await storage.deleteCustomRoute(req.params.id);
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 
 router.delete("/api/custom-routes/:id/waypoints", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const route = await storage.getCustomRoute(req.params.id);
@@ -205,14 +205,14 @@ router.delete("/api/custom-routes/:id/waypoints", async (req, res) => {
 
     await storage.deleteAllCustomRouteWaypoints(route.id);
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 
 router.post("/api/custom-routes/:id/waypoints", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const route = await storage.getCustomRoute(req.params.id);
@@ -236,14 +236,14 @@ router.post("/api/custom-routes/:id/waypoints", async (req, res) => {
     });
 
     res.json(waypoint);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 
 router.put("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const route = await storage.getCustomRoute(req.params.id);
@@ -265,14 +265,14 @@ router.put("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) => {
     });
 
     res.json(updated);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 
 router.delete("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const route = await storage.getCustomRoute(req.params.id);
@@ -281,8 +281,8 @@ router.delete("/api/custom-routes/:id/waypoints/:waypointId", async (req, res) =
 
     await storage.deleteCustomRouteWaypoint(req.params.waypointId);
     res.json({ success: true });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 
@@ -356,7 +356,7 @@ function gpxWaypointType(index: number, total: number): string {
 
 router.post("/api/custom-routes/import-gpx", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const featureSetting = await storage.getAppSetting("custom_routes_enabled");
@@ -417,7 +417,7 @@ router.post("/api/custom-routes/import-gpx", async (req, res) => {
 
 router.get("/api/custom-routes/:id/elevation", async (req, res) => {
   try {
-    const userId = (req.session as any)?.userId;
+    const userId = req.session.userId;
     if (!userId) return res.status(401).json({ error: "Non autenticato" });
 
     const route = await storage.getCustomRoute(req.params.id);
@@ -482,9 +482,10 @@ router.get("/api/custom-routes/:id/elevation", async (req, res) => {
         headers: { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" },
       });
       if (!topoResp.ok) throw new Error(`OpenTopoData ${topoResp.status}`);
-      const topoData = (await topoResp.json()) as any;
+      type TopoData = { status: string; results?: Array<{ elevation?: number }> };
+      const topoData = await topoResp.json() as TopoData;
       if (topoData.status !== "OK") throw new Error("OpenTopoData status: " + topoData.status);
-      elevations = (topoData.results as any[]).map((r: any) => Math.round(r.elevation ?? 0));
+      elevations = (topoData.results ?? []).map((r) => Math.round(r.elevation ?? 0));
     } catch (err) {
       console.error("[custom-routes elevation] OpenTopoData error:", err);
       return res.status(502).json({ message: "Dati altimetrici non disponibili al momento" });
@@ -514,7 +515,7 @@ router.get("/api/custom-routes/:id/elevation", async (req, res) => {
       totalLoss: Math.round(totalLoss),
       points: sampled.length,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[custom-routes elevation] error:", err);
     return res.status(500).json({ message: "Errore profilo altimetrico" });
   }
@@ -523,7 +524,7 @@ router.get("/api/custom-routes/:id/elevation", async (req, res) => {
 // ─── GET /api/users/:userId/custom-routes ─────────────────────────────────────
 router.get("/api/users/:userId/custom-routes", async (req, res) => {
   try {
-    const sessionUserId = (req.session as any)?.userId;
+    const sessionUserId = req.session.userId;
     if (!sessionUserId) return res.status(401).json({ error: "Non autenticato" });
 
     const { userId } = req.params;
@@ -553,8 +554,8 @@ router.get("/api/users/:userId/custom-routes", async (req, res) => {
     );
 
     res.json({ routes: enriched });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    res.status(500).json({ error: error instanceof Error ? error.message : "Errore interno" });
   }
 });
 

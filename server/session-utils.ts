@@ -31,7 +31,8 @@ export async function getActiveSessionsByUserId(
   const rows = await db.execute(
     sql`SELECT sid, sess->>'sessionType' AS session_type, expire FROM session WHERE sess->>'userId' = ${userId}`
   );
-  return (rows.rows as any[]).map((r) => ({
+  type SessionRow = { sid: string; session_type: string | null; expire: string | null };
+  return (rows.rows as SessionRow[]).map((r) => ({
     sid: r.sid,
     sessionType: r.session_type ?? null,
     expiry: r.expire ? new Date(r.expire) : null,

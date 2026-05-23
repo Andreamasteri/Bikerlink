@@ -132,7 +132,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
       ridingStyle: ridingStyle ?? null,
     });
 
-    const matches: any[] = [];
+    const matches: Array<{ bikerNickname: string | undefined; brand: string | null; model: string | null; ridingStyle: string }> = [];
     if (ridingStyle) {
       const bikerMotos = await storage.findMatchingBikerMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
       for (const bikerMoto of bikerMotos) {
@@ -162,7 +162,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
           referenceId: bikerMoto.userId,
         });
         sendMatchPushNotifications([bikerMoto.userId, userId]);
-        matches.push({ bikerNickname: bikerUser?.nickname, brand, model, ridingStyle });
+        matches.push({ bikerNickname: bikerUser?.nickname, brand: brand ?? null, model: model ?? null, ridingStyle });
       }
     }
 

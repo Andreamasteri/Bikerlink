@@ -30,10 +30,11 @@ router.post("/:id/points", async (req: Request, res: Response) => {
     const parsedPoints = addRoutePointsSchema.safeParse(req.body);
     if (!parsedPoints.success) {
       const rawPoints = Array.isArray(req.body?.points) ? req.body.points : [];
+      type RawPoint = { latitude?: unknown; longitude?: unknown };
       const invalidPoints = rawPoints.filter(
-        (p: any) =>
-          typeof p.latitude !== "number" || !isFinite(p.latitude) ||
-          typeof p.longitude !== "number" || !isFinite(p.longitude)
+        (p: RawPoint) =>
+          typeof p.latitude !== "number" || !isFinite(p.latitude as number) ||
+          typeof p.longitude !== "number" || !isFinite(p.longitude as number)
       );
       if (invalidPoints.length > 0) {
         const payload = JSON.stringify(invalidPoints);
@@ -66,7 +67,7 @@ router.post("/:id/points", async (req: Request, res: Response) => {
     }
 
     const { points } = parsedPoints.data;
-    const routePoints = points.map((p: any) => ({
+    const routePoints = points.map((p) => ({
       routeId: id as string,
       latitude: p.latitude as number,
       longitude: p.longitude as number,

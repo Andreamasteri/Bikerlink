@@ -53,7 +53,8 @@ router.post("/bulk", adUpload.array("images", 10), async (req: Request, res: Res
   try {
     const parsedAb = adsBulkSchema.safeParse(req.body);
     if (!parsedAb.success) return sendError(res, 400, parsedAb.error.issues[0].message);
-    const { name, sponsor, linkUrl, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = parsedAb.data as any;
+    const adBulkData = parsedAb.data as Record<string, string | undefined>;
+    const { name, sponsor, linkUrl, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = adBulkData;
 
     const files = (req.files as Express.Multer.File[]) || [];
     const groupId = crypto.randomUUID();
@@ -63,7 +64,7 @@ router.post("/bulk", adUpload.array("images", 10), async (req: Request, res: Res
       const file = files[i];
       const imageUrl = await uploadAdImageToObjectStorage(file.buffer, file.originalname, file.mimetype);
       const campaign = await storage.createAdCampaign({
-        name: files.length === 1 ? name.trim() : `${name.trim()} #${i + 1}`,
+        name: files.length === 1 ? (name ?? "").trim() : `${(name ?? "").trim()} #${i + 1}`,
         sponsor: sponsor || "Syneco Lubrificanti",
         imageUrl,
         linkUrl: linkUrl || null,
@@ -146,17 +147,17 @@ router.put("/:id", adUpload.single("image"), async (req: Request, res: Response)
     if (id === null) return sendError(res, 400, "ID non valido");
     const parsedAu = adsUpdateSchema.safeParse(req.body);
     if (!parsedAu.success) return sendError(res, 400, parsedAu.error.issues[0].message);
-    const adBody = parsedAu.data as any;
-    const updates: any = {};
+    const adBody = parsedAu.data;
+    const updates: Partial<import("@shared/db").InsertAdCampaign> = {};
     if (adBody.name !== undefined) updates.name = adBody.name;
     if (adBody.sponsor !== undefined) updates.sponsor = adBody.sponsor;
     if (adBody.linkUrl !== undefined) updates.linkUrl = adBody.linkUrl;
     if (adBody.description !== undefined) updates.description = adBody.description;
     if (adBody.isActive !== undefined) updates.isActive = adBody.isActive === true || adBody.isActive === "true";
     if (adBody.targetUserType !== undefined) updates.targetUserType = adBody.targetUserType;
-    if (adBody.rotationDuration !== undefined) updates.rotationDuration = parseInt(adBody.rotationDuration);
+    if (adBody.rotationDuration !== undefined) updates.rotationDuration = parseInt(String(adBody.rotationDuration));
     if (adBody.rotationMode !== undefined) updates.rotationMode = adBody.rotationMode;
-    if (adBody.sortOrder !== undefined) updates.sortOrder = parseInt(adBody.sortOrder);
+    if (adBody.sortOrder !== undefined) updates.sortOrder = parseInt(String(adBody.sortOrder));
     if (adBody.startDate !== undefined) updates.startDate = adBody.startDate ? new Date(adBody.startDate) : null;
     if (adBody.endDate !== undefined) updates.endDate = adBody.endDate ? new Date(adBody.endDate) : null;
     if (adBody.placement !== undefined) updates.placement = adBody.placement;
@@ -243,7 +244,7 @@ router.put("/group/:groupId", async (req: Request, res: Response) => {
     const groupId = req.params.groupId as string;
     const parsedGu = adsGroupUpdateSchema.safeParse(req.body);
     if (!parsedGu.success) return sendError(res, 400, parsedGu.error.issues[0].message);
-    const { name, linkUrl, isActive } = parsedGu.data as any;
+    const { name, linkUrl, isActive } = parsedGu.data;
     if (!name?.trim()) {
       return sendError(res, 400, "Nome base obbligatorio");
     }

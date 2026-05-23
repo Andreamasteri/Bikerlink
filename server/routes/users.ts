@@ -21,7 +21,7 @@ export function applyPositionFuzz(lat: number, lng: number, radiusKm: number): {
 export function fuzzedCoordsForViewer(
   lat: number | null | undefined,
   lng: number | null | undefined,
-  profile: any,
+  profile: { positionFuzz?: boolean | null; positionFuzzKm?: number | null } | null | undefined,
   isOwner: boolean
 ): { latitude: number | null; longitude: number | null } {
   if (lat == null || lng == null) return { latitude: null, longitude: null };
@@ -32,7 +32,7 @@ export function fuzzedCoordsForViewer(
   return { latitude: lat, longitude: lng };
 }
 
-export function isPositionFuzzed(profile: any, isOwner: boolean): boolean {
+export function isPositionFuzzed(profile: { positionFuzz?: boolean | null; positionFuzzKm?: number | null } | null | undefined, isOwner: boolean): boolean {
   if (isOwner) return false;
   return !!(profile?.positionFuzz && (profile?.positionFuzzKm ?? 0) > 0);
 }
@@ -40,7 +40,7 @@ export function isPositionFuzzed(profile: any, isOwner: boolean): boolean {
 export function applyFakeZones(
   lat: number,
   lng: number,
-  profile: any
+  profile: { fakeHomeEnabled?: boolean | null; homeLatitude?: number | null; homeLongitude?: number | null; fakeHomeLatitude?: number | null; fakeHomeLongitude?: number | null; fakeHomeRadiusKm?: number | null; fakeHomeRadius?: number | null; fakeWorkEnabled?: boolean | null; workLatitude?: number | null; workLongitude?: number | null; fakeWorkLatitude?: number | null; fakeWorkLongitude?: number | null; fakeWorkRadiusKm?: number | null; fakeWorkRadius?: number | null; fakeWhateverEnabled?: boolean | null; whateverLatitude?: number | null; whateverLongitude?: number | null; fakeWhateverLatitude?: number | null; fakeWhateverLongitude?: number | null; fakeWhateverRadius?: number | null } | null | undefined
 ): { lat: number; lng: number; applied: boolean } {
   if (profile?.fakeHomeEnabled &&
       profile.homeLatitude != null && profile.homeLongitude != null &&
@@ -85,12 +85,13 @@ export async function captureFirstAvailabilityLocation(
     await storage.updateUser(userId, {
       firstLoginLat: resolvedLat,
       firstLoginLng: resolvedLng,
-    } as any);
+    });
   } catch (err) {
     console.warn("[captureFirstAvailabilityLocation] fallita:", err);
   }
 } 
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function systemAccountConditions(usersTable: any) {
   const { systemAccountConditions: baseConditions } = require("../lib/system-account-filter");
   return baseConditions(usersTable);

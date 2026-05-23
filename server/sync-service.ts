@@ -178,8 +178,8 @@ export async function syncProdToDev(): Promise<{ ok: boolean; error?: string }> 
     await upsertSetting("sync.next_at", new Date(Date.now() + INTERVAL_MS).toISOString(), "Prossimo sync prod→dev");
     console.log("[sync-service] Sync completato con successo");
     return { ok: true };
-  } catch (err: any) {
-    const errMsg = err?.message ?? String(err);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
     const meta: SyncMeta = { startedAt, finishedAt: new Date().toISOString(), ok: false, error: errMsg };
     await upsertJsonSetting("sync.last", meta, "Ultimo sync prod→dev").catch(() => {});
     await upsertSetting("sync.next_at", new Date(Date.now() + INTERVAL_MS).toISOString(), "Prossimo sync prod→dev").catch(() => {});
