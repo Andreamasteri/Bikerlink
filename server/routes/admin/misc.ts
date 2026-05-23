@@ -6,6 +6,7 @@ import { adCampaigns as adCampaignsTable, moderatorLogs, motoClubs, motoClubRequ
 import { workshopSchema, easterEggSchema, easterEggBatchSchema, reportResolveSchema } from "@shared/validators";
 import { eq, sql, desc, inArray } from "drizzle-orm";
 import { massSeedFakeUsers, getMassSeedStatus } from "../../mass-seed";
+import { setMotionEnabled, getMotionStatus } from "../../motion-simulator";
 
 const router = Router();
 
@@ -156,6 +157,31 @@ router.get("/graphhopper-status", (_req: Request, res: Response) => {
 // Cache cleanup (stub — svuota cache in-memory future)
 router.post("/cache/cleanup", (_req: Request, res: Response) => {
   return sendSuccess(res, { cleaned: true });
+});
+
+// ── Motion simulator — spec-required paths (/api/admin/motion/*) ─────────────
+// These are aliases of the stregatti-namespaced routes for API contract compliance.
+
+router.get("/motion/status", (_req: Request, res: Response) => {
+  try {
+    return res.json(getMotionStatus());
+  } catch {
+    return sendError(res, 500, "Errore stato motion");
+  }
+});
+
+router.post("/motion/toggle", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return sendError(res, 400, "Campo 'enabled' booleano richiesto");
+    }
+    await setMotionEnabled(enabled);
+    return res.json(getMotionStatus());
+  } catch (err) {
+    console.error("[MOTION] toggle error:", err);
+    return sendError(res, 500, "Errore toggle motion");
+  }
 });
 
 export default router;

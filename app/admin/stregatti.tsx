@@ -213,6 +213,33 @@ export default function FakeUsersAdmin() {
   const [massSeedError, setMassSeedError] = useState<string | null>(null);
   const [massSeedConfirmVisible, setMassSeedConfirmVisible] = useState(false);
 
+  const { data: motionStatus, refetch: refetchMotionStatus } = useQuery<{
+    enabled: boolean;
+    totalFakeUsers: number;
+    movingNow: number;
+    restingNow: number;
+    lastCycleAt: string | null;
+    totalCycles: number;
+  }>({
+    queryKey: ["/api/admin/stregatti/motion/status"],
+    refetchInterval: 35_000,
+  });
+
+  const toggleMotionMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const url = new URL("/api/admin/stregatti/motion/toggle", getApiUrl());
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => refetchMotionStatus(),
+  });
+
   const wakeAllMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/stregatti/wake-all", {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] }),
@@ -428,6 +455,9 @@ export default function FakeUsersAdmin() {
               onToggleChatbot={(v) => chatbotMutation.mutate(v)}
               allEnabled={allEnabled}
               onToggleAll={(v) => { setPendingToggleVal(v); setTogglePwdVisible(true); }}
+              motionStatus={motionStatus ?? null}
+              onToggleMotion={(v) => toggleMotionMutation.mutate(v)}
+              isTogglingMotion={toggleMotionMutation.isPending}
               onMassSeed={() => setMassSeedConfirmVisible(true)}
               onWakeAll={() => wakeAllMutation.mutate()}
               onDistribute={() => distributeMutation.mutate()}

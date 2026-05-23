@@ -7,6 +7,7 @@ import { eq, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { setMotionEnabled, getMotionStatus } from "../../motion-simulator";
 
 const router = Router();
 
@@ -97,6 +98,30 @@ router.post("/distribute-to-clubs", async (_req: Request, res: Response) => {
     return sendSuccess(res);
   } catch (error) {
     return sendError(res, 500, "Errore distribuzione");
+  }
+});
+
+// ── Motion simulator endpoints ────────────────────────────────────────────────
+
+router.get("/motion/status", (_req: Request, res: Response) => {
+  try {
+    return res.json(getMotionStatus());
+  } catch (error) {
+    return sendError(res, 500, "Errore lettura stato motion");
+  }
+});
+
+router.post("/motion/toggle", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return sendError(res, 400, "Campo 'enabled' booleano richiesto");
+    }
+    await setMotionEnabled(enabled);
+    return res.json(getMotionStatus());
+  } catch (error) {
+    console.error("[MOTION] toggle error:", error);
+    return sendError(res, 500, "Errore toggle motion");
   }
 });
 

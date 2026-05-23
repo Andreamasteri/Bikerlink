@@ -6,15 +6,28 @@ import {
   TouchableOpacity,
   Switch,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+
+interface MotionStatus {
+  enabled: boolean;
+  totalFakeUsers: number;
+  movingNow: number;
+  restingNow: number;
+  lastCycleAt: string | null;
+  totalCycles: number;
+}
 
 interface StregattaActionsProps {
   chatbotEnabled: boolean;
   onToggleChatbot: (val: boolean) => void;
   allEnabled: boolean;
   onToggleAll: (val: boolean) => void;
+  motionStatus: MotionStatus | null;
+  onToggleMotion: (val: boolean) => void;
+  isTogglingMotion: boolean;
   onMassSeed: () => void;
   onWakeAll: () => void;
   onDistribute: () => void;
@@ -39,6 +52,9 @@ export function StregattaActions({
   onToggleChatbot,
   allEnabled,
   onToggleAll,
+  motionStatus,
+  onToggleMotion,
+  isTogglingMotion,
   onMassSeed,
   onWakeAll,
   onDistribute,
@@ -57,6 +73,14 @@ export function StregattaActions({
   totalCount,
   t,
 }: StregattaActionsProps) {
+  const motionEnabled = motionStatus?.enabled ?? false;
+
+  const formatLastCycle = (iso: string | null): string => {
+    if (!iso) return "Mai";
+    const d = new Date(iso);
+    return d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.controlsCard}>
@@ -93,6 +117,51 @@ export function StregattaActions({
         <Text style={styles.controlDesc}>
           Nascondi o mostra tutti gli stregatti contemporaneamente.
         </Text>
+
+        <View style={styles.controlDivider} />
+
+        <View style={styles.controlRow}>
+          <View style={styles.controlInfo}>
+            <Ionicons name="navigate" size={24} color={Colors.accent} />
+            <Text style={styles.controlLabel}>Falli muovere</Text>
+          </View>
+          {isTogglingMotion ? (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          ) : (
+            <Switch
+              value={motionEnabled}
+              onValueChange={onToggleMotion}
+              trackColor={{ false: "#767577", true: Colors.accent }}
+              thumbColor={Platform.OS === "ios" ? "#fff" : motionEnabled ? "#fff" : "#f4f3f4"}
+            />
+          )}
+        </View>
+        <Text style={styles.controlDesc}>
+          Simula spostamenti GPS realistici (giri brevi + trasferimenti lunghi, comitive).
+        </Text>
+
+        {motionStatus && (
+          <View style={styles.motionStats}>
+            <View style={styles.motionStatRow}>
+              <Ionicons name="radio-button-on" size={12} color={motionEnabled ? "#4CAF50" : Colors.textSecondary} />
+              <Text style={[styles.motionStatText, motionEnabled && { color: "#4CAF50" }]}>
+                {motionStatus.movingNow} / {motionStatus.totalFakeUsers} in moto
+              </Text>
+            </View>
+            <View style={styles.motionStatRow}>
+              <Ionicons name="time-outline" size={12} color={Colors.textSecondary} />
+              <Text style={styles.motionStatText}>
+                Ultimo ciclo: {formatLastCycle(motionStatus.lastCycleAt)}
+              </Text>
+            </View>
+            <View style={styles.motionStatRow}>
+              <Ionicons name="refresh-outline" size={12} color={Colors.textSecondary} />
+              <Text style={styles.motionStatText}>
+                Cicli totali: {motionStatus.totalCycles}
+              </Text>
+            </View>
+          </View>
+        )}
       </View>
 
       <View style={styles.gridContainer}>
@@ -183,8 +252,6 @@ export function StregattaActions({
   );
 }
 
-import { Platform } from "react-native";
-
 const styles = StyleSheet.create({
   container: {
     marginBottom: 20,
@@ -222,6 +289,23 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: Colors.border,
     marginVertical: 14,
+  },
+  motionStats: {
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    gap: 4,
+  },
+  motionStatRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  motionStatText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
   },
   gridContainer: {
     flexDirection: "row",

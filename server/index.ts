@@ -297,6 +297,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
     const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
     await withPhaseTimeout("saveSchemaSnapshot", saveSchemaSnapshot());
+
+    // Motion simulator for fake users (non-fatal)
+    try {
+      const { startMotionSimulator } = await import("./motion-simulator");
+      await startMotionSimulator();
+    } catch (e) {
+      console.warn("[INIT] Phase 5: motion simulator (non-fatal):", e);
+    }
   } catch (err) {
     console.error("[INIT] FATAL — Phase 5 failed:", err);
     process.exit(1);
