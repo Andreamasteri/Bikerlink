@@ -78,6 +78,12 @@
       "sourceType": "github",
       "skillPath": "skills/web-design-guidelines/SKILL.md",
       "computedHash": "f3bc47f890f42a44db1007ab390709ec368e4b8c089baee6b0007182236ac474"
+    },
+    "error-handling-protocol": {
+      "source": "local",
+      "sourceType": "local",
+      "skillPath": ".agents/skills/error-handling-protocol/SKILL.md",
+      "description": "Protocollo obbligatorio per la gestione degli errori in BikerLink. Usare quando si incontra un errore di compilazione, runtime, typecheck, test, API, crash, warning bloccante, o fallimento silenzioso. Definisce la scheda strutturata da produrre e il flusso di comunicazione con l'utente prima di procedere alla risoluzione."
     }
   }
 }

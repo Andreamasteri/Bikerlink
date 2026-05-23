@@ -38,6 +38,27 @@ BikerLink is a React Native (Expo SDK 55) mobile application designed to connect
 ## User Preferences
 I prefer detailed explanations and iterative development. Ask before making major changes. Do not make changes to folder `node_modules`. Do not make changes to file `package-lock.json`.
 
+## Protocollo Gestione Errori
+
+Quando il Build agent incontra un errore (compilazione, runtime, typecheck, test, API, crash) o un warning bloccante o un fallimento silenzioso (es. migrazione saltata senza eccezione), deve fermarsi e produrre obbligatoriamente una **scheda strutturata**:
+
+```
+🔴 TIPO DI ERRORE: <categoria leggibile — es. TypeScript type mismatch, DB migration failure, API 500, ESLint bloccante, crash runtime>
+📍 LOCALIZZAZIONE: <file + numero di riga se disponibile, oppure stack trace sintetico>
+💬 SPIEGAZIONE: <cosa significa l'errore in termini concreti, senza gergo inutile>
+🔎 CAUSA PROBABILE: <la ragione più plausibile>
+```
+
+Dopo la scheda, l'agente chiede: **"Hai preferenze su come risolvere, o procedo in autonomia?"**
+
+- Se l'utente risponde con una preferenza ("usa il metodo X", "non toccare il file Y") → applicarla
+- Se l'utente dice "vai" o non risponde con vincoli → procedere in full-auto
+
+**Eccezioni** (seguono protocolli separati già definiti in questo file):
+- Errori di build EAS (APK) → vedi sezione "APK Build — Regola Obbligatoria"
+- Errori OTA → vedi sezione OTA
+- Warning non bloccanti (solo informativi) → non richiedono stop, riportare inline
+
 **Sistema OTA — esecuzione sequenziale**: quando si lavora con il sistema OTA (publish-ota.sh, step export/publish, verifica bundle, rollback), eseguire sempre le operazioni in **sequenza**, un passo alla volta. Non parallelizzare tool call o script OTA. Aspettare il completamento e il log di ogni step prima di procedere con il successivo.
 
 **"Pubblica l'OTA"** significa SOLO pubblicare una OTA (Over-the-Air update). NON avviare mai una build EAS (APK/AAB) in risposta a questo comando. La build EAS è un'operazione separata e richiede autorizzazione esplicita come da sezione "APK Build — Regola Obbligatoria".
