@@ -62,7 +62,7 @@ const PROFILE_WEIGHTS: Array<{ profile: SpeedProfile; weight: number }> = [
   { profile: "mountain", weight: 0.20 },
 ];
 
-interface UserMotionState {
+export interface UserMotionState {
   userId: string;
   lat: number;
   lng: number;
@@ -281,8 +281,9 @@ function assignFreshDriveParams(state: UserMotionState, driveSlot: Slot): void {
 /**
  * Advance currentSpeedKph one step toward targetSpeedKph, capped by
  * the profile's accelKphPerCycle.  When close to target, pick a new target.
+ * Exported for unit testing.
  */
-function stepSpeed(state: UserMotionState): void {
+export function stepSpeed(state: UserMotionState): void {
   const cfg = SPEED_PROFILES[state.speedProfile];
   const diff = state.targetSpeedKph - state.currentSpeedKph;
   const step = Math.min(Math.abs(diff), cfg.accelKphPerCycle) * Math.sign(diff);
@@ -342,6 +343,7 @@ function formConvoysForNewSlot(newDriveUsers: UserMotionState[]): void {
 
 /**
  * Apply a physics-correct movement delta to (lat, lng).
+ * Exported for unit testing.
  *
  * Distance is derived from currentSpeedKph × cycle interval, converting
  * km/h → km/cycle → degrees via the local scale factors.
@@ -358,7 +360,7 @@ function formConvoysForNewSlot(newDriveUsers: UserMotionState[]): void {
  * NOTE: the caller is responsible for updating state.currentSpeedKph
  * (via stepSpeed or ramp logic) before invoking this function.
  */
-function applyDelta(
+export function applyDelta(
   lat: number,
   lng: number,
   state: UserMotionState,
