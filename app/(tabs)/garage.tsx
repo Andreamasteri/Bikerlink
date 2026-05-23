@@ -46,9 +46,9 @@ const RIDING_STYLES = [
 
 export default function GarageScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   if (user?.userType === "zavorrina") {
-    const insets = useSafeAreaInsets();
     return <WishlistSection insets={insets} MOTO_TYPES={MOTO_TYPES} RIDING_STYLES={RIDING_STYLES} />;
   }
 

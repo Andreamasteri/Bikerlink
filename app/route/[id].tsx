@@ -88,6 +88,12 @@ export default function RouteDetailScreen() {
     return formatDateTime(dateStr, locale, timeFormat);
   };
 
+  const pts = route?.points || [];
+  const mappedPoints = useMemo(
+    () => pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude, speedKmh: p.speedKmh ?? null })),
+    [pts]
+  );
+
   if (isLoading) {
     return (
       <View style={styles.center}>
@@ -109,15 +115,9 @@ export default function RouteDetailScreen() {
     );
   }
 
-  const pts = route.points || [];
   const hasPoints = pts.length > 0;
   const hasSensorData = pts.some((p) => p.accelG != null || p.tiltDeg != null);
   const speedUnitLabel = convertSpeed(0, speedUnit).label;
-
-  const mappedPoints = useMemo(
-    () => pts.map((p) => ({ latitude: p.latitude, longitude: p.longitude, speedKmh: p.speedKmh ?? null })),
-    [pts]
-  );
 
   const region = hasPoints
     ? {
