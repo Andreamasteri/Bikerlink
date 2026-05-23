@@ -30,7 +30,7 @@ export function useToggleSettings(t: (k: string) => string, setProtectedToggle: 
   });
 
   const protectedToggleMutation = useMutation({
-    mutationFn: async ({ key, value, adminPassword }: { key: string; value: string; adminPassword: string }) => {
+    mutationFn: async ({ key, value, adminPassword }: { key: string; value: string; adminPassword?: string }) => {
       const baseUrl = getApiUrl();
       const url = new URL("/api/admin/settings/toggle-protected", baseUrl);
       const res = await fetch(url.toString(), {
@@ -55,6 +55,7 @@ export function useToggleSettings(t: (k: string) => string, setProtectedToggle: 
       queryClient.invalidateQueries({ queryKey: ["/api/settings/ghost-mode-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/phone-field-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/user-available-on-login"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/primal-user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/floating-widget"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });

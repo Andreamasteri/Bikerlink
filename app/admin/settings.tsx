@@ -56,28 +56,28 @@ export default function AdminSettings() {
 
         <GeneralToggleSection
           marketplaceEnabled={state.marketplaceEnabled}
-          onMarketplaceToggle={(val) => state.setProtectedToggle({ key: "marketplace_enabled", value: val, label: "Mercatino Moto" })}
+          onMarketplaceToggle={(val) => state.protectedToggleMutation.mutate({ key: "marketplace_enabled", value: val ? "true" : "false" })}
           marketplaceLoading={state.protectedToggleMutation.isPending}
           gpsRequired={state.gpsRequired}
-          onGpsRequiredToggle={(val) => state.setProtectedToggle({ key: "gps_required", value: val, label: "GPS Obbligatorio" })}
+          onGpsRequiredToggle={(val) => state.protectedToggleMutation.mutate({ key: "gps_required", value: val ? "true" : "false" })}
           gpsRequiredLoading={state.protectedToggleMutation.isPending}
           ghostModeEnabled={state.ghostModeEnabled}
-          onGhostModeToggle={(val) => state.setProtectedToggle({ key: "ghost_mode_enabled", value: val, label: "Ghost Mode" })}
+          onGhostModeToggle={(val) => state.protectedToggleMutation.mutate({ key: "ghost_mode_enabled", value: val ? "true" : "false" })}
           ghostModeLoading={state.protectedToggleMutation.isPending}
           emailVerifEnabled={state.emailVerifEnabled}
-          onEmailVerifToggle={(val) => state.setProtectedToggle({ key: "email_verification_enabled", value: val, label: "Verifica Email" })}
+          onEmailVerifToggle={(val) => state.protectedToggleMutation.mutate({ key: "email_verification_enabled", value: val ? "true" : "false" })}
           emailVerifLoading={state.protectedToggleMutation.isPending}
           phoneFieldEnabled={state.phoneFieldEnabled}
-          onPhoneFieldToggle={(val) => state.setProtectedToggle({ key: "phone_field_enabled", value: val, label: "Campo telefono in registrazione" })}
+          onPhoneFieldToggle={(val) => state.protectedToggleMutation.mutate({ key: "phone_field_enabled", value: val ? "true" : "false" })}
           phoneFieldLoading={state.protectedToggleMutation.isPending}
           userAvailableOnLogin={state.userAvailableOnLogin}
-          onUserAvailableToggle={(val) => state.setProtectedToggle({ key: "user_available_on_login", value: val, label: "Utente Disponibile all'accesso" })}
+          onUserAvailableToggle={(val) => state.protectedToggleMutation.mutate({ key: "user_available_on_login", value: val ? "true" : "false" })}
           userAvailableLoading={state.protectedToggleMutation.isPending}
           primalEnabled={state.primalEnabled}
-          onPrimalToggle={(val) => state.setProtectedToggle({ key: "primal_user_enabled", value: val, label: "Account Primal" })}
+          onPrimalToggle={(val) => state.protectedToggleMutation.mutate({ key: "primal_user_enabled", value: val ? "true" : "false" })}
           primalLoading={state.protectedToggleMutation.isPending}
           unitsPrefEnabled={state.unitsPrefEnabled}
-          onUnitsPrefToggle={(val) => state.setProtectedToggle({ key: "units_preference_enabled", value: val, label: "Scelta Unità di Misura" })}
+          onUnitsPrefToggle={(val) => state.protectedToggleMutation.mutate({ key: "units_preference_enabled", value: val ? "true" : "false" })}
           unitsPrefLoading={state.protectedToggleMutation.isPending}
         />
 

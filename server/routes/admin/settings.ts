@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
+import bcrypt from "bcryptjs";
 import { appSettings } from "@shared/db";
 import { emailConfigSchema, disableFeatureSchema, toggleProtectedSchema, booleanSettingValueSchema, stringSettingValueSchema, mapsProviderSchema, themeDefaultSchema, matchingCountriesSchema, coordinatesMaxAgeSchema, genericSettingSchema, maintenanceSettingsSchema, bgLocationSettingsSchema, coordinateHistorySettingsSchema, nativeVersionSchema, urlSettingSchema } from "@shared/validators";
 import { eq, sql } from "drizzle-orm";
@@ -70,8 +71,20 @@ router.put("/toggle-protected", async (req: Request, res: Response) => {
   try {
     const parsedTp = toggleProtectedSchema.safeParse(req.body);
     if (!parsedTp.success) return sendError(res, 400, parsedTp.error.issues[0].message);
-    void parsedTp.data;
-    return sendSuccess(res);
+    const { key, value, adminPassword } = parsedTp.data;
+
+    if (key === "syneco_branding_visible") {
+      if (!adminPassword) return sendError(res, 400, "Password admin richiesta per questo toggle");
+      const userId = req.session?.userId;
+      if (!userId) return sendError(res, 401, "Non autenticato");
+      const user = await storage.getUser(userId);
+      if (!user) return sendError(res, 401, "Utente non trovato");
+      const valid = await bcrypt.compare(adminPassword, user.password);
+      if (!valid) return sendError(res, 403, "Password admin non valida");
+    }
+
+    const setting = await storage.upsertAppSetting(key, value);
+    return res.json(setting);
   } catch (error) {
     return sendError(res, 500, "Errore toggle protetto");
   }

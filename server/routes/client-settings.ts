@@ -163,9 +163,10 @@ export function registerClientSettingsRoutes(app: Express) {
   app.get("/api/settings/gps-required", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("gps_required");
-      res.json({ required: setting?.value !== "false" });
+      const enabled = setting?.value !== "false";
+      res.json({ enabled, required: enabled });
     } catch {
-      res.json({ required: true });
+      res.json({ enabled: true, required: true });
     }
   });
 

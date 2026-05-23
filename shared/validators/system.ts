@@ -55,7 +55,7 @@ export type DisableFeatureInput = z.infer<typeof disableFeatureSchema>;
 export const toggleProtectedSchema = z.object({
   key: z.string().min(1, "Chiave obbligatoria"),
   value: z.string(),
-  adminPassword: z.string().min(1, "Password admin richiesta"),
+  adminPassword: z.string().optional(),
 });
 export type ToggleProtectedInput = z.infer<typeof toggleProtectedSchema>;
 
