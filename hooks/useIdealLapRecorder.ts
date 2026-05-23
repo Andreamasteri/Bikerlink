@@ -1,5 +1,4 @@
 import { useRef, useCallback, useState, useEffect } from "react";
-import { Platform } from "react-native";
 import * as Location from "expo-location";
 import { Accelerometer } from "expo-sensors";
 import { apiRequest } from "@/lib/query-client";
@@ -33,12 +32,10 @@ export function useIdealLapRecorder(lapIndex: number) {
     setLapState("recording");
     setSampleCount(0);
 
-    if (Platform.OS !== "web") {
-      Accelerometer.setUpdateInterval(1000);
-      accelSubRef.current = Accelerometer.addListener((data) => {
-        accelRef.current = data;
-      });
-    }
+    Accelerometer.setUpdateInterval(1000);
+    accelSubRef.current = Accelerometer.addListener((data) => {
+      accelRef.current = data;
+    });
 
     try {
       const sub = await Location.watchPositionAsync(
@@ -60,12 +57,10 @@ export function useIdealLapRecorder(lapIndex: number) {
           if (speed != null && speed >= 0) sample.speed_kmh = speed * 3.6;
           if (altitude != null) sample.altitude_m = altitude;
           if (heading != null && heading >= 0) sample.heading = heading;
-          if (Platform.OS !== "web") {
-            sample.gforce_x = accel.x;
-            sample.gforce_y = accel.y;
-            sample.gforce_z = accel.z;
-            sample.lean_angle = calcLeanAngle(accel.x, accel.z);
-          }
+          sample.gforce_x = accel.x;
+          sample.gforce_y = accel.y;
+          sample.gforce_z = accel.z;
+          sample.lean_angle = calcLeanAngle(accel.x, accel.z);
 
           bufferRef.current.push(sample);
           setSampleCount(bufferRef.current.length);

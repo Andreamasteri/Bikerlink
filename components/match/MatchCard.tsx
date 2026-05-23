@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -136,7 +135,7 @@ const sheetStyles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingHorizontal: 24,
-    paddingBottom: Platform.OS === "web" ? 34 : 40,
+    paddingBottom: 40,
     paddingTop: 12,
     alignItems: "center",
   },

@@ -6,7 +6,6 @@ import {
   Alert,
   Linking,
   ActivityIndicator,
-  Platform,
 } from "react-native";
 import WebView from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -126,8 +125,8 @@ export default function NavigateScreen() {
   const locale = useLocale();
   const t = useT();
 
-  const topPad = Platform.OS === "web" ? 67 : insets.top;
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const topPad = insets.top;
+  const bottomPad = insets.bottom;
 
   const webViewRef = useRef<WebView>(null);
   const locationSubRef = useRef<Location.LocationSubscription | null>(null);

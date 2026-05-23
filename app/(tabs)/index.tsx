@@ -4,9 +4,6 @@ import {
   Text,
   ActivityIndicator,
   ScrollView,
-  TouchableOpacity,
-  Linking,
-  Platform,
   Animated,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -19,7 +16,6 @@ import MapSearchBar from "@/components/map/MapSearchBar";
 import AdBanner from "@/components/map/AdBanner";
 import { HomeHeader } from "@/components/home/HomeHeader";
 import { HomeStatsRow } from "@/components/home/HomeStatsRow";
-import { WebLocationNudges } from "@/components/home/WebLocationNudges";
 import { HomeMapSection } from "@/components/home/HomeMapSection";
 import { HomeModalsAndSheets } from "@/components/home/HomeModalsAndSheets";
 import { HomeFullscreenMap } from "@/components/home/HomeFullscreenMap";
@@ -34,10 +30,6 @@ export default function MapScreen() {
     user,
     authLoading,
     t,
-    contextPositionReady,
-    requestPermission,
-    locationPermissionDenied,
-    locationPermissionPrompt,
     mapFullscreen,
     setMapFullscreen,
     mapFullscreenReady,
@@ -80,8 +72,6 @@ export default function MapScreen() {
     setShowHomeMessage,
     lastSmallMapCenter,
     setLastSmallMapCenter,
-    showLocationNudge,
-    setShowLocationNudge,
     filterBiker,
     filterZavorrina,
     filterClubs,
@@ -92,8 +82,6 @@ export default function MapScreen() {
     toggleFilterEvents,
     location,
     locationLoading,
-    webMobilePosition,
-    webPhonePositionStatus,
     setLocation,
     mapData,
     saveCountries,
@@ -124,39 +112,6 @@ export default function MapScreen() {
   } = useHomeMapState();
 
   if (authLoading || locationLoading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color={Colors.accent} />
-        <Text style={styles.loadingText}>{t("map.loadingMap")}</Text>
-      </View>
-    );
-  }
-
-  if (Platform.OS === "web" && !location && !contextPositionReady) {
-    if (locationPermissionDenied) {
-      return (
-        <View style={styles.loading}>
-          <Ionicons name="location" size={56} color={Colors.error ?? "#e53935"} style={{ marginBottom: 20 }} />
-          <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "600", marginBottom: 8 }]}>{t("map.locationDeniedTitle")}</Text>
-          <Text style={[styles.loadingText, { fontSize: 14, opacity: 0.7, marginBottom: 28, textAlign: "center", paddingHorizontal: 32 }]}>{t("map.locationDeniedDesc")}</Text>
-          <TouchableOpacity onPress={() => Linking.openURL("https://support.google.com/chrome/answer/142065")} style={{ backgroundColor: Colors.accent, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 24 }}>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{t("map.openSettings")}</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-    if (locationPermissionPrompt) {
-      return (
-        <View style={styles.loading}>
-          <Ionicons name="location-outline" size={56} color={Colors.accent} style={{ marginBottom: 20 }} />
-          <Text style={[styles.loadingText, { fontSize: 18, fontWeight: "600", marginBottom: 8 }]}>{t("map.waitingLocationTitle")}</Text>
-          <Text style={[styles.loadingText, { fontSize: 14, opacity: 0.7, marginBottom: 28, textAlign: "center", paddingHorizontal: 32 }]}>{t("map.waitingLocationDesc")}</Text>
-          <TouchableOpacity onPress={requestPermission} style={{ backgroundColor: Colors.accent, paddingHorizontal: 28, paddingVertical: 12, borderRadius: 24 }}>
-            <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>{t("map.allowLocation")}</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
     return (
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={Colors.accent} />
@@ -220,17 +175,6 @@ export default function MapScreen() {
         setLastSmallMapCenter={setLastSmallMapCenter}
         smallMapInitialCenter={smallMapInitialCenter}
         setMapFullscreen={setMapFullscreen}
-      />
-
-      {/* Web location nudges */}
-      <WebLocationNudges
-        showLocationNudge={showLocationNudge}
-        onDismissNudge={() => setShowLocationNudge(false)}
-        webMobilePosition={webMobilePosition}
-        webPhonePositionStatus={webPhonePositionStatus}
-        onSetLocation={setLocation}
-        onFocusCoordinate={(pos) => mapRef.current?.focusOnCoordinate(pos)}
-        t={t}
       />
 
       {/* Stats Row */}

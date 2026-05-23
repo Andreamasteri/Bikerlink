@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, Modal,
-  ScrollView, StyleSheet, ActivityIndicator, Platform,
+  ScrollView, StyleSheet, ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation } from "@tanstack/react-query";
@@ -57,7 +57,7 @@ export function HazardReportSheet({ visible, onClose, userLocation }: HazardRepo
     slowdown: "#6A1B9A",
   };
 
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const bottomPad = insets.bottom;
 
   return (
     <Modal

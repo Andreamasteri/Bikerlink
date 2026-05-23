@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect } from "react";
-import { Platform } from "react-native";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
@@ -18,8 +17,6 @@ type Props = {
 type Result = {
   location: Coords | null;
   locationLoading: boolean;
-  webMobilePosition: Coords | null;
-  webPhonePositionStatus: "live" | "stale" | null;
   setLocation: (coords: Coords) => void;
   fetchGPSLocation: () => Promise<Coords | null>;
   handleCenterPosition: () => Promise<void>;
@@ -28,8 +25,6 @@ type Result = {
 export function useMapLocation({ userRegion, userCountry, profileLat, profileLng }: Props): Result {
   const [location, setLocation] = useState<Coords | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
-  const [webMobilePosition, setWebMobilePosition] = useState<Coords | null>(null);
-  const [webPhonePositionStatus, setWebPhonePositionStatus] = useState<"live" | "stale" | null>(null);
 
   const fetchGPSLocation = useCallback(async (): Promise<Coords | null> => {
     try {
@@ -73,51 +68,18 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
 
         sendStartupBeacon("fetch_gps_start");
 
-        if (Platform.OS !== "web") {
-          if (userRegion) {
-            if (!cancelled) setLocation((prev) => prev ?? getRegionCoordinates(userRegion!, userCountry));
-            if (!cancelled) setLocationLoading(false);
-            const gps = await fetchGPSLocation();
-            if (gps && !cancelled) setLocation(gps);
-            return;
-          }
-          if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
-            if (!cancelled) setLocation((prev) => prev ?? { latitude: Number(profileLat), longitude: Number(profileLng) });
-            if (!cancelled) setLocationLoading(false);
-            const gps = await fetchGPSLocation();
-            if (gps && !cancelled) setLocation(gps);
-            return;
-          }
-        }
-
-        if (Platform.OS === "web") {
-          let savedMobilePos: (Coords & { source: string | null }) | null = null;
-          try {
-            const res = await apiRequest("GET", "/api/user/position");
-            const data = await res.json();
-            if (data?.latitude != null && data?.longitude != null) {
-              savedMobilePos = { latitude: data.latitude, longitude: data.longitude, source: data.source ?? null };
-              if (!cancelled) setWebMobilePosition({ latitude: data.latitude, longitude: data.longitude });
-            }
-          } catch {
-            // no-op: ignore position fetch failures on web
-          }
-          try {
-            const lastPosRes = await apiRequest("GET", "/api/users/my-last-position");
-            const lastPosData = await lastPosRes.json();
-            if (!cancelled) setWebPhonePositionStatus(lastPosData?.available ? "live" : "stale");
-          } catch {
-            // no-op: ignore last position status fetch failures on web
-          }
-          if (savedMobilePos?.source === "live") {
-            if (!cancelled) { setLocation({ latitude: savedMobilePos.latitude, longitude: savedMobilePos.longitude }); setLocationLoading(false); }
-            return;
-          }
+        if (userRegion) {
+          if (!cancelled) setLocation((prev) => prev ?? getRegionCoordinates(userRegion!, userCountry));
+          if (!cancelled) setLocationLoading(false);
           const gps = await fetchGPSLocation();
-          if (cancelled) return;
-          if (gps) setLocation(gps);
-          else if (savedMobilePos) setLocation((prev) => prev ?? { latitude: savedMobilePos!.latitude, longitude: savedMobilePos!.longitude });
-          setLocationLoading(false);
+          if (gps && !cancelled) setLocation(gps);
+          return;
+        }
+        if (profileLat != null && profileLng != null && !isNaN(Number(profileLat)) && !isNaN(Number(profileLng))) {
+          if (!cancelled) setLocation((prev) => prev ?? { latitude: Number(profileLat), longitude: Number(profileLng) });
+          if (!cancelled) setLocationLoading(false);
+          const gps = await fetchGPSLocation();
+          if (gps && !cancelled) setLocation(gps);
           return;
         }
 
@@ -143,8 +105,6 @@ export function useMapLocation({ userRegion, userCountry, profileLat, profileLng
   return {
     location,
     locationLoading,
-    webMobilePosition,
-    webPhonePositionStatus,
     setLocation,
     fetchGPSLocation,
     handleCenterPosition,

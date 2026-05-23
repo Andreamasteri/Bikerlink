@@ -104,21 +104,6 @@ const styles = StyleSheet.create({
   locationNudgeHowBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: "#F59E0B22" },
   locationNudgeHowText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#F59E0B" },
   locationNudgeDismissBtn: { padding: 4 },
-  webMobilePositionBtn: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 10,
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    alignSelf: "flex-start" as const,
-  },
-  webMobilePositionBtnText: { fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.accent },
 });
 
 export default styles;

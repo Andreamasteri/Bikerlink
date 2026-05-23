@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from "react";
-import { Platform, AppState, type AppStateStatus } from "react-native";
+import { AppState, type AppStateStatus } from "react-native";
 import * as Location from "expo-location";
 import { Accelerometer } from "expo-sensors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -158,12 +158,10 @@ export function useTelemetry(isActive: boolean) {
     teardown();
 
     // Stop background task if it was running
-    if (Platform.OS !== "web") {
-      await stopTelemetryBackgroundTask();
-      // Drain any remaining background samples before clearing the session
-      await drainAndFlushBackgroundBuffer();
-      await AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY);
-    }
+    await stopTelemetryBackgroundTask();
+    // Drain any remaining background samples before clearing the session
+    await drainAndFlushBackgroundBuffer();
+    await AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY);
 
     await flush(true); // force-flush remaining foreground buffer
     sessionIdRef.current = null;
@@ -172,13 +170,11 @@ export function useTelemetry(isActive: boolean) {
 
   // ── start foreground location + accelerometer subscriptions ───────────────
   const startForegroundSubs = useCallback(async () => {
-    // Accelerometer at 1 Hz (native only)
-    if (Platform.OS !== "web") {
-      Accelerometer.setUpdateInterval(SAMPLE_INTERVAL_MS);
-      accelSubRef.current = Accelerometer.addListener((data) => {
-        accelRef.current = data;
-      });
-    }
+    // Accelerometer at 1 Hz
+    Accelerometer.setUpdateInterval(SAMPLE_INTERVAL_MS);
+    accelSubRef.current = Accelerometer.addListener((data) => {
+      accelRef.current = data;
+    });
 
     // GPS at 1 Hz
     try {
@@ -209,12 +205,10 @@ export function useTelemetry(isActive: boolean) {
           if (heading != null && heading >= 0) {
             sample.heading = heading;
           }
-          if (Platform.OS !== "web") {
-            sample.gforce_x   = accel.x;
-            sample.gforce_y   = accel.y;
-            sample.gforce_z   = accel.z;
-            sample.lean_angle = calcLeanAngle(accel.x, accel.z);
-          }
+          sample.gforce_x   = accel.x;
+          sample.gforce_y   = accel.y;
+          sample.gforce_z   = accel.z;
+          sample.lean_angle = calcLeanAngle(accel.x, accel.z);
 
           bufferRef.current.push(sample);
 
@@ -243,9 +237,7 @@ export function useTelemetry(isActive: boolean) {
     bufferRef.current    = [];
 
     // Persist session ID so the background task can tag its samples
-    if (Platform.OS !== "web") {
-      await AsyncStorage.setItem(BG_TELEMETRY_SESSION_KEY, sessionIdRef.current);
-    }
+    await AsyncStorage.setItem(BG_TELEMETRY_SESSION_KEY, sessionIdRef.current);
 
     await startForegroundSubs();
   }, [startForegroundSubs]);
@@ -275,16 +267,14 @@ export function useTelemetry(isActive: boolean) {
       // Flush whatever is in the foreground buffer before switching.
       await flush(true);
 
-      if (Platform.OS !== "web") {
-        const started = await startTelemetryBackgroundTask();
-        if (!started) {
-          // Background permission not granted — fall back to a full stop.
-          inBackgroundRef.current = false;
-          activeRef.current = false;
-          await AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY);
-          sessionIdRef.current = null;
-          bufferRef.current = [];
-        }
+      const started = await startTelemetryBackgroundTask();
+      if (!started) {
+        // Background permission not granted — fall back to a full stop.
+        inBackgroundRef.current = false;
+        activeRef.current = false;
+        await AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY);
+        sessionIdRef.current = null;
+        bufferRef.current = [];
       }
     });
   }, [enqueueTransition, flush, teardown]);
@@ -295,14 +285,12 @@ export function useTelemetry(isActive: boolean) {
       if (!activeRef.current || !inBackgroundRef.current) return;
       inBackgroundRef.current = false;
 
-      if (Platform.OS !== "web") {
-        // Stop the background task before restarting foreground subs.
-        // This must complete before we call startForegroundSubs so there is
-        // no window where both are running simultaneously.
-        await stopTelemetryBackgroundTask();
-        // Drain and flush background samples before restarting foreground.
-        await drainAndFlushBackgroundBuffer();
-      }
+      // Stop the background task before restarting foreground subs.
+      // This must complete before we call startForegroundSubs so there is
+      // no window where both are running simultaneously.
+      await stopTelemetryBackgroundTask();
+      // Drain and flush background samples before restarting foreground.
+      await drainAndFlushBackgroundBuffer();
 
       await startForegroundSubs();
     });
@@ -325,10 +313,8 @@ export function useTelemetry(isActive: boolean) {
       if (sessionIdRef.current && bufferRef.current.length > 0) {
         flush(true).catch(() => {});
       }
-      if (Platform.OS !== "web") {
-        stopTelemetryBackgroundTask().catch(() => {});
-        AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY).catch(() => {});
-      }
+      stopTelemetryBackgroundTask().catch(() => {});
+      AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY).catch(() => {});
       sessionIdRef.current = null;
       bufferRef.current = [];
     };

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { Platform, Linking, Alert, Animated } from "react-native";
+import { Linking, Alert, Animated } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { useLocationGate } from "@/lib/location-context";
@@ -60,8 +60,6 @@ export function useHomeMapState() {
   const [pendingHighlight, setPendingHighlight] = useState<{ lat: number; lng: number; userId: string } | null>(null);
   const [focusToast, setFocusToast] = useState<string | null>(null);
   const focusToastAnim = useRef(new Animated.Value(0)).current;
-  const [showLocationNudge, setShowLocationNudge] = useState(false);
-  const locationNudgeCheckedRef = useRef(false);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -83,7 +81,7 @@ export function useHomeMapState() {
 
   const typedUser = user as UserWithProfileCoords | null | undefined;
 
-  const { location, locationLoading, webMobilePosition, webPhonePositionStatus, setLocation } = useMapLocation({
+  const { location, locationLoading, setLocation } = useMapLocation({
     userRegion: user?.region,
     userCountry: user?.country,
     profileLat: typedUser?.profileLatitude,
@@ -209,23 +207,6 @@ export function useHomeMapState() {
     });
   }, []);
 
-  useEffect(() => {
-    if (Platform.OS !== "web") return;
-    if (locationNudgeCheckedRef.current) return;
-    if (locationLoading) return;
-    locationNudgeCheckedRef.current = true;
-    (async () => {
-      try {
-        const dismissed = await AsyncStorage.getItem("location_nudge_dismissed");
-        if (dismissed === "1") return;
-        if (!location && webPhonePositionStatus !== "live") {
-          setShowLocationNudge(true);
-        }
-      } catch {
-        // no-op: ignore storage read failures for location nudge
-      }
-    })();
-  }, [locationLoading, location, webPhonePositionStatus]);
 
   useEffect(() => {
     (async () => {
@@ -531,8 +512,6 @@ export function useHomeMapState() {
     setShowHomeMessage,
     lastSmallMapCenter,
     setLastSmallMapCenter,
-    showLocationNudge,
-    setShowLocationNudge,
     filterBiker,
     filterZavorrina,
     filterClubs,
@@ -543,8 +522,6 @@ export function useHomeMapState() {
     toggleFilterEvents,
     location,
     locationLoading,
-    webMobilePosition,
-    webPhonePositionStatus,
     setLocation,
     mapData,
     saveCountries,

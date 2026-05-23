@@ -105,7 +105,7 @@ export function HazardDetailSheet({ hazardId, onClose }: HazardDetailSheetProps)
     },
   });
 
-  const bottomPad = Platform.OS === "web" ? 34 : insets.bottom;
+  const bottomPad = insets.bottom;
   const accentColor = data ? (HAZARD_COLORS[data.hazard.type] ?? "#FF6F00") : "#FF6F00";
 
   const myExistingComment = data?.comments.find((c) => c.userId === user?.id);
