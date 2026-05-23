@@ -111,10 +111,8 @@ export function HazardDetailSheet({ hazardId, onClose }: HazardDetailSheetProps)
   const myExistingComment = data?.comments.find((c) => c.userId === user?.id);
 
   React.useEffect(() => {
-    if (myExistingComment) {
-      setCommentText(myExistingComment.text);
-    }
-  }, [myExistingComment?.id]);
+    setCommentText(myExistingComment ? myExistingComment.text : "");
+  }, [hazardId, myExistingComment?.id]);
 
   const visible = !!hazardId;
 
