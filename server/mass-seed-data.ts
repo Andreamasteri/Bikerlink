@@ -172,6 +172,67 @@ export const EUROPEAN_ZONES: EuropeanZone[] = [
   // ── KENYA (2 regioni) ─────────────────────────────────────────────────────
   { region: "Nairobi", country: "KE", lat: -1.29, lng: 36.82, spokenLanguages: ["English"] },
   { region: "Coast", country: "KE", lat: -3.30, lng: 40.03, spokenLanguages: ["English"] },
+
+  // ── STATI UNITI (8 aree) ────────────────────────────────────────────────────
+  { region: "California", country: "US", lat: 34.05, lng: -118.24, spokenLanguages: ["English"] },
+  { region: "Texas", country: "US", lat: 30.27, lng: -97.74, spokenLanguages: ["English"] },
+  { region: "New York", country: "US", lat: 40.71, lng: -74.01, spokenLanguages: ["English"] },
+  { region: "Florida", country: "US", lat: 25.77, lng: -80.19, spokenLanguages: ["English"] },
+  { region: "Illinois", country: "US", lat: 41.88, lng: -87.63, spokenLanguages: ["English"] },
+  { region: "Washington", country: "US", lat: 47.61, lng: -122.33, spokenLanguages: ["English"] },
+  { region: "Georgia", country: "US", lat: 33.75, lng: -84.39, spokenLanguages: ["English"] },
+  { region: "Michigan", country: "US", lat: 42.33, lng: -83.05, spokenLanguages: ["English"] },
+
+  // ── BRASILE (4 aree) ─────────────────────────────────────────────────────────
+  { region: "São Paulo", country: "BR", lat: -23.55, lng: -46.63, spokenLanguages: ["Português"] },
+  { region: "Rio de Janeiro", country: "BR", lat: -22.91, lng: -43.17, spokenLanguages: ["Português"] },
+  { region: "Minas Gerais", country: "BR", lat: -19.92, lng: -43.94, spokenLanguages: ["Português"] },
+  { region: "Bahia", country: "BR", lat: -12.97, lng: -38.50, spokenLanguages: ["Português"] },
+
+  // ── MESSICO (3 aree) ─────────────────────────────────────────────────────────
+  { region: "Ciudad de Mexico", country: "MX", lat: 19.43, lng: -99.13, spokenLanguages: ["Español"] },
+  { region: "Jalisco", country: "MX", lat: 20.67, lng: -103.35, spokenLanguages: ["Español"] },
+  { region: "Nuevo León", country: "MX", lat: 25.67, lng: -100.31, spokenLanguages: ["Español"] },
+
+  // ── CANADA (3 aree) ──────────────────────────────────────────────────────────
+  { region: "Ontario", country: "CA", lat: 43.65, lng: -79.38, spokenLanguages: ["English"] },
+  { region: "British Columbia", country: "CA", lat: 49.28, lng: -123.12, spokenLanguages: ["English"] },
+  { region: "Quebec", country: "CA", lat: 45.51, lng: -73.56, spokenLanguages: ["Français"] },
+
+  // ── ARGENTINA (2 aree) ───────────────────────────────────────────────────────
+  { region: "Buenos Aires", country: "AR", lat: -34.60, lng: -58.38, spokenLanguages: ["Español"] },
+  { region: "Córdoba", country: "AR", lat: -31.42, lng: -64.19, spokenLanguages: ["Español"] },
+
+  // ── TURCHIA (3 aree) ─────────────────────────────────────────────────────────
+  { region: "Istanbul", country: "TR", lat: 41.01, lng: 28.95, spokenLanguages: ["English"] },
+  { region: "Ankara", country: "TR", lat: 39.93, lng: 32.86, spokenLanguages: ["English"] },
+  { region: "Izmir", country: "TR", lat: 38.42, lng: 27.14, spokenLanguages: ["English"] },
+
+  // ── GIAPPONE (4 aree) ────────────────────────────────────────────────────────
+  { region: "Tokyo", country: "JP", lat: 35.69, lng: 139.69, spokenLanguages: ["English"] },
+  { region: "Osaka", country: "JP", lat: 34.69, lng: 135.50, spokenLanguages: ["English"] },
+  { region: "Aichi", country: "JP", lat: 35.18, lng: 136.91, spokenLanguages: ["English"] },
+  { region: "Kanagawa", country: "JP", lat: 35.45, lng: 139.64, spokenLanguages: ["English"] },
+
+  // ── COREA DEL SUD (2 aree) ───────────────────────────────────────────────────
+  { region: "Seoul", country: "KR", lat: 37.57, lng: 126.98, spokenLanguages: ["English"] },
+  { region: "Busan", country: "KR", lat: 35.18, lng: 129.07, spokenLanguages: ["English"] },
+
+  // ── CINA (4 aree) ────────────────────────────────────────────────────────────
+  { region: "Guangdong", country: "CN", lat: 23.13, lng: 113.26, spokenLanguages: ["English"] },
+  { region: "Shanghai", country: "CN", lat: 31.23, lng: 121.47, spokenLanguages: ["English"] },
+  { region: "Beijing", country: "CN", lat: 39.91, lng: 116.39, spokenLanguages: ["English"] },
+  { region: "Sichuan", country: "CN", lat: 30.66, lng: 104.07, spokenLanguages: ["English"] },
+
+  // ── UAE (1 area) ─────────────────────────────────────────────────────────────
+  { region: "Dubai", country: "AE", lat: 25.20, lng: 55.27, spokenLanguages: ["English"] },
+
+  // ── MAROCCO (2 aree) ─────────────────────────────────────────────────────────
+  { region: "Casablanca", country: "MA", lat: 33.59, lng: -7.62, spokenLanguages: ["English"] },
+  { region: "Marrakech", country: "MA", lat: 31.63, lng: -8.00, spokenLanguages: ["English"] },
+
+  // ── EGITTO (1 area) ──────────────────────────────────────────────────────────
+  { region: "Cairo", country: "EG", lat: 30.04, lng: 31.24, spokenLanguages: ["English"] },
 ];
 
 export const MALE_NAMES = [

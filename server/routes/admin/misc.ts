@@ -1,10 +1,11 @@
-import { sendError } from "../../lib/api-response";
+import { sendError, sendSuccess } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
 import { adCampaigns as adCampaignsTable, moderatorLogs, motoClubs, motoClubRequests } from "@shared/db";
 import { workshopSchema, easterEggSchema, easterEggBatchSchema, reportResolveSchema } from "@shared/validators";
 import { eq, sql, desc, inArray } from "drizzle-orm";
+import { massSeedFakeUsers, getMassSeedStatus } from "../../mass-seed";
 
 const router = Router();
 
@@ -122,6 +123,39 @@ router.get("/moderator-logs", async (req: Request, res: Response) => {
   } catch (error) {
     return sendError(res, 500, "Errore lettura log moderatori");
   }
+});
+
+// Mass seed
+router.post("/mass-seed-fake-users", async (_req: Request, res: Response) => {
+  try {
+    const status = await getMassSeedStatus();
+    if (status.running) return sendError(res, 409, "already_running");
+    massSeedFakeUsers().catch((e: unknown) => {
+      console.error("[mass-seed] background error:", e);
+    });
+    return sendSuccess(res, { status: "started" });
+  } catch (error) {
+    return sendError(res, 500, "Errore avvio mass seed");
+  }
+});
+
+router.get("/mass-seed-status", async (_req: Request, res: Response) => {
+  try {
+    const status = await getMassSeedStatus();
+    return sendSuccess(res, status as unknown as Record<string, unknown>);
+  } catch (error) {
+    return sendError(res, 500, "Errore lettura stato mass seed");
+  }
+});
+
+// GraphHopper status (stub — non configurato)
+router.get("/graphhopper-status", (_req: Request, res: Response) => {
+  return sendSuccess(res, { mode: "disabled", healthy: false, profile: null, reason: "Server GraphHopper non configurato" });
+});
+
+// Cache cleanup (stub — svuota cache in-memory future)
+router.post("/cache/cleanup", (_req: Request, res: Response) => {
+  return sendSuccess(res, { cleaned: true });
 });
 
 export default router;

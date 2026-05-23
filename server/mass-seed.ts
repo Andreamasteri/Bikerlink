@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { db } from "./db";
+import { db, pool } from "./db";
 import { storage } from "./storage";
 import {
   users, userProfiles, userMotorcycles, zavarrinaWishlistMotos,
@@ -52,6 +52,18 @@ function logSeedError(context: string, err: unknown): void {
   console.error(`[mass-seed] ${entry}`);
 }
 
+async function cleanAllFakeUsers(): Promise<void> {
+  console.log("[mass-seed] Cleaning all fake users from DB...");
+  await pool.query("DELETE FROM users WHERE is_fake = true");
+  await pool.query(`
+    DELETE FROM conversations
+    WHERE id NOT IN (
+      SELECT DISTINCT conversation_id FROM conversation_participants
+    )
+  `);
+  console.log("[mass-seed] Fake user cleanup complete.");
+}
+
 export async function massSeedFakeUsers(): Promise<void> {
   if (massSeedStatus.running) return;
 
@@ -64,6 +76,8 @@ export async function massSeedFakeUsers(): Promise<void> {
 
   try {
     await storage.upsertAppSetting("skip_fake_user_seed", "false");
+
+    await cleanAllFakeUsers();
 
     await cleanupOldSeedUsers(logSeedError);
 
