@@ -182,7 +182,6 @@ export function registerExpoUpdatesRoutes(app: Express) {
 
       let rawDeviceId: string | null =
         (req.headers["expo-device-id"] as string | undefined) ||
-        (req.headers["expo-installation-id"] as string | undefined) ||
         null;
       if (rawDeviceId === "extra-params") {
         try {
@@ -197,6 +196,12 @@ export function registerExpoUpdatesRoutes(app: Express) {
         } catch {
           rawDeviceId = null;
         }
+      }
+      // Fallback: if expo-device-id was "extra-params" but expo-extra-params header was
+      // absent (or unparseable), try expo-installation-id as a last resort.
+      // Also covers SDK versions that only send expo-installation-id without expo-device-id.
+      if (!rawDeviceId) {
+        rawDeviceId = (req.headers["expo-installation-id"] as string | undefined) || null;
       }
       const deviceId = rawDeviceId?.substring(0, 128) || null;
       console.log(`[expo-updates] device-id resolved: "${deviceId ?? "null"}" (expo-device-id="${(req.headers["expo-device-id"] as string | undefined) ?? ""}" expo-installation-id="${(req.headers["expo-installation-id"] as string | undefined) ?? ""}")`);
