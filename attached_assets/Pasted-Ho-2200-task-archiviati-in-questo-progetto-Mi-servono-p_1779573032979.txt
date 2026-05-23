@@ -1,0 +1,59 @@
+Ho ~2200 task archiviati in questo progetto. Mi servono per ricostruire 
+la storia di BikerLink in un altro progetto Replit.
+
+Per favore, fai questo:
+
+1. Trova come Replit conserva i task archiviati di questo progetto.
+   Controlla in ordine:
+   a. La skill `project_tasks` per capire dove sta lo storage dei task
+   b. La cartella `.local/state/replit/` per file di stato dei task
+   c. Eventuali API o tool a tua disposizione per elencarli
+   Dimmi cosa hai trovato PRIMA di andare avanti, così confermo.
+
+2. Una volta individuata la fonte, scrivi uno script 
+   `scripts/src/export-tasks.ts` che:
+   - elenca tutti i task (titolo, data, stato, prompt iniziale, 
+     eventuale riassunto / output)
+   - li ordina cronologicamente
+   - per ogni task estrae solo:
+     * titolo
+     * data
+     * la richiesta dell'utente (il prompt iniziale)
+     * un riassunto di 2-4 righe del risultato (se troppo lungo, 
+       riassumi tu)
+   - scrive tutto in `exports/bikerlink-tasks.md` con questa struttura:
+
+     # BikerLink — storia per task
+     _esportato <ISO timestamp> — N task totali_
+     
+     ## YYYY-MM-DD — <titolo task>
+     **Richiesta:** ...
+     **Risultato:** ...
+     
+     ---
+
+3. Aggiungi una route Express NUOVA E ISOLATA:
+   `GET /api/_internal/tasks-export`
+   - Richiede header `Authorization: Bearer <CHAT_EXPORT_TOKEN>` 
+     (secret nuovo da creare con lo skill environment-secrets, 
+     valore lungo e casuale, NON stamparmelo)
+   - Confronto del token a tempo costante
+   - Risponde con il contenuto di `exports/bikerlink-tasks.md` 
+     come `text/markdown; charset=utf-8`
+   - NON inserire questa route nell'OpenAPI spec
+   - Mettila in `routes/_internal.ts` e montala separatamente
+
+4. Esegui lo script una volta, verifica con curl locale che il 401 
+   e il 200 funzionino, e poi dimmi:
+   - quanti task sono stati esportati
+   - dimensione del file in KB / MB
+   - la base URL pubblica del progetto (`$REPLIT_DOMAINS`)
+   - di non scrivere il token in chat
+
+5. Se la dimensione totale supera 5 MB, dividi l'output in più file 
+   `bikerlink-tasks-part-01.md`, `part-02.md`, ecc. (max ~2 MB l'uno) 
+   e fai in modo che la route accetti `?part=01` per servirli uno alla 
+   volta. Dimmi quante parti hai prodotto.
+
+Non fare niente di più: niente UI, niente cron, niente database. 
+Solo lo script di export + l'endpoint protetto.

@@ -593,3 +593,9 @@ id = "rC7Qm0uIshefO9bhhdp1A"
 uri = "file://attached_assets/mockup-status-group-affiancato.png"
 type = "image"
 title = "Mockup — Status group affiancato (Ready screen)"
+
+[[outputs]]
+id = "wBBrFls6jNbV_lsLYTabL"
+uri = "file://exports/bikerlink-chat-history.md"
+type = "text"
+title = "BikerLink — Storia chat (23 mag 2026)"
