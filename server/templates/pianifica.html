@@ -812,8 +812,8 @@ function resetPlanner() {
   currentParsed = null;
   isStreaming = false;
   document.getElementById('save-bar').classList.remove('show');
-  document.getElementById('details-body').innerHTML = '<div class="details-empty"><p style="font-size:14px;color:var(--text3)">I dettagli appariranno al completamento dell\'analisi AI</p></div>';
-  document.getElementById('log-stream').innerHTML = '<div class="log-empty"><div class="log-empty-icon">💬</div><p>L\'output dell\'AI apparirà qui in tempo reale</p></div>';
+  document.getElementById('details-body').innerHTML = "<div class=\"details-empty\"><p style=\"font-size:14px;color:var(--text3)\">I dettagli appariranno al completamento dell'analisi AI</p></div>";
+  document.getElementById('log-stream').innerHTML = "<div class=\"log-empty\"><div class=\"log-empty-icon\">💬</div><p>L'output dell'AI apparirà qui in tempo reale</p></div>";
   setBadge('log-badge', 'In attesa', false);
   setBadge('details-badge', 'In attesa', false);
   setBadge('map-badge', 'In attesa', false);
@@ -827,7 +827,7 @@ function resetPlanner() {
 
 function resetPanels() {
   document.getElementById('save-bar').classList.remove('show');
-  document.getElementById('details-body').innerHTML = '<div class="details-empty"><p style="font-size:14px;color:var(--text3)">I dettagli appariranno al completamento dell\'analisi AI</p></div>';
+  document.getElementById('details-body').innerHTML = "<div class=\"details-empty\"><p style=\"font-size:14px;color:var(--text3)\">I dettagli appariranno al completamento dell'analisi AI</p></div>";
   setBadge('details-badge', 'In attesa', false);
   setBadge('map-badge', 'In attesa', false);
   if (leafletMap && markerLayer) { leafletMap.removeLayer(markerLayer); markerLayer = null; }

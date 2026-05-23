@@ -1357,7 +1357,7 @@ async function deleteRoute(id) {
       const el = document.getElementById(`route-item-${id}`);
       if (el) el.remove();
     } else {
-      alert('Errore durante l\'eliminazione del giro.');
+      alert("Errore durante l'eliminazione del giro.");
     }
   } catch {
     alert('Errore di rete, riprova.');
@@ -1859,7 +1859,7 @@ async function loadApkUrlSetting() {
         sourceEl.textContent = '✓ URL caricato dal database';
         sourceEl.style.color = 'var(--success)';
       } else if (data.source === 'env') {
-        sourceEl.textContent = 'ℹ URL caricato dalla variabile d\'ambiente (nessun valore nel DB)';
+        sourceEl.textContent = "ℹ URL caricato dalla variabile d'ambiente (nessun valore nel DB)";
         sourceEl.style.color = 'var(--text3)';
       } else {
         sourceEl.textContent = '⚠ Nessun URL configurato — /api/download/apk/latest risponde 404';
@@ -2068,7 +2068,7 @@ async function uploadLandingImage(input, slot, urlInputId, previewId) {
     });
     const data = await res.json();
     if (!res.ok) {
-      showAlert('settings-alert', data.message || 'Errore durante l\'upload');
+      showAlert('settings-alert', data.message || "Errore durante l'upload");
     } else {
       showAlert('settings-alert', 'File caricato e salvato. La landing è già aggiornata.', 'success');
       const urlInput = document.getElementById(urlInputId);
@@ -2076,7 +2076,7 @@ async function uploadLandingImage(input, slot, urlInputId, previewId) {
       updateLandingPreview(previewId, data.url);
     }
   } catch {
-    showAlert('settings-alert', 'Errore di rete durante l\'upload.');
+    showAlert('settings-alert', "Errore di rete durante l'upload.");
   }
   input.value = '';
 }

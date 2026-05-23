@@ -19,6 +19,12 @@ cd "$PROJECT_ROOT"
 
 mkdir -p "$DIST_DIR"
 
+# ── SAFETY CHECK: apostrophes in inline <script> blocks ──────────────────────
+# Runs unconditionally (even on cache hits) so a bad pattern is caught
+# immediately, before serving broken HTML to the browser.
+log_phase "Controllo apostrofi nelle inline <script>..."
+bash "$SCRIPT_DIR/check-script-apostrophes.sh"
+
 compute_checksum() {
   find server/ shared/ -name '*.ts' -not -path '*/node_modules/*' 2>/dev/null \
     | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}'
