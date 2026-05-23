@@ -132,6 +132,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   var markersLayer = L.layerGroup().addTo(map);
   var circlesLayer = L.layerGroup().addTo(map);
   var pulseLayer = L.layerGroup().addTo(map);
+  var hazardsLayer = L.layerGroup().addTo(map);
   var userDotMarker = null;
   var userPositions = {};
   var speedProfileUserPositions = [];
@@ -558,6 +559,50 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     centerOnUser: function(lat, lng) {
       var z = map.getZoom();
       map.setView([lat, lng], z < 13 ? 13 : z, { animate: true });
+    },
+
+    updateHazards: function(jsonStr) {
+      hazardsLayer.clearLayers();
+      var hazards;
+      try { hazards = JSON.parse(jsonStr); } catch(e) { return; }
+      if (!Array.isArray(hazards)) return;
+      var hazardColors = {
+        oil: "#FF6F00", gravel: "#795548", animals: "#2E7D32",
+        roadwork: "#F57C00", wet: "#1565C0", accident: "#C62828",
+        fog: "#546E7A", slowdown: "#6A1B9A"
+      };
+      var hazardIcons = {
+        oil: "🛢️", gravel: "🪨", animals: "🦌", roadwork: "🚧",
+        wet: "💧", accident: "🚨", fog: "🌫️", slowdown: "🐢"
+      };
+      hazards.forEach(function(h) {
+        var emoji = hazardIcons[h.type] || "⚠️";
+        var bg = hazardColors[h.type] || "#FF6F00";
+        var count = h.confirmCount || 0;
+        var countBadge = count > 0
+          ? "<div style=\\"position:absolute;top:-5px;right:-5px;background:#fff;" +
+            "border-radius:8px;padding:0 4px;font-size:9px;font-weight:800;color:" + bg + ";" +
+            "border:1px solid " + bg + ";line-height:16px;min-width:14px;text-align:center;\\">" +
+            count + "</div>"
+          : "";
+        var html = "<div style=\\"position:relative;display:inline-flex;flex-direction:column;" +
+          "align-items:center;\\">" +
+          "<div style=\\"background:" + bg + ";border-radius:22px;padding:4px 6px;" +
+          "border:2px solid rgba(255,255,255,0.9);box-shadow:0 2px 6px rgba(0,0,0,0.5);" +
+          "font-size:18px;line-height:1;position:relative;\\">" +
+          emoji + countBadge + "</div>" +
+          "<div style=\\"width:0;height:0;border-left:5px solid transparent;" +
+          "border-right:5px solid transparent;border-top:7px solid " + bg + ";" +
+          "margin-top:-1px;\\"></div></div>";
+        var m = L.marker([h.lat, h.lng], {
+          icon: L.divIcon({ html: html, className: "", iconSize: [36, 44], iconAnchor: [18, 44] }),
+          zIndexOffset: 500
+        });
+        m.addTo(hazardsLayer);
+        m.on("click", function() {
+          postMsg({ type: "markerPress", markerType: "hazard", id: h.id });
+        });
+      });
     }
   };
 

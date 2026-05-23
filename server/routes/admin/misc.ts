@@ -2,9 +2,9 @@ import { sendError, sendSuccess } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { adCampaigns as adCampaignsTable, moderatorLogs, motoClubs, motoClubRequests } from "@shared/db";
+import { adCampaigns as adCampaignsTable, moderatorLogs, motoClubs, motoClubRequests, roadHazards as roadHazardsTable } from "@shared/db";
 import { workshopSchema, easterEggSchema, easterEggBatchSchema, reportResolveSchema } from "@shared/validators";
-import { eq, sql, desc, inArray } from "drizzle-orm";
+import { eq, sql, desc, inArray, isNull } from "drizzle-orm";
 import { massSeedFakeUsers, getMassSeedStatus } from "../../mass-seed";
 import { setMotionEnabled, getMotionStatus } from "../../motion-simulator";
 
@@ -157,6 +157,78 @@ router.get("/graphhopper-status", (_req: Request, res: Response) => {
 // Cache cleanup (stub — svuota cache in-memory future)
 router.post("/cache/cleanup", (_req: Request, res: Response) => {
   return sendSuccess(res, { cleaned: true });
+});
+
+// ── Road hazards admin endpoints ─────────────────────────────────────────────
+
+router.get("/settings/road-hazards-enabled", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("road_hazards_enabled");
+    return sendSuccess(res, { enabled: setting?.value !== "false" });
+  } catch {
+    return sendError(res, 500, "Errore lettura impostazione");
+  }
+});
+
+router.post("/settings/road-hazards-enabled", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") return sendError(res, 400, "Campo 'enabled' booleano richiesto");
+    await storage.upsertAppSetting("road_hazards_enabled", enabled ? "true" : "false");
+    return sendSuccess(res, { enabled });
+  } catch {
+    return sendError(res, 500, "Errore aggiornamento impostazione");
+  }
+});
+
+router.get("/road-hazards", async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const now = new Date();
+    const rows = await db
+      .select()
+      .from(roadHazardsTable)
+      .where(isNull(roadHazardsTable.deletedAt))
+      .orderBy(desc(roadHazardsTable.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const [{ count }] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(roadHazardsTable)
+      .where(isNull(roadHazardsTable.deletedAt));
+
+    return sendSuccess(res, { hazards: rows, total: Number(count) });
+  } catch (err) {
+    console.error("[admin road-hazards] GET error:", err);
+    return sendError(res, 500, "Errore lettura segnalazioni");
+  }
+});
+
+router.post("/road-hazards/:id/approve", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.update(roadHazardsTable)
+      .set({ isApproved: true })
+      .where(eq(roadHazardsTable.id, id));
+    return sendSuccess(res, { approved: true });
+  } catch {
+    return sendError(res, 500, "Errore approvazione");
+  }
+});
+
+router.delete("/road-hazards/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    await db.update(roadHazardsTable)
+      .set({ deletedAt: new Date() })
+      .where(eq(roadHazardsTable.id, id));
+    return sendSuccess(res, { deleted: true });
+  } catch {
+    return sendError(res, 500, "Errore eliminazione");
+  }
 });
 
 // ── Motion simulator — spec-required paths (/api/admin/motion/*) ─────────────

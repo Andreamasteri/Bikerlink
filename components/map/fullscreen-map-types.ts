@@ -52,4 +52,5 @@ export type FullscreenMapModalProps = {
   getUserIcon: (u: MapUser) => "people" | "person" | "bicycle";
   getUserColor: (u: MapUser) => string;
   getUserTypeLabel: (u: MapUser) => string;
+  showHazardReportButton?: boolean;
 };

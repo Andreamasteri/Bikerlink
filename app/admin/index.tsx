@@ -209,6 +209,7 @@ const adminGroups: AdminGroup[] = [
       { key: "eventi", label: "Raduni", icon: "calendar", iconSet: "Ionicons", route: "/admin/eventi" },
       { key: "easter-eggs", label: "Easter Eggs", icon: "egg-easter", iconSet: "MaterialCommunityIcons", route: "/admin/easter-eggs" },
       { key: "ads", label: "Campagne", icon: "campaign", iconSet: "MaterialIcons", route: "/admin/ads" },
+      { key: "road-hazards", label: "Segnalazioni Stradali", icon: "alert-rhombus-outline", iconSet: "MaterialCommunityIcons", route: "/admin/road-hazards", accentColor: "#f59e0b" },
     ],
   },
   {

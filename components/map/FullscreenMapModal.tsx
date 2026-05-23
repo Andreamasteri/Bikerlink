@@ -58,6 +58,7 @@ export default function FullscreenMapModal({
   isReady,
   getUserIcon,
   getUserColor,
+  showHazardReportButton = false,
   getUserTypeLabel,
 }: Props) {
   const t = useT();
@@ -96,6 +97,7 @@ export default function FullscreenMapModal({
             initialCenterOverride={initialCenterOverride}
             onRegionChangeComplete={onRegionChangeComplete}
             onReady={onMapReady}
+            showHazardReportButton={showHazardReportButton}
           />
         ) : (
           <View style={styles.placeholder}>

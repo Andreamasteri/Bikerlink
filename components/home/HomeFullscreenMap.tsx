@@ -170,6 +170,7 @@ export const HomeFullscreenMap: React.FC<HomeFullscreenMapProps> = ({
       getUserIcon={getUserIcon}
       getUserColor={getUserColor}
       getUserTypeLabel={(u) => getUserTypeLabel(u, t)}
+      showHazardReportButton={true}
     />
   );
 };

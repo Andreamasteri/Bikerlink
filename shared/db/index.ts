@@ -16,3 +16,4 @@ export * from "./ota";
 export * from "./music";
 export * from "./events";
 export * from "./gps";
+export * from "./road-hazards";
