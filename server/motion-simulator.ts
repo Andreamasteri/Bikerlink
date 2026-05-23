@@ -4,9 +4,12 @@
  *
  * - Each fake user gets a per-session schedule: alternating drive/rest slots
  *   summing to ~18h drive / 6h rest over 24h.
- * - Two movement modes per drive slot:
- *     "short"  — small deltas (0.005°–0.015°/cycle), local ride 30-100 km
- *     "long"   — large deltas (0.05°–0.15°/cycle), fixed heading, 200-500 km
+ * - Each drive slot is assigned a speed profile: city (30–60 km/h),
+ *   highway (90–130 km/h), or mountain (20–50 km/h).
+ * - Deltas are computed from speed × cycle_interval (physics-correct) rather
+ *   than raw random degree offsets, eliminating impossible speed jumps.
+ * - Speed varies smoothly within a slot via a per-cycle acceleration step,
+ *   targeting a random speed within the profile range.
  * - 35% of users are grouped in convoys of 5/10/20; groups form at the START
  *   of each drive slot among users who just entered that slot. Users already
  *   mid-slot are NOT regrouped.
@@ -28,7 +31,36 @@ interface Slot {
   durationMs: number;
 }
 
-type MoveMode = "short" | "long";
+/** Italian road speed profiles */
+export type SpeedProfile = "city" | "highway" | "mountain";
+
+/**
+ * Physical characteristics of each speed profile.
+ * accelKphPerCycle: max speed change allowed in one 30 s tick (smooth curve).
+ * fixedHeading: true for highways (straight), false for city/mountain (winding).
+ */
+export interface SpeedProfileConfig {
+  minKph: number;
+  maxKph: number;
+  accelKphPerCycle: number;
+  fixedHeading: boolean;
+}
+
+export const SPEED_PROFILES: Record<SpeedProfile, SpeedProfileConfig> = {
+  city:     { minKph: 30,  maxKph: 60,  accelKphPerCycle: 10, fixedHeading: false },
+  highway:  { minKph: 90,  maxKph: 130, accelKphPerCycle: 15, fixedHeading: true  },
+  mountain: { minKph: 20,  maxKph: 50,  accelKphPerCycle: 8,  fixedHeading: false },
+};
+
+/**
+ * Profile selection weights for Italian roads.
+ * city 50 %, highway 30 %, mountain 20 %.
+ */
+const PROFILE_WEIGHTS: Array<{ profile: SpeedProfile; weight: number }> = [
+  { profile: "city",     weight: 0.50 },
+  { profile: "highway",  weight: 0.30 },
+  { profile: "mountain", weight: 0.20 },
+];
 
 interface UserMotionState {
   userId: string;
@@ -38,8 +70,12 @@ interface UserMotionState {
   scheduleStartMs: number;
   /** Index of the slot the user is currently in */
   currentSlotIdx: number;
-  /** Mode for the current drive slot (assigned fresh on each slot transition) */
-  mode: MoveMode;
+  /** Speed profile for the current drive slot */
+  speedProfile: SpeedProfile;
+  /** Current speed in km/h (varies smoothly within profile range) */
+  currentSpeedKph: number;
+  /** Target speed the current cycle is accelerating/decelerating toward */
+  targetSpeedKph: number;
   headingRad: number;
   /** Small positional offset within a convoy (~±0.001°) */
   offsetLat: number;
@@ -55,6 +91,9 @@ let _lastCycleAt: Date | null = null;
 let _totalCycles = 0;
 
 export const MOTION_CRON_INTERVAL_MS = 30_000;
+
+/** Metres per degree of latitude (constant). */
+const KM_PER_LAT_DEG = 111.32;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -147,12 +186,50 @@ function randHeading(): number {
   return Math.random() * 2 * Math.PI;
 }
 
-/** Assign a fresh mode and heading to a user entering a new drive slot. */
+/**
+ * Pick a speed profile using the configured weighted distribution.
+ * Exported for unit testing.
+ */
+export function pickSpeedProfile(): SpeedProfile {
+  const r = Math.random();
+  let cumulative = 0;
+  for (const { profile, weight } of PROFILE_WEIGHTS) {
+    cumulative += weight;
+    if (r < cumulative) return profile;
+  }
+  return "city";
+}
+
+/** Pick a random starting speed within the given profile range. */
+function randSpeedForProfile(profile: SpeedProfile): number {
+  const cfg = SPEED_PROFILES[profile];
+  return rand(cfg.minKph, cfg.maxKph);
+}
+
+/** Assign a fresh speed profile, heading, and speed to a user entering a new drive slot. */
 function assignFreshDriveParams(state: UserMotionState): void {
-  state.mode = Math.random() < 0.5 ? "short" : "long";
+  state.speedProfile = pickSpeedProfile();
   state.headingRad = randHeading();
   state.offsetLat = 0;
   state.offsetLng = 0;
+  state.currentSpeedKph = randSpeedForProfile(state.speedProfile);
+  state.targetSpeedKph  = randSpeedForProfile(state.speedProfile);
+}
+
+/**
+ * Advance currentSpeedKph one step toward targetSpeedKph, capped by
+ * the profile's accelKphPerCycle.  When close to target, pick a new target.
+ */
+function stepSpeed(state: UserMotionState): void {
+  const cfg = SPEED_PROFILES[state.speedProfile];
+  const diff = state.targetSpeedKph - state.currentSpeedKph;
+  const step = Math.min(Math.abs(diff), cfg.accelKphPerCycle) * Math.sign(diff);
+  state.currentSpeedKph = Math.max(cfg.minKph, Math.min(cfg.maxKph, state.currentSpeedKph + step));
+
+  // When within 2 km/h of the target, pick a new random target
+  if (Math.abs(state.targetSpeedKph - state.currentSpeedKph) < 2) {
+    state.targetSpeedKph = randSpeedForProfile(state.speedProfile);
+  }
 }
 
 /**
@@ -175,16 +252,19 @@ function formConvoysForNewSlot(newDriveUsers: UserMotionState[]): void {
     // Only form exact-sized convoys (5, 10, or 20). Skip leftover fragments.
     if (members.length < size) break;
 
-    // Leader's state defines group mode, heading, and anchor position
+    // Leader's state defines group profile, heading, and anchor position
     const leader = members[0];
-    const groupMode: MoveMode = leader.mode;
+    const groupProfile: SpeedProfile = leader.speedProfile;
     const groupHeading = leader.headingRad;
     const anchorLat = leader.lat;
     const anchorLng = leader.lng;
 
     for (const m of members) {
-      m.mode = groupMode;
+      m.speedProfile = groupProfile;
       m.headingRad = groupHeading;
+      // Start convoy members at a random speed within the shared profile
+      m.currentSpeedKph = randSpeedForProfile(groupProfile);
+      m.targetSpeedKph  = randSpeedForProfile(groupProfile);
       // Cluster members tightly around leader anchor (~±0.001° ≈ 100 m).
       // The base position (m.lat/m.lng) is stored WITHOUT the offset so that
       // runCycle's "effectiveLat = state.lat + state.offsetLat" does not
@@ -199,27 +279,42 @@ function formConvoysForNewSlot(newDriveUsers: UserMotionState[]): void {
 }
 
 /**
- * Apply a movement delta to (lat, lng) given mode & heading.
- * For "short" mode, heading is randomised per-cycle (local winding ride).
- * For "long" mode, heading is fixed for the entire slot (straight transfer).
+ * Apply a physics-correct movement delta to (lat, lng).
+ *
+ * Distance is derived from currentSpeedKph × cycle interval, converting
+ * km/h → km/cycle → degrees via the local scale factors.
+ * City and mountain profiles use a randomised heading each cycle (winding
+ * roads).  Highway uses the fixed slot heading (straight corridor).
+ *
+ * Longitude degrees shrink toward the poles: 1° lng ≈ 111.32 × cos(lat) km.
  */
 function applyDelta(
   lat: number,
   lng: number,
-  mode: MoveMode,
-  headingRad: number,
-): { lat: number; lng: number; headingUsed: number } {
-  const effectiveHeading = mode === "short" ? randHeading() : headingRad;
-  const dist = mode === "short"
-    ? rand(0.005, 0.015)
-    : rand(0.05, 0.15);
+  state: UserMotionState,
+): { lat: number; lng: number } {
+  // Advance speed smoothly before computing the displacement
+  stepSpeed(state);
 
-  const dlat = dist * Math.cos(effectiveHeading);
-  const dlng = dist * Math.sin(effectiveHeading);
+  const cfg = SPEED_PROFILES[state.speedProfile];
+  const intervalSeconds = MOTION_CRON_INTERVAL_MS / 1000;
+
+  // Physical distance covered this cycle (km)
+  const distKm = (state.currentSpeedKph / 3600) * intervalSeconds;
+
+  // Heading: highways keep a fixed bearing, city/mountain wind randomly
+  const effectiveHeading = cfg.fixedHeading ? state.headingRad : randHeading();
+
+  // Convert km → degrees (latitude is uniform; longitude depends on lat)
+  const latRad = (lat * Math.PI) / 180;
+  const kmPerLngDeg = KM_PER_LAT_DEG * Math.cos(latRad);
+
+  const dlat = (distKm * Math.cos(effectiveHeading)) / KM_PER_LAT_DEG;
+  const dlng = (distKm * Math.sin(effectiveHeading)) / (kmPerLngDeg || 1);
 
   const newLat = Math.max(-85, Math.min(85, lat + dlat));
   const newLng = ((lng + dlng + 180) % 360 + 360) % 360 - 180;
-  return { lat: newLat, lng: newLng, headingUsed: effectiveHeading };
+  return { lat: newLat, lng: newLng };
 }
 
 // ── Initialization ───────────────────────────────────────────────────────────
@@ -254,15 +349,17 @@ async function loadFakeUsers(): Promise<void> {
     const schedule = generateSchedule();
     // Stagger start times so not all users are in the same slot phase
     const scheduleStartMs = nowMs - rand(0, 24 * 60 * 60 * 1000);
-    const initIdx = 0; // will be resolved on first cycle
+    const initProfile = pickSpeedProfile();
     newStates.set(row.id, {
       userId: row.id,
       lat,
       lng,
       schedule,
       scheduleStartMs,
-      currentSlotIdx: initIdx,
-      mode: Math.random() < 0.5 ? "short" : "long",
+      currentSlotIdx: 0, // resolved on first cycle
+      speedProfile: initProfile,
+      currentSpeedKph: randSpeedForProfile(initProfile),
+      targetSpeedKph:  randSpeedForProfile(initProfile),
       headingRad: randHeading(),
       offsetLat: 0,
       offsetLng: 0,
@@ -322,7 +419,7 @@ async function runCycleInner(): Promise<void> {
       state.currentSlotIdx = newIdx;
       const newSlot = state.schedule[newIdx];
       if (newSlot.kind === "drive") {
-        // Entering a new drive slot — assign fresh mode and heading
+        // Entering a new drive slot — assign fresh speed profile and heading
         assignFreshDriveParams(state);
         newDriveUsers.push(state);
       }
@@ -334,7 +431,7 @@ async function runCycleInner(): Promise<void> {
     formConvoysForNewSlot(newDriveUsers);
   }
 
-  // Step 3: compute and apply deltas for all currently-in-drive users
+  // Step 3: compute and apply physics-based deltas for all currently-in-drive users
   const movingIds: string[] = [];
   const updates: Array<{ userId: string; lat: number; lng: number }> = [];
 
@@ -344,10 +441,9 @@ async function runCycleInner(): Promise<void> {
 
     const effectiveLat = state.lat + state.offsetLat;
     const effectiveLng = state.lng + state.offsetLng;
-    const { lat, lng } = applyDelta(effectiveLat, effectiveLng, state.mode, state.headingRad);
+    const { lat, lng } = applyDelta(effectiveLat, effectiveLng, state);
 
     // Move the base position (without offset) so future cycles are coherent.
-    // headingUsed is ignored here — short mode re-randomises every call anyway.
     state.lat = lat - state.offsetLat;
     state.lng = lng - state.offsetLng;
 
@@ -430,13 +526,22 @@ export async function setMotionEnabled(enabled: boolean): Promise<void> {
 
 export function getMotionStatus() {
   let movingCount = 0;
+  const profileCounts: Record<SpeedProfile, number> = { city: 0, highway: 0, mountain: 0 };
+  let speedSum = 0;
+  let speedCount = 0;
+
   if (_enabled) {
     for (const s of _userStates.values()) {
       const slot = s.schedule[s.currentSlotIdx];
-      if (slot && slot.kind === "drive") movingCount++;
+      if (slot && slot.kind === "drive") {
+        movingCount++;
+        profileCounts[s.speedProfile]++;
+        speedSum += s.currentSpeedKph;
+        speedCount++;
+      }
     }
   }
-  // When disabled every fake user is effectively stationary
+
   const restingNow = _userStates.size - movingCount;
 
   return {
@@ -446,6 +551,12 @@ export function getMotionStatus() {
     restingNow,
     lastCycleAt: _lastCycleAt?.toISOString() ?? null,
     totalCycles: _totalCycles,
+    speedDistribution: {
+      city: profileCounts.city,
+      highway: profileCounts.highway,
+      mountain: profileCounts.mountain,
+    },
+    averageSpeedKph: speedCount > 0 ? Math.round(speedSum / speedCount) : 0,
   };
 }
 
