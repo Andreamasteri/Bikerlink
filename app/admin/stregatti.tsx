@@ -229,6 +229,16 @@ export default function FakeUsersAdmin() {
     refetchInterval: 35_000,
   });
 
+  const { data: bboxData, refetch: refetchBbox } = useQuery<{
+    latMin: number;
+    latMax: number;
+    lngMin: number;
+    lngMax: number;
+    enabled: boolean;
+  }>({
+    queryKey: ["/api/admin/stregatti/motion/bbox"],
+  });
+
   const toggleMotionMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const url = new URL("/api/admin/stregatti/motion/toggle", getApiUrl());
@@ -242,6 +252,21 @@ export default function FakeUsersAdmin() {
       return res.json();
     },
     onSuccess: () => refetchMotionStatus(),
+  });
+
+  const updateBboxMutation = useMutation({
+    mutationFn: async (patch: { enabled?: boolean; latMin?: number; latMax?: number; lngMin?: number; lngMax?: number }) => {
+      const url = new URL("/api/admin/stregatti/motion/bbox", getApiUrl());
+      const res = await fetch(url.toString(), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    onSuccess: () => refetchBbox(),
   });
 
   const wakeAllMutation = useMutation({
@@ -491,6 +516,9 @@ export default function FakeUsersAdmin() {
               motionStatus={motionStatus ?? null}
               onToggleMotion={(v) => toggleMotionMutation.mutate(v)}
               isTogglingMotion={toggleMotionMutation.isPending}
+              bboxData={bboxData ?? null}
+              onToggleBbox={(v) => updateBboxMutation.mutate({ enabled: v })}
+              isTogglingBbox={updateBboxMutation.isPending}
               onMassSeed={() => setMassSeedConfirmVisible(true)}
               onWakeAll={() => wakeAllMutation.mutate()}
               onDistribute={() => distributeMutation.mutate()}

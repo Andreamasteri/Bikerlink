@@ -82,6 +82,35 @@ interface UserMotionState {
   offsetLng: number;
 }
 
+// ── Bounding Box ─────────────────────────────────────────────────────────────
+
+export interface BoundingBox {
+  latMin: number;
+  latMax: number;
+  lngMin: number;
+  lngMax: number;
+  enabled: boolean;
+}
+
+const DEFAULT_BBOX: BoundingBox = {
+  latMin: 35,
+  latMax: 71,
+  lngMin: -25,
+  lngMax: 45,
+  enabled: true,
+};
+
+let _bbox: BoundingBox = { ...DEFAULT_BBOX };
+
+export function getBoundingBox(): BoundingBox {
+  return { ..._bbox };
+}
+
+export async function setBoundingBox(patch: Partial<BoundingBox>): Promise<void> {
+  _bbox = { ..._bbox, ...patch };
+  await storage.upsertAppSetting("motion_bbox", JSON.stringify(_bbox));
+}
+
 // ── State ────────────────────────────────────────────────────────────────────
 
 let _enabled = false;
@@ -287,12 +316,17 @@ function formConvoysForNewSlot(newDriveUsers: UserMotionState[]): void {
  * roads).  Highway uses the fixed slot heading (straight corridor).
  *
  * Longitude degrees shrink toward the poles: 1° lng ≈ 111.32 × cos(lat) km.
+ *
+ * When the bounding box is enabled the position is clamped to it and the
+ * heading is reflected so the user bounces back instead of escaping the box.
+ * The returned `headingUsed` incorporates any reflection so fixed-heading
+ * (highway) riders persist the corrected bearing on the next cycle.
  */
 function applyDelta(
   lat: number,
   lng: number,
   state: UserMotionState,
-): { lat: number; lng: number } {
+): { lat: number; lng: number; headingUsed: number } {
   // Advance speed smoothly before computing the displacement
   stepSpeed(state);
 
@@ -303,7 +337,7 @@ function applyDelta(
   const distKm = (state.currentSpeedKph / 3600) * intervalSeconds;
 
   // Heading: highways keep a fixed bearing, city/mountain wind randomly
-  const effectiveHeading = cfg.fixedHeading ? state.headingRad : randHeading();
+  let effectiveHeading = cfg.fixedHeading ? state.headingRad : randHeading();
 
   // Convert km → degrees (latitude is uniform; longitude depends on lat)
   const latRad = (lat * Math.PI) / 180;
@@ -312,9 +346,29 @@ function applyDelta(
   const dlat = (distKm * Math.cos(effectiveHeading)) / KM_PER_LAT_DEG;
   const dlng = (distKm * Math.sin(effectiveHeading)) / (kmPerLngDeg || 1);
 
-  const newLat = Math.max(-85, Math.min(85, lat + dlat));
-  const newLng = ((lng + dlng + 180) % 360 + 360) % 360 - 180;
-  return { lat: newLat, lng: newLng };
+  let newLat = lat + dlat;
+  let newLng = lng + dlng;
+
+  if (_bbox.enabled) {
+    // Clamp latitude; if we hit a lat boundary reflect the lat component
+    // of the heading (flip across the horizontal axis: θ → -θ).
+    if (newLat < _bbox.latMin || newLat > _bbox.latMax) {
+      newLat = Math.max(_bbox.latMin, Math.min(_bbox.latMax, newLat));
+      effectiveHeading = -effectiveHeading;
+    }
+    // Clamp longitude; if we hit a lng boundary reflect the lng component
+    // of the heading (flip across the vertical axis: θ → π - θ).
+    if (newLng < _bbox.lngMin || newLng > _bbox.lngMax) {
+      newLng = Math.max(_bbox.lngMin, Math.min(_bbox.lngMax, newLng));
+      effectiveHeading = Math.PI - effectiveHeading;
+    }
+  } else {
+    // Global wrap-around fallback
+    newLat = Math.max(-85, Math.min(85, newLat));
+    newLng = ((newLng + 180) % 360 + 360) % 360 - 180;
+  }
+
+  return { lat: newLat, lng: newLng, headingUsed: effectiveHeading };
 }
 
 // ── Initialization ───────────────────────────────────────────────────────────
@@ -441,11 +495,16 @@ async function runCycleInner(): Promise<void> {
 
     const effectiveLat = state.lat + state.offsetLat;
     const effectiveLng = state.lng + state.offsetLng;
-    const { lat, lng } = applyDelta(effectiveLat, effectiveLng, state);
+    const { lat, lng, headingUsed } = applyDelta(effectiveLat, effectiveLng, state);
 
     // Move the base position (without offset) so future cycles are coherent.
+    // For highway riders (fixedHeading), persist the (possibly reflected)
+    // heading so they bounce back from the bounding box boundary correctly.
     state.lat = lat - state.offsetLat;
     state.lng = lng - state.offsetLng;
+    if (SPEED_PROFILES[state.speedProfile].fixedHeading) {
+      state.headingRad = headingUsed;
+    }
 
     movingIds.push(state.userId);
     updates.push({ userId: state.userId, lat, lng });
@@ -489,6 +548,16 @@ async function runCycleInner(): Promise<void> {
 export async function startMotionSimulator(): Promise<void> {
   const setting = await storage.getAppSetting("fake_motion_enabled");
   _enabled = setting?.value === "true";
+
+  const bboxSetting = await storage.getAppSetting("motion_bbox");
+  if (bboxSetting?.value) {
+    try {
+      _bbox = { ...DEFAULT_BBOX, ...JSON.parse(bboxSetting.value) };
+    } catch {
+      _bbox = { ...DEFAULT_BBOX };
+    }
+  }
+
   await loadFakeUsers();
 
   if (_enabled && _userStates.size > 0) {

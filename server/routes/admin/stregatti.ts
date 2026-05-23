@@ -7,7 +7,7 @@ import { eq, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { setMotionEnabled, getMotionStatus, getPositions } from "../../motion-simulator";
+import { setMotionEnabled, getMotionStatus, getPositions, getBoundingBox, setBoundingBox } from "../../motion-simulator";
 
 const router = Router();
 
@@ -130,6 +130,31 @@ router.post("/motion/toggle", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("[MOTION] toggle error:", error);
     return sendError(res, 500, "Errore toggle motion");
+  }
+});
+
+router.get("/motion/bbox", (_req: Request, res: Response) => {
+  try {
+    return res.json(getBoundingBox());
+  } catch (error) {
+    return sendError(res, 500, "Errore lettura bounding box");
+  }
+});
+
+router.put("/motion/bbox", async (req: Request, res: Response) => {
+  try {
+    const { latMin, latMax, lngMin, lngMax, enabled } = req.body;
+    const patch: Record<string, unknown> = {};
+    if (typeof latMin === "number") patch.latMin = latMin;
+    if (typeof latMax === "number") patch.latMax = latMax;
+    if (typeof lngMin === "number") patch.lngMin = lngMin;
+    if (typeof lngMax === "number") patch.lngMax = lngMax;
+    if (typeof enabled === "boolean") patch.enabled = enabled;
+    await setBoundingBox(patch);
+    return res.json(getBoundingBox());
+  } catch (error) {
+    console.error("[MOTION] bbox update error:", error);
+    return sendError(res, 500, "Errore aggiornamento bounding box");
   }
 });
 

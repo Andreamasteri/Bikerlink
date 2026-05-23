@@ -20,6 +20,14 @@ interface MotionStatus {
   totalCycles: number;
 }
 
+interface BboxData {
+  latMin: number;
+  latMax: number;
+  lngMin: number;
+  lngMax: number;
+  enabled: boolean;
+}
+
 interface StregattaActionsProps {
   chatbotEnabled: boolean;
   onToggleChatbot: (val: boolean) => void;
@@ -28,6 +36,9 @@ interface StregattaActionsProps {
   motionStatus: MotionStatus | null;
   onToggleMotion: (val: boolean) => void;
   isTogglingMotion: boolean;
+  bboxData: BboxData | null;
+  onToggleBbox: (val: boolean) => void;
+  isTogglingBbox: boolean;
   onMassSeed: () => void;
   onWakeAll: () => void;
   onDistribute: () => void;
@@ -55,6 +66,9 @@ export function StregattaActions({
   motionStatus,
   onToggleMotion,
   isTogglingMotion,
+  bboxData,
+  onToggleBbox,
+  isTogglingBbox,
   onMassSeed,
   onWakeAll,
   onDistribute,
@@ -74,6 +88,7 @@ export function StregattaActions({
   t,
 }: StregattaActionsProps) {
   const motionEnabled = motionStatus?.enabled ?? false;
+  const bboxEnabled = bboxData?.enabled ?? true;
 
   const formatLastCycle = (iso: string | null): string => {
     if (!iso) return "Mai";
@@ -160,6 +175,35 @@ export function StregattaActions({
                 Cicli totali: {motionStatus.totalCycles}
               </Text>
             </View>
+          </View>
+        )}
+
+        <View style={styles.controlDivider} />
+
+        <View style={styles.controlRow}>
+          <View style={styles.controlInfo}>
+            <Ionicons name="map" size={24} color={Colors.accent} />
+            <Text style={styles.controlLabel}>Zona Europa</Text>
+          </View>
+          {isTogglingBbox ? (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          ) : (
+            <Switch
+              value={bboxEnabled}
+              onValueChange={onToggleBbox}
+              trackColor={{ false: "#767577", true: Colors.accent }}
+              thumbColor={Platform.OS === "ios" ? "#fff" : bboxEnabled ? "#fff" : "#f4f3f4"}
+            />
+          )}
+        </View>
+        <Text style={styles.controlDesc}>
+          Confina i rider nel territorio europeo. Se escono dal confine, invertono la direzione.
+        </Text>
+        {bboxData && (
+          <View style={styles.bboxInfo}>
+            <Text style={styles.bboxInfoText}>
+              Lat {bboxData.latMin}°–{bboxData.latMax}°  ·  Lng {bboxData.lngMin}°–{bboxData.lngMax}°
+            </Text>
           </View>
         )}
       </View>
@@ -365,5 +409,18 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: Colors.error,
+  },
+  bboxInfo: {
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: Colors.accent + "15",
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
+  bboxInfoText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.accent,
   },
 });
