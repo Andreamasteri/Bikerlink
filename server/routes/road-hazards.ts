@@ -3,7 +3,6 @@ import { db, pool } from "../db";
 import {
   roadHazards,
   roadHazardConfirms,
-  roadHazardComments,
   RECURRING_TYPES,
   HAZARD_LABELS,
   HAZARD_ICONS,

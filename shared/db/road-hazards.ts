@@ -8,6 +8,7 @@ import {
   timestamp,
   doublePrecision,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { users } from "./users";
@@ -109,7 +110,7 @@ export const roadHazardComments = pgTable("road_hazard_comments", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("road_hazard_comments_hazard_idx").on(table.hazardId),
-  index("road_hazard_comments_unique_idx").on(table.hazardId, table.userId),
+  uniqueIndex("road_hazard_comments_unique_idx").on(table.hazardId, table.userId),
 ]);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
