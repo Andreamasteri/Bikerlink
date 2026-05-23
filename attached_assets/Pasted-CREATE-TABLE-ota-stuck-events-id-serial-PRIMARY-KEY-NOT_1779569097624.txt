@@ -1,0 +1,64 @@
+CREATE TABLE "ota_stuck_events" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"device_id" varchar(64) NOT NULL,
+	"rollback_count" integer DEFAULT 0 NOT NULL,
+	"stuck_sessions" integer DEFAULT 0 NOT NULL,
+	"runtime_version" varchar(32),
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+CREATE TABLE "ota_publish_tokens" (
+	"id" serial PRIMARY KEY NOT NULL,
+	"token_hash" text NOT NULL,
+	"label" varchar(100) DEFAULT 'default' NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"expires_at" timestamp,
+	"last_used_at" timestamp,
+	"revoked" boolean DEFAULT false NOT NULL,
+	CONSTRAINT "ota_publish_tokens_token_hash_key" UNIQUE("token_hash")
+);
+CREATE TABLE "device_ota_assignments" (
+	"device_id" varchar(128) PRIMARY KEY NOT NULL,
+	"slot" varchar(32) DEFAULT 'stable' NOT NULL,
+	"assigned_at" timestamp DEFAULT now() NOT NULL,
+	"assigned_by" varchar(100),
+	"expires_at" timestamp
+);
+CREATE TABLE "schema_migrations" (
+	"filename" text PRIMARY KEY NOT NULL,
+	"applied_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+ALTER TABLE "road_hazards" ALTER COLUMN "expires_at" SET DATA TYPE timestamp with time zone;
+ALTER TABLE "road_hazards" ALTER COLUMN "deleted_at" SET DATA TYPE timestamp with time zone;
+ALTER TABLE "road_hazards" ALTER COLUMN "created_at" SET DATA TYPE timestamp with time zone;
+ALTER TABLE "road_hazards" ALTER COLUMN "created_at" SET DEFAULT now();
+ALTER TABLE "road_hazard_confirms" ALTER COLUMN "created_at" SET DATA TYPE timestamp with time zone;
+ALTER TABLE "road_hazard_confirms" ALTER COLUMN "created_at" SET DEFAULT now();
+ALTER TABLE "road_hazard_comments" ALTER COLUMN "created_at" SET DATA TYPE timestamp with time zone;
+ALTER TABLE "road_hazard_comments" ALTER COLUMN "created_at" SET DEFAULT now();
+ALTER TABLE "road_hazard_comments" ALTER COLUMN "updated_at" SET DATA TYPE timestamp with time zone;
+ALTER TABLE "road_hazard_comments" ALTER COLUMN "updated_at" SET DEFAULT now();
+CREATE INDEX "ota_stuck_events_created_idx" ON "ota_stuck_events" USING btree ("created_at");
+CREATE INDEX "ota_stuck_events_rv_idx" ON "ota_stuck_events" USING btree ("runtime_version");
+CREATE INDEX "ota_publish_tokens_hash_idx" ON "ota_publish_tokens" USING btree ("token_hash");
+ALTER TABLE "route_weather_cache" ADD CONSTRAINT "route_weather_cache_route_id_planned_routes_id_fk" FOREIGN KEY ("route_id") REFERENCES "public"."planned_routes"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "road_hazards" ADD CONSTRAINT "road_hazards_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "site_visits" ADD CONSTRAINT "site_visits_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;
+ALTER TABLE "events" ADD CONSTRAINT "events_approved_by_users_id_fk" FOREIGN KEY ("approved_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;
+ALTER TABLE "road_hazard_confirms" ADD CONSTRAINT "road_hazard_confirms_hazard_id_fkey" FOREIGN KEY ("hazard_id") REFERENCES "public"."road_hazards"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "road_hazard_confirms" ADD CONSTRAINT "road_hazard_confirms_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "road_hazard_comments" ADD CONSTRAINT "road_hazard_comments_hazard_id_fkey" FOREIGN KEY ("hazard_id") REFERENCES "public"."road_hazards"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "road_hazard_comments" ADD CONSTRAINT "road_hazard_comments_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+ALTER TABLE "ride_telemetry" ADD CONSTRAINT "ride_telemetry_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;
+CREATE UNIQUE INDEX "app_crash_logs_uniq_session_crash" ON "app_crash_logs" USING btree ("user_id","session_id","crash_type");
+CREATE INDEX "arcade_scores_game_score_idx" ON "arcade_scores" USING btree ("game","score");
+CREATE UNIQUE INDEX "users_nickname_lower_unique_idx" ON "users" USING btree (lower((nickname)::text) text_ops);
+CREATE INDEX "coordinate_history_user_created_idx" ON "coordinate_history" USING btree ("user_id","created_at");
+CREATE INDEX "events_date_idx" ON "events" USING btree ("event_date");
+CREATE UNIQUE INDEX "biker_biker_symmetric_idx" ON "biker_biker_matches" USING btree (LEAST(biker1_id, biker2_id) text_ops,GREATEST(biker1_id, biker2_id) text_ops,motorcycle_brand text_ops);
+CREATE UNIQUE INDEX "road_hazard_confirms_unique_idx" ON "road_hazard_confirms" USING btree ("hazard_id","user_id");
+CREATE INDEX "newsletter_subscribers_email_idx" ON "newsletter_subscribers" USING btree ("email");
+CREATE INDEX "ride_telemetry_matched_idx" ON "ride_telemetry" USING btree ("matched");
+ALTER TABLE "gps_errors" DROP COLUMN "ota_number";
+ALTER TABLE "users" DROP COLUMN "last_ota_number";
+ALTER TABLE "gps_rejection_stats" DROP COLUMN "last_ota_number";
+ALTER TABLE "newsletter_subscribers" ADD CONSTRAINT "newsletter_subscribers_email_key" UNIQUE("email");
