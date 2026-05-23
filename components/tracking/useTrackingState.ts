@@ -164,13 +164,13 @@ export function useTrackingState() {
   const isTabFocusedRef = useRef(isTabFocused);
 
   // Sync refs
-  useEffect(() => { settings.profileRef.current = settings.profile; }, [settings.profile]);
-  useEffect(() => { settings.handsOffEnabledRef.current = settings.handsOffEnabled; }, [settings.handsOffEnabled]);
-  useEffect(() => { settings.handsOffSpeedRef.current = parseFloat(settings.handsOffSpeedStr || "50") || 50; }, [settings.handsOffSpeedStr]);
-  useEffect(() => { settings.is0100EnabledRef.current = settings.is0100Enabled; }, [settings.is0100Enabled]);
-  useEffect(() => { settings.sensorsEnabledRef.current = settings.sensorsEnabled; }, [settings.sensorsEnabled]);
-  useEffect(() => { session.phaseRef.current = session.phase; }, [session.phase]);
-  useEffect(() => { sensors.mountAxisCalibRef.current = sensors.mountAxisCalib; }, [sensors.mountAxisCalib]);
+  useEffect(() => { settings.profileRef.current = settings.profile; }, [settings.profile, settings.profileRef]);
+  useEffect(() => { settings.handsOffEnabledRef.current = settings.handsOffEnabled; }, [settings.handsOffEnabled, settings.handsOffEnabledRef]);
+  useEffect(() => { settings.handsOffSpeedRef.current = parseFloat(settings.handsOffSpeedStr || "50") || 50; }, [settings.handsOffSpeedStr, settings.handsOffSpeedRef]);
+  useEffect(() => { settings.is0100EnabledRef.current = settings.is0100Enabled; }, [settings.is0100Enabled, settings.is0100EnabledRef]);
+  useEffect(() => { settings.sensorsEnabledRef.current = settings.sensorsEnabled; }, [settings.sensorsEnabled, settings.sensorsEnabledRef]);
+  useEffect(() => { session.phaseRef.current = session.phase; }, [session.phase, session.phaseRef]);
+  useEffect(() => { sensors.mountAxisCalibRef.current = sensors.mountAxisCalib; }, [sensors.mountAxisCalib, sensors.mountAxisCalibRef]);
 
   const { data: records, refetch: refetchRecords } = useQuery<RouteRecord[]>({ queryKey: ["/api/routes"] });
   const { data: sprintHistory } = useQuery<Array<{ sprint0to100Ms: number | null }>>({
@@ -374,7 +374,7 @@ export function useTrackingState() {
     try { refs.watchSubRef.current = await Location.watchPositionAsync({ accuracy, timeInterval, distanceInterval }, loc => onNativeLocation(loc)); }
     catch (e) { logGpsError(e, "watchPositionAsync"); Alert.alert(t("common.error"), t("tracking.gpsStartError")); cleanupTracking(); session.setPhase("idle"); return; }
     startDeviceMotion(); setTrackingActive(true); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
-  }, [cleanupTracking, flushPoints, startDeviceMotion, t, gps, sensors, battery, session, stats, settings, refs, onNativeLocation]);
+  }, [cleanupTracking, flushPoints, startDeviceMotion, t, gps, battery, session, stats, settings, refs, onNativeLocation]);
 
   const handleStart = useCallback(async () => {
     if (session.phase !== "idle") return;

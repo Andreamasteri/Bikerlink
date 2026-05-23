@@ -117,7 +117,7 @@ export function useHomeMapState() {
     if (!authLoading && !isAuthenticated) {
       router.replace("/welcome");
     }
-  }, [authLoading, isAuthenticated]);
+  }, [authLoading, isAuthenticated, router]);
 
   useEffect(() => {
     if (mapReady) return;
@@ -242,11 +242,12 @@ export function useHomeMapState() {
     })();
   }, []);
 
+  const { invalidateCountryQueries } = mapData;
   const saveCountries = useCallback(async (countries: string[]) => {
     setSelectedCountries(countries);
     try { await AsyncStorage.setItem("map_area_countries", JSON.stringify(countries)); } catch {}
-    mapData.invalidateCountryQueries();
-  }, [mapData.invalidateCountryQueries]);
+    invalidateCountryQueries();
+  }, [invalidateCountryQueries]);
 
   const toggleCountryInModal = useCallback((code: string) => {
     if (code === "__world__") { setSelectedCountries([]); return; }
@@ -303,12 +304,12 @@ export function useHomeMapState() {
   const fakeMeMarker = fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null
     ? { latitude: Number(fakeHomeLat), longitude: Number(fakeHomeLng) } : null;
 
-  const myAds = mapData.myAdsQuery.data || [];
+  const myAds = useMemo(() => mapData.myAdsQuery.data || [], [mapData.myAdsQuery.data]);
   const onlineCount = mapData.onlineCountQuery.data?.count ?? 0;
   const bikerCount = mapData.bikerCountQuery.data?.count ?? 0;
   const zavCount = mapData.zavCountQuery.data?.count ?? 0;
 
-  const nearbyUsers = (mapData.nearbyUsersQuery.data as any) || [];
+  const nearbyUsers = useMemo(() => (mapData.nearbyUsersQuery.data as any) || [], [mapData.nearbyUsersQuery.data]);
 
   const usersWithSelf = useMemo(() => {
     const rawList: any[] = Array.isArray(nearbyUsers) ? nearbyUsers : [];
@@ -375,7 +376,7 @@ export function useHomeMapState() {
           .finally(() => { autoCollectingRef.current.delete(egg.id); });
       });
     }
-  }, [mapData.easterEggsQuery.data]);
+  }, [mapData.easterEggsQuery.data, t]);
 
   useEffect(() => {
     if (myAds.length <= 1) return;

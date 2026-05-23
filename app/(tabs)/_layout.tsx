@@ -62,6 +62,7 @@ export default function TabLayout() {
 
   useEffect(() => {
     sendStartupBeacon("tabs_layout_mount", { hasUser: !!user, authLoading: isLoading });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const { taskbarStyle } = useTaskbarStyle();
@@ -110,13 +111,13 @@ export default function TabLayout() {
     } else {
       handsOffBlinkAnim.setValue(1);
     }
-  }, [globalHandsOffActive]);
+  }, [globalHandsOffActive, handsOffBlinkAnim]);
 
   useEffect(() => {
     if (!isLoading && user === null) {
       router.replace("/(auth)/login");
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, router]);
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
   const isZavorrina = user?.userType === "zavorrina";

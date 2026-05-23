@@ -224,7 +224,7 @@ export default function EditProfileScreen() {
 
   const handleRequestDeletion = useCallback(() => {
     requestDeletionMutation.mutate();
-  }, []);
+  }, [requestDeletionMutation]);
 
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
@@ -235,7 +235,7 @@ export default function EditProfileScreen() {
         { text: t("common.delete"), style: "destructive", onPress: handleRequestDeletion },
       ]
     );
-  }, []);
+  }, [t, handleRequestDeletion]);
 
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
     showImagePickerMenu(
@@ -252,7 +252,7 @@ export default function EditProfileScreen() {
       },
       { aspect: [1, 1], quality: 0.8 }
     );
-  }, []);
+  }, [uploadPhotoMutation]);
 
   const handleDeletePhoto = useCallback((photoId: string) => {
     Alert.alert(t("profile.deletePhoto"), t("profile.deletePhotoConfirm"), [
@@ -263,7 +263,7 @@ export default function EditProfileScreen() {
         onPress: () => deletePhotoMutation.mutate(photoId),
       },
     ]);
-  }, []);
+  }, [t, deletePhotoMutation]);
 
   const handleSave = () => {
     const data: Record<string, unknown> = {};

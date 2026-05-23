@@ -86,9 +86,9 @@ export function useNewMatchAlert() {
       .catch(() => setSeenLoaded(true));
   }, [userId]);
 
-  const persistSeen = () => {
+  const persistSeen = useCallback(() => {
     AsyncStorage.setItem(SEEN_KEY, JSON.stringify([...seenRef.current])).catch(() => {});
-  };
+  }, []);
 
   const persistInit = useCallback(() => {
     if (!userId) return;
@@ -104,14 +104,14 @@ export function useNewMatchAlert() {
     updateServerSeenTimestamp();
   }, []);
 
-  const addSeen = (ids: string[]) => {
+  const addSeen = useCallback((ids: string[]) => {
     ids.forEach((id) => seenRef.current.add(id));
     if (seenRef.current.size > MAX_SEEN_IDS) {
       const trimmed = [...seenRef.current];
       seenRef.current = new Set(trimmed.slice(trimmed.length - MAX_SEEN_IDS));
     }
     persistSeen();
-  };
+  }, [persistSeen]);
 
   const markSourceInitialized = useCallback((sourceKey: string) => {
     initializedSources.current.add(sourceKey);
@@ -158,7 +158,7 @@ export function useNewMatchAlert() {
       setVisible(true);
       maybeSyncToServer();
     }
-  }, [seenLoaded, serverLastSeenAt, markSourceInitialized, maybeSyncToServer]);
+  }, [seenLoaded, serverLastSeenAt, addSeen, markSourceInitialized, maybeSyncToServer]);
 
   const enabled = !!userId && seenLoaded;
 
@@ -182,15 +182,15 @@ export function useNewMatchAlert() {
 
   useEffect(() => {
     processSource("garage", garageData);
-  }, [garageData, seenLoaded]);
+  }, [garageData, processSource]);
 
   useEffect(() => {
     processSource("biker", bikerData);
-  }, [bikerData, seenLoaded]);
+  }, [bikerData, processSource]);
 
   useEffect(() => {
     processSource("proposals", proposalData);
-  }, [proposalData, seenLoaded]);
+  }, [proposalData, processSource]);
 
   const dismiss = useCallback(() => {
     setVisible(false);
