@@ -73,6 +73,10 @@ args = "eslint"
 task = "workflow.run"
 args = "apostrophe-check"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "hooks-check"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -204,6 +208,17 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/check-script-apostrophes.sh"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "hooks-check"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/eslint-hooks-check.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
