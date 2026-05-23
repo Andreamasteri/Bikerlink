@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
 import { HazardReportSheet } from "@/components/map/HazardReportSheet";
+import { HazardDetailSheet } from "@/components/map/HazardDetailSheet";
 import Colors from "@/constants/colors";
 import { useMapConfig } from "@/lib/map-context";
 import type { MapProvider } from "@/lib/map-tiles";
@@ -50,6 +51,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const webViewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
   const [hazardSheetOpen, setHazardSheetOpen] = useState(false);
+  const [hazardDetailId, setHazardDetailId] = useState<string | null>(null);
   const initialCenterDoneRef = useRef(false);
   const gpsCenterDoneRef = useRef(false);
   const { userLocation, locationLoading } = useLocationWatch();
@@ -136,6 +138,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     createMapMessageHandler({
       users, clubPins, easterEggs,
       onUserPress, onClubPress, onEventPress, onEasterEggPress,
+      onHazardPress: (id) => setHazardDetailId(id),
       onReady, onRegionChangeComplete, setMapReady,
     }),
     [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete],
@@ -207,6 +210,10 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         visible={hazardSheetOpen}
         onClose={() => setHazardSheetOpen(false)}
         userLocation={userLocation}
+      />
+      <HazardDetailSheet
+        hazardId={hazardDetailId}
+        onClose={() => setHazardDetailId(null)}
       />
     </View>
   );

@@ -94,11 +94,30 @@ export const roadHazardConfirms = pgTable("road_hazard_confirms", {
   index("road_hazard_confirms_unique_idx").on(table.hazardId, table.userId),
 ]);
 
+export const roadHazardComments = pgTable("road_hazard_comments", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  hazardId: varchar("hazard_id", { length: 36 })
+    .notNull()
+    .references(() => roadHazards.id, { onDelete: "cascade" }),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  text: varchar("text", { length: 140 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("road_hazard_comments_hazard_idx").on(table.hazardId),
+  index("road_hazard_comments_unique_idx").on(table.hazardId, table.userId),
+]);
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type RoadHazard = typeof roadHazards.$inferSelect;
 export type InsertRoadHazard = typeof roadHazards.$inferInsert;
 export type RoadHazardConfirm = typeof roadHazardConfirms.$inferSelect;
+export type RoadHazardComment = typeof roadHazardComments.$inferSelect;
 
 // ── Migration SQL ─────────────────────────────────────────────────────────────
 

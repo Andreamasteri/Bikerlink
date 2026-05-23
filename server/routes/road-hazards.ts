@@ -3,7 +3,10 @@ import { db, pool } from "../db";
 import {
   roadHazards,
   roadHazardConfirms,
+  roadHazardComments,
   RECURRING_TYPES,
+  HAZARD_LABELS,
+  HAZARD_ICONS,
   createHazardSchema,
 } from "@shared/db";
 import { eq, and, isNull, or, gt, desc } from "drizzle-orm";
@@ -68,6 +71,99 @@ router.get("/", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("[road-hazards] GET / error:", error);
     return sendError(res, 500, "Errore lettura segnalazioni");
+  }
+});
+
+// ── GET /:id — hazard detail + comments ──────────────────────────────────────
+router.get("/:id", async (req: Request, res: Response) => {
+  try {
+    const hazardId = String(req.params.id);
+
+    const [hazard] = await db
+      .select()
+      .from(roadHazards)
+      .where(
+        and(
+          eq(roadHazards.id, hazardId),
+          isNull(roadHazards.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!hazard) return sendError(res, 404, "Segnalazione non trovata");
+
+    const commentsRaw = await pool.query<{
+      id: string;
+      user_id: string;
+      text: string;
+      created_at: string;
+      updated_at: string;
+      nickname: string | null;
+    }>(
+      `SELECT c.id, c.user_id, c.text, c.created_at, c.updated_at,
+              u.username AS nickname
+         FROM road_hazard_comments c
+         JOIN users u ON u.id = c.user_id
+        WHERE c.hazard_id = $1
+        ORDER BY c.created_at ASC`,
+      [hazardId]
+    );
+
+    const comments = commentsRaw.rows.map((r) => ({
+      id: r.id,
+      userId: r.user_id,
+      text: r.text,
+      createdAt: r.created_at,
+      updatedAt: r.updated_at,
+      nickname: r.nickname ?? "Utente",
+    }));
+
+    return sendSuccess(res, {
+      hazard: {
+        ...hazard,
+        label: HAZARD_LABELS[hazard.type as keyof typeof HAZARD_LABELS] ?? hazard.type,
+        icon: HAZARD_ICONS[hazard.type as keyof typeof HAZARD_ICONS] ?? "⚠️",
+      },
+      comments,
+    });
+  } catch (error) {
+    console.error("[road-hazards] GET /:id error:", error);
+    return sendError(res, 500, "Errore lettura segnalazione");
+  }
+});
+
+// ── POST /:id/comments — upsert user comment ─────────────────────────────────
+router.post("/:id/comments", async (req: Request, res: Response) => {
+  try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const hazardId = String(req.params.id);
+    const text = typeof req.body?.text === "string" ? req.body.text.trim() : "";
+    if (!text || text.length > 140) {
+      return sendError(res, 400, "Testo commento non valido (max 140 caratteri)");
+    }
+
+    const [hazard] = await db
+      .select({ id: roadHazards.id })
+      .from(roadHazards)
+      .where(and(eq(roadHazards.id, hazardId), isNull(roadHazards.deletedAt)))
+      .limit(1);
+
+    if (!hazard) return sendError(res, 404, "Segnalazione non trovata");
+
+    await pool.query(
+      `INSERT INTO road_hazard_comments(hazard_id, user_id, text)
+       VALUES($1, $2, $3)
+       ON CONFLICT (hazard_id, user_id)
+       DO UPDATE SET text = EXCLUDED.text, updated_at = NOW()`,
+      [hazardId, userId, text]
+    );
+
+    return sendSuccess(res, { saved: true });
+  } catch (error) {
+    console.error("[road-hazards] POST /:id/comments error:", error);
+    return sendError(res, 500, "Errore salvataggio commento");
   }
 });
 
