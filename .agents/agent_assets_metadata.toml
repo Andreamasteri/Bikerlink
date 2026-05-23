@@ -372,6 +372,12 @@ uri = "file://server/public/assets/images/hero-community.png"
 type = "image"
 title = "generated_image"
 
+[[generated]]
+id = "0hbVEcuq53v7B880HZcME"
+uri = "file://attached_assets/mockup-status-group-affiancato.png"
+type = "image"
+title = "bikerlink ready screen accordion panels side by side mockup"
+
 [[outputs]]
 id = "4Y78ngKHwO0VLy8lAIKVp"
 uri = "file://manuale-utente-bikerlink.docx"
@@ -581,3 +587,9 @@ id = "p6iLQsUdzf6SINZ_8ji9G"
 uri = "file://server/public/assets/images/hero-handlebar-sm.webp"
 type = "image"
 title = "Hero (small) — hero-handlebar-sm.webp"
+
+[[outputs]]
+id = "rC7Qm0uIshefO9bhhdp1A"
+uri = "file://attached_assets/mockup-status-group-affiancato.png"
+type = "image"
+title = "Mockup — Status group affiancato (Ready screen)"
