@@ -51,11 +51,11 @@ Il progetto usa il bare workflow (directory `android/` committata). I tre file d
 
 | File | Campo | Valore corrente |
 |---|---|---|
-| `app.json` | `expo.version` | `48.13.10` |
-| `app.json` | `expo.android.versionCode` | `48` |
+| `app.json` | `expo.version` | `49.0.10` |
+| `app.json` | `expo.android.versionCode` | `49` |
 | `app.json` | `expo.runtimeVersion` | `10.0.0` |
-| `android/app/build.gradle` | `versionCode` | `48` |
-| `android/app/build.gradle` | `versionName` | `"48.13.10"` |
+| `android/app/build.gradle` | `versionCode` | `49` |
+| `android/app/build.gradle` | `versionName` | `"49.0.10"` |
 | `android/app/src/main/res/values/strings.xml` | `expo_runtime_version` | `10.0.0` |
 
 ⚠️ **Aggiornare sempre tutti e tre i file contemporaneamente.** Un disallineamento causa errori di update check a runtime.
@@ -93,7 +93,8 @@ La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` (hardcodata ne
 | v45 | 45 | 3.4.0 | 8.0.0 | 8.x | OTA 1–29 | Ultimo APK ciclo 8 — ciclo CHIUSO a OTA-29 |
 | v46 | 46 | 46.29.9 | 9.0.0 | 9.x | OTA 1–13 | Primo APK schema semantico — ciclo CHIUSO a OTA-13 |
 | v47 | 47 | 47.2.9 | 9.0.0 | 9.x | OTA 1–13 | Ultimo APK ciclo 9 — SDK 56 migration |
-| v48 | 48 | 48.13.10 | 10.0.0 | 10.x | — | **Corrente** — primo APK ciclo 10, SDK 56 |
+| v48 | 48 | 48.13.10 | 10.0.0 | 10.x | — | Primo APK ciclo 10, SDK 56 |
+| v49 | 49 | 49.0.10 | 10.0.0 | 10.x | — | **Corrente** — SDK 56 compliance, New Arch, arm64, no OTA |
 
 > **Cicli precedenti** (schema vecchio `major.minor.patch` senza significato semantico):
 > - Ciclo 2.x: rv 2.0.0
