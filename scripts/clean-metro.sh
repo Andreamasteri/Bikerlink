@@ -38,6 +38,8 @@ if [ -d "$PROJECT_ROOT/.expo" ]; then
     mkdir -p "$PROJECT_ROOT/.expo/types"
     cp -r /tmp/_expo_types_backup/. "$PROJECT_ROOT/.expo/types/"
     rm -rf /tmp/_expo_types_backup
+    # Rimuovi eventuali sottocartelle spurie (es. types/types/ generata per errore da task agents)
+    rm -rf "$PROJECT_ROOT/.expo/types/types"
     echo "  [OK]   .expo/types/ ripristinata (router.d.ts preservato)"
   fi
 else
