@@ -165,7 +165,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
     await withPhaseTimeout("ensureBikerLinkOfficialOnBoot", ensureBikerLinkOfficialOnBoot());
     startMatchingEngine();
-    await withPhaseTimeout("initMissingClubConversations", initMissingClubConversations());
   } catch (err) {
     console.error("[INIT] FATAL — Phase 4 failed:", err);
     process.exit(1);
@@ -241,6 +240,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   initState.initializing = false;
   const totalElapsed = ((Date.now() - BOOT_START) / 1000).toFixed(1);
   console.log(`[INIT] All startup phases completed in ${totalElapsed}s — server is READY`);
+
+  // Fire-and-forget: runs after server is READY so it cannot block or timeout boot.
+  // The function has its own internal error handling and will not crash the process.
+  setImmediate(() => {
+    console.log("[INIT] Background: starting initMissingClubConversations...");
+    initMissingClubConversations().catch((err) => {
+      console.warn("[INIT] Background initMissingClubConversations error:", err);
+    });
+  });
 })().catch((err) => {
   console.error("[INIT] Uncaught fatal error during startup:", err);
   process.exit(1);
