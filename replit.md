@@ -275,5 +275,5 @@ Configurazione applicata in:
 > Quando dice **"cosa dovevi ricordarmi?"**, rileggo questa sezione e gliene faccio un elenco.
 
 <!-- PROMEMORIA_INIZIO -->
-*(nessun promemoria salvato)*
+- **2026-05-24** — Controllare stato e operatività delle chat dei club. C'era qualcosa che non andava all'avvio (problema da indagare).
 <!-- PROMEMORIA_FINE -->
