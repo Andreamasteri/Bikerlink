@@ -105,6 +105,9 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 (async () => {
   const TOTAL = 5;
+  // Tracks whether the initial DB seed was skipped (already populated).
+  // Read by the post-boot fire-and-forget block to decide if autoSeedFakeUsers should run.
+  let needsFakeSeed = false;
 
   // ── Phase 1: Migrations ───────────────────────────────────────────────────
   bootLog(1, TOTAL, "Migrations", "start");
@@ -154,15 +157,13 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
     if (!skipSeed) {
       await withPhaseTimeout("autoSeedEssentialUsers", autoSeedEssentialUsers());
-      await withPhaseTimeout("autoSeedFakeUsers", autoSeedFakeUsers());
-      await withPhaseTimeout("seedAppleReviewerAccount", seedAppleReviewerAccount());
-      await withPhaseTimeout("seedGooglePlayReviewerAccount", seedGooglePlayReviewerAccount());
-    } else {
-      // Still ensure reviewer accounts and BikerLink official
-      await withPhaseTimeout("seedAppleReviewerAccount", seedAppleReviewerAccount());
-      await withPhaseTimeout("seedGooglePlayReviewerAccount", seedGooglePlayReviewerAccount());
+      // autoSeedFakeUsers is non-essential (bulk fake users) — moved to fire-and-forget below
+      needsFakeSeed = true;
     }
 
+    // Reviewer accounts and BikerLink official are fast and required before serving traffic
+    await withPhaseTimeout("seedAppleReviewerAccount", seedAppleReviewerAccount());
+    await withPhaseTimeout("seedGooglePlayReviewerAccount", seedGooglePlayReviewerAccount());
     await withPhaseTimeout("ensureBikerLinkOfficialOnBoot", ensureBikerLinkOfficialOnBoot());
     startMatchingEngine();
   } catch (err) {
@@ -202,7 +203,10 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
         console.log(`[SNAPSHOT] Playlist snapshot saved for ${saved} users`);
       } catch (e) { console.warn("[SNAPSHOT] runPlaylistSnapshot error:", e); }
     };
-    await withPhaseTimeout("runPlaylistSnapshot", runPlaylistSnapshot());
+    // runPlaylistSnapshot iterates every user's tracks — non-essential at boot, fire-and-forget
+    setImmediate(() => {
+      runPlaylistSnapshot().catch((e) => console.warn("[SNAPSHOT] background runPlaylistSnapshot error:", e));
+    });
     setInterval(runPlaylistSnapshot, SIX_HOURS_MS);
 
     const { cleanupOrphanedAdImages } = await import("./routes/ads");
@@ -221,7 +225,10 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     scheduleWeeklyCurvyScoreUpdate();
 
     const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
-    await withPhaseTimeout("saveSchemaSnapshot", saveSchemaSnapshot());
+    // saveSchemaSnapshot is a dev/maintenance utility — non-essential at boot, fire-and-forget
+    setImmediate(() => {
+      saveSchemaSnapshot().catch((e) => console.warn("[INIT] background saveSchemaSnapshot error:", e));
+    });
 
     // Motion simulator for fake users (non-fatal)
     try {
@@ -241,13 +248,20 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   const totalElapsed = ((Date.now() - BOOT_START) / 1000).toFixed(1);
   console.log(`[INIT] All startup phases completed in ${totalElapsed}s — server is READY`);
 
-  // Fire-and-forget: runs after server is READY so it cannot block or timeout boot.
-  // The function has its own internal error handling and will not crash the process.
+  // Fire-and-forget background jobs — run after server is READY.
+  // None of these can block, timeout, or crash the boot sequence.
   setImmediate(() => {
     console.log("[INIT] Background: starting initMissingClubConversations...");
     initMissingClubConversations().catch((err) => {
       console.warn("[INIT] Background initMissingClubConversations error:", err);
     });
+
+    if (needsFakeSeed) {
+      console.log("[INIT] Background: starting autoSeedFakeUsers...");
+      autoSeedFakeUsers().catch((err) => {
+        console.warn("[INIT] Background autoSeedFakeUsers error:", err);
+      });
+    }
   });
 })().catch((err) => {
   console.error("[INIT] Uncaught fatal error during startup:", err);
