@@ -1908,6 +1908,10 @@ function renderOtaReleases(releases) {
         </div>` : ''}
       ${r.approvedAt ? `<div style="font-size:11px;color:var(--text3);margin-top:8px">Approvata: ${fmtDate(r.approvedAt)}</div>` : ''}
       ${r.rejectedAt ? `<div style="font-size:11px;color:var(--text3);margin-top:8px">Rifiutata: ${fmtDate(r.rejectedAt)}</div>` : ''}
+      ${r.status==='approved' ? `
+        <div style="margin-top:10px">
+          <button class="btn btn-ghost btn-sm" onclick="rollbackOta('${r.id}')" style="width:100%;border-style:dashed;color:var(--accent);border-color:var(--accent);font-size:12px">↩ Rollback su Production</button>
+        </div>` : ''}
     </div>
   `).join('');
 }
@@ -1937,6 +1941,22 @@ async function rejectOta(id) {
       showAlert('settings-alert', data.message || 'Errore rifiuto OTA', 'error');
     } else {
       showAlert('settings-alert', 'OTA rifiutata', 'success');
+      await loadOtaReleases();
+    }
+  } catch {
+    showAlert('settings-alert', 'Errore di rete', 'error');
+  }
+}
+
+async function rollbackOta(id) {
+  if (!confirm('Ri-promuovere questa release su production?\n\nGli utenti riceveranno questa versione precedente approvata.')) return;
+  try {
+    const res = await fetch('/api/admin/ota/' + id + '/rollback', { method: 'POST', credentials: 'include' });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('settings-alert', data.message || 'Errore rollback OTA', 'error');
+    } else {
+      showAlert('settings-alert', 'Rollback eseguito: release ri-promossa su production', 'success');
       await loadOtaReleases();
     }
   } catch {

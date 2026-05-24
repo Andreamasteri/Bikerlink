@@ -204,6 +204,40 @@ router.get("/:id/try", async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/admin/ota/:id/rollback — ri-promuove una release approvata su production
+router.post("/:id/rollback", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const userId = req.session.userId!;
+
+    const [release] = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+    if (!release) return sendError(res, 404, "OTA release non trovata");
+    if (release.status !== "approved") return sendError(res, 400, `Rollback disponibile solo per release approvate (stato attuale: ${release.status})`);
+
+    try {
+      await promoteToProduction(release.easUpdateId);
+    } catch (err) {
+      console.error("[ota] EAS rollback promote error:", err);
+      return sendError(res, 502, "Errore rollback su EAS production: " + (err instanceof Error ? err.message : String(err)));
+    }
+
+    const [updated] = await db
+      .update(otaReleases)
+      .set({
+        approvedAt: new Date(),
+        approvedBy: userId,
+        channel: "production",
+      })
+      .where(eq(otaReleases.id, id))
+      .returning();
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("[ota] POST /:id/rollback error:", err);
+    return sendError(res, 500, "Errore rollback OTA");
+  }
+});
+
 // POST /api/admin/ota/sync — forza sync manuale da EAS
 router.post("/sync", async (_req: Request, res: Response) => {
   try {

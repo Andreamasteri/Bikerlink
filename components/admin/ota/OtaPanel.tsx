@@ -56,6 +56,7 @@ export default function OtaPanel() {
   const [tryingId, setTryingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rollingBackId, setRollingBackId] = useState<string | null>(null);
 
   const { data: releases, isLoading, refetch, isFetching } = useQuery<OtaRelease[]>({
     queryKey: ["/api/admin/ota/releases"],
@@ -82,6 +83,18 @@ export default function OtaPanel() {
     onError: (err: Error) => {
       setRejectingId(null);
       Alert.alert("Errore", err.message || "Impossibile rifiutare");
+    },
+  });
+
+  const rollbackMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/ota/${id}/rollback`),
+    onSuccess: () => {
+      setRollingBackId(null);
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+    },
+    onError: (err: Error) => {
+      setRollingBackId(null);
+      Alert.alert("Errore rollback", err.message || "Impossibile eseguire il rollback");
     },
   });
 
@@ -119,6 +132,24 @@ export default function OtaPanel() {
       ]
     );
   }, [rejectMutation]);
+
+  const handleRollback = useCallback((release: OtaRelease) => {
+    Alert.alert(
+      "Rollback OTA",
+      `Ri-promuovere questa release su production?\n\nVersione: ${release.otaVersion ?? release.easUpdateId.slice(0, 8)}\nMessaggio: ${release.message ?? "—"}\n\nGli utenti riceveranno questa versione precedente.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Esegui Rollback",
+          style: "destructive",
+          onPress: () => {
+            setRollingBackId(release.id);
+            rollbackMutation.mutate(release.id);
+          },
+        },
+      ]
+    );
+  }, [rollbackMutation]);
 
   const handleTryOta = useCallback(async (release: OtaRelease) => {
     if (Platform.OS === "web") {
@@ -267,6 +298,18 @@ export default function OtaPanel() {
                     Rifiutata: {formatDate(release.rejectedAt)}
                   </Text>
                 )}
+
+                {release.status === "approved" && (
+                  <TouchableOpacity
+                    style={[styles.rollbackBtn, { borderColor: colors.accent }]}
+                    onPress={() => handleRollback(release)}
+                    disabled={rollingBackId === release.id}
+                  >
+                    {rollingBackId === release.id
+                      ? <ActivityIndicator size="small" color={colors.accent} />
+                      : <Text style={[styles.rollbackBtnText, { color: colors.accent }]}>↩ Rollback su Production</Text>}
+                  </TouchableOpacity>
+                )}
               </View>
             );
           })}
@@ -309,6 +352,8 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "column", gap: 8, marginTop: 12 },
   actionBtn: { borderRadius: 6, paddingVertical: 10, paddingHorizontal: 16, alignItems: "center", borderWidth: 1 },
   actionBtnText: { fontSize: 13, fontWeight: "700" as const },
+  rollbackBtn: { marginTop: 10, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 12, alignItems: "center", borderWidth: 1, borderStyle: "dashed" as const },
+  rollbackBtnText: { fontSize: 12, fontWeight: "600" as const },
   sectionTitle: {
     fontSize: 12,
     fontWeight: "700" as const,
