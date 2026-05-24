@@ -1,6 +1,7 @@
 import React, { useRef } from "react";
 import {
   View,
+  Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -20,6 +21,7 @@ import { AdRotationSection } from "@/components/admin/ads/AdRotationSection";
 import { CreateAdModal } from "@/components/admin/ads/CreateAdModal";
 import { useAdAdmin } from "@/components/admin/ads/useAdAdmin";
 import { AdTabs, AdHealthBanner, AdToolbar } from "@/components/admin/ads/AdLayoutComponents";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
 
@@ -30,7 +32,7 @@ const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "c
   { key: "coppia", label: "Coppie", icon: "people", iconSet: "material", color: Colors.coupleIcon },
 ];
 
-export default function AdminAds() {
+function AdminAdsInner() {
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
   
@@ -63,6 +65,7 @@ export default function AdminAds() {
     settingsMode, setSettingsMode,
     campaigns,
     isLoading,
+    campaignsError,
     cacheStats,
     healthBannerDismissed, setHealthBannerDismissed,
     brokenInView,
@@ -96,6 +99,23 @@ export default function AdminAds() {
   return (
     <View style={styles.container}>
       <AdTabs tabs={TABS} activeTab={activeTab} onTabPress={setActiveTab} />
+
+      {campaignsError && (
+        <View style={styles.errorBanner}>
+          <MaterialIcons name="error-outline" size={16} color={Colors.error} />
+          <Text style={styles.errorBannerText} numberOfLines={3}>
+            {(campaignsError as Error)?.message
+              ? `Impossibile caricare le campagne: ${(campaignsError as Error).message}`
+              : "Impossibile caricare le campagne. Controlla la connessione e riprova."}
+          </Text>
+          <TouchableOpacity
+            onPress={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] })}
+            style={styles.errorBannerRetry}
+          >
+            <MaterialIcons name="refresh" size={16} color={Colors.error} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {brokenInView.length > 0 && !healthBannerDismissed && (
         <AdHealthBanner brokenCount={brokenInView.length} onDismiss={() => setHealthBannerDismissed(true)} />
@@ -258,8 +278,35 @@ export default function AdminAds() {
   );
 }
 
+export default function AdminAds() {
+  return (
+    <ErrorBoundary>
+      <AdminAdsInner />
+    </ErrorBoundary>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.error + "18",
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.error + "44",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.error,
+  },
+  errorBannerRetry: {
+    padding: 2,
+  },
   fab: {
     position: "absolute",
     right: 20,

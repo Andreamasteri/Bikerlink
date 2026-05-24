@@ -275,6 +275,14 @@ const adminGroups: AdminGroup[] = [
       { key: "telemetry", label: "Telemetria", icon: "chart-line", iconSet: "MaterialCommunityIcons", route: "/admin/telemetry", accentColor: "#22C55E" },
     ],
   },
+  {
+    title: "Controllo OTA",
+    headerIcon: "cloud-download",
+    headerIconSet: "MaterialCommunityIcons",
+    items: [
+      { key: "ota", label: "Aggiornamenti OTA", icon: "cloud-download", iconSet: "MaterialCommunityIcons", route: "/admin/ota", accentColor: "#0EA5E9" },
+    ],
+  },
 ];
 
 function renderIcon(item: AdminItem, size = 28, color = Colors.accent) {

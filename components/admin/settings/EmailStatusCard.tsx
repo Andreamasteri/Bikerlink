@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
@@ -56,11 +56,28 @@ export const emailStatusStyles = StyleSheet.create({
   btnText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
 });
 
+const smtpStyles = StyleSheet.create({
+  expandRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, marginTop: 4, borderTopWidth: 1, borderTopColor: Colors.border },
+  expandLabel: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent },
+  form: { paddingTop: 6, gap: 4 },
+  fieldLabel: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.textSecondary, marginTop: 8, marginBottom: 4 },
+  input: { backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.text },
+  result: { padding: 10, borderRadius: 8, borderLeftWidth: 3, marginTop: 8 },
+  resultText: { fontFamily: "Inter_500Medium", fontSize: 12 },
+});
+
 export function EmailStatusCard() {
   const t = useT();
   const [testing, setTesting] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; messageId?: string; errorCode?: string; error?: string; smtpResponse?: string } | null>(null);
+
+  const [smtpExpanded, setSmtpExpanded] = useState(false);
+  const [smtpUser, setSmtpUser] = useState("");
+  const [smtpPassword, setSmtpPassword] = useState("");
+  const [smtpAdminPwd, setSmtpAdminPwd] = useState("");
+  const [savingSmtp, setSavingSmtp] = useState(false);
+  const [smtpSaveResult, setSmtpSaveResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const { data: diag, refetch: refetchDiag, isLoading: loadingDiag } = useQuery<EmailDiagnostics>({
     queryKey: ["/api/admin/email-status"],
@@ -70,6 +87,32 @@ export function EmailStatusCard() {
     queryKey: ["/api/admin/email-rate-limit-status"],
     refetchInterval: 30000,
   });
+
+  const handleSaveSmtp = async () => {
+    if (!smtpAdminPwd.trim()) {
+      Alert.alert("Errore", "Inserisci la password admin per confermare la modifica.");
+      return;
+    }
+    setSavingSmtp(true);
+    setSmtpSaveResult(null);
+    try {
+      await apiRequest("PUT", "/api/admin/settings/email-config", {
+        gmailUser: smtpUser.trim() || null,
+        gmailAppPassword: smtpPassword.trim() || null,
+        adminPassword: smtpAdminPwd.trim(),
+      });
+      setSmtpSaveResult({ ok: true, message: "Credenziali SMTP salvate correttamente." });
+      setSmtpUser("");
+      setSmtpPassword("");
+      setSmtpAdminPwd("");
+      refetchDiag();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Salvataggio fallito";
+      setSmtpSaveResult({ ok: false, message: msg });
+    } finally {
+      setSavingSmtp(false);
+    }
+  };
 
   const handleTest = async () => {
     setTesting(true);
@@ -244,6 +287,69 @@ export function EmailStatusCard() {
               )}
             </TouchableOpacity>
           </View>
+
+          {/* Configura credenziali SMTP */}
+          <TouchableOpacity
+            style={smtpStyles.expandRow}
+            onPress={() => { setSmtpExpanded((v) => !v); setSmtpSaveResult(null); }}
+          >
+            <Ionicons name="key" size={15} color={Colors.accent} />
+            <Text style={smtpStyles.expandLabel}>Configura credenziali Gmail / SMTP</Text>
+            <Ionicons name={smtpExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.textSecondary} />
+          </TouchableOpacity>
+
+          {smtpExpanded && (
+            <View style={smtpStyles.form}>
+              <Text style={smtpStyles.fieldLabel}>Email Gmail (es. nome@gmail.com)</Text>
+              <TextInput
+                style={smtpStyles.input}
+                placeholder="gmail account"
+                placeholderTextColor={Colors.textSecondary}
+                value={smtpUser}
+                onChangeText={setSmtpUser}
+                autoCapitalize="none"
+                keyboardType="email-address"
+              />
+              <Text style={smtpStyles.fieldLabel}>App Password Gmail (16 caratteri)</Text>
+              <TextInput
+                style={smtpStyles.input}
+                placeholder="xxxx xxxx xxxx xxxx"
+                placeholderTextColor={Colors.textSecondary}
+                value={smtpPassword}
+                onChangeText={setSmtpPassword}
+                autoCapitalize="none"
+                secureTextEntry
+              />
+              <Text style={smtpStyles.fieldLabel}>Password admin (conferma identità)</Text>
+              <TextInput
+                style={smtpStyles.input}
+                placeholder="password admin"
+                placeholderTextColor={Colors.textSecondary}
+                value={smtpAdminPwd}
+                onChangeText={setSmtpAdminPwd}
+                secureTextEntry
+              />
+              {smtpSaveResult && (
+                <View style={[smtpStyles.result, { borderLeftColor: smtpSaveResult.ok ? "#22c55e" : "#ef4444", backgroundColor: smtpSaveResult.ok ? "rgba(34,197,94,0.10)" : "rgba(239,68,68,0.10)" }]}>
+                  <Text style={[smtpStyles.resultText, { color: smtpSaveResult.ok ? "#22c55e" : "#ef4444" }]}>{smtpSaveResult.message}</Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[emailStatusStyles.btn, emailStatusStyles.btnPrimary, { marginTop: 8 }, savingSmtp && { opacity: 0.6 }]}
+                onPress={handleSaveSmtp}
+                disabled={savingSmtp}
+              >
+                {savingSmtp ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <>
+                    <Ionicons name="save" size={16} color="#fff" />
+                    <Text style={emailStatusStyles.btnText}>Salva credenziali</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
         </>
       )}
     </View>

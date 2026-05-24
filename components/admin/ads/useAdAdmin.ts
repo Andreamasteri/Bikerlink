@@ -56,7 +56,7 @@ export function useAdAdmin() {
   const [settingsDuration, setSettingsDuration] = useState("10");
   const [settingsMode, setSettingsMode] = useState<"sequential" | "random">("sequential");
 
-  const { data: allCampaigns = [], isLoading } = useQuery<Campaign[]>({
+  const { data: allCampaigns = [], isLoading, error: campaignsError } = useQuery<Campaign[]>({
     queryKey: ["/api/admin/advertisements"],
   });
 
@@ -533,6 +533,7 @@ export function useAdAdmin() {
     settingsMode, setSettingsMode,
     campaigns,
     isLoading,
+    campaignsError,
     cacheStats,
     healthBannerDismissed, setHealthBannerDismissed,
     brokenInView,
