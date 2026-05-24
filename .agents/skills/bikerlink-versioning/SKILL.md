@@ -118,7 +118,7 @@ La riga che calcola la versione OTA in `scripts/publish-ota.sh`:
 local VERSION="49.${NEXT_OTA}.10"
 ```
 
-⚠️ `scripts/publish-ota.sh` non esiste ancora — il sistema OTA è stato rimosso e sarà ricostruito con EAS Update. Questa formula è documentata per quando lo script verrà ricreato.
+Lo script si trova in `scripts/publish-ota.sh` e calcola NEXT_OTA interrogando l'EAS GraphQL API.
 
 Quando viene pubblicato un nuovo APK con un nuovo ciclo, aggiornare:
 - Il primo numero (`49` → nuovo versionCode)
