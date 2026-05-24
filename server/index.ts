@@ -201,11 +201,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
           saved++;
         }
         console.log(`[SNAPSHOT] Playlist snapshot saved for ${saved} users`);
-      } catch (e) { console.warn("[SNAPSHOT] runPlaylistSnapshot error:", e); }
+      } catch (e) { console.warn("[SNAPSHOT] runPlaylistSnapshot error:", e); throw e; }
     };
     // runPlaylistSnapshot iterates every user's tracks — non-essential at boot, fire-and-forget
     setImmediate(() => {
-      runPlaylistSnapshot().catch((e) => console.warn("[SNAPSHOT] background runPlaylistSnapshot error:", e));
+      console.log("[INIT][BG] Starting runPlaylistSnapshot...");
+      runPlaylistSnapshot()
+        .then(() => console.log("[INIT][BG] runPlaylistSnapshot — done"))
+        .catch((e) => console.warn("[INIT][BG] runPlaylistSnapshot error:", e));
     });
     setInterval(runPlaylistSnapshot, SIX_HOURS_MS);
 
@@ -227,7 +230,10 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
     // saveSchemaSnapshot is a dev/maintenance utility — non-essential at boot, fire-and-forget
     setImmediate(() => {
-      saveSchemaSnapshot().catch((e) => console.warn("[INIT] background saveSchemaSnapshot error:", e));
+      console.log("[INIT][BG] Starting saveSchemaSnapshot...");
+      saveSchemaSnapshot()
+        .then(() => console.log("[INIT][BG] saveSchemaSnapshot — done"))
+        .catch((e) => console.warn("[INIT][BG] saveSchemaSnapshot error:", e));
     });
 
     // Motion simulator for fake users (non-fatal)
@@ -248,19 +254,41 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   const totalElapsed = ((Date.now() - BOOT_START) / 1000).toFixed(1);
   console.log(`[INIT] All startup phases completed in ${totalElapsed}s — server is READY`);
 
+  // ── Boot summary ──────────────────────────────────────────────────────────
+  console.log("[INIT][SUMMARY] ── Boot task summary ──────────────────────────");
+  console.log(`[INIT][SUMMARY]   FOREGROUND (ran before READY):`);
+  console.log(`[INIT][SUMMARY]     autoSeedEssentialUsers   : ${needsFakeSeed ? "ran" : "skipped (DB already seeded)"}`);
+  console.log(`[INIT][SUMMARY]     seedAppleReviewerAccount : ran`);
+  console.log(`[INIT][SUMMARY]     seedGooglePlayReviewerAccount : ran`);
+  console.log(`[INIT][SUMMARY]     ensureBikerLinkOfficialOnBoot : ran`);
+  console.log(`[INIT][SUMMARY]     startMatchingEngine      : ran`);
+  console.log(`[INIT][SUMMARY]     scheduleNightlyVacuum    : scheduled`);
+  console.log(`[INIT][SUMMARY]     scheduleNightlyMapMatching : scheduled`);
+  console.log(`[INIT][SUMMARY]     scheduleWeeklyCurvyScoreUpdate : scheduled`);
+  console.log(`[INIT][SUMMARY]   BACKGROUND (fire-and-forget after READY):`);
+  console.log(`[INIT][SUMMARY]     runPlaylistSnapshot      : scheduled`);
+  console.log(`[INIT][SUMMARY]     saveSchemaSnapshot       : scheduled`);
+  console.log(`[INIT][SUMMARY]     initMissingClubConversations : scheduled`);
+  console.log(`[INIT][SUMMARY]     autoSeedFakeUsers        : ${needsFakeSeed ? "scheduled" : "skipped (needsFakeSeed=false)"}`);
+  console.log("[INIT][SUMMARY] ────────────────────────────────────────────────");
+
   // Fire-and-forget background jobs — run after server is READY.
   // None of these can block, timeout, or crash the boot sequence.
   setImmediate(() => {
-    console.log("[INIT] Background: starting initMissingClubConversations...");
-    initMissingClubConversations().catch((err) => {
-      console.warn("[INIT] Background initMissingClubConversations error:", err);
-    });
+    console.log("[INIT][BG] Starting initMissingClubConversations...");
+    initMissingClubConversations()
+      .then(() => console.log("[INIT][BG] initMissingClubConversations — done"))
+      .catch((err) => {
+        console.warn("[INIT][BG] initMissingClubConversations error:", err);
+      });
 
     if (needsFakeSeed) {
-      console.log("[INIT] Background: starting autoSeedFakeUsers...");
-      autoSeedFakeUsers().catch((err) => {
-        console.warn("[INIT] Background autoSeedFakeUsers error:", err);
-      });
+      console.log("[INIT][BG] Starting autoSeedFakeUsers...");
+      autoSeedFakeUsers()
+        .then(() => console.log("[INIT][BG] autoSeedFakeUsers — done"))
+        .catch((err) => {
+          console.warn("[INIT][BG] autoSeedFakeUsers error:", err);
+        });
     }
   });
 })().catch((err) => {
