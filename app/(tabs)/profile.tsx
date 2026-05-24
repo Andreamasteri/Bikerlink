@@ -27,7 +27,6 @@ import MatchPrefsPanel from "@/components/profile/MatchPrefsPanel";
 import OfflineMapsPanel from "@/components/profile/OfflineMapsPanel";
 import ThemePanel from "@/components/profile/ThemePanel";
 import UnitsPanel from "@/components/profile/UnitsPanel";
-import PrivacyPanel from "@/components/profile/PrivacyPanel";
 
 // New sub-components
 import { ProfileHeader } from "@/components/profile/view/ProfileHeader";

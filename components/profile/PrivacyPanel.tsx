@@ -1,3 +1,4 @@
+// unused — kept for future use
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
