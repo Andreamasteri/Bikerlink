@@ -7,7 +7,7 @@ import { useT } from "@/lib/language-context";
 import type { WebViewMessageEvent } from "react-native-webview";
 
 interface NavigationMapProps {
-  mapHtml: string | null;
+  mapUri: string | null;
   webViewRef: React.RefObject<WebView>;
   handleMapMessage: (event: WebViewMessageEvent) => void;
   handleClose: () => void;
@@ -19,7 +19,7 @@ interface NavigationMapProps {
 }
 
 export function NavigationMap({
-  mapHtml,
+  mapUri,
   webViewRef,
   handleMapMessage,
   handleClose,
@@ -35,15 +35,17 @@ export function NavigationMap({
 
   return (
     <View style={s.mapContainer}>
-      {mapHtml ? (
+      {mapUri ? (
         <WebView
           ref={webViewRef}
-          source={{ html: mapHtml, baseUrl: "" }}
+          source={{ uri: mapUri }}
           style={s.map}
           javaScriptEnabled
           originWhitelist={["*"]}
           onMessage={handleMapMessage}
           scrollEnabled={false}
+          onError={(e) => console.warn("[NavigationMap] WebView error:", e.nativeEvent.description)}
+          onHttpError={(e) => console.warn("[NavigationMap] HTTP error:", e.nativeEvent.statusCode, mapUri)}
         />
       ) : (
         <View style={[s.map, { justifyContent: "center", alignItems: "center", backgroundColor: colors.surface }]}>

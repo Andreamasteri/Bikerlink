@@ -4,7 +4,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
 import { getTileConfig } from "@/lib/map-tiles";
-import { buildLeafletRouteMapHtml, type RouteWaypoint } from "@/lib/leaflet-route-map-html";
+import { getApiUrl } from "@/lib/query-client";
+import type { RouteWaypoint } from "@/lib/leaflet-route-map-html";
 import Colors from "@/constants/colors";
 
 interface LeafletRouteMapProps {
@@ -19,10 +20,19 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
   const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
 
-  const html = useMemo(
-    () => buildLeafletRouteMapHtml(tileConfig.urlTemplate, tileConfig.maximumZ, waypoints, Colors.accent, typeColors, showMarkers, trackPoints),
-    [tileConfig.urlTemplate, tileConfig.maximumZ, waypoints, typeColors, showMarkers, trackPoints]
-  );
+  const mapUri = useMemo(() => {
+    const base = getApiUrl() + "/leaflet-route-map.html";
+    return (
+      base +
+      "?tileUrl=" + encodeURIComponent(tileConfig.urlTemplate) +
+      "&tileMaxZoom=" + tileConfig.maximumZ +
+      "&waypoints=" + encodeURIComponent(JSON.stringify(waypoints)) +
+      "&accentColor=" + encodeURIComponent(Colors.accent) +
+      "&typeColors=" + encodeURIComponent(JSON.stringify(typeColors || {})) +
+      "&showMarkers=" + (showMarkers ? "true" : "false") +
+      "&trackPoints=" + encodeURIComponent(JSON.stringify(trackPoints || []))
+    );
+  }, [tileConfig.urlTemplate, tileConfig.maximumZ, waypoints, typeColors, showMarkers, trackPoints]);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [skeletonVisible, setSkeletonVisible] = useState(true);
@@ -30,7 +40,7 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
   useEffect(() => {
     fadeAnim.setValue(0);
     setSkeletonVisible(true);
-  }, [html, fadeAnim]);
+  }, [mapUri, fadeAnim]);
 
   const handleLoadEnd = () => {
     Animated.timing(fadeAnim, {
@@ -46,7 +56,7 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
     <View style={containerStyle}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
         <WebView
-          source={{ html, baseUrl: "" }}
+          source={{ uri: mapUri }}
           style={styles.map}
           javaScriptEnabled={true}
           domStorageEnabled={true}
@@ -57,6 +67,8 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
           cacheEnabled={true}
           startInLoadingState={false}
           onLoadEnd={handleLoadEnd}
+          onError={(e) => console.warn("[LeafletRouteMap] WebView error:", e.nativeEvent.description)}
+          onHttpError={(e) => console.warn("[LeafletRouteMap] HTTP error:", e.nativeEvent.statusCode, mapUri)}
         />
       </Animated.View>
       {skeletonVisible && (

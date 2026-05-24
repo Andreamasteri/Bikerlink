@@ -3,7 +3,7 @@ import { View, StyleSheet } from "react-native";
 import WebView from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
 import { getTileConfig } from "@/lib/map-tiles";
-import { buildLeafletMiniMapHtml } from "@/lib/leaflet-mini-map-html";
+import { getApiUrl } from "@/lib/query-client";
 
 interface LeafletMiniMapProps {
   latitude: number;
@@ -15,15 +15,21 @@ export default function LeafletMiniMap({ latitude, longitude, height = 180 }: Le
   const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
 
-  const html = useMemo(
-    () => buildLeafletMiniMapHtml(tileConfig.urlTemplate, tileConfig.maximumZ, latitude, longitude),
-    [tileConfig.urlTemplate, tileConfig.maximumZ, latitude, longitude]
-  );
+  const mapUri = useMemo(() => {
+    const base = getApiUrl() + "/leaflet-mini-map.html";
+    return (
+      base +
+      "?lat=" + latitude +
+      "&lng=" + longitude +
+      "&tileUrl=" + encodeURIComponent(tileConfig.urlTemplate) +
+      "&tileMaxZoom=" + tileConfig.maximumZ
+    );
+  }, [latitude, longitude, tileConfig.urlTemplate, tileConfig.maximumZ]);
 
   return (
     <View style={[styles.wrapper, { height }]} pointerEvents="none">
       <WebView
-        source={{ html, baseUrl: "" }}
+        source={{ uri: mapUri }}
         style={styles.map}
         javaScriptEnabled={true}
         domStorageEnabled={true}
@@ -33,6 +39,8 @@ export default function LeafletMiniMap({ latitude, longitude, height = 180 }: Le
         overScrollMode="never"
         cacheEnabled={true}
         startInLoadingState={false}
+        onError={(e) => console.warn("[LeafletMiniMap] WebView error:", e.nativeEvent.description)}
+        onHttpError={(e) => console.warn("[LeafletMiniMap] HTTP error:", e.nativeEvent.statusCode, mapUri)}
       />
     </View>
   );

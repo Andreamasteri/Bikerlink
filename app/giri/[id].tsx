@@ -17,7 +17,6 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
-import { buildLeafletCurvatureGradientHtml } from "@/lib/leaflet-route-map-html";
 import { getTileConfig } from "@/lib/map-tiles";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
 import { decodePolyline } from "@/lib/polyline";
@@ -194,15 +193,16 @@ export default function GiriDetailScreen() {
     onError: () => Alert.alert("Errore", "Impossibile eliminare il giro."),
   });
 
-  const mapHtml = useMemo(() => {
+  const mapUri = useMemo(() => {
     if (!routePoints.length) return null;
-    return buildLeafletCurvatureGradientHtml(
-      TILE_CONFIG.urlTemplate,
-      TILE_CONFIG.maximumZ,
-      routePoints,
-      offline.offlineTileBasePath
+    const base = getApiUrl() + "/leaflet-curvature-map.html";
+    return (
+      base +
+      "?tileUrl=" + encodeURIComponent(TILE_CONFIG.urlTemplate) +
+      "&tileMaxZoom=" + TILE_CONFIG.maximumZ +
+      "&points=" + encodeURIComponent(JSON.stringify(routePoints))
     );
-  }, [routePoints, offline.offlineTileBasePath]);
+  }, [routePoints]);
 
   const multiDayDays = useMemo(() => {
     if (!route?.isMultiDay) return null;
@@ -452,7 +452,7 @@ export default function GiriDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         <GiriMap
-          mapHtml={mapHtml}
+          mapUri={mapUri}
           style={route.style}
           distanceKm={route.distanceKm}
           offlineStatus={offline.status}

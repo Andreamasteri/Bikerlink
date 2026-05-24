@@ -5,6 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { registerRoutes } from "./routes";
 import { registerSiteRoutes } from "./site/routes";
+import { registerLeafletMapRoutes } from "./routes/leaflet-maps";
 import { storage } from "./storage";
 
 const log = console.log;
@@ -91,6 +92,9 @@ export function registerAllRoutes(app: express.Application) {
   
   // API Routes
   registerRoutes(expressApp);
+
+  // Leaflet map HTML endpoints (served as URI to avoid large inline source={{ html }})
+  registerLeafletMapRoutes(expressApp);
 
   // Expo Manifest and Landing/Site Routes
   app.use((req, res, next) => {

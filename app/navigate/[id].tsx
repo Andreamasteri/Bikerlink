@@ -16,9 +16,8 @@ import * as Location from "expo-location";
 import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { haversineM, closestPointIndexOnPolyline } from "@/lib/geo";
-import { buildNavigationMapHtml } from "@/lib/leaflet-navigation-html";
 import { getTileConfig } from "@/lib/map-tiles";
 import { useLocale, useT } from "@/lib/language-context";
 import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
@@ -424,15 +423,21 @@ export default function NavigateScreen() {
 
   const s = styles(colors);
 
-  // Build map HTML — rebuilt whenever polylinePoints change (including after reroute)
-  const mapHtml = React.useMemo(() => {
+  // Build map URI — rebuilt whenever polylinePoints change (including after reroute)
+  const mapUri = React.useMemo(() => {
     if (polylinePoints.length < 2) return null;
     const stepsForMap = activeStepsRef.current ?? route?.navigationSteps ?? [];
     const stepPoints = stepsForMap.map((step) => {
       const idx = step.interval[0];
       return idx < polylinePoints.length ? polylinePoints[idx] : polylinePoints[0];
     });
-    return buildNavigationMapHtml(TILE_CONFIG.urlTemplate, polylinePoints, stepPoints);
+    const base = getApiUrl() + "/leaflet-navigation-map.html";
+    return (
+      base +
+      "?tileUrl=" + encodeURIComponent(TILE_CONFIG.urlTemplate) +
+      "&routeCoords=" + encodeURIComponent(JSON.stringify(polylinePoints)) +
+      "&stepCoords=" + encodeURIComponent(JSON.stringify(stepPoints))
+    );
   }, [polylinePoints, route?.navigationSteps]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
@@ -467,7 +472,7 @@ export default function NavigateScreen() {
   return (
     <View style={s.container}>
       <NavigationMap
-        mapHtml={mapHtml}
+        mapUri={mapUri}
         // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView ref type
         webViewRef={webViewRef as any}
         handleMapMessage={handleMapMessage}

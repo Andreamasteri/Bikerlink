@@ -7,7 +7,7 @@ import type { ThemeColors } from '@/constants/colors';
 import type { WebViewMessageEvent } from 'react-native-webview';
 
 interface GiriMapProps {
-  mapHtml: string | null;
+  mapUri: string | null;
   style: string;
   distanceKm: number;
   offlineStatus: string;
@@ -16,7 +16,7 @@ interface GiriMapProps {
 }
 
 export const GiriMap: React.FC<GiriMapProps> = ({
-  mapHtml,
+  mapUri,
   style,
   distanceKm,
   offlineStatus,
@@ -26,7 +26,7 @@ export const GiriMap: React.FC<GiriMapProps> = ({
   const colors = useColors();
   const s = styles(colors);
 
-  if (!mapHtml) {
+  if (!mapUri) {
     return (
       <View style={s.mapPlaceholder}>
         <Ionicons name="map-outline" size={32} color={colors.textSecondary} />
@@ -38,15 +38,14 @@ export const GiriMap: React.FC<GiriMapProps> = ({
   return (
     <View style={s.mapContainer}>
       <WebView
-        source={{ html: mapHtml, baseUrl: "" }}
+        source={{ uri: mapUri }}
         style={s.map}
         scrollEnabled={false}
         javaScriptEnabled
         originWhitelist={["*"]}
-        allowFileAccess
-        allowFileAccessFromFileURLs
-        allowUniversalAccessFromFileURLs
         onMessage={onMessage}
+        onError={(e) => console.warn("[GiriMap] WebView error:", e.nativeEvent.description)}
+        onHttpError={(e) => console.warn("[GiriMap] HTTP error:", e.nativeEvent.statusCode, mapUri)}
       />
       <View style={s.mapOverlayBadge}>
         <MaterialCommunityIcons
