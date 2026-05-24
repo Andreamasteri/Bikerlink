@@ -20,11 +20,26 @@ accidentalmente nel repository.
 
 ### Come funziona
 
+La protezione opera su **due livelli**:
+
+**Livello 1 — pre-commit hook (locale)**
+
 Ad ogni `git commit`, il hook:
 
 1. Scansiona i file in staging alla ricerca di pattern riconducibili a segreti.
 2. Confronta il risultato con la baseline approvata (`.secrets.baseline`).
 3. Blocca il commit se vengono trovati nuovi segreti non in baseline.
+
+**Livello 2 — CI/CD (GitHub Actions)**
+
+Ad ogni `push` e `pull_request` verso `main`, il job **Secrets Scan** nella
+pipeline CI esegue `detect-secrets-hook --baseline .secrets.baseline` su tutti i
+file tracciati dal repository. Il processo esce con codice 1 e la pipeline fallisce
+se vengono trovati segreti non presenti nella baseline, bloccando il merge anche
+quando il pre-commit hook è stato aggirato con `--no-verify` o non era attivo in
+locale.
+
+Il risultato è visibile nella sezione **Checks** di ogni PR.
 
 ### Falsi positivi
 
