@@ -266,3 +266,14 @@ Configurazione applicata in:
 - L'APK arm64 dimagrita (~50MB) è installabile direttamente dall'utente per side-load sui device piantati su OTA-19
 
 **Ciclo precedente:** APK v43 / rv 8.0.0 / 3.2.0 — apkBuildId `38cb1b32-4316-4f63-9799-1b9ab36888e8`, APK https://expo.dev/artifacts/eas/81L2RgW8kFuzUiRzACfAEm.apk (STABILE)
+
+---
+
+## 📌 Promemoria utente
+
+> Quando l'utente dice **"ricordami di..."** o **"ricordiamoci di..."**, aggiungo una voce qui sotto con la data.
+> Quando dice **"cosa dovevi ricordarmi?"**, rileggo questa sezione e gliene faccio un elenco.
+
+<!-- PROMEMORIA_INIZIO -->
+*(nessun promemoria salvato)*
+<!-- PROMEMORIA_FINE -->
