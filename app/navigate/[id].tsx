@@ -521,6 +521,32 @@ export default function NavigateScreen() {
           )}
         </Pressable>
       )}
+
+      {/* Offline map available indicator with delete action */}
+      {offline.status === "available" && (
+        <Pressable
+          style={s.offlineAvailableBanner}
+          onPress={() => {
+            Alert.alert(
+              "Rimuovi mappa offline",
+              "Vuoi eliminare le mappe salvate per questo percorso?",
+              [
+                { text: "Annulla", style: "cancel" },
+                {
+                  text: "Rimuovi",
+                  style: "destructive",
+                  onPress: () => offline.deleteOffline(),
+                },
+              ]
+            );
+          }}
+        >
+          <Ionicons name="checkmark-circle-outline" size={15} color="#22c55e" />
+          <Text style={s.offlineAvailableBannerText}>Mappa offline ✓</Text>
+          <Ionicons name="trash-outline" size={15} color="rgba(255,255,255,0.6)" />
+        </Pressable>
+      )}
+
       {offline.status === "downloading" && (
         <View style={s.downloadBanner}>
           <Ionicons name="cloud-download-outline" size={15} color="#fff" />
@@ -601,4 +627,13 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     paddingHorizontal: 12,
   },
   staleBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#fff" },
+  offlineAvailableBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(34,197,94,0.15)",
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+  },
+  offlineAvailableBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#22c55e", flex: 1 },
 });
