@@ -1,3 +1,5 @@
+import { LEAFLET_JS, LEAFLET_CSS } from './leaflet-bundle';
+
 export interface PickerWaypoint {
   lat: number;
   lng: number;
@@ -23,7 +25,7 @@ export function buildLeafletPickerMapHtml(
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>${LEAFLET_CSS}</style>
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
@@ -34,7 +36,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 </head>
 <body>
 <div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>${LEAFLET_JS}</script>
 <script>
 (function() {
   var tileUrl = ${JSON.stringify(tileUrl)};

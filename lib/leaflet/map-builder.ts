@@ -1,6 +1,7 @@
 import { MAP_STYLES, CURVATURE_LEGEND_HTML, TAP_HINT_HTML } from './map-styles';
 import { COMMON_SCRIPTS } from './map-scripts';
 import { MARKER_SCRIPTS, getWaypointColor } from './map-markers';
+import { LEAFLET_JS, LEAFLET_CSS } from '../leaflet-bundle';
 
 export interface PlannerWaypoint {
   lat: number;
@@ -33,14 +34,14 @@ export function buildPlannerMapHtml(
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>${LEAFLET_CSS}</style>
 <style>${MAP_STYLES}</style>
 </head>
 <body>
 <div id="map"></div>
 ${CURVATURE_LEGEND_HTML}
 ${TAP_HINT_HTML}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>${LEAFLET_JS}</script>
 <script>
 (function() {
   ${COMMON_SCRIPTS}
@@ -220,12 +221,12 @@ export function buildLeafletPostRideHtml(
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>${LEAFLET_CSS}</style>
 <style>\${MAP_STYLES}</style>
 </head>
 <body>
 <div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>${LEAFLET_JS}</script>
 <script>
 (function() {
   \${MARKER_SCRIPTS}
@@ -278,13 +279,13 @@ export function buildLeafletCurvatureGradientHtml(
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>${LEAFLET_CSS}</style>
 <style>\${MAP_STYLES}</style>
 </head>
 <body>
 <div id="map"></div>
 \${CURVATURE_LEGEND_HTML}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>${LEAFLET_JS}</script>
 <script>
 (function() {
   \${COMMON_SCRIPTS}
@@ -389,12 +390,12 @@ export function buildLeafletRouteMapHtml(
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>${LEAFLET_CSS}</style>
 <style>\${MAP_STYLES}</style>
 </head>
 <body>
 <div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>${LEAFLET_JS}</script>
 <script>
 (function() {
   \${MARKER_SCRIPTS}
