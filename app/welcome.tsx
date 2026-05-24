@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent,
   },
   registerText: {
-    fontSize: 18,
+    fontSize: 23,
     fontFamily: "Inter_600SemiBold",
     color: Colors.accent,
   },
