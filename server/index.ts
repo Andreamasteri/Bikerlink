@@ -236,6 +236,20 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
         .catch((e) => console.warn("[INIT][BG] saveSchemaSnapshot error:", e));
     });
 
+    // OTA sync cron — every 15 min, picks up eas update --channel staging publishes
+    const FIFTEEN_MIN_MS = 15 * 60 * 1000;
+    const { syncStagingUpdates } = await import("./routes/admin/ota");
+    setImmediate(() => {
+      console.log("[INIT][BG] OTA sync: first run...");
+      syncStagingUpdates()
+        .then(() => console.log("[INIT][BG] OTA sync: first run done"))
+        .catch((e) => console.warn("[INIT][BG] OTA sync error:", e));
+    });
+    setInterval(() => {
+      syncStagingUpdates().catch((e) => console.warn("[OTA-CRON] sync error:", e));
+    }, FIFTEEN_MIN_MS);
+    console.log("[INIT] OTA cron scheduled every 15 min");
+
     // Motion simulator for fake users — fire-and-forget so it cannot hang boot
     import("./motion-simulator")
       .then(({ startMotionSimulator }) => startMotionSimulator())
@@ -262,6 +276,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   console.log(`[INIT][SUMMARY]     scheduleNightlyVacuum    : scheduled`);
   console.log(`[INIT][SUMMARY]     scheduleNightlyMapMatching : scheduled`);
   console.log(`[INIT][SUMMARY]     scheduleWeeklyCurvyScoreUpdate : scheduled`);
+  console.log(`[INIT][SUMMARY]     syncStagingUpdates (OTA cron)  : scheduled every 15 min`);
   console.log(`[INIT][SUMMARY]   BACKGROUND (fire-and-forget after READY):`);
   console.log(`[INIT][SUMMARY]     runPlaylistSnapshot      : scheduled`);
   console.log(`[INIT][SUMMARY]     saveSchemaSnapshot       : scheduled`);
