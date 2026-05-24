@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# setup-hooks.sh — installa i git hooks di sicurezza per BikerLink
+# Esegui una volta dopo aver clonato il repo: bash scripts/setup-hooks.sh
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+HOOKS_DIR="$REPO_ROOT/.git/hooks"
+SCRIPT_DIR="$REPO_ROOT/scripts"
+
+echo "🔧 Installazione git hooks BikerLink..."
+
+# --- pre-commit: detect-secrets ---
+PRE_COMMIT_SRC="$SCRIPT_DIR/pre-commit"
+PRE_COMMIT_DST="$HOOKS_DIR/pre-commit"
+
+if [[ ! -f "$PRE_COMMIT_SRC" ]]; then
+  echo "❌ Script sorgente non trovato: $PRE_COMMIT_SRC"
+  exit 1
+fi
+
+cp "$PRE_COMMIT_SRC" "$PRE_COMMIT_DST"
+chmod +x "$PRE_COMMIT_DST"
+echo "✅ pre-commit hook installato in $PRE_COMMIT_DST"
+
+# --- Verifica detect-secrets ---
+DETECT_SECRETS_BIN=""
+for candidate in \
+  "$(command -v detect-secrets 2>/dev/null)" \
+  "$HOME/.local/bin/detect-secrets" \
+  "/home/runner/workspace/.pythonlibs/bin/detect-secrets" \
+  "/usr/local/bin/detect-secrets"; do
+  if [[ -x "$candidate" ]]; then
+    DETECT_SECRETS_BIN="$candidate"
+    break
+  fi
+done
+
+if [[ -z "$DETECT_SECRETS_BIN" ]]; then
+  echo ""
+  echo "⚠️  detect-secrets non trovato nel PATH."
+  echo "   Installa con: pip install detect-secrets"
+  echo "   Poi riesegui questo script."
+else
+  echo "✅ detect-secrets trovato: $DETECT_SECRETS_BIN"
+
+  # Genera baseline se mancante
+  BASELINE="$REPO_ROOT/.secrets.baseline"
+  if [[ ! -f "$BASELINE" ]]; then
+    echo "📋 Genero baseline iniziale (.secrets.baseline)..."
+    cd "$REPO_ROOT"
+    "$DETECT_SECRETS_BIN" scan > "$BASELINE"
+    echo "✅ Baseline creata. Rivedi $BASELINE prima di committare."
+  else
+    echo "ℹ️  Baseline esistente trovata ($BASELINE) — non sovrascritta."
+  fi
+fi
+
+echo ""
+echo "🎉 Setup completato. Il hook pre-commit è attivo."
+echo "   Per bypassare (solo falsi positivi): git commit --no-verify"

@@ -1,0 +1,93 @@
+#!/usr/bin/env bash
+# pre-commit hook — blocca segreti e token prima del commit
+# Installato da: scripts/setup-hooks.sh
+# Bypass per falsi positivi: git commit --no-verify
+# oppure aggiungi '# pragma: allowlist secret' sulla riga incriminata
+
+set -euo pipefail
+
+DETECT_SECRETS_HOOK=""
+DETECT_SECRETS_BIN=""
+
+for candidate in \
+  "$(command -v detect-secrets-hook 2>/dev/null)" \
+  "$HOME/.local/bin/detect-secrets-hook" \
+  "/home/runner/workspace/.pythonlibs/bin/detect-secrets-hook" \
+  "/usr/local/bin/detect-secrets-hook"; do
+  if [[ -x "$candidate" ]]; then
+    DETECT_SECRETS_HOOK="$candidate"
+    break
+  fi
+done
+
+for candidate in \
+  "$(command -v detect-secrets 2>/dev/null)" \
+  "$HOME/.local/bin/detect-secrets" \
+  "/home/runner/workspace/.pythonlibs/bin/detect-secrets" \
+  "/usr/local/bin/detect-secrets"; do
+  if [[ -x "$candidate" ]]; then
+    DETECT_SECRETS_BIN="$candidate"
+    break
+  fi
+done
+
+# Fail-closed: se detect-secrets non è installato, blocca il commit
+if [[ -z "$DETECT_SECRETS_HOOK" ]]; then
+  echo ""
+  echo "❌ COMMIT BLOCCATO — detect-secrets non trovato."
+  echo ""
+  echo "   Installa con: pip install detect-secrets"
+  echo "   Poi reinstalla l'hook: bash scripts/setup-hooks.sh"
+  echo ""
+  echo "   Bypass una-tantum (solo emergenze): git commit --no-verify"
+  exit 1
+fi
+
+# Raccoglie i file in staging (aggiunti o modificati, non cancellati)
+mapfile -t STAGED_FILES < <(git diff --cached --name-only --diff-filter=ACM 2>/dev/null | \
+  grep -Ev '(node_modules|\.expo|server_dist|static-build|dist-ota|\.git|\.secrets\.baseline|package-lock\.json|yarn\.lock)' || true)
+
+if [[ ${#STAGED_FILES[@]} -eq 0 ]]; then
+  exit 0
+fi
+
+echo "🔍 detect-secrets: scansione file in staging..."
+
+BASELINE=".secrets.baseline"
+
+# Crea la baseline se non esiste ancora
+if [[ ! -f "$BASELINE" ]]; then
+  echo "📋 Baseline non trovata — creo .secrets.baseline iniziale..."
+  if [[ -n "$DETECT_SECRETS_BIN" ]]; then
+    "$DETECT_SECRETS_BIN" scan --no-verify "${STAGED_FILES[@]}" > "$BASELINE"
+    echo "✅ Baseline creata da file in staging. Rivedi '$BASELINE' e rifai il commit."
+  else
+    echo '{"version":"1.5.0","plugins_used":[],"filters_used":[],"results":{},"generated_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}' > "$BASELINE"
+    echo "✅ Baseline vuota creata. Rifai il commit."
+  fi
+  exit 1
+fi
+
+# detect-secrets-hook confronta i file staged con la baseline e
+# esce con codice non-zero se trova segreti non approvati
+if "$DETECT_SECRETS_HOOK" --baseline "$BASELINE" "${STAGED_FILES[@]}"; then
+  echo "✅ Nessun segreto rilevato — commit consentito."
+  exit 0
+else
+  echo ""
+  echo "❌ COMMIT BLOCCATO — possibili segreti non approvati rilevati."
+  echo ""
+  echo "   Soluzioni:"
+  echo "   1. Rimuovi il segreto dal file (raccomandato)."
+  echo "   2. Falso positivo? Aggiungi sulla riga incriminata il commento:"
+  echo "        # pragma: allowlist secret"
+  echo "   3. Aggiorna la baseline (approva il falso positivo):"
+  echo "        detect-secrets scan --no-verify > .secrets.baseline"
+  echo "        detect-secrets audit .secrets.baseline"
+  echo "        git add .secrets.baseline && git commit"
+  echo "   4. Bypass una-tantum (solo emergenze):"
+  echo "        git commit --no-verify"
+  echo ""
+  echo "   Consulta CONTRIBUTING.md per la procedura completa."
+  exit 1
+fi
