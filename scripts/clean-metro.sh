@@ -24,7 +24,25 @@ remove_path() {
 echo "[$TIMESTAMP] === Pulizia profonda Metro ==="
 
 # 1. Cartella .expo/ (stato interno Expo: manifest, sessione, cache bundler)
-remove_path "$PROJECT_ROOT/.expo" ".expo/"
+# Preserva .expo/types/ — contiene router.d.ts generato da expo-router,
+# non fa parte della cache Metro e serve al typecheck TypeScript.
+if [ -d "$PROJECT_ROOT/.expo" ]; then
+  # Backup types/ se presente
+  if [ -d "$PROJECT_ROOT/.expo/types" ]; then
+    cp -r "$PROJECT_ROOT/.expo/types" /tmp/_expo_types_backup 2>/dev/null || true
+  fi
+  rm -rf "$PROJECT_ROOT/.expo"
+  echo "  [OK]   .expo/"
+  # Ripristina types/
+  if [ -d /tmp/_expo_types_backup ]; then
+    mkdir -p "$PROJECT_ROOT/.expo/types"
+    cp -r /tmp/_expo_types_backup/. "$PROJECT_ROOT/.expo/types/"
+    rm -rf /tmp/_expo_types_backup
+    echo "  [OK]   .expo/types/ ripristinata (router.d.ts preservato)"
+  fi
+else
+  echo "  [SKIP] .expo/ (non presente)"
+fi
 
 # 2. Cache Metro dentro node_modules (solo le sottodirectory metro-*)
 if [ -d "$PROJECT_ROOT/node_modules/.cache" ]; then
