@@ -114,12 +114,14 @@ La riga che calcola la versione OTA in `scripts/publish-ota.sh`:
 
 ```bash
 # Formato versione OTA: <build>.<updateNumber>.<ciclo_ota>
-# 48 = versionCode APK corrente, NEXT_OTA = numero progressivo OTA nel ciclo, 10 = ciclo runtimeVersion (10.0.0)
-local VERSION="48.${NEXT_OTA}.10"
+# 49 = versionCode APK corrente, NEXT_OTA = numero progressivo OTA nel ciclo, 10 = ciclo runtimeVersion (10.0.0)
+local VERSION="49.${NEXT_OTA}.10"
 ```
 
+⚠️ `scripts/publish-ota.sh` non esiste ancora — il sistema OTA è stato rimosso e sarà ricostruito con EAS Update. Questa formula è documentata per quando lo script verrà ricreato.
+
 Quando viene pubblicato un nuovo APK con un nuovo ciclo, aggiornare:
-- Il primo numero (`48` → nuovo versionCode)
+- Il primo numero (`49` → nuovo versionCode)
 - Il terzo numero (`10` → numero del nuovo ciclo runtimeVersion)
 - Il commento sopra la riga
 
