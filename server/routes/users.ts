@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { storage } from "../storage";
 import { haversineKm } from "../geo";
+import { users } from "@shared/db";
 import profileRouter from "./users/profile";
 import discoveryRouter from "./users/discovery";
 import actionsRouter from "./users/actions";
@@ -91,8 +92,7 @@ export async function captureFirstAvailabilityLocation(
   }
 } 
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function systemAccountConditions(usersTable: any) {
+export function systemAccountConditions(usersTable: typeof users) {
   const { systemAccountConditions: baseConditions } = require("../lib/system-account-filter");
   return baseConditions(usersTable);
 }

@@ -58,10 +58,13 @@ export async function objectExists(objectPath: string): Promise<boolean> {
   return result.ok && result.value === true;
 }
 
+interface StorageClientWithGCS {
+  getBucket(): Promise<{ file(path: string): { publicUrl(): string } }>;
+}
+
 export async function getPublicUrl(objectPath: string): Promise<string> {
   const client = getClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const bucket = await (client as any).getBucket();
+  const bucket = await (client as unknown as StorageClientWithGCS).getBucket();
   const file = bucket.file(objectPath);
   return file.publicUrl();
 }

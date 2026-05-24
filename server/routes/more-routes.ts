@@ -214,10 +214,22 @@ export function registerMoreRoutes(app: Express) {
 
   const PRIVACY_EXPORT_PDF_PATH = path.resolve(process.cwd(), "server/public/bikerlink-privacy-policy-export.pdf");
 
+  interface PDFDocumentInstance {
+    pipe(dest: NodeJS.WritableStream): void;
+    fontSize(size: number): PDFDocumentInstance;
+    font(name: string): PDFDocumentInstance;
+    text(text: string, options?: Record<string, unknown>): PDFDocumentInstance;
+    moveDown(lines?: number): PDFDocumentInstance;
+    end(): void;
+  }
+  interface PDFDocumentConstructor {
+    new (options?: Record<string, unknown>): PDFDocumentInstance;
+  }
+
   app.get("/api/privacy-policy/export", async (_req, res) => {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any
-      const PDFDocument = require("pdfkit") as any;
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const PDFDocument = require("pdfkit") as PDFDocumentConstructor;
       const publicDir = path.dirname(PRIVACY_EXPORT_PDF_PATH);
       if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
 
