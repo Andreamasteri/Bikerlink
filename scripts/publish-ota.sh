@@ -112,9 +112,20 @@ VERSION="${BUILD_NUM}.${NEXT_OTA}.${RUNTIME_VER}"
 
 log_info "NEXT_OTA: ${NEXT_OTA}, Versione OTA: ${VERSION}"
 log_info "Messaggio: ${MESSAGE}"
-log_info "Pubblicazione su canale staging..."
+
+# ── Aggiorna APPLIED_OTA_NUMBER in constants/buildInfo.ts ──
+# Il bundle OTA pubblicato conterrà il numero baked-in:
+# al primo avvio dopo l'apply, ProfileVersionSection lo salva in AsyncStorage
+BUILD_INFO="constants/buildInfo.ts"
+if [[ -f "$BUILD_INFO" ]]; then
+  sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${NEXT_OTA};/" "$BUILD_INFO"
+  log_info "APPLIED_OTA_NUMBER aggiornato a ${NEXT_OTA} in ${BUILD_INFO}"
+else
+  log_warn "${BUILD_INFO} non trovato — APPLIED_OTA_NUMBER non aggiornato"
+fi
 
 # ── Pubblica su staging ──
+log_info "Pubblicazione su canale staging..."
 EAS_OUTPUT=$(EXPO_TOKEN="${EAS_TOKEN}" eas update \
   --channel staging \
   --message "${MESSAGE}" \
