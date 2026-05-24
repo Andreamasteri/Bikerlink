@@ -177,8 +177,7 @@ export default function NavigateScreen() {
 
   const offlineRoutePoints = React.useMemo(
     () => polylinePoints.map(([lat, lng]) => ({ lat, lng })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [polylinePoints.length]
+    [polylinePoints]
   );
   const offline = useOfflineTiles(id, route?.title ?? "", offlineRoutePoints);
 
@@ -538,6 +537,17 @@ export default function NavigateScreen() {
         </View>
       )}
 
+      {/* Stale offline tiles banner — shown after a reroute when the cached
+          tiles no longer fully cover the new polyline */}
+      {offline.status === "stale" && (
+        <View style={s.staleBanner}>
+          <Ionicons name="map-outline" size={14} color="#fff" />
+          <Text style={s.staleBannerText}>
+            Mappe offline non coprono il percorso ricalcolato
+          </Text>
+        </View>
+      )}
+
       <NavigationInstruction
         step={step}
         nextStep={steps[currentStep + 1] ?? null}
@@ -581,4 +591,14 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   downloadProgressWrap: { flex: 1, gap: 4 },
   downloadProgressBg: { height: 3, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 2, overflow: "hidden" },
   downloadProgressFill: { height: 3, backgroundColor: colors.accent, borderRadius: 2 },
+  staleBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#e67e22",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  staleBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#fff" },
 });
