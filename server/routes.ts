@@ -54,7 +54,7 @@ import { onlineTracker } from "./online-tracker";
 import { registerClientSettingsRoutes } from "./routes/client-settings";
 import { registerMoreRoutes } from "./routes/more-routes";
 
-async function requireAdmin(req: Request, res: Response, next: NextFunction) {
+async function _requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = req.session as { userId?: string };
   if (!session?.userId) {
     return res.status(401).json({ message: "Non autenticato" });
