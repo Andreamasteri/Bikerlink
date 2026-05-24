@@ -37,8 +37,8 @@ export function LastfmLoginModal({
         throw new Error(data.message || "Errore di connessione");
       }
       onClose();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     } finally {
       setIsLoading(false);
     }

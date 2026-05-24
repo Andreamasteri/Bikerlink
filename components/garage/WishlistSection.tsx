@@ -82,7 +82,7 @@ export const WishlistSection: React.FC<WishlistSectionProps> = ({
         Alert.alert("Here Comes Your Chance!!", matchInfo);
       }
     },
-    onError: (err: any) => Alert.alert(t("common.error"), err.message),
+    onError: (err: any) => Alert.alert(t("common.error"), (err as Error).message),
   });
 
   const updateMotoMutation = useMutation({

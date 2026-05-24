@@ -281,12 +281,12 @@ export default function ChatConversationScreen() {
 
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ message: t("chat.uploadError") }));
-        throw new Error(err.message ?? t("chat.uploadPhotoError"));
+        throw new Error((err as Error).message ?? t("chat.uploadPhotoError"));
       }
 
       await queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${id}/messages`] });
-    } catch (err: any) {
-      Alert.alert("Errore", err?.message ?? "Impossibile inviare la foto.");
+    } catch (err: unknown) {
+      Alert.alert("Errore", (err instanceof Error ? err.message : null) ?? "Impossibile inviare la foto.");
     } finally {
       setIsUploadingImage(false);
     }

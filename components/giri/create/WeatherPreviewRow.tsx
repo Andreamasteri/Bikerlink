@@ -1,4 +1,5 @@
 import React from "react";
+import type { ThemeColors } from '@/constants/colors';
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { WeatherBadge } from "./WeatherBadge";
 
@@ -10,7 +11,7 @@ interface WeatherWaypoint {
 
 interface WeatherPreviewRowProps {
   weather: WeatherWaypoint[];
-  colors: any;
+  colors: ThemeColors;
 }
 
 export const WeatherPreviewRow: React.FC<WeatherPreviewRowProps> = ({ weather, colors }) => {

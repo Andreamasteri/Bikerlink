@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TextInput, StyleSheet } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 interface RouteTitleSectionProps {
   title: string;
@@ -28,7 +29,7 @@ export const RouteTitleSection: React.FC<RouteTitleSectionProps> = ({
   );
 };
 
-const styles = (colors: any) =>
+const styles = (colors: ThemeColors) =>
   StyleSheet.create({
     section: { marginBottom: 20 },
     sectionLabel: {

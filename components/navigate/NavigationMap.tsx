@@ -4,11 +4,13 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
 import { useColors } from "@/hooks/useColors";
 import { useT } from "@/lib/language-context";
+import type { ThemeColors } from "@/constants/colors";
+import type { WebViewMessageEvent } from "react-native-webview";
 
 interface NavigationMapProps {
   mapHtml: string | null;
   webViewRef: React.RefObject<WebView>;
-  handleMapMessage: (event: any) => void;
+  handleMapMessage: (event: WebViewMessageEvent) => void;
   handleClose: () => void;
   isRerouting: boolean;
   remainingKm: number | null;
@@ -77,7 +79,7 @@ export function NavigationMap({
   );
 }
 
-const styles = (_colors: any) =>
+const styles = (_colors: ThemeColors) =>
   StyleSheet.create({
     mapContainer: {
       flex: 1,

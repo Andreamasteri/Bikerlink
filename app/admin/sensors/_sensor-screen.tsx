@@ -111,7 +111,7 @@ function SensorBody({ def }: { def: SensorDefinition }) {
     try {
       available = await checkSensorAvailable(def.key);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = e instanceof Error ? (e as Error).message : String(e);
       addLog("error", `Errore verifica disponibilità: ${msg}`);
       setIsStarting(false);
       return;
@@ -153,7 +153,7 @@ function SensorBody({ def }: { def: SensorDefinition }) {
         addLog("success", "Permesso concesso");
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = e instanceof Error ? (e as Error).message : String(e);
       addLog("error", `Errore richiesta permesso: ${msg}`);
       setIsStarting(false);
       return;
@@ -171,7 +171,7 @@ function SensorBody({ def }: { def: SensorDefinition }) {
       await AsyncStorage.setItem(`sensor_config_${def.key}`, configStr).catch(() => {});
       addLog("success", `Sensore avviato — config: ${configStr}`);
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = e instanceof Error ? (e as Error).message : String(e);
       addLog("error", `Errore avvio sensore: ${msg}`);
     } finally {
       setIsStarting(false);

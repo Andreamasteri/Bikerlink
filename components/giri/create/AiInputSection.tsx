@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 interface AiInputSectionProps {
   aiPrompt: string;
@@ -49,7 +50,7 @@ export const AiInputSection: React.FC<AiInputSectionProps> = ({
   );
 };
 
-const styles = (colors: any) =>
+const styles = (colors: ThemeColors) =>
   StyleSheet.create({
     section: { marginBottom: 20 },
     sectionLabel: {

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import type { ThemeColors } from '@/constants/colors';
 
 interface GiriOfflineCardProps {
   status: 'none' | 'available' | 'downloading';
@@ -78,7 +79,7 @@ export const GiriOfflineCard: React.FC<GiriOfflineCardProps> = ({
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   offlineCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, marginBottom: 20, gap: 10 },
   offlineCardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
   offlineCardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: colors.text, flex: 1 },

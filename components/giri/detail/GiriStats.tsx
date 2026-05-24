@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import type { ThemeColors } from '@/constants/colors';
 
 interface GiriStatsProps {
   distanceKm: number;
@@ -112,7 +113,7 @@ export const GiriStats: React.FC<GiriStatsProps> = ({
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   heroCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 16, gap: 12 },
   heroStats: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
   heroStat: { alignItems: "center" },

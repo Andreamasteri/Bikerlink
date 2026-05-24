@@ -2,6 +2,7 @@ import React from "react";
 import { Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 interface ActionButtonsSectionProps {
   calculating: boolean;
@@ -54,7 +55,7 @@ export const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
   );
 };
 
-const styles = (colors: any) =>
+const styles = (colors: ThemeColors) =>
   StyleSheet.create({
     primaryBtn: {
       flexDirection: "row",

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { getApiUrl } from "@/lib/query-client";
+import type { ThemeColors } from '@/constants/colors';
 
 interface POIPhoto {
   id: string;
@@ -16,7 +17,7 @@ interface POIPhoto {
 
 interface POIPhotoGalleryProps {
   poiId: string;
-  colors: any;
+  colors: ThemeColors;
 }
 
 const POIPhotoGallery: React.FC<POIPhotoGalleryProps> = ({ poiId, colors }) => {

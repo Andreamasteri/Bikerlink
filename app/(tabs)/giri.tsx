@@ -108,7 +108,7 @@ export default function GiriScreen() {
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
       router.push(`/giri/${route.id}` as any);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Impossibile leggere il file GPX.";
+      const msg = err instanceof Error ? (err as Error).message : "Impossibile leggere il file GPX.";
       Alert.alert("Errore", msg);
     } finally {
       setIsImporting(false);

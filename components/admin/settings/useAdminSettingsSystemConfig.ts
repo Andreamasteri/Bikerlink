@@ -45,7 +45,7 @@ export function useAdminSettingsSystemConfig(isAdmin: boolean, _t: (k: string) =
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       Alert.alert("Successo", "Intervallo aggiornato");
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const coordMaxAgeMutation = useMutation({
@@ -66,7 +66,7 @@ export function useAdminSettingsSystemConfig(isAdmin: boolean, _t: (k: string) =
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       Alert.alert("Successo", "Età max aggiornata");
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   return {

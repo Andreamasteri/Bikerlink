@@ -9,11 +9,11 @@ export class SensorBoundary extends Component<BoundaryProps, BoundaryState> {
   state: BoundaryState = { crashed: false, errorMessage: "" };
 
   static getDerivedStateFromError(error: Error): BoundaryState {
-    return { crashed: true, errorMessage: error.message };
+    return { crashed: true, errorMessage: (error as Error).message };
   }
 
   componentDidCatch(error: Error) {
-    this.props.onCrash(error.message);
+    this.props.onCrash((error as Error).message);
   }
 
   render() {

@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Pressable, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
 import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 interface UserMotorcycle { id: string; brand: string; model: string; year?: number | null; ridingStyle?: string | null; }
 
@@ -72,7 +73,7 @@ export const GarageIntegrationSection: React.FC<GarageIntegrationSectionProps> =
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   section: { marginBottom: 20 },
   sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
   motoChip: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 12, backgroundColor: colors.surface, marginRight: 8, borderWidth: 1, borderColor: colors.border },

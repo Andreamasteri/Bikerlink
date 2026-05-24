@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 interface RouteMapSectionProps {
   plannerMapHtml: string;
@@ -62,7 +63,7 @@ export const RouteMapSection: React.FC<RouteMapSectionProps> = ({
   );
 };
 
-const styles = (colors: any) =>
+const styles = (colors: ThemeColors) =>
   StyleSheet.create({
     section: { marginBottom: 20 },
     sectionLabel: {

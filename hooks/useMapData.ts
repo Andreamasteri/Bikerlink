@@ -196,7 +196,7 @@ export function useMapData({
       if (d.conversationId) router.push(`/chat/${d.conversationId}` as any);
     },
     onError: (error: Error) => {
-      Alert.alert(t("common.error"), error.message);
+      Alert.alert(t("common.error"), (error as Error).message);
     },
   });
 
@@ -243,7 +243,7 @@ export function useMapData({
       setSelectedEgg(null);
     },
     onError: (err: any) => {
-      Alert.alert(t("common.error"), err.message || t("home.cannotCollect"));
+      Alert.alert(t("common.error"), (err as Error).message || t("home.cannotCollect"));
     },
   });
 

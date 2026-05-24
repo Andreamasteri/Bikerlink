@@ -2,10 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, Linking, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import type { ThemeColors } from '@/constants/colors';
+
+interface HotelStop { location?: string; hotels?: Array<{ name?: string; address?: string; lat?: number; lng?: number; bookingUrl?: string }> }
 
 interface GiriMultiDayInfoProps {
   days: Array<{ day: number; from: string; to: string; km: number; minutes: number }>;
-  hotels: any[] | null;
+  hotels: HotelStop[] | null;
   hotelsLoading: boolean;
   onLoadHotels: () => void;
 }
@@ -68,10 +71,10 @@ export const GiriMultiDayInfo: React.FC<GiriMultiDayInfoProps> = ({
         {hotels !== null && hotels.length === 0 && (
           <Text style={s.emptyText}>Nessun hotel trovato per le soste</Text>
         )}
-        {hotels !== null && hotels.map((day: any, di: number) => (
+        {hotels !== null && hotels.map((day, di) => (
           <View key={di} style={s.hotelDayBlock}>
             <Text style={s.hotelDayTitle}>Sosta Giorno {di + 1} — {day.location ?? `Tappa ${di + 1}`}</Text>
-            {(day.hotels ?? []).slice(0, 3).map((h: any, hi: number) => (
+            {(day.hotels ?? []).slice(0, 3).map((h, hi) => (
               <Pressable
                 key={hi}
                 style={s.hotelCard}
@@ -98,7 +101,7 @@ export const GiriMultiDayInfo: React.FC<GiriMultiDayInfoProps> = ({
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   section: { marginBottom: 20 },
   sectionTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: colors.text, marginBottom: 12 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },

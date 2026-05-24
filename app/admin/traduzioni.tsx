@@ -75,7 +75,7 @@ export default function TraduzioniScreen() {
       const data: TableRow[] = await resp.json();
       setTableData(data);
     } catch (e: unknown) {
-      setTableError(e instanceof Error ? e.message : t("admin.loadError2"));
+      setTableError(e instanceof Error ? (e as Error).message : t("admin.loadError2"));
     } finally {
       setLoadingTable(false);
     }
@@ -198,14 +198,14 @@ export default function TraduzioniScreen() {
       setPrepareResult(
         `${data.count} stringhe IT` + (langSummary ? ` | Esistenti → ${langSummary}` : "")
       );
-    } catch (e: any) {
+    } catch (e: unknown) {
       setPrepareStatus("error");
-      setPrepareResult(e?.message || t("admin.prepareError"));
+      setPrepareResult((e instanceof Error ? e.message : null) || t("admin.prepareError"));
     }
   }
 
   function extractErrorMessage(e: unknown, fallback: string): string {
-    if (e instanceof Error) return e.message || fallback;
+    if (e instanceof Error) return (e as Error).message || fallback;
     return fallback;
   }
 
@@ -270,8 +270,8 @@ export default function TraduzioniScreen() {
       await apiRequest("POST", "/api/admin/translations/restart", {});
       setRestartStatus("success");
       setRestartResult("Backend in riavvio...");
-    } catch (e: any) {
-      const msg: string = e?.message ?? "";
+    } catch (e: unknown) {
+      const msg: string = (e instanceof Error ? e.message : "") ?? "";
       const isConnectionDrop =
         msg.includes("Network request failed") ||
         msg.includes("Failed to fetch") ||
@@ -425,9 +425,9 @@ export default function TraduzioniScreen() {
       setAiStatus("success");
       setAiResult(data.message || "Completamento AI riuscito");
       if (data.summary) setAiSummary(data.summary as Record<string, number>);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setAiStatus("error");
-      setAiResult(e?.message || "Errore durante il completamento AI");
+      setAiResult((e instanceof Error ? e.message : null) || "Errore durante il completamento AI");
     }
   }
 

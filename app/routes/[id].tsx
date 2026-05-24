@@ -118,8 +118,8 @@ export default function CustomRouteDetailScreen() {
       await apiRequest("PUT", `/api/custom-routes/${id}`, { visibility: next });
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes", id] });
-    } catch (e: any) {
-      Alert.alert(t("common.error"), e.message || t("routes.cannotUpdateVisibility"));
+    } catch (e: unknown) {
+      Alert.alert(t("common.error"), (e as Error).message || t("routes.cannotUpdateVisibility"));
     } finally {
       setIsTogglingVisibility(false);
     }

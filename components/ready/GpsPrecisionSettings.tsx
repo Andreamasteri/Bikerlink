@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
+import Colors, { ThemeColors } from "@/constants/colors";
 
 export function GpsPrecisionSettings({
   colors,
@@ -12,7 +12,7 @@ export function GpsPrecisionSettings({
   setGpsPrecision,
   privacyMutation,
 }: {
-  colors: any;
+  colors: ThemeColors;
   gpsPrecisionExpanded: boolean;
   setGpsPrecisionExpanded: React.Dispatch<React.SetStateAction<boolean>>;
   gpsOptions: { key: string; label: string; desc: string; icon: string }[];

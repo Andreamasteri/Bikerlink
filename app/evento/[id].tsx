@@ -68,7 +68,7 @@ export default function EventoDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/events", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   const leaveMutation = useMutation({
@@ -79,7 +79,7 @@ export default function EventoDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/events", id] });
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   const deleteMutation = useMutation({
@@ -91,7 +91,7 @@ export default function EventoDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/events/my"] });
       router.back();
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   const handleDelete = () => {

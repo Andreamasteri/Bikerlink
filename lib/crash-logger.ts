@@ -109,7 +109,7 @@ export async function markClean(): Promise<void> {
 
 export async function markJsError(error: Error, stack?: string): Promise<void> {
   if (!_currentSession) return;
-  const errMsg = (error.message ?? "").slice(0, 500);
+  const errMsg = ((error as Error).message ?? "").slice(0, 500);
   const errStack = (stack ?? error.stack ?? "").slice(0, 3000);
   _currentSession.jsError = { message: errMsg, stack: errStack };
   await saveCurrentSession();

@@ -3,6 +3,8 @@ import { View, Text, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import type { ThemeColors } from '@/constants/colors';
+import type { WebViewMessageEvent } from 'react-native-webview';
 
 interface GiriMapProps {
   mapHtml: string | null;
@@ -10,7 +12,7 @@ interface GiriMapProps {
   distanceKm: number;
   offlineStatus: string;
   streetViewTip: boolean;
-  onMessage: (event: any) => void;
+  onMessage: (event: WebViewMessageEvent) => void;
 }
 
 export const GiriMap: React.FC<GiriMapProps> = ({
@@ -69,7 +71,7 @@ export const GiriMap: React.FC<GiriMapProps> = ({
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   mapContainer: { height: 200, borderRadius: 14, overflow: "hidden", marginBottom: 14, position: "relative" },
   map: { flex: 1 },
   mapOverlayBadge: { position: "absolute", bottom: 8, right: 8, backgroundColor: "rgba(0,0,0,0.7)", borderRadius: 8, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 8, paddingVertical: 4 },

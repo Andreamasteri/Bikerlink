@@ -220,7 +220,7 @@ export default function AdminUsers() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users", selectedUser?.id, "sessions"] });
     },
-    onError: (err: Error) => Alert.alert("Errore revoca", err.message || "Impossibile revocare la sessione"),
+    onError: (err: Error) => Alert.alert("Errore revoca", (err as Error).message || "Impossibile revocare la sessione"),
   });
 
   const filteredUsers = users.filter((u) => {

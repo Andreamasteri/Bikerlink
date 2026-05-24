@@ -2,10 +2,20 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import type { ThemeColors } from '@/constants/colors';
 import ElevationProfile from '@/components/ElevationProfile';
 
+interface ElevationData {
+  elevations: number[];
+  distanceKm: number[];
+  totalGain: number;
+  totalLoss: number;
+  minEle: number;
+  maxEle: number;
+}
+
 interface GiriElevationProps {
-  elevation: any | null;
+  elevation: ElevationData | null;
   elevationLoading: boolean;
   elevationError: boolean;
   onLoadElevation: () => void;
@@ -82,7 +92,7 @@ export const GiriElevation: React.FC<GiriElevationProps> = ({
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   eleCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 14, marginBottom: 16, gap: 10 },
   eleTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   eleTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: colors.text },

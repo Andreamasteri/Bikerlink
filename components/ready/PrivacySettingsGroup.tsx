@@ -1,12 +1,12 @@
 import React from "react";
 import { View, Text, Switch, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
+import Colors, { ThemeColors } from "@/constants/colors";
 import { UseMutationResult } from "@tanstack/react-query";
 
 interface PrivacySettingsGroupProps {
   t: (key: string) => string;
-  colors: any;
+  colors: ThemeColors;
   isGhostMode: boolean;
   ghostModeFeatureEnabled: boolean;
   ghostMutation: UseMutationResult<boolean, Error, boolean>;

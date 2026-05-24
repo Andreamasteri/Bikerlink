@@ -1,7 +1,7 @@
 import React from "react";
 import { View, Text, Switch, TextInput, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
+import Colors, { ThemeColors } from "@/constants/colors";
 import { FakeZoneCoordPanel, MapTarget } from "./FakeZoneCoordPanel";
 
 export function PrivacyPositionSettings({
@@ -42,7 +42,7 @@ export function PrivacyPositionSettings({
   openMapPicker,
 }: {
   t: any;
-  colors: any;
+  colors: ThemeColors;
   privacyExpanded: boolean;
   setPrivacyExpanded: React.Dispatch<React.SetStateAction<boolean>>;
   positionFuzz: boolean;

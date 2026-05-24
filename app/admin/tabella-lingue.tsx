@@ -46,7 +46,7 @@ export default function TabellaLingue() {
       const data: TableRow[] = await resp.json();
       setTableData(data);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Errore nel caricamento");
+      setError(e instanceof Error ? (e as Error).message : "Errore nel caricamento");
     } finally {
       setLoading(false);
     }
@@ -66,7 +66,7 @@ export default function TabellaLingue() {
       setAiResult({ ok: true, msg: data.message || "Completamento AI riuscito" });
       loadTable();
     } catch (e: unknown) {
-      setAiResult({ ok: false, msg: e instanceof Error ? e.message : "Errore AI" });
+      setAiResult({ ok: false, msg: e instanceof Error ? (e as Error).message : "Errore AI" });
     } finally {
       setAiLoading(false);
     }

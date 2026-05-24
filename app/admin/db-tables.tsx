@@ -99,7 +99,7 @@ export default function DbTablesScreen() {
     },
     onError: (err: unknown) => {
       const msg =
-        err instanceof Error ? err.message : "Errore sconosciuto";
+        err instanceof Error ? (err as Error).message : "Errore sconosciuto";
       Alert.alert("Errore", `Impossibile avviare il VACUUM: ${msg}`);
     },
   });

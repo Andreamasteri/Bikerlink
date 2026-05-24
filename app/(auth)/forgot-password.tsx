@@ -66,7 +66,7 @@ export default function ForgotPasswordScreen() {
       });
       setStep(2);
       startCooldown();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(parseError(err, t("auth.sendErrorFP")));
     } finally {
       setLoading(false);
@@ -83,7 +83,7 @@ export default function ForgotPasswordScreen() {
       });
       setResendSuccess(true);
       startCooldown();
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(parseError(err, t("auth.sendErrorFP")));
     } finally {
       setResendLoading(false);
@@ -123,7 +123,7 @@ export default function ForgotPasswordScreen() {
       const { sessionToken: _t, ...user } = userData ?? {};
       queryClient.setQueryData(["/api/auth/me"], user);
       router.replace("/(tabs)");
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError(parseError(err, t("auth.resetError")));
     } finally {
       setLoading(false);

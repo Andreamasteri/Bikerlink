@@ -117,7 +117,7 @@ export default function ClubDetailScreen() {
       queryClient.invalidateQueries({ queryKey: [`/api/motoclubs/${id}/public`] });
       Alert.alert("Benvenuto!", "Sei entrato nel club con successo.");
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const allMembers: Member[] = [...(club?.members ?? []), ...extraMembers];
@@ -156,7 +156,7 @@ export default function ClubDetailScreen() {
       setShowProposeModal(false);
       Alert.alert(t("motoclub.locationProposalSent"), t("motoclub.locationProposalMsg"));
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   function handleSubmitPropose(coords: { latitude: number; longitude: number }, address: string) {

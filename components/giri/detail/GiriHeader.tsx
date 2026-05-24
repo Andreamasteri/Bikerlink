@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import type { ThemeColors } from '@/constants/colors';
 
 interface GiriHeaderProps {
   title: string;
@@ -36,7 +37,7 @@ export const GiriHeader: React.FC<GiriHeaderProps> = ({
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   nav: { 
     flexDirection: "row", 
     alignItems: "center", 

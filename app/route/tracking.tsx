@@ -108,7 +108,7 @@ export default function TrackingScreen() {
     onError: (error: Error) => {
       Alert.alert(
         t("gps_error_title") || "Errore GPS",
-        error.message || t("gps_error_body") || "Impossibile salvare i punti GPS. Verifica la connessione e riprova.",
+        (error as Error).message || t("gps_error_body") || "Impossibile salvare i punti GPS. Verifica la connessione e riprova.",
         [{ text: "OK" }]
       );
     },

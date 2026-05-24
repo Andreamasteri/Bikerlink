@@ -92,7 +92,7 @@ export default function ReadyToRideScreen() {
       setCustomRadius("");
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message);
+      Alert.alert("Errore", (error as Error).message);
     },
   });
 
@@ -106,7 +106,7 @@ export default function ReadyToRideScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/sos/active"] });
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message);
+      Alert.alert("Errore", (error as Error).message);
     },
   });
 

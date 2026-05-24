@@ -36,7 +36,7 @@ export function useAdminSettingsAppState(isAdmin: boolean, t: (k: string) => str
       queryClient.invalidateQueries({ queryKey: ["/api/settings/home-message"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const handleSaveHomeMessageText = async () => {
@@ -46,8 +46,8 @@ export function useAdminSettingsAppState(isAdmin: boolean, t: (k: string) => str
       queryClient.invalidateQueries({ queryKey: ["/api/settings/home-message"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
       Alert.alert("Successo", "Messaggio home salvato");
-    } catch (error: any) {
-      Alert.alert("Errore", error.message || "Errore durante il salvataggio");
+    } catch (error: unknown) {
+      Alert.alert("Errore", (error as Error).message || "Errore durante il salvataggio");
     } finally {
       setIsSavingHomeMessage(false);
     }
@@ -76,7 +76,7 @@ export function useAdminSettingsAppState(isAdmin: boolean, t: (k: string) => str
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/theme"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const themeDefaultMutation = useMutation({
@@ -95,7 +95,7 @@ export function useAdminSettingsAppState(isAdmin: boolean, t: (k: string) => str
       setTheme(variables);
       queryClient.invalidateQueries({ queryKey: ["/api/settings/theme"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const { data: splashModeData } = useQuery<{ value: string }>({
@@ -108,8 +108,8 @@ export function useAdminSettingsAppState(isAdmin: boolean, t: (k: string) => str
     try {
       await apiRequest("PUT", "/api/admin/settings/splash_mode", { value: mode });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/splash_mode"] });
-    } catch (error: any) {
-      Alert.alert("Errore", error.message);
+    } catch (error: unknown) {
+      Alert.alert("Errore", (error as Error).message);
     }
   };
 
@@ -125,8 +125,8 @@ export function useAdminSettingsAppState(isAdmin: boolean, t: (k: string) => str
     try {
       await apiRequest("PUT", "/api/admin/settings/splash_messages_list", { value: JSON.stringify(list) });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/splash_messages_list"] });
-    } catch (error: any) {
-      Alert.alert("Errore", error.message);
+    } catch (error: unknown) {
+      Alert.alert("Errore", (error as Error).message);
     }
   };
 

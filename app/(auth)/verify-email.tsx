@@ -94,8 +94,8 @@ export default function VerifyEmailScreen() {
       const { sessionToken: _t, ...user } = userData ?? {};
       queryClient.setQueryData(["/api/auth/me"], user);
       router.replace("/(tabs)");
-    } catch (err: any) {
-      const msg = err?.message || translate("auth.verifyError");
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : "") || translate("auth.verifyError");
       const cleaned = msg.replace(/^\d+:\s*/, "");
       let finalMsg = cleaned;
       try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {
@@ -115,8 +115,8 @@ export default function VerifyEmailScreen() {
       await apiRequest("POST", "/api/auth/resend-verification", { email });
       setResendSuccess(true);
       startCooldown();
-    } catch (err: any) {
-      const msg = err?.message || translate("auth.sendError");
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : "") || translate("auth.sendError");
       const cleaned = msg.replace(/^\d+:\s*/, "");
       let finalMsg = cleaned;
       try { finalMsg = JSON.parse(cleaned).message || cleaned; } catch {

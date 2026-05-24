@@ -104,8 +104,8 @@ export function ManualAdminSection() {
       } else {
         Alert.alert("Errore", data.message || "Errore upload");
       }
-    } catch (e: any) {
-      Alert.alert("Errore", e.message || "Errore upload");
+    } catch (e: unknown) {
+      Alert.alert("Errore", (e as Error).message || "Errore upload");
     } finally {
       setUploading(false);
     }

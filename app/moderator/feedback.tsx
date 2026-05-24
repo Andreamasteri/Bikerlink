@@ -128,7 +128,7 @@ export default function ModeratorFeedback() {
       }
     },
     onError: (err: Error) => {
-      Alert.alert("Errore", err.message);
+      Alert.alert("Errore", (err as Error).message);
     },
   });
 

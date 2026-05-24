@@ -1,6 +1,7 @@
 import { StyleSheet } from "react-native";
+import type { ThemeColors } from "@/constants/colors";
 
-export const useGiriCreateStyles = (colors: any) => {
+export const useGiriCreateStyles = (colors: ThemeColors) => {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     nav: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingBottom: 10 },

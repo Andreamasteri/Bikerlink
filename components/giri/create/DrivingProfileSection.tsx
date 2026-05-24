@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 type DrivingProfile = "geometric" | "real" | "my_style";
 
@@ -91,7 +92,7 @@ export const DrivingProfileSection: React.FC<DrivingProfileSectionProps> = ({
   );
 };
 
-const styles = (colors: any) =>
+const styles = (colors: ThemeColors) =>
   StyleSheet.create({
     section: { marginBottom: 20 },
     sectionLabel: {

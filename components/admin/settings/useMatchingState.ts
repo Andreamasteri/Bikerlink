@@ -34,7 +34,7 @@ export function useMatchingState(t: (k: string) => string) {
       queryClient.invalidateQueries({ queryKey: ["/api/match-preferences/gate"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const autoMatchMutation = useMutation({
@@ -54,7 +54,7 @@ export function useMatchingState(t: (k: string) => string) {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/auto-matching"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const triggerMatchingMutation = useMutation({
@@ -66,7 +66,7 @@ export function useMatchingState(t: (k: string) => string) {
       setMatchingTriggerFeedback(`${t("admin.matchingTriggered")}: ${(data as any).count} ${t("admin.matchesCreated")}`);
       setTimeout(() => setMatchingTriggerFeedback(null), 5000);
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   return {

@@ -104,13 +104,13 @@ export function useGiriCreateState(language?: string) {
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
-        throw new Error(err.message ?? "Importazione fallita");
+        throw new Error((err as Error).message ?? "Importazione fallita");
       }
       const route = await resp.json() as { id: string };
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
       router.replace(`/giri/${route.id}` as any);
     } catch (err: unknown) {
-      Alert.alert("Errore GPX", err instanceof Error ? err.message : "Impossibile leggere il file GPX.");
+      Alert.alert("Errore GPX", err instanceof Error ? (err as Error).message : "Impossibile leggere il file GPX.");
     } finally {
       setIsImportingGpx(false);
     }
@@ -177,8 +177,8 @@ export function useGiriCreateState(language?: string) {
           });
         });
       });
-    } catch (err: any) {
-      console.warn("[AI parse] fallback attivato:", err?.message);
+    } catch (err: unknown) {
+      console.warn("[AI parse] fallback attivato:", (err instanceof Error ? err.message : null));
       const fallback = clientFallbackAiParse(aiPrompt);
       setTitle(fallback.title);
       setStyle(fallback.style as Style);
@@ -274,8 +274,8 @@ export function useGiriCreateState(language?: string) {
         Alert.alert("Giro Multi-giorno", `Il percorso dura più di 8 ore.\nAbbiamo attivato il piano multi-giorno su ${suggestedDays} giorni.`, [{ text: "OK" }]);
       }
       autoLoadWeather(toCalc);
-    } catch (err: any) {
-      Alert.alert("Calcolo automatico fallito", `${err?.message ?? "Errore"}\nModifica le tappe e premi "Calcola percorso" manualmente.`);
+    } catch (err: unknown) {
+      Alert.alert("Calcolo automatico fallito", `${(err instanceof Error ? err.message : null) ?? "Errore"}\nModifica le tappe e premi "Calcola percorso" manualmente.`);
     } finally {
       setCalculating(false);
     }
@@ -342,8 +342,8 @@ export function useGiriCreateState(language?: string) {
         );
       }
       autoLoadWeather(toCalc);
-    } catch (err: any) {
-      Alert.alert("Errore", err?.message ?? "Calcolo percorso fallito");
+    } catch (err: unknown) {
+      Alert.alert("Errore", (err instanceof Error ? err.message : null) ?? "Calcolo percorso fallito");
     } finally { setCalculating(false); }
   };
 

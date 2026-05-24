@@ -15,7 +15,7 @@ export function useToggleSettings(t: (k: string) => string, setProtectedToggle: 
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: t("admin.genericError2") }));
-        throw new Error(err.message);
+        throw new Error((err as Error).message);
       }
       return res.json();
     },
@@ -25,7 +25,7 @@ export function useToggleSettings(t: (k: string) => string, setProtectedToggle: 
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message);
+      Alert.alert("Errore", (error as Error).message);
     },
   });
 
@@ -41,7 +41,7 @@ export function useToggleSettings(t: (k: string) => string, setProtectedToggle: 
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: t("admin.genericError2") }));
-        throw new Error(err.message);
+        throw new Error((err as Error).message);
       }
       return res.json();
     },
@@ -63,7 +63,7 @@ export function useToggleSettings(t: (k: string) => string, setProtectedToggle: 
       setProtectedPassword("");
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message);
+      Alert.alert("Errore", (error as Error).message);
     },
   });
 

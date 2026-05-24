@@ -243,7 +243,7 @@ export default function CreateProposalScreen() {
       router.back();
     },
     onError: (error: Error) => {
-      Alert.alert(t("common.error"), error.message);
+      Alert.alert(t("common.error"), (error as Error).message);
     },
   });
 

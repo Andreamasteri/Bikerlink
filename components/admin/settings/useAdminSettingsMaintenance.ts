@@ -21,7 +21,7 @@ export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => 
       refetchSyncStatus();
       Alert.alert(t("admin.syncCompleted"), t("admin.devSyncMsg"));
     },
-    onError: (e: Error) => Alert.alert("Errore sync", e.message),
+    onError: (e: Error) => Alert.alert("Errore sync", (e as Error).message),
   });
 
 
@@ -57,8 +57,8 @@ export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => 
       setEmailConfigAppPass("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/email-config"] });
       Alert.alert("Successo", "Configurazione email salvata");
-    } catch (error: any) {
-      Alert.alert("Errore", error.message);
+    } catch (error: unknown) {
+      Alert.alert("Errore", (error as Error).message);
     } finally {
       setIsSavingEmailConfig(false);
     }
@@ -81,8 +81,8 @@ export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => 
       await apiRequest("PUT", "/api/admin/settings/paypal_donation_email", { value: paypalEmail });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/paypal_donation_email"] });
       Alert.alert("Successo", "Email PayPal salvata");
-    } catch (error: any) {
-      Alert.alert("Errore", error.message);
+    } catch (error: unknown) {
+      Alert.alert("Errore", (error as Error).message);
     } finally {
       setIsSavingPaypal(false);
     }
@@ -97,8 +97,8 @@ export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => 
       formData.append("file", { uri: file.uri, name: file.name, type: "application/pdf" } as any);
       await apiRequest("POST", "/api/admin/upload-eula", formData);
       Alert.alert("Successo", "Documento EULA caricato correttamente");
-    } catch (e: any) {
-      Alert.alert("Errore", e.message);
+    } catch (e: unknown) {
+      Alert.alert("Errore", (e as Error).message);
     }
   };
 

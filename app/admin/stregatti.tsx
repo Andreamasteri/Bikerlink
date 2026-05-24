@@ -152,7 +152,7 @@ export default function FakeUsersAdmin() {
           // no-op: fallback to default error object
           return { message: "Errore" };
         });
-        throw new Error(err.message);
+        throw new Error((err as Error).message);
       }
       return res.json();
     },
@@ -358,8 +358,8 @@ export default function FakeUsersAdmin() {
       setMassSeedCreated(0);
       setMassSeedTotal(5000);
       pollRef.current = setInterval(pollStatus, 3000);
-    } catch (e: any) {
-      setMassSeedError(e.message || "Errore di rete");
+    } catch (e: unknown) {
+      setMassSeedError((e as Error).message || "Errore di rete");
     }
   };
 

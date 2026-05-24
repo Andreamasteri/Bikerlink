@@ -147,7 +147,7 @@ export default function CreateRouteScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       router.replace(`/routes/${route.id}` as any);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Impossibile leggere il file GPX.";
+      const msg = err instanceof Error ? (err as Error).message : "Impossibile leggere il file GPX.";
       Alert.alert("Errore", msg);
     } finally {
       setIsImporting(false);
@@ -209,7 +209,7 @@ export default function CreateRouteScreen() {
       }
     },
     onError: (err: Error) => {
-      Alert.alert("Errore", err.message);
+      Alert.alert("Errore", (err as Error).message);
     },
   });
 
@@ -221,8 +221,8 @@ export default function CreateRouteScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       setShowPublishDialog(false);
       router.replace(`/routes/${createdRouteId}` as any);
-    } catch (e: any) {
-      Alert.alert(t("common.error"), e.message || t("routes.cannotUpdateVisibilityLater"));
+    } catch (e: unknown) {
+      Alert.alert(t("common.error"), (e as Error).message || t("routes.cannotUpdateVisibilityLater"));
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       setShowPublishDialog(false);
       router.replace(`/routes/${createdRouteId}` as any);

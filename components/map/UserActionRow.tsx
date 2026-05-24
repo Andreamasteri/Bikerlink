@@ -36,8 +36,8 @@ export default function UserActionRow({
             const conv = await res.json();
             onClose();
             router.push(`/chat/${conv.id}` as any);
-          } catch (e: any) {
-            Alert.alert(t("common.error"), e.message || t("home.cannotOpenChat"));
+          } catch (e: unknown) {
+            Alert.alert(t("common.error"), (e as Error).message || t("home.cannotOpenChat"));
           }
         }}
       >

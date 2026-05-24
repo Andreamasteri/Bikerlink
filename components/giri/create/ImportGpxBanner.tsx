@@ -1,10 +1,11 @@
 import React from "react";
+import type { ThemeColors } from '@/constants/colors';
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 interface ImportGpxBannerProps {
   isImporting: boolean;
-  colors: any;
+  colors: ThemeColors;
 }
 
 export const ImportGpxBanner: React.FC<ImportGpxBannerProps> = ({ isImporting, colors }) => {

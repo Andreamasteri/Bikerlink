@@ -79,8 +79,8 @@ export function EmailStatusCard() {
       const json = await res.json();
       setTestResult(json);
       refetchDiag();
-    } catch (e: any) {
-      setTestResult({ ok: false, error: e?.message || t("admin.networkError") });
+    } catch (e: unknown) {
+      setTestResult({ ok: false, error: (e instanceof Error ? e.message : null) || t("admin.networkError") });
     } finally {
       setTesting(false);
     }
@@ -101,8 +101,8 @@ export function EmailStatusCard() {
               await apiRequest("POST", "/api/admin/email-rate-limit-reset", { scope: "all" });
               refetchRL();
               Alert.alert("OK", "Rate limit resettati");
-            } catch (e: any) {
-              Alert.alert("Errore", e?.message || "Reset fallito");
+            } catch (e: unknown) {
+              Alert.alert("Errore", (e instanceof Error ? e.message : null) || "Reset fallito");
             } finally {
               setResetting(false);
             }

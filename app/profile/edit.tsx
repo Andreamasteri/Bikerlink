@@ -138,7 +138,7 @@ export default function EditProfileScreen() {
       router.back();
     },
     onError: (error: Error) => {
-      Alert.alert(t("common.error"), error.message);
+      Alert.alert(t("common.error"), (error as Error).message);
     },
   });
 
@@ -159,7 +159,7 @@ export default function EditProfileScreen() {
       Alert.alert(t("common.success"), "Moto aggiunta");
     },
     onError: (error: Error) => {
-      Alert.alert(t("common.error"), error.message);
+      Alert.alert(t("common.error"), (error as Error).message);
     },
   });
 
@@ -189,7 +189,7 @@ export default function EditProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
     },
     onError: (error: Error) => {
-      let msg = error.message;
+      let msg = (error as Error).message;
       try {
         const parsed = JSON.parse(msg);
         if (parsed?.message) msg = parsed.message;

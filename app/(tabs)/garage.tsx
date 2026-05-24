@@ -114,7 +114,7 @@ function GarageContent() {
       }
     },
     onError: (err: any) => {
-      Alert.alert(t("common.error"), err.message || t("garage.saveError"));
+      Alert.alert(t("common.error"), (err as Error).message || t("garage.saveError"));
     },
   });
 

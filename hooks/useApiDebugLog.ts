@@ -115,9 +115,9 @@ export function useApiDebugLog() {
           result = parsed as T;
         }
         return result;
-      } catch (err: any) {
+      } catch (err: unknown) {
         const durationMs = Date.now() - t0;
-        const preview = err?.message ?? String(err);
+        const preview = (err instanceof Error ? err.message : null) ?? String(err);
         addLog({
           id, timestamp: t0,
           endpoint, method,

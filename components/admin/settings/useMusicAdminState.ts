@@ -35,7 +35,7 @@ export function useMusicAdminState() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/music-match"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const musicExportMutation = useMutation({
@@ -55,7 +55,7 @@ export function useMusicAdminState() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/music-export-playlist"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const musicImportMutation = useMutation({
@@ -75,7 +75,7 @@ export function useMusicAdminState() {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/music-import-playlist"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   return {

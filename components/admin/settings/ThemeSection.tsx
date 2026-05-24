@@ -1,7 +1,7 @@
 import React from "react";
 import { View as RNView, Text as RNText, StyleSheet as RNStyleSheet, TouchableOpacity as RNTouchableOpacity, Switch as RNSwitch } from "react-native";
 import { Ionicons as IoniconsSet } from "@expo/vector-icons";
-import Colors, { THEMES, THEME_META, ThemeName } from "@/constants/colors";
+import Colors, { THEMES, THEME_META, ThemeName, ThemeColors } from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 
 const themeStyles = RNStyleSheet.create({
@@ -60,7 +60,7 @@ interface ThemeSectionProps {
   themeDefaultPending: boolean;
   currentTheme: ThemeName;
   setTheme: (name: ThemeName) => void;
-  colors: any;
+  colors: ThemeColors;
 }
 
 export function ThemeSection({

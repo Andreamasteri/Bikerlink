@@ -268,7 +268,7 @@ export default function NotificationsScreen() {
       qc.invalidateQueries({ queryKey: ["/api/notifications"] });
     },
     onError: (e: any) => {
-      Alert.alert("Errore", e.message || "Impossibile accettare la richiesta");
+      Alert.alert("Errore", (e as Error).message || "Impossibile accettare la richiesta");
     },
   });
 
@@ -278,7 +278,7 @@ export default function NotificationsScreen() {
       qc.invalidateQueries({ queryKey: ["/api/friends/requests/incoming"] });
     },
     onError: (e: any) => {
-      Alert.alert("Errore", e.message || "Impossibile rifiutare la richiesta");
+      Alert.alert("Errore", (e as Error).message || "Impossibile rifiutare la richiesta");
     },
   });
 

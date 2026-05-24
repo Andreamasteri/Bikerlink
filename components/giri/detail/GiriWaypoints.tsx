@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
+import type { ThemeColors } from '@/constants/colors';
 
 interface Waypoint { lat: number; lng: number; name?: string; }
 
@@ -34,7 +35,7 @@ export const GiriWaypoints: React.FC<GiriWaypointsProps> = ({ waypoints }) => {
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   section: { marginBottom: 20 },
   sectionTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: colors.text, marginBottom: 12 },
   wpRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 4 },

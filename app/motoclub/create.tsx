@@ -110,7 +110,7 @@ export default function CreateMotoclub() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: t("motoclub.createError") }));
-        throw new Error(err.message);
+        throw new Error((err as Error).message);
       }
       return res.json();
     },

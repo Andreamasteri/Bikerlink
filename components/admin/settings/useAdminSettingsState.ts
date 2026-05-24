@@ -103,7 +103,7 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
       setEditValue("");
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const getSettingValue = (key: string) => settings.find((s) => s.key === key)?.value || "";

@@ -173,7 +173,7 @@ export default function ModeratorCampaigns() {
       setShowCreateModal(false);
       resetForm();
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   const updateMutation = useMutation({
@@ -197,7 +197,7 @@ export default function ModeratorCampaigns() {
       setEditingCampaign(null);
       resetForm();
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   const toggleMutation = useMutation({

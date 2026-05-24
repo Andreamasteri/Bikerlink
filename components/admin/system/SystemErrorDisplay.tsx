@@ -49,7 +49,7 @@ export function SystemErrorDisplay({
     title = t("admin.serverUnreachable");
     hint = t("admin.checkConnection");
   } else if (error?.message) {
-    hint = String(error.message);
+    hint = String((error as Error).message);
   } else {
     hint = t("admin.emptyResponse");
   }

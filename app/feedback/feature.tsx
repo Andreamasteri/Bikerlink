@@ -36,7 +36,7 @@ export default function FeatureRequestScreen() {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: t("feedback.unknownError") }));
-        throw new Error(err.message || t("feedback.sendError"));
+        throw new Error((err as Error).message || t("feedback.sendError"));
       }
       return res.json();
     },
@@ -47,7 +47,7 @@ export default function FeatureRequestScreen() {
       if (router.canGoBack()) router.back();
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message);
+      Alert.alert("Errore", (error as Error).message);
     },
   });
 

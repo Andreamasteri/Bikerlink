@@ -116,7 +116,7 @@ export function useAdminSettingsFeatureFlags(_isAdmin: boolean, _t: (k: string) 
       queryClient.invalidateQueries({ queryKey: ["/api/settings/motoclub-user-creation"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const showSearchPrefMutation = useMutation({
@@ -136,7 +136,7 @@ export function useAdminSettingsFeatureFlags(_isAdmin: boolean, _t: (k: string) 
       queryClient.invalidateQueries({ queryKey: ["/api/settings/show-search-preference"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const searchPrefLockedMutation = useMutation({
@@ -156,7 +156,7 @@ export function useAdminSettingsFeatureFlags(_isAdmin: boolean, _t: (k: string) 
       queryClient.invalidateQueries({ queryKey: ["/api/settings/search-preference-locked"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const sosMutation = useMutation({
@@ -177,7 +177,7 @@ export function useAdminSettingsFeatureFlags(_isAdmin: boolean, _t: (k: string) 
       queryClient.invalidateQueries({ queryKey: ["/api/settings/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const mapsEnabledMutation = useMutation({
@@ -197,7 +197,7 @@ export function useAdminSettingsFeatureFlags(_isAdmin: boolean, _t: (k: string) 
       queryClient.invalidateQueries({ queryKey: ["/api/settings/maps-enabled"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   const mapsProviderMutation = useMutation({
@@ -217,7 +217,7 @@ export function useAdminSettingsFeatureFlags(_isAdmin: boolean, _t: (k: string) 
       queryClient.invalidateQueries({ queryKey: ["/api/settings/maps-provider"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   return {

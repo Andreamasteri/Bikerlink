@@ -2,6 +2,7 @@ import React from "react";
 import { View, Text, TextInput, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 interface Waypoint { lat: number; lng: number; name: string; }
 interface GeoResult { name: string; lat: number; lng: number; }
@@ -89,7 +90,7 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   section: { marginBottom: 20 },
   sectionLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.textSecondary, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 },
   wpRow: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },

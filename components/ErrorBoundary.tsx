@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }): void {
-    const errorKey = error.message;
+    const errorKey = (error as Error).message;
     if (errorKey !== this.lastErrorKey) {
       this.autoRetryCount = 0;
       this.lastErrorKey = errorKey;

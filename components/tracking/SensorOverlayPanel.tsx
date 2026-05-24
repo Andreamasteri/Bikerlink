@@ -1,4 +1,5 @@
 import React from "react";
+import type { ThemeColors } from '@/constants/colors';
 import { View, Text } from "react-native";
 import { MountAxisCalibration } from "@/components/MountCalibWizard";
 
@@ -9,7 +10,7 @@ interface SensorOverlayPanelProps {
   maxAccelG: number;
   mountAxisCalib: MountAxisCalibration | null;
   sensorsEnabled: boolean;
-  colors: any;
+  colors: ThemeColors;
   styles: {
     sensorOverlayPanel: object;
     sensorOverlayItem: object;

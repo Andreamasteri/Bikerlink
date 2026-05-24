@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, ActivityIndicator, Pressable } from "
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import ElevationProfile from "@/components/ElevationProfile";
 import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 interface RouteResult {
   encoded?: string | null;
@@ -177,7 +178,7 @@ export const RouteResultCard: React.FC<RouteResultCardProps> = ({
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   resultCard: { backgroundColor: colors.surface, borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: colors.border },
   warningRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#ef444422", borderRadius: 8, padding: 8, borderWidth: 1, borderColor: "#ef444444", marginBottom: 4 },
   warningText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#ef4444", flex: 1 },

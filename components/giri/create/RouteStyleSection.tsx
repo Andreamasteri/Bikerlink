@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { useColors } from "@/hooks/useColors";
+import type { ThemeColors } from "@/constants/colors";
 
 type Style = "direct" | "fast" | "balanced" | "curvy" | "extra_curvy";
 
@@ -45,7 +46,7 @@ export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
   );
 };
 
-const styles = (colors: any) =>
+const styles = (colors: ThemeColors) =>
   StyleSheet.create({
     section: { marginBottom: 20 },
     sectionLabel: {

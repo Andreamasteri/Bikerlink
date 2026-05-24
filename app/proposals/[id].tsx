@@ -112,7 +112,7 @@ export default function ProposalDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals"] });
     },
     onError: (error: Error) => {
-      Alert.alert(t("common.error"), error.message);
+      Alert.alert(t("common.error"), (error as Error).message);
     },
   });
 
@@ -344,8 +344,8 @@ export default function ProposalDetailScreen() {
                   await apiRequest("DELETE", `/api/proposals/${id}`);
                   queryClient.invalidateQueries({ queryKey: ["/api/proposals"] });
                   router.back();
-                } catch (e: any) {
-                  Alert.alert(t("common.error"), e.message || t("proposals.detail.cannotDelete"));
+                } catch (e: unknown) {
+                  Alert.alert(t("common.error"), (e as Error).message || t("proposals.detail.cannotDelete"));
                 }
               };
               Alert.alert(
@@ -378,8 +378,8 @@ export default function ProposalDetailScreen() {
                 });
                 const conv = await res.json();
                 router.push(`/chat/${conv.id}` as any);
-              } catch (e: any) {
-                Alert.alert(t("common.error"), e.message || t("proposals.detail.cannotOpenChat"));
+              } catch (e: unknown) {
+                Alert.alert(t("common.error"), (e as Error).message || t("proposals.detail.cannotOpenChat"));
               }
             }}
             activeOpacity={0.8}

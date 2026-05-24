@@ -248,7 +248,7 @@ export default function AdminEventiScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/events"] });
       queryClient.invalidateQueries({ queryKey: ["/api/events/map"] });
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   const rejectMutation = useMutation({
@@ -262,7 +262,7 @@ export default function AdminEventiScreen() {
       setRejectModal(null);
       setRejectReason("");
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   const handleRejectConfirm = () => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import type { ThemeColors } from '@/constants/colors';
 
 interface WeatherWaypoint {
   lat: number; lng: number; name: string;
@@ -51,7 +52,7 @@ export const GiriWeather: React.FC<GiriWeatherProps> = ({ weather, weatherIcon }
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   section: { marginBottom: 20 },
   sectionTitle: { fontFamily: "Inter_600SemiBold", fontSize: 16, color: colors.text, marginBottom: 12 },
   weatherAlert: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.accentRed + "22", borderRadius: 8, padding: 10, marginBottom: 10 },

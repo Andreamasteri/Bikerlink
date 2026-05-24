@@ -183,7 +183,7 @@ export function MatchingEngineSection({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/matching/stats"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   return (

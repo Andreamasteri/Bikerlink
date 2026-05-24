@@ -163,7 +163,7 @@ export function useAdAdmin() {
       resetForm();
     },
     onError: (err: Error) => {
-      Alert.alert("Errore", err.message);
+      Alert.alert("Errore", (err as Error).message);
     },
   });
 
@@ -217,7 +217,7 @@ export function useAdAdmin() {
       queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
       setEditingCampaign(null);
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   const groupEditMutation = useMutation({
@@ -232,7 +232,7 @@ export function useAdAdmin() {
       queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
       setEditingGroupId(null);
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   const groupToggleMutation = useMutation({
@@ -270,7 +270,7 @@ export function useAdAdmin() {
       queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
     },
-    onError: (err: Error) => Alert.alert("Errore", err.message),
+    onError: (err: Error) => Alert.alert("Errore", (err as Error).message),
   });
 
   useEffect(() => {

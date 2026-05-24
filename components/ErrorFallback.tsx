@@ -25,7 +25,7 @@ const MAX_AUTO_RETRIES = 3;
 const AUTO_RETRY_SECONDS = 5;
 
 function isNetworkError(error: Error): boolean {
-  const msg = (error.message ?? "").toLowerCase();
+  const msg = ((error as Error).message ?? "").toLowerCase();
   const name = (error.name ?? "").toLowerCase();
   return (
     name === "networkerror" ||
@@ -113,7 +113,7 @@ export function ErrorFallback({
   };
 
   const formatErrorDetails = (): string => {
-    let details = `Errore: ${error.message}\n\n`;
+    let details = `Errore: ${(error as Error).message}\n\n`;
     if (error.stack) {
       details += `Stack Trace:\n${error.stack}`;
     }

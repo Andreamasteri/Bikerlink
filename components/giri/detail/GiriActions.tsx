@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/useColors';
+import type { ThemeColors } from '@/constants/colors';
 
 interface GiriActionsProps {
   onNavigate: () => void;
@@ -63,7 +64,7 @@ export const GiriActions: React.FC<GiriActionsProps> = ({
   );
 };
 
-const styles = (colors: any) => StyleSheet.create({
+const styles = (colors: ThemeColors) => StyleSheet.create({
   navigateBtn: {
     flexDirection: "row",
     alignItems: "center",

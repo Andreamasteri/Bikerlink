@@ -1,4 +1,5 @@
 import React from "react";
+import type { ThemeColors } from '@/constants/colors';
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -7,7 +8,7 @@ interface ModeChipProps {
   isActive: boolean;
   icon: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
-  colors: any;
+  colors: ThemeColors;
 }
 
 const ModeChip: React.FC<ModeChipProps> = ({ label, isActive, icon, onPress, colors }) => (
@@ -29,7 +30,7 @@ const ModeChip: React.FC<ModeChipProps> = ({ label, isActive, icon, onPress, col
 interface ModeSelectorProps {
   mode: "ai" | "manual" | "ai-preview";
   setMode: (mode: "ai" | "manual") => void;
-  colors: any;
+  colors: ThemeColors;
 }
 
 export const ModeSelector: React.FC<ModeSelectorProps> = ({ mode, setMode, colors }) => {

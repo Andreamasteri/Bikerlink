@@ -85,8 +85,8 @@ export default function SystemScreen() {
     try {
       await apiRequest("POST", "/api/admin/cache/cleanup");
       Alert.alert("Avviata", "Pulizia cache workspace avviata in background.");
-    } catch (e: any) {
-      if (e.status === 409) {
+    } catch (e: unknown) {
+      if ((e as { status?: number })?.status === 409) {
         Alert.alert("In corso", "Pulizia cache già in esecuzione, attendi.");
       } else {
         Alert.alert("Errore", "Impossibile avviare la pulizia della cache.");
@@ -124,8 +124,8 @@ export default function SystemScreen() {
         ios: { latestVersion: nativeIosLatest, minVersion: nativeIosMin, storeUrl: nativeIosUrl }
       });
       Alert.alert("Salvato", "Configurazione versioni native aggiornata.");
-    } catch (e: any) {
-      Alert.alert("Errore", e.message || "Impossibile salvare la configurazione.");
+    } catch (e: unknown) {
+      Alert.alert("Errore", (e as Error).message || "Impossibile salvare la configurazione.");
     } finally {
       setSavingNative(false);
     }
@@ -166,8 +166,8 @@ export default function SystemScreen() {
           },
         ]
       );
-    } catch (e: any) {
-      Alert.alert("Errore", e.message || t("admin.serverError"));
+    } catch (e: unknown) {
+      Alert.alert("Errore", (e as Error).message || t("admin.serverError"));
     } finally {
       setIsPurging(false);
     }

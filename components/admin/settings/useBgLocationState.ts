@@ -38,7 +38,7 @@ export function useBgLocationState(isAdmin: boolean, t: (k: string) => string) {
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: t("admin.genericError2") }));
-        throw new Error(err.message);
+        throw new Error((err as Error).message);
       }
       return res.json();
     },
@@ -46,7 +46,7 @@ export function useBgLocationState(isAdmin: boolean, t: (k: string) => string) {
       refetchBgLocation();
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/bg-location"] });
     },
-    onError: (e: Error) => Alert.alert("Errore", e.message),
+    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
   return {

@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useT } from "@/lib/language-context";
+import type { ThemeColors } from "@/constants/colors";
 
 interface NavigationFinishedProps {
   route: {
@@ -54,7 +55,7 @@ export function NavigationFinished({
   );
 }
 
-const styles = (colors: any) =>
+const styles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
     finishedContainer: {

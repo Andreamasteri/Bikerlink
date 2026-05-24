@@ -286,8 +286,8 @@ export default function PublicProfileScreen() {
       });
       const conv = await res.json();
       router.push(`/chat/${conv.id}` as any);
-    } catch (e: any) {
-      Alert.alert("Errore", e.message || "Impossibile aprire la chat");
+    } catch (e: unknown) {
+      Alert.alert("Errore", (e as Error).message || "Impossibile aprire la chat");
     }
   };
 

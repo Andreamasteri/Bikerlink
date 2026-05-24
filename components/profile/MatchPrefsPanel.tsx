@@ -41,7 +41,7 @@ export default function MatchPrefsPanel() {
       queryClient.invalidateQueries({ queryKey: ["/api/match-preferences"] });
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message);
+      Alert.alert("Errore", (error as Error).message);
     },
   });
 

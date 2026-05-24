@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useT } from "@/lib/language-context";
+import type { ThemeColors } from "@/constants/colors";
 
 interface NavigationInstructionProps {
   step: {
@@ -95,7 +96,7 @@ export function NavigationInstruction({
   );
 }
 
-const styles = (colors: any) =>
+const styles = (colors: ThemeColors) =>
   StyleSheet.create({
     panel: {
       backgroundColor: colors.surface,

@@ -12,7 +12,7 @@ export async function logGpsError(
   try {
     const err = error instanceof Error ? error : new Error(String(error));
     const payload = {
-      errorMessage: err.message || String(error),
+      errorMessage: (err as Error).message || String(error),
       stackTrace: err.stack || null,
       timestamp: new Date().toISOString(),
       platform: Platform.OS,

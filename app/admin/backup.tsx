@@ -156,8 +156,8 @@ export default function BackupScreen() {
       } else {
         Alert.alert("Scaricato", `Salvato in: ${dl.uri}`);
       }
-    } catch (err: any) {
-      Alert.alert("Errore download", err?.message || "Impossibile scaricare");
+    } catch (err: unknown) {
+      Alert.alert("Errore download", (err instanceof Error ? err.message : null) || "Impossibile scaricare");
     } finally {
       setDownloadingType(null);
     }

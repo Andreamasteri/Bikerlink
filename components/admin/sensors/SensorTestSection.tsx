@@ -104,7 +104,7 @@ export const SensorTestSection: React.FC<SensorTestSectionProps> = ({
           <TouchableOpacity
             onPress={() => {
               Linking.openSettings().catch((err) => {
-                addLog("error", `Impossibile aprire Impostazioni: ${err instanceof Error ? err.message : String(err)}`);
+                addLog("error", `Impossibile aprire Impostazioni: ${err instanceof Error ? (err as Error).message : String(err)}`);
               });
             }}
             style={ss.openSettingsBtn}

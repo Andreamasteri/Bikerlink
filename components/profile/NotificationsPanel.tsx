@@ -61,7 +61,7 @@ export default function NotificationsPanel({ serverPushEnabled, serverNotifPrefs
     setPushTogglePending(true);
     setPushNotificationsEnabled(next);
     const getMessage = (e: unknown): string =>
-      e instanceof Error ? e.message : typeof e === "string" ? e : "Operazione non riuscita";
+      e instanceof Error ? (e as Error).message : typeof e === "string" ? e : "Operazione non riuscita";
     try {
       await AsyncStorage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, next ? "true" : "false");
       await apiRequest("PUT", "/api/users/profile/dynamic", { pushNotificationsEnabled: next });
@@ -110,7 +110,7 @@ export default function NotificationsPanel({ serverPushEnabled, serverNotifPrefs
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
     },
     onError: (error: Error) => {
-      Alert.alert("Errore", error.message);
+      Alert.alert("Errore", (error as Error).message);
     },
   });
 

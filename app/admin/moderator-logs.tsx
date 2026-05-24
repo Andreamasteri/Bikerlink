@@ -125,7 +125,7 @@ export default function AdminModeratorLogs() {
       Alert.alert("Log svuotati", `${result.deletedCount} righe eliminate.`);
     },
     onError: (err: unknown) => {
-      const msg = err instanceof Error ? err.message : t("admin.unknownError");
+      const msg = err instanceof Error ? (err as Error).message : t("admin.unknownError");
       Alert.alert("Errore", `Impossibile svuotare i log: ${msg}`);
     },
   });

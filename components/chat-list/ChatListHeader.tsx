@@ -1,11 +1,11 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Switch } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Colors from "@/constants/colors";
+import Colors, { ThemeColors } from "@/constants/colors";
 
 interface ChatListHeaderProps {
   insets: { top: number };
-  colors: any;
+  colors: ThemeColors;
   emailNotifEnabled: boolean;
   onToggleEmailNotif: (val: boolean) => void;
   onNewChatPress: () => void;
