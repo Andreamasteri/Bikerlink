@@ -37,6 +37,7 @@ interface MotionStatus {
   totalCycles: number;
   speedDistribution?: { city: number; highway: number; mountain: number };
   averageSpeedKph?: number;
+  convoiRiders?: number;
 }
 
 interface StregattaMapProps {
@@ -266,6 +267,12 @@ export function StregattaMap({
           <View style={[styles.dot, { backgroundColor: "#5A5A7A" }]} />
           <Text style={styles.statText}>{restingNow} fermi</Text>
         </View>
+        {motionEnabled && (motionStatus?.convoiRiders ?? 0) > 0 && (
+          <View style={styles.statItem}>
+            <Ionicons name="people" size={13} color="#FF6B35" />
+            <Text style={[styles.statText, { color: "#FF6B35" }]}>{motionStatus!.convoiRiders} comitiva</Text>
+          </View>
+        )}
         {motionEnabled && motionStatus?.averageSpeedKph != null && motionStatus.averageSpeedKph > 0 && (
           <View style={styles.statItem}>
             <Ionicons name="speedometer-outline" size={13} color={Colors.textSecondary} />
@@ -317,7 +324,7 @@ export function StregattaMap({
             color={motionEnabled ? "#FF6B35" : Colors.textSecondary}
           />
           <Text style={[styles.controlLabel, motionEnabled && { color: "#FF6B35" }]}>
-            {motionEnabled ? "Simulatore attivo" : "Simulatore pauso"}
+            {motionEnabled ? "Simulatore attivo" : "Simulatore in pausa"}
           </Text>
           {motionStatus?.lastCycleAt && (
             <Text style={styles.cycleText}>

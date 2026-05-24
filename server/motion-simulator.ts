@@ -703,6 +703,7 @@ export function getUserSpeedMap(): Map<string, { currentSpeedKph: number; speedP
 
 export function getMotionStatus() {
   let movingCount = 0;
+  let convoiRiders = 0;
   const profileCounts: Record<SpeedProfile, number> = { city: 0, highway: 0, mountain: 0 };
   let speedSum = 0;
   let speedCount = 0;
@@ -715,6 +716,8 @@ export function getMotionStatus() {
         profileCounts[s.speedProfile]++;
         speedSum += s.currentSpeedKph;
         speedCount++;
+        // Convoy members have non-zero position offsets set by formConvoysForNewSlot
+        if (s.offsetLat !== 0 || s.offsetLng !== 0) convoiRiders++;
       }
     }
   }
@@ -734,6 +737,7 @@ export function getMotionStatus() {
       mountain: profileCounts.mountain,
     },
     averageSpeedKph: speedCount > 0 ? Math.round(speedSum / speedCount) : 0,
+    convoiRiders,
   };
 }
 

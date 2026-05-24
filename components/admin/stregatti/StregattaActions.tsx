@@ -20,6 +20,7 @@ interface MotionStatus {
   totalCycles: number;
   speedDistribution?: { city: number; highway: number; mountain: number };
   averageSpeedKph?: number;
+  convoiRiders?: number;
 }
 
 interface BboxData {
@@ -164,6 +165,14 @@ export function StregattaActions({
                 {motionStatus.movingNow} / {motionStatus.totalFakeUsers} in moto
               </Text>
             </View>
+            {motionEnabled && (motionStatus.convoiRiders ?? 0) > 0 && (
+              <View style={styles.motionStatRow}>
+                <Ionicons name="people" size={12} color="#FF6B35" />
+                <Text style={[styles.motionStatText, { color: "#FF6B35" }]}>
+                  {motionStatus.convoiRiders} in comitiva
+                </Text>
+              </View>
+            )}
             {motionEnabled && motionStatus.averageSpeedKph != null && motionStatus.averageSpeedKph > 0 && (
               <View style={styles.motionStatRow}>
                 <Ionicons name="speedometer-outline" size={12} color={Colors.textSecondary} />

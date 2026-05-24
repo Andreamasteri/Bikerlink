@@ -226,6 +226,7 @@ export default function FakeUsersAdmin() {
     totalCycles: number;
     speedDistribution: { city: number; highway: number; mountain: number };
     averageSpeedKph: number;
+    convoiRiders: number;
   }>({
     queryKey: ["/api/admin/stregatti/motion/status"],
     refetchInterval: 35_000
