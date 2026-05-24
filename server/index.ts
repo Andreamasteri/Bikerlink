@@ -236,13 +236,10 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
         .catch((e) => console.warn("[INIT][BG] saveSchemaSnapshot error:", e));
     });
 
-    // Motion simulator for fake users (non-fatal)
-    try {
-      const { startMotionSimulator } = await import("./motion-simulator");
-      await startMotionSimulator();
-    } catch (e) {
-      console.warn("[INIT] Phase 5: motion simulator (non-fatal):", e);
-    }
+    // Motion simulator for fake users — fire-and-forget so it cannot hang boot
+    import("./motion-simulator")
+      .then(({ startMotionSimulator }) => startMotionSimulator())
+      .catch((e) => console.warn("[INIT] Background: motion simulator error:", e));
   } catch (err) {
     console.error("[INIT] FATAL — Phase 5 failed:", err);
     process.exit(1);
