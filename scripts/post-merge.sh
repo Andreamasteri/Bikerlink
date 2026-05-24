@@ -104,7 +104,7 @@ if [ -n "$GITHUB_PAT" ]; then
   echo "→ Push branch '${CURRENT_BRANCH}' su GitHub..."
   GIT_PUSH_EXIT=0
   git -c "credential.helper=!f() { echo username=x; echo password=${GITHUB_PAT}; }; f" \
-    push --force-with-lease "${GITHUB_REPO_URL}" "HEAD:${CURRENT_BRANCH}" 2>&1 || GIT_PUSH_EXIT=$?
+    push --force "${GITHUB_REPO_URL}" "HEAD:${CURRENT_BRANCH}" 2>&1 || GIT_PUSH_EXIT=$?
   if [ "$GIT_PUSH_EXIT" -eq 0 ]; then
     echo "✅ GitHub sincronizzato correttamente (branch: ${CURRENT_BRANCH})."
   else
