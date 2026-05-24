@@ -377,6 +377,7 @@ const sharedStyles = StyleSheet.create({
 });
 
 export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, onRemove, isPending, t, locale }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match shape varies by type
   match: any;
   currentUserId: string;
   onAccept: () => void;
@@ -430,7 +431,7 @@ export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onCh
 
       <TouchableOpacity
         style={{ marginBottom: 10 }}
-        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as any)}
+        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as never)}
         activeOpacity={0.7}
       >
         <View style={sharedStyles.matchUserInfo}>
@@ -496,6 +497,7 @@ export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onCh
 }
 
 export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, onBlock, onChatPress, onRemove, isPending, t, locale }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match shape varies by type
   match: any;
   currentUserId: string;
   onAccept: () => void;
@@ -546,7 +548,7 @@ export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, 
 
       <TouchableOpacity
         style={{ marginBottom: 6 }}
-        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as any)}
+        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as never)}
         activeOpacity={0.7}
       >
         <View style={sharedStyles.matchUserInfo}>
@@ -587,6 +589,7 @@ export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, 
 }
 
 export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onReject, onChatPress, isPending, t, locale }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match shape varies by type
   match: any;
   currentUserId: string;
   onAccept: () => void;
@@ -632,7 +635,7 @@ export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onRej
 
       <TouchableOpacity
         style={{ marginBottom: 10 }}
-        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as any)}
+        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as never)}
         activeOpacity={0.7}
       >
         <View style={sharedStyles.matchUserInfo}>
@@ -690,6 +693,7 @@ export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onRej
 }
 
 export function MatchCardFull({ match, currentUserId, onAccept, onReject, onRemove, isPending, t, locale }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match shape varies by type
   match: any;
   currentUserId: string;
   onAccept: () => void;
@@ -748,7 +752,7 @@ export function MatchCardFull({ match, currentUserId, onAccept, onReject, onRemo
 
       <TouchableOpacity
         style={{ marginBottom: 10 }}
-        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as any)}
+        onPress={() => otherUserId && cardRouter.push(`/profile/${otherUserId}` as never)}
         activeOpacity={0.7}
       >
         <View style={sharedStyles.matchUserInfo}>

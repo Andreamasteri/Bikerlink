@@ -377,6 +377,7 @@ export default function NavigateScreen() {
     }
   }, [polylinePoints, route, mapReady, isFinished, locale, t]);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView message event
   const handleMapMessage = useCallback((event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
@@ -453,6 +454,7 @@ export default function NavigateScreen() {
         topPad={topPad}
         bottomPad={bottomPad}
         formatDuration={formatDuration}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
         onSave={() => router.replace(`/route/tracking` as any)}
         onClose={handleClose}
       />
@@ -466,6 +468,7 @@ export default function NavigateScreen() {
     <View style={s.container}>
       <NavigationMap
         mapHtml={mapHtml}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView ref type
         webViewRef={webViewRef as any}
         handleMapMessage={handleMapMessage}
         handleClose={handleClose}
@@ -478,6 +481,7 @@ export default function NavigateScreen() {
 
       {/* Progress bar */}
       <View style={s.progressBg}>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- percentage string for width */}
         <View style={[s.progressFill, { width: `${progressPct}%` as any }]} />
       </View>
 

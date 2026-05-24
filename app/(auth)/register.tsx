@@ -208,44 +208,42 @@ export default function RegisterScreen() {
       }
     }
 
-    const data: any = {
+    const data = {
       nickname: nickname.trim(),
       email: email.trim().toLowerCase(),
       password,
-      userType,
+      userType: userType as "biker" | "zavorrina" | "coppia",
       eulaAccepted: true as const,
+      phone: phone.trim() ? phonePrefix + phone.trim() : undefined,
+      coupleSexConfig: (userType === "coppia" && coupleSexConfig) ? coupleSexConfig as "M+M" | "M+F" | "F+F" : undefined,
+      sex: (userType !== "coppia" && sex) ? sex as "M" | "F" : undefined,
+      birthYear: birthYear ? parseInt(birthYear, 10) : undefined,
+      country: country || PHONE_PREFIX_TO_COUNTRY[phonePrefix] || "IT",
+      region: region || undefined,
+      invitationCode: inviteCode.trim() ? inviteCode.trim().toUpperCase() : undefined,
     };
-    if (phone.trim()) data.phone = phonePrefix + phone.trim();
-    if (userType === "coppia" && coupleSexConfig) {
-      data.coupleSexConfig = coupleSexConfig;
-    } else if (sex) {
-      data.sex = sex;
-    }
-    if (birthYear) data.birthYear = parseInt(birthYear, 10);
-    data.country = country || PHONE_PREFIX_TO_COUNTRY[phonePrefix] || "IT";
-    if (region) data.region = region;
-    if (inviteCode.trim()) data.invitationCode = inviteCode.trim().toUpperCase();
 
     registerMutation.mutate(data, {
-      onSuccess: (response: any) => {
-        if (response?.giftMessage) {
-          setGiftModalMessage(response.giftMessage);
+      onSuccess: (response: unknown) => {
+        const res = response as { giftMessage?: string; requiresEmailVerification?: boolean } | null;
+        if (res?.giftMessage) {
+          setGiftModalMessage(res.giftMessage);
           setGiftModalCode(inviteCode.trim().toUpperCase());
-          if (response?.requiresEmailVerification) {
+          if (res?.requiresEmailVerification) {
             setPendingNavigation("verify");
             setVerifyEmail(data.email);
           } else {
             setPendingNavigation("tabs");
           }
           setShowGiftModal(true);
-        } else if (response?.requiresEmailVerification) {
+        } else if (res?.requiresEmailVerification) {
           router.replace({ pathname: "/(auth)/verify-email", params: { email: data.email } });
         } else {
           router.replace("/(tabs)");
         }
       },
-      onError: (err: any) => {
-        const msg = err?.message || t("auth.registerError");
+      onError: (err: Error) => {
+        const msg = err.message || t("auth.registerError");
         const cleaned = msg.replace(/^\d+:\s*/, "");
         try {
           const parsed = JSON.parse(cleaned);

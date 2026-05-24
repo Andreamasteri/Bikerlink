@@ -21,6 +21,7 @@ export const DatabaseSection: React.FC<DatabaseSectionProps> = ({
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ionicons name not in type union */}
         <Ionicons name={"database-outline" as any} size={18} color={Colors.accent} />
         <Text style={styles.cardTitle}>{t("admin.database")}</Text>
       </View>

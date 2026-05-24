@@ -34,7 +34,7 @@ function isAfterBaseline(item: MatchItem, baseline: Date): boolean {
 export function useNewMatchAlert() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const serverLastSeenAt = (user as any)?.lastSeenMatchAt as string | null | undefined;
+  const serverLastSeenAt = (user as { lastSeenMatchAt?: string | null } | null)?.lastSeenMatchAt;
 
   const [visible, setVisible] = useState(false);
   const [seenLoaded, setSeenLoaded] = useState(false);

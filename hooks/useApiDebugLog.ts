@@ -15,14 +15,15 @@ export interface DebugLogEntry {
   missingKey: boolean;
 }
 
-function detectFallback(body: any, endpoint: string): boolean {
+function detectFallback(body: unknown, endpoint: string): boolean {
   if (!body || typeof body !== "object") return false;
+  const b = body as Record<string, unknown>;
   if (endpoint.includes("ai-parse")) {
-    if (!body.startLocation && !body.title) return true;
-    if (body.title === "Giro in moto" && !body.startLocation) return true;
+    if (!b.startLocation && !b.title) return true;
+    if (b.title === "Giro in moto" && !b.startLocation) return true;
   }
   if (endpoint.includes("calculate")) {
-    return (body.distanceKm ?? 0) === 0;
+    return ((b.distanceKm as number) ?? 0) === 0;
   }
   if (endpoint.includes("geocode")) {
     return Array.isArray(body) && body.length === 0;
@@ -30,18 +31,19 @@ function detectFallback(body: any, endpoint: string): boolean {
   return false;
 }
 
-function detectMissingKey(body: any, statusCode: number | null, endpoint: string): boolean {
+function detectMissingKey(body: unknown, statusCode: number | null, endpoint: string): boolean {
   if (!endpoint.includes("ai-parse")) return false;
   if (statusCode === 401 || statusCode === 403) return true;
   if (body && typeof body === "object") {
-    if (!body.startLocation && !body.title && !body.waypoints) return true;
-    const errMsg = (body.error ?? body.message ?? "").toLowerCase();
+    const b = body as Record<string, unknown>;
+    if (!b.startLocation && !b.title && !b.waypoints) return true;
+    const errMsg = (String(b.error ?? b.message ?? "")).toLowerCase();
     if (errMsg.includes("key") || errMsg.includes("api") || errMsg.includes("quota")) return true;
   }
   return false;
 }
 
-function truncate(value: any, maxLen = 300): string {
+function truncate(value: unknown, maxLen = 300): string {
   try {
     const str = typeof value === "string" ? value : JSON.stringify(value);
     return str.length > maxLen ? str.slice(0, maxLen) + "…" : str;
@@ -81,7 +83,7 @@ export function useApiDebugLog() {
         const durationMs = Date.now() - t0;
 
         let rawText = "";
-        let parsed: any = null;
+        let parsed: unknown = null;
         try {
           rawText = await response.clone().text();
           parsed = JSON.parse(rawText);

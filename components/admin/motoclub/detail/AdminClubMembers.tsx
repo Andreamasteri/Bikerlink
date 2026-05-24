@@ -145,6 +145,7 @@ export const MemberItem: React.FC<MemberItemProps> = ({ item, onRemove, isRemovi
           )}
         </View>
         <View style={styles.memberRow}>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ionicons name from userTypeIcon */}
           <Ionicons name={userTypeIcon(item.userType) as any} size={13} color={userTypeColor(item.userType)} />
           <Text style={[styles.memberSub, { color: userTypeColor(item.userType) }]}>{item.userType}</Text>
           {item.country && (

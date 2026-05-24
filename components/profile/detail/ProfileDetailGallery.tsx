@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from "rea
 import Colors from "@/constants/colors";
 
 interface ProfileDetailGalleryProps {
-  profile: any;
+  profile: { photos?: { id: string; photoUrl?: string | null }[] };
   baseUrl: string;
   onPhotoPress: (uri: string) => void;
 }
@@ -15,7 +15,7 @@ export const ProfileDetailGallery: React.FC<ProfileDetailGalleryProps> = ({ prof
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Foto</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
-        {profile.photos.map((p: any) => {
+        {profile.photos.map((p) => {
           const uri = p.photoUrl?.startsWith("http") ? p.photoUrl : `${baseUrl}${p.photoUrl}`;
           return (
             <TouchableOpacity key={p.id} onPress={() => onPhotoPress(uri)} activeOpacity={0.8}>

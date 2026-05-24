@@ -24,7 +24,7 @@ export default function UserProposals({ proposals, detailLoading, onClose }: Pro
           <Pressable
             key={p.id}
             style={styles.proposalCard}
-            onPress={() => { onClose(); router.push(`/proposals/${p.id}` as any); }}
+            onPress={() => { onClose(); router.push(`/proposals/${p.id}` as never); }}
           >
             <Ionicons name="navigate" size={16} color={Colors.accent} />
             <View style={{ flex: 1 }}>

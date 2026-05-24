@@ -35,7 +35,7 @@ export default function UserActionRow({
             });
             const conv = await res.json();
             onClose();
-            router.push(`/chat/${conv.id}` as any);
+            router.push(`/chat/${conv.id}` as never);
           } catch (e: unknown) {
             Alert.alert(t("common.error"), (e as Error).message || t("home.cannotOpenChat"));
           }
@@ -55,7 +55,7 @@ export default function UserActionRow({
       )}
       <Pressable
         style={styles.profileBtn}
-        onPress={() => { onClose(); router.push(`/profile/${selectedUser?.id}` as any); }}
+        onPress={() => { onClose(); router.push(`/profile/${selectedUser?.id}` as never); }}
       >
         <Text style={styles.profileBtnText}>{t("home.goToProfile")}</Text>
       </Pressable>

@@ -265,6 +265,7 @@ export default function TrackingScreen() {
         // no-op: server tracking will time out naturally
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace(`/route/${routeId}` as any);
     }
 

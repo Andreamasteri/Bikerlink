@@ -150,6 +150,7 @@ interface CoordinateHistorySectionProps {
   chUserSearch: string;
   setChUserSearch: (val: string) => void;
   chSearchResults: Array<{ id: string; nickname: string; userType: string }> | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation body shape varies
   onMutation: (body: any) => void;
   isPending: boolean;
 }

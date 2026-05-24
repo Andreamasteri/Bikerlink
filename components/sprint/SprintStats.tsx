@@ -21,7 +21,7 @@ interface SprintResult {
 interface SprintStatsProps {
   personalBest: SprintResult | null;
   locale: string;
-  timeFormat: string | "12h" | "24h";
+  timeFormat: "12h" | "24h";
 }
 
 export const SprintStats: React.FC<SprintStatsProps> = ({
@@ -41,7 +41,7 @@ export const SprintStats: React.FC<SprintStatsProps> = ({
         </Text>
       </View>
       <Text style={styles.pbSince}>
-        {formatDateTime(personalBest.createdAt, locale, timeFormat as any)}
+        {formatDateTime(personalBest.createdAt, locale, timeFormat)}
       </Text>
     </View>
   );

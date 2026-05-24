@@ -20,7 +20,7 @@ export function ContestHeader({ votesRemaining }: ContestHeaderProps) {
       </Text>
       <Pressable
         style={styles.winnersBtn}
-        onPress={() => router.push("/contest/winners" as any)}
+        onPress={() => router.push("/contest/winners" as never)}
       >
         <Ionicons name="trophy" size={16} color={Colors.accent} />
         <Text style={styles.winnersText}>Hall of Fame</Text>

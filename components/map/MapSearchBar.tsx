@@ -19,9 +19,11 @@ type Props = {
   searchText: string;
   onChangeText: (text: string) => void;
   onClear: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- search results from API
   searchResults: any[];
   searchLoading: boolean;
   showSearchResults: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- result user shape from API
   onResultPress: (u: any) => void;
   currentUserId?: string;
 };
@@ -65,6 +67,7 @@ export default function MapSearchBar({
             <Text style={styles.searchNoResults}>{t("common.noResults")}</Text>
           ) : (
             <ScrollView style={{ maxHeight: 200 }} keyboardShouldPersistTaps="handled">
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- search result item from API */}
               {searchResults.map((u: any) => (
                 <TouchableOpacity key={u.id} style={styles.searchResultItem} onPress={() => onResultPress(u)}>
                   <Ionicons name={getUserIcon(u)} size={22} color={getUserColor(u)} style={{ marginRight: 10 }} />

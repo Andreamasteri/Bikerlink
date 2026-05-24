@@ -192,6 +192,7 @@ export default function AdminMotoclubs() {
           : tab === "user_creation" ? displayedUserCreation
           : tab === "sedi" ? pendingLocations
           : displayedClubs
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- data from multiple query shapes
         ) as any[]}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
@@ -235,7 +236,7 @@ export default function AdminMotoclubs() {
           return (
             <AdminMotoClubCard 
               club={item as Club}
-              onPress={() => router.push(`/admin/motoclub/${item.id}` as any)}
+              onPress={() => router.push(`/admin/motoclub/${item.id}` as never)}
               onDelete={() => handleDelete(item as Club)}
             />
           );

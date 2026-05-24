@@ -9,8 +9,13 @@ type MapFiltersPrefs = {
   events?: boolean;
 };
 
+interface MapFiltersUser {
+  id?: string | number | null;
+  mapFilters?: MapFiltersPrefs | null;
+}
+
 type UseMapFiltersProps = {
-  user: any;
+  user: MapFiltersUser | null | undefined;
   isAuthenticated: boolean;
 };
 
@@ -22,7 +27,7 @@ export function useMapFilters({ user, isAuthenticated }: UseMapFiltersProps) {
   const [filtersLoaded, setFiltersLoaded] = useState(false);
 
   const serverFiltersAppliedRef = useRef(false);
-  const lastAppliedUserIdRef = useRef<string | null>(null);
+  const lastAppliedUserIdRef = useRef<string | number | null>(null);
 
   useEffect(() => {
     const currentId = user?.id ?? null;
@@ -56,7 +61,7 @@ export function useMapFilters({ user, isAuthenticated }: UseMapFiltersProps) {
     if (!user) return;
     if (!("mapFilters" in user)) return;
     serverFiltersAppliedRef.current = true;
-    const serverFilters = (user as any).mapFilters as MapFiltersPrefs | null;
+    const serverFilters = user.mapFilters as MapFiltersPrefs | null;
     if (serverFilters && typeof serverFilters === "object") {
       const nextBiker = typeof serverFilters.biker === "boolean" ? serverFilters.biker : filterBiker;
       const nextZav = typeof serverFilters.zavorrina === "boolean" ? serverFilters.zavorrina : filterZavorrina;

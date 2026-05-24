@@ -70,6 +70,7 @@ export default function GiriCreateScreen() {
     handleMapTap
   } = useGiriCreateState(language);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView ref type
   const webviewRef = React.useRef<any>(null);
   const autoCalcTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -94,6 +95,7 @@ export default function GiriCreateScreen() {
 
   useEffect(() => {
     const js = `(function(){ if(typeof window.updateCompassDirection==='function'){ window.updateCompassDirection(${JSON.stringify(compassDirLabel)}); } })(); true;`;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView ref injectJavaScript
     (webviewRef.current as any)?.injectJavaScript(js);
   }, [compassDirLabel]);
 
@@ -177,6 +179,7 @@ export default function GiriCreateScreen() {
               setAiSuccessBanner={setAiSuccessBanner} aiSuccessTimer={aiSuccessTimer}
               updatePreviewItemName={updatePreviewItemName} regeocodePillItem={regeocodePillItem}
               handleConfirmPreview={handleConfirmPreview} setMode={setMode}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pill role helpers cast for prop compatibility
               pillRoleColor={pillRoleColor as any} pillRoleLabel={pillRoleLabel as any}
             />
           </>

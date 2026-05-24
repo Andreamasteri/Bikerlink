@@ -51,6 +51,7 @@ export const GiriOfflineCard: React.FC<GiriOfflineCardProps> = ({
       {status === "downloading" && (
         <View style={s.offlineProgressArea}>
           <View style={s.offlineProgressBg}>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- StyleSheet percentage string */}
             <View style={[s.offlineProgressFill, { width: `${progress * 100}%` as any }]} />
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -88,6 +89,7 @@ const styles = (colors: ThemeColors) => StyleSheet.create({
   offlineEstimate: { fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary },
   offlineProgressArea: { gap: 6 },
   offlineProgressBg: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- percentage height string
   offlineProgressFill: { height: "100%" as any, backgroundColor: colors.accent, borderRadius: 4 },
   offlineProgressText: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary },
   offlineActions: { flexDirection: "row", gap: 8 },

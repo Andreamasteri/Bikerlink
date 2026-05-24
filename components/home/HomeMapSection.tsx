@@ -4,12 +4,18 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import InteractiveMap, { type InteractiveMapHandle } from "@/components/InteractiveMap";
 
+interface GeoItem {
+  id?: string | number;
+  latitude?: number | null;
+  longitude?: number | null;
+  [key: string]: unknown;
+}
 interface HomeMapSectionProps {
   mapFullscreen: boolean;
   mapRef: React.RefObject<InteractiveMapHandle>;
-  usersWithSelf: any[];
-  workshops: any[];
-  activeSosRequests: any[];
+  usersWithSelf: GeoItem[];
+  workshops: GeoItem[];
+  activeSosRequests: GeoItem[];
   isAvailable: boolean;
   ghostMode: boolean;
   mySearchRadius: number | null;
@@ -17,7 +23,9 @@ interface HomeMapSectionProps {
   filterZavorrina: boolean;
   toggleFilterBiker: () => void;
   toggleFilterZavorrina: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts MapUser from useHomeMapState
   handleUserPress: (user: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts EasterEgg from useHomeMapState
   handleEasterEggPress: (egg: any) => void;
   onEventPress: (id: string) => void;
   setMapReady: (ready: boolean) => void;
@@ -59,13 +67,18 @@ export const HomeMapSection: React.FC<HomeMapSectionProps> = ({
         <InteractiveMap
           ref={mapRef}
           users={usersWithSelf.filter(
-            (u: any) => u.latitude != null && u.longitude != null && !isNaN(u.latitude) && !isNaN(u.longitude)
-          )}
+            (u) => u.latitude != null && u.longitude != null && !isNaN(u.latitude as number) && !isNaN(u.longitude as number)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GeoItem matches MapUser at runtime
+          ) as any}
           workshops={workshops.filter(
-            (w: any) => w.latitude != null && w.longitude != null && !isNaN(w.latitude) && !isNaN(w.longitude)
-          )}
+            (w) => w.latitude != null && w.longitude != null && !isNaN(w.latitude as number) && !isNaN(w.longitude as number)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GeoItem matches MapWorkshop at runtime
+          ) as any}
           easterEggs={[]}
-          activeSosRequests={activeSosRequests.filter((s: any) => s.latitude != null && s.longitude != null)}
+          activeSosRequests={activeSosRequests.filter(
+            (s) => s.latitude != null && s.longitude != null
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- GeoItem matches MapSosRequest at runtime
+          ) as any}
           isAvailable={isAvailable}
           ghostMode={ghostMode}
           searchRadiusKm={mySearchRadius ?? 0}

@@ -100,7 +100,7 @@ export default function MusicScreen() {
         return;
       }
       setSendModalVisible(false);
-      router.push(`/chat/${conv.id}` as any);
+      router.push(`/chat/${conv.id}` as never);
     } catch {
       Alert.alert(t("music.error"), t("music.sendPlaylistError"));
     } finally {
@@ -151,6 +151,7 @@ export default function MusicScreen() {
         const logic = pairs[1][1];
         const minS = pairs[2][1];
         if (criteria) setMatchCriteria(criteria.split(",").filter(Boolean));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- logic value matches union type at runtime
         if (logic === "tutti" || logic === "almeno_uno") setMatchLogic(logic as any);
         if (minS) setMinSongs(parseInt(minS, 10) || 5);
       })

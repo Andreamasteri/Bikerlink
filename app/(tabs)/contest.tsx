@@ -85,6 +85,7 @@ export default function ContestScreen() {
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1].toLowerCase()}` : "image/jpeg";
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FormData.append React Native overload
       formData.append("photo", { uri: data.imageUri, name: filename, type: mimeType } as any);
 
       if (data.caption) {

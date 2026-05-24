@@ -67,6 +67,7 @@ export const GiriStats: React.FC<GiriStatsProps> = ({
           </Text>
         </View>
         <View style={s.bsBarBg}>
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- StyleSheet percentage string */}
           <View style={[s.bsBarFill, { width: `${bikerScore * 100}%` as any, backgroundColor: scoreColor }]} />
         </View>
       </View>
@@ -122,6 +123,7 @@ const styles = (colors: ThemeColors) => StyleSheet.create({
   heroLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.textSecondary, marginTop: 2 },
   heroDivider: { width: 1, height: 50, backgroundColor: colors.border },
   bsBarBg: { height: 8, backgroundColor: colors.border, borderRadius: 4, overflow: "hidden" },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- percentage height string
   bsBarFill: { height: "100%" as any, borderRadius: 4 },
   realScoreBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "#22c55e18", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
   realScoreText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#22c55e", flex: 1 },

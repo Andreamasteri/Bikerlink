@@ -10,7 +10,6 @@ const SETTINGS_TTL_MS = 5 * 60 * 1000;
 
 export async function isBackgroundLocationSupported(): Promise<boolean> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Location = require("expo-location") as typeof import("expo-location");
     const { status } = await Location.getBackgroundPermissionsAsync();
     return status === "granted";
@@ -24,7 +23,6 @@ export async function startBackgroundLocationTask(
   notificationText: string
 ): Promise<boolean> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Location = require("expo-location") as typeof import("expo-location");
     const isRunning = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK_NAME);
     if (isRunning) return true;
@@ -53,7 +51,6 @@ export async function startBackgroundLocationTask(
 
 export async function stopBackgroundLocationTask(): Promise<void> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Location = require("expo-location") as typeof import("expo-location");
     const isRunning = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK_NAME);
     if (isRunning) {

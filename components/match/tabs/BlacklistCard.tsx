@@ -4,8 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
 import { useT } from '@/lib/language-context';
 
+interface BlacklistCardItem {
+  id: string;
+  nickname?: string | null;
+  blockedUser?: { nickname?: string | null; userType?: string | null };
+}
 interface BlacklistCardProps {
-  item: any;
+  item: BlacklistCardItem;
   onUnblock: (id: string) => void;
 }
 

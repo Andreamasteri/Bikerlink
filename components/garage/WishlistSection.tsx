@@ -46,7 +46,9 @@ export const WishlistSection: React.FC<WishlistSectionProps> = ({
     refetchOnMount: true,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- wishlist API response shape
   const wishlist = (data as any)?.wishlist;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- motos API response shape
   const motos: any[] = (data as any)?.motos || [];
 
   React.useEffect(() => {
@@ -66,10 +68,12 @@ export const WishlistSection: React.FC<WishlistSectionProps> = ({
   });
 
   const addMotoMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto form shape
     mutationFn: async (motoData: any) => {
       const res = await apiRequest("POST", "/api/wishlist/motos", motoData);
       return res.json();
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response shape
     onSuccess: (responseData: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] });
       setShowMotoForm(false);
@@ -77,15 +81,18 @@ export const WishlistSection: React.FC<WishlistSectionProps> = ({
       setEditingMotoId(null);
       if (responseData?.matches && responseData.matches.length > 0) {
         const matchInfo = responseData.matches
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match item from API
           .map((m: any) => `${m.bikerNickname || "Biker"} ${t("garage.hasBike")} ${m.brand} ${m.model}`)
           .join("\n");
         Alert.alert("Here Comes Your Chance!!", matchInfo);
       }
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error shape
     onError: (err: any) => Alert.alert(t("common.error"), (err as Error).message),
   });
 
   const updateMotoMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto data shape
     mutationFn: async ({ id, data: motoData }: { id: string; data: any }) => {
       await apiRequest("PUT", `/api/wishlist/motos/${id}`, motoData);
     },
@@ -104,6 +111,7 @@ export const WishlistSection: React.FC<WishlistSectionProps> = ({
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/wishlist"] }),
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto from API
   const openEditMoto = (moto: any) => {
     setEditingMotoId(moto.id);
     setMotoForm({ brand: moto.brand || "", model: moto.model || "", motorcycleType: moto.motorcycleType || "", ridingStyle: moto.ridingStyle || "" });
@@ -223,6 +231,7 @@ export const WishlistSection: React.FC<WishlistSectionProps> = ({
               <Text style={styles.emptySubtext}>{t("garage.noWishlistMoto")}</Text>
             </View>
           ) : (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto item from API
             motos.map((moto: any) => (
               <Pressable key={moto.id} style={wStyles.motoItem} onPress={() => openEditMoto(moto)}>
                 <View style={{ flex: 1 }}>

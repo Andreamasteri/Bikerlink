@@ -1,15 +1,16 @@
 import React from 'react';
+import { Ionicons } from '@expo/vector-icons';
 import { MatchList } from '@/components/match/MatchList';
 
 interface MatchCardStackProps {
-  currentList: any[];
-  renderItem: ({ item }: { item: any }) => React.ReactElement;
+  currentList: Record<string, unknown>[];
+  renderItem: ({ item }: { item: Record<string, unknown> }) => React.ReactElement;
   isRefetching: boolean;
   onRefresh: () => void;
   isLoading: boolean;
   isServerBusy: boolean;
   activeTab: string;
-  getEmptyIcon: () => any;
+  getEmptyIcon: () => keyof typeof Ionicons.glyphMap;
   getEmptyTitle: () => string;
   getEmptyDesc: () => string;
 }

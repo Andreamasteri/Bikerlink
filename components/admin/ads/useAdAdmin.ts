@@ -248,6 +248,7 @@ export function useAdAdmin() {
       );
       return { previous };
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- optimistic update context
     onError: (_err: Error, _vars, context: any) => {
       if (context?.previous) {
         queryClient.setQueryData(["/api/admin/advertisements"], context.previous);
@@ -379,6 +380,7 @@ export function useAdAdmin() {
         const normalised = ["image/jpg", "image/jpe", "image/jfif"].includes(rawMime)
           ? "image/jpeg"
           : rawMime;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData file object
         formData.append("images", { uri: img.uri, name: filename, type: normalised } as any);
       }
       try {
@@ -467,6 +469,7 @@ export function useAdAdmin() {
       const filename = formImageUri.split("/").pop() || "image.jpg";
       const match = /\.(\w+)$/.exec(filename);
       const type = match ? `image/${match[1]}` : "image/jpeg";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData file object
       formData.append("image", { uri: formImageUri, name: filename, type } as any);
     }
     createMutation.mutate(formData);

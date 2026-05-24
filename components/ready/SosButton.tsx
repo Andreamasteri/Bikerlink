@@ -6,9 +6,9 @@ import { UseMutationResult } from "@tanstack/react-query";
 const sosLaunchIcon = require("@/assets/images/sos-launch-icon.png");
 
 interface SosButtonProps {
-  mySosData: any;
+  mySosData: { id?: string } | null | undefined;
   setShowSosModal: (show: boolean) => void;
-  cancelSosMutation: UseMutationResult<any, Error, string>;
+  cancelSosMutation: UseMutationResult<unknown, Error, string>;
 }
 
 export function SosButton({
@@ -28,7 +28,7 @@ export function SosButton({
           {
             text: t("ready.cancelSosYes"),
             style: "destructive",
-            onPress: () => cancelSosMutation.mutate(mySosData.id),
+            onPress: () => cancelSosMutation.mutate(mySosData?.id ?? ""),
           },
         ]
       );

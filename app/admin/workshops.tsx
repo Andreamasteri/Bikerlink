@@ -36,6 +36,7 @@ export default function AdminWorkshops() {
   });
 
   const createMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- workshop form payload
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/admin/workshops", data);
       return res.json();

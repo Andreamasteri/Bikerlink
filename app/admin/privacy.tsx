@@ -38,6 +38,7 @@ export default function AdminPrivacy() {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/privacy-rules"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/show-distance-counter"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error shape from mutation
     onError: (err: any) => {
       Alert.alert("Errore", err?.message || "Impossibile aggiornare le regole di privacy");
     },

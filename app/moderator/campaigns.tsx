@@ -270,6 +270,7 @@ export default function ModeratorCampaigns() {
         style={[styles.tabBtn, active && { borderBottomColor: color, borderBottomWidth: 2 }]}
         onPress={() => setActiveTab(key)}
       >
+        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name cast for Ionicons */}
         <IconComp name={icon as any} size={18} color={active ? color : Colors.textSecondary} />
         <Text style={[styles.tabLabel, { color: active ? color : Colors.textSecondary }]}>{label}</Text>
       </TouchableOpacity>

@@ -129,6 +129,7 @@ export default function FeatureRequestScreen() {
             </View>
           </View>
           <View style={styles.plannedCard}>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ionicons name not in type union */}
             <Ionicons name={"logo-spotify" as any} size={20} color="#1DB954" />
             <View style={styles.plannedInfo}>
               <Text style={styles.plannedName}>Integrazione playlist Spotify</Text>

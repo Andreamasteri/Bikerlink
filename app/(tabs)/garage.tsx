@@ -88,6 +88,7 @@ function GarageContent() {
   const motorcycles = Array.isArray(data) ? data : [];
 
   const saveMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto form data matches server payload
     mutationFn: async (motoData: any) => {
       const payload = {
         ...motoData,
@@ -101,20 +102,20 @@ function GarageContent() {
       }
       return res.json();
     },
-    onSuccess: async (responseData: any) => {
+    onSuccess: async (responseData: { matches?: Array<{ zavarrinaNickname?: string; brand: string; model: string }> }) => {
       await queryClient.refetchQueries({ queryKey: ["/api/motorcycles"] });
       setShowForm(false);
       resetForm();
 
       if (responseData?.matches && responseData.matches.length > 0) {
         const matchInfo = responseData.matches
-          .map((m: any) => `${m.zavarrinaNickname || "Zavorrina"} ${t("garage.lookingFor")} ${m.brand} ${m.model}`)
+          .map((m) => `${m.zavarrinaNickname || "Zavorrina"} ${t("garage.lookingFor")} ${m.brand} ${m.model}`)
           .join("\n");
         Alert.alert("Here Comes Your Chance!!", matchInfo);
       }
     },
-    onError: (err: any) => {
-      Alert.alert(t("common.error"), (err as Error).message || t("garage.saveError"));
+    onError: (err: Error) => {
+      Alert.alert(t("common.error"), err.message || t("garage.saveError"));
     },
   });
 
@@ -137,6 +138,7 @@ function GarageContent() {
     setShowForm(true);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto from API
   const openEdit = (moto: any) => {
     setEditingId(moto.id);
     setForm({
@@ -175,6 +177,7 @@ function GarageContent() {
   const getMotoTypeLabel = (v: string) => t(`garage.motoType.${v}`) || v;
   const getStyleLabel = (v: string) => t(`garage.style.${v}`) || v;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto item from API
   const getMotoDisplayName = (item: any) => {
     const parts = [item.brand, item.model].filter(Boolean);
     const name = parts.join(" ");

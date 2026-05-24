@@ -20,8 +20,8 @@ interface EditBasicInfoProps {
   setBirthYear: (year: string) => void;
   bio: string;
   setBio: (bio: string) => void;
-  photos: any[];
-  uploadPhotoMutation: any;
+  photos: { id: string; photoUrl?: string | null; isApproved?: boolean }[];
+  uploadPhotoMutation: { mutate: (uri: string, options?: { onSettled?: () => void }) => void; isPending?: boolean };
   pickImageForSlot: (existingPhotoId?: string) => void;
   handleDeletePhoto: (photoId: string) => void;
   failedPhotos: Set<string>;
@@ -99,9 +99,8 @@ export function EditBasicInfo({
             const isUploading = uploadPhotoMutation.isPending && !photo;
             const isReplacing = photo && replacingSlot === photo.id;
             if (photo) {
-              const photoUri = photo.photoUrl.startsWith("http")
-                ? photo.photoUrl
-                : `${getApiUrl()}${photo.photoUrl}`;
+              const rawUrl = photo.photoUrl ?? "";
+              const photoUri = rawUrl.startsWith("http") ? rawUrl : `${getApiUrl()}${rawUrl}`;
               return (
                 <View key={photo.id} style={styles.photoItem}>
                   {failedPhotos.has(photo.id) ? (

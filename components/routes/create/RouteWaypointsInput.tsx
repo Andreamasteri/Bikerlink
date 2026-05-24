@@ -3,13 +3,30 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "rea
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
+interface WaypointMeta {
+  icon: string;
+  label: string;
+  color: string;
+}
+interface WaypointItem {
+  id?: string;
+  localId?: string;
+  name?: string;
+  type?: string;
+  waypointType?: string;
+  lat?: number;
+  lng?: number;
+  latitude?: number;
+  longitude?: number;
+  description?: string;
+}
 interface RouteWaypointsInputProps {
-  waypoints: any[];
+  waypoints: WaypointItem[];
   t: (key: string) => string;
   handleImportGpx: () => void;
   isImporting: boolean;
   openMapForNewWaypoint: () => void;
-  getWaypointMeta: (type: string) => any;
+  getWaypointMeta: (type: string) => WaypointMeta;
   moveWaypoint: (index: number, direction: "up" | "down") => void;
   removeWaypoint: (index: number) => void;
 }
@@ -60,17 +77,18 @@ export const RouteWaypointsInput: React.FC<RouteWaypointsInputProps> = ({
       )}
 
       {waypoints.map((wp, index) => {
-        const meta = getWaypointMeta(wp.waypointType);
+        const meta = getWaypointMeta(wp.waypointType ?? "");
         return (
           <View key={wp.localId} style={styles.waypointCard}>
             <View style={styles.waypointCardLeft}>
               <View style={[styles.waypointIconWrap, { backgroundColor: meta.color + "22" }]}>
-                <MaterialCommunityIcons name={meta.icon} size={18} color={meta.color} />
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from data */}
+                <MaterialCommunityIcons name={meta.icon as any} size={18} color={meta.color} />
               </View>
               <View style={styles.waypointInfo}>
                 <Text style={styles.waypointName} numberOfLines={1}>{wp.name}</Text>
                 <Text style={styles.waypointMeta}>
-                  {meta.label} - {wp.latitude.toFixed(4)}, {wp.longitude.toFixed(4)}
+                  {meta.label} - {(wp.latitude ?? 0).toFixed(4)}, {(wp.longitude ?? 0).toFixed(4)}
                 </Text>
                 {wp.description ? (
                   <Text style={styles.waypointDescText} numberOfLines={1}>{wp.description}</Text>

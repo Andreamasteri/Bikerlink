@@ -30,7 +30,6 @@ interface BgTelemetrySample {
 
 export async function startTelemetryBackgroundTask(): Promise<boolean> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Location = require("expo-location") as typeof import("expo-location");
     const { status } = await Location.getBackgroundPermissionsAsync();
     if (status !== "granted") return false;
@@ -57,7 +56,6 @@ export async function startTelemetryBackgroundTask(): Promise<boolean> {
 
 export async function stopTelemetryBackgroundTask(): Promise<void> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Location = require("expo-location") as typeof import("expo-location");
     const isRunning = await TaskManager.isTaskRegisteredAsync(TASK_TELEMETRY);
     if (isRunning) {

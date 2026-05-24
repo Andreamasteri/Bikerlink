@@ -13,7 +13,7 @@ export const ProfileMotoSection: React.FC<ProfileMotoSectionProps> = ({ isBikerO
   
   return (
     <View style={styles.section}>
-      <Pressable style={styles.garageCard} onPress={() => router.push("/garage" as any)}>
+      <Pressable style={styles.garageCard} onPress={() => router.push("/garage" as never)}>
         {isBikerOrCoppia ? (
           <MaterialCommunityIcons name="motorbike" size={36} color={Colors.accent} />
         ) : (

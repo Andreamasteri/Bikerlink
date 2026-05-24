@@ -3,8 +3,18 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
+interface ProfileMoto {
+  id: string;
+  brand?: string | null;
+  model?: string | null;
+  year?: number | null;
+  engineSize?: number | null;
+  ridingStyle?: string | null;
+  isForSale?: boolean;
+  saleDescription?: string | null;
+}
 interface ProfileDetailMotoProps {
-  profile: any;
+  profile: { motorcycles?: ProfileMoto[] };
   marketplaceEnabled: boolean;
 }
 
@@ -14,7 +24,7 @@ export const ProfileDetailMoto: React.FC<ProfileDetailMotoProps> = ({ profile, m
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Moto</Text>
-      {profile.motorcycles.map((m: any) => (
+      {profile.motorcycles.map((m) => (
         <View key={m.id} style={styles.motoCard}>
           <MaterialCommunityIcons name="motorbike" size={24} color={Colors.accent} />
           <View style={styles.motoInfo}>

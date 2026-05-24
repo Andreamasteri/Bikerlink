@@ -206,15 +206,19 @@ export default function ProposalsScreen() {
 
   const { data: proposals, isLoading, refetch, isRefetching } = useQuery<ProposalItem[]>({ queryKey });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches from API
   const { data: matches } = useQuery<any[]>({
     queryKey: ["/api/proposals/matches"]
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- proposal profile matches from API
   const { data: propProfileMatches } = useQuery<any[]>({
     queryKey: ["/api/proposals/proposal-profile-matches"]
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match item from API
   const pendingMatchCount = (matches || []).filter((m: any) => m.status === "pending").length;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- proposal match item from API
   const pendingPropProfileCount = (propProfileMatches || []).filter((m: any) => m.status === "new").length;
   const totalPendingCount = pendingMatchCount + pendingPropProfileCount;
 
@@ -226,6 +230,7 @@ export default function ProposalsScreen() {
     router.push(`/proposals/${id}`);
   }, [router]);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mixed list of proposal types
   const allData: any[] = [];
   if (totalPendingCount > 0) {
     allData.push({ type: "matchBanner", key: "mb" });
@@ -319,7 +324,7 @@ export default function ProposalsScreen() {
               return (
                 <TouchableOpacity
                   style={styles.matchBannerCard}
-                  onPress={() => router.push("/(tabs)/match" as any)}
+                  onPress={() => router.push("/(tabs)/match" as never)}
                 >
                   <Ionicons name="flash" size={20} color={Colors.accent} />
                   <Text style={styles.matchBannerText}>

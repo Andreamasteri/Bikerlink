@@ -12,7 +12,7 @@ interface PrivacySettingsGroupProps {
   ghostMutation: UseMutationResult<boolean, Error, boolean>;
   hideFromMap: boolean;
   offlineRandomize: boolean;
-  privacyMutation: UseMutationResult<void, Error, Record<string, any>>;
+  privacyMutation: UseMutationResult<void, Error, Record<string, unknown>>;
 }
 
 export function PrivacySettingsGroup({

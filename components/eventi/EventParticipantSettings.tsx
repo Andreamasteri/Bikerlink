@@ -19,6 +19,7 @@ interface EventParticipantSettingsProps {
     maxParticipants: string;
     websiteUrl: string;
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form setter with dynamic keys
   set: (key: any, value: any) => void;
   inviteClubsEnabled: boolean;
   setInviteClubsEnabled: (enabled: boolean) => void;

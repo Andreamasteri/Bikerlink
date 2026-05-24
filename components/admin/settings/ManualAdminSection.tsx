@@ -90,6 +90,7 @@ export function ManualAdminSection() {
         uri: file.uri,
         name: file.name || "manual.pdf",
         type: "application/pdf",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData file object
       } as any);
 
       const res = await fetch(new URL("/api/admin/manual/upload", getApiUrl()).toString(), {

@@ -4,6 +4,7 @@ import { RouteResultCard } from "./RouteResultCard";
 import ElevationProfile from "@/components/ElevationProfile";
 
 interface RouteResultSectionProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route result from API
   routeResult: any;
   isRoundTrip: boolean;
   isMultiDay: boolean;
@@ -11,9 +12,11 @@ interface RouteResultSectionProps {
   dismissedWarnings: Set<string>;
   setDismissedWarnings: React.Dispatch<React.SetStateAction<Set<string>>>;
   weatherLoading: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- weather preview from API
   weatherPreview: any;
   selectedMotoId: string | null;
   fuelStopsNeeded: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Animated.Value
   bikerScoreAnim: any;
 }
 
@@ -45,6 +48,7 @@ export const RouteResultSection: React.FC<RouteResultSectionProps> = ({
         selectedMotoId={selectedMotoId}
         fuelStopsNeeded={fuelStopsNeeded}
       />
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- elevation profile from route result */}
       <ElevationProfile profile={(routeResult.elevationProfile || []) as any} />
     </View>
   );

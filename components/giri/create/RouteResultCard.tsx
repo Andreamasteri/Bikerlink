@@ -86,6 +86,7 @@ export const RouteResultCard: React.FC<RouteResultCardProps> = ({
           { icon: "steering", value: String(Math.round(routeResult.bikerScore * 100)), label: "BikerScore" },
         ].map((stat, i) => (
           <View key={i} style={s.resultStat}>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from data */}
             <Ionicons name={stat.icon as any} size={20} color={colors.accent} />
             <Text style={s.resultStatValue}>{stat.value}</Text>
             <Text style={s.resultStatLabel}>{stat.label}</Text>

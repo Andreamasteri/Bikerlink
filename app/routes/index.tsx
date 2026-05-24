@@ -179,7 +179,7 @@ export default function RoutesListScreen() {
     return (
       <Pressable
         style={({ pressed }) => [styles.routeCard, pressed && styles.routeCardPressed]}
-        onPress={() => router.push(`/routes/${route.id}` as any)}
+        onPress={() => router.push(`/routes/${route.id}` as never)}
       >
         <View style={styles.routeIconContainer}>
           <MaterialCommunityIcons
@@ -256,7 +256,7 @@ export default function RoutesListScreen() {
           pressed && styles.fabPressed,
           { bottom: Math.max(insets.bottom, 16) + 16 },
         ]}
-        onPress={() => router.push("/routes/create" as any)}
+        onPress={() => router.push("/routes/create" as never)}
       >
         <Ionicons name="add" size={28} color="#FFFFFF" />
       </Pressable>

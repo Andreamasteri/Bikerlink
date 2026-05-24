@@ -147,7 +147,7 @@ export default function UserListSheet({
                   ]}
                   onPress={() => {
                     onClose();
-                    router.push(`/profile/${u.id}` as any);
+                    router.push(`/profile/${u.id}` as never);
                   }}
                 >
                   <View style={styles.userLeft}>

@@ -28,7 +28,7 @@ export function MatchCard({ match }: { match: MusicMatch }) {
       const res = await apiRequest("POST", "/api/chat/conversations", { conversationType: "private", participantIds: [match.user.id] });
       const data = await res.json();
       localQueryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
-      router.push(`/chat/${data.id}` as any);
+      router.push(`/chat/${data.id}` as never);
     } catch {
       Alert.alert(t("music.error"), t("music.chatOpenError"));
     } finally {
@@ -75,7 +75,7 @@ export function MatchCard({ match }: { match: MusicMatch }) {
         <View style={styles.matchActions}>
           <TouchableOpacity
             style={styles.matchActionBtn}
-            onPress={() => router.push(`/profile/${match.user.id}` as any)}
+            onPress={() => router.push(`/profile/${match.user.id}` as never)}
           >
             <Text style={styles.matchActionText}>Profilo</Text>
           </TouchableOpacity>

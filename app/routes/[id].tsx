@@ -92,6 +92,7 @@ export default function CustomRouteDetailScreen() {
   });
 
   const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- elevation data from API
   const [elevation, setElevation] = useState<any | null>(null);
   const [elevationLoading, setElevationLoading] = useState(false);
   const [elevationError, setElevationError] = useState(false);

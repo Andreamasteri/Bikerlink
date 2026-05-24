@@ -278,6 +278,7 @@ export default function FakeUsersAdmin() {
 
   const forceMatchingMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/force-matching", {}),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- force-matching response from API
     onSuccess: (data: any) => {
       const bb = data?.bikerBiker ?? 0;
       const zav = data?.zavarrina ?? 0;
@@ -288,6 +289,7 @@ export default function FakeUsersAdmin() {
 
   const resetMatchesMutation = useMutation({
     mutationFn: () => apiRequest("DELETE", "/api/admin/reset-matches", {}),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- reset-matches response from API
     onSuccess: (data: any) => {
       Alert.alert("Successo", `${data?.deleted ?? 0} match biker-biker eliminati`);
     }
@@ -295,6 +297,7 @@ export default function FakeUsersAdmin() {
 
   const distributeMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/stregatti/distribute-to-clubs", {}),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- distribute-to-clubs response from API
     onSuccess: (data: any) => {
       Alert.alert("Successo", `${data?.usersProcessed ?? "?"} utenti distribuiti (${data?.assigned ?? 0} assegnazioni)`);
     }
@@ -363,6 +366,7 @@ export default function FakeUsersAdmin() {
   };
 
   const createMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- stregatta data from form
     mutationFn: (data: any) => apiRequest("POST", "/api/admin/stregatti", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });

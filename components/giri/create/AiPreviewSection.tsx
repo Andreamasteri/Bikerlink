@@ -10,12 +10,16 @@ interface AiPreviewSectionProps {
   setAiPreview: React.Dispatch<React.SetStateAction<AiPreviewState | null>>;
   aiSuccessBanner: boolean;
   setAiSuccessBanner: (v: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- timer ref
   aiSuccessTimer: React.MutableRefObject<any>;
   updatePreviewItemName: (idx: number, name: string) => void;
   regeocodePillItem: (idx: number, name: string) => void;
   handleConfirmPreview: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mode is string union type
   setMode: (mode: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- role from AI parse result
   pillRoleColor: (role: any) => string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- role from AI parse result
   pillRoleLabel: (role: any) => string;
 }
 

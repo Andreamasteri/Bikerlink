@@ -4,8 +4,10 @@ import WebView from "react-native-webview";
 import { decodePolyline } from "@/lib/polyline";
 
 interface RouteMapLogicProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route result from API
   routeResult: any;
   webviewRef: React.RefObject<WebView>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- waypoints before full typing
   waypoints: any[];
   lastFittedWaypointSig: React.MutableRefObject<string>;
   bikerScoreAnim: Animated.Value;

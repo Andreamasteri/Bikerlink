@@ -20,6 +20,49 @@ type UserWithProfileCoords = Omit<User, "password"> & {
   profileLongitude?: number | null;
 };
 
+interface MapUser {
+  id: string | number;
+  nickname?: string | null;
+  userType?: string | null;
+  sex?: string | null;
+  country?: string | null;
+  region?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  [key: string]: unknown;
+}
+
+interface EasterEgg {
+  id: string;
+  collected?: boolean;
+  [key: string]: unknown;
+}
+
+interface Ad {
+  id: string;
+  rotationDuration?: number;
+  rotationMode?: string;
+  linkUrl?: string;
+  [key: string]: unknown;
+}
+
+interface ProfileQueryData {
+  isAvailable?: boolean;
+  ghostMode?: boolean;
+  fakeHomeEnabled?: boolean;
+  fakeHomeLatitude?: number | null;
+  fakeHomeLongitude?: number | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+interface ProposalItem {
+  userId?: string | number;
+  status?: string;
+  searchRadius?: number;
+  [key: string]: unknown;
+}
+
 export function useHomeMapState() {
   const router = useRouter();
   const { focusLat: focusLatParam, focusLng: focusLngParam } = useLocalSearchParams<{ focusLat?: string; focusLng?: string }>();
@@ -29,16 +72,16 @@ export function useHomeMapState() {
 
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [mapFullscreenReady, setMapFullscreenReady] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
+  const [selectedUser, setSelectedUser] = useState<MapUser | null>(null);
+  const [selectedUserDetail, setSelectedUserDetail] = useState<MapUser | null>(null);
   const [selectedMapPhoto, setSelectedMapPhoto] = useState<string | null>(null);
   const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<MapUser[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
-  const [selectedUserProposals, setSelectedUserProposals] = useState<any[]>([]);
+  const [selectedUserProposals, setSelectedUserProposals] = useState<ProposalItem[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [selectedEgg, setSelectedEgg] = useState<any>(null);
+  const [selectedEgg, setSelectedEgg] = useState<EasterEgg | null>(null);
   const [showOnlineList, setShowOnlineList] = useState(false);
   const [showBikerList, setShowBikerList] = useState(false);
   const [showZavorrinaList, setShowZavorrinaList] = useState(false);
@@ -102,7 +145,7 @@ export function useHomeMapState() {
     showBikerList,
     showZavorrinaList,
     showOfflineOnline,
-    selectedUserId: selectedUser?.id,
+    selectedUserId: selectedUser?.id != null ? String(selectedUser.id) : undefined,
     mapFullscreen,
     sosEnabled,
     setShowSosDetail,
@@ -284,11 +327,12 @@ export function useHomeMapState() {
     return () => clearInterval(interval);
   }, [hasActiveCountdown]);
 
-  const isAvailable = (mapData.profileQuery.data as any)?.isAvailable || false;
-  const isGhostMode = (mapData.profileQuery.data as any)?.ghostMode || false;
-  const fakeHomeEnabled = (mapData.profileQuery.data as any)?.fakeHomeEnabled || false;
-  const fakeHomeLat = (mapData.profileQuery.data as any)?.fakeHomeLatitude ?? null;
-  const fakeHomeLng = (mapData.profileQuery.data as any)?.fakeHomeLongitude ?? null;
+  const profileQData = mapData.profileQuery.data as ProfileQueryData | undefined;
+  const isAvailable = profileQData?.isAvailable || false;
+  const isGhostMode = profileQData?.ghostMode || false;
+  const fakeHomeEnabled = profileQData?.fakeHomeEnabled || false;
+  const fakeHomeLat = profileQData?.fakeHomeLatitude ?? null;
+  const fakeHomeLng = profileQData?.fakeHomeLongitude ?? null;
   const realMeMarker = fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null && location != null
     ? { latitude: location.latitude, longitude: location.longitude } : null;
   const fakeMeMarker = fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null
@@ -299,12 +343,12 @@ export function useHomeMapState() {
   const bikerCount = mapData.bikerCountQuery.data?.count ?? 0;
   const zavCount = mapData.zavCountQuery.data?.count ?? 0;
 
-  const nearbyUsers = useMemo(() => (mapData.nearbyUsersQuery.data as any) || [], [mapData.nearbyUsersQuery.data]);
+  const nearbyUsers = useMemo(() => (mapData.nearbyUsersQuery.data as MapUser[]) || [], [mapData.nearbyUsersQuery.data]);
 
   const usersWithSelf = useMemo(() => {
-    const rawList: any[] = Array.isArray(nearbyUsers) ? nearbyUsers : [];
+    const rawList: MapUser[] = Array.isArray(nearbyUsers) ? nearbyUsers : [];
     if (!user || !location) return rawList;
-    const alreadyPresent = rawList.some((u: any) => u.id === user.id);
+    const alreadyPresent = rawList.some((u) => u.id === user.id);
     if (alreadyPresent) return rawList;
     return [{
       id: user.id, nickname: user.nickname ?? "",
@@ -317,47 +361,46 @@ export function useHomeMapState() {
   const smallMapInitialCenter = useMemo(() => {
     const filtersActive = !filterBiker || !filterZavorrina;
     if (filtersActive) {
-      const visibleUsers = usersWithSelf.filter((u: any) => {
-        if (u.latitude == null || u.longitude == null || isNaN(u.latitude) || isNaN(u.longitude)) return false;
+      const visibleUsers = usersWithSelf.filter((u) => {
+        if (u.latitude == null || u.longitude == null || isNaN(Number(u.latitude)) || isNaN(Number(u.longitude))) return false;
         if (user?.id != null && u.id === user.id) return true;
         if (u.userType === "biker" && !filterBiker) return false;
         if (u.userType === "zavorrina" && !filterZavorrina) return false;
         return true;
       });
       if (visibleUsers.length > 0) {
-        const lat = visibleUsers.reduce((s: number, u: any) => s + Number(u.latitude), 0) / visibleUsers.length;
-        const lng = visibleUsers.reduce((s: number, u: any) => s + Number(u.longitude), 0) / visibleUsers.length;
+        const lat = visibleUsers.reduce((s: number, u) => s + Number(u.latitude), 0) / visibleUsers.length;
+        const lng = visibleUsers.reduce((s: number, u) => s + Number(u.longitude), 0) / visibleUsers.length;
         return { latitude: lat, longitude: lng };
       }
     }
-    const profileData = mapData.profileQuery.data as any;
-    const savedLat = profileData?.latitude;
-    const savedLng = profileData?.longitude;
+    const savedLat = profileQData?.latitude;
+    const savedLng = profileQData?.longitude;
     if (savedLat != null && savedLng != null && !isNaN(Number(savedLat)) && !isNaN(Number(savedLng))) {
       return { latitude: Number(savedLat), longitude: Number(savedLng) };
     }
     return null;
-  }, [filterBiker, filterZavorrina, usersWithSelf, user?.id, mapData.profileQuery.data]);
+  }, [filterBiker, filterZavorrina, usersWithSelf, user?.id, profileQData]);
 
   const mySearchRadius = useMemo(() => {
-    const myActive = (mapData.myProposalsQuery.data || []).filter(
-      (p: any) => p.userId === user?.id && p.status === "active" && p.searchRadius
+    const myActive = ((mapData.myProposalsQuery.data as ProposalItem[]) || []).filter(
+      (p) => p.userId === user?.id && p.status === "active" && p.searchRadius
     );
     if (myActive.length === 0) return 0;
-    return Math.max(...myActive.map((p: any) => p.searchRadius || 0));
+    return Math.max(...myActive.map((p) => p.searchRadius || 0));
   }, [mapData.myProposalsQuery.data, user?.id]);
 
   const autoCollectingRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    const nearbyEggs = mapData.easterEggsQuery.data || [];
-    const uncollected = nearbyEggs.filter((e: any) => !e.collected && !autoCollectingRef.current.has(e.id));
+    const nearbyEggs = (mapData.easterEggsQuery.data as EasterEgg[]) || [];
+    const uncollected = nearbyEggs.filter((e) => !e.collected && !autoCollectingRef.current.has(e.id));
     if (uncollected.length > 0) {
-      uncollected.forEach((egg: any) => {
+      uncollected.forEach((egg) => {
         autoCollectingRef.current.add(egg.id);
         apiRequest("POST", `/api/easter-eggs/${egg.id}/collect`)
           .then((res) => res.json())
-          .then((data: any) => {
+          .then((data: { prizeUnlocked?: boolean; message?: string }) => {
             if (data.prizeUnlocked) Alert.alert(t("home.easterEggPrize"), data.message || t("home.easterEgg10Msg"));
             else Alert.alert(t("home.easterEggTitle"), data.message || t("home.easterEggCongrats"));
             queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
@@ -372,7 +415,7 @@ export function useHomeMapState() {
 
   useEffect(() => {
     if (myAds.length <= 1) return;
-    const firstAd = myAds[0] as any;
+    const firstAd = myAds[0] as Ad;
     const duration = (firstAd?.rotationDuration || 10) * 1000;
     const mode = firstAd?.rotationMode || "sequential";
     const timer = setInterval(() => {
@@ -381,7 +424,7 @@ export function useHomeMapState() {
     return () => clearInterval(timer);
   }, [myAds]);
 
-  const handleUserPress = useCallback(async (mapUser: any) => {
+  const handleUserPress = useCallback(async (mapUser: MapUser) => {
     setSelectedUser(mapUser);
     setDetailLoading(true);
     setSelectedUserDetail(null);
@@ -393,8 +436,8 @@ export function useHomeMapState() {
       ]);
       setSelectedUserDetail(await detailRes.json());
       const allProposals = await proposalsRes.json();
-      setSelectedUserProposals((Array.isArray(allProposals) ? allProposals : []).filter(
-        (p: any) => p.userId === mapUser.id && p.status === "active"
+      setSelectedUserProposals(((Array.isArray(allProposals) ? allProposals : []) as ProposalItem[]).filter(
+        (p) => p.userId === mapUser.id && p.status === "active"
       ));
     } catch {
       // no-op: ignore user public detail fetch failures
@@ -402,9 +445,9 @@ export function useHomeMapState() {
     setDetailLoading(false);
   }, []);
 
-  const handleEasterEggPress = useCallback((egg: any) => { setSelectedEgg(egg); }, []);
+  const handleEasterEggPress = useCallback((egg: EasterEgg) => { setSelectedEgg(egg); }, []);
 
-  const handleAdClick = useCallback(async (ad: any) => {
+  const handleAdClick = useCallback(async (ad: Ad) => {
     try { await apiRequest("POST", `/api/ads/${ad.id}/click`); } catch {
       // no-op: ignore ad click logging failures
     }
@@ -425,29 +468,31 @@ export function useHomeMapState() {
     try {
       const res = await apiRequest("GET", `/api/users/search?q=${encodeURIComponent(text.trim())}`);
       const data = await res.json();
-      setSearchResults(data.filter((u: any) => u.id !== user?.id));
+      setSearchResults((data as MapUser[]).filter((u) => u.id !== user?.id));
     } catch {
       // no-op: ignore user search failures
     }
     setSearchLoading(false);
   }, [user?.id]);
 
-  const handleSearchResultPress = useCallback((u: any) => {
+  const handleSearchResultPress = useCallback((u: MapUser) => {
     setShowSearchResults(false);
     setSearchText("");
     setSearchResults([]);
-    router.push(`/profile/${u.id}` as any);
+    router.push(`/profile/${u.id}` as never);
   }, [router]);
 
-  const handleLocateUser = useCallback((u: any) => {
+  const handleLocateUser = useCallback((u: MapUser) => {
     setShowOnlineList(false);
     setShowBikerList(false);
     setShowZavorrinaList(false);
-    setLastSmallMapCenter({ latitude: u.latitude, longitude: u.longitude });
+    const lat = Number(u.latitude);
+    const lng = Number(u.longitude);
+    setLastSmallMapCenter({ latitude: lat, longitude: lng });
     const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
     setTimeout(() => {
-      activeRef.current?.focusOnCoordinate({ latitude: u.latitude, longitude: u.longitude, userId: u.id });
-      handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: u.latitude, longitude: u.longitude });
+      activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId: String(u.id) });
+      handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: lat, longitude: lng });
       if (u.nickname) {
         setFocusToast(`Vista centrata su ${u.nickname}`);
         Animated.sequence([

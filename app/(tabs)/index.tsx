@@ -114,6 +114,7 @@ export default function MapScreen() {
     );
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ad shape from API
   const currentAd = myAds[adIndex % myAds.length] as any;
 
   return (
@@ -129,7 +130,7 @@ export default function MapScreen() {
           const { data } = await mapData.homeMessageQuery.refetch();
           if (data?.enabled) setShowHomeMessage(true);
         }}
-        onChatPress={() => router.push("/chat" as any)}
+        onChatPress={() => router.push("/chat" as never)}
         homeMessageEnabled={mapData.homeMessageQuery.data?.enabled ?? false}
       />
 
@@ -148,6 +149,7 @@ export default function MapScreen() {
       {/* Small Map */}
       <HomeMapSection
         mapFullscreen={mapFullscreen}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ref type from InteractiveMap
         mapRef={mapRef as any}
         usersWithSelf={usersWithSelf}
         workshops={mapData.workshopsQuery.data ?? []}
@@ -163,6 +165,7 @@ export default function MapScreen() {
         handleEasterEggPress={handleEasterEggPress}
         onEventPress={(id) => router.push({ pathname: "/evento/[id]" as const, params: { id } })}
         setMapReady={setMapReady}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- user.id from auth context
         userId={user?.id as any}
         realMeMarker={realMeMarker}
         fakeMeMarker={fakeMeMarker}
@@ -247,6 +250,7 @@ export default function MapScreen() {
       <HomeFullscreenMap
         mapFullscreen={mapFullscreen}
         setMapFullscreen={setMapFullscreen}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fullscreen map ref
         fullscreenMapRef={fullscreenMapRef as any}
         usersWithSelf={usersWithSelf}
         workshopsQuery={mapData.workshopsQuery}
@@ -288,7 +292,7 @@ export default function MapScreen() {
         mapFullscreenReady={mapFullscreenReady}
         getUserIcon={getUserIcon}
         getUserColor={getUserColor}
-        getUserTypeLabel={getUserTypeLabel}
+        getUserTypeLabel={(u) => getUserTypeLabel(u, t)}
       />
     </ScrollView>
   );

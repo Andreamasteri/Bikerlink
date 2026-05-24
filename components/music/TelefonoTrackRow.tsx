@@ -23,10 +23,11 @@ export function TelefonoTrackRow({
   const { currentTrack, isPlaying } = usePlayer();
   const [artworkErr, setArtworkErr] = useState(false);
   const isActive = currentTrack?.id === asset.id;
-  const assetAny = asset as any;
-  const { title, artist } = parseAudioFilename(assetAny.filename ?? "");
-  const dur = assetAny.duration ?? 0;
-  const artworkUri = Platform.OS === "android" && !artworkErr ? `${assetAny.uri}/albumart` : null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- expo-media-library Asset typing gap
+  const a = asset as any;
+  const { title, artist } = parseAudioFilename(a.filename ?? "");
+  const dur = a.duration ?? 0;
+  const artworkUri = Platform.OS === "android" && !artworkErr ? `${a.uri}/albumart` : null;
 
   return (
     <TouchableOpacity

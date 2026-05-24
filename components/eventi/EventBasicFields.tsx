@@ -13,6 +13,7 @@ interface EventBasicFieldsProps {
     eventDate: string;
     eventTime: string;
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form field key/value setter
   set: (key: any, value: any) => void;
   showTypePicker: boolean;
   setShowTypePicker: (show: boolean) => void;

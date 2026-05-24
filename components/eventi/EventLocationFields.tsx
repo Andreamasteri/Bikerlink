@@ -9,18 +9,25 @@ interface EventLocationFieldsProps {
     latitude: string;
     longitude: string;
   };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form field key/value setter
   set: (key: any, value: any) => void;
   showMapPicker: boolean;
   setShowMapPicker: (show: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapRegion shape from react-native-maps
   mapRegion: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapRegion shape from react-native-maps
   setMapRegion: (region: any) => void;
   tempCoords: { latitude: number; longitude: number } | null;
   setTempCoords: (coords: { latitude: number; longitude: number } | null) => void;
   confirmMapCoords: () => void;
   coordLabel: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
   MapView: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
   Marker: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- safe area insets shape
   insets: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- map center coords
   italyCenter: any;
 }
 
@@ -102,6 +109,7 @@ export function EventLocationFields({
                 googleMapsApiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
                 region={mapRegion}
                 onRegionChangeComplete={setMapRegion}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapPress event from react-native-maps
                 onPress={(e: any) => {
                   const { latitude, longitude } = e.nativeEvent.coordinate;
                   setTempCoords({ latitude, longitude });

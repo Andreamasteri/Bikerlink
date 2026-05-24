@@ -10,6 +10,7 @@ import { MaterialIcons, MaterialCommunityIcons, Ionicons } from "@expo/vector-ic
 import Colors from "@/constants/colors";
 import { AdStats } from "@/components/admin/ads/AdStats";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- tab items from API, key is string at runtime
 export function AdTabs({ tabs, activeTab, onTabPress }: { tabs: any[], activeTab: string, onTabPress: (key: any) => void }) {
   return (
     <View style={styles.tabBar}>
@@ -22,10 +23,13 @@ export function AdTabs({ tabs, activeTab, onTabPress }: { tabs: any[], activeTab
             onPress={() => onTabPress(tab.key)}
           >
             {tab.iconSet === "community" ? (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from tab config
               <MaterialCommunityIcons name={tab.icon as any} size={22} color={isActive ? tab.color : Colors.textSecondary} />
             ) : tab.iconSet === "ionicons" ? (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from tab config
               <Ionicons name={tab.icon as any} size={22} color={isActive ? tab.color : Colors.textSecondary} />
             ) : (
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from tab config
               <MaterialIcons name={tab.icon as any} size={22} color={isActive ? tab.color : Colors.textSecondary} />
             )}
             <Text style={[styles.tabLabel, isActive && { color: tab.color }]}>{tab.label}</Text>
@@ -64,6 +68,7 @@ export function AdToolbar({
   onOpenSettings 
 }: { 
   campaignCount: number; 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cache stats from API
   cacheStats: any; 
   onRestartAll: () => void; 
   isRestartingAll: boolean; 

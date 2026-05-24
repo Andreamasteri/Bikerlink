@@ -40,7 +40,7 @@ export function PrivacyPositionSettings({
   pickFromGPS,
   openMapPicker,
 }: {
-  t: any;
+  t: (key: string) => string;
   colors: ThemeColors;
   privacyExpanded: boolean;
   setPrivacyExpanded: React.Dispatch<React.SetStateAction<boolean>>;
@@ -72,7 +72,7 @@ export function PrivacyPositionSettings({
   fakeWhateverLongitude: number | null;
   fakeWhateverRadius: number;
   setFakeWhateverRadius: (v: number) => void;
-  privacyMutation: any;
+  privacyMutation: { mutate: (data: Record<string, unknown>) => void };
   pickFromGPS: (target: MapTarget) => void;
   openMapPicker: (target: MapTarget, lat?: number | null, lng?: number | null) => void;
 }) {

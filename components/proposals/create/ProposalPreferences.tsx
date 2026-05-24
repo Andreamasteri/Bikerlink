@@ -18,7 +18,7 @@ interface ProposalPreferencesProps {
   canExtendToDestination: boolean;
   selectedClubId: string | null;
   setSelectedClubId: (val: string | null) => void;
-  myClubs: any[];
+  myClubs: { id: string; name: string }[];
 }
 
 export const ProposalPreferences = ({

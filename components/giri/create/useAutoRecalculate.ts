@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 
 interface AutoRecalculateProps {
   mode: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- waypoints before full typing
   waypoints: any[];
   style: string;
   drivingProfile: string;
@@ -11,10 +12,14 @@ interface AutoRecalculateProps {
   roundTripHours: number;
   headingDeg: number | null;
   language?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- timeout ref
   autoCalcTimeout: React.MutableRefObject<any>;
   setCalculating: (v: boolean) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route result shape
   setRouteResult: (res: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dismissed warnings Set
   setDismissedWarnings: (s: any) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- calcRoute function from api.ts
   calcRoute: any;
 }
 

@@ -23,8 +23,9 @@ export function useTrackingMap() {
     setHistMapVisible(true);
     setHistMapLoading(true);
     try {
-      const data = await apiRequest("GET", `/api/routes/${record.id}/points`) as any;
-      setHistMapPoints(data.points.map((p: any) => ({ lat: p.latitude, lng: p.longitude })));
+      const res = await apiRequest("GET", `/api/routes/${record.id}/points`);
+      const data = await res.json() as { points: Array<{ latitude: number; longitude: number }> };
+      setHistMapPoints(data.points.map((p) => ({ lat: p.latitude, lng: p.longitude })));
     } catch {
       Alert.alert(t("common.error"), t("tracking.loadPointsError"));
       setHistMapVisible(false);
@@ -35,9 +36,10 @@ export function useTrackingMap() {
 
   const handleExportGpx = useCallback(async (id: string) => {
     try {
-      const data = await apiRequest("GET", `/api/routes/${id}/gpx`) as any;
+      const res = await apiRequest("GET", `/api/routes/${id}/gpx`);
+      const data = await res.json() as { gpx: string };
       const fileUri = `${FileSystem.cacheDirectory}ride_${id}.gpx`;
-      await FileSystem.writeAsStringAsync(fileUri, data.gpx);
+      await FileSystem.writeAsStringAsync(fileUri, data.gpx ?? "");
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri);
       } else {

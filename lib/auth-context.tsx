@@ -45,7 +45,7 @@ function useLoginMutation() {
       }
       const { sessionToken: _t, ...user } = response;
       queryClient.setQueryData(["/api/auth/me"], user);
-      sendStartupBeacon("auth_login_success", { userId: (user as any)?.id });
+      sendStartupBeacon("auth_login_success", { userId: user?.id });
       AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
       // Clear the freshly-issued connect.sid cookie from the Android native jar
       if (Platform.OS === "android") {
@@ -119,6 +119,7 @@ function useRegisterMutation() {
       sex?: "M" | "F";
       coupleSexConfig?: "M+M" | "M+F" | "F+F";
       birthYear?: number;
+      country?: string;
       region?: string;
       eulaAccepted: true;
       invitationCode?: string;
@@ -126,13 +127,14 @@ function useRegisterMutation() {
       const res = await apiRequest("POST", "/api/auth/register", data);
       return await res.json();
     },
-    onSuccess: async (response: any) => {
-      if (!response?.requiresEmailVerification) {
+    onSuccess: async (response: unknown) => {
+      const res = response as { requiresEmailVerification?: boolean; sessionToken?: string; [key: string]: unknown };
+      if (!res?.requiresEmailVerification) {
         // Persist Bearer token (mobile cookie-jar bypass) BEFORE any subsequent fetch
-        if (response?.sessionToken) {
-          await setSessionToken(response.sessionToken);
+        if (res?.sessionToken) {
+          await setSessionToken(res.sessionToken);
         }
-        const { sessionToken: _t, ...user } = response;
+        const { sessionToken: _t, ...user } = res;
         queryClient.setQueryData(["/api/auth/me"], user);
         AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
       }

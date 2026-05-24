@@ -149,6 +149,7 @@ export default function SystemScreen() {
       const body = await purgeRes.json();
       Alert.alert(
         "Purga completata",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- purge response shape from API
         `Eliminati ${(body as any).deletedUsers} utenti non-admin.\nLe sessioni sono state invalidate.\nVerrai reindirizzato al login.`,
         [
           {

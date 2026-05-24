@@ -100,6 +100,7 @@ const styles = (colors: ThemeColors) =>
     approxBanner: {
       position: "absolute",
       top: 10,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- StyleSheet percentage string
       left: "50%" as any,
       transform: [{ translateX: -90 }],
       flexDirection: "row",

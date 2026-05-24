@@ -22,6 +22,7 @@ export const MultiDayPreview: React.FC<MultiDayPreviewProps> = ({
 
   return (
     <View style={styles.multiDayPreview}>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from data */}
       <Ionicons name={"calendar-range" as any} size={16} color="#a78bfa" />
       <Text style={styles.multiDayPreviewText}>
         {daysCount} giorni · ~{Math.round(routeResult.distanceKm / daysCount)} km/giorno

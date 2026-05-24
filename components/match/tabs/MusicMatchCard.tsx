@@ -5,8 +5,14 @@ import Colors from '@/constants/colors';
 import { useT } from '@/lib/language-context';
 import { useRouter } from 'expo-router';
 
+interface MusicMatchItem {
+  songsInCommon?: number;
+  genresInCommon?: string[];
+  commonGenres?: string[];
+  user?: { id?: string; nickname?: string; userType?: string };
+}
 interface MusicMatchCardProps {
-  item: any;
+  item: MusicMatchItem;
   onSendMessage: (userId: string) => void;
 }
 
@@ -24,7 +30,7 @@ export const MusicMatchCard: React.FC<MusicMatchCardProps> = ({ item, onSendMess
     <View style={styles.matchCard}>
       <TouchableOpacity
         style={styles.matchUserRow}
-        onPress={() => otherUserId && router.push(`/profile/${otherUserId}` as any)}
+        onPress={() => otherUserId && router.push(`/profile/${otherUserId}` as never)}
         activeOpacity={0.7}
       >
         <View style={styles.matchUserInfo}>

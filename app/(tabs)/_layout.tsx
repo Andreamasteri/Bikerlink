@@ -28,13 +28,20 @@ import {
 
 const FAKE_HOME_INTRO_KEY = "fake_home_intro_seen_v1";
 
-function useLayoutGating(user: any, meData: any) {
+interface LayoutGatingMeData {
+  profile?: { fakeHomeLatitude?: number | null; fakeHomeLongitude?: number | null } | null;
+}
+
+function useLayoutGating(
+  user: { id?: string | number | null } | null | undefined,
+  meData: LayoutGatingMeData | null | undefined
+) {
   const [showFakeHomeGlobal, setShowFakeHomeGlobal] = useState(false);
   const [fakeHomeDontShowGlobal, setFakeHomeDontShowGlobal] = useState(false);
 
   useEffect(() => {
     if (!meData || !user) return;
-    const p = (meData as any)?.profile;
+    const p = meData?.profile;
     if (!p) return;
     const unconfigured = p.fakeHomeLatitude == null || p.fakeHomeLongitude == null;
     if (unconfigured) {
@@ -161,12 +168,12 @@ export default function TabLayout() {
 
     const tabs: TabItem[] = state.routes
       .filter((route) => {
-        const options = descriptors[route.key].options as any;
+        const options = descriptors[route.key].options as Record<string, unknown>;
         return typeof options.tabBarButton !== "function";
       })
       .map((route) => {
         const descriptor = descriptors[route.key];
-        const options = descriptor.options as any;
+        const options = descriptor.options as Record<string, unknown>;
         const routeIndex = state.routes.indexOf(route);
         const isFocused = state.index === routeIndex;
 
@@ -177,7 +184,7 @@ export default function TabLayout() {
             canPreventDefault: true,
           });
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params as any);
+            navigation.navigate(route.name, route.params as never);
           }
         };
 
@@ -187,7 +194,7 @@ export default function TabLayout() {
 
         return {
           name: route.name,
-          title: (options.title as string) || route.name,
+          title: (options.title as string | undefined) || route.name,
           icon: (color: string, size: number) =>
             iconRenderer ? iconRenderer({ color, size, focused: isFocused }) : null,
           isFocused,
@@ -237,7 +244,7 @@ export default function TabLayout() {
     setShowFakeHomeGlobal,
     fakeHomeDontShowGlobal,
     setFakeHomeDontShowGlobal,
-  } = useLayoutGating(user, meData);
+  } = useLayoutGating(user, meData as LayoutGatingMeData | null | undefined);
 
   // ── Stato disponibilità (per icona cromatica "Status") ──────────────────
   const statusIsAvailable = profileData?.isAvailable || false;

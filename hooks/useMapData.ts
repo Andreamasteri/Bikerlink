@@ -21,7 +21,7 @@ type Props = {
   mapFullscreen: boolean;
   sosEnabled: boolean | undefined;
   setShowSosDetail: (v: boolean) => void;
-  setSelectedEgg: (v: any) => void;
+  setSelectedEgg: (v: null) => void;
   t: (key: string) => string;
 };
 
@@ -45,6 +45,7 @@ export function useMapData({
   const router = useRouter();
   const baseUrl = getApiUrl();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nearbyUsersQuery = useQuery<any[]>({
     queryKey: ["/api/users/nearby", location?.latitude, location?.longitude, countriesQueryParam],
     queryFn: async () => {
@@ -92,6 +93,7 @@ export function useMapData({
     enabled: isAuthenticated && mapReady && countriesLoaded,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const workshopsQuery = useQuery<any[]>({
     queryKey: ["/api/workshops"],
     retry: false,
@@ -99,6 +101,7 @@ export function useMapData({
     enabled: isAuthenticated && nearbyLoaded,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const easterEggsQuery = useQuery<any[]>({
     queryKey: ["/api/easter-eggs/nearby", location?.latitude, location?.longitude],
     queryFn: async () => {
@@ -119,6 +122,7 @@ export function useMapData({
   });
   const adsGloballyEnabled = adsEnabledData?.enabled !== false;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const myAdsQuery = useQuery<any[]>({
     queryKey: ["/api/ads/my-ads"],
     staleTime: 60000,
@@ -138,6 +142,7 @@ export function useMapData({
     enabled: isAuthenticated,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const onlineListQuery = useQuery<any[]>({
     queryKey: ["/api/users/online-list", location?.latitude, location?.longitude, showOfflineOnline, countriesQueryParam],
     queryFn: async () => {
@@ -152,6 +157,7 @@ export function useMapData({
     enabled: isAuthenticated && showOnlineList,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bikerListQuery = useQuery<any[]>({
     queryKey: ["/api/users/biker-available-list", location?.latitude, location?.longitude, countriesQueryParam],
     queryFn: async () => {
@@ -165,6 +171,7 @@ export function useMapData({
     enabled: isAuthenticated && showBikerList,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const zavListQuery = useQuery<any[]>({
     queryKey: ["/api/users/zavorrine-available-list", location?.latitude, location?.longitude, countriesQueryParam],
     queryFn: async () => {
@@ -178,6 +185,7 @@ export function useMapData({
     enabled: isAuthenticated && showZavorrinaList,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const activeSosQuery = useQuery<any[]>({
     queryKey: ["/api/sos/active"],
     staleTime: 15000,
@@ -190,16 +198,17 @@ export function useMapData({
       const res = await apiRequest("PUT", `/api/sos/${id}/accept`);
       return res.json();
     },
-    onSuccess: (d: any) => {
+    onSuccess: (d: { conversationId?: string }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/sos/active"] });
       setShowSosDetail(false);
-      if (d.conversationId) router.push(`/chat/${d.conversationId}` as any);
+      if (d.conversationId) router.push(`/chat/${d.conversationId}` as never);
     },
     onError: (error: Error) => {
       Alert.alert(t("common.error"), (error as Error).message);
     },
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const myProposalsQuery = useQuery<any[]>({
     queryKey: ["/api/proposals?status=active"],
     staleTime: 60000,
@@ -212,12 +221,15 @@ export function useMapData({
     enabled: isAuthenticated && mapFullscreen,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const myOrganizedEventsQuery = useQuery<any[]>({
     queryKey: ["/api/events/my"],
     enabled: isAuthenticated,
     staleTime: 60000,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     select: (data: any[]) => {
       const todayStr = new Date().toISOString().substring(0, 10);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       return (data || []).filter((ev: any) => ev.status === "approved" && (ev.eventDate ?? "").substring(0, 10) >= todayStr);
     },
   });
@@ -233,7 +245,7 @@ export function useMapData({
       const res = await apiRequest("POST", `/api/easter-eggs/${eggId}/collect`);
       return res.json();
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data: { prizeUnlocked?: boolean; message?: string }) => {
       if (data.prizeUnlocked) {
         Alert.alert(t("home.easterEggPrize"), data.message || t("home.easterEgg10Msg"));
       } else {
@@ -242,8 +254,8 @@ export function useMapData({
       queryClient.invalidateQueries({ queryKey: ["/api/easter-eggs/nearby"] });
       setSelectedEgg(null);
     },
-    onError: (err: any) => {
-      Alert.alert(t("common.error"), (err as Error).message || t("home.cannotCollect"));
+    onError: (err: Error) => {
+      Alert.alert(t("common.error"), err.message || t("home.cannotCollect"));
     },
   });
 

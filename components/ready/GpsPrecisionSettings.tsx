@@ -18,7 +18,7 @@ export function GpsPrecisionSettings({
   gpsOptions: { key: string; label: string; desc: string; icon: string }[];
   gpsPrecision: string;
   setGpsPrecision: (v: string) => void;
-  privacyMutation: any;
+  privacyMutation: { mutate: (data: Record<string, unknown>) => void };
 }) {
   return (
     <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
@@ -55,6 +55,7 @@ export function GpsPrecisionSettings({
                 }}
               >
                 <Ionicons
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ionicons name type is opaque
                   name={opt.icon as any}
                   size={20}
                   color={isSelected ? Colors.accent : Colors.textSecondary}

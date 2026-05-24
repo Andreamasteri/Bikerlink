@@ -17,7 +17,9 @@ import { apiRequest } from "@/lib/query-client";
 type Props = {
   visible: boolean;
   onClose: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- map user from useHomeMapState
   selectedUser: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- events from API
   myOrganizedEvents: any[];
   targetUserEventIds: string[];
 };
@@ -78,6 +80,7 @@ export default function InviteEventModal({
                     });
                     if (!res.ok) {
                       const err = await res.json().catch(() => ({}));
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API error shape
                       Alert.alert(t("common.error"), (err as any).message || t("home.inviteError"));
                     } else {
                       Alert.alert(

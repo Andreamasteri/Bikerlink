@@ -24,7 +24,7 @@ interface ProfileReportModalProps {
   onDescriptionChange: (text: string) => void;
   onSubmit: () => void;
   isPending: boolean;
-  insets: any;
+  insets: { bottom: number; top: number; left: number; right: number };
 }
 
 export const ProfileReportModal: React.FC<ProfileReportModalProps> = ({

@@ -268,6 +268,7 @@ export default function MatchControlScreen() {
                 >
                   {stat.totalMatches}
                 </Text>
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- StyleSheet style merging */}
                 <View style={[styles.tableCell, styles.tableCellCenter as any, { flex: 0.8 }]}>
                   {stat.isAnomaly ? (
                     <Ionicons name="warning" size={14} color={Colors.warning} />

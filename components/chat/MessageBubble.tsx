@@ -60,6 +60,7 @@ function TextWithHashtags({
 }: {
   text: string;
   isOwn: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- StyleSheet style from parent
   style: any;
 }) {
   const parts = text.split(/(\s+)/);
@@ -100,7 +101,7 @@ function PlaylistBubble({ message, isOwn }: { message: ChatMessage; isOwn: boole
 
   const handlePress = () => {
     if (isOwn || !playlistId) return;
-    router.push({ pathname: "/(tabs)/music", params: { tab: "brani", playlistId: String(playlistId) } } as any);
+    router.push({ pathname: "/(tabs)/music", params: { tab: "brani", playlistId: String(playlistId) } } as never);
   };
 
   return (

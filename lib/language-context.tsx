@@ -13,14 +13,14 @@ const VALID_LANGS: AppLanguage[] = ["it", "en", "de", "es", "fr", "el", "tr"];
  */
 function detectDeviceLanguage(): AppLanguage | null {
   try {
-    let locales: string[] = [];
+    const locales: string[] = [];
     if (typeof Intl !== "undefined" && Intl.DateTimeFormat) {
       const resolved = Intl.DateTimeFormat().resolvedOptions().locale;
       if (resolved) locales.push(resolved);
     }
     // Navigator is available on web
     if (typeof navigator !== "undefined") {
-      const nav = navigator as any;
+      const nav = navigator as unknown as { language?: string; languages?: readonly string[] };
       if (Array.isArray(nav.languages)) locales.push(...nav.languages);
       else if (nav.language) locales.push(nav.language);
     }

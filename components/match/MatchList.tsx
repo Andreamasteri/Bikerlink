@@ -4,8 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
 interface MatchListProps {
-  currentList: any[];
-  renderItem: ({ item }: { item: any }) => React.ReactElement;
+  currentList: Record<string, unknown>[];
+  renderItem: ({ item }: { item: Record<string, unknown> }) => React.ReactElement;
   isRefetching: boolean;
   onRefresh: () => void;
   isLoading: boolean;
@@ -48,7 +48,8 @@ export function MatchList({
   return (
     <FlatList
       data={currentList}
-      keyExtractor={(item) => item.id?.toString() ?? item.user?.id ?? item.lastfmTrackId ?? String(item.songsInCommon) + (item.user?.id ?? "")}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- keyExtractor for polymorphic items
+      keyExtractor={(item) => { const r = item as any; return r.id?.toString() ?? r.user?.id ?? r.lastfmTrackId ?? String(r.songsInCommon) + (r.user?.id ?? ""); }}
       renderItem={renderItem}
       extraData={[currentList, activeTab]}
       contentContainerStyle={styles.list}

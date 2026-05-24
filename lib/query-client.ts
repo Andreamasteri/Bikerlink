@@ -8,7 +8,7 @@ export function getApiUrl(): string {
     host = "biker-link.replit.app";
   }
 
-  let url = new URL(`https://${host}`);
+  const url = new URL(`https://${host}`);
 
   return url.href.replace(/\/$/, "");
 }

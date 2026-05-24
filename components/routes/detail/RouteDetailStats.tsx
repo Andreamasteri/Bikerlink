@@ -11,6 +11,7 @@ import Colors from "@/constants/colors";
 import ElevationProfile from "@/components/ElevationProfile";
 
 interface RouteDetailStatsProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- elevation data from API
   elevation: any | null;
   elevationLoading: boolean;
   elevationError: boolean;

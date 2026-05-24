@@ -42,7 +42,7 @@ export const ProfileActionsBar: React.FC<ProfileActionsBarProps> = ({
     <View>
       {/* ── Edit Profile ───────────────────────────────── */}
       <View style={styles.section}>
-        <Pressable style={[styles.menuItem, { justifyContent: "space-between" }]} onPress={() => router.push("/profile/edit" as any)}>
+        <Pressable style={[styles.menuItem, { justifyContent: "space-between" }]} onPress={() => router.push("/profile/edit" as never)}>
           <Text style={[styles.menuLabel, { fontSize: 20 }]}>{t("profile.editProfile")}</Text>
           <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
         </Pressable>
@@ -90,13 +90,13 @@ export const ProfileActionsBar: React.FC<ProfileActionsBarProps> = ({
 
       {/* ── Feedback / Admin ───────────────────────────── */}
       <View style={styles.section}>
-        <MenuItem icon="bug" label={t("profile.reportBug")} onPress={() => router.push("/feedback/bug" as any)} color={Colors.accentRed} />
-        <MenuItem icon="bulb" label={t("profile.requestFeature")} onPress={() => router.push("/feedback/feature" as any)} color={Colors.accent} />
+        <MenuItem icon="bug" label={t("profile.reportBug")} onPress={() => router.push("/feedback/bug" as never)} color={Colors.accentRed} />
+        <MenuItem icon="bulb" label={t("profile.requestFeature")} onPress={() => router.push("/feedback/feature" as never)} color={Colors.accent} />
         {isAdmin && (
-          <MenuItem icon="shield" label="Pannello Admin" onPress={() => router.push("/admin" as any)} color={Colors.accent} />
+          <MenuItem icon="shield" label="Pannello Admin" onPress={() => router.push("/admin" as never)} color={Colors.accent} />
         )}
         {(isModerator || isAdmin) && (
-          <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as any)} color={Colors.warning} />
+          <MenuItem icon="eye" label="Pannello Moderatore" onPress={() => router.push("/moderator" as never)} color={Colors.warning} />
         )}
       </View>
     </View>

@@ -67,7 +67,7 @@ export const MotoClubMarketplace: React.FC<MotoClubMarketplaceProps> = ({
         <TouchableOpacity
           style={styles.marketCard}
           activeOpacity={0.7}
-          onPress={() => router.push(`/profile/${moto.seller.id}` as any)}
+          onPress={() => router.push(`/profile/${moto.seller.id}` as never)}
         >
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surfaceLight, alignItems: "center", justifyContent: "center" }}>

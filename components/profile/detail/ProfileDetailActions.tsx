@@ -3,13 +3,23 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "rea
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
+interface ProfileAction {
+  latitude?: number | null;
+  longitude?: number | null;
+  coordinatesUpdatedAt?: string | null;
+}
+
+interface FriendStatus {
+  status: "self" | "friends" | "pending_sent" | "pending_received" | "none";
+}
+
 interface ProfileDetailActionsProps {
   id: string;
   isSelf: boolean;
   isBlocked: boolean;
   publicRoutesCount: number;
-  profile: any;
-  friendStatus: any;
+  profile: ProfileAction;
+  friendStatus: FriendStatus | null | undefined;
   onViewRoutes: () => void;
   onGeoLocate: () => void;
   onStartChat: () => void;

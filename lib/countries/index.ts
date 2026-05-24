@@ -3,7 +3,7 @@ import { ASIA_COUNTRIES } from './asia';
 import { EUROPE_COUNTRIES } from './europe';
 import { AMERICAS_COUNTRIES } from './americas';
 import { OCEANIA_COUNTRIES } from './oceania';
-import { CountryData, ContinentData } from './types';
+import { CountryData, ContinentData, RegionData } from './types';
 
 export * from './types';
 export { AFRICA_COUNTRIES } from './africa';
@@ -59,7 +59,7 @@ export function getCountryByCode(code: string): CountryData | undefined {
   return ALL_COUNTRIES.find((c) => c.code === code);
 }
 
-export function getRegionsForCountry(code: string): any[] {
+export function getRegionsForCountry(code: string): RegionData[] {
   return getCountryByCode(code)?.regions ?? [];
 }
 

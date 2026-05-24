@@ -11,7 +11,9 @@ import { EdgeInsets } from "react-native-safe-area-context";
 interface AddMotoFormProps {
   visible: boolean;
   onClose: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form state shape matches server
   form: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form state shape matches server
   setForm: React.Dispatch<React.SetStateAction<any>>;
   editingId: string | null;
   onSave: () => void;
@@ -64,6 +66,7 @@ export const AddMotoForm: React.FC<AddMotoFormProps> = ({
           <Text style={styles.label}>{t("garage.brand")} *</Text>
           <MotoPicker
             value={form.brand}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form state updater
             onValueChange={(b) => setForm((p: any) => ({ ...p, brand: b, model: "" }))}
             placeholder={t("garage.brandPlaceholder")}
             items={MOTORCYCLE_BRANDS}
@@ -78,6 +81,7 @@ export const AddMotoForm: React.FC<AddMotoFormProps> = ({
           <Text style={styles.label}>{t("garage.model")} *</Text>
           <MotoPicker
             value={form.model}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form state updater
             onValueChange={(m) => setForm((p: any) => ({ ...p, model: m }))}
             placeholder={form.brand ? t("garage.modelPlaceholder") : t("garage.selectBrandFirst")}
             items={getModelsForBrand(form.brand)}
@@ -94,22 +98,27 @@ export const AddMotoForm: React.FC<AddMotoFormProps> = ({
             placeholder={t("garage.displacementPlaceholder")}
             placeholderTextColor={Colors.textSecondary}
             value={form.displacement}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form state updater
             onChangeText={(v) => setForm((p: any) => ({ ...p, displacement: v.replace(/[^0-9]/g, "") }))}
             keyboardType="numeric"
           />
 
           <Text style={styles.label}>{t("garage.motoType")} *</Text>
           <View style={styles.optionRow}>
+            {/* eslint-disable @typescript-eslint/no-explicit-any -- form state updaters in map */}
             {MOTO_TYPES.map(mt => (
               <OptionButton key={mt.value} label={t(`garage.motoType.${mt.value}`)} selected={form.motorcycleType === mt.value} onPress={() => setForm((p: any) => ({ ...p, motorcycleType: mt.value }))} />
             ))}
+            {/* eslint-enable @typescript-eslint/no-explicit-any */}
           </View>
 
           <Text style={styles.label}>{t("garage.ridingStyle")} *</Text>
           <View style={styles.optionRow}>
+            {/* eslint-disable @typescript-eslint/no-explicit-any -- form state updaters in map */}
             {RIDING_STYLES.map(s => (
               <OptionButton key={s.value} label={t(`garage.style.${s.value}`)} selected={form.ridingStyle === s.value} onPress={() => setForm((p: any) => ({ ...p, ridingStyle: s.value }))} />
             ))}
+            {/* eslint-enable @typescript-eslint/no-explicit-any */}
           </View>
 
           <Text style={styles.label}>{t("garage.motoDescription")}</Text>
@@ -118,11 +127,13 @@ export const AddMotoForm: React.FC<AddMotoFormProps> = ({
             placeholder={t("garage.motoDescriptionPlaceholder")}
             placeholderTextColor={Colors.textSecondary}
             value={form.motoDescription}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form state updater
             onChangeText={(v) => setForm((p: any) => ({ ...p, motoDescription: v }))}
             multiline
             maxLength={500}
           />
 
+          {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- form state updater */}
           <Pressable style={styles.defaultRow} onPress={() => setForm((p: any) => ({ ...p, isDefault: !p.isDefault }))}>
             <View style={[styles.checkbox, form.isDefault && styles.checkboxChecked]}>
               {form.isDefault && <Text style={styles.checkmark}>✓</Text>}
@@ -135,6 +146,7 @@ export const AddMotoForm: React.FC<AddMotoFormProps> = ({
               <View style={[styles.defaultRow, { marginTop: 12, borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: 16 }]}>
                 <Switch
                   value={form.isForSale}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form state updater
                   onValueChange={(val) => setForm((p: any) => ({ ...p, isForSale: val, saleDescription: val ? p.saleDescription : "" }))}
                   trackColor={{ false: Colors.border, true: "#FF9800" }}
                   thumbColor={form.isForSale ? Colors.text : Colors.textSecondary}
@@ -154,6 +166,7 @@ export const AddMotoForm: React.FC<AddMotoFormProps> = ({
                     placeholder={t("garage.salePlaceholder")}
                     placeholderTextColor={Colors.textSecondary}
                     value={form.saleDescription}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- form state updater
                     onChangeText={(v) => setForm((p: any) => ({ ...p, saleDescription: v }))}
                     multiline
                     numberOfLines={3}

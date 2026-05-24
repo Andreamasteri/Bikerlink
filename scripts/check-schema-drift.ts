@@ -58,6 +58,8 @@ function drizzleTypeToPgType(columnType: string): string | null {
  * We detect withTimezone via the column's internal config object.
  */
 function timestampPgType(col: unknown): string {
+  // Accessing Drizzle internal column config object — no public API available
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const config = (col as any)?.config ?? (col as any);
   const withTz = config?.withTimezone === true || config?.mode === "string";
   return withTz ? "timestamp with time zone" : "timestamp without time zone";
@@ -89,6 +91,7 @@ function getSchemaTableMetas() {
       const config = getTableConfig(tbl);
       if (!config?.name || !config.columns?.length) continue;
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cols: ColMeta[] = config.columns.map((col: any) => {
         const columnType: string = col.columnType ?? "";
 

@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Alert } from "react-native";
 import { getApiUrl, queryClient } from "@/lib/query-client";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- toggle value is mixed type
 export function useToggleSettings(t: (k: string) => string, setProtectedToggle: (v: any) => void, setProtectedPassword: (v: string) => void) {
   const disableFeatureMutation = useMutation({
     mutationFn: async (key: string) => {

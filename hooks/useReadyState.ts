@@ -87,15 +87,30 @@ export function useReadyState() {
   });
   const ghostModeFeatureEnabled = ghostSettingData?.enabled === true;
 
-  const isAvailable = (data as any)?.isAvailable || false;
-  const isGhostMode = (data as any)?.ghostMode || false;
+  interface ProfileQueryData { isAvailable?: boolean; ghostMode?: boolean }
+  const profileD = data as ProfileQueryData | undefined;
+  const isAvailable = profileD?.isAvailable || false;
+  const isGhostMode = profileD?.ghostMode || false;
 
-  const meProfile = (meData as any)?.profile;
+  interface MeProfile {
+    hideFromMap?: boolean; offlinePositionRandomize?: boolean;
+    positionFuzz?: boolean; positionFuzzKm?: number;
+    fakeHomeEnabled?: boolean; homeLatitude?: number | null; homeLongitude?: number | null;
+    fakeHomeLatitude?: number | null; fakeHomeLongitude?: number | null; fakeHomeRadius?: number;
+    fakeWorkEnabled?: boolean; workLatitude?: number | null; workLongitude?: number | null;
+    fakeWorkLatitude?: number | null; fakeWorkLongitude?: number | null; fakeWorkRadius?: number;
+    fakeWhateverEnabled?: boolean; whateverLatitude?: number | null; whateverLongitude?: number | null;
+    fakeWhateverLatitude?: number | null; fakeWhateverLongitude?: number | null; fakeWhateverRadius?: number;
+    gpsPrecision?: string;
+  }
+  interface MeQueryData { profile?: MeProfile | null }
+  const meQ = meData as MeQueryData | undefined;
+  const meProfile = meQ?.profile;
   const hideFromMap = meProfile?.hideFromMap ?? false;
   const offlineRandomize = meProfile?.offlinePositionRandomize !== false;
 
   useEffect(() => {
-    const p = (meData as any)?.profile;
+    const p = (meData as MeQueryData | undefined)?.profile;
     if (!p) return;
     setPositionFuzz(p.positionFuzz ?? false);
     setPositionFuzzKm(p.positionFuzzKm ?? 1);
@@ -119,7 +134,7 @@ export function useReadyState() {
     setFakeWhateverRadius(p.fakeWhateverRadius ?? 2);
     setGpsPrecision(p.gpsPrecision ?? "balanced");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [(meData as any)?.profile]);
+  }, [(meData as MeQueryData | undefined)?.profile]);
 
   const invalidateOnlineQueries = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/users/profile"] });

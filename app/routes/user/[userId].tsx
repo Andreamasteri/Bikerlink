@@ -96,7 +96,7 @@ export default function UserPublicRoutesScreen() {
               return (
                 <Pressable
                   style={({ pressed }) => [styles.routeCard, pressed && styles.routeCardPressed]}
-                  onPress={() => router.push(`/routes/${item.id}` as any)}
+                  onPress={() => router.push(`/routes/${item.id}` as never)}
                 >
                   <View style={styles.routeIconContainer}>
                     <MaterialCommunityIcons

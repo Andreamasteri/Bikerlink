@@ -5,10 +5,12 @@ import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 
 interface MotoCardProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto item from API
   item: any;
   onPress: () => void;
   onDelete: () => void;
   marketplaceEnabled: boolean;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto item from API
   getMotoDisplayName: (item: any) => string;
   getMotoTypeLabel: (v: string) => string;
   getStyleLabel: (v: string) => string;

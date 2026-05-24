@@ -21,7 +21,7 @@ interface WaypointFormModalProps {
   setWaypointDesc: (text: string) => void;
   waypointType: string;
   setWaypointType: (type: string) => void;
-  waypointTypes: any[];
+  waypointTypes: { value: string; label: string; icon: string; color: string }[];
   pendingCoord: { latitude: number; longitude: number } | null;
   onClose: () => void;
   onSave: () => void;
@@ -84,7 +84,8 @@ export const WaypointFormModal: React.FC<WaypointFormModalProps> = ({
                     ]}
                     onPress={() => setWaypointType(wt.value)}
                   >
-                    <MaterialCommunityIcons name={wt.icon} size={16} color={wt.color} />
+                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from data */}
+                    <MaterialCommunityIcons name={wt.icon as any} size={16} color={wt.color} />
                     <Text style={[styles.typeChipText, waypointType === wt.value && { color: wt.color }]}>
                       {wt.label}
                     </Text>

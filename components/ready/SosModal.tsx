@@ -27,7 +27,7 @@ export function SosModal({
   onSubmit: (finalRadius: number) => void;
   isPending: boolean;
   location: { latitude: number; longitude: number } | null;
-  t: any;
+  t: (key: string) => string;
 }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>

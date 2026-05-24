@@ -76,9 +76,9 @@ if (!TaskManager.isTaskDefined(BACKGROUND_LOCATION_TASK)) {
     const { locations } = data as { locations: Location.LocationObject[] };
     try {
       const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
-      const existing: any[] = raw ? JSON.parse(raw) : [];
+      const existing: unknown[] = raw ? JSON.parse(raw) : [];
       const sensorRaw = await AsyncStorage.getItem(BG_SENSOR_SNAPSHOT_KEY);
-      const sensorSnapshot: any = sensorRaw ? JSON.parse(sensorRaw) : null;
+      const sensorSnapshot: { accelG?: number; tiltDeg?: number } | null = sensorRaw ? JSON.parse(sensorRaw) : null;
       const newPoints = locations.map((loc) => ({
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,
@@ -287,12 +287,14 @@ export function useTrackingState() {
           let tiltDeg = 0, lateralG = 0, accelG = 0;
           if (sensors.mountAxisCalibRef.current) {
             const { x: ax, y: ay, z: az } = data.accelerationIncludingGravity;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MountAxisCalibration runtime shape
             const up = (sensors.mountAxisCalibRef.current as any).up, forward = (sensors.mountAxisCalibRef.current as any).forward;
             const right = { x: up.y * forward.z - up.z * forward.y, y: up.z * forward.x - up.x * forward.z, z: up.x * forward.y - up.y * forward.x };
             accelG = (ax * forward.x + ay * forward.y + az * forward.z) / 9.81;
             lateralG = (ax * right.x + ay * right.y + az * right.z) / 9.81;
             tiltDeg = Math.atan2(lateralG, (ax * up.x + ay * up.y + az * up.z) / 9.81) * (180 / Math.PI);
           } else {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- DeviceMotion rotation.roll not typed in expo-sensors
             accelG = y / 9.81; lateralG = x / 9.81; tiltDeg = ((data.rotation as any).roll || 0) * (180 / Math.PI);
           }
           sensors.currentAccelGRef.current = accelG; sensors.currentLateralGRef.current = lateralG; sensors.currentTiltDegRef.current = tiltDeg;
@@ -341,7 +343,9 @@ export function useTrackingState() {
     if (settings.sensorsEnabledRef.current) refs.telemetryAccumRef.current.push({ timestamp: point.timestamp, lat: latitude, lon: longitude, leanAngle: sensors.currentTiltDegRef.current, gForceX: sensors.currentAccelGRef.current, speedKmh: smoothedSpeed });
     if (settings.handsOffEnabledRef.current && !handsOffDismissedForRideRef.current) {
       if (smoothedSpeed >= settings.handsOffSpeedRef.current) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
         if (!handsOffActive) { setHandsOffActive(true); setHandsOffBroadcast(true); (VolumeManager as any).showNativeVolumeUI(false); }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
       } else if (handsOffActive) { setHandsOffActive(false); setHandsOffBroadcast(false); (VolumeManager as any).showNativeVolumeUI(true); }
     }
   }, [gps, sensors, sprint, bg, handsOffActive, settings, stats, session, refs]);
@@ -386,7 +390,7 @@ export function useTrackingState() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") { session.setLoading(false); Alert.alert(t("tracking.permReq"), t("tracking.permDenied")); return; }
       Location.requestBackgroundPermissionsAsync().catch(() => {});
-      const res = await apiRequest("POST", "/api/routes", { status: "active", isSprint: settings.is0100EnabledRef.current }) as any;
+      const res = await apiRequest("POST", "/api/routes", { status: "active", isSprint: settings.is0100EnabledRef.current }) as unknown as { id: string };
       refs.routeIdRef.current = res.id; resetTrackingState();
       if (settings.countdownEnabled) {
         session.setPhase("countdown"); session.setCountdownValue(parseInt(settings.countdownSec || "10", 10)); session.setLoading(false);
@@ -405,7 +409,12 @@ export function useTrackingState() {
     const rId = refs.routeIdRef.current; if (!rId) { session.setPhase("idle"); session.setLoading(false); return; }
     await flushPoints();
     try {
-      const updateData: any = {
+      const updateData: {
+        status: string; totalDistanceKm: number; maxSpeedKmh: number; avgSpeedKmh: number; maxAltitude: number;
+        durationSeconds: number; idleTimeSeconds: number; maxAccelerationG: number | null;
+        isSprint: boolean; sprint0to100Ms: number | null; gpsBlackoutCount: number; gpsBlackoutSeconds: number;
+        telemetryData?: string;
+      } = {
         status: "completed", totalDistanceKm: gps.totalKmRef.current, maxSpeedKmh: gps.maxSpeedRef.current, avgSpeedKmh: stats.avgSpeedDisplayKmh, maxAltitude: gps.maxAltRef.current,
         durationSeconds: Math.floor(stats.totalMs / 1000), idleTimeSeconds: Math.floor(stats.idleMsRef.current / 1000), maxAccelerationG: sensors.maxAccelGRef.current,
         isSprint: settings.is0100EnabledRef.current, sprint0to100Ms: sprint.sprint0to100MsRef.current, gpsBlackoutCount: gps.gpsBlackoutCountRef.current, gpsBlackoutSeconds: Math.floor(gps.gpsBlackoutSecondsRef.current / 1000),
@@ -425,6 +434,7 @@ export function useTrackingState() {
         return AsyncStorage.multiRemove([GPS_BUFFER_SEGCOUNT_KEY, ...Array.from({ length: n }, (_, i) => GPS_BUFFER_SEG_KEY(i))]);
       }).catch(() => {});
     } catch (e) { logGpsError(e, "handleStop"); Alert.alert(t("common.error"), t("tracking.routeUpdateError")); }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
     finally { session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false); (VolumeManager as any).showNativeVolumeUI(true); }
   }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs]);
 
@@ -436,6 +446,7 @@ export function useTrackingState() {
 
   const handleRecalibrate = useCallback(() => {
     [sensors.maxAccelGRef, sensors.maxDecelGRef, sensors.maxTiltDegRef, sensors.maxLateralGRef].forEach(r => r.current = 0);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- sensor setter array, all accept number
     [sensors.setMaxAccelG, sensors.setMaxDecelG, sensors.setMaxTiltDeg, sensors.setMaxLateralG, sensors.setCurrentG, sensors.setCurrentLateralG, sensors.setCurrentTiltDeg, sensors.setShowSensorOverlay].forEach(f => (f as any)(0));
     sensors.setShowSensorOverlay(false);
     if (sensors.sensorSourceRef.current === "accelerometer") { sensors.setIsCalibrating(true); sensors.accelBaselineRef.current = null; sensors.accelCalibSamples.current = []; }
@@ -461,6 +472,7 @@ export function useTrackingState() {
           const raw = await AsyncStorage.getItem(BG_POINTS_KEY);
           if (raw) {
             const bgPoints: GpsPoint[] = JSON.parse(raw); await AsyncStorage.removeItem(BG_POINTS_KEY);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- LocationObject partial shape, native handler accepts it
             bgPoints.forEach(p => onNativeLocation({ coords: { latitude: p.latitude, longitude: p.longitude, altitude: p.altitude, speed: p.speedKmh / 3.6, accuracy: 0, heading: 0, altitudeAccuracy: 0 }, timestamp: new Date(p.timestamp).getTime() } as any));
             if (bgPoints.length > 0) {
               if (isTabFocusedRef.current) {

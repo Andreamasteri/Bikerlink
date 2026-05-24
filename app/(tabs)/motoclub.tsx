@@ -168,7 +168,7 @@ export default function MotoclubScreen() {
       const url = conversationId
         ? `/motoclub/${clubId}?conversationId=${conversationId}`
         : `/motoclub/${clubId}`;
-      router.push(url as any);
+      router.push(url as never);
     },
     [router]
   );
@@ -293,7 +293,7 @@ export default function MotoclubScreen() {
       {motoclubCreationEnabled && !hasPendingRequest && (
         <TouchableOpacity
           style={[styles.fab, { bottom: insets.bottom + 16 }]}
-          onPress={() => router.push("/motoclub/create" as any)}
+          onPress={() => router.push("/motoclub/create" as never)}
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={26} color="#fff" />
@@ -302,7 +302,7 @@ export default function MotoclubScreen() {
       {motoclubCreationEnabled && hasPendingRequest && (
         <TouchableOpacity
           style={[styles.fab, { bottom: insets.bottom + 16, backgroundColor: Colors.warning }]}
-          onPress={() => router.push("/motoclub/create" as any)}
+          onPress={() => router.push("/motoclub/create" as never)}
           activeOpacity={0.85}
         >
           <Ionicons name="time" size={22} color="#fff" />

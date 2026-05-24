@@ -49,6 +49,7 @@ export default function AdminEasterEggs() {
   });
 
   const createMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- easter egg form payload
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/admin/easter-eggs", data);
       return res.json();
@@ -60,6 +61,7 @@ export default function AdminEasterEggs() {
   });
 
   const updateMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- easter egg update payload
     mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const res = await apiRequest("PUT", `/api/admin/easter-eggs/${id}`, data);
       return res.json();

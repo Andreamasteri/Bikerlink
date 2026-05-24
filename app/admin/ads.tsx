@@ -119,6 +119,7 @@ export default function AdminAds() {
 
       <AdGroupList
         listItems={listItems}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FlatList ref type
         flatListRef={flatListRef as any}
         isLoading={isLoading}
         collapsedGroups={collapsedGroups}
@@ -169,6 +170,7 @@ export default function AdminAds() {
             bulkBaseName={bulkBaseName}
             onBulkBaseNameChange={setBulkBaseName}
             bulkTarget={bulkTarget}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bulk target matches enum at runtime
             onBulkTargetChange={(target) => setBulkTarget(target as any)}
             bulkDuration={bulkDuration}
             onBulkDurationChange={setBulkDuration}

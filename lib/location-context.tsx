@@ -6,7 +6,6 @@ import { sendStartupBeacon } from "@/lib/startup-beacon";
 let _expoLocation: typeof import("expo-location") | null = null;
 function loc(): typeof import("expo-location") {
   if (_expoLocation === null) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     _expoLocation = require("expo-location") as typeof import("expo-location");
   }
   return _expoLocation!;

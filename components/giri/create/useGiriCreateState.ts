@@ -48,6 +48,7 @@ export function useGiriCreateState(language?: string) {
 
   const [waypoints, setWaypoints] = useState<Waypoint[]>([{ lat: 0, lng: 0, name: "" }, { lat: 0, lng: 0, name: "" }]);
   const [wpInputs, setWpInputs] = useState<string[]>(["", ""]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocoding suggestion results from API
   const [wpSuggestions, setWpSuggestions] = useState<{ index: number; results: any[] } | null>(null);
 
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
@@ -108,6 +109,7 @@ export function useGiriCreateState(language?: string) {
       }
       const route = await resp.json() as { id: string };
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace(`/giri/${route.id}` as any);
     } catch (err: unknown) {
       Alert.alert("Errore GPX", err instanceof Error ? (err as Error).message : "Impossibile leggere il file GPX.");
@@ -156,6 +158,7 @@ export function useGiriCreateState(language?: string) {
 
       initialItems.forEach((item, idx) => {
         if (!item.name) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
         logFetch<any[]>(
           "/api/planned-routes/geocode", "GET",
           () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", item.name); return fetch(url.toString(), { credentials: "include" }); },
@@ -210,6 +213,7 @@ export function useGiriCreateState(language?: string) {
       items[idx] = { ...items[idx], geocoding: true };
       return { ...prev, items };
     });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
     logFetch<any[]>(
       "/api/planned-routes/geocode", "GET",
       () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", name); return fetch(url.toString(), { credentials: "include" }); },
@@ -288,6 +292,7 @@ export function useGiriCreateState(language?: string) {
     if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
     if (text.length >= 3) {
       suggestionTimeout.current = setTimeout(async () => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
         const results = await logFetch<any[]>(
           "/api/planned-routes/geocode", "GET",
           () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", text); return fetch(url.toString(), { credentials: "include" }); },
@@ -298,6 +303,7 @@ export function useGiriCreateState(language?: string) {
     } else { setWpSuggestions(null); }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geo suggestion from geocode API
   const selectSuggestion = (index: number, geo: any) => {
     const newWps = [...waypoints]; newWps[index] = { lat: geo.lat, lng: geo.lng, name: geo.name.split(",")[0] }; setWaypoints(newWps);
     const newInputs = [...wpInputs]; newInputs[index] = geo.name.split(",")[0]; setWpInputs(newInputs);
@@ -348,12 +354,14 @@ export function useGiriCreateState(language?: string) {
   };
 
   const saveMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route data payload
     mutationFn: async (data: any) => {
       const resp = await apiRequest("POST", "/api/planned-routes", data);
       return resp.json();
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace(`/giri/${data.id}` as any);
     },
     onError: () => Alert.alert("Errore", "Impossibile salvare il giro.")
@@ -396,6 +404,7 @@ export function useGiriCreateState(language?: string) {
       const resp = await fetch(url, { headers: { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" } });
       let name = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
       if (resp.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Nominatim response shape
         const data = await resp.json() as any;
         const d = data.address ?? {};
         name = d.road ?? d.suburb ?? d.town ?? d.city ?? d.county ?? name;

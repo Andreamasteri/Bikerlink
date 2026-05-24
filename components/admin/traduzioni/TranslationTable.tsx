@@ -10,6 +10,7 @@ import Colors from "@/constants/colors";
 import { TranslationRow, CellState } from "./TranslationRow";
 
 interface TranslationTableProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- translation table data from API
   filteredData: any[];
   activeLangList: { code: string; label: string }[];
   totalWidth: number;
@@ -19,6 +20,7 @@ interface TranslationTableProps {
   editingCell: { key: string; lang: string } | null;
   editDraft: string;
   cellStates: Record<string, CellState>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- translation row data shape
   rowHasMissing: (row: any) => boolean;
   handleSave: (key: string, lang: string, value: string) => Promise<void>;
   handleStartEdit: (key: string, lang: string, currentValue: string) => void;
@@ -56,6 +58,7 @@ export const TranslationTable: React.FC<TranslationTableProps> = ({
     </View>
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- translation row item from API
   const renderRow = ({ item }: { item: any }) => (
     <TranslationRow
       item={item}

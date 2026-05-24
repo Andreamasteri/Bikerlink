@@ -94,6 +94,7 @@ export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => 
       if (result.canceled) return;
       const file = result.assets[0];
       const formData = new FormData();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData file object
       formData.append("file", { uri: file.uri, name: file.name, type: "application/pdf" } as any);
       await apiRequest("POST", "/api/admin/upload-eula", formData);
       Alert.alert("Successo", "Documento EULA caricato correttamente");

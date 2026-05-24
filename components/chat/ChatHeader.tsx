@@ -70,7 +70,7 @@ export function ChatHeader({
         <Ionicons name="trash-outline" size={22} color={Colors.error} />
       </TouchableOpacity>
       {isPrivateChat && otherParticipantId && (
-        <TouchableOpacity onPress={() => router.push(`/profile/${otherParticipantId}` as any)} style={styles.infoButton}>
+        <TouchableOpacity onPress={() => router.push(`/profile/${otherParticipantId}` as never)} style={styles.infoButton}>
           <Ionicons name="information-circle-outline" size={26} color={Colors.text} />
         </TouchableOpacity>
       )}

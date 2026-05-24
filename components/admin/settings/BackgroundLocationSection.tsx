@@ -112,6 +112,7 @@ interface BackgroundLocationSectionProps {
   setBgIntervalInput: (val: string) => void;
   bgNotificationTextInput: string;
   setBgNotificationTextInput: (val: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation body shape varies
   onMutation: (body: any) => void;
   isPending: boolean;
 }

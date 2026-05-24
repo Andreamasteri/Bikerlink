@@ -268,6 +268,7 @@ export default function ChatConversationScreen() {
       const filename = uri.split("/").pop() ?? "photo.jpg";
       const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
       const mimeType = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FormData.append with RN file object
       (formData as any).append("image", { uri, name: filename, type: mimeType } as any);
 
       const uploadUrl = new URL(`/api/chat/conversations/${id}/images`, getApiUrl()).toString();

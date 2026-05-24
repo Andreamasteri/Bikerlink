@@ -101,6 +101,7 @@ export default function AdminUsers() {
     queryKey: ["/api/admin/users"],
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- users summary from API
   const { data: summary } = useQuery<any>({
     queryKey: ["/api/admin/users/stats/summary"],
   });

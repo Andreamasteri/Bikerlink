@@ -62,6 +62,7 @@ export function AdImageUpload({
             <View
               style={[
                 styles.progressFill,
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- percentage string width
                 { width: `${Math.round((progress.current / progress.total) * 100)}%` as any },
               ]}
             />

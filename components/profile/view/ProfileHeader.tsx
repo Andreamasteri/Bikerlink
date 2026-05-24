@@ -7,9 +7,9 @@ import type { ProfileData } from "@/components/profile/types";
 
 interface ProfileHeaderProps {
   profile: ProfileData | undefined;
-  user: any;
+  user: { id?: string; email?: string; nickname?: string } | null | undefined;
   typeColor: string;
-  avatarSource: any;
+  avatarSource: { uri: string } | number | null | undefined;
   isUploading: boolean;
   onPickImage: () => void;
   getUserTypeIcon: (userType: string) => keyof typeof Ionicons.glyphMap;

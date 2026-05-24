@@ -9,6 +9,8 @@ import PhotoLightbox from "@/components/map/PhotoLightbox";
 import HomeMessageModal from "@/components/map/HomeMessageModal";
 import AreaSelectorModal from "@/components/map/AreaSelectorModal";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- home map state types vary
+type AnyObj = any;
 interface HomeModalsAndSheetsProps {
   showOnlineList: boolean;
   setShowOnlineList: (show: boolean) => void;
@@ -18,46 +20,39 @@ interface HomeModalsAndSheetsProps {
   setShowZavorrinaList: (show: boolean) => void;
   showOfflineOnline: boolean;
   setShowOfflineOnline: (show: boolean) => void;
-  onlineListQuery: any;
-  bikerListQuery: any;
-  zavListQuery: any;
+  onlineListQuery: AnyObj;
+  bikerListQuery: AnyObj;
+  zavListQuery: AnyObj;
   offlineCountdown: number;
   startOfflineTimer: () => void;
-  handleLocateUser: (user: any) => void;
-  
-  selectedUser: any;
-  setSelectedUser: (user: any) => void;
-  selectedUserDetail: any;
-  selectedUserProposals: any[];
+  handleLocateUser: AnyObj;
+  selectedUser: AnyObj;
+  setSelectedUser: AnyObj;
+  selectedUserDetail: AnyObj;
+  selectedUserProposals: AnyObj[];
   detailLoading: boolean;
   setSelectedMapPhoto: (uri: string | null) => void;
-  myOrganizedEvents: any[];
-  targetUserEventIds: any[];
-  
-  activeSosRequests: any[];
+  myOrganizedEvents: AnyObj[];
+  targetUserEventIds: string[];
+  activeSosRequests: AnyObj[];
   showSosDetail: boolean;
   setShowSosDetail: (show: boolean) => void;
-  acceptSosMutation: any;
-  
-  selectedEgg: any;
-  setSelectedEgg: (egg: any) => void;
-  collectEggMutation: any;
-  
+  acceptSosMutation: AnyObj;
+  selectedEgg: AnyObj;
+  setSelectedEgg: AnyObj;
+  collectEggMutation: AnyObj;
   selectedMapPhoto: string | null;
-  
   showHomeMessage: boolean;
   setShowHomeMessage: (show: boolean) => void;
   homeMessageText: string;
-  
   showAreaModal: boolean;
   setShowAreaModal: (show: boolean) => void;
   selectedCountries: string[];
   toggleCountryInModal: (code: string) => void;
   toggleContinentInModal: (code: string) => void;
   saveCountries: (countries: string[]) => void;
-  
   onToggleOfflineOnline: () => void;
-  user: any;
+  user: AnyObj;
   t: (key: string) => string;
 }
 

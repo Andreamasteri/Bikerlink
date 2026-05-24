@@ -124,7 +124,7 @@ function MatchRequestCard({
     <View style={[matchCardStyles.card, { backgroundColor: colors.surface, borderColor: colors.accent }]}>
       <TouchableOpacity
         style={matchCardStyles.senderRow}
-        onPress={() => request.sender && router.push(`/profile/${request.sender.id}` as any)}
+        onPress={() => request.sender && router.push(`/profile/${request.sender.id}` as never)}
         activeOpacity={0.7}
       >
         <View style={[matchCardStyles.avatar, { backgroundColor: colors.accent + "22" }]}>
@@ -267,6 +267,7 @@ export default function NotificationsScreen() {
       qc.invalidateQueries({ queryKey: ["/api/friends"] });
       qc.invalidateQueries({ queryKey: ["/api/notifications"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation error shape
     onError: (e: any) => {
       Alert.alert("Errore", (e as Error).message || "Impossibile accettare la richiesta");
     },
@@ -277,6 +278,7 @@ export default function NotificationsScreen() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/friends/requests/incoming"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation error shape
     onError: (e: any) => {
       Alert.alert("Errore", (e as Error).message || "Impossibile rifiutare la richiesta");
     },

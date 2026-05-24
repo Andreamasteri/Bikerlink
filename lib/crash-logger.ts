@@ -133,7 +133,7 @@ export async function flushQueue(): Promise<void> {
   if (!_currentUserId) return;
   const uid = _currentUserId;
   try {
-    let queue = await readQueue();
+    const queue = await readQueue();
     const mine = queue.filter((e) => e.userId === uid);
     const others = queue.filter((e) => e.userId !== uid);
     let offset = 0;

@@ -6,6 +6,7 @@ import Colors from "@/constants/colors";
 import { isAdminError } from "./systemUtils";
 
 interface SystemErrorDisplayProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error from React Query, shape varies
   error: any;
   sessionExpired: boolean;
   t: (key: string) => string;
@@ -22,8 +23,11 @@ export function SystemErrorDisplay({
   goToLogin,
   topPadding = 0,
 }: SystemErrorDisplayProps) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AdminError properties not typed
   const code = isAdminError(error) ? (error as any).code : undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AdminError properties not typed
   const status = isAdminError(error) ? (error as any).status : undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AdminError properties not typed
   const reason = isAdminError(error) ? (error as any).reason : undefined;
   
   const isSessionGone = code === "session_expired" || sessionExpired;

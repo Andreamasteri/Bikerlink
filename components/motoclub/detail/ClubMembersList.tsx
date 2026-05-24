@@ -66,7 +66,7 @@ export const MemberCard: React.FC<{ item: Member; currentUserId?: string }> = ({
     <TouchableOpacity
       style={styles.memberCard}
       activeOpacity={0.7}
-      onPress={() => router.push(`/profile/${item.profileId}` as any)}
+      onPress={() => router.push(`/profile/${item.profileId}` as never)}
     >
       <AvatarCircle nickname={item.nickname} size={42} />
       <View style={styles.memberInfo}>

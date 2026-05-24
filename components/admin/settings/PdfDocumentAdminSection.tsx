@@ -102,6 +102,7 @@ export function PdfDocumentAdminSection({
         uri: file.uri,
         name: file.name || "document.pdf",
         type: "application/pdf",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData file object
       } as any);
 
       const res = await fetch(new URL(uploadEndpoint, getApiUrl()).toString(), {

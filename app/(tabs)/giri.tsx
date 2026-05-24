@@ -106,7 +106,7 @@ export default function GiriScreen() {
       });
       const route = await res.json() as { id: string };
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
-      router.push(`/giri/${route.id}` as any);
+      router.push(`/giri/${route.id}` as never);
     } catch (err: unknown) {
       const msg = err instanceof Error ? (err as Error).message : "Impossibile leggere il file GPX.";
       Alert.alert("Errore", msg);
@@ -122,7 +122,7 @@ export default function GiriScreen() {
       <GiriListHeader
         isImporting={isImporting}
         onImportGpx={handleImportGpx}
-        onPlan={() => router.push("/giri/create" as any)}
+        onPlan={() => router.push("/giri/create" as never)}
       />
 
       <TelemetryProgressBanner />
@@ -145,7 +145,7 @@ export default function GiriScreen() {
         ) : routes.length === 0 ? (
           <GiriEmptyState 
             filter={filter} 
-            onPlan={() => router.push("/giri/create" as any)} 
+            onPlan={() => router.push("/giri/create" as never)} 
           />
         ) : (
           routes.map((route) => (
@@ -154,7 +154,7 @@ export default function GiriScreen() {
               route={route}
               isOffline={offlineRouteIds.has(route.id)}
               isMine={filter === "mine"}
-              onPress={() => router.push(`/giri/${route.id}` as any)}
+              onPress={() => router.push(`/giri/${route.id}` as never)}
               onDelete={() => deleteMutation.mutate(route.id)}
             />
           ))

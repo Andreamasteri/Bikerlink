@@ -67,6 +67,7 @@ export function GiriListCard({ route, isOffline, isMine, onPress, onDelete }: Gi
       <View style={s.cardHeader}>
         <View style={s.cardTitleRow}>
           <MaterialCommunityIcons
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from data
             name={styleIcon(route.style) as any}
             size={16}
             color={colors.accent}

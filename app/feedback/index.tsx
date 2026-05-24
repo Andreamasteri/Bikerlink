@@ -7,8 +7,10 @@ export default function FeedbackRedirect() {
 
   useEffect(() => {
     if (type === "bug") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace("/feedback/bug" as any);
     } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace("/feedback/feature" as any);
     }
   }, [type, router]);

@@ -127,6 +127,7 @@ interface TranslationRowProps {
   editingCell: { key: string; lang: string } | null;
   editDraft: string;
   cellStates: Record<string, CellState>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- translation row data shape
   rowHasMissing: (row: any) => boolean;
   handleSave: (key: string, lang: string, value: string) => Promise<void>;
   handleStartEdit: (key: string, lang: string, currentValue: string) => void;

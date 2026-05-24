@@ -28,6 +28,7 @@ export function useBgLocationState(isAdmin: boolean, t: (k: string) => string) {
   }, [bgLocationSettings]);
 
   const bgLocationMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- body values are mixed types
     mutationFn: async (body: Record<string, any>) => {
       const url = new URL("/api/admin/settings/bg-location", getApiUrl());
       const res = await fetch(url.toString(), {

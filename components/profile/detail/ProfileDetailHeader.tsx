@@ -5,15 +5,28 @@ import Colors from "@/constants/colors";
 import FavoriteStar from "@/components/FavoriteStar";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 
+interface ProfileDetailHeaderProfile {
+  avatarUrl?: string | null;
+  userType?: string | null;
+  isOnline?: boolean;
+  isAvailable?: boolean;
+  lastLoginAt?: string | null;
+  nickname?: string | null;
+  country?: string | null;
+  region?: string | null;
+  city?: string | null;
+  bio?: string | null;
+  sex?: string | null;
+}
 interface ProfileDetailHeaderProps {
-  profile: any;
+  profile: ProfileDetailHeaderProfile;
   id: string;
   isSelf: boolean;
   color: string;
   baseUrl: string;
   formatLastSeen: (dateStr: string | null) => string;
   getUserTypeLabel: (userType: string) => string;
-  sprintRankData: any;
+  sprintRankData: { rank?: number | null } | null | undefined;
   onSprintRankPress: () => void;
 }
 
@@ -68,7 +81,7 @@ export const ProfileDetailHeader: React.FC<ProfileDetailHeaderProps> = ({
         </Text>
       )}
       <Text style={styles.userType}>
-        {getUserTypeLabel(profile.userType)}
+        {getUserTypeLabel(profile.userType ?? "")}
         {profile.sex ? ` · ${profile.sex === "M" ? "Maschio" : "Femmina"}` : ""}
       </Text>
       {(!!profile.country || !!profile.region) && (
@@ -78,7 +91,7 @@ export const ProfileDetailHeader: React.FC<ProfileDetailHeaderProps> = ({
             {[
               profile.region || null,
               profile.city || null,
-              profile.country ? getCountryFlag(profile.country) + " " + getCountryName(profile.country) : null,
+              profile.country ? getCountryFlag(profile.country) + " " + getCountryName(profile.country as string) : null,
             ].filter(Boolean).join(", ")}
           </Text>
         </View>

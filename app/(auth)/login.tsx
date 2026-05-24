@@ -46,10 +46,10 @@ export default function LoginScreen() {
           setIsSubmitting(false);
           router.replace("/(tabs)");
         },
-        onError: (err: any) => {
+        onError: (err: Error) => {
           sendStartupBeacon("login_5_error");
           setIsSubmitting(false);
-          const msg = err?.message || t("auth.loginError");
+          const msg = err.message || t("auth.loginError");
           const cleaned = msg.replace(/^\d+:\s*/, "");
           try {
             const parsed = JSON.parse(cleaned);

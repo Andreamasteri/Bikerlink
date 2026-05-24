@@ -7,6 +7,7 @@ import type { ThemeColors } from "@/constants/colors";
 interface ActionButtonsSectionProps {
   calculating: boolean;
   handleCalculate: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- route result from API
   routeResult: any;
   handleSave: () => void;
   saveMutationPending: boolean;

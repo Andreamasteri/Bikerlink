@@ -82,7 +82,9 @@ export default function AdminSettings() {
           expanded={state.matchingEngineExpanded}
           onToggle={() => state.setMatchingEngineExpanded((v) => !v)}
           autoMatchEnabled={state.autoMatchEnabled}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- state from useAdminSettingsState
           onAutoMatchToggle={(val) => (state as any).autoMatchMutation.mutate(val)}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- state from useAdminSettingsState
           autoMatchPending={(state as any).autoMatchMutation.isPending}
           showSearchPrefEnabled={state.showSearchPrefEnabled}
           onShowSearchPrefToggle={(val) => state.showSearchPrefMutation.mutate(val)}

@@ -30,6 +30,7 @@ export const PreferencesDiffCard: React.FC<PreferencesDiffCardProps> = ({
 
   const handleEditPress = () => {
     router.push({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       pathname: "/admin/match-preferences-edit" as any,
       params: { userId, nickname },
     });

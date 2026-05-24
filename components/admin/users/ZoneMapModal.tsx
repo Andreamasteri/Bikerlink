@@ -8,7 +8,9 @@ import { GeoZone } from "./UserDetailModal";
 interface ZoneMapModalProps {
   zone: GeoZone | null;
   onClose: () => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
   MapView: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
   MapMarker: any;
   insets: { top: number; bottom: number };
 }

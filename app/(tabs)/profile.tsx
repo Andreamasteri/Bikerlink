@@ -143,6 +143,7 @@ export default function ProfileScreen() {
       const filename = uri.split("/").pop() || "photo.jpg";
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData requires non-standard object shape
       formData.append("photo", { uri, name: filename, type: mimeType } as any);
       const baseUrl = getApiUrl();
       const url = new URL("/api/users/me/photos", baseUrl);
@@ -222,10 +223,13 @@ export default function ProfileScreen() {
   }, [t]);
 
   const currentUserType = profile?.userType ?? user?.userType ?? "biker";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- auth user has sex field at runtime
   const currentSex = profile?.sex ?? (user as any)?.sex;
   const typeColor = getUserTypeColor(currentUserType, currentSex);
   const isBikerOrCoppia = currentUserType === "biker" || currentUserType === "coppia";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- auth user has role field at runtime
   const isAdmin = profile?.role === "admin" || (user as any)?.role === "admin";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- auth user has role field at runtime
   const isModerator = profile?.role === "moderator" || (user as any)?.role === "moderator";
 
   const avatarSource = profile?.avatarUrl

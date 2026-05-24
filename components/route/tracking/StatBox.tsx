@@ -13,6 +13,7 @@ export const StatBox = ({ icon, label, value }: Props) => {
   return (
     <View style={styles.statBox}>
       <MaterialCommunityIcons
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from data
         name={icon as any}
         size={20}
         color={Colors.accent}

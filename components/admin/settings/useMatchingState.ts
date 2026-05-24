@@ -63,6 +63,7 @@ export function useMatchingState(t: (k: string) => string) {
       return res;
     },
     onSuccess: (data) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matching trigger response from API
       setMatchingTriggerFeedback(`${t("admin.matchingTriggered")}: ${(data as any).count} ${t("admin.matchesCreated")}`);
       setTimeout(() => setMatchingTriggerFeedback(null), 5000);
     },

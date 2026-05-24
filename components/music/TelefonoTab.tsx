@@ -29,16 +29,20 @@ export function TelefonoTab() {
     setLoading(true);
     try {
       const result = await MediaLibrary.getAssetsAsync({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MediaLibrary typing gap
         mediaType: "audio" as any,
         first: 50,
         after: cursor,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SortBy not typed in expo-media-library
         sortBy: ((MediaLibrary as any).SortBy?.creationTime ?? (MediaLibrary as any).SortBy?.default),
       });
-      setAssets((prev: any[]) => {
-        const combined = cursor ? [...prev, ...result.assets] : result.assets;
-        return combined.slice().sort((a: any, b: any) => {
-          const ta = parseAudioFilename(a.filename ?? "").title.toLowerCase();
-          const tb = parseAudioFilename(b.filename ?? "").title.toLowerCase();
+      setAssets((prev) => {
+        const combined: MediaLibrary.Asset[] = cursor ? [...prev, ...(result.assets as unknown as MediaLibrary.Asset[])] : (result.assets as unknown as MediaLibrary.Asset[]);
+        return combined.slice().sort((a, b) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- expo-media-library Asset typing gap
+          const ta = parseAudioFilename((a as any).filename ?? "").title.toLowerCase();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- expo-media-library Asset typing gap
+          const tb = parseAudioFilename((b as any).filename ?? "").title.toLowerCase();
           return ta.localeCompare(tb);
         });
       });
@@ -62,22 +66,26 @@ export function TelefonoTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [permission?.granted]);
 
-  const handlePlayTrack = useCallback((asset: any) => {
+  const handlePlayTrack = useCallback((asset: MediaLibrary.Asset) => {
     if (!playerAvailable) return;
-    const { title, artist } = parseAudioFilename(asset.filename ?? "");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- expo-media-library Asset typing gap
+    const a = asset as any;
+    const { title, artist } = parseAudioFilename(a.filename ?? "");
     playTrack({
-      id: asset.id,
-      url: asset.uri,
+      id: a.id,
+      url: a.uri,
       title,
       artist,
-      duration: asset.duration,
+      duration: a.duration,
       source: "file",
     });
   }, [playTrack, playerAvailable]);
 
   const handlePlayAll = useCallback(async () => {
     if (!playerAvailable || assets.length === 0) return;
-    const tracks: PlayerTrack[] = (assets as any[]).map((a: any) => {
+    const tracks: PlayerTrack[] = assets.map((asset) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- expo-media-library Asset typing gap
+      const a = asset as any;
       const { title, artist } = parseAudioFilename(a.filename ?? "");
       return { id: a.id, url: a.uri, title, artist, duration: a.duration, source: "file" as const };
     });

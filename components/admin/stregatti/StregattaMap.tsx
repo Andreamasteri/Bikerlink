@@ -374,6 +374,7 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary
   },
   refreshBtn: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- "auto" margin not in RN types
     marginLeft: "auto" as any,
     padding: 4
   },

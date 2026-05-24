@@ -12,12 +12,16 @@ import InviteEventModal from "@/components/map/InviteEventModal";
 import UserDetailContent from "@/components/map/UserDetailContent";
 
 type Props = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- map user shape from useHomeMapState
   selectedUser: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- user detail from API
   selectedUserDetail: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- proposals from API
   selectedUserProposals: any[];
   detailLoading: boolean;
   onClose: () => void;
   onPhotoPress: (uri: string) => void;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- events from API
   myOrganizedEvents: any[];
   targetUserEventIds: string[];
   currentUserId: string | null | undefined;

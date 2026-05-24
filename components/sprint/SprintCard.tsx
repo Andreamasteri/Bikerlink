@@ -23,7 +23,7 @@ interface SprintCardProps {
   index: number;
   targetLabel: string;
   locale: string;
-  timeFormat: string | "12h" | "24h";
+  timeFormat: "12h" | "24h";
   onPublish: (item: SprintResult) => void;
 }
 
@@ -82,7 +82,7 @@ export const SprintCard: React.FC<SprintCardProps> = ({
 
       <View style={styles.sprintDate}>
         <Text style={styles.dateText} numberOfLines={2}>
-          {formatDateTime(item.createdAt, locale, timeFormat as any)}
+          {formatDateTime(item.createdAt, locale, timeFormat)}
         </Text>
       </View>
 

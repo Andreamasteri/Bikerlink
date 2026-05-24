@@ -83,6 +83,7 @@ function weatherIcon(code: number): keyof typeof Ionicons.glyphMap {
   return "cloud-outline";
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- colors from useColors hook
 function bikerScoreColor(score: number, colors: any): string {
   if (score >= 0.7) return "#22c55e";
   if (score >= 0.4) return colors.accent;
@@ -136,9 +137,11 @@ export default function GiriDetailScreen() {
   const [selectedPOI, setSelectedPOI] = useState<POI | null>(null);
   const [matchBikers, setMatchBikers] = useState<CompatibleBiker[] | null>(null);
   const [matchLoading, setMatchLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- hotel data from API
   const [hotels, setHotels] = useState<any[] | null>(null);
   const [hotelsLoading, setHotelsLoading] = useState(false);
   const [matchBannerDismissed, setMatchBannerDismissed] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- elevation data from API
   const [elevation, setElevation] = useState<any | null>(null);
   const [elevationLoading, setElevationLoading] = useState(false);
   const [elevationError, setElevationError] = useState(false);
@@ -185,6 +188,7 @@ export default function GiriDetailScreen() {
     mutationFn: () => apiRequest("DELETE", `/api/planned-routes/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/planned-routes"] });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace("/(tabs)/giri" as any);
     },
     onError: () => Alert.alert("Errore", "Impossibile eliminare il giro."),
@@ -222,6 +226,7 @@ export default function GiriDetailScreen() {
     });
   }, [route]);
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView message event
   const handleWebViewMessage = (event: any) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data);
@@ -471,7 +476,7 @@ export default function GiriDetailScreen() {
         />
 
         <GiriActions
-          onNavigate={() => router.push(`/navigate/${id}` as any)}
+          onNavigate={() => router.push(`/navigate/${id}` as never)}
           onOpenGoogleMaps={handleOpenInGoogleMaps}
           onOpenWaze={handleOpenInWaze}
           onOpenAppleMaps={handleOpenInAppleMaps}
@@ -520,7 +525,7 @@ export default function GiriDetailScreen() {
           matchBannerDismissed={matchBannerDismissed}
           onDismissBanner={() => setMatchBannerDismissed(true)}
           onFindBikers={handleFindBikers}
-          onPressBiker={(uid) => router.push(`/profile/${uid}` as any)}
+          onPressBiker={(uid) => router.push(`/profile/${uid}` as never)}
         />
 
         {multiDayDays && (
@@ -546,6 +551,7 @@ export default function GiriDetailScreen() {
   );
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- colors from useColors hook
 const styles = (colors: any) => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: colors.textSecondary, textAlign: "center", paddingVertical: 8 },

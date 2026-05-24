@@ -14,7 +14,7 @@ import { useT } from "@/lib/language-context";
 
 interface EditMotoProps {
   isBikerOrCoppia: boolean;
-  motorcycles: any[];
+  motorcycles: { id: string; brand?: string | null; model?: string | null; year?: number | null; engineSize?: number | null; ridingStyle?: string | null }[];
   showAddMoto: boolean;
   setShowAddMoto: (show: boolean) => void;
   motoBrand: string;

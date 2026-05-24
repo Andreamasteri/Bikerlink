@@ -14,6 +14,7 @@ import { SensorOverlayPanel } from "./SensorOverlayPanel";
 import TrackingMap from "@/components/TrackingMap";
 import { DistanceUnit, SpeedUnit } from "@/lib/units-context";
 import { MountAxisCalibration } from "@/components/MountCalibWizard";
+import { useRouter } from "expo-router";
 import { UpdateProfile, formatHMS, convertSpeed, speedUnitLabel, convertDistance, distanceUnitLabel } from "./tracking-utils";
 
 interface TrackingDashboardProps {
@@ -59,8 +60,9 @@ interface TrackingDashboardProps {
   pointsSent: number;
   sprintGoFired: boolean;
   t: (key: string) => string;
-  router: any;
-  styles: any;
+  router: ReturnType<typeof useRouter>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- StyleSheet object, typed by caller
+  styles: Record<string, any>;
 }
 
 export function TrackingDashboard({
@@ -221,7 +223,7 @@ export function TrackingDashboard({
             mountAxisCalib={mountAxisCalib}
             sensorsEnabled={sensorsEnabled}
             colors={Colors}
-            styles={styles}
+            styles={styles as { sensorOverlayPanel: object; sensorOverlayItem: object; sensorOverlayValue: object; sensorOverlayLabel: object; sensorOverlaySep: object }}
             t={t}
           />
         )}
@@ -433,7 +435,7 @@ export function TrackingDashboard({
                     mountAxisCalib={mountAxisCalib}
                     sensorsEnabled={sensorsEnabled}
                     colors={Colors}
-                    styles={styles}
+                    styles={styles as { sensorOverlayPanel: object; sensorOverlayItem: object; sensorOverlayValue: object; sensorOverlayLabel: object; sensorOverlaySep: object }}
                     t={t}
                   />
                 )}

@@ -304,8 +304,8 @@ export default function ForgotPasswordScreen() {
   );
 }
 
-function parseError(err: any, fallback: string): string {
-  const msg = err?.message || fallback;
+function parseError(err: unknown, fallback: string): string {
+  const msg = (err instanceof Error ? err.message : null) || fallback;
   const cleaned = msg.replace(/^\d+:\s*/, "");
   try {
     return JSON.parse(cleaned).message || cleaned;

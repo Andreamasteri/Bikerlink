@@ -369,6 +369,7 @@ function StatCard({
   return (
     <View style={styles.statCard}>
       <MaterialCommunityIcons
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from stat
         name={icon as any}
         size={22}
         color={Colors.accent}
@@ -438,6 +439,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statCard: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- percentage width string
     width: "31%" as any,
     backgroundColor: Colors.surface,
     borderRadius: 14,

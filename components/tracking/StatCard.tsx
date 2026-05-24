@@ -17,6 +17,7 @@ export function StatCard({
 }: StatCardProps) {
   return (
     <View style={styles.statCard}>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from data */}
       <Ionicons name={icon as any} size={16} color={color} />
       <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit>
         {value}

@@ -130,7 +130,9 @@ export default function CreateProposalScreen() {
   }, [showMapPicker]);
 
   useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- auth user has profile coords at runtime
     const profileLat = (user as any)?.profileLatitude;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- auth user has profile coords at runtime
     const profileLng = (user as any)?.profileLongitude;
     if (profileLat && profileLng && !departureLat) {
       setDepartureLat(profileLat);
@@ -199,9 +201,12 @@ export default function CreateProposalScreen() {
     queryKey: ["/api/motoclubs/me/clubs"],
     enabled: isBikerOrCoppia,
   });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- clubs data from API
   const myClubs = (myClubsData as any[]) || [];
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- motorcycles from API
   const motos = (motorcycles as any[]) || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- wishlist data from API
   const wishlistMotos = (wishlistData as any)?.motos || [];
 
   useEffect(() => {
@@ -442,6 +447,7 @@ export default function CreateProposalScreen() {
                 testID={`target-type-${opt.key}`}
               >
                 <MaterialCommunityIcons
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from option
                   name={opt.icon as any}
                   size={28}
                   color={isSelected ? opt.color : Colors.textSecondary}
@@ -563,6 +569,7 @@ export default function CreateProposalScreen() {
       <MapPickerContent
         visible={showMapPicker}
         onClose={() => setShowMapPicker(false)}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- map picker coord shape
         onSelect={(coord: any) => {
           if (mapPickerMode === "departure") {
             setDepartureLat(coord.latitude);

@@ -1,13 +1,20 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { WebView } from "react-native-webview";
+import WebView from "react-native-webview";
 import Colors from "@/constants/colors";
 
+interface Waypoint {
+  id?: string;
+  name?: string;
+  lat?: number;
+  lng?: number;
+  type?: string;
+}
 interface RouteMapPreviewProps {
-  waypoints: any[];
+  waypoints: Waypoint[];
   curvatureMapHtml: string;
-  webviewRef: React.RefObject<any>;
+  webviewRef: React.RefObject<WebView | null>;
   handleMapLoaded: () => void;
   routeStyle: "curvy" | "balanced" | "fastest";
   setRouteStyle: (style: "curvy" | "balanced" | "fastest") => void;
@@ -46,6 +53,7 @@ export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
                 onPress={() => setRouteStyle(s)}
                 testID={`route-style-${s}`}
               >
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ionicons name subset */}
                 <Ionicons name={meta.icon as any} size={18} color={isActive ? meta.color : Colors.textSecondary} />
                 <Text style={[styles.styleBtnText, isActive && { color: meta.color, fontWeight: "700" as const }]}>
                   {meta.label}
@@ -72,13 +80,14 @@ export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
             {/* Style badge overlay */}
             {(() => {
               const styleMeta = {
-                curvy: { label: "Panoramico", icon: "terrain" as any, color: "#4CAF50" },
-                balanced: { label: "Bilanciato", icon: "swap-horizontal" as any, color: Colors.accent },
-                fastest: { label: "Veloce", icon: "flash" as any, color: "#FF9800" },
+                curvy: { label: "Panoramico", icon: "terrain", color: "#4CAF50" },
+                balanced: { label: "Bilanciato", icon: "swap-horizontal", color: Colors.accent },
+                fastest: { label: "Veloce", icon: "flash", color: "#FF9800" },
               }[routeStyle];
               return (
                 <View style={[styles.styleBadge, { backgroundColor: styleMeta.color + "DD" }]}>
-                  <Ionicons name={styleMeta.icon} size={12} color="#fff" />
+                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ionicons name subset */}
+                  <Ionicons name={styleMeta.icon as any} size={12} color="#fff" />
                   <Text style={styles.styleBadgeText}>{styleMeta.label}</Text>
                 </View>
               );

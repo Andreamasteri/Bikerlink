@@ -168,6 +168,7 @@ export default function EditProfileScreen() {
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData file object
       formData.append("photo", { uri, name: filename, type: mimeType } as any);
 
       const baseUrl = getApiUrl();

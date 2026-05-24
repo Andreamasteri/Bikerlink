@@ -199,6 +199,7 @@ export default function ProposalDetailScreen() {
       >
         <View style={[styles.typeBanner, { backgroundColor: typeInfo.color + "15" }]}>
           <MaterialCommunityIcons
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from typeInfo
             name={typeInfo.name as any}
             size={28}
             color={typeInfo.color}
@@ -375,7 +376,7 @@ export default function ProposalDetailScreen() {
                   participantIds: participantUserIds,
                 });
                 const conv = await res.json();
-                router.push(`/chat/${conv.id}` as any);
+                router.push(`/chat/${conv.id}` as never);
               } catch (e: unknown) {
                 Alert.alert(t("common.error"), (e as Error).message || t("proposals.detail.cannotOpenChat"));
               }

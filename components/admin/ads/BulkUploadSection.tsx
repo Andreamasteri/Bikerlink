@@ -9,6 +9,7 @@ interface BulkUploadSectionProps {
   bulkBaseName: string;
   onBulkBaseNameChange: (text: string) => void;
   bulkTarget: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- bulk target enum value
   onBulkTargetChange: (target: any) => void;
   bulkDuration: string;
   onBulkDurationChange: (text: string) => void;

@@ -60,7 +60,7 @@ export default function MatchScreen() {
       AsyncStorage.multiGet(["match_distance_mode", "match_distance_km"]).then(pairs => {
         const mode = pairs[0][1];
         const km = pairs[1][1];
-        if (mode === "all" || mode === "km") setDistanceMode(mode as any);
+        if (mode === "all" || mode === "km") setDistanceMode(mode);
         if (km) { setDistanceKm(km); setPendingKm(km); }
       }).catch(() => {});
     }, [])
@@ -80,6 +80,7 @@ export default function MatchScreen() {
     }, [activeTab])
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
   const { data: proposalMatches, isLoading: proposalLoading, refetch: proposalRefetch, isRefetching: proposalRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/matches"],
     enabled: !!user,
@@ -87,6 +88,7 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
   const { data: garageMatches, isLoading: garageLoading, refetch: garageRefetch, isRefetching: garageRefetching, isFetching: garageIsFetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/garage-matches"],
     enabled: !!user,
@@ -94,6 +96,7 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
   const { data: bikerMatches, isLoading: bikerLoading, refetch: bikerRefetch, isRefetching: bikerRefetching, isFetching: bikerIsFetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/biker-matches"],
     enabled: !!user,
@@ -101,6 +104,7 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- user list shape
   const { data: blockedUsers, isLoading: blockedLoading, refetch: blockedRefetch, isRefetching: blockedRefetching } = useQuery<any[]>({
     queryKey: ["/api/users/blocked"],
     enabled: !!user,
@@ -108,6 +112,7 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
   const { data: acceptedMatches, isLoading: acceptedLoading, refetch: acceptedRefetch, isRefetching: acceptedRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/matches/accepted"],
     enabled: !!user,
@@ -115,6 +120,7 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
   const { data: propProfileMatches, isLoading: propProfileLoading, refetch: propProfileRefetch, isRefetching: propProfileRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/proposal-profile-matches"],
     enabled: !!user,
@@ -127,6 +133,7 @@ export default function MatchScreen() {
     enabled: !!user,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- music match shape
   const { data: musicMatches, isLoading: musicLoading, refetch: musicRefetch, isRefetching: musicRefetching, error: musicError } = useQuery<any[]>({
     queryKey: ["/api/music/matches"],
     enabled: !!user && activeTab === "music" && lastfmStatus?.connected === true,
@@ -213,8 +220,10 @@ export default function MatchScreen() {
   const startChatMutation = useMutation({
     mutationFn: (targetUserId: string) => apiRequest("POST", "/api/chat/conversations", { targetUserId }),
     onSuccess: (data) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response shape
       if ((data as any).id) {
-        router.push(`/chat/${(data as any).id}` as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API response shape
+        router.push(`/chat/${(data as any).id}` as never);
       }
     },
   });
@@ -331,6 +340,7 @@ export default function MatchScreen() {
   const isLoading = proposalLoading || garageLoading || bikerLoading || blockedLoading || musicLoading || acceptedLoading || propProfileLoading;
   const isRefetching = proposalRefetching || garageRefetching || bikerRefetching || blockedRefetching || musicRefetching || acceptedRefetching || propProfileRefetching;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- item shape varies by tab
   const renderItem = useCallback(({ item }: { item: any }) => {
     if (activeTab === "blacklist") {
       return (
@@ -421,7 +431,7 @@ export default function MatchScreen() {
           currentUserId={user?.id || ""}
           onAccept={() => {}}
           onReject={() => {}}
-          onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as any) : undefined}
+          onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as never) : undefined}
           onRemove={() => confirmRemoveProposalMatch(item.id)}
           isPending={false}
           t={t}
@@ -487,7 +497,7 @@ export default function MatchScreen() {
           acceptMutation.mutate(item.id);
         }}
         onReject={() => rejectMutation.mutate(item.id)}
-        onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as any) : undefined}
+        onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as never) : undefined}
         onRemove={item.status === "accepted" ? () => confirmRemoveProposalMatch(item.id) : undefined}
         isPending={pendingMatchId === item.id}
         t={t}

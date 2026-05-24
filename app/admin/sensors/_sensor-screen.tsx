@@ -30,6 +30,7 @@ import { SensorTestSection, LogEntry, LogType } from "@/components/admin/sensors
 import { SensorNotesSection } from "@/components/admin/sensors/SensorNotesSection";
 import { SensorBoundary } from "@/components/admin/sensors/SensorBoundary";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- DeviceSensor generic type from expo-sensors
 type Subscription = ReturnType<DeviceSensor<any>["addListener"]>;
 
 export { SensorKey, SensorDefinition };

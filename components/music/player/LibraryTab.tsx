@@ -38,12 +38,14 @@ export function LibraryTab({ onPlayTrack }: LibraryTabProps) {
       setLoading(true);
       try {
         const result = await MediaLibrary.getAssetsAsync({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MediaLibrary typing gap
           mediaType: "audio" as any,
           first: 30,
           after: cursor,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SortBy not typed in expo-media-library
           sortBy: ((MediaLibrary as any).SortBy?.default),
         });
-        setAssets((prev: any[]) => (cursor ? [...prev, ...result.assets] : result.assets));
+        setAssets((prev) => (cursor ? [...prev, ...(result.assets as unknown as MediaLibrary.Asset[])] : (result.assets as unknown as MediaLibrary.Asset[])));
         setHasMore(result.hasNextPage);
         setEndCursor(result.endCursor);
       } catch (err) {
@@ -153,6 +155,7 @@ export function LibraryTab({ onPlayTrack }: LibraryTabProps) {
         onEndReachedThreshold={0.5}
         ListFooterComponent={loading ? <ActivityIndicator color={Colors.accent} style={{ padding: 12 }} /> : null}
         renderItem={({ item }) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MediaLibrary.Asset legacy/index type mismatch
           const itemAny = item as any;
           const title = (itemAny.filename ?? "").replace(/\.[^.]+$/, "") || "Brano";
           const durationSec = itemAny.duration ?? 0;

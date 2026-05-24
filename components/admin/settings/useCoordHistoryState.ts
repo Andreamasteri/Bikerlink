@@ -30,6 +30,7 @@ export function useCoordHistoryState(isAdmin: boolean, t: (k: string) => string,
   }, [coordHistorySettings]);
 
   const coordHistoryMutation = useMutation({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- body values are mixed types
     mutationFn: async (body: Record<string, any>) => {
       const url = new URL("/api/admin/coordinate-history/settings", getApiUrl());
       const res = await fetch(url.toString(), {

@@ -147,6 +147,7 @@ export default function ClubDetailScreen() {
       const res = await apiRequest("POST", `/api/motoclubs/${id}/propose-location`, { latitude, longitude, address: address || null });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- API error response shape
         throw new Error((err as any).message || t("motoclub.proposalError"));
       }
       return res.json();
@@ -172,7 +173,7 @@ export default function ClubDetailScreen() {
 
   function handleOpenChat() {
     if (!resolvedConvId) return;
-    router.push(`/chat/${resolvedConvId}` as any);
+    router.push(`/chat/${resolvedConvId}` as never);
   }
 
   if (isLoading || (isNotMember && isLoadingPublic)) {

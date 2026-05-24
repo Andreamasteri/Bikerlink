@@ -21,7 +21,9 @@ import { EventLocationFields } from "./EventLocationFields";
 import { EventPhotosSection } from "./EventPhotosSection";
 import { EventParticipantSettings } from "./EventParticipantSettings";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
 let MapView: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
 let Marker: any = null;
 try {
   const maps = require("react-native-maps");

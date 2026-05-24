@@ -4,9 +4,17 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 
+interface SearchType {
+  key: string;
+  color: string;
+  icon: string;
+  label?: string;
+  labelKey?: string;
+  subtitleKey: string;
+}
 interface ProposalTypeSelectorProps {
   isZavorrina: boolean;
-  searchTypes: any[];
+  searchTypes: SearchType[];
   selectedSearchTypes: string[];
   toggleSearchType: (key: string) => void;
 }
@@ -40,12 +48,13 @@ export const ProposalTypeSelector = ({
               disabled={isDisabled}
             >
               <MaterialCommunityIcons
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from data
                 name={st.icon as any}
                 size={28}
                 color={isSelected ? st.color : Colors.textSecondary}
               />
               <Text style={[styles.typeCardLabel, isSelected && { color: st.color }]}>
-                {(st as any).labelKey ? t((st as any).labelKey) : st.label}
+                {st.labelKey ? t(st.labelKey) : st.label}
               </Text>
               <Text style={styles.typeCardSub}>{t(st.subtitleKey)}</Text>
               {isSelected && (

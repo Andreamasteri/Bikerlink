@@ -10,6 +10,7 @@ import {
   DeviceSensor,
 } from "expo-sensors";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- DeviceSensor generic type from expo-sensors
 export type Subscription = ReturnType<DeviceSensor<any>["addListener"]>;
 
 export type SensorKey =
@@ -86,6 +87,7 @@ export function startSensorSub(
       return Magnetometer.addListener((d) => onData(xyzFormat(d)));
     case "magnetometerUncalibrated":
       MagnetometerUncalibrated.setUpdateInterval(interval);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MagnetometerUncalibrated listener data
       return MagnetometerUncalibrated.addListener((d: any) =>
         onData(
           `x:${d.x.toFixed(3)} y:${d.y.toFixed(3)} z:${d.z.toFixed(3)} | bias x:${d.biasX?.toFixed(3) ?? "—"} y:${d.biasY?.toFixed(3) ?? "—"} z:${d.biasZ?.toFixed(3) ?? "—"}`

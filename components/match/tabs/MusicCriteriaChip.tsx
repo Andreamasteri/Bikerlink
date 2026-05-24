@@ -35,7 +35,7 @@ export const MusicCriteriaChip: React.FC<MusicCriteriaChipProps> = ({
         {" · min "}{musicMinSongs}
         {distanceMode === "km" ? ` · ≤ ${kmLimit} km` : ` · ${t("match.anyDistance")}`}
       </Text>
-      <TouchableOpacity onPress={() => router.push("/(tabs)/music" as any)}>
+      <TouchableOpacity onPress={() => router.push("/(tabs)/music" as never)}>
         <Text style={styles.musicCriteriaChange}>{t("match.change")}</Text>
       </TouchableOpacity>
     </View>

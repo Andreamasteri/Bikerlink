@@ -139,6 +139,7 @@ export default function PublicProfileScreen() {
       refetchFriendStatus();
       queryClient.invalidateQueries({ queryKey: ["/api/friends/status", id] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation error shape
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile inviare la richiesta");
     }
@@ -153,6 +154,7 @@ export default function PublicProfileScreen() {
       refetchFriendStatus();
       queryClient.invalidateQueries({ queryKey: ["/api/friends/status", id] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation error shape
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile annullare la richiesta");
     }
@@ -199,6 +201,7 @@ export default function PublicProfileScreen() {
       queryClient.invalidateQueries({ queryKey: ["/api/users/zavorrine-available-count"] });
       router.back();
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation error shape
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile bloccare l'utente");
     }
@@ -213,6 +216,7 @@ export default function PublicProfileScreen() {
       setBlockedOverride(false);
       queryClient.invalidateQueries({ queryKey: ["/api/users", id, "public"] });
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation error shape
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile sbloccare l'utente");
     }
@@ -226,6 +230,7 @@ export default function PublicProfileScreen() {
     onSuccess: () => {
       setReportSent(true);
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mutation error shape
     onError: (e: any) => {
       Alert.alert("Errore", e.message || "Impossibile inviare la segnalazione");
     }
@@ -285,7 +290,7 @@ export default function PublicProfileScreen() {
         participantIds: [id]
       });
       const conv = await res.json();
-      router.push(`/chat/${conv.id}` as any);
+      router.push(`/chat/${conv.id}` as never);
     } catch (e: unknown) {
       Alert.alert("Errore", (e as Error).message || "Impossibile aprire la chat");
     }
@@ -374,7 +379,7 @@ export default function PublicProfileScreen() {
           publicRoutesCount={publicRoutesCount}
           profile={profile}
           friendStatus={friendStatus}
-          onViewRoutes={() => router.push(`/routes/user/${id}` as any)}
+          onViewRoutes={() => router.push(`/routes/user/${id}` as never)}
           onGeoLocate={async () => {
             try {
               await AsyncStorage.setItem(
@@ -390,6 +395,7 @@ export default function PublicProfileScreen() {
             } catch {
               // no-op: last profile cache is best-effort
             }
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
             router.navigate({ pathname: "/(tabs)/index" } as any);
           }}
           onStartChat={handleStartChat}

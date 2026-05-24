@@ -5,7 +5,7 @@ import Colors from "@/constants/colors";
 
 interface ProposalVehicleProps {
   needsMotoSelection: boolean;
-  motos: any[];
+  motos: { id: string; brand?: string | null; model?: string | null; motorcycleType?: string | null; ridingStyle?: string | null }[];
   selectedMotoId: string;
   setSelectedMotoId: (id: string) => void;
   needsWishlistMoto: boolean;
@@ -13,7 +13,7 @@ interface ProposalVehicleProps {
   setAnyMotoOk: (val: boolean) => void;
   selectedWishlistMotoId: string;
   setSelectedWishlistMotoId: (id: string) => void;
-  wishlistMotos: any[];
+  wishlistMotos: { id: string; brand?: string | null; model?: string | null; motorcycleType?: string | null; ridingStyle?: string | null }[];
 }
 
 export const ProposalVehicle = ({
@@ -39,6 +39,7 @@ export const ProposalVehicle = ({
             <Text style={styles.emptyText}>Nessuna moto nel garage. Aggiungine una prima.</Text>
           ) : (
             <View style={styles.motoList}>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto from API */}
               {motos.map((m: any) => (
                 <TouchableOpacity
                   key={m.id}
@@ -88,6 +89,7 @@ export const ProposalVehicle = ({
           </TouchableOpacity>
           {!anyMotoOk && wishlistMotos.length > 0 && (
             <View style={styles.motoList}>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- wishlist moto from API */}
               {wishlistMotos.map((m: any) => (
                 <TouchableOpacity
                   key={m.id}

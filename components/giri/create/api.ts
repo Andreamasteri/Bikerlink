@@ -2,6 +2,7 @@ import { getApiUrl } from "@/lib/query-client";
 import { Ionicons } from "@expo/vector-icons";
 import { Waypoint, Style, DrivingProfile, RouteResult, WeatherWaypoint } from "./types";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
 export async function geocode(q: string): Promise<any[]> {
   const url = new URL("/api/planned-routes/geocode", getApiUrl());
   url.searchParams.set("q", q);
@@ -40,6 +41,7 @@ export async function calcRoute(
   return resp.json();
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- AI parse result shape from API
 export async function parseAI(prompt: string): Promise<any> {
   const url = new URL("/api/planned-routes/ai-parse", getApiUrl());
   const resp = await fetch(url.toString(), {

@@ -110,6 +110,7 @@ export default function InviteCodesScreen() {
       setFormError("");
       setPendingImage(null);
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error shape from API
     onError: (err: any) => {
       const msg = err?.message || t("admin.createError2");
       try { setFormError(JSON.parse(msg.replace(/^\d+:\s*/, "")).message); } catch { setFormError(msg); }
@@ -130,6 +131,7 @@ export default function InviteCodesScreen() {
       setPendingImage(null);
       setShowCreateModal(false);
     },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- error shape from API
     onError: (err: any) => {
       const msg = err?.message || t("admin.updateError");
       try { setFormError(JSON.parse(msg.replace(/^\d+:\s*/, "")).message); } catch { setFormError(msg); }

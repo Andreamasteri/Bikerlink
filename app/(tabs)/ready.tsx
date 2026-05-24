@@ -71,6 +71,7 @@ export default function ReadyToRideScreen() {
     pickFromGPS,
   } = useReadyState();
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- SOS response shape from API
   const mySosQuery = useQuery<any>({
     queryKey: ["/api/sos/my"],
     staleTime: 10000,
@@ -186,6 +187,7 @@ export default function ReadyToRideScreen() {
             ghostMutation={ghostMutation}
             hideFromMap={hideFromMap}
             offlineRandomize={offlineRandomize}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- privacyMutation shape from useReadyState
             privacyMutation={privacyMutation as any}
           />
 

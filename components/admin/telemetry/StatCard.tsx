@@ -19,6 +19,7 @@ export function StatCard({
   const c = color ?? Colors.accent;
   return (
     <View style={[styles.statCard, { borderLeftColor: c }]}>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from stat config */}
       <MaterialCommunityIcons name={icon as any} size={20} color={c} />
       <View style={styles.statCardText}>
         <Text style={styles.statValue}>{value}</Text>

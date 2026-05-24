@@ -60,6 +60,7 @@ export default function CreateRouteScreen() {
   const insets = useSafeAreaInsets();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const isEditMode = !!editId;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView ref type
   const webviewRef = useRef<any>(null);
 
   const [title, setTitle] = useState("");
@@ -145,6 +146,7 @@ export default function CreateRouteScreen() {
       });
       const route = await res.json() as { id: string };
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace(`/routes/${route.id}` as any);
     } catch (err: unknown) {
       const msg = err instanceof Error ? (err as Error).message : "Impossibile leggere il file GPX.";
@@ -202,6 +204,7 @@ export default function CreateRouteScreen() {
     onSuccess: (route) => {
       if (isEditMode) {
         queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
         router.replace(`/routes/${route.id}` as any);
       } else {
         setCreatedRouteId(route.id);
@@ -220,11 +223,13 @@ export default function CreateRouteScreen() {
       await apiRequest("PUT", `/api/custom-routes/${createdRouteId}`, { isPublic: publish });
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       setShowPublishDialog(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace(`/routes/${createdRouteId}` as any);
     } catch (e: unknown) {
       Alert.alert(t("common.error"), (e as Error).message || t("routes.cannotUpdateVisibilityLater"));
       queryClient.invalidateQueries({ queryKey: ["/api/custom-routes"] });
       setShowPublishDialog(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic route path
       router.replace(`/routes/${createdRouteId}` as any);
     } finally {
       setIsSettingVisibility(false);
