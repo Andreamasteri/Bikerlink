@@ -1,27 +1,23 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import * as Application from "expo-application";
-import Constants from "expo-constants";
-import * as Updates from "expo-updates";
-import Colors from "@/constants/colors";
+import { useColors } from "@/hooks/useColors";
+import {
+  RELEASE_NUMBER,
+  OTA_BUNDLED_COUNT,
+  APPLIED_OTA_NUMBER,
+} from "@/constants/buildInfo";
 
 export const ProfileVersionSection: React.FC = () => {
+  const colors = useColors();
+
+  const buildString = `V${RELEASE_NUMBER}-${OTA_BUNDLED_COUNT}`;
+  const otaString =
+    APPLIED_OTA_NUMBER != null ? `OTA-${APPLIED_OTA_NUMBER}` : "OTA-\u2014";
+
   return (
     <View style={styles.container}>
-      <View style={styles.row}>
-        <Text style={styles.label}>Versione app</Text>
-        <Text style={styles.value}>
-          {(`v${Application.nativeBuildVersion ?? "?"}  ${Constants.expoConfig?.version ?? ""}`).trim()}
-        </Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>Commit EAS</Text>
-        <Text style={styles.value}>
-          {Updates.updateId ? Updates.updateId.substring(0, 8) : "embedded"}
-        </Text>
-      </View>
-      <Text style={styles.betaText}>
-        Beta
+      <Text style={[styles.badge, { color: colors.textSecondary }]}>
+        {buildString}{"   "}{otaString}
       </Text>
     </View>
   );
@@ -30,28 +26,12 @@ export const ProfileVersionSection: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  row: {
-    flexDirection: "row",
-    gap: 8,
+    marginTop: 12,
     marginBottom: 4,
   },
-  label: {
+  badge: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
-  value: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  betaText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    fontStyle: "italic",
-    color: "#FF6600",
+    letterSpacing: 0.5,
   },
 });
