@@ -51,11 +51,11 @@ Il progetto usa il bare workflow (directory `android/` committata). I tre file d
 
 | File | Campo | Valore corrente |
 |---|---|---|
-| `app.json` | `expo.version` | `49.0.10` |
-| `app.json` | `expo.android.versionCode` | `49` |
+| `app.json` | `expo.version` | `50.0.10` |
+| `app.json` | `expo.android.versionCode` | `50` |
 | `app.json` | `expo.runtimeVersion` | `10.0.0` |
-| `android/app/build.gradle` | `versionCode` | `49` |
-| `android/app/build.gradle` | `versionName` | `"49.0.10"` |
+| `android/app/build.gradle` | `versionCode` | `50` |
+| `android/app/build.gradle` | `versionName` | `"50.0.10"` |
 | `android/app/src/main/res/values/strings.xml` | `expo_runtime_version` | `10.0.0` |
 
 ⚠️ **Aggiornare sempre tutti e tre i file contemporaneamente.** Un disallineamento causa errori di update check a runtime.
@@ -94,7 +94,8 @@ La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` (hardcodata ne
 | v46 | 46 | 46.29.9 | 9.0.0 | 9.x | OTA 1–13 | Primo APK schema semantico — ciclo CHIUSO a OTA-13 |
 | v47 | 47 | 47.2.9 | 9.0.0 | 9.x | OTA 1–13 | Ultimo APK ciclo 9 — SDK 56 migration |
 | v48 | 48 | 48.13.10 | 10.0.0 | 10.x | — | Primo APK ciclo 10, SDK 56 |
-| v49 | 49 | 49.0.10 | 10.0.0 | 10.x | — | **Corrente** — SDK 56 compliance, New Arch, arm64, no OTA |
+| v49 | 49 | 49.0.10 | 10.0.0 | 10.x | — | SDK 56 compliance, New Arch, arm64 — standalone (no OTA) |
+| v50 | 50 | 50.0.10 | 10.0.0 | 10.x | — | **Corrente** — OTA attiva, staged rollout, arm64 |
 
 > **Cicli precedenti** (schema vecchio `major.minor.patch` senza significato semantico):
 > - Ciclo 2.x: rv 2.0.0
@@ -114,8 +115,8 @@ La riga che calcola la versione OTA in `scripts/publish-ota.sh`:
 
 ```bash
 # Formato versione OTA: <build>.<updateNumber>.<ciclo_ota>
-# 49 = versionCode APK corrente, NEXT_OTA = numero progressivo OTA nel ciclo, 10 = ciclo runtimeVersion (10.0.0)
-local VERSION="49.${NEXT_OTA}.10"
+# 50 = versionCode APK corrente, NEXT_OTA = numero progressivo OTA nel ciclo, 10 = ciclo runtimeVersion (10.0.0)
+local VERSION="50.${NEXT_OTA}.10"
 ```
 
 ✅ `scripts/publish-ota.sh` esiste ed è funzionante. Pubblica su canale `staging`, registra la release nel database, e attende l'approvazione admin prima di promuovere su `production`.

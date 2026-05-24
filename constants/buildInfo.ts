@@ -1,4 +1,4 @@
-export const RELEASE_NUMBER = 49;
+export const RELEASE_NUMBER = 50;
 export const OTA_BUNDLED_COUNT = 0;
 export const RUNTIME_VERSION = "10.0.0";
 
