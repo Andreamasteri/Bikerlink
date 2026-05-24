@@ -58,6 +58,7 @@ export default function OtaPanel() {
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rollingBackId, setRollingBackId] = useState<string | null>(null);
+  const [forcingUpdate, setForcingUpdate] = useState(false);
 
   const { data: releases, isLoading, refetch, isFetching } = useQuery<OtaRelease[]>({
     queryKey: ["/api/admin/ota/releases"],
@@ -168,6 +169,38 @@ export default function OtaPanel() {
     );
   }, [rollbackMutation]);
 
+  const handleForceUpdate = useCallback(async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Non disponibile", "Il force update funziona solo su dispositivo Android/iOS.");
+      return;
+    }
+    setForcingUpdate(true);
+    try {
+      const check = await Updates.checkForUpdateAsync();
+      if (!check.isAvailable) {
+        Alert.alert("Nessun aggiornamento", "Sei già all'ultima versione disponibile sul canale production.");
+        return;
+      }
+      const result = await Updates.fetchUpdateAsync();
+      if (result.isNew) {
+        Alert.alert(
+          "Aggiornamento pronto",
+          "Bundle scaricato. L'app si riavvierà ora per applicarlo.",
+          [{ text: "Riavvia ora", onPress: () => Updates.reloadAsync() }]
+        );
+      } else {
+        Alert.alert("Bundle già presente", "Il bundle era già aggiornato. Riavvio per applicarlo.", [
+          { text: "Riavvia", onPress: () => Updates.reloadAsync() },
+          { text: "Annulla", style: "cancel" },
+        ]);
+      }
+    } catch (err: unknown) {
+      Alert.alert("Errore force update", err instanceof Error ? err.message : "Impossibile scaricare l'aggiornamento");
+    } finally {
+      setForcingUpdate(false);
+    }
+  }, []);
+
   const handleTryOta = useCallback(async (release: OtaRelease) => {
     if (Platform.OS === "web") {
       Alert.alert("Prova OTA", `Su web non è applicabile direttamente.\nUpdate ID: ${release.easUpdateId}`);
@@ -215,6 +248,16 @@ export default function OtaPanel() {
             : <Text style={[styles.refreshText, { color: colors.accent }]}>↻</Text>}
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={[styles.forceUpdateBtn, { backgroundColor: colors.accent }]}
+        onPress={handleForceUpdate}
+        disabled={forcingUpdate}
+      >
+        {forcingUpdate
+          ? <ActivityIndicator size="small" color="#fff" />
+          : <Text style={styles.forceUpdateText}>⚡ Forza Aggiornamento OTA su questo dispositivo</Text>}
+      </TouchableOpacity>
 
       <View style={[styles.directApplyRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.directApplyLeft}>
@@ -404,6 +447,20 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 12,
     marginTop: 8,
+  },
+  forceUpdateBtn: {
+    borderRadius: 8,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    marginBottom: 12,
+    minHeight: 46,
+  },
+  forceUpdateText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700" as const,
   },
   directApplyRow: {
     flexDirection: "row",
