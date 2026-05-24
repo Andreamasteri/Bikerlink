@@ -66,6 +66,9 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] Avvio frontend — pulizia Metro in corso..
 
 bash "$SCRIPT_DIR/clean-metro.sh"
 
+# ── Crea directory log Expo (evita ENOENT al primo avvio) ────────────────────
+mkdir -p "$PROJECT_ROOT/.expo/dev/logs"
+
 # ── Avvio Expo come processo figlio (non exec) ────────────────────────────────
 # Importante: NON usare exec qui. exec sostituisce la shell corrente e impedisce
 # l'esecuzione del trap EXIT, lasciando il lock file orfano.
