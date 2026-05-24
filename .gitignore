@@ -72,3 +72,6 @@ server_dist/.migrations-hash
 # I file critici (build.gradle, AndroidManifest.xml, adi-registration.properties)
 # devono rimanere tracciati in git per le build EAS/Play Console
 server/data/schema-snapshot.json
+
+# Screenshot e asset incollati dalla chat — non devono essere tracciati
+attached_assets/
