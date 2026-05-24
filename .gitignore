@@ -41,6 +41,10 @@ yarn-error.*
 *.tsbuildinfo
 .vercel
 
+# Next.js build output
+.next/
+website/.next/
+
 .env
 
 # Stress test logs (keep apk-build-history.log tracked)
