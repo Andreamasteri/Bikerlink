@@ -1,0 +1,320 @@
+import React, { useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import * as Updates from "expo-updates";
+import { useTheme } from "@/lib/theme-context";
+import { apiRequest } from "@/lib/query-client";
+
+interface OtaRelease {
+  id: string;
+  easUpdateId: string;
+  channel: string;
+  runtimeVersion: string | null;
+  message: string | null;
+  otaVersion: string | null;
+  status: "pending" | "approved" | "rejected";
+  publishedAt: string;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  rejectedAt: string | null;
+  rejectedBy: string | null;
+}
+
+function getStatusColor(status: string, colors: { success: string; error: string; accent: string; textSecondary: string }): string {
+  if (status === "approved") return colors.success;
+  if (status === "rejected") return colors.error;
+  return colors.accent;
+}
+
+function getStatusLabel(status: string): string {
+  if (status === "approved") return "Approvata ✓";
+  if (status === "rejected") return "Rifiutata ✗";
+  return "In attesa";
+}
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return "—";
+  try {
+    return new Date(dateStr).toLocaleString("it-IT", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch { return dateStr; }
+}
+
+export default function OtaPanel() {
+  const { colors } = useTheme();
+  const qc = useQueryClient();
+  const [tryingId, setTryingId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+
+  const { data: releases, isLoading, refetch, isFetching } = useQuery<OtaRelease[]>({
+    queryKey: ["/api/admin/ota/releases"],
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/ota/${id}/approve`),
+    onSuccess: () => {
+      setApprovingId(null);
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+    },
+    onError: (err: Error) => {
+      setApprovingId(null);
+      Alert.alert("Errore", err.message || "Impossibile approvare");
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("POST", `/api/admin/ota/${id}/reject`),
+    onSuccess: () => {
+      setRejectingId(null);
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+    },
+    onError: (err: Error) => {
+      setRejectingId(null);
+      Alert.alert("Errore", err.message || "Impossibile rifiutare");
+    },
+  });
+
+  const handleApprove = useCallback((release: OtaRelease) => {
+    Alert.alert(
+      "Approva e Distribuisci",
+      `Promuovere questa OTA su production?\n\nVersione: ${release.otaVersion ?? release.easUpdateId.slice(0, 8)}\nMessaggio: ${release.message ?? "—"}`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Approva e Distribuisci",
+          onPress: () => {
+            setApprovingId(release.id);
+            approveMutation.mutate(release.id);
+          },
+        },
+      ]
+    );
+  }, [approveMutation]);
+
+  const handleReject = useCallback((release: OtaRelease) => {
+    Alert.alert(
+      "Rifiuta OTA",
+      "L'OTA verrà archiviata e non distribuita.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Rifiuta",
+          style: "destructive",
+          onPress: () => {
+            setRejectingId(release.id);
+            rejectMutation.mutate(release.id);
+          },
+        },
+      ]
+    );
+  }, [rejectMutation]);
+
+  const handleTryOta = useCallback(async (release: OtaRelease) => {
+    if (Platform.OS === "web") {
+      Alert.alert("Prova OTA", `Su web non è applicabile direttamente.\nUpdate ID: ${release.easUpdateId}`);
+      return;
+    }
+    setTryingId(release.id);
+    try {
+      const result = await Updates.fetchUpdateAsync();
+      if (result.isNew) {
+        Alert.alert(
+          "OTA scaricata",
+          "Aggiornamento pronto. Riavvio app.",
+          [{ text: "Riavvia", onPress: () => Updates.reloadAsync() }]
+        );
+      } else {
+        Alert.alert("Nessun aggiornamento", "Nessun nuovo update trovato su staging.");
+      }
+    } catch (err: unknown) {
+      Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile scaricare l'OTA");
+    } finally {
+      setTryingId(null);
+    }
+  }, []);
+
+  if (isLoading) {
+    return (
+      <View style={styles.center}>
+        <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
+
+  const pending = (releases ?? []).filter((r) => r.status === "pending");
+  const history = (releases ?? []).filter((r) => r.status !== "pending");
+
+  return (
+    <View>
+      <View style={styles.header}>
+        <Text style={[styles.title, { color: colors.text }]}>OTA Releases</Text>
+        <TouchableOpacity onPress={() => refetch()} disabled={isFetching} style={styles.refreshBtn}>
+          {isFetching
+            ? <ActivityIndicator size="small" color={colors.accent} />
+            : <Text style={[styles.refreshText, { color: colors.accent }]}>↻</Text>}
+        </TouchableOpacity>
+      </View>
+
+      {pending.length === 0 && (
+        <View style={[styles.emptyBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Nessuna OTA in attesa</Text>
+          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+            Pubblica con: ./scripts/publish-ota.sh --message "..."
+          </Text>
+        </View>
+      )}
+
+      {pending.map((release) => (
+        <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.accent + "44" }]}>
+          <View style={styles.cardHeader}>
+            <View style={[styles.badge, { backgroundColor: colors.accent + "22" }]}>
+              <Text style={[styles.badgeText, { color: colors.accent }]}>IN ATTESA</Text>
+            </View>
+            <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
+          </View>
+
+          <Text style={[styles.versionText, { color: colors.text }]}>
+            {release.otaVersion ?? release.easUpdateId.slice(0, 16) + "…"}
+          </Text>
+
+          {release.message
+            ? <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
+            : <Text style={[styles.messageText, { color: colors.textSecondary, fontStyle: "italic" }]}>Nessun messaggio</Text>}
+
+          <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+            ID: {release.easUpdateId.slice(0, 20)}…
+          </Text>
+          {release.runtimeVersion && (
+            <Text style={[styles.metaText, { color: colors.textSecondary }]}>Runtime: {release.runtimeVersion}</Text>
+          )}
+
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}
+              onPress={() => handleTryOta(release)}
+              disabled={tryingId === release.id}
+            >
+              {tryingId === release.id
+                ? <ActivityIndicator size="small" color={colors.text} />
+                : <Text style={[styles.actionBtnText, { color: colors.text }]}>🔬 Prova OTA</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: colors.success, borderColor: colors.success }]}
+              onPress={() => handleApprove(release)}
+              disabled={approvingId === release.id}
+            >
+              {approvingId === release.id
+                ? <ActivityIndicator size="small" color="#fff" />
+                : <Text style={[styles.actionBtnText, { color: "#fff" }]}>✓ Approva e Distribuisci</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: "transparent", borderColor: colors.error }]}
+              onPress={() => handleReject(release)}
+              disabled={rejectingId === release.id}
+            >
+              {rejectingId === release.id
+                ? <ActivityIndicator size="small" color={colors.error} />
+                : <Text style={[styles.actionBtnText, { color: colors.error }]}>✗ Rifiuta</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      ))}
+
+      {history.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Storico</Text>
+          {history.map((release) => {
+            const sc = getStatusColor(release.status, colors);
+            return (
+              <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.cardHeader}>
+                  <View style={[styles.badge, { backgroundColor: sc + "22" }]}>
+                    <Text style={[styles.badgeText, { color: sc }]}>
+                      {getStatusLabel(release.status).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
+                </View>
+
+                <Text style={[styles.versionText, { color: colors.text }]}>
+                  {release.otaVersion ?? release.easUpdateId.slice(0, 16) + "…"}
+                </Text>
+
+                {release.message && (
+                  <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
+                )}
+
+                {release.approvedAt && (
+                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                    Approvata: {formatDate(release.approvedAt)}
+                  </Text>
+                )}
+                {release.rejectedAt && (
+                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                    Rifiutata: {formatDate(release.rejectedAt)}
+                  </Text>
+                )}
+              </View>
+            );
+          })}
+        </>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  title: { fontSize: 17, fontWeight: "700" },
+  refreshBtn: { padding: 8 },
+  refreshText: { fontSize: 18 },
+  emptyBox: { borderRadius: 8, padding: 20, alignItems: "center", borderWidth: 1, marginBottom: 12 },
+  emptyText: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
+  emptySubtext: {
+    fontSize: 11,
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+    textAlign: "center",
+  },
+  card: { borderRadius: 8, padding: 16, marginBottom: 12, borderWidth: 1 },
+  cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  badge: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
+  badgeText: { fontSize: 10, fontWeight: "800" as const, letterSpacing: 0.5 },
+  dateText: { fontSize: 11 },
+  versionText: {
+    fontSize: 16,
+    fontWeight: "700" as const,
+    marginBottom: 4,
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+  },
+  messageText: { fontSize: 13, marginBottom: 8, lineHeight: 18 },
+  metaText: {
+    fontSize: 11,
+    marginBottom: 2,
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+  },
+  actions: { flexDirection: "column", gap: 8, marginTop: 12 },
+  actionBtn: { borderRadius: 6, paddingVertical: 10, paddingHorizontal: 16, alignItems: "center", borderWidth: 1 },
+  actionBtnText: { fontSize: 13, fontWeight: "700" as const },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: "700" as const,
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 12,
+    marginTop: 8,
+  },
+} as const);

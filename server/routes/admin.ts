@@ -231,12 +231,14 @@ import analyticsRouter from './admin/analytics';
 import stregattiRouter from './admin/stregatti';
 import miscRouter from './admin/misc';
 import matchingRouter from './admin/matching';
+import otaRouter from './admin/ota';
 
-router.use('/users', usersRouter);
+router.use('/users', _requireAdmin, usersRouter);
 router.use('/settings', settingsRouter);
-router.use('/advertisements', adsRouter);
-router.use('/analytics', analyticsRouter);
-router.use('/stregatti', stregattiRouter);
+router.use('/advertisements', _requireAdmin, adsRouter);
+router.use('/analytics', _requireAdmin, analyticsRouter);
+router.use('/stregatti', _requireAdmin, stregattiRouter);
+router.use('/ota', _requireAdmin, otaRouter);
 router.use('/', miscRouter);
 router.use('/', matchingRouter);
 

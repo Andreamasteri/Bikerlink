@@ -118,7 +118,7 @@ La riga che calcola la versione OTA in `scripts/publish-ota.sh`:
 local VERSION="49.${NEXT_OTA}.10"
 ```
 
-Lo script si trova in `scripts/publish-ota.sh` e calcola NEXT_OTA interrogando l'EAS GraphQL API.
+✅ `scripts/publish-ota.sh` esiste ed è funzionante. Pubblica su canale `staging`, registra la release nel database, e attende l'approvazione admin prima di promuovere su `production`.
 
 Quando viene pubblicato un nuovo APK con un nuovo ciclo, aggiornare:
 - Il primo numero (`49` → nuovo versionCode)

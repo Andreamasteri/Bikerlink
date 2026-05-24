@@ -25,5 +25,13 @@
         "autoIncrement": false
       }
     }
+  },
+  "update": {
+    "staging": {
+      "channel": "staging"
+    },
+    "production": {
+      "channel": "production"
+    }
   }
 }

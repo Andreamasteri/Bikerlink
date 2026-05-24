@@ -1,101 +1,101 @@
 ---
 name: bikerlink-ota-publish
-description: Pubblica un aggiornamento OTA BikerLink su EAS Update (canale staging). Usare quando l'utente dice "vai con l'ota", "pubblica ota", "ota update", "nuovo ota", o varianti.
+description: Pubblica un OTA BikerLink su staging tramite script shell. Trigger: "vai con l'ota", "pubblica ota", "ota update", "nuovo ota", "lancia ota". NON richiedere password admin — EAS_TOKEN è l'unico secret necessario.
 ---
 
-# BikerLink — Pubblicazione OTA automatica
+# BikerLink — OTA Publish Skill
 
 ## Trigger
 
-Questa skill si attiva quando l'utente dice:
+Attivare questa skill quando l'utente dice una delle seguenti (o varianti):
 - "vai con l'ota"
 - "pubblica ota"
+- "lancia ota"
 - "ota update"
 - "nuovo ota"
-- qualsiasi variante che implica pubblicare un aggiornamento OTA
+- "fai l'ota"
+- "pubblica l'aggiornamento OTA"
 
 ## Prerequisiti
 
-1. Leggere **`bikerlink-versioning`** prima di procedere (`.agents/skills/bikerlink-versioning/SKILL.md`).
-2. `EAS_TOKEN` deve essere presente nei secret Replit — è l'**unico** secret necessario.
+**Leggere prima** `.agents/skills/bikerlink-versioning/SKILL.md` per capire il formato versione OTA.
 
-> ⛔ **NON inserire e NON richiedere la password admin — non è un secret e non deve diventarlo.**
-> Lo script usa solo `EAS_TOKEN`. Nessuna altra credenziale è richiesta.
+## ⚠️ VINCOLO CRITICO — Credenziali
 
-## Autenticazione
-
-| Secret | Necessario | Note |
-|--------|-----------|------|
-| `EAS_TOKEN` | ✅ Sì | Token EAS per autenticarsi all'API e pubblicare |
-| Password admin | ❌ No | Non richiesta, non usata, non da inserire |
+- **EAS_TOKEN** è l'**unico secret necessario** per pubblicare
+- **NON inserire** e **NON richiedere** la password admin
+- La password admin non è un secret e non deve diventarlo
+- EAS_TOKEN è già configurato come secret Replit — non serve chiederlo all'utente
 
 ## Passi da seguire
 
-### 1. Raccogliere il messaggio changelog
+### 1. Raccogli il messaggio changelog
 
-Se l'utente non ha fornito un messaggio di changelog, chiedere:
-> "Qual è il messaggio da associare a questo aggiornamento OTA?"
+- Se l'utente ha fornito un messaggio changelog nella sua richiesta, usalo direttamente
+- Se il messaggio NON è fornito, chiedi: *"Qual è il messaggio changelog per questo OTA? (es: 'Fix crash login', 'Nuova sezione eventi')"*
+- Non procedere senza un messaggio
 
-Il messaggio sarà visibile nel pannello EAS e agli sviluppatori.
-
-### 2. Eseguire lo script
+### 2. Esegui lo script
 
 ```bash
-bash scripts/publish-ota.sh --message "Messaggio del changelog"
+./scripts/publish-ota.sh --message "MESSAGGIO_CHANGELOG_QUI"
 ```
 
-Lo script:
-- Verifica `EAS_TOKEN` nell'ambiente (esce con errore se mancante)
-- Interroga l'EAS GraphQL API per determinare `NEXT_OTA` (max updateNumber tra staging e production + 1)
-- Calcola la versione OTA secondo la formula `<build>.<NEXT_OTA>.<ciclo>` (es. `49.1.10`)
-- Pubblica con `eas update --channel staging --message "..." --non-interactive`
-- Stampa in output: versione OTA, update ID EAS, canale, messaggio
+**Importante:**
+- Lo script usa `EAS_TOKEN` dall'ambiente automaticamente
+- Pubblica sempre sul canale `staging` (mai direttamente su `production`)
+- L'output include la versione OTA calcolata e l'Update ID EAS
 
-### 3. Riportare il risultato all'utente
+### 3. Riporta il risultato all'utente
 
-Dopo l'esecuzione riuscita, comunicare all'utente:
-- **Versione pubblicata** (es. `49.1.10`)
-- **Update ID EAS** (UUID)
+Dopo l'esecuzione riportare:
+- **Versione OTA** pubblicata (es. `49.1.10`)
+- **Update ID** EAS (GUID)
 - **Canale**: staging
-- **Link approvazione**: `https://expo.dev/accounts/<owner>/projects/<slug>/updates`
+- **Link al pannello**: apri `/admin/settings` nel web portal oppure la sezione OTA nell'app admin
 
 Esempio di risposta:
-> OTA pubblicata:
+
+> OTA pubblicata ✓
+>
 > - Versione: `49.1.10`
 > - Update ID: `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`
 > - Canale: staging
-> - Approva/rifiuta su: https://expo.dev/accounts/...
+>
+> Ora apri il pannello OTA admin (nell'app o su /admin/settings) per testare e approvare la distribuzione a production.
 
-## Contesto fisso (ciclo corrente)
+### 4. Non richiedere altro
 
-| Campo | Valore |
-|-------|--------|
-| versionCode APK | `49` |
-| runtimeVersion | `10.0.0` |
-| Ciclo OTA | `10` |
-| Formula versione | `49.<NEXT_OTA>.10` |
-| Canale pubblicazione | `staging` |
+Non chiedere all'utente:
+- Password admin ❌
+- Credenziali EAS ❌
+- Conferma del token ❌
 
-> Questi valori vanno aggiornati ogni volta che cambia il versionCode APK o la runtimeVersion.
-> Vedi checklist in `bikerlink-versioning`.
+## Script path
 
-## Gestione errori
+`scripts/publish-ota.sh`
 
-| Errore | Causa probabile | Azione |
-|--------|----------------|--------|
-| `EAS_TOKEN non presente` | Secret non configurato | Aggiungere `EAS_TOKEN` nei Secrets Replit |
-| `EAS CLI non trovato` | eas-cli non installato | Eseguire `npm install -g eas-cli` |
-| `Pubblicazione OTA fallita` | Errore EAS (auth, rete, config) | Leggere l'output completo di EAS per diagnosticare |
-| `NEXT_OTA impostato a 1` | API EAS non raggiungibile o app non trovata | Verificare `EAS_TOKEN` e slug/owner in `app.json` |
+## Cosa fa lo script
 
-## Path script
+1. Valida presenza di `--message` e `EAS_TOKEN`
+2. Legge `versionCode` e `runtimeVersion` da `app.json`
+3. Interroga EAS GraphQL API per il numero OTA più alto tra staging e production
+4. Calcola `NEXT_OTA = max + 1` e `VERSION = "<build>.<NEXT_OTA>.<ciclo>"`
+5. Esegue `eas update --channel staging --message "..." --non-interactive`
+6. Stampa versione OTA, Update ID, canale, messaggio
+
+## Formula versione OTA
 
 ```
-scripts/publish-ota.sh
+<build>.<NEXT_OTA>.<ciclo>
 ```
 
-## Fuori scope
+Vedi `.agents/skills/bikerlink-versioning/SKILL.md` per dettagli completi.
 
-- Promozione automatica staging → production (approvazione manuale nel pannello EAS)
-- Bump di versione APK o runtimeVersion (vedi `bikerlink-versioning`)
-- Notifiche push agli utenti
+## Flusso approvazione (post-publish)
+
+Dopo la pubblicazione su staging, l'admin deve:
+1. Testare l'OTA nell'app (tasto "Prova OTA" nel pannello admin)
+2. Approvare (→ promuove su `production`) o Rifiutare
+
+La promozione avviene tramite il pannello admin nell'app o nel web portal — non tramite CLI.

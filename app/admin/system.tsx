@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
+  View,
   TouchableOpacity,
   Platform,
   ActivityIndicator,
   Alert,
 } from "react-native";
+import { useTheme } from "@/lib/theme-context";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +29,7 @@ import { PurgeConfirmationModal } from "@/components/admin/system/PurgeConfirmat
 import { SystemErrorDisplay } from "@/components/admin/system/SystemErrorDisplay";
 import { SystemLoadingDisplay } from "@/components/admin/system/SystemLoadingDisplay";
 import { RecentEventsSection } from "@/components/admin/system/RecentEventsSection";
+import OtaPanel from "@/components/admin/ota/OtaPanel";
 
 import {
   AdminFetchError,
@@ -39,6 +42,15 @@ import {
   type NativeVersionConfigData
 } from "@/components/admin/system/systemUtils";
 
+
+function OtaSectionWrapper() {
+  const { colors } = useTheme();
+  return (
+    <View style={{ backgroundColor: colors.surface, borderRadius: 8, padding: 16, marginTop: 16, borderWidth: 1, borderColor: colors.border }}>
+      <OtaPanel />
+    </View>
+  );
+}
 
 function outcomeMeta(o: UpdateOutcome, t: (key: string) => string): { label: string; color: string; icon: keyof typeof Ionicons.glyphMap } {
   if (o === "force") return { label: "Force update richiesto", color: "#FF4444", icon: "alert-circle" };
@@ -391,6 +403,8 @@ export default function SystemScreen() {
               outcomeMeta={outcomeMeta}
               t={t}
             />
+
+            <OtaSectionWrapper />
 
           </>
         }

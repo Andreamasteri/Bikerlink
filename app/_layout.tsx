@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
 import { getApiUrl } from "@/lib/query-client";
@@ -33,6 +33,7 @@ import { RootProviders } from "@/components/RootProviders";
 import { AppStateHandler } from "@/components/layout/AppStateHandler";
 import { BackgroundNotificationHandler } from "@/components/layout/BackgroundNotificationHandler";
 import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
+import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
 SplashScreen.preventAutoHideAsync();
 
 function GpsAlwaysGate({ isAuthenticated }: { isAuthenticated: boolean }) {
@@ -120,6 +121,31 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
     );
   }
   return <>{children}</>;
+}
+
+function OtaPendingBanner() {
+  const { hasPending } = useOtaStagingBanner();
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  if (!hasPending) return null;
+
+  return (
+    <View
+      style={[
+        revocationBannerStyles.banner,
+        { top: insets.top, backgroundColor: colors.accent + "EE" },
+      ]}
+    >
+      <Text
+        style={revocationBannerStyles.text}
+        onPress={() => router.push("/admin/system")}
+      >
+        🚀 OTA in staging — Approva o rifiuta in Admin › Sistema
+      </Text>
+    </View>
+  );
 }
 
 function AdminUptimeOverlay() {
@@ -248,6 +274,7 @@ export default function RootLayout() {
         <MapReadyGate>
           <AppStateHandler />
           <GpsAlwaysGateWrapper />
+          <OtaPendingBanner />
           <AdminUptimeOverlay />
           <BackgroundNotificationHandler />
           <PushTokenRegistrar />

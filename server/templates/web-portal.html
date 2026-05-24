@@ -1750,6 +1750,19 @@ async function renderAdminSettings() {
         </div>
       </div>
 
+      <!-- ── OTA Releases ── -->
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:28px;margin-top:16px" id="ota-section">
+        <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:20px">
+          OTA Releases — Staged Rollout
+        </div>
+        <div style="font-size:12px;color:var(--text3);margin-bottom:16px">
+          Ogni OTA pubblicata con <code style="background:var(--surface2);padding:1px 6px;border-radius:3px;font-size:11px">./scripts/publish-ota.sh</code> arriva prima su <b>staging</b>. Approva per promuovere su <b>production</b>.
+        </div>
+        <div id="ota-releases-list">
+          <div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">Caricamento...</div>
+        </div>
+      </div>
+
       <!-- ── Manutenzione ── -->
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:28px;margin-top:16px">
         <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:20px">
@@ -1843,7 +1856,92 @@ async function renderAdminSettings() {
     loadWebsiteUrlSetting(),
     loadMaintenanceSetting(),
     loadLandingImagesSetting(),
+    loadOtaReleases(),
   ]);
+}
+
+async function loadOtaReleases() {
+  const container = document.getElementById('ota-releases-list');
+  if (!container) return;
+  try {
+    const res = await fetch('/api/admin/ota/releases', { credentials: 'include' });
+    if (!res.ok) {
+      container.innerHTML = '<div style="color:var(--error,#f44336);font-size:13px;padding:8px">Errore caricamento OTA releases</div>';
+      return;
+    }
+    const releases = await res.json();
+    renderOtaReleases(releases);
+  } catch {
+    container.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:8px">Errore di rete</div>';
+  }
+}
+
+function renderOtaReleases(releases) {
+  const container = document.getElementById('ota-releases-list');
+  if (!container) return;
+  if (!releases || releases.length === 0) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:20px;color:var(--text3);font-size:13px">
+        Nessuna OTA release.<br>
+        <code style="font-size:11px;background:var(--surface2);padding:2px 8px;border-radius:3px;display:inline-block;margin-top:8px">./scripts/publish-ota.sh --message "..."</code>
+      </div>`;
+    return;
+  }
+
+  const fmtDate = (d) => d ? new Date(d).toLocaleString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+  const statusColor = { pending: 'var(--accent)', approved: '#4CAF50', rejected: '#f44336' };
+  const statusLabel = { pending: 'IN ATTESA', approved: 'APPROVATA ✓', rejected: 'RIFIUTATA ✗' };
+
+  container.innerHTML = releases.map(r => `
+    <div style="border:1px solid ${r.status==='pending'?'var(--accent)44':'var(--border)'};border-radius:6px;padding:16px;margin-bottom:10px;background:var(--surface2)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <span style="font-size:10px;font-weight:800;letter-spacing:0.5px;background:${statusColor[r.status]}22;color:${statusColor[r.status]};padding:3px 8px;border-radius:4px">${statusLabel[r.status]||r.status}</span>
+        <span style="font-size:11px;color:var(--text3)">${fmtDate(r.publishedAt)}</span>
+      </div>
+      <div style="font-family:monospace;font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px">${esc(r.otaVersion || r.easUpdateId.slice(0,16)+'…')}</div>
+      ${r.message ? `<div style="font-size:13px;color:var(--text2);margin-bottom:8px">${esc(r.message)}</div>` : ''}
+      <div style="font-size:11px;color:var(--text3);font-family:monospace">ID: ${esc(r.easUpdateId.slice(0,24))}…</div>
+      ${r.status==='pending' ? `
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button class="btn btn-primary btn-sm" onclick="approveOta('${r.id}')" style="flex:1;background:#4CAF50;border-color:#4CAF50">✓ Approva e Distribuisci</button>
+          <button class="btn btn-ghost btn-sm" onclick="rejectOta('${r.id}')" style="flex:1;color:#f44336;border-color:#f44336">✗ Rifiuta</button>
+        </div>` : ''}
+      ${r.approvedAt ? `<div style="font-size:11px;color:var(--text3);margin-top:8px">Approvata: ${fmtDate(r.approvedAt)}</div>` : ''}
+      ${r.rejectedAt ? `<div style="font-size:11px;color:var(--text3);margin-top:8px">Rifiutata: ${fmtDate(r.rejectedAt)}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+async function approveOta(id) {
+  if (!confirm('Promuovere questa OTA su production?')) return;
+  try {
+    const res = await fetch('/api/admin/ota/' + id + '/approve', { method: 'POST', credentials: 'include' });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('settings-alert', data.message || 'Errore approvazione OTA', 'error');
+    } else {
+      showAlert('settings-alert', 'OTA approvata e distribuita su production', 'success');
+      await loadOtaReleases();
+    }
+  } catch {
+    showAlert('settings-alert', 'Errore di rete', 'error');
+  }
+}
+
+async function rejectOta(id) {
+  if (!confirm('Rifiutare questa OTA?')) return;
+  try {
+    const res = await fetch('/api/admin/ota/' + id + '/reject', { method: 'POST', credentials: 'include' });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('settings-alert', data.message || 'Errore rifiuto OTA', 'error');
+    } else {
+      showAlert('settings-alert', 'OTA rifiutata', 'success');
+      await loadOtaReleases();
+    }
+  } catch {
+    showAlert('settings-alert', 'Errore di rete', 'error');
+  }
 }
 
 async function loadApkUrlSetting() {
