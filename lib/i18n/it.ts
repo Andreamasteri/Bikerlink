@@ -1235,6 +1235,9 @@ const it: Record<string, string> = {
   "nav.save_ride": "Salva il giro",
   "nav.close": "Chiudi",
   "nav.then": "Poi:",
+  "nav.offline.download": "Scarica mappa offline",
+  "nav.offline.downloading": "Download in corso…",
+  "nav.offline.retry": "Riprova download",
 
   "compatibility.sheetTitle": "Compatibilità del match",
   "compatibility.bikerBikerExplanation": "Siete entrambi biker in cerca di un compagno di viaggio. Questo match è emerso perché le vostre proposte e i profili da rider sono reciprocamente compatibili.",

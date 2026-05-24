@@ -1134,6 +1134,9 @@ const de: Record<string, string> = {
   "nav.save_ride": "Fahrt speichern",
   "nav.close": "Schließen",
   "nav.then": "Dann:",
+  "nav.offline.download": "Offline-Karte herunterladen",
+  "nav.offline.downloading": "Herunterladen…",
+  "nav.offline.retry": "Download wiederholen",
 
   "compatibility.sheetTitle": "Match-Kompatibilität",
   "compatibility.bikerBikerExplanation": "Ihr seid beide Biker auf der Suche nach einem Fahrbegleiter. Dieses Match wurde angezeigt, weil eure Vorschläge und Fahrerprofile gegenseitig kompatibel sind.",

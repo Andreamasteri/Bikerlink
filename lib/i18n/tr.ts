@@ -1125,6 +1125,9 @@ const tr: Record<string, string> = {
   "nav.save_ride": "Sürüşü kaydet",
   "nav.close": "Kapat",
   "nav.then": "Sonra:",
+  "nav.offline.download": "Çevrimdışı harita indir",
+  "nav.offline.downloading": "İndiriliyor…",
+  "nav.offline.retry": "İndirmeyi yeniden dene",
 
   "compatibility.sheetTitle": "Eşleşme uyumluluğu",
   "compatibility.bikerBikerExplanation": "İkiniz de sürüş arkadaşı arayan bikersiniz. Bu eşleşme, önerilerinizin ve sürücü profillerinizin karşılıklı olarak uyumlu olması nedeniyle öne çıktı.",

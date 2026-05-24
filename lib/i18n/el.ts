@@ -1125,6 +1125,9 @@ const el: Record<string, string> = {
   "nav.save_ride": "Αποθήκευση διαδρομής",
   "nav.close": "Κλείσιμο",
   "nav.then": "Έπειτα:",
+  "nav.offline.download": "Λήψη χάρτη εκτός σύνδεσης",
+  "nav.offline.downloading": "Λήψη…",
+  "nav.offline.retry": "Επανάληψη λήψης",
 
   "compatibility.sheetTitle": "Συμβατότητα αντιστοίχισης",
   "compatibility.bikerBikerExplanation": "Και οι δύο σας είστε bikers που αναζητάτε συνοδοιπόρο. Αυτή η αντιστοίχιση εμφανίστηκε επειδή οι προτάσεις και τα προφίλ οδηγών σας είναι αμοιβαία συμβατά.",

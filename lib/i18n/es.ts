@@ -1134,6 +1134,9 @@ const es: Record<string, string> = {
   "nav.save_ride": "Guardar ruta",
   "nav.close": "Cerrar",
   "nav.then": "Luego:",
+  "nav.offline.download": "Descargar mapa sin conexión",
+  "nav.offline.downloading": "Descargando…",
+  "nav.offline.retry": "Reintentar descarga",
 
   "compatibility.sheetTitle": "Compatibilidad del match",
   "compatibility.bikerBikerExplanation": "Ambos sois bikers buscando un compañero de ruta. Este match surgió porque vuestras propuestas y perfiles de rider son mutuamente compatibles.",

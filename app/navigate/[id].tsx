@@ -6,6 +6,7 @@ import {
   Alert,
   Linking,
   ActivityIndicator,
+  Pressable,
 } from "react-native";
 import WebView from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -509,6 +510,34 @@ export default function NavigateScreen() {
         </View>
       )}
 
+      {/* Download map banner — visible only when tiles are not yet available */}
+      {(offline.status === "none" || offline.status === "error") && (
+        <Pressable style={s.downloadBanner} onPress={offline.startDownload}>
+          <Ionicons name="download-outline" size={15} color="#fff" />
+          <Text style={s.downloadBannerText}>
+            {offline.status === "error" ? t("nav.offline.retry") : t("nav.offline.download")}
+          </Text>
+          {offline.status === "error" && (
+            <Ionicons name="alert-circle-outline" size={16} color="rgba(255,200,100,0.9)" />
+          )}
+        </Pressable>
+      )}
+      {offline.status === "downloading" && (
+        <View style={s.downloadBanner}>
+          <Ionicons name="cloud-download-outline" size={15} color="#fff" />
+          <View style={s.downloadProgressWrap}>
+            <Text style={s.downloadBannerText}>
+              {t("nav.offline.downloading")} {offline.total > 0 ? `${Math.round((offline.progress / offline.total) * 100)}%` : "0%"}
+            </Text>
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- percentage width string required by StyleSheet */}
+            <View style={[s.downloadProgressBg]}><View style={[s.downloadProgressFill, { width: (offline.total > 0 ? `${Math.round((offline.progress / offline.total) * 100)}%` : "0%") as any }]} /></View>
+          </View>
+          <Pressable onPress={offline.cancelDownload} hitSlop={8}>
+            <Ionicons name="close-circle-outline" size={18} color="rgba(255,255,255,0.8)" />
+          </Pressable>
+        </View>
+      )}
+
       <NavigationInstruction
         step={step}
         nextStep={steps[currentStep + 1] ?? null}
@@ -540,4 +569,16 @@ const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
     paddingHorizontal: 12,
   },
   offlineBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#fff" },
+  downloadBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+  },
+  downloadBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#fff", flex: 1 },
+  downloadProgressWrap: { flex: 1, gap: 4 },
+  downloadProgressBg: { height: 3, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 2, overflow: "hidden" },
+  downloadProgressFill: { height: 3, backgroundColor: colors.accent, borderRadius: 2 },
 });
