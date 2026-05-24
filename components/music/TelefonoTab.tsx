@@ -18,7 +18,7 @@ import { TelefonoTrackRow } from "./TelefonoTrackRow";
 export function TelefonoTab() {
   const t = useT();
   const { playTrack, playQueue, isAvailable: playerAvailable } = usePlayer();
-  const [permission, requestPermission] = MediaLibrary.usePermissions();
+  const [permission, requestPermission] = MediaLibrary.usePermissions({ granularPermissions: ["audio"] });
   const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
