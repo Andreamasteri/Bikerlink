@@ -16,6 +16,7 @@ import * as Location from "expo-location";
 import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
+import { useOfflineTiles } from "@/hooks/useOfflineTiles";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { haversineM, closestPointIndexOnPolyline } from "@/lib/geo";
 import { getTileConfig } from "@/lib/map-tiles";
@@ -172,6 +173,13 @@ export default function NavigateScreen() {
     enabled: !!id,
     retry: false,
   });
+
+  const offlineRoutePoints = React.useMemo(
+    () => polylinePoints.map(([lat, lng]) => ({ lat, lng })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [polylinePoints.length]
+  );
+  const offline = useOfflineTiles(id, route?.title ?? "", offlineRoutePoints);
 
   // Decode polyline once route loads; also seed active refs
   useEffect(() => {
@@ -423,7 +431,7 @@ export default function NavigateScreen() {
 
   const s = styles(colors);
 
-  // Build map URI — rebuilt whenever polylinePoints change (including after reroute)
+  // Build map URI — rebuilt whenever polylinePoints or offline tile status change
   const mapUri = React.useMemo(() => {
     if (polylinePoints.length < 2) return null;
     const stepsForMap = activeStepsRef.current ?? route?.navigationSteps ?? [];
@@ -432,13 +440,16 @@ export default function NavigateScreen() {
       return idx < polylinePoints.length ? polylinePoints[idx] : polylinePoints[0];
     });
     const base = getApiUrl() + "/leaflet-navigation-map.html";
-    return (
+    let uri =
       base +
       "?tileUrl=" + encodeURIComponent(TILE_CONFIG.urlTemplate) +
       "&routeCoords=" + encodeURIComponent(JSON.stringify(polylinePoints)) +
-      "&stepCoords=" + encodeURIComponent(JSON.stringify(stepPoints))
-    );
-  }, [polylinePoints, route?.navigationSteps]);
+      "&stepCoords=" + encodeURIComponent(JSON.stringify(stepPoints));
+    if (offline.status === "available" && offline.offlineTileBasePath) {
+      uri += "&offlinePath=" + encodeURIComponent(offline.offlineTileBasePath);
+    }
+    return uri;
+  }, [polylinePoints, route?.navigationSteps, offline.status, offline.offlineTileBasePath]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
 

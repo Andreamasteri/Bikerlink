@@ -3,10 +3,12 @@ import { LEAFLET_JS, LEAFLET_CSS } from './leaflet-bundle';
 export function buildNavigationMapHtml(
   tileUrl: string,
   polylinePoints: Array<[number, number]>,
-  stepPoints: Array<[number, number]>
+  stepPoints: Array<[number, number]>,
+  offlineTileBasePath?: string | null
 ): string {
   const routeCoords = JSON.stringify(polylinePoints.map(([lat, lng]) => [lat, lng]));
   const stepCoords = JSON.stringify(stepPoints);
+  const offlinePathJs = offlineTileBasePath ? JSON.stringify(offlineTileBasePath) : "null";
 
   return `<!DOCTYPE html>
 <html>
@@ -38,7 +40,30 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     zoomControl: false, attributionControl: true
   });
 
-  L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: 19, attribution: "" }).addTo(map);
+  var offlineBasePath = ${offlinePathJs};
+  if (offlineBasePath) {
+    var OfflineTileLayer = L.TileLayer.extend({
+      createTile: function(coords, done) {
+        var img = document.createElement("img");
+        img.setAttribute("role", "presentation");
+        var offlineUrl = offlineBasePath + coords.z + "/" + coords.x + "/" + coords.y + ".png";
+        var onlineUrl = ${JSON.stringify(tileUrl)}
+          .replace("{z}", coords.z)
+          .replace("{x}", coords.x)
+          .replace("{y}", coords.y);
+        img.onload = function() { done(null, img); };
+        img.onerror = function() {
+          img.src = onlineUrl;
+          img.onerror = function() { done(new Error("tile load failed"), img); };
+        };
+        img.src = offlineUrl;
+        return img;
+      }
+    });
+    new OfflineTileLayer("", { maxZoom: 19, attribution: "" }).addTo(map);
+  } else {
+    L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: 19, attribution: "" }).addTo(map);
+  }
 
   var routeCoords = ${routeCoords};
   var stepCoords = ${stepCoords};

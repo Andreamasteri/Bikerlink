@@ -58,12 +58,13 @@ export function registerLeafletMapRoutes(app: Express) {
 
   app.get("/leaflet-navigation-map.html", (req: Request, res: Response) => {
     const tileUrl = String(req.query.tileUrl || "");
+    const offlinePath = req.query.offlinePath ? String(req.query.offlinePath) : null;
     let routeCoords: Array<[number, number]> = [];
     let stepCoords: Array<[number, number]> = [];
     try { routeCoords = JSON.parse(String(req.query.routeCoords || "[]")); } catch { /* ignore */ }
     try { stepCoords = JSON.parse(String(req.query.stepCoords || "[]")); } catch { /* ignore */ }
     if (!tileUrl) return res.status(400).send("Missing tileUrl");
-    sendHtml(res, buildNavigationMapHtml(tileUrl, routeCoords, stepCoords));
+    sendHtml(res, buildNavigationMapHtml(tileUrl, routeCoords, stepCoords, offlinePath));
   });
 
   app.get("/leaflet-curvature-map.html", (req: Request, res: Response) => {
