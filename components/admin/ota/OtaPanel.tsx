@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Switch,
   StyleSheet,
   Alert,
   ActivityIndicator,
@@ -60,6 +61,22 @@ export default function OtaPanel() {
 
   const { data: releases, isLoading, refetch, isFetching } = useQuery<OtaRelease[]>({
     queryKey: ["/api/admin/ota/releases"],
+  });
+
+  const { data: settings, isLoading: settingsLoading } = useQuery<{ directApply: boolean }>({
+    queryKey: ["/api/admin/ota/settings"],
+  });
+
+  const settingsMutation = useMutation({
+    mutationFn: (directApply: boolean) =>
+      apiRequest("POST", "/api/admin/ota/settings", { directApply }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/settings"] });
+    },
+    onError: (err: Error) => {
+      Alert.alert("Errore", err.message || "Impossibile salvare le impostazioni");
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/settings"] });
+    },
   });
 
   const approveMutation = useMutation({
@@ -186,6 +203,8 @@ export default function OtaPanel() {
   const pending = (releases ?? []).filter((r) => r.status === "pending");
   const history = (releases ?? []).filter((r) => r.status !== "pending");
 
+  const directApply = settings?.directApply ?? false;
+
   return (
     <View>
       <View style={styles.header}>
@@ -195,6 +214,30 @@ export default function OtaPanel() {
             ? <ActivityIndicator size="small" color={colors.accent} />
             : <Text style={[styles.refreshText, { color: colors.accent }]}>↻</Text>}
         </TouchableOpacity>
+      </View>
+
+      <View style={[styles.directApplyRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={styles.directApplyLeft}>
+          <Text style={[styles.directApplyLabel, { color: colors.text }]}>Applicazione Diretta</Text>
+          {settingsLoading
+            ? null
+            : directApply
+              ? <Text style={[styles.directApplyNote, { color: colors.success }]}>
+                  Attiva — le nuove OTA vengono promosse in production automaticamente
+                </Text>
+              : <Text style={[styles.directApplyNote, { color: colors.textSecondary }]}>
+                  Disattiva — le OTA richiedono approvazione manuale
+                </Text>}
+        </View>
+        {settingsLoading
+          ? <ActivityIndicator size="small" color={colors.accent} />
+          : <Switch
+              value={directApply}
+              onValueChange={(val) => settingsMutation.mutate(val)}
+              disabled={settingsMutation.isPending}
+              trackColor={{ false: colors.border, true: colors.success }}
+              thumbColor={directApply ? "#fff" : colors.textSecondary}
+            />}
       </View>
 
       {pending.length === 0 && (
@@ -361,5 +404,28 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 12,
     marginTop: 8,
+  },
+  directApplyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  directApplyLeft: {
+    flex: 1,
+    marginRight: 12,
+  },
+  directApplyLabel: {
+    fontSize: 14,
+    fontWeight: "600" as const,
+    marginBottom: 2,
+  },
+  directApplyNote: {
+    fontSize: 11,
+    lineHeight: 15,
   },
 } as const);

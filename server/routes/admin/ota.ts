@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
-import { otaReleases } from "@shared/db";
+import { otaReleases, appSettings } from "@shared/db";
 import { eq, desc } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 
@@ -26,6 +26,14 @@ async function easGraphQL(query: string, variables?: Record<string, unknown>): P
     throw new Error(`EAS GraphQL error: ${JSON.stringify(json.errors)}`);
   }
   return json.data;
+}
+
+async function getDirectApplySetting(): Promise<boolean> {
+  const [row] = await db.select({ value: appSettings.value })
+    .from(appSettings)
+    .where(eq(appSettings.key, "ota_direct_apply"))
+    .limit(1);
+  return row?.value === "true";
 }
 
 async function syncStagingUpdates(): Promise<void> {
@@ -64,6 +72,8 @@ async function syncStagingUpdates(): Promise<void> {
   const updates = data?.app?.byId?.updateBranchByName?.updates ?? [];
   if (updates.length === 0) return;
 
+  const directApply = await getDirectApplySetting();
+
   for (const upd of updates) {
     const existing = await db.select({ id: otaReleases.id })
       .from(otaReleases)
@@ -71,6 +81,31 @@ async function syncStagingUpdates(): Promise<void> {
       .limit(1);
 
     if (existing.length > 0) continue;
+
+    if (directApply) {
+      let promoted = false;
+      try {
+        await promoteToProduction(upd.id);
+        promoted = true;
+      } catch (err) {
+        console.warn("[ota-sync] direct-apply: EAS promote failed, inserting as pending:", err);
+      }
+
+      if (promoted) {
+        await db.insert(otaReleases).values({
+          easUpdateId: upd.id,
+          channel: "production",
+          runtimeVersion: upd.runtimeVersion ?? null,
+          message: upd.message ?? null,
+          status: "approved",
+          publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
+          approvedAt: new Date(),
+          approvedBy: null,
+        }).onConflictDoNothing();
+        console.log("[ota-sync] direct-apply: auto-promoted", upd.id);
+        continue;
+      }
+    }
 
     await db.insert(otaReleases).values({
       easUpdateId: upd.id,
@@ -247,6 +282,35 @@ router.post("/sync", async (_req: Request, res: Response) => {
   } catch (err) {
     console.error("[ota] POST /sync error:", err);
     return sendError(res, 500, "Errore sync OTA da EAS");
+  }
+});
+
+// GET /api/admin/ota/settings — legge il setting ota_direct_apply
+router.get("/settings", async (_req: Request, res: Response) => {
+  try {
+    const directApply = await getDirectApplySetting();
+    return res.json({ directApply });
+  } catch (err) {
+    console.error("[ota] GET /settings error:", err);
+    return sendError(res, 500, "Errore lettura impostazioni OTA");
+  }
+});
+
+// POST /api/admin/ota/settings — upsert ota_direct_apply
+router.post("/settings", async (req: Request, res: Response) => {
+  try {
+    const { directApply } = req.body as { directApply?: unknown };
+    if (typeof directApply !== "boolean") {
+      return sendError(res, 400, "Campo 'directApply' obbligatorio (booleano)");
+    }
+    const value = directApply ? "true" : "false";
+    await db.insert(appSettings)
+      .values({ key: "ota_direct_apply", value, description: "Applica OTA direttamente in production senza approvazione manuale" })
+      .onConflictDoUpdate({ target: [appSettings.key], set: { value, updatedAt: new Date() } });
+    return res.json({ directApply });
+  } catch (err) {
+    console.error("[ota] POST /settings error:", err);
+    return sendError(res, 500, "Errore salvataggio impostazioni OTA");
   }
 });
 
