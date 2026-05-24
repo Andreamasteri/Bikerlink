@@ -19,7 +19,7 @@ function buildApp(): express.Application {
   const app = express();
   app.use(express.json());
   app.use((req: Request, _res: Response, next: NextFunction) => {
-    (req as any).session = { userId: USER_ID };
+    Object.assign(req, { session: { userId: USER_ID } });
     next();
   });
   app.use("/api/telemetry", telemetryRouter);
@@ -36,11 +36,10 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
 
   it("progress_pct stays 0 when DB returns 0 km (i.e. ideal_lap filtered out)", async () => {
     const dbExecute = vi.mocked(db.execute);
-
     dbExecute
-      .mockResolvedValueOnce({ rows: [{ sample_count: "0", session_count: "0" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "0" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as any);
+      .mockResolvedValueOnce({ rows: [{ sample_count: "0", session_count: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -53,11 +52,10 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
 
   it("progress_pct and session_count reflect only non-ideal_lap data from DB", async () => {
     const dbExecute = vi.mocked(db.execute);
-
     dbExecute
-      .mockResolvedValueOnce({ rows: [{ sample_count: "200", session_count: "3" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "150.5" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as any);
+      .mockResolvedValueOnce({ rows: [{ sample_count: "200", session_count: "3" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "150.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -71,11 +69,10 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
 
   it("adding more km (simulating a non-ideal ride) increases progress_pct", async () => {
     const dbExecute = vi.mocked(db.execute);
-
     dbExecute
-      .mockResolvedValueOnce({ rows: [{ sample_count: "500", session_count: "5" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "300" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as any);
+      .mockResolvedValueOnce({ rows: [{ sample_count: "500", session_count: "5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "300" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ track_km: "0" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 
@@ -87,11 +84,10 @@ describe("GET /api/telemetry/stats — ideal_lap exclusion", () => {
 
   it("track_km is populated from ideal_lap sessions only", async () => {
     const dbExecute = vi.mocked(db.execute);
-
     dbExecute
-      .mockResolvedValueOnce({ rows: [{ sample_count: "300", session_count: "4" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ km_collected: "200" }] } as any)
-      .mockResolvedValueOnce({ rows: [{ track_km: "12.5" }] } as any);
+      .mockResolvedValueOnce({ rows: [{ sample_count: "300", session_count: "4" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ km_collected: "200" }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [{ track_km: "12.5" }] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const res = await request(app).get("/api/telemetry/stats");
 

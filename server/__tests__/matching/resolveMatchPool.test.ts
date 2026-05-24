@@ -87,13 +87,13 @@ describe("resolveMatchPool — single-type ↔ single-type (MATCH_RULES baseline
   });
 
   it("returns false when searchType is null on both sides", () => {
-    const p1 = makeProposal({ searchType: null as any });
-    const p2 = makeProposal({ searchType: null as any });
+    const p1 = makeProposal({ searchType: null as unknown as P['searchType'] });
+    const p2 = makeProposal({ searchType: null as unknown as P['searchType'] });
     expect(resolveMatchPool(p1, p2)).toBe(false);
   });
 
   it("returns false when searchType is null on one side", () => {
-    const p1 = makeProposal({ searchType: null as any });
+    const p1 = makeProposal({ searchType: null as unknown as P['searchType'] });
     const p2 = makeProposal({ searchType: "find_a_friend" });
     expect(resolveMatchPool(p1, p2)).toBe(false);
   });
@@ -106,27 +106,27 @@ describe("resolveMatchPool — single-type ↔ single-type (MATCH_RULES baseline
 // ---------------------------------------------------------------------------
 describe("resolveMatchPool — multi-type ↔ single-type (regression scenario)", () => {
   it("multi-type [find_a_guest, find_a_friend] ↔ find_a_biker → match via find_a_guest rule", () => {
-    const multi = makeProposal({ searchTypes: ["find_a_guest", "find_a_friend"], searchType: null as any });
+    const multi = makeProposal({ searchTypes: ["find_a_guest", "find_a_friend"], searchType: null as unknown as P['searchType'] });
     const biker = makeProposal({ searchType: "find_a_biker" });
     expect(resolveMatchPool(multi, biker)).toBe(true);
     expect(resolveMatchPool(biker, multi)).toBe(true);
   });
 
   it("multi-type [find_a_friend, hitcher] ↔ hitchhiker → match via hitcher rule", () => {
-    const multi = makeProposal({ searchTypes: ["find_a_friend", "hitcher"], searchType: null as any });
+    const multi = makeProposal({ searchTypes: ["find_a_friend", "hitcher"], searchType: null as unknown as P['searchType'] });
     const hh = makeProposal({ searchType: "hitchhiker" });
     expect(resolveMatchPool(multi, hh)).toBe(true);
     expect(resolveMatchPool(hh, multi)).toBe(true);
   });
 
   it("multi-type [find_a_guest, hitcher] ↔ find_a_biker → match (hitcher rule)", () => {
-    const multi = makeProposal({ searchTypes: ["find_a_guest", "hitcher"], searchType: null as any });
+    const multi = makeProposal({ searchTypes: ["find_a_guest", "hitcher"], searchType: null as unknown as P['searchType'] });
     const biker = makeProposal({ searchType: "find_a_biker" });
     expect(resolveMatchPool(multi, biker)).toBe(true);
   });
 
   it("multi-type [find_a_guest, hitcher] ↔ hitchhiker → match (both rules fire)", () => {
-    const multi = makeProposal({ searchTypes: ["find_a_guest", "hitcher"], searchType: null as any });
+    const multi = makeProposal({ searchTypes: ["find_a_guest", "hitcher"], searchType: null as unknown as P['searchType'] });
     const hh = makeProposal({ searchType: "hitchhiker" });
     expect(resolveMatchPool(multi, hh)).toBe(true);
   });
@@ -144,14 +144,14 @@ describe("resolveMatchPool — multi-type ↔ single-type (regression scenario)"
   });
 
   it("multi-type with NO matching category ↔ single-type → NO match", () => {
-    const multi = makeProposal({ searchTypes: ["hitchhiker", "find_a_biker"], searchType: null as any });
+    const multi = makeProposal({ searchTypes: ["hitchhiker", "find_a_biker"], searchType: null as unknown as P['searchType'] });
     const friend = makeProposal({ searchType: "find_a_friend" });
     expect(resolveMatchPool(multi, friend)).toBe(false);
     expect(resolveMatchPool(friend, multi)).toBe(false);
   });
 
   it("multi-type with no valid types at all → NO match", () => {
-    const multi = makeProposal({ searchTypes: [], searchType: null as any });
+    const multi = makeProposal({ searchTypes: [], searchType: null as unknown as P['searchType'] });
     const friend = makeProposal({ searchType: "find_a_friend" });
     expect(resolveMatchPool(multi, friend)).toBe(false);
   });
@@ -162,39 +162,39 @@ describe("resolveMatchPool — multi-type ↔ single-type (regression scenario)"
 // ---------------------------------------------------------------------------
 describe("resolveMatchPool — multi-type ↔ multi-type", () => {
   it("[find_a_guest, find_a_friend] ↔ [find_a_biker, hitchhiker] → match via find_a_guest rule", () => {
-    const p1 = makeProposal({ searchTypes: ["find_a_guest", "find_a_friend"], searchType: null as any });
-    const p2 = makeProposal({ searchTypes: ["find_a_biker", "hitchhiker"], searchType: null as any });
+    const p1 = makeProposal({ searchTypes: ["find_a_guest", "find_a_friend"], searchType: null as unknown as P['searchType'] });
+    const p2 = makeProposal({ searchTypes: ["find_a_biker", "hitchhiker"], searchType: null as unknown as P['searchType'] });
     expect(resolveMatchPool(p1, p2)).toBe(true);
     expect(resolveMatchPool(p2, p1)).toBe(true);
   });
 
   it("[hitcher, find_a_friend] ↔ [hitchhiker, find_a_friend] → match via hitcher↔hitchhiker rule", () => {
-    const p1 = makeProposal({ searchTypes: ["hitcher", "find_a_friend"], searchType: null as any });
-    const p2 = makeProposal({ searchTypes: ["hitchhiker", "find_a_friend"], searchType: null as any });
+    const p1 = makeProposal({ searchTypes: ["hitcher", "find_a_friend"], searchType: null as unknown as P['searchType'] });
+    const p2 = makeProposal({ searchTypes: ["hitchhiker", "find_a_friend"], searchType: null as unknown as P['searchType'] });
     expect(resolveMatchPool(p1, p2)).toBe(true);
   });
 
   it("[find_a_friend] ↔ [find_a_friend] single-element arrays → match", () => {
-    const p1 = makeProposal({ searchTypes: ["find_a_friend"], searchType: null as any });
-    const p2 = makeProposal({ searchTypes: ["find_a_friend"], searchType: null as any });
+    const p1 = makeProposal({ searchTypes: ["find_a_friend"], searchType: null as unknown as P['searchType'] });
+    const p2 = makeProposal({ searchTypes: ["find_a_friend"], searchType: null as unknown as P['searchType'] });
     expect(resolveMatchPool(p1, p2)).toBe(true);
   });
 
   it("[hitchhiker, find_a_biker] ↔ [hitchhiker, find_a_biker] → NO match (no complementary rule)", () => {
-    const p1 = makeProposal({ searchTypes: ["hitchhiker", "find_a_biker"], searchType: null as any });
-    const p2 = makeProposal({ searchTypes: ["hitchhiker", "find_a_biker"], searchType: null as any });
+    const p1 = makeProposal({ searchTypes: ["hitchhiker", "find_a_biker"], searchType: null as unknown as P['searchType'] });
+    const p2 = makeProposal({ searchTypes: ["hitchhiker", "find_a_biker"], searchType: null as unknown as P['searchType'] });
     expect(resolveMatchPool(p1, p2)).toBe(false);
   });
 
   it("[find_a_friend] ↔ [find_a_biker] → NO match (incompatible single-element arrays)", () => {
-    const p1 = makeProposal({ searchTypes: ["find_a_friend"], searchType: null as any });
-    const p2 = makeProposal({ searchTypes: ["find_a_biker"], searchType: null as any });
+    const p1 = makeProposal({ searchTypes: ["find_a_friend"], searchType: null as unknown as P['searchType'] });
+    const p2 = makeProposal({ searchTypes: ["find_a_biker"], searchType: null as unknown as P['searchType'] });
     expect(resolveMatchPool(p1, p2)).toBe(false);
   });
 
   it("both empty arrays → NO match", () => {
-    const p1 = makeProposal({ searchTypes: [], searchType: null as any });
-    const p2 = makeProposal({ searchTypes: [], searchType: null as any });
+    const p1 = makeProposal({ searchTypes: [], searchType: null as unknown as P['searchType'] });
+    const p2 = makeProposal({ searchTypes: [], searchType: null as unknown as P['searchType'] });
     expect(resolveMatchPool(p1, p2)).toBe(false);
   });
 
@@ -210,13 +210,13 @@ describe("resolveMatchPool — multi-type ↔ multi-type", () => {
 // ---------------------------------------------------------------------------
 describe("resolveMatchPool — no-match / edge cases", () => {
   it("unknown searchType on both sides → NO match", () => {
-    const p1 = makeProposal({ searchType: "mystery_type" as any });
-    const p2 = makeProposal({ searchType: "mystery_type" as any });
+    const p1 = makeProposal({ searchType: "mystery_type" as unknown as P['searchType'] });
+    const p2 = makeProposal({ searchType: "mystery_type" as unknown as P['searchType'] });
     expect(resolveMatchPool(p1, p2)).toBe(false);
   });
 
   it("multi-type with one unknown and one valid type ↔ matching single → still matches via valid type", () => {
-    const p1 = makeProposal({ searchTypes: ["mystery_type" as any, "find_a_guest"], searchType: null as any });
+    const p1 = makeProposal({ searchTypes: ["mystery_type" as unknown as string, "find_a_guest"], searchType: null as unknown as P['searchType'] });
     const p2 = makeProposal({ searchType: "find_a_biker" });
     expect(resolveMatchPool(p1, p2)).toBe(true);
   });
@@ -224,7 +224,7 @@ describe("resolveMatchPool — no-match / edge cases", () => {
   it("explicit targetUserTypes path short-circuits MATCH_RULES even with multi searchTypes", () => {
     const p1 = makeProposal({
       searchTypes: ["find_a_guest", "find_a_friend"],
-      searchType: null as any,
+      searchType: null as unknown as P['searchType'],
       targetUserTypes: ["zavorrina"],
       authorUserType: "biker",
     });

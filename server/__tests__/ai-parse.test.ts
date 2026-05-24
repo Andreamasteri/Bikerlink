@@ -58,7 +58,7 @@ function buildApp(): express.Application {
   const app = express();
   app.use(express.json());
   app.use((req: Request, _res: Response, next: NextFunction) => {
-    (req as any).session = { userId: AUTH_USER_ID };
+    Object.assign(req, { session: { userId: AUTH_USER_ID } });
     next();
   });
   app.use("/api/planned-routes", plannedRoutesRouter);
@@ -439,7 +439,7 @@ describe("POST /api/planned-routes/ai-parse — input validation", () => {
     const unauthApp = express();
     unauthApp.use(express.json());
     unauthApp.use((req: Request, _res: Response, next: NextFunction) => {
-      (req as any).session = {};
+      Object.assign(req, { session: {} });
       next();
     });
     unauthApp.use("/api/planned-routes", plannedRoutesRouter);

@@ -7,6 +7,7 @@ vi.mock("@shared/db", () => ({
 }));
 
 import { clubScopeAllows, prefEnabled, bothPrefsEnabled } from "../../matching/filters";
+type ClubScopeArg = Parameters<typeof clubScopeAllows>[0];
 import { MatchPrefRow } from "../../matching/types";
 
 // ---------------------------------------------------------------------------
@@ -58,63 +59,63 @@ describe("clubScopeAllows", () => {
     const p1 = makeProposal("user1", null);
     const p2 = makeProposal("user2", null);
     const keys = new Set<string>();
-    expect(clubScopeAllows(p1 as any, p2 as any, keys)).toBe(true);
+    expect(clubScopeAllows(p1 as unknown as ClubScopeArg, p2 as unknown as ClubScopeArg, keys)).toBe(true);
   });
 
   it("returns true when both proposals are in the same club and both users are members", () => {
     const p1 = makeProposal("user1", "club-a");
     const p2 = makeProposal("user2", "club-a");
     const keys = new Set(["user1:club-a", "user2:club-a"]);
-    expect(clubScopeAllows(p1 as any, p2 as any, keys)).toBe(true);
+    expect(clubScopeAllows(p1 as unknown as ClubScopeArg, p2 as unknown as ClubScopeArg, keys)).toBe(true);
   });
 
   it("returns false when proposals are in different clubs", () => {
     const p1 = makeProposal("user1", "club-a");
     const p2 = makeProposal("user2", "club-b");
     const keys = new Set(["user1:club-a", "user2:club-b"]);
-    expect(clubScopeAllows(p1 as any, p2 as any, keys)).toBe(false);
+    expect(clubScopeAllows(p1 as unknown as ClubScopeArg, p2 as unknown as ClubScopeArg, keys)).toBe(false);
   });
 
   it("returns false when p1 has a club but p2 does not (mixed scope)", () => {
     const p1 = makeProposal("user1", "club-a");
     const p2 = makeProposal("user2", null);
     const keys = new Set(["user1:club-a"]);
-    expect(clubScopeAllows(p1 as any, p2 as any, keys)).toBe(false);
+    expect(clubScopeAllows(p1 as unknown as ClubScopeArg, p2 as unknown as ClubScopeArg, keys)).toBe(false);
   });
 
   it("returns false when p2 has a club but p1 does not (mixed scope)", () => {
     const p1 = makeProposal("user1", null);
     const p2 = makeProposal("user2", "club-b");
     const keys = new Set(["user2:club-b"]);
-    expect(clubScopeAllows(p1 as any, p2 as any, keys)).toBe(false);
+    expect(clubScopeAllows(p1 as unknown as ClubScopeArg, p2 as unknown as ClubScopeArg, keys)).toBe(false);
   });
 
   it("returns false when same club but p1 membership key is missing", () => {
     const p1 = makeProposal("user1", "club-a");
     const p2 = makeProposal("user2", "club-a");
     const keys = new Set(["user2:club-a"]);
-    expect(clubScopeAllows(p1 as any, p2 as any, keys)).toBe(false);
+    expect(clubScopeAllows(p1 as unknown as ClubScopeArg, p2 as unknown as ClubScopeArg, keys)).toBe(false);
   });
 
   it("returns false when same club but p2 membership key is missing", () => {
     const p1 = makeProposal("user1", "club-a");
     const p2 = makeProposal("user2", "club-a");
     const keys = new Set(["user1:club-a"]);
-    expect(clubScopeAllows(p1 as any, p2 as any, keys)).toBe(false);
+    expect(clubScopeAllows(p1 as unknown as ClubScopeArg, p2 as unknown as ClubScopeArg, keys)).toBe(false);
   });
 
   it("returns false when same club but membershipKeys is completely empty", () => {
     const p1 = makeProposal("user1", "club-a");
     const p2 = makeProposal("user2", "club-a");
     const keys = new Set<string>();
-    expect(clubScopeAllows(p1 as any, p2 as any, keys)).toBe(false);
+    expect(clubScopeAllows(p1 as unknown as ClubScopeArg, p2 as unknown as ClubScopeArg, keys)).toBe(false);
   });
 
   it("returns false when keys exist for a different club (no cross-club elevation)", () => {
     const p1 = makeProposal("user1", "club-a");
     const p2 = makeProposal("user2", "club-a");
     const keys = new Set(["user1:club-b", "user2:club-b"]);
-    expect(clubScopeAllows(p1 as any, p2 as any, keys)).toBe(false);
+    expect(clubScopeAllows(p1 as unknown as ClubScopeArg, p2 as unknown as ClubScopeArg, keys)).toBe(false);
   });
 });
 
@@ -142,13 +143,13 @@ describe("prefEnabled", () => {
 
   it("returns true when the preference value is null (treated as not-false)", () => {
     const map = new Map<string, MatchPrefRow>();
-    map.set("user1", makePrefRow("user1", { bikerBikerBrand: null as any }));
+    map.set("user1", makePrefRow("user1", { bikerBikerBrand: null as unknown as boolean }));
     expect(prefEnabled(map, "user1", "bikerBikerBrand")).toBe(true);
   });
 
   it("returns true when the preference value is undefined (treated as not-false)", () => {
     const map = new Map<string, MatchPrefRow>();
-    map.set("user1", makePrefRow("user1", { bikerBikerBrand: undefined as any }));
+    map.set("user1", makePrefRow("user1", { bikerBikerBrand: undefined as unknown as boolean }));
     expect(prefEnabled(map, "user1", "bikerBikerBrand")).toBe(true);
   });
 

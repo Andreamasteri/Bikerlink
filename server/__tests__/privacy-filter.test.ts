@@ -58,6 +58,13 @@ vi.mock("../routes/motoclubs", () => ({
 // ---------------------------------------------------------------------------
 
 import { storage } from "../storage";
+// Mock return type aliases — avoids explicit `any` casts
+type StorageUser = Awaited<ReturnType<typeof storage.getAllUsers>>[0];
+type StorageSetting = Awaited<ReturnType<typeof storage.getAppSetting>>;
+type StorageSearchRow = Awaited<ReturnType<typeof storage.searchUsers>>[0];
+type StorageNearbyRow = Awaited<ReturnType<typeof storage.getNearbyUsers>>[0];
+type StorageAvailableRow = Awaited<ReturnType<typeof storage.getAvailableUsersList>>[0];
+
 import { onlineTracker } from "../online-tracker";
 import usersRouter from "../routes/users";
 
@@ -72,7 +79,7 @@ function buildApp(): express.Application {
   const app = express();
   app.use(express.json());
   app.use((req: Request, _res: Response, next: NextFunction) => {
-    (req as any).session = { userId: REQUESTER_ID };
+    Object.assign(req, { session: { userId: REQUESTER_ID } });
     next();
   });
   app.use("/api/users", usersRouter);
@@ -173,42 +180,42 @@ describe("GET /api/users — map_visibility_filter", () => {
 
     // Two non-requester users in the DB
     vi.mocked(storage.getAllUsers).mockResolvedValue([
-      makeUser("user-online") as any,
-      makeUser("user-offline") as any,
+      makeUser("user-online") as unknown as StorageUser,
+      makeUser("user-offline") as unknown as StorageUser,
     ]);
   });
 
   it("filter=all — returns both online and offline users", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as unknown as StorageSetting);
     vi.mocked(onlineTracker.getOnlineUserIds).mockReturnValue(["user-online"]);
 
     const res = await request(app).get("/api/users");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-online");
     expect(ids).toContain("user-offline");
   });
 
   it("filter=online_only — excludes offline users", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("online_only") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("online_only") as unknown as StorageSetting);
     vi.mocked(onlineTracker.getOnlineUserIds).mockReturnValue(["user-online"]);
 
     const res = await request(app).get("/api/users");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-online");
     expect(ids).not.toContain("user-offline");
   });
 
   it("filter=available_only — excludes users not in available set", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("available_only") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("available_only") as unknown as StorageSetting);
     // user-online is online but NOT available; user-available is available
     vi.mocked(storage.getAllUsers).mockResolvedValue([
-      makeUser("user-online") as any,
-      makeUser("user-offline") as any,
-      makeUser("user-available") as any,
+      makeUser("user-online") as unknown as StorageUser,
+      makeUser("user-offline") as unknown as StorageUser,
+      makeUser("user-available") as unknown as StorageUser,
     ]);
     vi.mocked(onlineTracker.getAvailableBikerIds).mockReturnValue(["user-available"]);
     vi.mocked(onlineTracker.getAvailableZavorrinaIds).mockReturnValue([]);
@@ -216,24 +223,24 @@ describe("GET /api/users — map_visibility_filter", () => {
     const res = await request(app).get("/api/users");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-available");
     expect(ids).not.toContain("user-online");
     expect(ids).not.toContain("user-offline");
   });
 
   it("requester is always excluded from results regardless of filter", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as unknown as StorageSetting);
     vi.mocked(storage.getAllUsers).mockResolvedValue([
-      makeUser(REQUESTER_ID) as any,
-      makeUser("user-online") as any,
+      makeUser(REQUESTER_ID) as unknown as StorageUser,
+      makeUser("user-online") as unknown as StorageUser,
     ]);
     vi.mocked(onlineTracker.getOnlineUserIds).mockReturnValue([REQUESTER_ID, "user-online"]);
 
     const res = await request(app).get("/api/users");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).not.toContain(REQUESTER_ID);
   });
 });
@@ -250,44 +257,44 @@ describe("GET /api/users/search — map_visibility_filter", () => {
     app = buildApp();
     vi.mocked(storage.getBlockedUserIds).mockResolvedValue([]);
     vi.mocked(storage.searchUsers).mockResolvedValue([
-      makeSearchRow("user-online") as any,
-      makeSearchRow("user-offline") as any,
+      makeSearchRow("user-online") as unknown as StorageSearchRow,
+      makeSearchRow("user-offline") as unknown as StorageSearchRow,
     ]);
   });
 
   it("filter=all — returns all matching users", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as unknown as StorageSetting);
     vi.mocked(onlineTracker.getOnlineUserIds).mockReturnValue(["user-online"]);
     vi.mocked(onlineTracker.isOnline).mockImplementation((id) => id === "user-online");
 
     const res = await request(app).get("/api/users/search?q=user");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-online");
     expect(ids).toContain("user-offline");
   });
 
   it("filter=online_only — excludes offline users", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("online_only") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("online_only") as unknown as StorageSetting);
     vi.mocked(onlineTracker.getOnlineUserIds).mockReturnValue(["user-online"]);
     vi.mocked(onlineTracker.isOnline).mockImplementation((id) => id === "user-online");
 
     const res = await request(app).get("/api/users/search?q=user");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-online");
     expect(ids).not.toContain("user-offline");
   });
 
   it("filter=available_only — excludes non-available users", async () => {
     vi.mocked(storage.searchUsers).mockResolvedValue([
-      makeSearchRow("user-online") as any,
-      makeSearchRow("user-offline") as any,
-      makeSearchRow("user-available") as any,
+      makeSearchRow("user-online") as unknown as StorageSearchRow,
+      makeSearchRow("user-offline") as unknown as StorageSearchRow,
+      makeSearchRow("user-available") as unknown as StorageSearchRow,
     ]);
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("available_only") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("available_only") as unknown as StorageSetting);
     vi.mocked(onlineTracker.getAvailableBikerIds).mockReturnValue(["user-available"]);
     vi.mocked(onlineTracker.getAvailableZavorrinaIds).mockReturnValue([]);
     vi.mocked(onlineTracker.getOnlineUserIds).mockReturnValue(["user-online", "user-available"]);
@@ -298,7 +305,7 @@ describe("GET /api/users/search — map_visibility_filter", () => {
     const res = await request(app).get("/api/users/search?q=user");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-available");
     expect(ids).not.toContain("user-online");
     expect(ids).not.toContain("user-offline");
@@ -327,68 +334,68 @@ describe("GET /api/users/nearby — map_visibility_filter", () => {
     app = buildApp();
     vi.mocked(storage.getBlockedUserIds).mockResolvedValue([]);
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      return undefined;
     });
   });
 
   it("filter=all — returns both online and offline users with valid coords", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(storage.getNearbyUsers).mockResolvedValue([
-      makeNearbyRow("user-online", { lastLoginAt: recentLoginAt }) as any,
-      makeNearbyRow("user-offline", { lastLoginAt: oldLoginAt }) as any,
+      makeNearbyRow("user-online", { lastLoginAt: recentLoginAt }) as unknown as StorageNearbyRow,
+      makeNearbyRow("user-offline", { lastLoginAt: oldLoginAt }) as unknown as StorageNearbyRow,
     ]);
 
     const res = await request(app).get("/api/users/nearby?lat=45&lng=9");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-online");
     expect(ids).toContain("user-offline");
   });
 
   it("filter=online_only — excludes offline users", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("online_only") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("online_only") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(storage.getNearbyUsers).mockResolvedValue([
-      makeNearbyRow("user-online", { lastLoginAt: recentLoginAt }) as any,
-      makeNearbyRow("user-offline", { lastLoginAt: oldLoginAt }) as any,
+      makeNearbyRow("user-online", { lastLoginAt: recentLoginAt }) as unknown as StorageNearbyRow,
+      makeNearbyRow("user-offline", { lastLoginAt: oldLoginAt }) as unknown as StorageNearbyRow,
     ]);
 
     const res = await request(app).get("/api/users/nearby?lat=45&lng=9");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-online");
     expect(ids).not.toContain("user-offline");
   });
 
   it("filter=available_only — excludes online but non-available users", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("available_only") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("available_only") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(storage.getNearbyUsers).mockResolvedValue([
       // online but NOT available
-      makeNearbyRow("user-online-not-available", { lastLoginAt: recentLoginAt }, { isAvailable: false }) as any,
+      makeNearbyRow("user-online-not-available", { lastLoginAt: recentLoginAt }, { isAvailable: false }) as unknown as StorageNearbyRow,
       // online AND available
-      makeNearbyRow("user-available", { lastLoginAt: recentLoginAt }, { isAvailable: true }) as any,
+      makeNearbyRow("user-available", { lastLoginAt: recentLoginAt }, { isAvailable: true }) as unknown as StorageNearbyRow,
       // offline
-      makeNearbyRow("user-offline", { lastLoginAt: oldLoginAt }, { isAvailable: false }) as any,
+      makeNearbyRow("user-offline", { lastLoginAt: oldLoginAt }, { isAvailable: false }) as unknown as StorageNearbyRow,
     ]);
 
     const res = await request(app).get("/api/users/nearby?lat=45&lng=9");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-available");
     expect(ids).not.toContain("user-online-not-available");
     expect(ids).not.toContain("user-offline");
@@ -396,19 +403,19 @@ describe("GET /api/users/nearby — map_visibility_filter", () => {
 
   it("users with hideFromMap=true are always excluded regardless of filter", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(storage.getNearbyUsers).mockResolvedValue([
-      makeNearbyRow("hidden-user", { lastLoginAt: recentLoginAt }, { hideFromMap: true }) as any,
-      makeNearbyRow("visible-user", { lastLoginAt: recentLoginAt }) as any,
+      makeNearbyRow("hidden-user", { lastLoginAt: recentLoginAt }, { hideFromMap: true }) as unknown as StorageNearbyRow,
+      makeNearbyRow("visible-user", { lastLoginAt: recentLoginAt }) as unknown as StorageNearbyRow,
     ]);
 
     const res = await request(app).get("/api/users/nearby?lat=45&lng=9");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).not.toContain("hidden-user");
     expect(ids).toContain("visible-user");
   });
@@ -434,25 +441,25 @@ describe("GET /api/users/available-list — map_visibility_filter", () => {
   });
 
   it("filter=all — returns all available users from storage", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as unknown as StorageSetting);
     vi.mocked(storage.getAvailableUsersList).mockResolvedValue([
-      makeAvailableRow("user-avail-1") as any,
-      makeAvailableRow("user-avail-2") as any,
+      makeAvailableRow("user-avail-1") as unknown as StorageAvailableRow,
+      makeAvailableRow("user-avail-2") as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-avail-1");
     expect(ids).toContain("user-avail-2");
   });
 
   it("filter=online_only — excludes users not in the online tracker set", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("online_only") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("online_only") as unknown as StorageSetting);
     vi.mocked(storage.getAvailableUsersList).mockResolvedValue([
-      makeAvailableRow("user-online") as any,
-      makeAvailableRow("user-offline") as any,
+      makeAvailableRow("user-online") as unknown as StorageAvailableRow,
+      makeAvailableRow("user-offline") as unknown as StorageAvailableRow,
     ]);
     // Only user-online is tracked as currently online
     vi.mocked(onlineTracker.getOnlineUserIds).mockReturnValue(["user-online"]);
@@ -460,32 +467,32 @@ describe("GET /api/users/available-list — map_visibility_filter", () => {
     const res = await request(app).get("/api/users/available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("user-online");
     expect(ids).not.toContain("user-offline");
   });
 
   it("filter=available_only — is a no-op; all storage-returned rows appear (endpoint contract: only available users stored)", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("available_only") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("available_only") as unknown as StorageSetting);
     // Mix: one row with isAvailable=true (correct) and one with isAvailable=false (defensive case).
     // The route treats available_only as a no-op and trusts storage to pre-filter. Both rows pass
     // the JS filter, confirming the no-op behaviour is intentional and documented in the source.
     vi.mocked(storage.getAvailableUsersList).mockResolvedValue([
-      makeAvailableRow("user-avail-1", "biker", { isAvailable: true }) as any,
-      makeAvailableRow("user-avail-2", "biker", { isAvailable: false }) as any,
+      makeAvailableRow("user-avail-1", "biker", { isAvailable: true }) as unknown as StorageAvailableRow,
+      makeAvailableRow("user-avail-2", "biker", { isAvailable: false }) as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     // Both pass — the no-op is by design (storage already filters; the route trusts it)
     expect(ids).toContain("user-avail-1");
     expect(ids).toContain("user-avail-2");
   });
 
   it("returns empty list when storage returns no available users", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as unknown as StorageSetting);
     vi.mocked(storage.getAvailableUsersList).mockResolvedValue([]);
 
     const res = await request(app).get("/api/users/available-list");
@@ -495,17 +502,17 @@ describe("GET /api/users/available-list — map_visibility_filter", () => {
   });
 
   it("blocked users are excluded even when filter=all", async () => {
-    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as any);
-    vi.mocked(storage.getBlockedUserIds).mockResolvedValue(["user-blocked"] as any);
+    vi.mocked(storage.getAppSetting).mockResolvedValue(filterSetting("all") as unknown as StorageSetting);
+    vi.mocked(storage.getBlockedUserIds).mockResolvedValue(["user-blocked"]);
     vi.mocked(storage.getAvailableUsersList).mockResolvedValue([
-      makeAvailableRow("user-blocked") as any,
-      makeAvailableRow("user-visible") as any,
+      makeAvailableRow("user-blocked") as unknown as StorageAvailableRow,
+      makeAvailableRow("user-visible") as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).not.toContain("user-blocked");
     expect(ids).toContain("user-visible");
   });
@@ -527,41 +534,41 @@ describe("GET /api/users/biker-available-list — map_visibility_filter", () => 
 
   it("filter=all — returns all tracker-available bikers", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.getAvailableBikerIds).mockReturnValue(["biker-1", "biker-2"]);
     vi.mocked(storage.getAvailableBikersList).mockResolvedValue([
-      makeAvailableRow("biker-1") as any,
-      makeAvailableRow("biker-2") as any,
+      makeAvailableRow("biker-1") as unknown as StorageAvailableRow,
+      makeAvailableRow("biker-2") as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/biker-available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("biker-1");
     expect(ids).toContain("biker-2");
   });
 
   it("filter=online_only — returns only tracker-present bikers (offline excluded)", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("online_only") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("online_only") as unknown as StorageSetting;
+      return undefined;
     });
     // Only biker-online is in the tracker
     vi.mocked(onlineTracker.getAvailableBikerIds).mockReturnValue(["biker-online"]);
     vi.mocked(storage.getAvailableBikersList).mockResolvedValue([
-      makeAvailableRow("biker-online") as any,
+      makeAvailableRow("biker-online") as unknown as StorageAvailableRow,
     ]);
 
     // With online_only, includeOffline branch is skipped entirely
     const res = await request(app).get("/api/users/biker-available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("biker-online");
     // biker-offline never entered results (not in tracker, offline branch skipped)
     expect(ids).not.toContain("biker-offline");
@@ -569,29 +576,29 @@ describe("GET /api/users/biker-available-list — map_visibility_filter", () => 
 
   it("filter=available_only — excludes bikers whose profile marks them as not available", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("available_only") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("available_only") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.getAvailableBikerIds).mockReturnValue(["biker-avail", "biker-not-avail"]);
     vi.mocked(storage.getAvailableBikersList).mockResolvedValue([
-      makeAvailableRow("biker-avail", "biker", { isAvailable: true }) as any,
-      makeAvailableRow("biker-not-avail", "biker", { isAvailable: false }) as any,
+      makeAvailableRow("biker-avail", "biker", { isAvailable: true }) as unknown as StorageAvailableRow,
+      makeAvailableRow("biker-not-avail", "biker", { isAvailable: false }) as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/biker-available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("biker-avail");
     expect(ids).not.toContain("biker-not-avail");
   });
 
   it("returns empty list when no bikers are available in tracker", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.getAvailableBikerIds).mockReturnValue([]);
 
@@ -618,68 +625,68 @@ describe("GET /api/users/zavorrine-available-list — map_visibility_filter", ()
 
   it("filter=all — returns all tracker-available zavorrine", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.getAvailableZavorrinaIds).mockReturnValue(["zav-1", "zav-2"]);
     vi.mocked(storage.getAvailableZavorrinaList).mockResolvedValue([
-      makeAvailableRow("zav-1", "zavorrina") as any,
-      makeAvailableRow("zav-2", "zavorrina") as any,
+      makeAvailableRow("zav-1", "zavorrina") as unknown as StorageAvailableRow,
+      makeAvailableRow("zav-2", "zavorrina") as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/zavorrine-available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("zav-1");
     expect(ids).toContain("zav-2");
   });
 
   it("filter=online_only — offline branch is skipped; only tracker users returned", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("online_only") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("online_only") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.getAvailableZavorrinaIds).mockReturnValue(["zav-online"]);
     vi.mocked(storage.getAvailableZavorrinaList).mockResolvedValue([
-      makeAvailableRow("zav-online", "zavorrina") as any,
+      makeAvailableRow("zav-online", "zavorrina") as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/zavorrine-available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("zav-online");
     expect(ids).not.toContain("zav-offline");
   });
 
   it("filter=available_only — excludes zavorrine whose profile marks them as not available", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("available_only") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("available_only") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.getAvailableZavorrinaIds).mockReturnValue(["zav-avail", "zav-not-avail"]);
     vi.mocked(storage.getAvailableZavorrinaList).mockResolvedValue([
-      makeAvailableRow("zav-avail", "zavorrina", { isAvailable: true }) as any,
-      makeAvailableRow("zav-not-avail", "zavorrina", { isAvailable: false }) as any,
+      makeAvailableRow("zav-avail", "zavorrina", { isAvailable: true }) as unknown as StorageAvailableRow,
+      makeAvailableRow("zav-not-avail", "zavorrina", { isAvailable: false }) as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/zavorrine-available-list");
 
     expect(res.status).toBe(200);
-    const ids = res.body.map((u: any) => u.id);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
     expect(ids).toContain("zav-avail");
     expect(ids).not.toContain("zav-not-avail");
   });
 
   it("returns empty list when no zavorrine are available in tracker", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.getAvailableZavorrinaIds).mockReturnValue([]);
 
@@ -706,9 +713,9 @@ describe("positionFuzz — distance nulled to prevent triangulation", () => {
 
   it("nearby: distance is null for a positionFuzz user viewed by another user", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(storage.getNearbyUsers).mockResolvedValue([
       {
@@ -717,22 +724,22 @@ describe("positionFuzz — distance nulled to prevent triangulation", () => {
           positionFuzzKm: 2,
         }),
         distance: 7.5,
-      } as any,
+      } as unknown as StorageNearbyRow,
     ]);
 
     const res = await request(app).get("/api/users/nearby?lat=45&lng=9&radius=50");
 
     expect(res.status).toBe(200);
-    const user = res.body.find((u: any) => u.id === "fuzz-user");
+    const user = res.body.find((u: Record<string, unknown>) => u.id === "fuzz-user");
     expect(user).toBeDefined();
     expect(user.distance).toBeNull();
   });
 
   it("nearby: distance is present for a non-fuzzed user", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(storage.getNearbyUsers).mockResolvedValue([
       {
@@ -741,57 +748,57 @@ describe("positionFuzz — distance nulled to prevent triangulation", () => {
           positionFuzzKm: 0,
         }),
         distance: 7.5,
-      } as any,
+      } as unknown as StorageNearbyRow,
     ]);
 
     const res = await request(app).get("/api/users/nearby?lat=45&lng=9&radius=50");
 
     expect(res.status).toBe(200);
-    const user = res.body.find((u: any) => u.id === "plain-user");
+    const user = res.body.find((u: Record<string, unknown>) => u.id === "plain-user");
     expect(user).toBeDefined();
     expect(user.distance).toBe(7.5);
   });
 
   it("biker-available-list: distance is null for a positionFuzz biker viewed by another user", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.getAvailableBikerIds).mockReturnValue(["fuzz-biker"]);
     vi.mocked(storage.getAvailableBikersList).mockResolvedValue([
       makeAvailableRow("fuzz-biker", "biker", {
         positionFuzz: true,
         positionFuzzKm: 3,
-      }) as any,
+      }) as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/biker-available-list?lat=45&lng=9");
 
     expect(res.status).toBe(200);
-    const user = res.body.find((u: any) => u.id === "fuzz-biker");
+    const user = res.body.find((u: Record<string, unknown>) => u.id === "fuzz-biker");
     expect(user).toBeDefined();
     expect(user.distance).toBeNull();
   });
 
   it("zavorrine-available-list: distance is null for a positionFuzz zavorrina viewed by another user", async () => {
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      if (key === "map_visibility_filter") return filterSetting("all") as any;
-      return null;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.getAvailableZavorrinaIds).mockReturnValue(["fuzz-zav"]);
     vi.mocked(storage.getAvailableZavorrinaList).mockResolvedValue([
       makeAvailableRow("fuzz-zav", "zavorrina", {
         positionFuzz: true,
         positionFuzzKm: 1,
-      }) as any,
+      }) as unknown as StorageAvailableRow,
     ]);
 
     const res = await request(app).get("/api/users/zavorrine-available-list?lat=45&lng=9");
 
     expect(res.status).toBe(200);
-    const user = res.body.find((u: any) => u.id === "fuzz-zav");
+    const user = res.body.find((u: Record<string, unknown>) => u.id === "fuzz-zav");
     expect(user).toBeDefined();
     expect(user.distance).toBeNull();
   });

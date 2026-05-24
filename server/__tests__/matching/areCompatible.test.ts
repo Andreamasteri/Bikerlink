@@ -60,8 +60,8 @@ describe("areCompatible — pool mismatch", () => {
   });
 
   it("returns false when both proposals have no valid search types", () => {
-    const p1 = makeProposal({ userId: "userA", searchType: null as any, searchTypes: [] });
-    const p2 = makeProposal({ userId: "userB", searchType: null as any, searchTypes: [] });
+    const p1 = makeProposal({ userId: "userA", searchType: null as unknown as P['searchType'], searchTypes: [] });
+    const p2 = makeProposal({ userId: "userB", searchType: null as unknown as P['searchType'], searchTypes: [] });
     expect(areCompatible(p1, p2)).toBe(false);
   });
 

@@ -76,7 +76,7 @@ describe("deriveTargetUserTypes", () => {
   });
 
   it("unknown searchType → biker + zavorrina + coppia", () => {
-    const p = makeProposal({ searchType: "something_else" as any, targetUserTypes: [] });
+    const p = makeProposal({ searchType: "something_else" as unknown as P['searchType'], targetUserTypes: [] });
     expect(deriveTargetUserTypes(p)).toEqual(["biker", "zavorrina", "coppia"]);
   });
 });
@@ -132,7 +132,7 @@ describe("resolveMatchPool — rule-based (no explicit targetUserTypes)", () => 
   });
 
   it("returns false when searchType is missing on either side", () => {
-    const p1 = makeProposal({ searchType: null as any, targetUserTypes: [] });
+    const p1 = makeProposal({ searchType: null as unknown as P['searchType'], targetUserTypes: [] });
     const p2 = makeProposal({ searchType: "find_a_friend", targetUserTypes: [] });
     expect(resolveMatchPool(p1, p2)).toBe(false);
   });
@@ -235,7 +235,7 @@ describe("routesIntersect", () => {
   });
 
   it("returns false when either departure coordinate is null", () => {
-    const p1 = makeProposal({ departureLatitude: null as any, departureLongitude: null as any });
+    const p1 = makeProposal({ departureLatitude: null as unknown as number, departureLongitude: null as unknown as number });
     const p2 = makeProposal({ departureLatitude: 45.0, departureLongitude: 9.0 });
     expect(routesIntersect(p1, p2)).toBe(false);
   });

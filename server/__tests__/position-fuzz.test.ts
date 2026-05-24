@@ -84,6 +84,13 @@ vi.mock("../routes/motoclubs", () => ({
 // ---------------------------------------------------------------------------
 
 import { storage } from "../storage";
+// Mock return type aliases
+type StorageSetting = Awaited<ReturnType<typeof storage.getAppSetting>>;
+type StorageOnlineRow = Awaited<ReturnType<typeof storage.getOnlineUsersList>>[0];
+type StorageAvailableRow = Awaited<ReturnType<typeof storage.getAvailableBikersList>>[0];
+type StorageNearbyRow = Awaited<ReturnType<typeof storage.getNearbyUsers>>[0];
+type StorageSearchRow = Awaited<ReturnType<typeof storage.searchUsers>>[0];
+
 import { onlineTracker } from "../online-tracker";
 import usersRouter from "../routes/users";
 
@@ -121,7 +128,7 @@ function buildApp(): express.Application {
   const app = express();
   app.use(express.json());
   app.use((req: Request, _res: Response, next: NextFunction) => {
-    (req as any).session = { userId: REQUESTER_ID };
+    Object.assign(req, { session: { userId: REQUESTER_ID } });
     next();
   });
   app.use("/api/users", usersRouter);
@@ -228,13 +235,13 @@ describe("GET /api/users/online-list — positionFuzz hides exact coords", () =>
 
     vi.mocked(storage.getBlockedUserIds).mockResolvedValue([]);
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "map_visibility_filter") return filterAll() as any;
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      return null;
+      if (key === "map_visibility_filter") return filterAll() as unknown as StorageSetting;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(storage.getUserMotorcycles).mockResolvedValue([]);
     vi.mocked(onlineTracker.getOnlineUserIds).mockReturnValue([TARGET_ID]);
-    vi.mocked(storage.getOnlineUsersList).mockResolvedValue([makeOnlineListRow()] as any);
+    vi.mocked(storage.getOnlineUsersList).mockResolvedValue([makeOnlineListRow()] as unknown as StorageOnlineRow[]);
   });
 
   afterEach(() => {
@@ -245,7 +252,7 @@ describe("GET /api/users/online-list — positionFuzz hides exact coords", () =>
     const res = await request(app).get("/api/users/online-list");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
 
     expect(target.latitude).not.toBeNull();
@@ -260,12 +267,12 @@ describe("GET /api/users/online-list — positionFuzz hides exact coords", () =>
       user: { ...makeTargetUser(), id: REQUESTER_ID },
       profile: makeFuzzedProfile(),
       distance: 0,
-    }] as any);
+    }] as unknown as StorageAvailableRow[]);
 
     const res = await request(app).get("/api/users/online-list");
 
     expect(res.status).toBe(200);
-    const self = res.body.find((u: any) => u.id === REQUESTER_ID);
+    const self = res.body.find((u: Record<string, unknown>) => u.id === REQUESTER_ID);
     expect(self).toBeDefined();
     expect(self.latitude).toBe(STORED_LAT);
     expect(self.longitude).toBe(STORED_LNG);
@@ -275,12 +282,12 @@ describe("GET /api/users/online-list — positionFuzz hides exact coords", () =>
     vi.mocked(storage.getOnlineUsersList).mockResolvedValue([{
       ...makeOnlineListRow(),
       profile: makeExactProfile(),
-    }] as any);
+    }] as unknown as StorageAvailableRow[]);
 
     const res = await request(app).get("/api/users/online-list");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).toBe(STORED_LAT);
     expect(target.longitude).toBe(STORED_LNG);
@@ -302,13 +309,13 @@ describe("GET /api/users/biker-available-list — positionFuzz hides exact coord
 
     vi.mocked(storage.getBlockedUserIds).mockResolvedValue([]);
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "map_visibility_filter") return filterAll() as any;
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      return null;
+      if (key === "map_visibility_filter") return filterAll() as unknown as StorageSetting;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(storage.getUserMotorcycles).mockResolvedValue([]);
     vi.mocked(onlineTracker.getAvailableBikerIds).mockReturnValue([TARGET_ID]);
-    vi.mocked(storage.getAvailableBikersList).mockResolvedValue([makeAvailableRow("biker")] as any);
+    vi.mocked(storage.getAvailableBikersList).mockResolvedValue([makeAvailableRow("biker")] as unknown as StorageAvailableRow[]);
   });
 
   afterEach(() => {
@@ -319,7 +326,7 @@ describe("GET /api/users/biker-available-list — positionFuzz hides exact coord
     const res = await request(app).get("/api/users/biker-available-list");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).not.toBeNull();
     expect(target.longitude).not.toBeNull();
@@ -331,12 +338,12 @@ describe("GET /api/users/biker-available-list — positionFuzz hides exact coord
     vi.mocked(storage.getAvailableBikersList).mockResolvedValue([{
       ...makeAvailableRow("biker"),
       profile: makeExactProfile({ isAvailable: true }),
-    }] as any);
+    }] as unknown as StorageAvailableRow[]);
 
     const res = await request(app).get("/api/users/biker-available-list");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).toBe(STORED_LAT);
     expect(target.longitude).toBe(STORED_LNG);
@@ -358,13 +365,13 @@ describe("GET /api/users/zavorrine-available-list — positionFuzz hides exact c
 
     vi.mocked(storage.getBlockedUserIds).mockResolvedValue([]);
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "map_visibility_filter") return filterAll() as any;
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      return null;
+      if (key === "map_visibility_filter") return filterAll() as unknown as StorageSetting;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(storage.getUserMotorcycles).mockResolvedValue([]);
     vi.mocked(onlineTracker.getAvailableZavorrinaIds).mockReturnValue([TARGET_ID]);
-    vi.mocked(storage.getAvailableZavorrinaList).mockResolvedValue([makeAvailableRow("zavorrina")] as any);
+    vi.mocked(storage.getAvailableZavorrinaList).mockResolvedValue([makeAvailableRow("zavorrina")] as unknown as StorageAvailableRow[]);
   });
 
   afterEach(() => {
@@ -375,7 +382,7 @@ describe("GET /api/users/zavorrine-available-list — positionFuzz hides exact c
     const res = await request(app).get("/api/users/zavorrine-available-list");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).not.toBeNull();
     expect(target.longitude).not.toBeNull();
@@ -387,12 +394,12 @@ describe("GET /api/users/zavorrine-available-list — positionFuzz hides exact c
     vi.mocked(storage.getAvailableZavorrinaList).mockResolvedValue([{
       ...makeAvailableRow("zavorrina"),
       profile: makeExactProfile({ isAvailable: true }),
-    }] as any);
+    }] as unknown as StorageAvailableRow[]);
 
     const res = await request(app).get("/api/users/zavorrine-available-list");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).toBe(STORED_LAT);
     expect(target.longitude).toBe(STORED_LNG);
@@ -414,11 +421,11 @@ describe("GET /api/users/nearby — positionFuzz hides exact coords", () => {
 
     vi.mocked(storage.getBlockedUserIds).mockResolvedValue([]);
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "map_visibility_filter") return filterAll() as any;
-      if (key === "offline_position_randomize_default") return { key, value: "false" } as any;
-      return null;
+      if (key === "map_visibility_filter") return filterAll() as unknown as StorageSetting;
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      return undefined;
     });
-    vi.mocked(storage.getNearbyUsers).mockResolvedValue([makeNearbyRow()] as any);
+    vi.mocked(storage.getNearbyUsers).mockResolvedValue([makeNearbyRow()] as unknown as StorageNearbyRow[]);
   });
 
   afterEach(() => {
@@ -429,7 +436,7 @@ describe("GET /api/users/nearby — positionFuzz hides exact coords", () => {
     const res = await request(app).get("/api/users/nearby?lat=45&lng=9");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).not.toBeNull();
     expect(target.longitude).not.toBeNull();
@@ -441,12 +448,12 @@ describe("GET /api/users/nearby — positionFuzz hides exact coords", () => {
     vi.mocked(storage.getNearbyUsers).mockResolvedValue([{
       ...makeNearbyRow(),
       profile: makeExactProfile({ offlinePositionRandomize: false }),
-    }] as any);
+    }] as unknown as StorageAvailableRow[]);
 
     const res = await request(app).get("/api/users/nearby?lat=45&lng=9");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).toBe(STORED_LAT);
     expect(target.longitude).toBe(STORED_LNG);
@@ -473,12 +480,12 @@ describe("GET /api/users/search — positionFuzz hides exact coords", () => {
 
     vi.mocked(storage.getBlockedUserIds).mockResolvedValue([]);
     vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
-      if (key === "map_visibility_filter") return filterAll() as any;
-      return null;
+      if (key === "map_visibility_filter") return filterAll() as unknown as StorageSetting;
+      return undefined;
     });
     vi.mocked(onlineTracker.isOnline).mockReturnValue(false);
     vi.mocked(onlineTracker.getOnlineUserIds).mockReturnValue([]);
-    vi.mocked(storage.searchUsers).mockResolvedValue([makeSearchRow()] as any);
+    vi.mocked(storage.searchUsers).mockResolvedValue([makeSearchRow()] as unknown as StorageSearchRow[]);
   });
 
   afterEach(() => {
@@ -489,7 +496,7 @@ describe("GET /api/users/search — positionFuzz hides exact coords", () => {
     const res = await request(app).get("/api/users/search?q=fuzz_target");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).not.toBeNull();
     expect(target.longitude).not.toBeNull();
@@ -501,12 +508,12 @@ describe("GET /api/users/search — positionFuzz hides exact coords", () => {
     vi.mocked(storage.searchUsers).mockResolvedValue([{
       ...makeSearchRow(),
       profile: makeExactProfile(),
-    }] as any);
+    }] as unknown as StorageAvailableRow[]);
 
     const res = await request(app).get("/api/users/search?q=fuzz_target");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).toBe(STORED_LAT);
     expect(target.longitude).toBe(STORED_LNG);
@@ -516,12 +523,12 @@ describe("GET /api/users/search — positionFuzz hides exact coords", () => {
     vi.mocked(storage.searchUsers).mockResolvedValue([{
       user: { ...makeTargetUser(), ghostMode: true },
       profile: makeFuzzedProfile(),
-    }] as any);
+    }] as unknown as StorageAvailableRow[]);
 
     const res = await request(app).get("/api/users/search?q=fuzz_target");
 
     expect(res.status).toBe(200);
-    const target = res.body.find((u: any) => u.id === TARGET_ID);
+    const target = res.body.find((u: Record<string, unknown>) => u.id === TARGET_ID);
     expect(target).toBeDefined();
     expect(target.latitude).toBeNull();
     expect(target.longitude).toBeNull();

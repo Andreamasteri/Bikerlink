@@ -195,15 +195,16 @@ vi.mock("express-rate-limit", () => {
 });
 
 vi.mock("multer", () => {
-  const multerMock: any = () => ({
-    single: () => (_: any, __: any, next: any) => next(),
-    array: () => (_: any, __: any, next: any) => next(),
-    fields: () => (_: any, __: any, next: any) => next(),
-  });
-  multerMock.memoryStorage = vi.fn().mockReturnValue({});
-  multerMock.diskStorage = vi.fn().mockReturnValue({});
-  multerMock.default = multerMock;
-  return { default: multerMock };
+  const handler = (_req: Request, _res: Response, next: NextFunction) => next();
+  const multerFn = Object.assign(
+    () => ({ single: () => handler, array: () => handler, fields: () => handler }),
+    {
+      memoryStorage: vi.fn().mockReturnValue({}),
+      diskStorage: vi.fn().mockReturnValue({}),
+    }
+  ) as ReturnType<typeof Object.assign>;
+  (multerFn as Record<string, unknown>).default = multerFn;
+  return { default: multerFn };
 });
 
 vi.mock("docx", () => ({
@@ -241,8 +242,7 @@ function buildAdminApp() {
 
   // Inject a fake admin session so requireAdmin() passes
   app.use((req: Request, _res: Response, next: NextFunction) => {
-    (req as any).session = { userId: "admin-test-id", sessionID: "test-session" };
-    (req as any).sessionID = "test-session";
+    Object.assign(req, { session: { userId: "admin-test-id", sessionID: "test-session" }, sessionID: "test-session" });
     next();
   });
 
@@ -277,8 +277,8 @@ beforeEach(() => {
   mockGetAllUsers.mockResolvedValue(TEST_USERS);
 
   // Default: db.select().from() returns empty arrays (lastfm/music queries in GET /users)
-  vi.mocked(db.select).mockReturnValue({ from: vi.fn().mockResolvedValue([]) } as any);
-  vi.mocked(db.selectDistinct).mockReturnValue({ from: vi.fn().mockResolvedValue([]) } as any);
+  vi.mocked(db.select).mockReturnValue({ from: vi.fn().mockResolvedValue([]) } as unknown as ReturnType<typeof db.select>);
+  vi.mocked(db.selectDistinct).mockReturnValue({ from: vi.fn().mockResolvedValue([]) } as unknown as ReturnType<typeof db.selectDistinct>);
 });
 
 afterEach(() => {
@@ -300,7 +300,7 @@ describe("Real admin router — GET /users", () => {
   it("strips passwords from returned users", async () => {
     const response = await supertest(buildAdminApp()).get("/users");
     expect(response.status).toBe(200);
-    expect(response.body.every((u: any) => !("password" in u))).toBe(true);
+    expect(response.body.every((u: Record<string, unknown>) => !("password" in u))).toBe(true);
   });
 
   it("includes offline users in the response (map_visibility_filter=online_only must not apply)", async () => {
@@ -312,7 +312,7 @@ describe("Real admin router — GET /users", () => {
 
     const response = await supertest(buildAdminApp()).get("/users");
     expect(response.status).toBe(200);
-    const offlineUser = response.body.find((u: any) => u.id === "u2");
+    const offlineUser = response.body.find((u: Record<string, unknown>) => u.id === "u2");
     expect(offlineUser).toBeDefined();
     expect(offlineUser.status).toBe("offline");
   });
@@ -325,7 +325,7 @@ describe("Real admin router — GET /users", () => {
 
     const response = await supertest(buildAdminApp()).get("/users");
     expect(response.status).toBe(200);
-    const suspendedUser = response.body.find((u: any) => u.id === "u3");
+    const suspendedUser = response.body.find((u: Record<string, unknown>) => u.id === "u3");
     expect(suspendedUser).toBeDefined();
     expect(suspendedUser.status).toBe("suspended");
   });
@@ -373,8 +373,8 @@ describe("Real admin router — GET /users/match-summary", () => {
   /** Configures db.execute to return the two responses match-summary needs. */
   function mockMatchSummaryDb(userRows: object[], total = userRows.length) {
     vi.mocked(db.execute)
-      .mockResolvedValueOnce({ rows: [{ cnt: String(total) }] } as any) // COUNT query
-      .mockResolvedValueOnce({ rows: userRows } as any);                 // main SELECT
+      .mockResolvedValueOnce({ rows: [{ cnt: String(total) }] } as unknown as Awaited<ReturnType<typeof db.execute>>) // COUNT query
+      .mockResolvedValueOnce({ rows: userRows } as unknown as Awaited<ReturnType<typeof db.execute>>);                 // main SELECT
   }
 
   beforeEach(() => {
@@ -395,7 +395,7 @@ describe("Real admin router — GET /users/match-summary", () => {
   it("includes offline users in the paginated results", async () => {
     const response = await supertest(buildAdminApp()).get("/users/match-summary");
     expect(response.status).toBe(200);
-    const offlineUser = response.body.users.find((u: any) => u.id === "u2");
+    const offlineUser = response.body.users.find((u: Record<string, unknown>) => u.id === "u2");
     expect(offlineUser).toBeDefined();
     expect(offlineUser.status).toBe("offline");
   });
@@ -418,7 +418,7 @@ describe("Real admin router — GET /users/match-summary", () => {
 
       const response = await supertest(buildAdminApp()).get("/users/match-summary");
       expect(response.status).toBe(200);
-      resultSets.push(response.body.users.map((u: any) => u.id));
+      resultSets.push(response.body.users.map((u: Record<string, unknown>) => u.id));
     }
 
     // All filter values should produce the exact same user ID set
@@ -447,8 +447,8 @@ describe("Real admin router — GET /users/match-summary", () => {
     vi.mocked(db.execute).mockReset();
     const totalFromDb = 42;
     vi.mocked(db.execute)
-      .mockResolvedValueOnce({ rows: [{ cnt: String(totalFromDb) }] } as any)
-      .mockResolvedValueOnce({ rows: [] } as any);
+      .mockResolvedValueOnce({ rows: [{ cnt: String(totalFromDb) }] } as unknown as Awaited<ReturnType<typeof db.execute>>)
+      .mockResolvedValueOnce({ rows: [] } as unknown as Awaited<ReturnType<typeof db.execute>>);
 
     const response = await supertest(buildAdminApp()).get("/users/match-summary");
     expect(response.status).toBe(200);

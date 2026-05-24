@@ -307,7 +307,7 @@ describe("routesIntersect — destination-overlap path (extendToDestination)", (
     const p1 = makeRouteProposal({
       departureLatitude: 44.0, departureLongitude: 8.0,
       destinationLatitude: 45.46, destinationLongitude: 9.19,
-      destinationSearchRadius: undefined as any,
+      destinationSearchRadius: undefined as unknown as number,
       extendToDestination: true,
       searchRadius: 50,
     });
