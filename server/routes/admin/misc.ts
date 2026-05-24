@@ -2,6 +2,7 @@ import { sendError, sendSuccess } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
+import { sql } from "drizzle-orm";
 import { moderatorLogs, motoClubs, motoClubRequests } from "@shared/db";
 import { workshopSchema, easterEggSchema, reportResolveSchema } from "@shared/validators";
 import { eq } from "drizzle-orm";
@@ -159,13 +160,77 @@ router.post("/cache/cleanup", (_req: Request, res: Response) => {
   return sendSuccess(res, { cleaned: true });
 });
 
-// ── Road hazards admin endpoints — disabled pre-deploy ───────────────────────
-// These routes are commented out until Road Hazard feature is re-enabled.
-// router.get("/settings/road-hazards-enabled", ...)
-// router.post("/settings/road-hazards-enabled", ...)
-// router.get("/road-hazards", ...)
-// router.post("/road-hazards/:id/approve", ...)
-// router.delete("/road-hazards/:id", ...)
+// ── Road hazards admin endpoints ──────────────────────────────────────────────
+
+router.get("/settings/road-hazards-enabled", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("road_hazards_enabled");
+    const enabled = setting?.value !== "false";
+    return sendSuccess(res, { enabled });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura impostazione");
+  }
+});
+
+router.post("/settings/road-hazards-enabled", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") return sendError(res, 400, "Campo 'enabled' booleano richiesto");
+    await storage.upsertAppSetting("road_hazards_enabled", String(enabled));
+    return sendSuccess(res, { enabled });
+  } catch (_error) {
+    return sendError(res, 500, "Errore aggiornamento impostazione");
+  }
+});
+
+router.get("/road-hazards", async (req: Request, res: Response) => {
+  try {
+    const { roadHazards } = await import("@shared/db");
+    const { isNull, desc } = await import("drizzle-orm");
+    const limit = Math.min(parseInt(String(req.query.limit ?? "30"), 10) || 30, 100);
+    const offset = parseInt(String(req.query.offset ?? "0"), 10) || 0;
+    const rows = await db.select().from(roadHazards)
+      .where(isNull(roadHazards.deletedAt))
+      .orderBy(desc(roadHazards.createdAt))
+      .limit(limit).offset(offset);
+    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(roadHazards).where(isNull(roadHazards.deletedAt));
+    return sendSuccess(res, { hazards: rows, total: Number(count) });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura segnalazioni");
+  }
+});
+
+router.post("/road-hazards/:id/approve", async (req: Request, res: Response) => {
+  try {
+    const { roadHazards } = await import("@shared/db");
+    const { eq } = await import("drizzle-orm");
+    const hazardId = String(req.params.id);
+    const [updated] = await db.update(roadHazards)
+      .set({ isApproved: true })
+      .where(eq(roadHazards.id, hazardId))
+      .returning();
+    if (!updated) return sendError(res, 404, "Segnalazione non trovata");
+    return sendSuccess(res, { hazard: updated });
+  } catch (_error) {
+    return sendError(res, 500, "Errore approvazione segnalazione");
+  }
+});
+
+router.delete("/road-hazards/:id", async (req: Request, res: Response) => {
+  try {
+    const { roadHazards } = await import("@shared/db");
+    const { eq } = await import("drizzle-orm");
+    const hazardId = String(req.params.id);
+    const [updated] = await db.update(roadHazards)
+      .set({ deletedAt: new Date() })
+      .where(eq(roadHazards.id, hazardId))
+      .returning();
+    if (!updated) return sendError(res, 404, "Segnalazione non trovata");
+    return sendSuccess(res, { deleted: true });
+  } catch (_error) {
+    return sendError(res, 500, "Errore eliminazione segnalazione");
+  }
+});
 
 // ── Motion simulator — spec-required paths (/api/admin/motion/*) ─────────────
 // These are aliases of the stregatti-namespaced routes for API contract compliance.

@@ -76,6 +76,16 @@ export function registerClientSettingsRoutes(app: Express) {
     }
   });
 
+  app.get("/api/settings/road-hazards-enabled", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("road_hazards_enabled");
+      res.json({ enabled: setting?.value !== "false" });
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch road-hazards-enabled:", err);
+      res.json({ enabled: true });
+    }
+  });
+
   app.get("/api/settings/phone-sensors-enabled", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("phone_sensors_enabled");

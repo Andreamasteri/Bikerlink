@@ -134,7 +134,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   var markersLayer = L.layerGroup().addTo(map);
   var circlesLayer = L.layerGroup().addTo(map);
   var pulseLayer = L.layerGroup().addTo(map);
-  // var hazardsLayer = L.layerGroup().addTo(map); // disabled pre-deploy
+  var hazardsLayer = L.layerGroup().addTo(map);
   var userDotMarker = null;
   var userPositions = {};
   var speedProfileUserPositions = [];
@@ -563,8 +563,31 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       map.setView([lat, lng], z < 13 ? 13 : z, { animate: true });
     },
 
-    updateHazards: function(_jsonStr) {
-      /* Road Hazard disabled pre-deploy */
+    updateHazards: function(jsonStr) {
+      hazardsLayer.clearLayers();
+      var hazards;
+      try { hazards = JSON.parse(jsonStr); } catch(e) { return; }
+      if (!Array.isArray(hazards)) return;
+      var HAZARD_COLORS = {
+        oil: "#FF6F00", gravel: "#795548", animals: "#2E7D32",
+        roadwork: "#F57C00", wet: "#1565C0", accident: "#C62828",
+        fog: "#546E7A", slowdown: "#6A1B9A"
+      };
+      hazards.forEach(function(h) {
+        var color = HAZARD_COLORS[h.type] || "#FF6F00";
+        var icon = L.divIcon({
+          className: "",
+          html: '<div style="background:' + color + ';width:36px;height:36px;border-radius:18px;border:2.5px solid rgba(255,255,255,0.9);display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,0.5);">' + h.icon + '</div>',
+          iconSize: [36, 36],
+          iconAnchor: [18, 18],
+          popupAnchor: [0, -20]
+        });
+        var marker = L.marker([h.lat, h.lng], { icon: icon });
+        marker.on("click", function() {
+          postMsg({ type: "markerPress", markerType: "hazard", id: h.id });
+        });
+        hazardsLayer.addLayer(marker);
+      });
     }
   };
 

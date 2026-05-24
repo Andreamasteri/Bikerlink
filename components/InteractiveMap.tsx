@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { View, ActivityIndicator, StyleSheet } from "react-native";
+import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Text } from "react-native";
 import WebView from "react-native-webview";
 import Colors from "@/constants/colors";
 import { useMapConfig } from "@/lib/map-context";
@@ -12,12 +12,23 @@ import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { MapControls } from "@/components/map/MapControls";
 import { useMapStateSync } from "@/hooks/useMapStateSync";
 import { createMapMessageHandler } from "@/components/map/createMapMessageHandler";
+import { HazardDetailSheet } from "@/components/map/HazardDetailSheet";
+import { HazardReportSheet } from "@/components/map/HazardReportSheet";
+import { HAZARD_ICONS } from "@shared/db/road-hazards";
 import type {
   MapUser, MapWorkshop, MapEasterEgg, MapSosRequest,
   ClubMapPin, EventMapPin, InteractiveMapProps, InteractiveMapHandle,
 } from "@/components/map/map-types";
 
 export type { MapUser, MapWorkshop, MapEasterEgg, MapSosRequest, ClubMapPin, InteractiveMapHandle };
+
+interface HazardItem {
+  id: string;
+  type: string;
+  lat: number;
+  lng: number;
+  icon: string;
+}
 
 const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(function InteractiveMap({
   users = [], workshops = [], easterEggs = [], activeSosRequests = [],
@@ -31,6 +42,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   filterEvents = true, onToggleFilterEvents,
   onClubPress, initialCenterOverride,
   onRegionChangeComplete, gpsFollowupEnabled = false,
+  showHazardReportButton = false,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
@@ -38,6 +50,8 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const initialCenterDoneRef = useRef(false);
   const gpsCenterDoneRef = useRef(false);
   const { userLocation, locationLoading } = useLocationWatch();
+  const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
+  const [showHazardReport, setShowHazardReport] = useState(false);
   useEffect(() => { sendStartupBeacon("interactive_map_mount"); }, []);
 
   const today = new Date().toISOString().substring(0, 10);
@@ -49,6 +63,37 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     )),
   });
   const eventPins = eventPinsRaw ?? [];
+
+  const { data: hazardsEnabledData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/road-hazards-enabled"],
+    staleTime: 60000,
+    enabled: mapReady,
+  });
+  const hazardsEnabled = hazardsEnabledData?.enabled !== false;
+
+  const { data: hazardsRaw } = useQuery<{ hazards: HazardItem[] }>({
+    queryKey: ["/api/road-hazards", userLocation?.latitude, userLocation?.longitude],
+    queryFn: async () => {
+      if (!userLocation) return { hazards: [] };
+      const url = new URL("/api/road-hazards", getApiUrl());
+      url.searchParams.set("lat", String(userLocation.latitude));
+      url.searchParams.set("lng", String(userLocation.longitude));
+      url.searchParams.set("radius", "50");
+      const res = await apiRequest("GET", url.pathname + url.search);
+      const json = await res.json();
+      return json.data ?? json;
+    },
+    enabled: mapReady && hazardsEnabled && !!userLocation,
+    staleTime: 60000,
+    refetchInterval: 5 * 60 * 1000,
+  });
+  const hazards: HazardItem[] = (hazardsRaw?.hazards ?? []).map((h) => ({
+    id: h.id,
+    type: h.type,
+    lat: h.lat,
+    lng: h.lng,
+    icon: HAZARD_ICONS[h.type as keyof typeof HAZARD_ICONS] ?? "⚠️",
+  }));
 
   const saveMapStyleMutation = useMutation({
     mutationFn: async (style: MapProvider) => {
@@ -81,6 +126,13 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   });
 
   useEffect(() => {
+    if (!mapReady) return;
+    const jsonStr = JSON.stringify(hazardsEnabled ? hazards : []);
+    inject("window.leafletBridge && window.leafletBridge.updateHazards(" + JSON.stringify(jsonStr) + ")");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, hazards.length, hazardsEnabled]);
+
+  useEffect(() => {
     if (!mapReady || initialCenterDoneRef.current) return;
     if (initialCenterOverride) {
       initialCenterDoneRef.current = true;
@@ -103,6 +155,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     createMapMessageHandler({
       users, clubPins, easterEggs,
       onUserPress, onClubPress, onEventPress, onEasterEggPress,
+      onHazardPress: (id) => setSelectedHazardId(id),
       onReady, onRegionChangeComplete, setMapReady,
     }),
     [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete],
@@ -161,6 +214,24 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         isDayNightPending={saveMapStyleMutation.isPending}
         onCenterOnUser={centerOnUser} onToggleDayNight={handleToggleDayNight}
       />
+      {showHazardReportButton && hazardsEnabled && (
+        <TouchableOpacity
+          style={styles.hazardFab}
+          onPress={() => setShowHazardReport(true)}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.hazardFabIcon}>⚠️</Text>
+        </TouchableOpacity>
+      )}
+      <HazardDetailSheet
+        hazardId={selectedHazardId}
+        onClose={() => setSelectedHazardId(null)}
+      />
+      <HazardReportSheet
+        visible={showHazardReport}
+        onClose={() => setShowHazardReport(false)}
+        userLocation={userLocation}
+      />
     </View>
   );
 });
@@ -173,5 +244,21 @@ const styles = StyleSheet.create({
   loadingOverlay: {
     position: "absolute", top: 16, right: 16,
     backgroundColor: Colors.surface, borderRadius: 20, padding: 8,
+  },
+  hazardFab: {
+    position: "absolute",
+    bottom: 155,
+    right: 12,
+    backgroundColor: Colors.surface,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  hazardFabIcon: {
+    fontSize: 20,
   },
 });
