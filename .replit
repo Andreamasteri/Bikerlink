@@ -55,10 +55,6 @@ args = "healthcheck"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "typecheck-client"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "typecheck-server"
 
 [[workflows.workflow.tasks]]
@@ -76,6 +72,10 @@ args = "apostrophe-check"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "hooks-check"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "typecheck-client"
 
 [[workflows.workflow]]
 name = "Start App"
@@ -158,17 +158,6 @@ args = "bash scripts/check-runtime-health.sh"
 isValidation = true
 
 [[workflows.workflow]]
-name = "typecheck-client"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsc --noEmit --project tsconfig.json"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
 name = "typecheck-server"
 author = "agent"
 
@@ -222,6 +211,17 @@ args = "bash scripts/eslint-hooks-check.sh"
 
 [workflows.workflow.metadata]
 isValidation = true
+
+[[workflows.workflow]]
+name = "typecheck-client"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/typecheck-client.sh"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"

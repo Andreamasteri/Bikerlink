@@ -4,7 +4,6 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
 import { useColors } from "@/hooks/useColors";
 import { useT } from "@/lib/language-context";
-import type { ThemeColors } from "@/constants/colors";
 import type { WebViewMessageEvent } from "react-native-webview";
 
 interface NavigationMapProps {
