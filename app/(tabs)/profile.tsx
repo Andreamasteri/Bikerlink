@@ -313,8 +313,6 @@ export default function ProfileScreen() {
         <OfflineMapsPanel />
         <ThemePanel />
         <UnitsPanel />
-        <PrivacyPanel profileData={profile} />
-
         <ProfileActionsBar
           isAdmin={isAdmin}
           isModerator={isModerator}
