@@ -69,10 +69,11 @@ export function registerLeafletMapRoutes(app: Express) {
   app.get("/leaflet-curvature-map.html", (req: Request, res: Response) => {
     const tileUrl = String(req.query.tileUrl || "");
     const tileMaxZoom = Number(req.query.tileMaxZoom) || 19;
+    const offlinePath = req.query.offlinePath ? String(req.query.offlinePath) : null;
     let points: Array<{ lat: number; lng: number }> = [];
     try { points = JSON.parse(String(req.query.points || "[]")); } catch { /* ignore */ }
     if (!tileUrl) return res.status(400).send("Missing tileUrl");
-    sendHtml(res, buildLeafletCurvatureGradientHtml(tileUrl, tileMaxZoom, points, null));
+    sendHtml(res, buildLeafletCurvatureGradientHtml(tileUrl, tileMaxZoom, points, offlinePath));
   });
 
   app.get("/leaflet-route-map.html", (req: Request, res: Response) => {

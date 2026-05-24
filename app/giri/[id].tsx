@@ -196,13 +196,16 @@ export default function GiriDetailScreen() {
   const mapUri = useMemo(() => {
     if (!routePoints.length) return null;
     const base = getApiUrl() + "/leaflet-curvature-map.html";
-    return (
+    let uri =
       base +
       "?tileUrl=" + encodeURIComponent(TILE_CONFIG.urlTemplate) +
       "&tileMaxZoom=" + TILE_CONFIG.maximumZ +
-      "&points=" + encodeURIComponent(JSON.stringify(routePoints))
-    );
-  }, [routePoints]);
+      "&points=" + encodeURIComponent(JSON.stringify(routePoints));
+    if (offline.status === "available" && offline.offlineTileBasePath) {
+      uri += "&offlinePath=" + encodeURIComponent(offline.offlineTileBasePath);
+    }
+    return uri;
+  }, [routePoints, offline.status, offline.offlineTileBasePath]);
 
   const multiDayDays = useMemo(() => {
     if (!route?.isMultiDay) return null;
