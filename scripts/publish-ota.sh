@@ -126,9 +126,10 @@ fi
 
 # ── Pubblica su staging ──
 log_info "Pubblicazione su canale staging..."
-EAS_OUTPUT=$(EXPO_TOKEN="${EAS_TOKEN}" eas update \
+EAS_OUTPUT=$(EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" eas update \
   --channel staging \
   --message "${MESSAGE}" \
+  --environment production \
   --non-interactive \
   2>&1) || {
   log_error "eas update fallito:"
