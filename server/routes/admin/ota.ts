@@ -38,19 +38,14 @@ async function getDirectApplySetting(): Promise<boolean> {
 
 async function syncStagingUpdates(): Promise<void> {
   const query = `
-    query GetBranchUpdates($appId: String!, $branchName: String!) {
+    query GetBranchUpdates($appId: String!) {
       app {
         byId(appId: $appId) {
-          updateBranches(offset: 0, limit: 1) {
-            id
-            name
-          }
-          updateBranchByName(name: $branchName) {
+          updateBranches(offset: 0, limit: 10) {
             id
             name
             updates(offset: 0, limit: 20) {
               id
-              updateGroup
               message
               runtimeVersion
               createdAt
@@ -61,15 +56,17 @@ async function syncStagingUpdates(): Promise<void> {
     }
   `;
 
-  let data: { app?: { byId?: { updateBranchByName?: { updates?: Array<{ id: string; updateGroup: string; message?: string; runtimeVersion?: string; createdAt?: string }> } } } };
+  let data: { app?: { byId?: { updateBranches?: Array<{ id: string; name: string; updates?: Array<{ id: string; message?: string; runtimeVersion?: string; createdAt?: string }> }> } } };
   try {
-    data = await easGraphQL(query, { appId: EAS_PROJECT_ID, branchName: "staging" }) as typeof data;
+    data = await easGraphQL(query, { appId: EAS_PROJECT_ID }) as typeof data;
   } catch (err) {
     console.warn("[ota-sync] EAS GraphQL error:", err);
     return;
   }
 
-  const updates = data?.app?.byId?.updateBranchByName?.updates ?? [];
+  const branches = data?.app?.byId?.updateBranches ?? [];
+  const stagingBranch = branches.find((b) => b.name === "staging");
+  const updates = stagingBranch?.updates ?? [];
   if (updates.length === 0) return;
 
   const directApply = await getDirectApplySetting();
@@ -123,7 +120,6 @@ async function promoteToProduction(easUpdateId: string): Promise<void> {
     mutation RepublishUpdate($updateId: ID!, $branchName: String!, $message: String) {
       updatePublishBranch(updateId: $updateId, branchName: $branchName) {
         id
-        updateGroup
       }
     }
   `;
