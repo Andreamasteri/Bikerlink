@@ -5,6 +5,7 @@ import type { WebViewMessageEvent } from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
 import { getTileConfig } from "@/lib/map-tiles";
 import { getApiUrl } from "@/lib/query-client";
+import { buildLeafletTrackingMapHtml } from "@/lib/leaflet-tracking-map-html";
 import Colors from "@/constants/colors";
 
 interface TrackingMapProps {
@@ -19,16 +20,11 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
   const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
 
-  const mapUri = useMemo(() => {
-    const base = getApiUrl() + "/leaflet-tracking-map.html";
-    return (
-      base +
-      "?tileUrl=" + encodeURIComponent(tileConfig.urlTemplate) +
-      "&tileMaxZoom=" + tileConfig.maximumZ +
-      "&accentColor=" + encodeURIComponent(Colors.accent) +
-      "&debug=" + (__DEV__ ? "true" : "false")
-    );
-  }, [tileConfig.urlTemplate, tileConfig.maximumZ]);
+  const mapHtml = useMemo(
+    () => buildLeafletTrackingMapHtml(tileConfig.urlTemplate, tileConfig.maximumZ, Colors.accent, __DEV__),
+    [tileConfig.urlTemplate, tileConfig.maximumZ]
+  );
+  const mapBaseUrl = getApiUrl();
 
   const inject = useCallback((js: string) => {
     webViewRef.current?.injectJavaScript(js + ";true;");
@@ -78,7 +74,7 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
     <View style={styles.wrapper}>
       <WebView
         ref={webViewRef}
-        source={{ uri: mapUri }}
+        source={{ html: mapHtml, baseUrl: mapBaseUrl }}
         style={styles.map}
         javaScriptEnabled={true}
         domStorageEnabled={true}
@@ -90,7 +86,6 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
         cacheEnabled={false}
         startInLoadingState={false}
         onError={(e) => console.warn("[LeafletTrackingMap] WebView error:", e.nativeEvent.description)}
-        onHttpError={(e) => console.warn("[LeafletTrackingMap] HTTP error:", e.nativeEvent.statusCode, mapUri)}
       />
     </View>
   );

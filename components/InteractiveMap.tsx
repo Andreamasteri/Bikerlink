@@ -7,6 +7,7 @@ import Colors from "@/constants/colors";
 import { useMapConfig } from "@/lib/map-context";
 import type { MapProvider } from "@/lib/map-tiles";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
+import { LEAFLET_MAP_HTML } from "@/lib/leaflet-map-html";
 import { useLocationWatch } from "@/hooks/useLocationWatch";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { MapControls } from "@/components/map/MapControls";
@@ -176,13 +177,14 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
 
   const showDayNightButton = mapsEnabled && (resolvedProvider === "carto_light" || resolvedProvider === "carto_dark");
 
-  const mapUri = getApiUrl() + "/leaflet-map.html";
+  const mapHtml = LEAFLET_MAP_HTML;
+  const mapBaseUrl = getApiUrl();
 
   return (
     <View style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ uri: mapUri }}
+        source={{ html: mapHtml, baseUrl: mapBaseUrl }}
         style={styles.map}
         javaScriptEnabled={true}
         domStorageEnabled={true}
@@ -191,10 +193,9 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         scrollEnabled={false}
         bounces={false}
         overScrollMode="never"
-        cacheEnabled={true}
+        cacheEnabled={false}
         startInLoadingState={false}
         onError={(e) => console.warn("[InteractiveMap] WebView error:", e.nativeEvent.description)}
-        onHttpError={(e) => console.warn("[InteractiveMap] HTTP error:", e.nativeEvent.statusCode, mapUri)}
       />
       {locationLoading && (
         <View style={styles.loadingOverlay}>

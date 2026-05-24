@@ -5,6 +5,7 @@ import type { WebViewMessageEvent } from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
 import { getTileConfig } from "@/lib/map-tiles";
 import { getApiUrl } from "@/lib/query-client";
+import { buildLeafletPickerMapHtml } from "@/lib/leaflet-picker-map-html";
 import type { PickerWaypoint } from "@/lib/leaflet-picker-map-html";
 import Colors from "@/constants/colors";
 
@@ -31,20 +32,15 @@ export default function LeafletPickerMap({
 
   const initialCoordRef = useRef(selectedCoord);
 
-  const mapUri = useMemo(() => {
-    const base = getApiUrl() + "/leaflet-picker-map.html";
-    return (
-      base +
-      "?tileUrl=" + encodeURIComponent(tileConfig.urlTemplate) +
-      "&tileMaxZoom=" + tileConfig.maximumZ +
-      "&lat=" + initialLat +
-      "&lng=" + initialLng +
-      "&zoom=" + initialZoom +
-      "&waypoints=" + encodeURIComponent(JSON.stringify(existingWaypoints)) +
-      "&selectedCoord=" + encodeURIComponent(JSON.stringify(initialCoordRef.current)) +
-      "&accentColor=" + encodeURIComponent(Colors.accent)
-    );
-  }, [tileConfig.urlTemplate, tileConfig.maximumZ, initialLat, initialLng, initialZoom, existingWaypoints]);
+  const mapHtml = useMemo(
+    () => buildLeafletPickerMapHtml(
+      tileConfig.urlTemplate, tileConfig.maximumZ,
+      initialLat, initialLng, initialZoom,
+      existingWaypoints, initialCoordRef.current, Colors.accent
+    ),
+    [tileConfig.urlTemplate, tileConfig.maximumZ, initialLat, initialLng, initialZoom, existingWaypoints]
+  );
+  const mapBaseUrl = getApiUrl();
 
   const inject = useCallback((js: string) => {
     webViewRef.current?.injectJavaScript(js + ";true;");
@@ -79,7 +75,7 @@ export default function LeafletPickerMap({
     <View style={styles.fill}>
       <WebView
         ref={webViewRef}
-        source={{ uri: mapUri }}
+        source={{ html: mapHtml, baseUrl: mapBaseUrl }}
         style={styles.map}
         javaScriptEnabled={true}
         domStorageEnabled={true}
@@ -91,7 +87,6 @@ export default function LeafletPickerMap({
         cacheEnabled={false}
         startInLoadingState={false}
         onError={(e) => console.warn("[LeafletPickerMap] WebView error:", e.nativeEvent.description)}
-        onHttpError={(e) => console.warn("[LeafletPickerMap] HTTP error:", e.nativeEvent.statusCode, mapUri)}
       />
     </View>
   );
