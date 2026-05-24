@@ -29,6 +29,7 @@ import {
 import "@/lib/background-telemetry-task";
 
 import { useAppBootstrap } from "@/hooks/useAppBootstrap";
+import { usePostUpdateRefresh } from "@/hooks/usePostUpdateRefresh";
 import { RootProviders } from "@/components/RootProviders";
 import { AppStateHandler } from "@/components/layout/AppStateHandler";
 import { BackgroundNotificationHandler } from "@/components/layout/BackgroundNotificationHandler";
@@ -230,6 +231,7 @@ function reportClientError(error: Error, componentStack: string) {
 
 export default function RootLayout() {
   const { ready } = useAppBootstrap();
+  usePostUpdateRefresh();
 
   useEffect(() => {
     type ErrorHandler = (error: Error, isFatal?: boolean) => void;
