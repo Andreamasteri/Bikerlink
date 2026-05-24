@@ -149,7 +149,7 @@ export default function CustomTabBar({
     return (
       <>
         <View style={[staticStyles.bar, barStyle]}>
-          {displayItems.map((item, _idx) => {
+          {displayItems.map((item) => {
             if (item === "community") {
               return (
                 <Pressable

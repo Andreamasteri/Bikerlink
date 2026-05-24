@@ -32,7 +32,7 @@ export function NavigationMap({
 }: NavigationMapProps) {
   const colors = useColors();
   const t = useT();
-  const s = styles(colors);
+  const s = styles();
 
   return (
     <View style={s.mapContainer}>
@@ -79,7 +79,7 @@ export function NavigationMap({
   );
 }
 
-const styles = (_colors: ThemeColors) =>
+const styles = () =>
   StyleSheet.create({
     mapContainer: {
       flex: 1,

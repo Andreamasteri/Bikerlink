@@ -32,7 +32,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   filterEvents = true, onToggleFilterEvents,
   onClubPress, initialCenterOverride,
   onRegionChangeComplete, gpsFollowupEnabled = false,
-  showHazardReportButton: _showHazardReportButton = false,
 }: InteractiveMapProps, ref) {
   const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const webViewRef = useRef<WebView>(null);

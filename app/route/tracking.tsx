@@ -9,7 +9,6 @@ import {
   Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -39,7 +38,6 @@ const FREQUENCY_OPTIONS = [
 
 export default function TrackingScreen() {
   const router = useRouter();
-  const _insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
 
   const { logs: debugLogs, clearLogs: clearDebugLogs, logFetch } = useApiDebugLog();

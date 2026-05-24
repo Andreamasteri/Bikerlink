@@ -8,7 +8,6 @@ import {
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { useT } from "@/lib/language-context";
 
 interface AiSectionProps {
   aiStatus: "idle" | "loading" | "success" | "error";
@@ -23,8 +22,6 @@ export const AiSection: React.FC<AiSectionProps> = ({
   aiResult,
   aiSummary,
 }) => {
-  const _t = useT();
-
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>

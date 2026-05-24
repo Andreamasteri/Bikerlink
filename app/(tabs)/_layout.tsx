@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useState } from "react";
-import { Tabs, useRouter, usePathname, type Href } from "expo-router";
+import { Tabs, useRouter, type Href } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { Pressable, Animated } from "react-native";
@@ -57,7 +57,6 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const colors = useColors();
   const router = useRouter();
-  const _pathname = usePathname();
   const { user, isLoading } = useAuth();
 
   useEffect(() => {
@@ -67,7 +66,6 @@ export default function TabLayout() {
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const { taskbarStyle } = useTaskbarStyle();
   const { unreadCount, hasActiveMatches } = useTabBadges();
-  const _prevUnreadRef = useRef<number>(0);
 
   // ── Global Hands-Off overlay ────────────────────────────────────────────────
   const [globalHandsOffActive, setGlobalHandsOffActive] = useState(false);

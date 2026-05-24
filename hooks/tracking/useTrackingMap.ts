@@ -25,7 +25,7 @@ export function useTrackingMap() {
     try {
       const data = await apiRequest("GET", `/api/routes/${record.id}/points`) as any;
       setHistMapPoints(data.points.map((p: any) => ({ lat: p.latitude, lng: p.longitude })));
-    } catch (_e) {
+    } catch {
       Alert.alert(t("common.error"), t("tracking.loadPointsError"));
       setHistMapVisible(false);
     } finally {
@@ -43,7 +43,7 @@ export function useTrackingMap() {
       } else {
         Alert.alert(t("common.error"), t("tracking.sharingNotAvailable"));
       }
-    } catch (_e) {
+    } catch {
       Alert.alert(t("common.error"), t("tracking.exportError"));
     }
   }, [t]);

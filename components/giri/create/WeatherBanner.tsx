@@ -14,15 +14,6 @@ interface WeatherBannerProps {
   colors: ThemeColors;
 }
 
-function _weatherIcon(code: number): keyof typeof Ionicons.glyphMap {
-  if (code === 0) return "sunny-outline";
-  if (code <= 3) return "partly-sunny-outline";
-  if (code <= 59) return "rainy-outline";
-  if (code <= 79) return "snow-outline";
-  if (code <= 99) return "thunderstorm-outline";
-  return "cloud-outline";
-}
-
 export const WeatherBanner: React.FC<WeatherBannerProps> = ({ weather, colors }) => {
   const suitableCount = weather.filter(w => w.isSuitable).length;
   const isAllGood = suitableCount === weather.length;

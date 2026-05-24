@@ -165,7 +165,6 @@ export default function FakeUsersAdmin() {
   const PAGE_SIZE = 50;
   const {
     data: usersData,
-    isLoading: _isLoading,
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage

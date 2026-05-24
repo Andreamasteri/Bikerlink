@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Text,
   ScrollView,
@@ -20,15 +20,6 @@ import { PrepareSection } from "@/components/admin/traduzioni/PrepareSection";
 import { RestartSection } from "@/components/admin/traduzioni/RestartSection";
 import { LiveTableSection } from "@/components/admin/traduzioni/LiveTableSection";
 import { traduzioniStyles as styles } from "@/components/admin/traduzioni/styles";
-
-const _LANGS = [
-  { code: "en", label: "EN — Inglese" },
-  { code: "de", label: "DE — Tedesco" },
-  { code: "es", label: "ES — Spagnolo" },
-  { code: "fr", label: "FR — Francese" },
-  { code: "el", label: "EL — Greco" },
-  { code: "tr", label: "TR — Turco" },
-];
 
 const TABLE_LANGS = [
   { code: "en", label: "EN" },
@@ -177,8 +168,6 @@ export default function TraduzioniScreen() {
   const [importStatus, setImportStatus] = useState<StepStatus>("idle");
   const [importResult, setImportResult] = useState("");
   const [importFileName, setImportFileName] = useState<string>("");
-  const webImportInputRef = useRef<any>(null);
-
   const [aiStatus, setAiStatus] = useState<StepStatus>("idle");
   const [aiResult, setAiResult] = useState("");
   const [aiSummary, setAiSummary] = useState<Record<string, number> | null>(null);
@@ -354,24 +343,6 @@ export default function TraduzioniScreen() {
     setImportResult(
       summary ? `Stringhe aggiornate → ${summary}` : payload.message || "Import completato"
     );
-  }
-
-  async function _handleWebFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setImportFileName(file.name);
-    setImportStatus("loading");
-    setImportResult("");
-    try {
-      const fd = new FormData();
-      fd.append("file", file, file.name);
-      await uploadDocxFile(fd);
-    } catch (err: unknown) {
-      setImportStatus("error");
-      setImportResult(extractErrorMessage(err, t("admin.importError")));
-    } finally {
-      if (webImportInputRef.current) webImportInputRef.current.value = "";
-    }
   }
 
   async function handlePickAndImportNative() {

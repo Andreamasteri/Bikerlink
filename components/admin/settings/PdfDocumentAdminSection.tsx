@@ -4,7 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
-import { useT } from "@/lib/language-context";
 import { useQuery } from "@tanstack/react-query";
 
 const manualStyles = StyleSheet.create({
@@ -75,7 +74,6 @@ export function PdfDocumentAdminSection({
   downloadEndpoint,
   uploadEndpoint,
 }: PdfDocumentAdminSectionProps) {
-  const _t = useT();
   const [uploading, setUploading] = useState(false);
 
   const { data: fileInfo, refetch } = useQuery<{

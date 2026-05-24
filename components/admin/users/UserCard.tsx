@@ -3,13 +3,6 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
-// Note: CURRENT_APP_VERSION should be imported or passed as prop. 
-// In the original file it was used but not defined in the snippet I saw, 
-// likely it's imported from somewhere or defined at the top.
-// Checking the snippet again... it was used at line 469.
-// It seems I missed where it was defined. Let me check the top of the file again.
-const _CURRENT_APP_VERSION = "1.0.0"; // Placeholder, will check later if it's imported.
-
 export interface AdminUser {
   id: string;
   nickname: string;

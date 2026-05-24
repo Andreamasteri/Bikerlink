@@ -395,7 +395,7 @@ export function useAdAdmin() {
           failed += data.failed ?? 0;
           if (data.failedFiles?.length) failedNames.push(...data.failedFiles);
         }
-      } catch (_err) {
+      } catch {
         failed += chunk.length;
       }
       setBulkProgress({ current: Math.min(chunkStart + CHUNK_SIZE, totalImages), total: totalImages });

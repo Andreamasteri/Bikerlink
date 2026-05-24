@@ -120,7 +120,8 @@ export default function ForgotPasswordScreen() {
       if (userData?.sessionToken) {
         await setSessionToken(userData.sessionToken);
       }
-      const { sessionToken: _t, ...user } = userData ?? {};
+      const { sessionToken: _omit, ...user } = userData ?? {};
+      void _omit;
       queryClient.setQueryData(["/api/auth/me"], user);
       router.replace("/(tabs)");
     } catch (err: unknown) {

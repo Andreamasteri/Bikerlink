@@ -2,7 +2,6 @@ import React from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { useT } from "@/lib/language-context";
 
 interface ProposalLocationProps {
   departureAddress: string;
@@ -45,8 +44,6 @@ export const ProposalLocation = ({
   handleAddStop,
   handleRemoveStop,
 }: ProposalLocationProps) => {
-  const _t = useT();
-
   return (
     <View>
       <Text style={styles.sectionTitle}>Punto di partenza</Text>

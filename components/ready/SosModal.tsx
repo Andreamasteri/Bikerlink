@@ -15,8 +15,6 @@ export function SosModal({
   setCustomRadius,
   onSubmit,
   isPending,
-  location: _location,
-  t: _t,
 }: {
   visible: boolean;
   onClose: () => void;

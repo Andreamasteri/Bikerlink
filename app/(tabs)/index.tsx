@@ -4,14 +4,9 @@ import {
   Text,
   ActivityIndicator,
   ScrollView,
-  Animated,
-  TouchableOpacity,
-  Linking,
-  Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { queryClient } from "@/lib/query-client";
-import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getUserColor, getUserTypeLabel, getUserIcon } from "@/lib/mapUserUtils";
@@ -83,9 +78,7 @@ export default function MapScreen() {
     toggleFilterZavorrina,
     toggleFilterClubs,
     toggleFilterEvents,
-    location,
     locationLoading,
-    setLocation,
     mapData,
     saveCountries,
     toggleCountryInModal,
@@ -109,8 +102,6 @@ export default function MapScreen() {
     handleSearchResultPress,
     handleLocateUser,
     myAds,
-    focusToast: _focusToast,
-    focusToastAnim: _focusToastAnim,
     handleFullscreenMapReady,
   } = useHomeMapState();
 

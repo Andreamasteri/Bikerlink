@@ -15,7 +15,6 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useAuth } from "@/lib/auth-context";
 import { useSetting } from "@/lib/settings-context";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
@@ -58,7 +57,6 @@ function visibilityIcon(v: Visibility): React.ComponentProps<typeof Ionicons>["n
 export default function RoutesListScreen() {
   const t = useT();
   const router = useRouter();
-  const { user: _user } = useAuth();
   const insets = useSafeAreaInsets();
   const [togglingId, setTogglingId] = useState<string | null>(null);
 

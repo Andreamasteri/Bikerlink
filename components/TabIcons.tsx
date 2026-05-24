@@ -18,7 +18,6 @@ interface TabIconProps {
 
 export function TabIcon({
   name,
-  focused: _focused,
   color,
   size,
   unreadCount = 0,

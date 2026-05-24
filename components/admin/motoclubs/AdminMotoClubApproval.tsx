@@ -36,7 +36,7 @@ export interface PendingLocation {
   proposerNickname: string | null;
 }
 
-interface _AdminMotoClubApprovalProps {
+export interface AdminMotoClubApprovalProps {
   onApprove: (req: ClubRequest) => void;
   onReject: (req: ClubRequest) => void;
   onApproveLocation: (loc: PendingLocation) => void;
@@ -195,7 +195,6 @@ export function AdminMotoClubLocationCard({ item, onApprove, onReject, isApprovi
   isApproving: boolean;
   isRejecting: boolean;
 }) {
-  const _t = useT();
   return (
     <View style={[styles.card, { borderLeftWidth: 3, borderLeftColor: "#2979FF" }]}>
       <View style={styles.cardIconWrap}>

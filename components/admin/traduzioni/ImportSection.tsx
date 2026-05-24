@@ -17,7 +17,6 @@ export function ImportSection({
   importFileName,
   importResult,
   onImportPress,
-  t: _t,
 }: ImportSectionProps) {
   return (
     <View style={styles.card}>

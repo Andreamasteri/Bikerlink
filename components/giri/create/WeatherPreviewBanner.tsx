@@ -3,8 +3,6 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 
-interface _Waypoint { lat: number; lng: number; name: string; }
-
 interface WeatherWaypoint {
   lat: number; lng: number; name: string;
   tempNow: number | null; precipProb: number; weatherCode: number;

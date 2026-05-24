@@ -1,15 +1,12 @@
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useColors } from "@/hooks/useColors";
 
 interface AiFallbackBannerProps {
   onDismiss: () => void;
 }
 
 export const AiFallbackBanner: React.FC<AiFallbackBannerProps> = ({ onDismiss }) => {
-  const _colors = useColors();
-  
   return (
     <View style={styles.aiFallbackBanner}>
       <Ionicons name="information-circle-outline" size={16} color="#b45309" />

@@ -13,7 +13,6 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiRequest, getQueryFn, getApiUrl } from "@/lib/query-client";
-import { useAuth } from "@/lib/auth-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
@@ -87,8 +86,6 @@ export default function CustomRouteDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
-  const { user: _user } = useAuth();
-
   const { data: route, isLoading } = useQuery<CustomRouteDetail>({
     queryKey: ["/api/custom-routes", id],
     queryFn: getQueryFn({ on401: "throw" }),

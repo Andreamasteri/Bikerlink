@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
-
-  StyleSheet,
   TouchableOpacity,
   Platform,
   ActivityIndicator,
@@ -62,7 +60,7 @@ export default function SystemScreen() {
   const [nativeIosUrl, setNativeIosUrl] = useState("");
   const [savingNative, setSavingNative] = useState(false);
 
-  const { data: nativeVerData, refetch: refetchNativeVer, isFetching: _isFetchingNativeVer } = useQuery<NativeVersionConfigData>({
+  const { data: nativeVerData, refetch: refetchNativeVer } = useQuery<NativeVersionConfigData>({
     queryKey: ["/api/settings/native-version"],
   });
 
@@ -119,7 +117,7 @@ export default function SystemScreen() {
   const saveNativeVersion = useCallback(async () => {
     setSavingNative(true);
     try {
-      const _res = await apiRequest("PUT", "/api/admin/settings/native-version", {
+      await apiRequest("PUT", "/api/admin/settings/native-version", {
         android: { latestVersion: nativeAndroidLatest, minVersion: nativeAndroidMin, storeUrl: nativeAndroidUrl },
         ios: { latestVersion: nativeIosLatest, minVersion: nativeIosMin, storeUrl: nativeIosUrl }
       });
@@ -132,9 +130,7 @@ export default function SystemScreen() {
   }, [nativeAndroidLatest, nativeAndroidMin, nativeAndroidUrl, nativeIosLatest, nativeIosMin, nativeIosUrl]);
 
   const router = useRouter();
-  const { sessionExpired, logoutMutation, user } = useAuth();
-  const _isAdmin = user?.role === "admin";
-
+  const { sessionExpired, logoutMutation } = useAuth();
   const executePurge = useCallback(async () => {
     if (purgeConfirmText.trim().toUpperCase() !== "PURGA") {
       Alert.alert("Conferma errata", "Devi scrivere esattamente PURGA per procedere.");
@@ -402,35 +398,3 @@ export default function SystemScreen() {
   );
 }
 
-const _styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.background,
-    gap: 12
-  },
-  loadingText: {
-    color: Colors.textMuted ?? "#888",
-    fontFamily: "Inter_400Regular",
-    fontSize: 14
-  },
-  errorText: {
-    color: "#FF4444",
-    fontFamily: "Inter_500Medium",
-    fontSize: 15,
-    textAlign: "center"
-  },
-  retryBtn: {
-    marginTop: 8,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    backgroundColor: Colors.accent,
-    borderRadius: 8
-  },
-  retryBtnText: {
-    color: "#fff",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14
-  }
-});

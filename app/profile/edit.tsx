@@ -22,7 +22,6 @@ import { useLanguage } from "@/lib/language-context";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { findCountryByRegion } from "@/lib/countries-regions";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
-import { useUnits } from "@/lib/units-context";
 import { useT } from "@/lib/language-context";
 import { updateUserSchema } from "@shared/validators";
 
@@ -71,7 +70,6 @@ export default function EditProfileScreen() {
   const params = useLocalSearchParams();
   const { user, logoutMutation } = useAuth();
   const { language, setLanguage } = useLanguage();
-  const { speedUnit: _speedUnit, setSystem: _setSystem } = useUnits();
 
   const profileQuery = useQuery<ProfileData>({
     queryKey: ["/api/users/me"],

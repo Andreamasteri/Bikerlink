@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -24,7 +24,6 @@ import {
 export default function AdminMatchPreferencesEditScreen() {
   const { userId, nickname } = useLocalSearchParams<{ userId: string; nickname?: string }>();
   const insets = useSafeAreaInsets();
-  const _router = useRouter();
   const queryClient = useQueryClient();
 
   const queryKey = ["/api/admin/users", userId, "match-preferences"];

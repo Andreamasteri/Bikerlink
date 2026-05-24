@@ -13,7 +13,6 @@ import { KeyboardAvoidingView } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
-import { useRouter } from "expo-router";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
 
 import Colors from "@/constants/colors";
@@ -38,9 +37,8 @@ interface ContestResponse {
 }
 
 export default function ContestScreen() {
-  const _router = useRouter();
   const t = useT();
-  const [_showUpload, setShowUpload] = useState(false);
+  const [, setShowUpload] = useState(false);
   const [caption, setCaption] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -110,7 +108,7 @@ export default function ContestScreen() {
       setCaption("");
       setSelectedImage(null);
     },
-    onError: (_error: Error) => {
+    onError: () => {
       Alert.alert("Errore", "Impossibile caricare la foto");
     },
   });

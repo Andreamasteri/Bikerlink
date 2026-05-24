@@ -69,12 +69,10 @@ export const HomeModalsAndSheets: React.FC<HomeModalsAndSheetsProps> = ({
   showZavorrinaList,
   setShowZavorrinaList,
   showOfflineOnline,
-  setShowOfflineOnline: _setShowOfflineOnline,
   onlineListQuery,
   bikerListQuery,
   zavListQuery,
   offlineCountdown,
-  startOfflineTimer: _startOfflineTimer,
   handleLocateUser,
   
   selectedUser,

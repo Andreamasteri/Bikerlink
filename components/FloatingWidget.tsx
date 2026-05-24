@@ -41,12 +41,6 @@ export default function FloatingWidget() {
   const dragDistanceRef = useRef(0);
   const menuOpacity = useRef(new Animated.Value(0)).current;
 
-  const _openMenu = useCallback(() => {
-    menuOpenRef.current = true;
-    setMenuOpen(true);
-    Animated.timing(menuOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
-  }, [menuOpacity]);
-
   const closeMenu = useCallback(() => {
     menuOpenRef.current = false;
     Animated.timing(menuOpacity, { toValue: 0, duration: 100, useNativeDriver: true }).start(() => {

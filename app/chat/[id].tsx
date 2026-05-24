@@ -14,7 +14,6 @@ import {
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { showImagePickerMenu } from "@/lib/image-picker-utils";
@@ -69,7 +68,6 @@ export default function ChatConversationScreen() {
   const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const _insets = useSafeAreaInsets();
   const { user } = (require("@/lib/auth-context")).useAuth();
   const userId = user?.id || "";
   const [inputText, setInputText] = useState("");

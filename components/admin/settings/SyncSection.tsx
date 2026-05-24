@@ -2,7 +2,6 @@ import React from "react";
 import { View as RNView, Text as RNText, StyleSheet as RNStyleSheet, TouchableOpacity as RNTouchableOpacity, ActivityIndicator as RNActivityIndicator } from "react-native";
 import { Ionicons as IoniconsSet } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { useT } from "@/lib/language-context";
 
 const styles = RNStyleSheet.create({
   paidCard: {
@@ -33,8 +32,6 @@ export function SyncSection({
   onSyncNow,
   syncPending,
 }: SyncSectionProps) {
-  const _t = useT();
-
   return (
     <RNView style={styles.paidCard}>
       <RNView style={styles.synecoHeader}>

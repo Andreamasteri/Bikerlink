@@ -1,15 +1,12 @@
 import React from "react";
 import { View, Text, StyleSheet, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useColors } from "@/hooks/useColors";
 
 interface AiSuccessBannerProps {
   onDismiss: () => void;
 }
 
 export const AiSuccessBanner: React.FC<AiSuccessBannerProps> = ({ onDismiss }) => {
-  const _colors = useColors();
-  
   return (
     <View style={styles.aiSuccessBanner}>
       <Ionicons name="checkmark-circle-outline" size={16} color="#15803d" />

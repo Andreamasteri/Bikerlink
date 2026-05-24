@@ -57,7 +57,7 @@ export default function MusicScreen() {
 
   const [pendingAddId, setPendingAddId] = useState<string | null>(null);
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
-  const [isConnecting, _setIsConnecting] = useState(false);
+  const [isConnecting] = useState(false);
   const [searchNeedsReconnect, setSearchNeedsReconnect] = useState(false);
 
   const [lastfmModalVisible, setLastfmModalVisible] = useState(false);

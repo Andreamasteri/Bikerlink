@@ -163,7 +163,7 @@ export function useTrackingState() {
 
   const handsOffDismissedForRideRef = useRef(false);
   const totalGpsPointsRef = useRef(0);
-  const [isTabFocused, _setIsTabFocused] = useState(true);
+  const [isTabFocused] = useState(true);
   const isTabFocusedRef = useRef(isTabFocused);
 
   // Sync refs

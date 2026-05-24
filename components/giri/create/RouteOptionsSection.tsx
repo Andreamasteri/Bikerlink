@@ -5,8 +5,6 @@ import Slider from "@react-native-community/slider";
 import { useColors } from "@/hooks/useColors";
 import type { ThemeColors } from "@/constants/colors";
 
-type _CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
-
 interface RouteOptionsSectionProps {
   isRoundTrip: boolean;
   setIsRoundTrip: (v: boolean) => void;

@@ -39,11 +39,9 @@ export default function RegisterScreen() {
   const { registerMutation } = useAuth();
   const params = useLocalSearchParams<{ inviteCode?: string }>();
 
-  const { data: emailVerifData } = useQuery<{ enabled: boolean }>({
+  useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/email-verification"],
   });
-  const _emailVerifEnabled = emailVerifData?.enabled === true;
-
   const { data: phoneFieldData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/phone-field-enabled"],
   });

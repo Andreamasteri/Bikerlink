@@ -27,7 +27,6 @@ export function SensorOverlayPanel({
   currentTiltDeg,
   maxAccelG,
   mountAxisCalib,
-  sensorsEnabled: _sensorsEnabled,
   colors,
   styles: s,
   t,

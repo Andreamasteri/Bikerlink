@@ -13,7 +13,6 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useRouter, Stack } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
@@ -89,7 +88,6 @@ function parseDateAndTime(dateStr: string, timeStr: string): Date | null {
 
 export default function CreateProposalScreen() {
   const router = useRouter();
-  const _insets = useSafeAreaInsets();
   const { user } = useAuth();
   const t = useT();
 

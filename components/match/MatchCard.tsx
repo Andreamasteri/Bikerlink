@@ -689,7 +689,7 @@ export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onRej
   );
 }
 
-export function MatchCardFull({ match, currentUserId, onAccept, onReject, onChatPress: _onChatPress, onRemove, isPending, t, locale }: {
+export function MatchCardFull({ match, currentUserId, onAccept, onReject, onRemove, isPending, t, locale }: {
   match: any;
   currentUserId: string;
   onAccept: () => void;

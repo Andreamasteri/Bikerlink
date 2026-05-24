@@ -9,7 +9,6 @@ const INIT_KEY_PREFIX = "bikerlink:matchAlertInit:v1:";
 const MAX_SEEN_IDS = 500;
 
 const ALL_SOURCES = ["garage", "biker", "proposals"] as const;
-type _SourceKey = typeof ALL_SOURCES[number];
 
 interface MatchItem {
   id: string | number;

@@ -81,8 +81,8 @@ export async function loadBatteryDrainStats(): Promise<BatteryDrainStats> {
   try {
     const raw = await AsyncStorage.getItem(BATTERY_DRAIN_STATS_KEY);
     if (raw) return normalizeBatteryDrainStats(JSON.parse(raw));
-  } catch (_e) {
-    // console.warn("[BikerLink] loadBatteryDrainStats error:", e);
+  } catch {
+    // console.warn("[BikerLink] loadBatteryDrainStats error");
   }
   return { easy: [], medium: [], race: [] };
 }
@@ -96,8 +96,8 @@ export async function appendBatteryDrainSample(
   const updated: BatteryDrainStats = { ...stats, [profile]: arr };
   try {
     await AsyncStorage.setItem(BATTERY_DRAIN_STATS_KEY, JSON.stringify(updated));
-  } catch (_e) {
-    // console.warn("[BikerLink] appendBatteryDrainSample persist error:", e);
+  } catch {
+    // console.warn("[BikerLink] appendBatteryDrainSample persist error");
   }
   return updated;
 }

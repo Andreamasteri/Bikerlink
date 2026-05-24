@@ -33,7 +33,7 @@ export function useTrackingStats() {
           try {
             await apiRequest("DELETE", `/api/routes/${id}`);
             refetchRecords();
-          } catch (_e) {
+          } catch {
             Alert.alert(t("common.error"), t("tracking.deleteError"));
           }
         },

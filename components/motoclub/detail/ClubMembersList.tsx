@@ -15,11 +15,6 @@ export interface Member {
   country: string | null;
 }
 
-interface _ClubMembersListProps {
-  members: Member[];
-  totalCount: number;
-  currentUserId?: string;
-}
 
 export function countryFlag(code: string | null) {
   if (!code || code.length !== 2) return "";

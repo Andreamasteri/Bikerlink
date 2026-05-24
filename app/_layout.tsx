@@ -203,7 +203,7 @@ function reportClientError(error: Error, componentStack: string) {
 }
 
 export default function RootLayout() {
-  const { ready, fontsLoaded: _fontsLoaded, fontError: _fontError } = useAppBootstrap();
+  const { ready } = useAppBootstrap();
 
   useEffect(() => {
     type ErrorHandler = (error: Error, isFatal?: boolean) => void;

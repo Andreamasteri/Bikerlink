@@ -13,9 +13,7 @@ import {
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import TrackingScreen from "@/app/(tabs)/tracking";
@@ -104,11 +102,6 @@ function ProposalCard({ item, onPress, t, locale }: { item: ProposalItem; onPres
       })
     : null;
 
-  const _creatorColor =
-    item.creatorUserType === "biker" ? Colors.maleIcon
-    : item.creatorUserType === "zavorrina" ? Colors.femaleIcon
-    : Colors.accent;
-
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.cardHeader}>
@@ -195,13 +188,11 @@ const HUB_SECTIONS = [
 
 export default function ProposalsScreen() {
   const router = useRouter();
-  const _insets = useSafeAreaInsets();
-  const { user: _user } = useAuth();
   const t = useT();
   const locale = useLocale();
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeHub, setActiveHub] = useState<"proposte" | "giri" | "percorsi" | "pianificati">("proposte");
-  const [_mountCalib, setMountCalib] = useState<MountAxisCalibration | null>(null);
+  const [, setMountCalib] = useState<MountAxisCalibration | null>(null);
   const [showMountCalibWizard, setShowMountCalibWizard] = useState(false);
 
   useEffect(() => {

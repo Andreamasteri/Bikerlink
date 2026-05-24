@@ -43,7 +43,6 @@ export function StregattaCard({
   onOpenChat,
   isTogglingAvailable,
   isTogglingOnline,
-  isDeleting: _isDeleting,
 }: StregattaCardProps) {
   const isAvailable = user.profile?.isAvailable ?? false;
   const isOnline = user.lastLoginAt ? (new Date().getTime() - new Date(user.lastLoginAt).getTime() < 5 * 60 * 1000) : false;

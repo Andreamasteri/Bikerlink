@@ -19,10 +19,6 @@ import { useUnits } from "@/lib/units-context";
 import { getCurrentLocale } from "@/lib/i18n";
 import { useT } from "@/lib/language-context";
 
-function _formatSprintTime(ms: number): string {
-  return (ms / 1000).toFixed(3) + "s";
-}
-
 import { SprintCard } from "@/components/sprint/SprintCard";
 import { SprintFilters } from "@/components/sprint/SprintFilters";
 import { SprintStats } from "@/components/sprint/SprintStats";

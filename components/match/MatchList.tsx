@@ -2,7 +2,6 @@ import React from "react";
 import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { useT } from "@/lib/language-context";
 
 interface MatchListProps {
   currentList: any[];
@@ -29,8 +28,6 @@ export function MatchList({
   getEmptyTitle,
   getEmptyDesc,
 }: MatchListProps) {
-  const _t = useT();
-
   if (isServerBusy) {
     return (
       <View style={styles.loading}>

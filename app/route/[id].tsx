@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
 
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -52,7 +52,6 @@ interface RouteDetail {
 
 export default function RouteDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const _router = useRouter();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const { distanceUnit, speedUnit, timeFormat } = useUnits();
@@ -115,18 +114,9 @@ export default function RouteDetailScreen() {
     );
   }
 
-  const hasPoints = pts.length > 0;
   const hasSensorData = pts.some((p) => p.accelG != null || p.tiltDeg != null);
   const speedUnitLabel = convertSpeed(0, speedUnit).label;
 
-  const _region = hasPoints
-    ? {
-        latitude: pts[Math.floor(pts.length / 2)].latitude,
-        longitude: pts[Math.floor(pts.length / 2)].longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      }
-    : { latitude: 41.9, longitude: 12.5, latitudeDelta: 5, longitudeDelta: 5 };
 
   return (
     <ScrollView

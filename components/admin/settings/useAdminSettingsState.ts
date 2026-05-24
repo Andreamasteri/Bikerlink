@@ -65,9 +65,9 @@ export function useAdminSettingsState({ isAdmin, t, setTheme }: UseAdminSettings
   const toggles = useToggleSettings(t, setProtectedToggle, setProtectedPassword);
 
   const appState = useAdminSettingsAppState(isAdmin, t, setTheme);
-  const featureFlags = useAdminSettingsFeatureFlags(isAdmin, t);
+  const featureFlags = useAdminSettingsFeatureFlags();
   const maintenance = useAdminSettingsMaintenance(isAdmin, t);
-  const systemConfig = useAdminSettingsSystemConfig(isAdmin, t);
+  const systemConfig = useAdminSettingsSystemConfig(isAdmin);
 
   useEffect(() => {
     AsyncStorage.getItem("uptime_widget_enabled").then((val) => {

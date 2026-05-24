@@ -34,7 +34,7 @@ interface Props {
 
 export default function EndlessBiker({ onGameOver }: Props) {
   const insets = useSafeAreaInsets();
-  const [_running, setRunning] = useState(true);
+  const [, setRunning] = useState(true);
   const [score, setScore] = useState(0);
   const [isDucking, setIsDucking] = useState(false);
 

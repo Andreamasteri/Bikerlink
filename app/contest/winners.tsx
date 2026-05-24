@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
 
 import Colors from "@/constants/colors";
@@ -61,8 +60,6 @@ function WinnerItem({ item, index }: { item: PhotoWinner; index: number }) {
 }
 
 export default function WinnersScreen() {
-  const _insets = useSafeAreaInsets();
-
   const { data, isLoading, refetch } = useQuery<PhotoWinner[]>({
     queryKey: ["/api/contest/winners"],
   });

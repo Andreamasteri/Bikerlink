@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ImageBackground,
-  Dimensions,
   Platform,
   Animated,
   Easing,
@@ -17,7 +16,6 @@ import { useLanguage, useT } from "@/lib/language-context";
 import { type AppLanguage } from "@/lib/i18n";
 import { pickSplashMessage } from "@/lib/splash-utils";
 
-const { width: _width, height: _height } = Dimensions.get("window");
 const AnimatedImageBackground = Animated.createAnimatedComponent(ImageBackground);
 
 const LANGUAGES: { code: AppLanguage; flag: string; label: string }[] = [

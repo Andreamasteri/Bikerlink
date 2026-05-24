@@ -12,7 +12,6 @@ import {
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
@@ -93,7 +92,6 @@ function getUserColor(userType: string): string {
 export default function ProposalDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const _insets = useSafeAreaInsets();
   const { user } = useAuth();
   const t = useT();
   const locale = useLocale();

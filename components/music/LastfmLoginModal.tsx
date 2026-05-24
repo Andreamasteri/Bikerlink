@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { useT } from "@/lib/language-context";
 import { apiRequest } from "@/lib/query-client";
 
 export function LastfmLoginModal({
@@ -21,7 +20,6 @@ export function LastfmLoginModal({
   visible: boolean;
   onClose: () => void;
 }) {
-  const _t = useT();
   const [username, setUsername] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

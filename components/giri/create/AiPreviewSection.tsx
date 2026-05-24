@@ -27,7 +27,6 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
   handleConfirmPreview,
   setMode,
   pillRoleColor,
-  pillRoleLabel: _pillRoleLabel,
 }) => {
   const colors = useColors();
   if (!aiPreview) return null;

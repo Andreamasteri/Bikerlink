@@ -1,6 +1,5 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
-import { useColors } from "@/hooks/useColors";
 import { RouteResultCard } from "./RouteResultCard";
 import ElevationProfile from "@/components/ElevationProfile";
 
@@ -20,7 +19,6 @@ interface RouteResultSectionProps {
 
 export const RouteResultSection: React.FC<RouteResultSectionProps> = ({
   routeResult,
-  isRoundTrip: _isRoundTrip,
   isMultiDay,
   daysCount,
   dismissedWarnings,
@@ -31,7 +29,6 @@ export const RouteResultSection: React.FC<RouteResultSectionProps> = ({
   fuelStopsNeeded,
   bikerScoreAnim,
 }) => {
-  const _colors = useColors();
   if (!routeResult) return null;
 
   return (

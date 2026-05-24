@@ -58,7 +58,7 @@ export default function GiriCreateScreen() {
     avoidHighways, setAvoidHighways, avoidTolls, setAvoidTolls,
     avoidFerries, setAvoidFerries, avoidUnpaved, setAvoidUnpaved,
     visibility, setVisibility, selectedMotoId, setSelectedMotoId,
-    fuelLevel, setFuelLevel, waypoints, setWaypoints: _setWaypoints,
+    fuelLevel, setFuelLevel, waypoints,
     wpInputs, wpSuggestions,
     routeResult, setRouteResult, calculating, setCalculating,
     dismissedWarnings, setDismissedWarnings,

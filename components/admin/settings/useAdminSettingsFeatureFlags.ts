@@ -2,7 +2,7 @@ import { Alert } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getApiUrl, queryClient } from "@/lib/query-client";
 
-export function useAdminSettingsFeatureFlags(_isAdmin: boolean, _t: (k: string) => string) {
+export function useAdminSettingsFeatureFlags() {
   const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/ads-enabled"],
   });

@@ -15,13 +15,7 @@ import { useT } from "@/lib/language-context";
 import { getCountryFlag, getCountryName } from "@/lib/countries-regions";
 import FavoriteStar from "@/components/FavoriteStar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import type { InteractiveMapHandle } from "@/components/InteractiveMap";
 
-type _MapUserRef = {
-  mapRef: React.RefObject<InteractiveMapHandle>;
-  fullscreenMapRef: React.RefObject<InteractiveMapHandle>;
-  mapFullscreen: boolean;
-};
 
 type UserItem = {
   id: string;

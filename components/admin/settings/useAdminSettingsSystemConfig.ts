@@ -3,7 +3,7 @@ import { Alert } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { getApiUrl, queryClient } from "@/lib/query-client";
 
-export function useAdminSettingsSystemConfig(isAdmin: boolean, _t: (k: string) => string) {
+export function useAdminSettingsSystemConfig(isAdmin: boolean) {
   const { data: refetchIntervalData } = useQuery<{ seconds: number }>({
     queryKey: ["/api/settings/profile-refetch-interval"],
   });
