@@ -6,12 +6,15 @@ import type { InteractiveMapProps, InteractiveMapHandle } from "@/components/map
 
 export const LazyLeafletInteractiveMap = React.lazy(() => import("@/components/InteractiveMap"));
 export const LazyMapLibreInteractiveMap = React.lazy(() => import("@/components/MapLibreInteractiveMap"));
+export const LazyOpenLayersInteractiveMap = React.lazy(() => import("@/components/OpenLayersInteractiveMap"));
 
 export const LazyLeafletRouteMap = React.lazy(() => import("@/components/LeafletRouteMap"));
 export const LazyMapLibreRouteMap = React.lazy(() => import("@/components/MapLibreRouteMap"));
+export const LazyOpenLayersRouteMap = React.lazy(() => import("@/components/OpenLayersRouteMap"));
 
 export const LazyLeafletMiniMap = React.lazy(() => import("@/components/LeafletMiniMap"));
 export const LazyMapLibreMiniMap = React.lazy(() => import("@/components/MapLibreMiniMap"));
+export const LazyOpenLayersMiniMap = React.lazy(() => import("@/components/OpenLayersMiniMap"));
 
 export const LazyLeafletPickerMap = React.lazy(() => import("@/components/LeafletPickerMap"));
 export const LazyMapLibrePickerMap = React.lazy(() => import("@/components/MapLibrePickerMap"));
@@ -22,12 +25,26 @@ export const LazyMapLibreTrackingMap = React.lazy(() => import("@/components/Map
 export function useMapRenderer() {
   const { renderer } = useMapsRollout();
   const isMapLibre = renderer === "maplibre";
+  const isOpenLayers = renderer === "openlayers";
 
   return {
     isMapLibre,
-    InteractiveMapComponent: isMapLibre ? LazyMapLibreInteractiveMap : LazyLeafletInteractiveMap,
-    RouteMapComponent: isMapLibre ? LazyMapLibreRouteMap : LazyLeafletRouteMap,
-    MiniMapComponent: isMapLibre ? LazyMapLibreMiniMap : LazyLeafletMiniMap,
+    isOpenLayers,
+    InteractiveMapComponent: isOpenLayers
+      ? LazyOpenLayersInteractiveMap
+      : isMapLibre
+        ? LazyMapLibreInteractiveMap
+        : LazyLeafletInteractiveMap,
+    RouteMapComponent: isOpenLayers
+      ? LazyOpenLayersRouteMap
+      : isMapLibre
+        ? LazyMapLibreRouteMap
+        : LazyLeafletRouteMap,
+    MiniMapComponent: isOpenLayers
+      ? LazyOpenLayersMiniMap
+      : isMapLibre
+        ? LazyMapLibreMiniMap
+        : LazyLeafletMiniMap,
     PickerMapComponent: isMapLibre ? LazyMapLibrePickerMap : LazyLeafletPickerMap,
     TrackingMapComponent: isMapLibre ? LazyMapLibreTrackingMap : LazyLeafletTrackingMap,
   };

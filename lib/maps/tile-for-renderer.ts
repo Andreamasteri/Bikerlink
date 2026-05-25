@@ -17,7 +17,7 @@ export function resolveTileUrl(provider: TileProvider): string {
 
 export function getActiveTileProvider(
   activeId: string,
-  renderer: "leaflet" | "maplibre" = "leaflet"
+  renderer: "leaflet" | "maplibre" | "openlayers" = "leaflet"
 ): ResolvedTile {
   const provider = TILE_PROVIDERS.find(
     (p) => p.id === activeId && p.rendererCompat.includes(renderer)

@@ -9,7 +9,7 @@ export interface TileProvider {
   apiKeyEnvVar?: string;
   maxZoom: number;
   cost: TileCost;
-  rendererCompat: Array<"leaflet" | "maplibre">;
+  rendererCompat: Array<"leaflet" | "maplibre" | "openlayers">;
 }
 
 export const TILE_PROVIDERS: TileProvider[] = [
@@ -20,7 +20,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     urlTemplate: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
     maxZoom: 19,
     cost: "free",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "carto-dark",
@@ -29,7 +29,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     urlTemplate: "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
     maxZoom: 19,
     cost: "free",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "carto-voyager",
@@ -38,7 +38,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     urlTemplate: "https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png",
     maxZoom: 19,
     cost: "free",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "esri-gray",
@@ -74,7 +74,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     urlTemplate: "https://a.tile.opentopomap.org/{z}/{x}/{y}.png",
     maxZoom: 17,
     cost: "free",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "stadia-smooth",
@@ -83,7 +83,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     urlTemplate: "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}.png",
     maxZoom: 20,
     cost: "free",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "stadia-dark",
@@ -92,7 +92,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     urlTemplate: "https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}.png",
     maxZoom: 20,
     cost: "free",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "stadia-osm-bright",
@@ -101,7 +101,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     urlTemplate: "https://tiles.stadiamaps.com/tiles/osm_bright/{z}/{x}/{y}.png",
     maxZoom: 20,
     cost: "free",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "maptiler-streets",
@@ -111,7 +111,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     apiKeyEnvVar: "MAPTILER_API_KEY",
     maxZoom: 20,
     cost: "api-key",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "maptiler-outdoor",
@@ -121,7 +121,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     apiKeyEnvVar: "MAPTILER_API_KEY",
     maxZoom: 20,
     cost: "api-key",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "usgs-topo",
@@ -167,7 +167,7 @@ export const TILE_PROVIDERS: TileProvider[] = [
     urlTemplate: "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
     maxZoom: 19,
     cost: "free",
-    rendererCompat: ["leaflet", "maplibre"],
+    rendererCompat: ["leaflet", "maplibre", "openlayers"],
   },
   {
     id: "owm-clouds",
