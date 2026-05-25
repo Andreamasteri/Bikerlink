@@ -394,3 +394,15 @@ export const serverRestarts = pgTable("server_restarts", {
 });
 export type ServerRestart = typeof serverRestarts.$inferSelect;
 export type InsertServerRestart = typeof serverRestarts.$inferInsert;
+
+export const mapsQuota = pgTable("maps_quota", {
+  providerId: varchar("provider_id", { length: 100 }).notNull(),
+  yearMonth: varchar("year_month", { length: 7 }).notNull(),
+  count: integer("count").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  { primaryKey: [table.providerId, table.yearMonth] },
+  index("maps_quota_provider_idx").on(table.providerId),
+]);
+export type MapsQuota = typeof mapsQuota.$inferSelect;
+export type InsertMapsQuota = typeof mapsQuota.$inferInsert;
