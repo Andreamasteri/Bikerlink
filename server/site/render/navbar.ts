@@ -31,10 +31,19 @@ export function navbar(currentPath: string): string {
 <script>
 (function(){
   var b=document.getElementById('navBurger'),n=document.getElementById('navLinks');
+  function setMenu(open){
+    n.classList.toggle('open',open);
+    b.setAttribute('aria-expanded',open?'true':'false');
+    try{document.body.style.overflow=open?'hidden':'';}catch(e){}
+  }
   if(b&&n){
     b.addEventListener('click',function(){
-      var o=n.classList.toggle('open');
-      b.setAttribute('aria-expanded',o?'true':'false');
+      setMenu(!n.classList.contains('open'));
+    });
+    n.querySelectorAll('a').forEach(function(a){
+      a.addEventListener('click',function(){
+        if(n.classList.contains('open')) setMenu(false);
+      });
     });
   }
 

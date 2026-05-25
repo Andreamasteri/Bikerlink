@@ -76,7 +76,7 @@ function footer(): string {
       </div>
     </div>
     <div>
-      <h2 style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.product">Prodotto</h2>
+      <h2 style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.product">Prodotto</h2>
       <ul>
         <li><a href="/features" data-i18n="footer.features">Funzionalità</a></li>
         <li><a href="/sos" data-i18n="footer.sos">SOS Biker</a></li>
@@ -86,7 +86,7 @@ function footer(): string {
       </ul>
     </div>
     <div>
-      <h2 style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.company">Azienda</h2>
+      <h2 style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.company">Azienda</h2>
       <ul>
         <li><a href="/about" data-i18n="footer.about">Chi siamo</a></li>
         <li><a href="/faq" data-i18n="footer.faq">Domande frequenti</a></li>
@@ -95,7 +95,7 @@ function footer(): string {
       </ul>
     </div>
     <div>
-      <h2 style="font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.legal">Legale</h2>
+      <h2 style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.legal">Legale</h2>
       <ul>
         <li><a href="/privacy" data-i18n="footer.privacy">Privacy Policy</a></li>
         <li><a href="/terms" data-i18n="footer.terms">Termini di Servizio</a></li>
@@ -217,7 +217,7 @@ export function renderPage(
 <html lang="it">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>${titleSafe}</title>
 <meta name="description" content="${descSafe}" />
 <meta name="robots" content="${robots}" />
