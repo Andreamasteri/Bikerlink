@@ -4,6 +4,15 @@
     "appVersionSource": "local"
   },
   "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "staging",
+      "credentialsSource": "remote",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
+      }
+    },
     "release-apk": {
       "distribution": "internal",
       "channel": "production",
@@ -25,5 +34,8 @@
         "autoIncrement": false
       }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
