@@ -2,6 +2,7 @@ import {
   type PageMeta,
   breadcrumbsJsonLd,
 } from "./render";
+import { COMP_SECTION } from "./pages-shared";
 
 export function buildFeatures(
   baseUrl: string,
@@ -60,7 +61,7 @@ export function buildFeatures(
   </div>
 </section>
 
-\${COMP_SECTION}
+${COMP_SECTION}
 
 <section class="cta-block">
   <h2>Provala adesso. <span style="color:var(--accent)">È gratis.</span></h2>

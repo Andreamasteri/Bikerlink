@@ -2,6 +2,7 @@ import {
   type PageMeta,
   organizationJsonLd,
 } from "./render";
+import { COMP_SECTION } from "./pages-shared";
 
 // ── HOME PAGE-SPECIFIC CSS ─────────────────────────────────────────────────────
 const HOME_CSS = `<style>
@@ -440,7 +441,7 @@ export function buildHome(baseUrl: string, images?: LandingImages): { meta: Page
   </div>
 </section>
 
-\${COMP_SECTION}
+${COMP_SECTION}
 
 <!-- ── SEO PROSE ── -->
 <section class="section alt" aria-label="Approfondimento">
