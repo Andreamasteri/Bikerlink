@@ -74,10 +74,6 @@ export default function FakeUsersAdmin() {
   const [filter, setFilter] = useState<StregattaFilterType>("tutti");
   const [deleteAllConfirmVisible, setDeleteAllConfirmVisible] = useState(false);
   const [deleteSingleTarget, setDeleteSingleTarget] = useState<{ id: string; nickname: string } | null>(null);
-  const [togglePwdVisible, setTogglePwdVisible] = useState(false);
-  const [togglePwdInput, setTogglePwdInput] = useState("");
-  const [togglePwdError, setTogglePwdError] = useState<string | null>(null);
-  const [pendingToggleVal, setPendingToggleVal] = useState<boolean | null>(null);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [chatModalVisible, setChatModalVisible] = useState(false);
   const [deletingChats, setDeletingChats] = useState(false);
@@ -524,7 +520,7 @@ export default function FakeUsersAdmin() {
               chatbotEnabled={chatbotEnabled}
               onToggleChatbot={(v) => chatbotMutation.mutate(v)}
               allEnabled={allEnabled}
-              onToggleAll={(v) => { setPendingToggleVal(v); setTogglePwdVisible(true); }}
+              onToggleAll={(v) => toggleAllMutation.mutate({ enabled: v, adminPassword: "" })}
               motionStatus={motionStatus ?? null}
               onToggleMotion={(v) => toggleMotionMutation.mutate(v)}
               isTogglingMotion={toggleMotionMutation.isPending}
@@ -643,27 +639,12 @@ export default function FakeUsersAdmin() {
       <StregattaModals
         massSeedConfirmVisible={massSeedConfirmVisible}
         setMassSeedConfirmVisible={setMassSeedConfirmVisible}
-        togglePwdVisible={togglePwdVisible}
-        setTogglePwdVisible={setTogglePwdVisible}
         deleteAllConfirmVisible={deleteAllConfirmVisible}
         setDeleteAllConfirmVisible={setDeleteAllConfirmVisible}
         deleteSingleTarget={deleteSingleTarget}
         setDeleteSingleTarget={setDeleteSingleTarget}
-        togglePwdInput={togglePwdInput}
-        setTogglePwdInput={setTogglePwdInput}
-        togglePwdError={togglePwdError}
-        pendingToggleVal={pendingToggleVal}
         totalCount={totalCount}
         onStartMassSeed={startMassSeed}
-        onConfirmToggleAll={() => {
-          toggleAllMutation.mutate(
-            { enabled: !!pendingToggleVal, adminPassword: togglePwdInput },
-            {
-              onSuccess: () => setTogglePwdVisible(false),
-              onError: (e) => setTogglePwdError(e.message)
-            }
-          );
-        }}
         onConfirmDeleteAll={() => deleteAllMutation.mutate(undefined, { onSettled: () => setDeleteAllConfirmVisible(false) })}
         onConfirmDeleteSingle={(id) => { deleteMutation.mutate(id); setDeleteSingleTarget(null); }}
       />

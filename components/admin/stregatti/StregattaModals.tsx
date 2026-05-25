@@ -1,24 +1,17 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput } from "react-native";
+import { View, Text, StyleSheet, Modal, TouchableOpacity } from "react-native";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 
 interface StregattaModalsProps {
   massSeedConfirmVisible: boolean;
   setMassSeedConfirmVisible: (visible: boolean) => void;
-  togglePwdVisible: boolean;
-  setTogglePwdVisible: (visible: boolean) => void;
   deleteAllConfirmVisible: boolean;
   setDeleteAllConfirmVisible: (visible: boolean) => void;
   deleteSingleTarget: { id: string; nickname: string } | null;
   setDeleteSingleTarget: (target: { id: string; nickname: string } | null) => void;
-  togglePwdInput: string;
-  setTogglePwdInput: (text: string) => void;
-  togglePwdError: string | null;
-  pendingToggleVal: boolean | null;
   totalCount: number;
   onStartMassSeed: () => void;
-  onConfirmToggleAll: () => void;
   onConfirmDeleteAll: () => void;
   onConfirmDeleteSingle: (id: string) => void;
 }
@@ -26,19 +19,12 @@ interface StregattaModalsProps {
 export const StregattaModals: React.FC<StregattaModalsProps> = ({
   massSeedConfirmVisible,
   setMassSeedConfirmVisible,
-  togglePwdVisible,
-  setTogglePwdVisible,
   deleteAllConfirmVisible,
   setDeleteAllConfirmVisible,
   deleteSingleTarget,
   setDeleteSingleTarget,
-  togglePwdInput,
-  setTogglePwdInput,
-  togglePwdError,
-  pendingToggleVal,
   totalCount,
   onStartMassSeed,
-  onConfirmToggleAll,
   onConfirmDeleteAll,
   onConfirmDeleteSingle,
 }) => {
@@ -57,27 +43,6 @@ export const StregattaModals: React.FC<StregattaModalsProps> = ({
               </TouchableOpacity>
               <TouchableOpacity style={[styles.pwdBtn, styles.pwdBtnConfirm]} onPress={() => { setMassSeedConfirmVisible(false); onStartMassSeed(); }}>
                 <Text style={styles.pwdBtnText}>Genera</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={togglePwdVisible} animationType="fade" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.pwdModalContainer}>
-            <Text style={styles.pwdModalTitle}>{pendingToggleVal ? "Abilita stregatti" : "Disabilita stregatti"}</Text>
-            <TextInput style={styles.pwdInput} placeholder="Password admin" secureTextEntry value={togglePwdInput} onChangeText={setTogglePwdInput} />
-            {!!togglePwdError && <Text style={styles.errorText}>{togglePwdError}</Text>}
-            <View style={styles.pwdModalButtons}>
-              <TouchableOpacity style={[styles.pwdBtn, styles.pwdBtnCancel]} onPress={() => setTogglePwdVisible(false)}>
-                <Text style={styles.pwdBtnText}>Annulla</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.pwdBtn, styles.pwdBtnConfirm]}
-                onPress={onConfirmToggleAll}
-              >
-                <Text style={styles.pwdBtnText}>Conferma</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -103,24 +103,6 @@ export function StregattaActions({
       <View style={styles.controlsCard}>
         <View style={styles.controlRow}>
           <View style={styles.controlInfo}>
-            <Ionicons name="chatbubble-ellipses" size={24} color={Colors.accent} />
-            <Text style={styles.controlLabel}>Stregatti Chatbot</Text>
-          </View>
-          <Switch
-            value={chatbotEnabled}
-            onValueChange={onToggleChatbot}
-            trackColor={{ false: "#767577", true: Colors.accent }}
-            thumbColor={Platform.OS === "ios" ? "#fff" : chatbotEnabled ? "#fff" : "#f4f3f4"}
-          />
-        </View>
-        <Text style={styles.controlDesc}>
-          Se attivo, gli stregatti risponderanno automaticamente usando l'IA.
-        </Text>
-
-        <View style={styles.controlDivider} />
-
-        <View style={styles.controlRow}>
-          <View style={styles.controlInfo}>
             <Ionicons name="people" size={24} color={Colors.accent} />
             <Text style={styles.controlLabel}>Visibilità Globale</Text>
           </View>
@@ -133,6 +115,24 @@ export function StregattaActions({
         </View>
         <Text style={styles.controlDesc}>
           Nascondi o mostra tutti gli stregatti contemporaneamente.
+        </Text>
+
+        <View style={styles.controlDivider} />
+
+        <View style={styles.controlRow}>
+          <View style={styles.controlInfo}>
+            <Ionicons name="chatbubble-ellipses" size={24} color={Colors.accent} />
+            <Text style={styles.controlLabel}>Stregatti Chatbot</Text>
+          </View>
+          <Switch
+            value={chatbotEnabled}
+            onValueChange={onToggleChatbot}
+            trackColor={{ false: "#767577", true: Colors.accent }}
+            thumbColor={Platform.OS === "ios" ? "#fff" : chatbotEnabled ? "#fff" : "#f4f3f4"}
+          />
+        </View>
+        <Text style={styles.controlDesc}>
+          Se attivo, gli stregatti risponderanno automaticamente usando l'IA.
         </Text>
 
         <View style={styles.controlDivider} />
