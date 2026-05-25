@@ -13,7 +13,8 @@ const weatherWaypointsSchema = z.object({
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { haversineKm } from "../../geo";
 const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
-import { calculateRoute as ghCalculateRoute, isSelfHosted, ACTIVE_PROFILE, ROUTING_DISABLED } from "../../graphhopper-client";
+import { ACTIVE_PROFILE } from "../../graphhopper-client";
+import { calculateRouteWithSelector } from "../../routing/router-selector";
 
 const router = Router();
 
@@ -371,15 +372,6 @@ router.post("/calculate", async (req: Request, res: Response) => {
     ];
   }
 
-  if (ROUTING_DISABLED) {
-    console.warn("[GraphHopper] routing disabilitato via kill-switch, uso percorso approssimativo");
-    return res.json(buildFallbackRoute(effectiveWaypoints));
-  }
-  if (!isSelfHosted && !process.env.GRAPHHOPPER_API_KEY) {
-    console.warn("[GraphHopper] non configurato, uso percorso approssimativo");
-    return res.json(buildFallbackRoute(effectiveWaypoints));
-  }
-
   let myStyleWarning: string | null = null;
 
   try {
@@ -454,8 +446,12 @@ router.post("/calculate", async (req: Request, res: Response) => {
       body.custom_model = { priority };
     }
 
-    const ghResult = await ghCalculateRoute(body as unknown as import("../../graphhopper-client").RouteRequest);
-    const path = ghResult.paths[0];
+    const { result: routeResult, engineUsed } = await calculateRouteWithSelector(
+      body as unknown as import("../../graphhopper-client").RouteRequest,
+      userId,
+      res,
+    );
+    const path = routeResult.paths[0];
 
     return res.json({
       encoded: path.points,
@@ -465,9 +461,10 @@ router.post("/calculate", async (req: Request, res: Response) => {
       bikerScore: 0.8,
       elevation: extractElevationProfile(path.points as string, (path as { points_encoded?: boolean; points?: { coordinates?: number[][] } }).points_encoded === false ? (path.points as { coordinates?: number[][] })?.coordinates : undefined),
       warning: myStyleWarning,
+      routingEngine: engineUsed,
     });
   } catch (err: unknown) {
-    console.error("[GraphHopper] error:", (err as Error)?.message ?? err);
+    console.error("[routing] error:", (err as Error)?.message ?? err);
     return res.json(buildFallbackRoute(effectiveWaypoints));
   }
 });

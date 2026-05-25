@@ -80,7 +80,7 @@ export const TILE_OPTIONS: ReadonlyArray<MapsOption<MapsTileId>> = [
 
 export const ROUTING_OPTIONS: ReadonlyArray<MapsOption<RoutingEngineId>> = [
   { id: "graphhopper", label: "GraphHopper (classico)", description: "Engine routing attuale self-hosted. Default produzione.", implemented: true },
-  { id: "valhalla", label: "Valhalla (self-hosted)", description: "Engine alternativo self-hosted con profili moto avanzati.", implemented: false },
+  { id: "valhalla", label: "Valhalla (self-hosted)", description: "Engine alternativo self-hosted con profili moto avanzati.", implemented: true },
   { id: "mapbox", label: "Mapbox Directions", description: "Cloud Mapbox — backup d'emergenza, copertura globale.", implemented: false },
   { id: "tomtom", label: "TomTom Routing", description: "Cloud TomTom — profilo moto + traffico EU real-time.", implemented: false },
 ];

@@ -142,6 +142,85 @@ router.put("/notes", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/admin/maps/test-routing
+ *
+ * Esegue una richiesta di test (Milano → Como) all'engine di routing
+ * attualmente configurato e ritorna esito + tempo di risposta.
+ * Usato dal pannello admin per validare a colpo d'occhio che l'engine è attivo.
+ */
+router.get("/test-routing", async (_req: Request, res: Response) => {
+  const MILANO: [number, number] = [9.1900, 45.4654];
+  const COMO: [number, number] = [9.0850, 45.8080];
+
+  const cfg = await readMapsConfig().catch(() => null);
+  const engine = cfg?.routing ?? "graphhopper";
+
+  const startMs = Date.now();
+
+  try {
+    let result: unknown;
+
+    if (engine === "valhalla") {
+      const { calculateRoute: valhallaRoute, isValhallaConfigured } = await import("../../valhalla-client");
+      if (!isValhallaConfigured) {
+        return res.json({
+          engine,
+          ok: false,
+          latencyMs: 0,
+          error: "VALHALLA_URL non configurata",
+        });
+      }
+      result = await valhallaRoute({
+        points: [MILANO, COMO],
+        profile: "motorcycle",
+      });
+    } else {
+      const { calculateRoute: ghRoute, ROUTING_DISABLED } = await import("../../graphhopper-client");
+      if (ROUTING_DISABLED) {
+        return res.json({
+          engine,
+          ok: false,
+          latencyMs: 0,
+          error: "GraphHopper disabilitato via kill-switch",
+        });
+      }
+      result = await ghRoute({
+        points: [MILANO, COMO],
+        profile: "motorcycle",
+        instructions: false,
+        calc_points: false,
+        points_encoded: true,
+      });
+    }
+
+    const latencyMs = Date.now() - startMs;
+    const paths = (result as { paths?: unknown[] })?.paths;
+    const firstPath = Array.isArray(paths) ? paths[0] : null;
+    const distanceM = (firstPath as { distance?: number } | null)?.distance ?? 0;
+    const timeMs = (firstPath as { time?: number } | null)?.time ?? 0;
+
+    return res.json({
+      engine,
+      ok: true,
+      latencyMs,
+      distanceKm: Math.round(distanceM / 100) / 10,
+      durationMinutes: Math.round(timeMs / 60000),
+      test: { from: "Milano", to: "Como" },
+    });
+  } catch (err: unknown) {
+    const latencyMs = Date.now() - startMs;
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[admin/maps/test-routing] engine=${engine} error:`, errMsg);
+    return res.json({
+      engine,
+      ok: false,
+      latencyMs,
+      error: errMsg.slice(0, 300),
+    });
+  }
+});
+
 router.put("/users/:id/map-tester", async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id ?? "");
