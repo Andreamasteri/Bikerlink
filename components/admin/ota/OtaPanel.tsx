@@ -17,6 +17,7 @@ import { apiRequest } from "@/lib/query-client";
 interface OtaRelease {
   id: string;
   easUpdateId: string;
+  easGroupId: string | null;
   channel: string;
   runtimeVersion: string | null;
   message: string | null;
@@ -60,9 +61,23 @@ export default function OtaPanel() {
   const [rollingBackId, setRollingBackId] = useState<string | null>(null);
   const [forcingUpdate, setForcingUpdate] = useState(false);
 
+  const [syncing, setSyncing] = useState(false);
+
   const { data: releases, isLoading, refetch, isFetching } = useQuery<OtaRelease[]>({
     queryKey: ["/api/admin/ota/releases"],
   });
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await apiRequest("POST", "/api/admin/ota/sync");
+      await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+    } catch (err: unknown) {
+      Alert.alert("Errore sync", err instanceof Error ? err.message : "Impossibile sincronizzare con EAS");
+    } finally {
+      setSyncing(false);
+    }
+  }, [qc]);
 
   const { data: settings, isLoading: settingsLoading } = useQuery<{ directApply: boolean }>({
     queryKey: ["/api/admin/ota/settings"],
@@ -242,11 +257,22 @@ export default function OtaPanel() {
     <View>
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>OTA Releases</Text>
-        <TouchableOpacity onPress={() => refetch()} disabled={isFetching} style={styles.refreshBtn}>
-          {isFetching
-            ? <ActivityIndicator size="small" color={colors.accent} />
-            : <Text style={[styles.refreshText, { color: colors.accent }]}>↻</Text>}
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            onPress={handleSync}
+            disabled={syncing || isFetching}
+            style={[styles.syncBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            {syncing
+              ? <ActivityIndicator size="small" color={colors.accent} />
+              : <Text style={[styles.syncBtnText, { color: colors.accent }]}>⟳ Sync EAS</Text>}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => refetch()} disabled={isFetching} style={styles.refreshBtn}>
+            {isFetching
+              ? <ActivityIndicator size="small" color={colors.accent} />
+              : <Text style={[styles.refreshText, { color: colors.accent }]}>↻</Text>}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity
@@ -292,63 +318,94 @@ export default function OtaPanel() {
         </View>
       )}
 
-      {pending.map((release) => (
-        <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.accent + "44" }]}>
-          <View style={styles.cardHeader}>
-            <View style={[styles.badge, { backgroundColor: colors.accent + "22" }]}>
-              <Text style={[styles.badgeText, { color: colors.accent }]}>IN ATTESA</Text>
+      {pending.map((release) => {
+        const hasGroupId = !!release.easGroupId;
+        return (
+          <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: hasGroupId ? colors.accent + "44" : colors.error + "55" }]}>
+            <View style={styles.cardHeader}>
+              <View style={styles.badgeRow}>
+                <View style={[styles.badge, { backgroundColor: colors.accent + "22" }]}>
+                  <Text style={[styles.badgeText, { color: colors.accent }]}>IN ATTESA</Text>
+                </View>
+                {hasGroupId
+                  ? (
+                    <View style={[styles.badge, { backgroundColor: colors.success + "22", marginLeft: 6 }]}>
+                      <Text style={[styles.badgeText, { color: colors.success }]}>● GroupID OK</Text>
+                    </View>
+                  )
+                  : (
+                    <View style={[styles.badge, { backgroundColor: colors.error + "22", marginLeft: 6 }]}>
+                      <Text style={[styles.badgeText, { color: colors.error }]}>⚠ RISINCRONIZZA</Text>
+                    </View>
+                  )}
+              </View>
+              <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
             </View>
-            <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
+
+            <Text style={[styles.versionText, { color: colors.text }]}>
+              {release.otaVersion ?? release.easUpdateId.slice(0, 16) + "…"}
+            </Text>
+
+            {release.message
+              ? <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
+              : <Text style={[styles.messageText, { color: colors.textSecondary, fontStyle: "italic" }]}>Nessun messaggio</Text>}
+
+            <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+              ID: {release.easUpdateId.slice(0, 20)}…
+            </Text>
+            {release.runtimeVersion && (
+              <Text style={[styles.metaText, { color: colors.textSecondary }]}>Runtime: {release.runtimeVersion}</Text>
+            )}
+
+            {!hasGroupId && (
+              <View style={[styles.warningBox, { backgroundColor: colors.error + "11", borderColor: colors.error + "44" }]}>
+                <Text style={[styles.warningText, { color: colors.error }]}>
+                  Questa release non ha un GroupID EAS valido. Premi "⟳ Sync EAS" in alto per risincronizzare, poi riprova ad approvare.
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}
+                onPress={() => handleTryOta(release)}
+                disabled={tryingId === release.id}
+              >
+                {tryingId === release.id
+                  ? <ActivityIndicator size="small" color={colors.text} />
+                  : <Text style={[styles.actionBtnText, { color: colors.text }]}>🔬 Prova OTA</Text>}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionBtn, {
+                  backgroundColor: hasGroupId ? colors.success : colors.textSecondary + "33",
+                  borderColor: hasGroupId ? colors.success : colors.textSecondary + "55",
+                  opacity: hasGroupId ? 1 : 0.5,
+                }]}
+                onPress={() => handleApprove(release)}
+                disabled={!hasGroupId || approvingId === release.id}
+                accessibilityState={{ disabled: !hasGroupId || approvingId === release.id }}
+              >
+                {approvingId === release.id
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Text style={[styles.actionBtnText, { color: hasGroupId ? "#fff" : colors.textSecondary }]}>
+                      {hasGroupId ? "✓ Approva e Distribuisci" : "✗ Approva (GroupID mancante)"}
+                    </Text>}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionBtn, { backgroundColor: "transparent", borderColor: colors.error }]}
+                onPress={() => handleReject(release)}
+                disabled={rejectingId === release.id}
+              >
+                {rejectingId === release.id
+                  ? <ActivityIndicator size="small" color={colors.error} />
+                  : <Text style={[styles.actionBtnText, { color: colors.error }]}>✗ Rifiuta</Text>}
+              </TouchableOpacity>
+            </View>
           </View>
-
-          <Text style={[styles.versionText, { color: colors.text }]}>
-            {release.otaVersion ?? release.easUpdateId.slice(0, 16) + "…"}
-          </Text>
-
-          {release.message
-            ? <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
-            : <Text style={[styles.messageText, { color: colors.textSecondary, fontStyle: "italic" }]}>Nessun messaggio</Text>}
-
-          <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-            ID: {release.easUpdateId.slice(0, 20)}…
-          </Text>
-          {release.runtimeVersion && (
-            <Text style={[styles.metaText, { color: colors.textSecondary }]}>Runtime: {release.runtimeVersion}</Text>
-          )}
-
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}
-              onPress={() => handleTryOta(release)}
-              disabled={tryingId === release.id}
-            >
-              {tryingId === release.id
-                ? <ActivityIndicator size="small" color={colors.text} />
-                : <Text style={[styles.actionBtnText, { color: colors.text }]}>🔬 Prova OTA</Text>}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.success, borderColor: colors.success }]}
-              onPress={() => handleApprove(release)}
-              disabled={approvingId === release.id}
-            >
-              {approvingId === release.id
-                ? <ActivityIndicator size="small" color="#fff" />
-                : <Text style={[styles.actionBtnText, { color: "#fff" }]}>✓ Approva e Distribuisci</Text>}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: "transparent", borderColor: colors.error }]}
-              onPress={() => handleReject(release)}
-              disabled={rejectingId === release.id}
-            >
-              {rejectingId === release.id
-                ? <ActivityIndicator size="small" color={colors.error} />
-                : <Text style={[styles.actionBtnText, { color: colors.error }]}>✗ Rifiuta</Text>}
-            </TouchableOpacity>
-          </View>
-        </View>
-      ))}
+        );
+      })}
 
       {history.length > 0 && (
         <>
@@ -409,8 +466,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
   title: { fontSize: 17, fontWeight: "700" },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 4 },
+  syncBtn: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
+  syncBtnText: { fontSize: 12, fontWeight: "600" as const },
   refreshBtn: { padding: 8 },
   refreshText: { fontSize: 18 },
+  badgeRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", flex: 1, gap: 4 },
+  warningBox: { borderRadius: 6, borderWidth: 1, padding: 10, marginTop: 8, marginBottom: 4 },
+  warningText: { fontSize: 12, lineHeight: 17 },
   emptyBox: { borderRadius: 8, padding: 20, alignItems: "center", borderWidth: 1, marginBottom: 12 },
   emptyText: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
   emptySubtext: {
