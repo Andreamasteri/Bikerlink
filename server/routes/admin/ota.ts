@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../db";
 import { otaReleases, appSettings } from "@shared/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, isNull, and } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 
 const router = Router();
@@ -121,6 +121,13 @@ async function syncStagingUpdates(): Promise<void> {
       status: "pending",
       publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
     }).onConflictDoNothing();
+  }
+
+  for (const upd of updates) {
+    if (!upd.group) continue;
+    await db.update(otaReleases)
+      .set({ easGroupId: upd.group })
+      .where(and(eq(otaReleases.easUpdateId, upd.id), isNull(otaReleases.easGroupId)));
   }
 }
 

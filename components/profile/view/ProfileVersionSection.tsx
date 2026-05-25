@@ -1,12 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet } from "react-native";
+import Constants from "expo-constants";
 import { useColors } from "@/hooks/useColors";
-import {
-  RELEASE_NUMBER,
-  OTA_BUNDLED_COUNT,
-  APPLIED_OTA_NUMBER,
-} from "@/constants/buildInfo";
+import { APPLIED_OTA_NUMBER } from "@/constants/buildInfo";
 import { loadAppliedOtaNumber, saveAppliedOtaNumber } from "@/lib/otaStorage";
+
+function parseAppVersion(): { releaseNumber: string; otaBundled: string } {
+  const version = Constants.expoConfig?.version ?? "";
+  const parts = version.split(".");
+  if (parts.length >= 2) {
+    return { releaseNumber: parts[0], otaBundled: parts[1] };
+  }
+  return { releaseNumber: "—", otaBundled: "—" };
+}
 
 export const ProfileVersionSection: React.FC = () => {
   const colors = useColors();
@@ -34,7 +40,8 @@ export const ProfileVersionSection: React.FC = () => {
     syncOtaNumber();
   }, []);
 
-  const buildString = `V${RELEASE_NUMBER}-${OTA_BUNDLED_COUNT}`;
+  const { releaseNumber, otaBundled } = parseAppVersion();
+  const buildString = `V${releaseNumber}-${otaBundled}`;
   const otaString =
     appliedOta != null ? `OTA-${appliedOta}` : "OTA-\u2014";
 
