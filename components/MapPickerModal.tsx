@@ -1,9 +1,15 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { Suspense } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import LeafletPickerMap from "@/components/LeafletPickerMap";
+import {
+  LazyLeafletPickerMap,
+  LazyMapLibrePickerMap,
+  useSilentFallback,
+} from "@/lib/maps/renderer-selector";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useMapsRollout } from "@/lib/maps/useMapsRollout";
 import type { PickerWaypoint } from "@/lib/leaflet-picker-map-html";
 
 interface ExistingWaypoint {
@@ -27,6 +33,9 @@ interface Props {
 
 export default function MapPickerContent({ visible, coord, onCoordChange, onConfirm, onClose, initialRegion, existingWaypoints = [] }: Props) {
   const insets = useSafeAreaInsets();
+  const { renderer } = useMapsRollout();
+  const [failed, triggerFallback, SilentFallback] = useSilentFallback();
+  const useMapLibre = renderer === "maplibre" && !failed;
 
   if (visible === false) return null;
 
@@ -63,7 +72,17 @@ export default function MapPickerContent({ visible, coord, onCoordChange, onConf
           <Text style={[styles.mapConfirmText, !coord && { opacity: 0.4 }]}>Conferma</Text>
         </TouchableOpacity>
       </View>
-      <LeafletPickerMap {...pickerMapProps} />
+      {useMapLibre ? (
+        <Suspense fallback={<ActivityIndicator />}>
+          <ErrorBoundary FallbackComponent={SilentFallback}>
+            <LazyMapLibrePickerMap {...pickerMapProps} onFatalError={triggerFallback} />
+          </ErrorBoundary>
+        </Suspense>
+      ) : (
+        <Suspense fallback={<ActivityIndicator />}>
+          <LazyLeafletPickerMap {...pickerMapProps} />
+        </Suspense>
+      )}
       {coord && (
         <View style={styles.mapCoordsBar}>
           <Text style={styles.mapCoordsText}>

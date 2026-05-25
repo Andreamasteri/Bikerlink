@@ -33,3 +33,24 @@ export function buildMapLibreStyle(tileUrl: string, maxZoom: number): object {
 }
 
 export { findTileProvider, DEFAULT_TILE_PROVIDER_ID };
+
+const MAPTILER_STYLE_URL = "https://api.maptiler.com/maps/streets-v2/style.json";
+const FALLBACK_TILE_URL = "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
+
+export function getMapLibreStyleExpr(
+  fallbackTileUrl: string = FALLBACK_TILE_URL
+): string {
+  const envTileUrl = process.env.MAPLIBRE_TILE_URL;
+  const apiKey = process.env.MAPLIBRE_API_KEY;
+
+  if (apiKey && apiKey.length > 4) {
+    const styleUrl = envTileUrl ?? MAPTILER_STYLE_URL;
+    const urlWithKey = styleUrl.includes("?")
+      ? `${styleUrl}&key=${apiKey}`
+      : `${styleUrl}?key=${apiKey}`;
+    return JSON.stringify(urlWithKey);
+  }
+
+  const rasterUrl = envTileUrl ?? fallbackTileUrl;
+  return JSON.stringify(buildMapLibreStyle(rasterUrl, 19));
+}

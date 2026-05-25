@@ -89,6 +89,7 @@ export interface InteractiveMapProps {
   onRegionChangeComplete?: (center: { latitude: number; longitude: number }) => void;
   gpsFollowupEnabled?: boolean;
   showHazardReportButton?: boolean;
+  onFatalError?: () => void;
 }
 
 export interface InteractiveMapHandle {

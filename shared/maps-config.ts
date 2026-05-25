@@ -21,8 +21,8 @@ export const RENDERER_OPTIONS: MapsOption<MapsRendererId>[] = [
   {
     id: "maplibre",
     label: "MapLibre GL",
-    description: "Renderer vettoriale WebGL — non ancora implementato.",
-    implemented: false,
+    description: "Renderer vettoriale WebGL — MapLibre GL minimal (2D, nessun 3D).",
+    implemented: true,
   },
 ];
 

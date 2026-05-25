@@ -8,7 +8,7 @@ interface OptionEntry<T extends string> {
 
 export const AVAILABLE_RENDERERS: OptionEntry<MapsRendererId>[] = [
   { id: "leaflet", label: "Leaflet", implemented: true },
-  { id: "maplibre", label: "MapLibre GL", implemented: false },
+  { id: "maplibre", label: "MapLibre GL", implemented: true },
 ];
 
 export const AVAILABLE_TILES: OptionEntry<MapsTileId>[] = [
