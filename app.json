@@ -2,7 +2,7 @@
   "expo": {
     "name": "BikerLink",
     "slug": "bikerlink",
-    "version": "51.1.10",
+    "version": "52.3.10",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 51,
+      "versionCode": 52,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
@@ -134,7 +134,7 @@
       "enabled": true,
       "url": "https://u.expo.dev/a25192d7-72e5-46af-97d0-2d38ed9b78e3",
       "fallbackToCacheTimeout": 0,
-      "checkOnLaunch": "ALWAYS"
+      "checkAutomatically": "ON_LOAD"
     },
     "runtimeVersion": "10.0.0",
     "extra": {

@@ -46,9 +46,8 @@ yarn-error.*
 # Stress test
 stress-test/
 
-# Server templates not needed for mobile build
-server/templates/
-server/public/
+# Server not needed for mobile build
+server/
 
 # Scripts directory (not needed for mobile build)
 scripts/
@@ -61,6 +60,17 @@ attached_assets/
 
 # Old web build output
 static-build/
+
+# OTA export artifacts (not needed for native APK build)
+exports/
+dist-ota-env/
+
+# Agent skills and docs (not needed for build)
+.agents/
+
+# Temp files
+tmp_eslint.json
+*.tmp
 
 # User uploads (runtime files, not needed for build)
 uploads/
