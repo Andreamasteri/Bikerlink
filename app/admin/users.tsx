@@ -13,6 +13,7 @@ import { UserSummary } from "@/components/admin/users/UserSummary";
 import { UserDetailModal, UserStats, SessionsData, GeoZone } from "@/components/admin/users/UserDetailModal";
 import { UserEditModal } from "@/components/admin/users/UserEditModal";
 import { ZoneMapModal } from "@/components/admin/users/ZoneMapModal";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 let MapView: React.ComponentType<Record<string, unknown>> | null = null;
 let MapMarker: React.ComponentType<Record<string, unknown>> | null = null;
@@ -397,49 +398,55 @@ export default function AdminUsers() {
         }
       />
 
-      <UserDetailModal
-        visible={statsModalVisible}
-        onClose={() => setStatsModalVisible(false)}
-        user={selectedUser}
-        stats={statsQuery.data}
-        isLoadingStats={statsQuery.isLoading}
-        fzEnabled={fzEnabled}
-        setFzEnabled={setFzEnabled}
-        fzData={fzData}
-        fzLoading={fzLoading}
-        fzError={fzError}
-        onZonePress={setFzMapZone}
-        sessions={sessionsQuery.data}
-        onRevokeSession={(sid) => selectedUser && revokeSessionMutation.mutate({ userId: selectedUser.id, sid })}
-        t={t}
-        formatDateIT={formatDateIT}
-        getRoleColor={getRoleColor}
-        getStatusColor={getStatusColor}
-      />
+      <ErrorBoundary>
+        <UserDetailModal
+          visible={statsModalVisible}
+          onClose={() => setStatsModalVisible(false)}
+          user={selectedUser}
+          stats={statsQuery.data}
+          isLoadingStats={statsQuery.isPending}
+          fzEnabled={fzEnabled}
+          setFzEnabled={setFzEnabled}
+          fzData={fzData}
+          fzLoading={fzLoading}
+          fzError={fzError}
+          onZonePress={setFzMapZone}
+          sessions={sessionsQuery.data}
+          onRevokeSession={(sid) => selectedUser && revokeSessionMutation.mutate({ userId: selectedUser.id, sid })}
+          t={t}
+          formatDateIT={formatDateIT}
+          getRoleColor={getRoleColor}
+          getStatusColor={getStatusColor}
+        />
+      </ErrorBoundary>
 
-      <UserEditModal
-        visible={editModalVisible}
-        onClose={() => setEditModalVisible(false)}
-        user={selectedUser}
-        editEmail={editEmail}
-        setEditEmail={setEditEmail}
-        editPassword={editPassword}
-        setEditPassword={setEditPassword}
-        onSaveEmail={handleSaveEmail}
-        onSavePassword={handleSavePassword}
-        onStatusChange={handleStatusChange}
-        onMakeModerator={handleMakeModerator}
-        onDeleteUser={handleDeleteUser}
-        getStatusColor={getStatusColor}
-      />
+      <ErrorBoundary>
+        <UserEditModal
+          visible={editModalVisible}
+          onClose={() => setEditModalVisible(false)}
+          user={selectedUser}
+          editEmail={editEmail}
+          setEditEmail={setEditEmail}
+          editPassword={editPassword}
+          setEditPassword={setEditPassword}
+          onSaveEmail={handleSaveEmail}
+          onSavePassword={handleSavePassword}
+          onStatusChange={handleStatusChange}
+          onMakeModerator={handleMakeModerator}
+          onDeleteUser={handleDeleteUser}
+          getStatusColor={getStatusColor}
+        />
+      </ErrorBoundary>
 
-      <ZoneMapModal
-        zone={fzMapZone}
-        onClose={() => setFzMapZone(null)}
-        MapView={MapView}
-        MapMarker={MapMarker}
-        insets={insets}
-      />
+      <ErrorBoundary>
+        <ZoneMapModal
+          zone={fzMapZone}
+          onClose={() => setFzMapZone(null)}
+          MapView={MapView}
+          MapMarker={MapMarker}
+          insets={insets}
+        />
+      </ErrorBoundary>
     </View>
   );
 }

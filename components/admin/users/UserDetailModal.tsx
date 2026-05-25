@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from "react-native";
+import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView, Platform } from "react-native";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { AdminUser } from "./UserCard";
@@ -104,7 +104,7 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
   if (!user) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === "ios" ? "formSheet" : undefined} onRequestClose={onClose}>
       <View style={statsStyles.modalContainer}>
         <View style={statsStyles.modalHeader}>
           <Text style={statsStyles.modalTitle}>{user.nickname}</Text>
@@ -191,30 +191,30 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
             </View>
 
             <View style={statsStyles.section}>
-              <Text style={statsStyles.sectionTitle}>Attivit&agrave;</Text>
+              <Text style={statsStyles.sectionTitle}>{"Attività"}</Text>
               <View style={statsStyles.statsGrid}>
                 <View style={statsStyles.statBox}>
-                  <Text style={statsStyles.statNumber}>{stats.stats.proposalsCreated}</Text>
+                  <Text style={statsStyles.statNumber}>{stats.stats?.proposalsCreated ?? 0}</Text>
                   <Text style={statsStyles.statLabel}>Proposte</Text>
                 </View>
                 <View style={statsStyles.statBox}>
-                  <Text style={statsStyles.statNumber}>{stats.stats.conversationsCount}</Text>
+                  <Text style={statsStyles.statNumber}>{stats.stats?.conversationsCount ?? 0}</Text>
                   <Text style={statsStyles.statLabel}>Chat</Text>
                 </View>
                 <View style={statsStyles.statBox}>
-                  <Text style={statsStyles.statNumber}>{stats.stats.messagesSent}</Text>
+                  <Text style={statsStyles.statNumber}>{stats.stats?.messagesSent ?? 0}</Text>
                   <Text style={statsStyles.statLabel}>Messaggi</Text>
                 </View>
                 <View style={statsStyles.statBox}>
-                  <Text style={statsStyles.statNumber}>{stats.stats.reportsReceived}</Text>
+                  <Text style={statsStyles.statNumber}>{stats.stats?.reportsReceived ?? 0}</Text>
                   <Text style={[statsStyles.statLabel, { color: Colors.error }]}>Report ricevuti</Text>
                 </View>
                 <View style={statsStyles.statBox}>
-                  <Text style={statsStyles.statNumber}>{stats.user.totalKm?.toFixed(0) ?? 0}</Text>
+                  <Text style={statsStyles.statNumber}>{stats.user?.totalKm?.toFixed(0) ?? 0}</Text>
                   <Text style={statsStyles.statLabel}>Km totali</Text>
                 </View>
                 <View style={statsStyles.statBox}>
-                  <Text style={statsStyles.statNumber}>{stats.user.totalRides ?? 0}</Text>
+                  <Text style={statsStyles.statNumber}>{stats.user?.totalRides ?? 0}</Text>
                   <Text style={statsStyles.statLabel}>Giri totali</Text>
                 </View>
               </View>
@@ -266,10 +266,10 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
               )}
             </View>
 
-            {stats.motorcycles.length > 0 && (
+            {(stats.motorcycles?.length ?? 0) > 0 && (
               <View style={statsStyles.section}>
                 <Text style={statsStyles.sectionTitle}>Garage</Text>
-                {stats.motorcycles.map((m, i) => (
+                {(stats.motorcycles ?? []).map((m, i) => (
                   <View key={i} style={statsStyles.motoCard}>
                     <Text style={statsStyles.motoTitle}>{m.brand} {m.model} ({m.year})</Text>
                     <Text style={statsStyles.motoSub}>{m.displacement}cc · {m.motorcycleType} · {m.ridingStyle}</Text>
@@ -293,11 +293,11 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
 
               {!sessions ? (
                 <Text style={{ color: Colors.textSecondary, fontSize: 13, marginTop: 4 }}>Caricamento sessioni...</Text>
-              ) : sessions.sessions.length === 0 ? (
+              ) : (sessions.sessions?.length ?? 0) === 0 ? (
                 <Text style={{ color: Colors.textSecondary, fontSize: 13, marginTop: 4 }}>Nessuna sessione attiva</Text>
               ) : (
                 <View style={{ marginTop: 8 }}>
-                  {sessions.sessions.map((sess) => (
+                  {(sessions.sessions ?? []).map((sess) => (
                     <View key={sess.sid} style={sessionStyles.sessionRow}>
                       <View style={sessionStyles.sessionInfo}>
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
@@ -328,10 +328,10 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
               )}
             </View>
 
-            {stats.moderatorLogs.length > 0 && (
+            {(stats.moderatorLogs?.length ?? 0) > 0 && (
               <View style={statsStyles.section}>
                 <Text style={statsStyles.sectionTitle}>Log Moderazione</Text>
-                {stats.moderatorLogs.map((l, i) => (
+                {(stats.moderatorLogs ?? []).map((l, i) => (
                   <View key={i} style={statsStyles.logItem}>
                     <Text style={statsStyles.logText}>{l.action} (da {l.moderatorNickname})</Text>
                     <Text style={statsStyles.logDate}>{formatDateIT(l.createdAt)}</Text>
@@ -340,10 +340,10 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
               </View>
             )}
 
-            {stats.adClicks.length > 0 && (
+            {(stats.adClicks?.length ?? 0) > 0 && (
               <View style={statsStyles.section}>
                 <Text style={statsStyles.sectionTitle}>Click Pubblicitari</Text>
-                {stats.adClicks.map((c, i) => (
+                {(stats.adClicks ?? []).map((c, i) => (
                   <View key={i} style={statsStyles.logItem}>
                     <Text style={statsStyles.logText}>{c.adTitle}</Text>
                     <Text style={statsStyles.logDate}>{formatDateIT(c.clickedAt)}</Text>
