@@ -134,10 +134,7 @@
       "enabled": true,
       "url": "https://biker-link.replit.app/api/expo-updates",
       "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "ON_LOAD",
-      "requestHeaders": {
-        "expo-channel-name": "production"
-      }
+      "checkAutomatically": "ON_LOAD"
     },
     "runtimeVersion": "10.0.0",
     "extra": {

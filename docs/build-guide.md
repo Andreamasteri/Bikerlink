@@ -115,21 +115,25 @@ Expo Launch gestisce:
 
 ## 6. Workflow OTA completo
 
-### Step 1 — Pubblica un aggiornamento JS su EAS
+### Step 1 — Pubblica un aggiornamento JS su EAS (canale staging)
 
 ```bash
 # Dalla root del progetto (shell Replit o terminale locale)
-# Pubblica sul canale production (raggiunge le build fatte con release-apk/production)
-eas update --channel production --message "Fix: schermata percorsi v52.3.11"
-
-# Pubblica sul canale staging (raggiunge le build preview — per test)
-eas update --channel staging --message "Test feature X"
+# IMPORTANTE: pubblica sempre su canale "staging" per entrare nella pipeline di approvazione.
+# Il server BikerLink sincronizza dal branch "staging" di EAS e mette le release in pending.
+eas update --channel staging --message "Fix: schermata percorsi v52.3.11"
 ```
 
-**EAS aggiorna solo il bundle JS** — non richiede una nuova build se non hai
-modificato codice nativo (see sezione 7).
+> **Perché staging e non production?**
+> Il server (`server/routes/admin/ota.ts`) sincronizza le nuove release leggendo
+> il branch `staging` di EAS. Solo dopo l'approvazione manuale nel pannello admin
+> il server le serve sul canale production. Pubblicare direttamente su `production`
+> bypasserebbe l'approvazione e le release non entrerebbero nella coda admin.
 
-### Step 2 — L'update appare nel pannello admin
+**EAS aggiorna solo il bundle JS** — non richiede una nuova build se non hai
+modificato codice nativo (vedi sezione 7).
+
+### Step 2 — L'update appare nel pannello admin in attesa di approvazione
 
 Il server BikerLink sincronizza automaticamente le nuove release da EAS ogni volta
 che si apre il pannello admin OTA. In alternativa, forzare la sincronizzazione:
@@ -144,7 +148,8 @@ Admin BikerLink → /admin/maps → sezione OTA → pulsante "Sync"
 Admin BikerLink → /admin/maps → sezione OTA → lista release pending → "Approva"
 ```
 
-Solo dopo l'approvazione la release diventa disponibile per gli utenti.
+Solo dopo l'approvazione la release viene promossa a `production` nel DB e diventa
+disponibile per gli utenti tramite il server custom.
 
 ### Step 4 — Gli utenti ricevono l'aggiornamento
 
@@ -152,19 +157,23 @@ Al prossimo avvio dell'app, il client chiede a:
 ```
 https://biker-link.replit.app/api/expo-updates
 ```
-Il server risponde con il manifest della release approvata.
+Il server risponde con il manifest della release approvata (proxy verso EAS CDN).
 L'app scarica il nuovo bundle JS e si riavvia automaticamente.
 
 ### Flusso completo visivo
 
 ```
-Developer → eas update --channel production → EAS ospita bundle JS
+Developer → eas update --channel staging → EAS ospita bundle JS (branch: staging)
                                                       ↓
-                                          Admin syncronizza + approva
+                              Server BikerLink sincronizza branch staging da EAS
+                              Release creata con status "pending" nel DB
+                                                      ↓
+                                          Admin approva nel pannello OTA
+                              Release aggiornata a status "approved", channel "production"
                                                       ↓
                                          App utente si avvia → chiede /api/expo-updates
                                                       ↓
-                                         Server risponde con manifest approvato
+                                         Server risponde con manifest approvato (proxy EAS CDN)
                                                       ↓
                                          App scarica bundle + si riavvia (silenzioso)
 ```
@@ -285,8 +294,13 @@ Non si possono aggiornare via OTA — richiedono una nuova build.
 |-----------|-------|------|
 | `EXPO_PUBLIC_DOMAIN` | ✅ Configurata | `biker-link.replit.app` — URL base API |
 | `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` | ✅ Configurata (Secret) | Google Maps SDK |
-| `EXPO_PUBLIC_MAPLIBRE_API_KEY` | ⚠️ Non configurata | Necessaria quando MapLibre è in rollout completo |
-| `EXPO_PUBLIC_MAPLIBRE_TILE_URL` | ⚠️ Non configurata | URL tile server self-hosted (configurare dopo deploy Mini PC) |
+| `EXPO_PUBLIC_MAPLIBRE_API_KEY` | 🔜 Futura | Non necessaria per le build attuali. Da aggiungere quando MapLibre passa al rollout completo (task #2313 in corso). |
+| `EXPO_PUBLIC_MAPLIBRE_TILE_URL` | 🔜 Futura | URL del tile server self-hosted sul Mini PC. Da aggiungere dopo il deploy del server (vedi `docs/self-hosting-setup.md`). |
+
+Le variabili marcate 🔜 non bloccano la build corrente — MapLibre ha fallback a Leaflet
+e il tile server self-hosted non è ancora operativo. Quando saranno pronte, aggiungerle
+come Secret in Replit e fare una nuova build nativa (non bastano OTA — le env vars
+sono embedded a build-time).
 
 ### Aggiungere una variabile mancante prima di buildare
 
