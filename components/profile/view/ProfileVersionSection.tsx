@@ -41,15 +41,24 @@ export const ProfileVersionSection: React.FC = () => {
   }, []);
 
   const { releaseNumber, otaBundled } = parseAppVersion();
-  const buildString = `V${releaseNumber}-${otaBundled}`;
-  const otaString =
-    appliedOta != null ? `OTA-${appliedOta}` : "OTA-\u2014";
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.badge, { color: colors.textSecondary }]}>
-        {buildString}{"   "}{otaString}
-      </Text>
+      <View style={styles.row}>
+        <View style={styles.item}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
+          <Text style={[styles.value, { color: colors.textSecondary }]}>
+            V{releaseNumber}.{otaBundled}
+          </Text>
+        </View>
+        <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
+        <View style={styles.item}>
+          <Text style={[styles.label, { color: colors.textSecondary }]}>OTA applicata</Text>
+          <Text style={[styles.value, { color: colors.textSecondary }]}>
+            {appliedOta != null ? `#${appliedOta}` : "—"}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 };
@@ -60,9 +69,28 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 4,
   },
-  badge: {
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  item: {
+    alignItems: "center",
+  },
+  label: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+    marginBottom: 1,
+  },
+  value: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
     letterSpacing: 0.5,
+  },
+  dot: {
+    fontSize: 14,
+    marginHorizontal: 2,
   },
 });

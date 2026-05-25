@@ -30,6 +30,14 @@ interface OtaRelease {
   rejectedBy: string | null;
 }
 
+function extractOtaNumber(release: OtaRelease, fallbackIndex: number): string {
+  if (release.otaVersion) {
+    const match = release.otaVersion.match(/OTA-?(\d+)/i);
+    if (match) return match[1];
+  }
+  return String(fallbackIndex);
+}
+
 function getStatusColor(status: string, colors: { success: string; error: string; accent: string; textSecondary: string }): string {
   if (status === "approved") return colors.success;
   if (status === "rejected") return colors.error;
@@ -68,15 +76,27 @@ export default function OtaPanel() {
   });
 
   const handleSync = useCallback(async () => {
-    setSyncing(true);
-    try {
-      await apiRequest("POST", "/api/admin/ota/sync");
-      await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
-    } catch (err: unknown) {
-      Alert.alert("Errore sync", err instanceof Error ? err.message : "Impossibile sincronizzare con EAS");
-    } finally {
-      setSyncing(false);
-    }
+    Alert.alert(
+      "☁ Sync con server Expo (EAS)",
+      "Questa operazione contatta i server Expo per recuperare le nuove release OTA pubblicate. Potrebbe richiedere qualche secondo.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Sincronizza",
+          onPress: async () => {
+            setSyncing(true);
+            try {
+              await apiRequest("POST", "/api/admin/ota/sync");
+              await qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+            } catch (err: unknown) {
+              Alert.alert("Errore sync", err instanceof Error ? err.message : "Impossibile sincronizzare con EAS");
+            } finally {
+              setSyncing(false);
+            }
+          },
+        },
+      ]
+    );
   }, [qc]);
 
   const { data: settings, isLoading: settingsLoading } = useQuery<{ directApply: boolean }>({
@@ -248,6 +268,15 @@ export default function OtaPanel() {
     );
   }
 
+  const allReleases = (releases ?? []).slice().sort(
+    (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+  );
+
+  const otaNumberMap = new Map<string, string>();
+  allReleases.forEach((r, idx) => {
+    otaNumberMap.set(r.id, extractOtaNumber(r, idx + 1));
+  });
+
   const pending = (releases ?? []).filter((r) => r.status === "pending");
   const history = (releases ?? []).filter((r) => r.status !== "pending");
 
@@ -261,16 +290,20 @@ export default function OtaPanel() {
           <TouchableOpacity
             onPress={handleSync}
             disabled={syncing || isFetching}
-            style={[styles.syncBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            style={[styles.syncBtn, { backgroundColor: colors.accent + "18", borderColor: colors.accent }]}
           >
             {syncing
               ? <ActivityIndicator size="small" color={colors.accent} />
-              : <Text style={[styles.syncBtnText, { color: colors.accent }]}>⟳ Sync EAS</Text>}
+              : <Text style={[styles.syncBtnText, { color: colors.accent }]}>☁ Sync EAS</Text>}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => refetch()} disabled={isFetching} style={styles.refreshBtn}>
+          <TouchableOpacity
+            onPress={() => refetch()}
+            disabled={isFetching}
+            style={[styles.listBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
             {isFetching
-              ? <ActivityIndicator size="small" color={colors.accent} />
-              : <Text style={[styles.refreshText, { color: colors.accent }]}>↻</Text>}
+              ? <ActivityIndicator size="small" color={colors.textSecondary} />
+              : <Text style={[styles.listBtnText, { color: colors.textSecondary }]}>↻ Lista</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -320,10 +353,14 @@ export default function OtaPanel() {
 
       {pending.map((release) => {
         const hasGroupId = !!release.easGroupId;
+        const otaNum = otaNumberMap.get(release.id) ?? "?";
         return (
           <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: hasGroupId ? colors.accent + "44" : colors.error + "55" }]}>
             <View style={styles.cardHeader}>
               <View style={styles.badgeRow}>
+                <View style={[styles.numBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={styles.numBadgeText}>#{otaNum}</Text>
+                </View>
                 <View style={[styles.badge, { backgroundColor: colors.accent + "22" }]}>
                   <Text style={[styles.badgeText, { color: colors.accent }]}>IN ATTESA</Text>
                 </View>
@@ -360,7 +397,7 @@ export default function OtaPanel() {
             {!hasGroupId && (
               <View style={[styles.warningBox, { backgroundColor: colors.error + "11", borderColor: colors.error + "44" }]}>
                 <Text style={[styles.warningText, { color: colors.error }]}>
-                  Questa release non ha un GroupID EAS valido. Premi "⟳ Sync EAS" in alto per risincronizzare, poi riprova ad approvare.
+                  Questa release non ha un GroupID EAS valido. Premi "☁ Sync EAS" in alto per risincronizzare, poi riprova ad approvare.
                 </Text>
               </View>
             )}
@@ -412,13 +449,19 @@ export default function OtaPanel() {
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Storico</Text>
           {history.map((release) => {
             const sc = getStatusColor(release.status, colors);
+            const otaNum = otaNumberMap.get(release.id) ?? "?";
             return (
               <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.cardHeader}>
-                  <View style={[styles.badge, { backgroundColor: sc + "22" }]}>
-                    <Text style={[styles.badgeText, { color: sc }]}>
-                      {getStatusLabel(release.status).toUpperCase()}
-                    </Text>
+                  <View style={styles.badgeRow}>
+                    <View style={[styles.numBadge, { backgroundColor: colors.accent }]}>
+                      <Text style={styles.numBadgeText}>#{otaNum}</Text>
+                    </View>
+                    <View style={[styles.badge, { backgroundColor: sc + "22" }]}>
+                      <Text style={[styles.badgeText, { color: sc }]}>
+                        {getStatusLabel(release.status).toUpperCase()}
+                      </Text>
+                    </View>
                   </View>
                   <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
                 </View>
@@ -466,11 +509,13 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
   title: { fontSize: 17, fontWeight: "700" },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 4 },
-  syncBtn: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
-  syncBtnText: { fontSize: 12, fontWeight: "600" as const },
-  refreshBtn: { padding: 8 },
-  refreshText: { fontSize: 18 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  syncBtn: { borderRadius: 6, borderWidth: 1.5, paddingHorizontal: 10, paddingVertical: 6 },
+  syncBtnText: { fontSize: 12, fontWeight: "700" as const },
+  listBtn: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
+  listBtnText: { fontSize: 12, fontWeight: "600" as const },
+  numBadge: { borderRadius: 4, paddingHorizontal: 7, paddingVertical: 3, marginRight: 4 },
+  numBadgeText: { fontSize: 11, fontWeight: "800" as const, color: "#fff", letterSpacing: 0.3 },
   badgeRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", flex: 1, gap: 4 },
   warningBox: { borderRadius: 6, borderWidth: 1, padding: 10, marginTop: 8, marginBottom: 4 },
   warningText: { fontSize: 12, lineHeight: 17 },
