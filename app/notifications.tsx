@@ -47,18 +47,21 @@ function getNotifIcon(type: string): { name: React.ComponentProps<typeof Ionicon
       return { name: "person-add", color: "#FF6600" };
     case "direct_match_accepted":
       return { name: "checkmark-circle", color: "#34C759" };
-    case "match_request":
-    case "match_accepted":
+    case "match":
       return { name: "bicycle", color: "#FF6600" };
-    case "proposal":
-    case "proposal_joined":
+    case "proposal_match":
       return { name: "map", color: "#4A90E2" };
     case "sos":
       return { name: "warning", color: "#E63946" };
     case "chat":
       return { name: "chatbubble", color: "#34C759" };
     case "motoclub":
+    case "motoclub_invite":
+    case "motoclub_join":
       return { name: "people", color: "#AF52DE" };
+    case "event_approved":
+    case "event_invite":
+      return { name: "calendar", color: "#4A90E2" };
     default:
       return { name: "notifications", color: "#FF6600" };
   }
@@ -79,8 +82,6 @@ function getNotifRoute(item: AppNotification): string | null {
     case "direct_match_accepted":
       return rid ? `/profile/${rid}` : null;
     case "match":
-    case "match_request":
-    case "match_accepted":
       return rid ? `/profile/${rid}` : null;
     case "motoclub":
     case "motoclub_invite":
@@ -90,9 +91,6 @@ function getNotifRoute(item: AppNotification): string | null {
     case "event_rejected":
     case "event_invite":
       return rid ? `/evento/${rid}` : null;
-    case "proposal":
-    case "proposal_joined":
-      return rid ? `/proposals/${rid}` : null;
     case "sos":
       return "/(tabs)/index";
     case "chat":
@@ -305,6 +303,14 @@ export default function NotificationsScreen() {
     }
     if (!item.isRead) {
       markReadMutation.mutate(item.id);
+    }
+    if (item.notificationType === "proposal_match") {
+      Alert.alert(
+        "Giro proposto",
+        "Hai un nuovo match su un giro proposto! Vai nella sezione Proposte per vedere i dettagli.",
+        [{ text: "OK" }]
+      );
+      return;
     }
     const route = getNotifRoute(item);
     if (route) {

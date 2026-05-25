@@ -315,7 +315,13 @@ export default function PublicProfileScreen() {
         <Stack.Screen options={{ headerShown: true, title: "", headerStyle: { backgroundColor: Colors.surface }, headerTintColor: Colors.text }} />
         <View style={[styles.centered, { paddingTop: webTopInset }]}>
           <Ionicons name="person-outline" size={48} color={Colors.textSecondary} />
-          <Text style={styles.emptyText}>Utente non trovato</Text>
+          <Text style={styles.emptyText}>Questo profilo non è più disponibile</Text>
+          <TouchableOpacity
+            onPress={() => router.canGoBack() ? router.back() : router.replace("/(tabs)" as never)}
+            style={styles.backButton}
+          >
+            <Text style={styles.backButtonText}>Torna indietro</Text>
+          </TouchableOpacity>
         </View>
       </>
     );
@@ -467,6 +473,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   centered: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: Colors.background },
   emptyText: { fontSize: 16, color: Colors.textSecondary, fontFamily: "Inter_400Regular", marginTop: 12 },
+  backButton: {
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 28,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  backButtonText: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.text },
   avatarSection: { alignItems: "center", paddingTop: 24, paddingBottom: 16 },
   avatar: { width: 96, height: 96, borderRadius: 48, justifyContent: "center", alignItems: "center", marginBottom: 12 },
   nicknameRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 0 },
@@ -595,5 +611,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24
   },
   menuItemText: { fontSize: 16, fontFamily: "Inter_500Medium" },
-  menuDivider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 }
+  menuDivider: { height: 1, backgroundColor: Colors.border, marginHorizontal: 16 },
 });

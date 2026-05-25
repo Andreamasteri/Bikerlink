@@ -137,6 +137,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
       const bikerMotos = await storage.findMatchingBikerMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
       for (const bikerMoto of bikerMotos) {
         if (bikerMoto.userId === userId) continue;
+        if (!bikerMoto.userId) continue;
         await storage.createMatch({
           bikerId: bikerMoto.userId,
           zavarrinaId: userId,
