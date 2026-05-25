@@ -195,6 +195,7 @@ export function useAdminSettingsFeatureFlags() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/maps-enabled"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/maps"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
     onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
@@ -215,6 +216,7 @@ export function useAdminSettingsFeatureFlags() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/maps-provider"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/maps"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
     },
     onError: (e: Error) => Alert.alert("Errore", (e as Error).message),

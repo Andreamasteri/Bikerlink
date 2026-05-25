@@ -61,10 +61,12 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
   const userPref: MapProvider | undefined =
     rawUserPref && VALID_PROVIDERS.includes(rawUserPref) ? rawUserPref : undefined;
 
+  const isCartoVariant = (p: MapProvider) => p === "carto_light" || p === "carto_dark";
+
   let resolvedProvider: MapProvider;
   if (!mapsEnabled) {
     resolvedProvider = adminProvider;
-  } else if ((adminProvider === "carto_light" || adminProvider === "carto_dark") && userPref) {
+  } else if (isCartoVariant(adminProvider) && userPref && isCartoVariant(userPref)) {
     resolvedProvider = userPref;
   } else {
     resolvedProvider = adminProvider;
