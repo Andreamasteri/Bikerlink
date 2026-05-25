@@ -62,9 +62,9 @@ router.post("/", async (req: Request, res: Response) => {
 
 router.put("/toggle-all", async (req: Request, res: Response) => {
   try {
-    const { online } = req.body;
+    const { enabled } = req.body;
     await db.update(users).set({ 
-      lastLoginAt: online ? new Date() : sql`last_login_at` 
+      lastLoginAt: enabled ? new Date() : sql`last_login_at` 
     }).where(eq(users.isFake, true));
     return sendSuccess(res);
   } catch (_error) {
