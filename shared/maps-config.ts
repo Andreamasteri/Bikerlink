@@ -1,7 +1,7 @@
 export type MapsRollout = "disabled" | "tester" | "all";
 export type MapsRendererId = "leaflet" | "maplibre";
 export type MapsTileId = "carto_light" | "carto_dark" | "osm";
-export type RoutingEngineId = "graphhopper" | "valhalla";
+export type RoutingEngineId = "graphhopper" | "valhalla" | "mapbox-directions";
 export type RoutingProfileId = "motorcycle" | "car";
 
 export interface MapsOption<T extends string> {
@@ -58,6 +58,12 @@ export const ROUTING_OPTIONS: MapsOption<RoutingEngineId>[] = [
     id: "valhalla",
     label: "Valhalla",
     description: "Engine alternativo OSM — self-hosted, profilo motorcycle nativo.",
+    implemented: true,
+  },
+  {
+    id: "mapbox-directions",
+    label: "Mapbox Directions",
+    description: "Cloud emergency fallback — 100k richieste/mese gratuiti. Attivare solo se entrambi i self-hosted sono down.",
     implemented: true,
   },
 ];

@@ -6,8 +6,17 @@ import {
   DEFAULT_RENDERER, DEFAULT_TILE, DEFAULT_ENGINE, DEFAULT_PROFILE,
 } from "./options";
 import type { MapsRendererId, MapsTileId, RoutingEngineId, RoutingProfileId, MapsRollout } from "@shared/maps-config";
+import { checkQuota } from "../../../routing/mapbox/quota-guard";
 
 const router = Router();
+
+/**
+ * Mapbox è non-stub (implementato) quando compare in AVAILABLE_ENGINES con implemented:true.
+ * La quota viene sempre inclusa nel payload config perché Mapbox è sempre disponibile.
+ */
+function isMapboxAvailable(): boolean {
+  return AVAILABLE_ENGINES.some((e) => e.id === "mapbox-directions" && e.implemented);
+}
 
 router.get("/config", async (_req: Request, res: Response) => {
   try {
@@ -20,11 +29,27 @@ router.get("/config", async (_req: Request, res: Response) => {
         storage.getAppSetting("maps_routing_profile"),
       ]);
 
-    return res.json({
+    const routing = (engineSetting?.value ?? DEFAULT_ENGINE) as RoutingEngineId;
+
+    let mapbox_quota: object | undefined;
+    if (isMapboxAvailable()) {
+      const quota = await checkQuota().catch(() => null);
+      if (quota) {
+        mapbox_quota = {
+          used: quota.used,
+          limit: quota.limit,
+          percent: quota.percent,
+          warning_threshold: quota.warning_threshold,
+          resets_at: quota.resets_at,
+        };
+      }
+    }
+
+    const payload: Record<string, unknown> = {
       rollout: (rolloutSetting?.value ?? "disabled") as MapsRollout,
       renderer: (rendererSetting?.value ?? DEFAULT_RENDERER) as MapsRendererId,
       tile: (tileSetting?.value ?? DEFAULT_TILE) as MapsTileId,
-      routing: (engineSetting?.value ?? DEFAULT_ENGINE) as RoutingEngineId,
+      routing,
       profile: (profileSetting?.value ?? DEFAULT_PROFILE) as RoutingProfileId,
       renderer_notes: "Renderer sperimentali sono stub — delegano a Leaflet.",
       routing_notes: "Engine sperimentali sono stub — delegano a GraphHopper.",
@@ -32,7 +57,13 @@ router.get("/config", async (_req: Request, res: Response) => {
       available_tiles: AVAILABLE_TILES,
       available_engines: AVAILABLE_ENGINES,
       available_profiles: AVAILABLE_PROFILES,
-    });
+    };
+
+    if (mapbox_quota !== undefined) {
+      payload.mapbox_quota = mapbox_quota;
+    }
+
+    return res.json(payload);
   } catch (err) {
     console.error("[admin/maps/config] GET error:", err);
     return sendError(res, 500, "Errore caricamento configurazione mappe");

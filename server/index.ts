@@ -227,6 +227,10 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     const { scheduleWeeklyCurvyScoreUpdate } = await import("./curvy-score-job");
     scheduleWeeklyCurvyScoreUpdate();
 
+    const { scheduleMonthlyReset: scheduleMapboxQuotaReset } = await import("./routing/mapbox/quota-guard");
+    scheduleMapboxQuotaReset();
+    console.log("[INIT] Mapbox quota monthly reset scheduled");
+
     const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
     // saveSchemaSnapshot is a dev/maintenance utility — non-essential at boot, fire-and-forget
     setImmediate(() => {

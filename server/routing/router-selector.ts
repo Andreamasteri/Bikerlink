@@ -2,6 +2,8 @@ import type { Response } from "express";
 import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
 import { routeViaGraphHopper, type RouteRequest, type RouteResult } from "./graphhopper-adapter";
 import { calculateRoute as valhallaCalculateRoute } from "./valhalla-client";
+import { calculateRoute as mapboxCalculateRoute } from "./mapbox-directions-client";
+import { checkQuota } from "./mapbox/quota-guard";
 
 interface RouterSelectorOptions {
   rollout: MapsRollout;
@@ -17,10 +19,6 @@ function isNewEngineEnabled(opts: RouterSelectorOptions): boolean {
 
 /**
  * Determina se l'errore Valhalla giustifica il fallback a GraphHopper.
- * Fallback su: 5xx, timeout (AbortError), errori di rete/trasporto (TypeError
- * da fetch — DNS failure, ECONNREFUSED, ENOTFOUND), VALHALLA_URL non
- * configurato, errori di mapping della risposta.
- * Gli errori 4xx (richiesta malformata lato client) vengono rilanciati.
  */
 function isTransientValhallaError(err: unknown): boolean {
   const name = err instanceof Error ? err.name : "";
@@ -35,10 +33,24 @@ function isTransientValhallaError(err: unknown): boolean {
 }
 
 /**
+ * Determina se l'errore Mapbox giustifica il fallback a GraphHopper.
+ * Fallback su: qualsiasi errore HTTP (4xx + 5xx), timeout (AbortError),
+ * errori di rete (TypeError), token non configurato.
+ * Il task richiede fallback su 4xx/5xx/timeout — tutti i casi HTTP sono inclusi.
+ */
+function isTransientMapboxError(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : "";
+  const msg = err instanceof Error ? err.message : String(err);
+  if (name === "AbortError") return true;
+  if (err instanceof TypeError) return true;
+  if (msg.includes("MAPBOX_ACCESS_TOKEN non configurato")) return true;
+  if (/Mapbox Directions error \d{3}/.test(msg)) return true;
+  if (msg.startsWith("Mapbox: ")) return true;
+  return false;
+}
+
+/**
  * Tenta il routing via Valhalla con fallback automatico a GraphHopper.
- * Fallback attivato su: 5xx, timeout, VALHALLA_URL non configurato,
- * errori di parsing risposta.
- * Errori 4xx sono rilasciati senza fallback (bad request).
  */
 async function routeViaValhallaWithFallback(
   req: RouteRequest,
@@ -52,6 +64,40 @@ async function routeViaValhallaWithFallback(
     }
     const msg = err instanceof Error ? err.message : String(err);
     console.warn(`[RouterSelector] Valhalla fallito (${msg}) — fallback a GraphHopper`);
+    if (res && !res.headersSent) {
+      res.setHeader("X-Routing-Fallback", "graphhopper");
+    }
+    return routeViaGraphHopper(req);
+  }
+}
+
+/**
+ * Tenta il routing via Mapbox con fallback automatico a GraphHopper.
+ * Verifica la quota PRIMA di chiamare Mapbox: se esaurita, fallback preventivo.
+ * Qualsiasi errore HTTP (4xx/5xx), timeout o errore di rete causa fallback.
+ */
+async function routeViaMapboxWithFallback(
+  req: RouteRequest,
+  res?: Response
+): Promise<RouteResult> {
+  const quota = await checkQuota();
+  if (!quota.ok) {
+    const msg = `Mapbox quota esaurita (${quota.used}/${quota.limit}) — fallback preventivo a GraphHopper`;
+    console.warn(`[RouterSelector] ${msg}`);
+    if (res && !res.headersSent) {
+      res.setHeader("X-Routing-Fallback", "graphhopper");
+    }
+    return routeViaGraphHopper(req);
+  }
+
+  try {
+    return await mapboxCalculateRoute(req);
+  } catch (err: unknown) {
+    if (!isTransientMapboxError(err)) {
+      throw err;
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[RouterSelector] Mapbox fallito (${msg}) — fallback a GraphHopper`);
     if (res && !res.headersSent) {
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
@@ -76,6 +122,10 @@ export async function getActiveRouter(
 
   if (opts.engine === "valhalla") {
     return routeViaValhallaWithFallback(req, res);
+  }
+
+  if (opts.engine === "mapbox-directions") {
+    return routeViaMapboxWithFallback(req, res);
   }
 
   return routeViaGraphHopper(req);
