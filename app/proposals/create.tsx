@@ -432,36 +432,40 @@ export default function CreateProposalScreen() {
           toggleSearchType={toggleSearchType}
         />
 
-        <Text style={styles.sectionTitle}>{t("proposal.targetSection")}</Text>
-        <View style={styles.typeGrid}>
-          {TARGET_USER_TYPE_OPTIONS.map((opt) => {
-            const isSelected = selectedTargetUserTypes.includes(opt.key);
-            return (
-              <TouchableOpacity
-                key={opt.key}
-                style={[
-                  styles.typeCard,
-                  isSelected && { borderColor: opt.color, backgroundColor: opt.color + "15" },
-                ]}
-                onPress={() => toggleTargetUserType(opt.key)}
-                testID={`target-type-${opt.key}`}
-              >
-                <MaterialCommunityIcons
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from option
-                  name={opt.icon as any}
-                  size={28}
-                  color={isSelected ? opt.color : Colors.textSecondary}
-                />
-                <Text style={[styles.typeCardLabel, isSelected && { color: opt.color }]}>
-                  {t(opt.labelKey)}
-                </Text>
-                {isSelected && (
-                  <Ionicons name="checkmark-circle" size={16} color={opt.color} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {selectedSearchTypes.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>{t("proposal.targetSection")}</Text>
+            <View style={styles.typeGrid}>
+              {TARGET_USER_TYPE_OPTIONS.map((opt) => {
+                const isSelected = selectedTargetUserTypes.includes(opt.key);
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[
+                      styles.typeCard,
+                      isSelected && { borderColor: opt.color, backgroundColor: opt.color + "15" },
+                    ]}
+                    onPress={() => toggleTargetUserType(opt.key)}
+                    testID={`target-type-${opt.key}`}
+                  >
+                    <MaterialCommunityIcons
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- icon name from option
+                      name={opt.icon as any}
+                      size={28}
+                      color={isSelected ? opt.color : Colors.textSecondary}
+                    />
+                    <Text style={[styles.typeCardLabel, isSelected && { color: opt.color }]}>
+                      {t(opt.labelKey)}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={16} color={opt.color} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
 
         {selectedSearchTypes.length > 0 && (
           <>
@@ -565,27 +569,29 @@ export default function CreateProposalScreen() {
         )}
       </KeyboardAwareScrollViewCompat>
 
-      {/* @ts-ignore – MapPickerContent API mismatch, props handled at runtime */}
-      <MapPickerContent
-        visible={showMapPicker}
-        onClose={() => setShowMapPicker(false)}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- map picker coord shape
-        onSelect={(coord: any) => {
-          if (mapPickerMode === "departure") {
-            setDepartureLat(coord.latitude);
-            setDepartureLng(coord.longitude);
-            setGpsSource("map");
-          } else {
-            setDestinationAddress(`${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)}`);
+      {showMapPicker && (
+        // @ts-ignore – MapPickerContent API mismatch, props handled at runtime
+        <MapPickerContent
+          visible={showMapPicker}
+          onClose={() => setShowMapPicker(false)}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- map picker coord shape
+          onSelect={(coord: any) => {
+            if (mapPickerMode === "departure") {
+              setDepartureLat(coord.latitude);
+              setDepartureLng(coord.longitude);
+              setGpsSource("map");
+            } else {
+              setDestinationAddress(`${coord.latitude.toFixed(4)}, ${coord.longitude.toFixed(4)}`);
+            }
+            setShowMapPicker(false);
+          }}
+          initialCoord={
+            departureLat && departureLng
+              ? { latitude: departureLat, longitude: departureLng }
+              : undefined
           }
-          setShowMapPicker(false);
-        }}
-        initialCoord={
-          departureLat && departureLng
-            ? { latitude: departureLat, longitude: departureLng }
-            : undefined
-        }
-      />
+        />
+      )}
     </>
   );
 }
