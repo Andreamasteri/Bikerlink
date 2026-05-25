@@ -599,3 +599,9 @@ id = "wBBrFls6jNbV_lsLYTabL"
 uri = "file://exports/bikerlink-chat-history.md"
 type = "text"
 title = "BikerLink — Storia chat (23 mag 2026)"
+
+[[outputs]]
+id = "i91MUnnmDi3aEI3cWJidB"
+uri = "file://exports/sistema-mappe-bikerlink.pdf"
+type = "pdf"
+title = "BikerLink — Sistema Mappe: Comparativa Completa"

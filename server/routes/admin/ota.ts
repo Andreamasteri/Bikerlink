@@ -20,7 +20,11 @@ async function easGraphQL(query: string, variables?: Record<string, unknown>): P
     },
     body: JSON.stringify({ query, variables }),
   });
-  if (!res.ok) throw new Error(`EAS GraphQL HTTP ${res.status}`);
+  if (!res.ok) {
+    let body = "";
+    try { body = await res.text(); } catch { /* ignore */ }
+    throw new Error(`EAS GraphQL HTTP ${res.status}: ${body}`);
+  }
   const json = await res.json() as { data?: unknown; errors?: unknown[] };
   if (json.errors && (json.errors as unknown[]).length > 0) {
     throw new Error(`EAS GraphQL error: ${JSON.stringify(json.errors)}`);
@@ -140,9 +144,6 @@ async function promoteToProduction(easGroupId: string, message?: string | null):
           group
           message
           runtimeVersion
-          branch {
-            name
-          }
         }
       }
     }
@@ -151,7 +152,7 @@ async function promoteToProduction(easGroupId: string, message?: string | null):
     input: {
       groupId: easGroupId,
       branchName: "production",
-      message: message ?? undefined,
+      ...(message ? { message } : {}),
     },
   });
 }
