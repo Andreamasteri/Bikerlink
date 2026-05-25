@@ -18,6 +18,7 @@ interface AdminMapsConfig {
   profile: RoutingProfileId;
   renderer_notes: string;
   routing_notes: string;
+  tile_source_status?: "maptiler" | "demo";
   osm_last_updated_at: string | null;
   mapbox_quota?: {
     used: number;
@@ -113,6 +114,7 @@ export default function AdminMapsPage() {
         renderer={data.renderer}
         tile={data.tile}
         rendererNotes={data.renderer_notes}
+        tileSourceStatus={data.tile_source_status}
         isPending={rendererMutation.isPending}
         onRendererChange={(renderer, tile) => rendererMutation.mutate({ renderer, tile })}
       />

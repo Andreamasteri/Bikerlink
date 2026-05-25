@@ -34,7 +34,7 @@ export function buildMapLibreStyle(tileUrl: string, maxZoom: number): object {
 
 export { findTileProvider, DEFAULT_TILE_PROVIDER_ID };
 
-const MAPTILER_STYLE_URL = "https://api.maptiler.com/maps/streets-v2/style.json";
+const MAPTILER_STYLE_URL = "https://api.maptiler.com/maps/outdoor-v2/style.json";
 const FALLBACK_TILE_URL = "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
 
 export function getMapLibreStyleExpr(

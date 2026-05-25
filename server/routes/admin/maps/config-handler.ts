@@ -46,12 +46,17 @@ router.get("/config", async (_req: Request, res: Response) => {
       }
     }
 
+    const maplibreKey = process.env.MAPLIBRE_API_KEY;
+    const tileSourceStatus: "maptiler" | "demo" =
+      maplibreKey && maplibreKey.length > 4 ? "maptiler" : "demo";
+
     const payload: Record<string, unknown> = {
       rollout: (rolloutSetting?.value ?? "disabled") as MapsRollout,
       renderer: (rendererSetting?.value ?? DEFAULT_RENDERER) as MapsRendererId,
       tile: (tileSetting?.value ?? DEFAULT_TILE) as MapsTileId,
       routing,
       profile: (profileSetting?.value ?? DEFAULT_PROFILE) as RoutingProfileId,
+      tile_source_status: tileSourceStatus,
       renderer_notes: "Renderer sperimentali sono stub — delegano a Leaflet.",
       routing_notes: "Engine sperimentali sono stub — delegano a GraphHopper.",
       osm_last_updated_at: osmSetting?.value ?? null,

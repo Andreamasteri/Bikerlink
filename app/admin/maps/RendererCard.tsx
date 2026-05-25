@@ -10,6 +10,7 @@ interface RendererCardProps {
   tile: MapsTileId;
   rendererNotes: string;
   isPending: boolean;
+  tileSourceStatus?: "maptiler" | "demo";
   onRendererChange: (renderer: MapsRendererId, tile: MapsTileId) => void;
 }
 
@@ -53,7 +54,7 @@ function OptionRow<T extends string>({
   );
 }
 
-export function RendererCard({ renderer, tile, rendererNotes, isPending, onRendererChange }: RendererCardProps) {
+export function RendererCard({ renderer, tile, rendererNotes, isPending, tileSourceStatus, onRendererChange }: RendererCardProps) {
   const [expanded, setExpanded] = React.useState(false);
   const [localTile, setLocalTile] = React.useState<MapsTileId>(tile);
 
@@ -82,6 +83,11 @@ export function RendererCard({ renderer, tile, rendererNotes, isPending, onRende
         <Text style={styles.currentValue}>{RENDERER_OPTIONS.find((r) => r.id === renderer)?.label ?? renderer}</Text>
         <Text style={styles.currentLabel}> · Tile: </Text>
         <Text style={styles.currentValue}>{TILE_OPTIONS.find((t) => t.id === tile)?.label ?? tile}</Text>
+        {!!tileSourceStatus && (
+          <View style={tileSourceStatus === "maptiler" ? styles.srcMaptiler : styles.srcDemo}>
+            <Text style={styles.srcText}>{tileSourceStatus === "maptiler" ? "● MapTiler" : "● Demo"}</Text>
+          </View>
+        )}
       </View>
 
       {!!rendererNotes && (
@@ -184,4 +190,7 @@ const styles = StyleSheet.create({
   tileChipText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.text },
   tileChipTextSelected: { color: Colors.accent, fontFamily: "Inter_500Medium" },
   stubSmall: { fontFamily: "Inter_400Regular", fontSize: 9, color: "#9333ea" },
+  srcMaptiler: { backgroundColor: "#16a34a22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 },
+  srcDemo: { backgroundColor: "#ca8a0422", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 },
+  srcText: { fontFamily: "Inter_500Medium", fontSize: 9, color: Colors.textSecondary },
 });
