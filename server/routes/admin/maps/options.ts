@@ -21,6 +21,7 @@ export const AVAILABLE_ENGINES: OptionEntry<RoutingEngineId>[] = [
   { id: "graphhopper", label: "GraphHopper", implemented: true },
   { id: "valhalla", label: "Valhalla", implemented: true },
   { id: "mapbox-directions", label: "Mapbox Directions", implemented: true },
+  { id: "tomtom", label: "TomTom Routing", implemented: true },
 ];
 
 export const AVAILABLE_PROFILES: OptionEntry<RoutingProfileId>[] = [

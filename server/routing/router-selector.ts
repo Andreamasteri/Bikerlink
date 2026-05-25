@@ -3,7 +3,9 @@ import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
 import { routeViaGraphHopper, type RouteRequest, type RouteResult } from "./graphhopper-adapter";
 import { calculateRoute as valhallaCalculateRoute } from "./valhalla-client";
 import { calculateRoute as mapboxCalculateRoute } from "./mapbox-directions-client";
+import { calculateRoute as tomtomCalculateRoute } from "./tomtom-routing-client";
 import { checkQuota } from "./mapbox/quota-guard";
+import { checkQuota as checkTomTomQuota } from "./tomtom/quota-guard";
 
 interface RouterSelectorOptions {
   rollout: MapsRollout;
@@ -106,6 +108,55 @@ async function routeViaMapboxWithFallback(
 }
 
 /**
+ * Determina se l'errore TomTom giustifica il fallback a GraphHopper.
+ * Fallback su: qualsiasi errore HTTP (4xx + 5xx), timeout, errori di rete,
+ * chiave non configurata.
+ */
+function isTransientTomTomError(err: unknown): boolean {
+  const name = err instanceof Error ? err.name : "";
+  const msg = err instanceof Error ? err.message : String(err);
+  if (name === "AbortError") return true;
+  if (err instanceof TypeError) return true;
+  if (msg.includes("TOMTOM_API_KEY non configurato")) return true;
+  if (/TomTom Routing error \d{3}/.test(msg)) return true;
+  if (msg.startsWith("TomTom: ")) return true;
+  return false;
+}
+
+/**
+ * Tenta il routing via TomTom con fallback automatico a GraphHopper.
+ * Verifica la quota PRIMA di chiamare TomTom: se esaurita, fallback preventivo.
+ */
+async function routeViaTomTomWithFallback(
+  req: RouteRequest,
+  res?: Response
+): Promise<RouteResult> {
+  const quota = await checkTomTomQuota();
+  if (!quota.ok) {
+    const msg = `TomTom quota esaurita (${quota.used}/${quota.limit}) — fallback preventivo a GraphHopper`;
+    console.warn(`[RouterSelector] ${msg}`);
+    if (res && !res.headersSent) {
+      res.setHeader("X-Routing-Fallback", "graphhopper");
+    }
+    return routeViaGraphHopper(req);
+  }
+
+  try {
+    return await tomtomCalculateRoute(req);
+  } catch (err: unknown) {
+    if (!isTransientTomTomError(err)) {
+      throw err;
+    }
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[RouterSelector] TomTom fallito (${msg}) — fallback a GraphHopper`);
+    if (res && !res.headersSent) {
+      res.setHeader("X-Routing-Fallback", "graphhopper");
+    }
+    return routeViaGraphHopper(req);
+  }
+}
+
+/**
  * Seleziona e invoca l'engine di routing attivo.
  * @param req    Parametri della richiesta di routing
  * @param opts   Configurazione rollout + engine
@@ -126,6 +177,10 @@ export async function getActiveRouter(
 
   if (opts.engine === "mapbox-directions") {
     return routeViaMapboxWithFallback(req, res);
+  }
+
+  if (opts.engine === "tomtom") {
+    return routeViaTomTomWithFallback(req, res);
   }
 
   return routeViaGraphHopper(req);

@@ -231,6 +231,10 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     scheduleMapboxQuotaReset();
     console.log("[INIT] Mapbox quota monthly reset scheduled");
 
+    const { scheduleDailyReset: scheduleTomTomQuotaReset } = await import("./routing/tomtom/quota-guard");
+    scheduleTomTomQuotaReset();
+    console.log("[INIT] TomTom quota daily reset scheduled");
+
     const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
     // saveSchemaSnapshot is a dev/maintenance utility — non-essential at boot, fire-and-forget
     setImmediate(() => {

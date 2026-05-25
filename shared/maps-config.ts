@@ -1,7 +1,7 @@
 export type MapsRollout = "disabled" | "tester" | "all";
 export type MapsRendererId = "leaflet" | "maplibre";
 export type MapsTileId = "carto_light" | "carto_dark" | "osm";
-export type RoutingEngineId = "graphhopper" | "valhalla" | "mapbox-directions";
+export type RoutingEngineId = "graphhopper" | "valhalla" | "mapbox-directions" | "tomtom";
 export type RoutingProfileId = "motorcycle" | "car";
 
 export interface MapsOption<T extends string> {
@@ -64,6 +64,12 @@ export const ROUTING_OPTIONS: MapsOption<RoutingEngineId>[] = [
     id: "mapbox-directions",
     label: "Mapbox Directions",
     description: "Cloud emergency fallback — 100k richieste/mese gratuiti. Attivare solo se entrambi i self-hosted sono down.",
+    implemented: true,
+  },
+  {
+    id: "tomtom",
+    label: "TomTom Routing",
+    description: "Cloud — profilo motorcycle nativo + traffic real-time EU. 2.500 req/giorno gratuiti.",
     implemented: true,
   },
 ];
