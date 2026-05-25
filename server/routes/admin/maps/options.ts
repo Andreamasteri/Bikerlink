@@ -19,7 +19,7 @@ export const AVAILABLE_TILES: OptionEntry<MapsTileId>[] = [
 
 export const AVAILABLE_ENGINES: OptionEntry<RoutingEngineId>[] = [
   { id: "graphhopper", label: "GraphHopper", implemented: true },
-  { id: "valhalla", label: "Valhalla", implemented: false },
+  { id: "valhalla", label: "Valhalla", implemented: true },
 ];
 
 export const AVAILABLE_PROFILES: OptionEntry<RoutingProfileId>[] = [

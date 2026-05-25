@@ -51,14 +51,14 @@ export const ROUTING_OPTIONS: MapsOption<RoutingEngineId>[] = [
   {
     id: "graphhopper",
     label: "GraphHopper",
-    description: "Engine di routing attuale — self-hosted.",
+    description: "Engine di routing principale — self-hosted.",
     implemented: true,
   },
   {
     id: "valhalla",
     label: "Valhalla",
-    description: "Engine alternativo OSM — non ancora implementato.",
-    implemented: false,
+    description: "Engine alternativo OSM — self-hosted, profilo motorcycle nativo.",
+    implemented: true,
   },
 ];
 

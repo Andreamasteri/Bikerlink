@@ -453,11 +453,15 @@ router.post("/calculate", async (req: Request, res: Response) => {
       _st.getAppSetting("maps_routing_engine"),
       _st.getUser(userId),
     ]);
-    const routeResult = await getActiveRouter(body as unknown as RouteRequest, {
-      rollout: (rolloutSetting?.value ?? "disabled") as import("@shared/maps-config").MapsRollout,
-      engine: (engineSetting?.value ?? "graphhopper") as import("@shared/maps-config").RoutingEngineId,
-      isMapTester: routeUser?.mapTester ?? false,
-    });
+    const routeResult = await getActiveRouter(
+      body as unknown as RouteRequest,
+      {
+        rollout: (rolloutSetting?.value ?? "disabled") as import("@shared/maps-config").MapsRollout,
+        engine: (engineSetting?.value ?? "graphhopper") as import("@shared/maps-config").RoutingEngineId,
+        isMapTester: routeUser?.mapTester ?? false,
+      },
+      res
+    );
     const path = routeResult.paths[0];
 
     return res.json({
