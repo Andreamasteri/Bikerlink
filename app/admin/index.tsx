@@ -267,6 +267,14 @@ const adminGroups: AdminGroup[] = [
     ],
   },
   {
+    title: "Sistema Mappe",
+    headerIcon: "map-outline",
+    headerIconSet: "Ionicons",
+    items: [
+      { key: "maps", label: "Sistema Mappe", icon: "map-outline", iconSet: "Ionicons", route: "/admin/maps", accentColor: "#0EA5E9" },
+    ],
+  },
+  {
     title: "Laboratorio",
     headerIcon: "flask",
     headerIconSet: "MaterialCommunityIcons",

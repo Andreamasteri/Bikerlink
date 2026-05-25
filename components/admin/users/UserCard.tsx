@@ -17,6 +17,7 @@ export interface AdminUser {
   isFake?: boolean;
   isPrimal?: boolean;
   hasLastfmData?: boolean;
+  mapTester?: boolean;
 }
 
 interface UserCardProps {
@@ -28,6 +29,7 @@ interface UserCardProps {
   onClearLastfm: (user: AdminUser) => void;
   onDeleteUser: (user: AdminUser) => void;
   onTogglePrimal: (id: string, isPrimal: boolean) => void;
+  onToggleMapTester?: (id: string, enabled: boolean) => void;
   isLastfmPending?: boolean;
   currentAppVersion?: string;
 }
@@ -41,6 +43,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   onClearLastfm,
   onDeleteUser,
   onTogglePrimal,
+  onToggleMapTester,
   isLastfmPending,
   currentAppVersion = "1.0.0",
 }) => {
@@ -69,6 +72,9 @@ export const UserCard: React.FC<UserCardProps> = ({
         )}
         {item.isPrimal === true && (
           <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#FF3B30" }}>PRIMAL</Text>
+        )}
+        {item.mapTester === true && (
+          <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#0EA5E9" }}>MAP TESTER</Text>
         )}
         <Text style={styles.nickname}>{item.nickname}</Text>
         <Text style={styles.email}>{item.email}</Text>
@@ -136,6 +142,14 @@ export const UserCard: React.FC<UserCardProps> = ({
         >
           <Ionicons name="star" size={22} color={item.isPrimal ? "#FF3B30" : Colors.border} />
         </TouchableOpacity>
+        {onToggleMapTester && (
+          <TouchableOpacity
+            onPress={() => onToggleMapTester(item.id, !item.mapTester)}
+            style={styles.actionBtn}
+          >
+            <Ionicons name="map" size={22} color={item.mapTester ? "#0EA5E9" : Colors.border} />
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   );

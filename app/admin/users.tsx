@@ -184,6 +184,17 @@ export default function AdminUsers() {
     onError: () => Alert.alert("Errore", "Impossibile aggiornare stato Primal"),
   });
 
+  const mapTesterMutation = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/maps/users/${id}/map-tester`, { enabled });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: () => Alert.alert("Errore", "Impossibile aggiornare flag Map Tester"),
+  });
+
   const clearLastfmMutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       const res = await apiRequest("DELETE", `/api/admin/users/${id}/lastfm`);
@@ -361,6 +372,7 @@ export default function AdminUsers() {
             onClearLastfm={handleClearLastfm}
             onDeleteUser={handleDeleteUser}
             onTogglePrimal={(id, isPrimal) => primalMutation.mutate({ id, isPrimal })}
+            onToggleMapTester={(id, enabled) => mapTesterMutation.mutate({ id, enabled })}
             isLastfmPending={clearLastfmMutation.isPending}
             currentAppVersion={CURRENT_APP_VERSION}
           />
