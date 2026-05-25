@@ -240,7 +240,7 @@ router.use('/analytics', _requireAdmin, analyticsRouter);
 router.use('/stregatti', _requireAdmin, stregattiRouter);
 router.use('/ota', _requireAdmin, otaRouter);
 router.use('/maps', _requireAdmin, mapsAdminRouter);
-router.use('/', miscRouter);
+router.use('/', _requireAdmin, miscRouter);
 router.use('/', matchingRouter);
 
 export default router;

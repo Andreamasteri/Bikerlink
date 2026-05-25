@@ -32,6 +32,29 @@ router.post("/workshops", async (req: Request, res: Response) => {
   }
 });
 
+router.put("/workshops/:id/approve", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const workshop = await storage.updateWorkshop(id, { isApproved: true });
+    if (!workshop) return sendError(res, 404, "Officina non trovata");
+    return res.json(workshop);
+  } catch (_error) {
+    return sendError(res, 500, "Errore approvazione officina");
+  }
+});
+
+router.delete("/workshops/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const existing = await storage.getWorkshop(id);
+    if (!existing) return sendError(res, 404, "Officina non trovata");
+    await storage.deleteWorkshop(id);
+    return res.json({ deleted: true });
+  } catch (_error) {
+    return sendError(res, 500, "Errore eliminazione officina");
+  }
+});
+
 // Easter Eggs
 router.get("/easter-eggs", async (_req: Request, res: Response) => {
   try {
