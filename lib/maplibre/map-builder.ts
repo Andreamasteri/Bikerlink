@@ -125,6 +125,11 @@ ${mapScriptWrap(styleVar, options, `
         }
       },
       updateHazards: function() {},
+      setStyle: function(payload) {
+        var style;
+        try { style = typeof payload === "string" ? JSON.parse(payload) : payload; } catch(e) { return; }
+        map.setStyle(style);
+      },
     };
     map.on("click", function(e) {
       postMsg({ type: "tap", lat: e.lngLat.lat, lng: e.lngLat.lng });

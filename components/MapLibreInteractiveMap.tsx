@@ -5,9 +5,12 @@ import WebView from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
 import { getApiUrl } from "@/lib/query-client";
 import { buildMapLibreInteractiveHtml } from "@/lib/maplibre/map-builder";
-import { getMapLibreStyleExpr } from "@/lib/maplibre/tile-config";
+import { getMapLibreStyleExpr, buildMapLibreStyle } from "@/lib/maplibre/tile-config";
 import { parseMessage } from "@/lib/maplibre/bridge-events";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
+import { MapStyleToggle } from "@/components/MapStyleToggle";
+import { useMapStyle } from "@/hooks/useMapStyle";
+import { MAP_STYLE_PRESETS } from "@/lib/maplibre/style-presets";
 import Colors from "@/constants/colors";
 import type { InteractiveMapProps, InteractiveMapHandle } from "@/components/map/map-types";
 
@@ -29,6 +32,7 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
   ) {
     const webViewRef = useRef<WebView>(null);
     const [mapReady, setMapReady] = useState(false);
+    const { styleId, setStyle } = useMapStyle();
     const styleExpr = getMapLibreStyleExpr();
     const initialCenterRef = useRef(
       initialCenterOverride ? { lat: initialCenterOverride.latitude, lng: initialCenterOverride.longitude } : null
@@ -44,6 +48,14 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
     const inject = useCallback((js: string) => {
       webViewRef.current?.injectJavaScript(js + ";true;");
     }, []);
+
+    useEffect(() => {
+      if (!mapReady) return;
+      const preset = MAP_STYLE_PRESETS[styleId];
+      const styleObj = buildMapLibreStyle(preset.tileUrl, preset.maxZoom);
+      const encoded = JSON.stringify(JSON.stringify(styleObj));
+      inject(`window.mlBridge && window.mlBridge.setStyle(${encoded})`);
+    }, [mapReady, styleId, inject]);
 
     const pushState = useCallback(() => {
       if (!mapReady) return;
@@ -132,6 +144,9 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
           <Pressable style={styles.centerBtn} onPress={handleCenterOnUser}>
             <Ionicons name="locate" size={20} color={Colors.text} />
           </Pressable>
+        )}
+        {mapReady && (
+          <MapStyleToggle currentStyleId={styleId} onSelectStyle={setStyle} />
         )}
         <MapFilterBar
           filterBiker={filterBiker} filterZavorrina={filterZavorrina}

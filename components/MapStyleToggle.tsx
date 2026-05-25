@@ -1,0 +1,63 @@
+import React from "react";
+import { View, Pressable, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import Colors from "@/constants/colors";
+import { MAP_STYLE_PRESETS, type MapStyleId } from "@/lib/maplibre/style-presets";
+
+interface Props {
+  currentStyleId: MapStyleId;
+  onSelectStyle: (id: MapStyleId) => void;
+}
+
+const STYLE_ORDER: MapStyleId[] = ["day", "night", "satellite"];
+
+export function MapStyleToggle({ currentStyleId, onSelectStyle }: Props) {
+  return (
+    <View style={styles.container}>
+      {STYLE_ORDER.map((id) => {
+        const preset = MAP_STYLE_PRESETS[id];
+        const active = id === currentStyleId;
+        return (
+          <Pressable
+            key={id}
+            style={[styles.btn, active && styles.btnActive]}
+            onPress={() => onSelectStyle(id)}
+            accessibilityLabel={preset.label}
+            accessibilityRole="button"
+          >
+            <Ionicons
+              name={preset.icon as React.ComponentProps<typeof Ionicons>["name"]}
+              size={18}
+              color={active ? Colors.accent : Colors.textSecondary}
+            />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  btn: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnActive: {
+    backgroundColor: Colors.surfaceLight,
+  },
+});

@@ -28,7 +28,8 @@ export type BridgeCommandType =
   | "updateTracking"
   | "setCoord"
   | "centerOnUser"
-  | "updateHazards";
+  | "updateHazards"
+  | "setStyle";
 
 export interface BridgeCommand {
   cmd: BridgeCommandType;

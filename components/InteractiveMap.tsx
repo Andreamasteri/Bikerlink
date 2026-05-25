@@ -11,6 +11,9 @@ import { LEAFLET_MAP_HTML } from "@/lib/leaflet-map-html";
 import { useLocationWatch } from "@/hooks/useLocationWatch";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { MapControls } from "@/components/map/MapControls";
+import { MapStyleToggle } from "@/components/MapStyleToggle";
+import { useMapStyle } from "@/hooks/useMapStyle";
+import { MAP_STYLE_PRESETS } from "@/lib/maplibre/style-presets";
 import { useMapStateSync } from "@/hooks/useMapStateSync";
 import { createMapMessageHandler } from "@/components/map/createMapMessageHandler";
 import { HazardDetailSheet } from "@/components/map/HazardDetailSheet";
@@ -45,7 +48,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   onRegionChangeComplete, gpsFollowupEnabled = false,
   showHazardReportButton = false,
 }: InteractiveMapProps, ref) {
-  const { enabled: mapsEnabled, resolvedProvider, activeTileUrl, activeTileMaxZoom } = useMapConfig();
+  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
   const initialCenterDoneRef = useRef(false);
@@ -53,6 +56,10 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const { userLocation, locationLoading } = useLocationWatch();
   const [selectedHazardId, setSelectedHazardId] = useState<string | null>(null);
   const [showHazardReport, setShowHazardReport] = useState(false);
+  const { styleId, setStyle } = useMapStyle();
+  const activePreset = MAP_STYLE_PRESETS[styleId];
+  const effectiveTileUrl = activePreset.tileUrl;
+  const effectiveTileMaxZoom = activePreset.maxZoom;
   useEffect(() => { sendStartupBeacon("interactive_map_mount"); }, []);
 
   const today = new Date().toISOString().substring(0, 10);
@@ -120,7 +127,10 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   });
 
   useMapStateSync({
-    mapReady, inject, mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable,
+    mapReady, inject, mapsEnabled,
+    activeTileUrl: effectiveTileUrl,
+    activeTileMaxZoom: effectiveTileMaxZoom,
+    userLocation, isAvailable,
     searchRadiusKm, filteredUsers, workshops, eventPins, showEventPins, filterEvents,
     clubPins, filterClubs, easterEggs, activeSosRequests, realMeMarker, fakeMeMarker,
     currentUserId,
@@ -215,6 +225,9 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         isDayNightPending={saveMapStyleMutation.isPending}
         onCenterOnUser={centerOnUser} onToggleDayNight={handleToggleDayNight}
       />
+      {mapReady && (
+        <MapStyleToggle currentStyleId={styleId} onSelectStyle={setStyle} />
+      )}
       {showHazardReportButton && hazardsEnabled && (
         <TouchableOpacity
           style={styles.hazardFab}
