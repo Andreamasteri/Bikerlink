@@ -132,7 +132,7 @@
     },
     "updates": {
       "enabled": true,
-      "url": "https://u.expo.dev/a25192d7-72e5-46af-97d0-2d38ed9b78e3",
+      "url": "https://biker-link.replit.app/api/expo-updates",
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_LOAD"
     },

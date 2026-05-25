@@ -47,6 +47,7 @@ import errorsRoutes from "./routes/errors";
 import sprintsRoutes from "./routes/sprints";
 import roadHazardsRoutes from "./routes/road-hazards";
 import { publicMediaRouter, adminMediaRouter } from "./routes/media-library";
+import expoUpdatesRoutes, { invalidateExpoUpdatesCache } from "./routes/expo-updates";
 import { db } from "./db";
 import { userFavorites } from "@shared/db";
 import { eq, and } from "drizzle-orm";
@@ -261,6 +262,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/road-hazards", roadHazardsRoutes);
   app.use("/api/media", publicMediaRouter);
   app.use("/api/admin/media", adminMediaRouter);
+  app.use("/api/expo-updates", expoUpdatesRoutes);
+  app.locals.invalidateExpoUpdateHash = () => invalidateExpoUpdatesCache();
 
   const { default: plannedRoutesRoutes } = await import("./routes/planned-routes");
   app.use("/api/planned-routes", plannedRoutesRoutes);
