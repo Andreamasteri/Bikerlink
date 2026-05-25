@@ -104,7 +104,7 @@ export type SharedPlaylist = typeof sharedPlaylists.$inferSelect;
 export type InsertSharedPlaylist = typeof sharedPlaylists.$inferInsert;
 
 export const createConversationSchema = z.object({
-  conversationType: z.enum(["direct", "private", "contact", "group", "club"]),
+  conversationType: z.enum(["direct", "private", "contact", "group", "club", "motoclub"]),
   title: z.string().max(200).optional().nullable(),
   proposalId: z.string().optional().nullable(),
   participantIds: z.array(z.string()).min(1, "Almeno un partecipante richiesto"),

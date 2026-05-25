@@ -62,13 +62,15 @@ export function ChatHeader({
           <Text style={[styles.hashtagBtnText, showHashtagPanel && styles.hashtagBtnTextActive]}>#</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity
-        onPress={onDeleteConversation}
-        style={styles.infoButton}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="trash-outline" size={22} color={Colors.error} />
-      </TouchableOpacity>
+      {!isMotoclub && (
+        <TouchableOpacity
+          onPress={onDeleteConversation}
+          style={styles.infoButton}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={22} color={Colors.error} />
+        </TouchableOpacity>
+      )}
       {isPrivateChat && otherParticipantId && (
         <TouchableOpacity onPress={() => router.push(`/profile/${otherParticipantId}` as never)} style={styles.infoButton}>
           <Ionicons name="information-circle-outline" size={26} color={Colors.text} />

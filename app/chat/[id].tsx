@@ -39,6 +39,12 @@ interface ConversationDetail {
   }>;
 }
 
+interface MotoClub {
+  id: string;
+  name: string;
+  conversationId: string | null;
+}
+
 function parseHashtagsFromInput(input: string): string[] {
   return input
     .split(/\s+/)
@@ -92,6 +98,12 @@ export default function ChatConversationScreen() {
 
   const conversation = conversationDetail ?? conversations?.find((c) => c.id === id);
   const isMotoclub = conversation?.conversationType === "motoclub";
+
+  const { data: myClubs } = useQuery<MotoClub[]>({
+    queryKey: ["/api/motoclubs/me/clubs"],
+    enabled: isMotoclub,
+    staleTime: 300000,
+  });
 
   const isMotoclubRef = useRef(false);
   if (conversation !== undefined) isMotoclubRef.current = isMotoclub;
@@ -317,7 +329,10 @@ export default function ChatConversationScreen() {
 
   const getTitle = (): string => {
     if (conversation?.title) return conversation.title;
-    if (conversation?.conversationType === "motoclub") return "Clubs";
+    if (conversation?.conversationType === "motoclub") {
+      const matchedClub = myClubs?.find((c) => c.conversationId === id);
+      return matchedClub?.name ?? "MotoClub";
+    }
     if (conversation?.conversationType === "contact") {
       const others = conversation.participants.filter((p) => p.id !== userId);
       if (others.length === 0) return t("chat.contactChat");
