@@ -109,8 +109,24 @@ export default function ContestScreen() {
       setCaption("");
       setSelectedImage(null);
     },
-    onError: () => {
-      Alert.alert("Errore", "Impossibile caricare la foto");
+    onError: (error: Error) => {
+      let message = "Impossibile caricare la foto";
+      const raw = error.message ?? "";
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.message) message = parsed.message;
+        else if (parsed?.error) message = parsed.error;
+      } catch {
+        try {
+          const colonBody = raw.includes(":") ? raw.split(":").slice(1).join(":").trim() : raw;
+          const parsed = JSON.parse(colonBody);
+          if (parsed?.message) message = parsed.message;
+          else if (parsed?.error) message = parsed.error;
+        } catch {
+          if (raw.length > 0 && raw.length < 200) message = raw;
+        }
+      }
+      Alert.alert("Errore upload", message);
     },
   });
 

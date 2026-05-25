@@ -35,33 +35,71 @@ function getWeekNumber(date: Date): number {
   return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
 }
 
+const MAX_FALLBACK_SIZE = 5 * 1024 * 1024; // 5 MB
+
 router.post("/entries", upload.single("photo"), async (req: Request, res: Response) => {
-  try {
-    const userId = requireUserId(req, res);
-    if (!userId) return;
+  const userId = requireUserId(req, res);
+  if (!userId) return;
 
-    const caption = req.body.caption || null;
-    const performanceData = req.body.performanceData || null;
+  const caption = req.body.caption || null;
+  const performanceData = req.body.performanceData || null;
 
-    let photoUrl: string | null = null;
+  let photoUrl: string | null = null;
 
-    if (req.file) {
+  if (req.file) {
+    // --- Step 1: compression ---
+    let uploadBuf: Buffer;
+    let uploadMime: string;
+    let fileExt: string;
+
+    try {
       const { compressToWebP } = await import("../utils/image-processing");
-      const webpBuffer = await compressToWebP(req.file.buffer);
-      const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.webp`;
-      const objectPath = `public/contest/${filename}`;
+      uploadBuf = await compressToWebP(req.file.buffer);
+      uploadMime = "image/webp";
+      fileExt = "webp";
+      console.log(`[contest] Compressione WebP riuscita — ${req.file.originalname} → ${uploadBuf.length} bytes`);
+    } catch (compressionError) {
+      console.warn(`[contest] Compressione WebP fallita per "${req.file.originalname}":`, compressionError);
 
-      await uploadBuffer(objectPath, webpBuffer, "image/webp");
+      if (req.file.buffer.length > MAX_FALLBACK_SIZE) {
+        return sendError(
+          res,
+          400,
+          `Foto troppo grande (max 5 MB quando il formato non è supportato). Riprova con un JPEG o PNG.`
+        );
+      }
 
-      photoUrl = `/api/contest/photos/${filename}`;
-    } else if (req.body.photoUrl) {
-      photoUrl = req.body.photoUrl;
+      // Fallback: upload del buffer originale
+      uploadBuf = req.file.buffer;
+      uploadMime = req.file.mimetype;
+      const rawExt = req.file.originalname.split(".").pop()?.toLowerCase() ?? "jpg";
+      fileExt = rawExt;
+      console.log(`[contest] Fallback: upload formato originale (${uploadMime}, ${uploadBuf.length} bytes)`);
     }
 
-    if (!photoUrl && !performanceData) {
-      return sendError(res, 400, "Foto o dati performance obbligatori");
+    // --- Step 2: object storage upload ---
+    const filename = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+    const objectPath = `public/contest/${filename}`;
+
+    try {
+      await uploadBuffer(objectPath, uploadBuf, uploadMime);
+      console.log(`[contest] Upload su object storage riuscito: ${objectPath}`);
+    } catch (storageError) {
+      console.error(`[contest] Upload su object storage fallito per ${objectPath}:`, storageError);
+      return sendError(res, 503, "Servizio storage temporaneamente non disponibile. Riprova tra qualche secondo.");
     }
 
+    photoUrl = `/api/contest/photos/${filename}`;
+  } else if (req.body.photoUrl) {
+    photoUrl = req.body.photoUrl;
+  }
+
+  if (!photoUrl && !performanceData) {
+    return sendError(res, 400, "Foto o dati performance obbligatori");
+  }
+
+  // --- Step 3: DB insert ---
+  try {
     const now = new Date();
     const weekNumber = getWeekNumber(now);
     const year = now.getFullYear();
@@ -76,10 +114,11 @@ router.post("/entries", upload.single("photo"), async (req: Request, res: Respon
       isApproved: true,
     });
 
+    console.log(`[contest] Entry creata con successo: ${entry.id} (utente ${userId})`);
     return res.status(201).json(entry);
-  } catch (error) {
-    console.error("Contest entry error:", error);
-    return sendError(res, 500, "Errore interno del server");
+  } catch (dbError) {
+    console.error(`[contest] Errore DB durante creazione entry (utente ${userId}):`, dbError);
+    return sendError(res, 500, "Errore nel salvataggio della foto. Riprova.");
   }
 });
 
@@ -243,6 +282,10 @@ router.get("/photos/:filename", async (req: Request, res: Response) => {
       ".jpeg": "image/jpeg",
       ".png": "image/png",
       ".webp": "image/webp",
+      ".heic": "image/heic",
+      ".heif": "image/heif",
+      ".avif": "image/avif",
+      ".gif": "image/gif",
     };
     const contentType = mimeTypes[ext] ?? "image/jpeg";
     res.set("Content-Type", contentType);
