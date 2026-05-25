@@ -1,16 +1,12 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
 import Colors from "@/constants/colors";
 
-interface Waypoint {
-  id?: string;
-  name?: string;
-  lat?: number;
-  lng?: number;
-  type?: string;
-}
+const MapLibre3DRoutePreviewMap = React.lazy(() => import("@/components/MapLibre3DRoutePreviewMap"));
+
+interface Waypoint { id?: string; name?: string; lat?: number; lng?: number; type?: string }
 interface RouteMapPreviewProps {
   waypoints: Waypoint[];
   curvatureMapHtml: string;
@@ -20,19 +16,29 @@ interface RouteMapPreviewProps {
   setRouteStyle: (style: "curvy" | "balanced" | "fastest") => void;
   isCalculatingRoute: boolean;
   routeStats: { distanceKm: number; durationMinutes: number } | null;
+  renderer?: string;
+  trackPoints3D?: Array<{ lat: number; lng: number }>;
 }
 
 export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
-  waypoints,
-  curvatureMapHtml,
-  webviewRef,
-  handleMapLoaded,
-  routeStyle,
-  setRouteStyle,
-  isCalculatingRoute,
-  routeStats,
+  waypoints, curvatureMapHtml, webviewRef, handleMapLoaded,
+  routeStyle, setRouteStyle, isCalculatingRoute, routeStats,
+  renderer, trackPoints3D,
 }) => {
   if (waypoints.length < 2) return null;
+
+  if (renderer === "maplibre-full-3d") {
+    return (
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>Anteprima percorso 3D</Text>
+        <View style={{ height: 200, borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: Colors.border }}>
+          <Suspense fallback={<ActivityIndicator style={{ flex: 1 }} />}>
+            <MapLibre3DRoutePreviewMap trackPoints={trackPoints3D} height={200} />
+          </Suspense>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <>

@@ -1,5 +1,5 @@
 export type MapsRollout = "disabled" | "tester" | "all";
-export type MapsRendererId = "leaflet" | "maplibre" | "openlayers";
+export type MapsRendererId = "leaflet" | "maplibre" | "openlayers" | "maplibre-full-3d";
 export type MapsTileId = "carto_light" | "carto_dark" | "osm";
 export type RoutingEngineId = "graphhopper" | "valhalla" | "mapbox-directions" | "tomtom";
 export type RoutingProfileId = "motorcycle" | "car";
@@ -28,6 +28,12 @@ export const RENDERER_OPTIONS: MapsOption<MapsRendererId>[] = [
     id: "openlayers",
     label: "OpenLayers",
     description: "Renderer Canvas/WebGL — ottimizzato per 5.000+ marker simultanei.",
+    implemented: true,
+  },
+  {
+    id: "maplibre-full-3d",
+    label: "MapLibre GL 3D",
+    description: "Renderer premium 3D — terrain, hillshade, satellite toggle. Solo web desktop.",
     implemented: true,
   },
 ];

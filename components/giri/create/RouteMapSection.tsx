@@ -1,9 +1,11 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { WebView } from "react-native-webview";
 import { Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import type { ThemeColors } from "@/constants/colors";
+
+const MapLibre3DPlannerMap = React.lazy(() => import("@/components/MapLibre3DPlannerMap"));
 
 interface RouteMapSectionProps {
   plannerMapHtml: string;
@@ -11,6 +13,8 @@ interface RouteMapSectionProps {
   onMapTap: (lat: number, lng: number) => void;
   isApproxRoute: boolean;
   calculating: boolean;
+  renderer?: string;
+  waypoints3D?: Array<{ lat: number; lng: number }>;
 }
 
 export const RouteMapSection: React.FC<RouteMapSectionProps> = ({
@@ -19,9 +23,24 @@ export const RouteMapSection: React.FC<RouteMapSectionProps> = ({
   onMapTap,
   isApproxRoute,
   calculating,
+  renderer,
+  waypoints3D,
 }) => {
   const colors = useColors();
   const s = styles(colors);
+
+  if (renderer === "maplibre-full-3d") {
+    return (
+      <View style={s.section}>
+        <Text style={s.sectionLabel}>Mappa percorso 3D</Text>
+        <View style={s.plannerMapContainer}>
+          <Suspense fallback={<ActivityIndicator style={{ flex: 1 }} />}>
+            <MapLibre3DPlannerMap waypoints={waypoints3D ?? []} onWaypointAdd={onMapTap} height={220} />
+          </Suspense>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={s.section}>

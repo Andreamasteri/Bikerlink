@@ -11,6 +11,12 @@ export const LazyOpenLayersInteractiveMap = React.lazy(() => import("@/component
 export const LazyLeafletRouteMap = React.lazy(() => import("@/components/LeafletRouteMap"));
 export const LazyMapLibreRouteMap = React.lazy(() => import("@/components/MapLibreRouteMap"));
 export const LazyOpenLayersRouteMap = React.lazy(() => import("@/components/OpenLayersRouteMap"));
+export const LazyMapLibre3DRoutePreviewMap = React.lazy(
+  () => import("@/components/MapLibre3DRoutePreviewMap")
+);
+export const LazyMapLibre3DPlannerMap = React.lazy(
+  () => import("@/components/MapLibre3DPlannerMap")
+);
 
 export const LazyLeafletMiniMap = React.lazy(() => import("@/components/LeafletMiniMap"));
 export const LazyMapLibreMiniMap = React.lazy(() => import("@/components/MapLibreMiniMap"));
@@ -26,27 +32,33 @@ export function useMapRenderer() {
   const { renderer } = useMapsRollout();
   const isMapLibre = renderer === "maplibre";
   const isOpenLayers = renderer === "openlayers";
+  const isMapLibre3D = renderer === "maplibre-full-3d";
+  const useMapLibreBase = isMapLibre || isMapLibre3D;
 
   return {
     isMapLibre,
     isOpenLayers,
+    isMapLibre3D,
     InteractiveMapComponent: isOpenLayers
       ? LazyOpenLayersInteractiveMap
-      : isMapLibre
+      : useMapLibreBase
         ? LazyMapLibreInteractiveMap
         : LazyLeafletInteractiveMap,
     RouteMapComponent: isOpenLayers
       ? LazyOpenLayersRouteMap
-      : isMapLibre
-        ? LazyMapLibreRouteMap
-        : LazyLeafletRouteMap,
+      : isMapLibre3D
+        ? LazyMapLibre3DRoutePreviewMap
+        : useMapLibreBase
+          ? LazyMapLibreRouteMap
+          : LazyLeafletRouteMap,
     MiniMapComponent: isOpenLayers
       ? LazyOpenLayersMiniMap
-      : isMapLibre
+      : useMapLibreBase
         ? LazyMapLibreMiniMap
         : LazyLeafletMiniMap,
-    PickerMapComponent: isMapLibre ? LazyMapLibrePickerMap : LazyLeafletPickerMap,
-    TrackingMapComponent: isMapLibre ? LazyMapLibreTrackingMap : LazyLeafletTrackingMap,
+    PickerMapComponent: useMapLibreBase ? LazyMapLibrePickerMap : LazyLeafletPickerMap,
+    TrackingMapComponent: useMapLibreBase ? LazyMapLibreTrackingMap : LazyLeafletTrackingMap,
+    PlannerMap3DComponent: LazyMapLibre3DPlannerMap,
   };
 }
 

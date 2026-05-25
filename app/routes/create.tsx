@@ -21,6 +21,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
 import { useMapConfig } from "@/lib/map-context";
+import { useMapsRollout } from "@/lib/maps/useMapsRollout";
 
 // Sub-components
 import { RouteOptionsPanel } from "@/components/routes/create/RouteOptionsPanel";
@@ -297,6 +298,7 @@ export default function CreateRouteScreen() {
 
   // Curvature map
   const { activeTileUrl, activeTileMaxZoom } = useMapConfig();
+  const { renderer } = useMapsRollout();
   const [curvatureMapHtml, setCurvatureMapHtml] = useState<string>("");
   const curvatureMapMountedRef = useRef(false);
 
@@ -445,6 +447,8 @@ export default function CreateRouteScreen() {
           setRouteStyle={setRouteStyle}
           isCalculatingRoute={isCalculatingRoute}
           routeStats={routeStats}
+          renderer={renderer}
+          trackPoints3D={routePolylinePts}
         />
 
         <RouteWaypointsInput

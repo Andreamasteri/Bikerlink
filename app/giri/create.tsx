@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
 import { useMapConfig } from "@/lib/map-context";
+import { useMapsRollout } from "@/lib/maps/useMapsRollout";
 import DebugPanel from "@/components/DebugPanel";
 import { useLanguage } from "@/lib/language-context";
 
@@ -75,6 +76,7 @@ export default function GiriCreateScreen() {
   const autoCalcTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { activeTileUrl, activeTileMaxZoom } = useMapConfig();
+  const { renderer } = useMapsRollout();
   const isApproxRoute = !!routeResult && (!!routeResult.approximate || !routeResult.encoded);
 
   const compassDirLabel: string | null =
@@ -192,7 +194,7 @@ export default function GiriCreateScreen() {
             <RouteTitleSection title={title} setTitle={setTitle} />
             <RouteStyleSection style={style} setStyle={setStyle} STYLE_LEVELS={STYLE_LEVELS} />
             <DrivingProfileSection drivingProfile={drivingProfile} setDrivingProfile={setDrivingProfile} myStyleProfile={myStyleProfile} />
-            <RouteMapSection plannerMapHtml={plannerMapHtml} webviewRef={webviewRef} onMapTap={handleMapTap} isApproxRoute={isApproxRoute} calculating={calculating} />
+            <RouteMapSection plannerMapHtml={plannerMapHtml} webviewRef={webviewRef} onMapTap={handleMapTap} isApproxRoute={isApproxRoute} calculating={calculating} renderer={renderer} waypoints3D={waypoints.map((w: { lat: number; lng: number }) => ({ lat: w.lat, lng: w.lng }))} />
           </>
         )}
 

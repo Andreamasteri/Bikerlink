@@ -10,6 +10,7 @@ export const AVAILABLE_RENDERERS: OptionEntry<MapsRendererId>[] = [
   { id: "leaflet", label: "Leaflet", implemented: true },
   { id: "maplibre", label: "MapLibre GL", implemented: true },
   { id: "openlayers", label: "OpenLayers", implemented: true },
+  { id: "maplibre-full-3d", label: "MapLibre GL 3D (web desktop)", implemented: true },
 ];
 
 export const AVAILABLE_TILES: OptionEntry<MapsTileId>[] = [

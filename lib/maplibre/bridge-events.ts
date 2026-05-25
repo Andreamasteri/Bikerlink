@@ -29,7 +29,11 @@ export type BridgeCommandType =
   | "setCoord"
   | "centerOnUser"
   | "updateHazards"
-  | "setStyle";
+  | "setStyle"
+  | "enableTerrain"
+  | "disableTerrain"
+  | "toggleHillshade"
+  | "toggleSatellite";
 
 export interface BridgeCommand {
   cmd: BridgeCommandType;
