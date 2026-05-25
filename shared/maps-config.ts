@@ -51,7 +51,7 @@ export const ROLLOUT_VALUES: ReadonlyArray<MapsRollout> = ["disabled", "tester",
 
 export const RENDERER_OPTIONS: ReadonlyArray<MapsOption<MapsRendererId>> = [
   { id: "leaflet", label: "Leaflet (classico)", description: "Renderer stabile attuale, basato su WebView Leaflet.js. Default produzione.", implemented: true },
-  { id: "maplibre_minimal", label: "MapLibre GL Minimal", description: "Renderer vettoriale leggero per WebView mobile. Performance migliore con tile vector.", implemented: false },
+  { id: "maplibre_minimal", label: "MapLibre GL Minimal", description: "Renderer vettoriale leggero per WebView mobile. Performance migliore con tile vector.", implemented: true },
   { id: "maplibre_full_3d", label: "MapLibre GL Full 3D", description: "Renderer 3D completo per desktop web. Tilt, pitch, edifici 3D.", implemented: false },
   { id: "openlayers", label: "OpenLayers", description: "Renderer alternativo ottimizzato per molti marker simultanei.", implemented: false },
   { id: "cesium_web", label: "CesiumJS (web desktop)", description: "Renderer 3D premium per planner desktop. Globo terrestre, terreno 3D.", implemented: false },

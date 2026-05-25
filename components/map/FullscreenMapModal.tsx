@@ -2,7 +2,7 @@ import React from "react";
 import { Modal, View, Pressable, Text, ActivityIndicator, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import InteractiveMap from "@/components/InteractiveMap";
+import RendererInteractiveMap from "@/components/RendererInteractiveMap";
 import FullscreenMapSearchBar from "@/components/map/FullscreenMapSearchBar";
 import MapStatsRow from "@/components/map/MapStatsRow";
 import type { FullscreenMapModalProps as Props } from "@/components/map/fullscreen-map-types";
@@ -64,7 +64,7 @@ export default function FullscreenMapModal({
     <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.container}>
         {isReady ? (
-          <InteractiveMap
+          <RendererInteractiveMap
             ref={mapRef}
             users={users}
             workshops={workshops}
@@ -96,6 +96,7 @@ export default function FullscreenMapModal({
             onReady={onMapReady}
             showHazardReportButton={showHazardReportButton}
           />
+
         ) : (
           <View style={styles.placeholder}>
             <ActivityIndicator size="large" color={Colors.accent} />

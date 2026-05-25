@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import LeafletPickerMap from "@/components/LeafletPickerMap";
+import RendererPickerMap from "@/components/RendererPickerMap";
 import type { PickerWaypoint } from "@/lib/leaflet-picker-map-html";
 
 interface ExistingWaypoint {
@@ -41,6 +41,15 @@ export default function MapPickerContent({ coord, onCoordChange, onConfirm, onCl
 
   const selectedCoord = coord ? { lat: coord.latitude, lng: coord.longitude } : null;
 
+  const pickerMapProps = {
+    initialLat,
+    initialLng,
+    initialZoom,
+    selectedCoord,
+    existingWaypoints: pickerWaypoints,
+    onCoordPicked: onCoordChange,
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: Colors.background }}>
       <View style={[styles.mapHeader, { paddingTop: insets.top + 8 }]}>
@@ -52,14 +61,7 @@ export default function MapPickerContent({ coord, onCoordChange, onConfirm, onCl
           <Text style={[styles.mapConfirmText, !coord && { opacity: 0.4 }]}>Conferma</Text>
         </TouchableOpacity>
       </View>
-      <LeafletPickerMap
-        initialLat={initialLat}
-        initialLng={initialLng}
-        initialZoom={initialZoom}
-        selectedCoord={selectedCoord}
-        existingWaypoints={pickerWaypoints}
-        onCoordPicked={onCoordChange}
-      />
+      <RendererPickerMap {...pickerMapProps} />
       {coord && (
         <View style={styles.mapCoordsBar}>
           <Text style={styles.mapCoordsText}>
