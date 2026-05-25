@@ -9,24 +9,21 @@ const router = Router();
 
 router.get("/", async (_req: Request, res: Response) => {
   try {
-    const [totalUsers, activeUsers, totalVisits, pendingReports] = await Promise.all([
+    const [totalUsers, onlineNow, activeWeek, pendingReports] = await Promise.all([
       db.select({ count: sql<number>`count(*)::int` }).from(users),
-      db.select({ count: sql<number>`count(*)::int` }).from(users).where(sql`last_login_at >= NOW() - INTERVAL '30 days'`),
-      db.select({ count: sql<number>`count(*)::int` }).from(siteVisits),
+      db.select({ count: sql<number>`count(*)::int` }).from(users).where(sql`last_login_at >= NOW() - INTERVAL '5 minutes'`),
+      db.select({ count: sql<number>`count(*)::int` }).from(users).where(sql`last_login_at >= NOW() - INTERVAL '7 days'`),
       storage.getPendingReportsCount(),
     ]);
 
     return res.json({
-      users: {
-        total: totalUsers[0].count,
-        active30d: activeUsers[0].count,
-      },
-      visits: {
-        total: totalVisits[0].count,
-      },
-      reports: {
-        pending: pendingReports,
-      },
+      totalUsers: totalUsers[0].count,
+      onlineUsersNow: onlineNow[0].count,
+      activeUsersWeek: activeWeek[0].count,
+      workshopContactsMonth: 0,
+      totalAdClicks: 0,
+      activeCampaigns: 0,
+      pendingReports,
       timestamp: new Date().toISOString(),
     });
   } catch (_error) {
