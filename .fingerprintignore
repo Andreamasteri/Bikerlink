@@ -1,0 +1,14 @@
+node_modules/
+.cache/
+.local/
+attached_assets/
+exports/
+dist-ota-env/
+dist/
+uploads/
+server/
+scripts/
+.agents/
+.git/
+tmp_eslint.json
+*.log
