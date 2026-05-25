@@ -59,12 +59,10 @@ export function AdGroupList({
     const campaign = item.data;
     return (
       <AdCard
-        campaign={campaign}
+        item={campaign}
         onToggle={() => onToggleCampaign(campaign.id, !campaign.isActive)}
         onDelete={() => onDeleteCampaign(campaign)}
         onEdit={() => onEditCampaign(campaign)}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- spread empty object for prop compat
-        {...({} as any)}
       />
     );
   };
