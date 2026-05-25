@@ -1,15 +1,20 @@
-import React from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   View,
   Text,
   ActivityIndicator,
   ScrollView,
+  Pressable,
+  Animated,
+  StyleSheet,
+  useWindowDimensions,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getUserColor, getUserTypeLabel, getUserIcon } from "@/lib/mapUserUtils";
+import { Ionicons } from "@expo/vector-icons";
 import MapSearchBar from "@/components/map/MapSearchBar";
 import AdBanner from "@/components/map/AdBanner";
 import { HomeHeader } from "@/components/home/HomeHeader";
@@ -18,19 +23,29 @@ import { HomeMapSection } from "@/components/home/HomeMapSection";
 import { HomeModalsAndSheets } from "@/components/home/HomeModalsAndSheets";
 import { HomeFullscreenMap } from "@/components/home/HomeFullscreenMap";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
+import InteractiveMap from "@/components/InteractiveMap";
 import { useHomeMapState } from "@/hooks/home/useHomeMapState";
-import styles from "@/components/map/mapScreenStyles";
+import mapScreenStyles from "@/components/map/mapScreenStyles";
+import type { ClubMapPin } from "@/components/InteractiveMap";
+
+interface CardLayout {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+}
 
 export default function MapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+
   const {
     user,
     authLoading,
     t,
     mapFullscreen,
     setMapFullscreen,
-    mapFullscreenReady,
     selectedUser,
     setSelectedUser,
     selectedUserDetail,
@@ -62,13 +77,12 @@ export default function MapScreen() {
     setOfflineCountdown,
     setMapReady,
     mapRef,
-    fullscreenMapRef,
     selectedCountries,
     showAreaModal,
     setShowAreaModal,
     showHomeMessage,
     setShowHomeMessage,
-    lastSmallMapCenter,
+    lastSmallMapCenter: _lastSmallMapCenter,
     setLastSmallMapCenter,
     filterBiker,
     filterZavorrina,
@@ -102,14 +116,56 @@ export default function MapScreen() {
     handleSearchResultPress,
     handleLocateUser,
     myAds,
-    handleFullscreenMapReady,
   } = useHomeMapState();
+
+  const [compactLayout, setCompactLayout] = useState<CardLayout | null>(null);
+  const firstLayoutDoneRef = useRef(false);
+
+  const animTop = useRef(new Animated.Value(0)).current;
+  const animLeft = useRef(new Animated.Value(0)).current;
+  const animWidth = useRef(new Animated.Value(screenWidth)).current;
+  const animHeight = useRef(new Animated.Value(screenHeight)).current;
+  const animRadius = useRef(new Animated.Value(0)).current;
+
+  const handleCardLayout = (layout: CardLayout) => {
+    setCompactLayout(layout);
+    if (!firstLayoutDoneRef.current) {
+      firstLayoutDoneRef.current = true;
+      animTop.setValue(layout.top);
+      animLeft.setValue(layout.left);
+      animWidth.setValue(layout.width);
+      animHeight.setValue(layout.height);
+      animRadius.setValue(20);
+    }
+  };
+
+  useEffect(() => {
+    if (!compactLayout) return;
+    if (mapFullscreen) {
+      Animated.parallel([
+        Animated.timing(animTop, { toValue: 0, duration: 250, useNativeDriver: false }),
+        Animated.timing(animLeft, { toValue: 0, duration: 250, useNativeDriver: false }),
+        Animated.timing(animWidth, { toValue: screenWidth, duration: 250, useNativeDriver: false }),
+        Animated.timing(animHeight, { toValue: screenHeight, duration: 250, useNativeDriver: false }),
+        Animated.timing(animRadius, { toValue: 0, duration: 250, useNativeDriver: false }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(animTop, { toValue: compactLayout.top, duration: 250, useNativeDriver: false }),
+        Animated.timing(animLeft, { toValue: compactLayout.left, duration: 250, useNativeDriver: false }),
+        Animated.timing(animWidth, { toValue: compactLayout.width, duration: 250, useNativeDriver: false }),
+        Animated.timing(animHeight, { toValue: compactLayout.height, duration: 250, useNativeDriver: false }),
+        Animated.timing(animRadius, { toValue: 20, duration: 250, useNativeDriver: false }),
+      ]).start();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapFullscreen]);
 
   if (authLoading || locationLoading) {
     return (
-      <View style={styles.loading}>
+      <View style={mapScreenStyles.loading}>
         <ActivityIndicator size="large" color={Colors.accent} />
-        <Text style={styles.loadingText}>{t("map.loadingMap")}</Text>
+        <Text style={mapScreenStyles.loadingText}>{t("map.loadingMap")}</Text>
       </View>
     );
   }
@@ -117,166 +173,213 @@ export default function MapScreen() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ad shape from API
   const currentAd = myAds[adIndex % myAds.length] as any;
 
+  const filteredUsers = usersWithSelf.filter(
+    (u) => u.latitude != null && u.longitude != null && !isNaN(u.latitude as number) && !isNaN(u.longitude as number)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) as any;
+
+  const filteredWorkshops = ((mapData.workshopsQuery.data ?? []) as { latitude?: number | null; longitude?: number | null }[]).filter(
+    (w) => w.latitude != null && w.longitude != null && !isNaN(w.latitude as number) && !isNaN(w.longitude as number)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) as any;
+
+  const filteredEasterEggs = ((mapData.easterEggsQuery.data ?? []) as { latitude?: number | null; longitude?: number | null }[]).filter(
+    (e) => e.latitude != null && e.longitude != null && !isNaN(e.latitude as number) && !isNaN(e.longitude as number)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) as any;
+
+  const filteredSosRequests = ((mapData.activeSosQuery.data ?? []) as { latitude?: number | null; longitude?: number | null }[]).filter(
+    (s) => s.latitude != null && s.longitude != null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) as any;
+
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: Colors.background }]}
-      contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 16 }}
-    >
-      {/* Header */}
-      <HomeHeader
-        areaLabel={areaLabel}
-        onShowAreaModal={() => setShowAreaModal(true)}
-        onShowHomeMessage={async () => {
-          const { data } = await mapData.homeMessageQuery.refetch();
-          if (data?.enabled) setShowHomeMessage(true);
-        }}
-        onChatPress={() => router.push("/chat" as never)}
-        homeMessageEnabled={mapData.homeMessageQuery.data?.enabled ?? false}
-      />
+    <View style={[styles.root, { backgroundColor: Colors.background }]}>
+      {/* Scrollable content */}
+      <ScrollView
+        style={[mapScreenStyles.container, { backgroundColor: Colors.background }]}
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 16 }}
+      >
+        <HomeHeader
+          areaLabel={areaLabel}
+          onShowAreaModal={() => setShowAreaModal(true)}
+          onShowHomeMessage={async () => {
+            const { data } = await mapData.homeMessageQuery.refetch();
+            if (data?.enabled) setShowHomeMessage(true);
+          }}
+          onChatPress={() => router.push("/chat" as never)}
+          homeMessageEnabled={mapData.homeMessageQuery.data?.enabled ?? false}
+        />
 
-      {/* Search Bar */}
-      <MapSearchBar
-        searchText={searchText}
-        onChangeText={handleSearch}
-        onClear={() => { setSearchText(""); setSearchResults([]); setShowSearchResults(false); }}
-        searchResults={searchResults}
-        searchLoading={searchLoading}
-        showSearchResults={showSearchResults}
-        onResultPress={handleSearchResultPress}
-        currentUserId={user?.id}
-      />
+        <MapSearchBar
+          searchText={searchText}
+          onChangeText={handleSearch}
+          onClear={() => { setSearchText(""); setSearchResults([]); setShowSearchResults(false); }}
+          searchResults={searchResults}
+          searchLoading={searchLoading}
+          showSearchResults={showSearchResults}
+          onResultPress={handleSearchResultPress}
+          currentUserId={user?.id}
+        />
 
-      {/* Small Map */}
-      <HomeMapSection
-        mapFullscreen={mapFullscreen}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ref type from InteractiveMap
-        mapRef={mapRef as any}
-        usersWithSelf={usersWithSelf}
-        workshops={mapData.workshopsQuery.data ?? []}
-        activeSosRequests={mapData.activeSosQuery.data ?? []}
-        isAvailable={isAvailable}
-        ghostMode={isGhostMode}
-        mySearchRadius={mySearchRadius}
-        filterBiker={filterBiker}
-        filterZavorrina={filterZavorrina}
-        toggleFilterBiker={toggleFilterBiker}
-        toggleFilterZavorrina={toggleFilterZavorrina}
-        handleUserPress={handleUserPress}
-        handleEasterEggPress={handleEasterEggPress}
-        onEventPress={(id) => router.push({ pathname: "/evento/[id]" as const, params: { id } })}
-        setMapReady={setMapReady}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- user.id from auth context
-        userId={user?.id as any}
-        realMeMarker={realMeMarker}
-        fakeMeMarker={fakeMeMarker}
-        setLastSmallMapCenter={setLastSmallMapCenter}
-        smallMapInitialCenter={smallMapInitialCenter}
-        setMapFullscreen={setMapFullscreen}
-      />
+        {/* Map placeholder — reserves layout space; actual map rendered below */}
+        <HomeMapSection onCardLayout={handleCardLayout} />
 
-      {/* Stats Row */}
-      <HomeStatsRow
-        onlineCount={onlineCount}
-        bikerCount={bikerCount}
-        zavCount={zavCount}
-        onShowOnlineList={() => setShowOnlineList(true)}
-        onShowBikerList={() => setShowBikerList(true)}
-        onShowZavorrinaList={() => setShowZavorrinaList(true)}
-        t={t}
-      />
+        <HomeStatsRow
+          onlineCount={onlineCount}
+          bikerCount={bikerCount}
+          zavCount={zavCount}
+          onShowOnlineList={() => setShowOnlineList(true)}
+          onShowBikerList={() => setShowBikerList(true)}
+          onShowZavorrinaList={() => setShowZavorrinaList(true)}
+          t={t}
+        />
 
-      {/* Ad Banner */}
-      {mapData.adsGloballyEnabled && myAds.length > 0 && currentAd && (
-        <AdBanner key={currentAd.id} ad={currentAd} onPress={handleAdClick} />
+        {mapData.adsGloballyEnabled && myAds.length > 0 && currentAd && (
+          <AdBanner key={currentAd.id} ad={currentAd} onPress={handleAdClick} />
+        )}
+
+        <InlineMiniPlayer />
+
+        <HomeModalsAndSheets
+          showOnlineList={showOnlineList}
+          setShowOnlineList={setShowOnlineList}
+          showBikerList={showBikerList}
+          setShowBikerList={setShowBikerList}
+          showZavorrinaList={showZavorrinaList}
+          setShowZavorrinaList={setShowZavorrinaList}
+          showOfflineOnline={showOfflineOnline}
+          setShowOfflineOnline={setShowOfflineOnline}
+          onlineListQuery={mapData.onlineListQuery}
+          bikerListQuery={mapData.bikerListQuery}
+          zavListQuery={mapData.zavListQuery}
+          offlineCountdown={offlineCountdown.online}
+          startOfflineTimer={startOfflineTimer}
+          handleLocateUser={handleLocateUser}
+          onToggleOfflineOnline={() => {
+            const next = !showOfflineOnline;
+            setShowOfflineOnline(next);
+            if (next) {
+              startOfflineTimer();
+              queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] });
+            } else {
+              setOfflineCountdown({ online: 0 });
+            }
+          }}
+          selectedUser={selectedUser}
+          setSelectedUser={setSelectedUser}
+          selectedUserDetail={selectedUserDetail}
+          selectedUserProposals={selectedUserProposals}
+          detailLoading={detailLoading}
+          setSelectedMapPhoto={setSelectedMapPhoto}
+          myOrganizedEvents={mapData.myOrganizedEventsQuery.data ?? []}
+          targetUserEventIds={mapData.targetUserEventIdsQuery.data ?? []}
+          activeSosRequests={mapData.activeSosQuery.data ?? []}
+          showSosDetail={showSosDetail}
+          setShowSosDetail={setShowSosDetail}
+          acceptSosMutation={mapData.acceptSosMutation}
+          selectedEgg={selectedEgg}
+          setSelectedEgg={setSelectedEgg}
+          collectEggMutation={mapData.collectEggMutation}
+          selectedMapPhoto={selectedMapPhoto}
+          showHomeMessage={showHomeMessage}
+          setShowHomeMessage={setShowHomeMessage}
+          homeMessageText={mapData.homeMessageQuery.data?.text || ""}
+          showAreaModal={showAreaModal}
+          setShowAreaModal={setShowAreaModal}
+          selectedCountries={selectedCountries}
+          toggleCountryInModal={toggleCountryInModal}
+          toggleContinentInModal={toggleContinentInModal}
+          saveCountries={saveCountries}
+          user={user}
+          t={t}
+        />
+      </ScrollView>
+
+      {/* Single always-mounted InteractiveMap — animated between compact and fullscreen */}
+      {compactLayout && (
+        <Animated.View
+          style={[
+            styles.animatedMap,
+            {
+              top: animTop,
+              left: animLeft,
+              width: animWidth,
+              height: animHeight,
+              borderRadius: animRadius,
+              zIndex: mapFullscreen ? 100 : 2,
+            },
+          ]}
+        >
+          <InteractiveMap
+            ref={mapRef}
+            users={filteredUsers}
+            workshops={filteredWorkshops}
+            easterEggs={filteredEasterEggs}
+            activeSosRequests={filteredSosRequests}
+            isAvailable={isAvailable}
+            ghostMode={isGhostMode}
+            searchRadiusKm={mySearchRadius ?? 0}
+            filterBiker={filterBiker}
+            filterZavorrina={filterZavorrina}
+            filterClubs={filterClubs}
+            filterEvents={filterEvents}
+            onToggleFilterBiker={toggleFilterBiker}
+            onToggleFilterZavorrina={toggleFilterZavorrina}
+            onToggleFilterClubs={toggleFilterClubs}
+            onToggleFilterEvents={toggleFilterEvents}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapUser index signature mismatch between map-types and useHomeMapState
+            onUserPress={(u) => { handleUserPress(u as any); }}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- EasterEgg vs MapEasterEgg index signature mismatch
+            onEasterEggPress={(e) => { handleEasterEggPress(e as any); }}
+            onEventPress={(id) => {
+              setMapFullscreen(false);
+              router.push({ pathname: "/evento/[id]" as const, params: { id } });
+            }}
+            onClubPress={(club: ClubMapPin) => {
+              setMapFullscreen(false);
+              router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } });
+            }}
+            onProposeClubLocation={(club: ClubMapPin) => {
+              setMapFullscreen(false);
+              router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } });
+            }}
+            onReady={() => setMapReady(true)}
+            currentUserId={user?.id ?? null}
+            realMeMarker={realMeMarker}
+            fakeMeMarker={fakeMeMarker}
+            showEventPins={mapFullscreen}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            clubPins={(mapData.clubPinsQuery.data ?? []) as any}
+            initialCenterOverride={smallMapInitialCenter}
+            onRegionChangeComplete={(center) => setLastSmallMapCenter(center)}
+            filterBarTopOffset={mapFullscreen ? insets.top : undefined}
+            gpsFollowupEnabled={true}
+            showHazardReportButton={mapFullscreen}
+          />
+
+          {/* Compact mode: transparent tap target to expand + expand icon */}
+          {!mapFullscreen && (
+            <>
+              <Pressable
+                style={StyleSheet.absoluteFill}
+                onPress={() => setMapFullscreen(true)}
+              />
+              <View style={styles.expandHint} pointerEvents="none">
+                <Ionicons name="expand" size={16} color={Colors.text} />
+              </View>
+            </>
+          )}
+        </Animated.View>
       )}
 
-      <InlineMiniPlayer />
-
-      <HomeModalsAndSheets
-        showOnlineList={showOnlineList}
-        setShowOnlineList={setShowOnlineList}
-        showBikerList={showBikerList}
-        setShowBikerList={setShowBikerList}
-        showZavorrinaList={showZavorrinaList}
-        setShowZavorrinaList={setShowZavorrinaList}
-        showOfflineOnline={showOfflineOnline}
-        setShowOfflineOnline={setShowOfflineOnline}
-        onlineListQuery={mapData.onlineListQuery}
-        bikerListQuery={mapData.bikerListQuery}
-        zavListQuery={mapData.zavListQuery}
-        offlineCountdown={offlineCountdown.online}
-        startOfflineTimer={startOfflineTimer}
-        handleLocateUser={handleLocateUser}
-        onToggleOfflineOnline={() => {
-          const next = !showOfflineOnline;
-          setShowOfflineOnline(next);
-          if (next) {
-            startOfflineTimer();
-            queryClient.invalidateQueries({ queryKey: ["/api/users/online-list"] });
-          } else {
-            setOfflineCountdown({ online: 0 });
-          }
-        }}
-        selectedUser={selectedUser}
-        setSelectedUser={setSelectedUser}
-        selectedUserDetail={selectedUserDetail}
-        selectedUserProposals={selectedUserProposals}
-        detailLoading={detailLoading}
-        setSelectedMapPhoto={setSelectedMapPhoto}
-        myOrganizedEvents={mapData.myOrganizedEventsQuery.data ?? []}
-        targetUserEventIds={mapData.targetUserEventIdsQuery.data ?? []}
-        activeSosRequests={mapData.activeSosQuery.data ?? []}
-        showSosDetail={showSosDetail}
-        setShowSosDetail={setShowSosDetail}
-        acceptSosMutation={mapData.acceptSosMutation}
-        selectedEgg={selectedEgg}
-        setSelectedEgg={setSelectedEgg}
-        collectEggMutation={mapData.collectEggMutation}
-        selectedMapPhoto={selectedMapPhoto}
-        showHomeMessage={showHomeMessage}
-        setShowHomeMessage={setShowHomeMessage}
-        homeMessageText={mapData.homeMessageQuery.data?.text || ""}
-        showAreaModal={showAreaModal}
-        setShowAreaModal={setShowAreaModal}
-        selectedCountries={selectedCountries}
-        toggleCountryInModal={toggleCountryInModal}
-        toggleContinentInModal={toggleContinentInModal}
-        saveCountries={saveCountries}
-        user={user}
-        t={t}
-      />
-
-      {/* Fullscreen Map */}
+      {/* Fullscreen overlay UI — rendered above map, only interactive when fullscreen */}
       <HomeFullscreenMap
         mapFullscreen={mapFullscreen}
         setMapFullscreen={setMapFullscreen}
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- fullscreen map ref
-        fullscreenMapRef={fullscreenMapRef as any}
-        usersWithSelf={usersWithSelf}
-        workshopsQuery={mapData.workshopsQuery}
-        easterEggsQuery={mapData.easterEggsQuery}
-        activeSosQuery={mapData.activeSosQuery}
-        isAvailable={isAvailable}
-        isGhostMode={isGhostMode}
-        mySearchRadius={mySearchRadius}
-        filterBiker={filterBiker}
-        filterZavorrina={filterZavorrina}
-        filterClubs={filterClubs}
-        filterEvents={filterEvents}
-        toggleFilterBiker={toggleFilterBiker}
-        toggleFilterZavorrina={toggleFilterZavorrina}
-        toggleFilterClubs={toggleFilterClubs}
-        toggleFilterEvents={toggleFilterEvents}
-        handleUserPress={handleUserPress}
-        handleEasterEggPress={handleEasterEggPress}
-        realMeMarker={realMeMarker}
-        fakeMeMarker={fakeMeMarker}
-        clubPinsQuery={mapData.clubPinsQuery}
-        lastSmallMapCenter={lastSmallMapCenter}
         insets={insets}
         setShowAreaModal={setShowAreaModal}
         areaLabel={areaLabel}
-        onMapReady={handleFullscreenMapReady}
         searchText={searchText}
         handleSearch={handleSearch}
         setSearchText={setSearchText}
@@ -289,11 +392,29 @@ export default function MapScreen() {
         onlineCount={onlineCount}
         bikerCount={bikerCount}
         zavCount={zavCount}
-        mapFullscreenReady={mapFullscreenReady}
+        currentUserFullId={user?.id}
         getUserIcon={getUserIcon}
         getUserColor={getUserColor}
         getUserTypeLabel={(u) => getUserTypeLabel(u, t)}
       />
-    </ScrollView>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+  animatedMap: {
+    position: "absolute",
+    overflow: "hidden",
+  },
+  expandHint: {
+    position: "absolute",
+    bottom: 12,
+    right: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.8)",
+    padding: 6,
+    borderRadius: 8,
+  },
+});

@@ -1,40 +1,12 @@
-import type React from "react";
-import type { InteractiveMapHandle, ClubMapPin, MapUser, MapWorkshop, MapEasterEgg, MapSosRequest } from "@/components/InteractiveMap";
+import type { MapUser } from "@/components/InteractiveMap";
 
-export type FullscreenMapModalProps = {
+export type FullscreenMapOverlayProps = {
   visible: boolean;
   onClose: () => void;
-  mapRef: React.RefObject<InteractiveMapHandle | null>;
-  users: MapUser[];
-  workshops: MapWorkshop[];
-  easterEggs: MapEasterEgg[];
-  activeSosRequests: MapSosRequest[];
-  isAvailable: boolean;
-  ghostMode: boolean;
-  searchRadiusKm: number;
-  filterBiker: boolean;
-  filterZavorrina: boolean;
-  filterClubs: boolean;
-  filterEvents: boolean;
-  onToggleFilterBiker: () => void;
-  onToggleFilterZavorrina: () => void;
-  onToggleFilterClubs: () => void;
-  onToggleFilterEvents: () => void;
-  onUserPress: (u: MapUser) => void;
-  onEasterEggPress: (egg: MapEasterEgg) => void;
-  onEventPress: (id: string) => void;
-  onClubPress: (club: ClubMapPin) => void;
-  onProposeClubLocation: (club: ClubMapPin) => void;
-  currentUserId: string | null | undefined;
-  realMeMarker: { latitude: number; longitude: number } | null;
-  fakeMeMarker: { latitude: number; longitude: number } | null;
-  clubPins: ClubMapPin[];
-  initialCenterOverride: { latitude: number; longitude: number } | null;
-  filterBarTopOffset: number;
+  insetsTop: number;
+  insetsBottom: number;
   onShowAreaModal: () => void;
   areaLabel: string;
-  onRegionChangeComplete?: (center: { latitude: number; longitude: number }) => void;
-  onMapReady?: () => void;
   searchText: string;
   onSearch: (text: string) => void;
   onClearSearch: () => void;
@@ -46,11 +18,9 @@ export type FullscreenMapModalProps = {
   onlineCount: number;
   bikerCount: number;
   zavCount: number;
-  insetsTop: number;
-  insetsBottom: number;
-  isReady: boolean;
   getUserIcon: (u: MapUser) => "people" | "person" | "bicycle";
   getUserColor: (u: MapUser) => string;
   getUserTypeLabel: (u: MapUser) => string;
-  showHazardReportButton?: boolean;
 };
+
+export type FullscreenMapModalProps = FullscreenMapOverlayProps;

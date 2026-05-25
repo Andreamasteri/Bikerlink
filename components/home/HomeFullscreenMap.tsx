@@ -1,46 +1,10 @@
 import React from "react";
-import { useAuth } from "@/lib/auth-context";
-import { useRouter } from "expo-router";
 import FullscreenMapModal from "@/components/map/FullscreenMapModal";
+import type { MapUser } from "@/components/InteractiveMap";
 
-interface MapItem {
-  id?: string | number;
-  latitude?: number | null;
-  longitude?: number | null;
-  [key: string]: unknown;
-}
-interface QueryLike {
-  data?: unknown;
-  isLoading?: boolean;
-}
 interface HomeFullscreenMapProps {
   mapFullscreen: boolean;
   setMapFullscreen: (val: boolean) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- map ref type varies
-  fullscreenMapRef: React.RefObject<any>;
-  usersWithSelf: MapItem[];
-  workshopsQuery: QueryLike;
-  easterEggsQuery: QueryLike;
-  activeSosQuery: QueryLike;
-  isAvailable: boolean;
-  isGhostMode: boolean;
-  mySearchRadius: number;
-  filterBiker: boolean;
-  filterZavorrina: boolean;
-  filterClubs: boolean;
-  filterEvents: boolean;
-  toggleFilterBiker: () => void;
-  toggleFilterZavorrina: () => void;
-  toggleFilterClubs: () => void;
-  toggleFilterEvents: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts MapUser from useHomeMapState
-  handleUserPress: (user: any) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- accepts EasterEgg from useHomeMapState
-  handleEasterEggPress: (egg: any) => void;
-  realMeMarker: { latitude: number; longitude: number } | null;
-  fakeMeMarker: { latitude: number; longitude: number } | null;
-  clubPinsQuery: QueryLike;
-  lastSmallMapCenter: { latitude: number; longitude: number } | null;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- insets type from react-native-safe-area-context
   insets: any;
   setShowAreaModal: (val: boolean) => void;
@@ -60,8 +24,7 @@ interface HomeFullscreenMapProps {
   onlineCount: number;
   bikerCount: number;
   zavCount: number;
-  mapFullscreenReady: boolean;
-  onMapReady?: () => void;
+  currentUserFullId: string | null | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- user icon/color helpers accept any user shape
   getUserIcon: (user: any) => string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- user icon/color helpers accept any user shape
@@ -73,28 +36,6 @@ interface HomeFullscreenMapProps {
 export const HomeFullscreenMap: React.FC<HomeFullscreenMapProps> = ({
   mapFullscreen,
   setMapFullscreen,
-  fullscreenMapRef,
-  usersWithSelf,
-  workshopsQuery,
-  easterEggsQuery,
-  activeSosQuery,
-  isAvailable,
-  isGhostMode,
-  mySearchRadius,
-  filterBiker,
-  filterZavorrina,
-  filterClubs,
-  filterEvents,
-  toggleFilterBiker,
-  toggleFilterZavorrina,
-  toggleFilterClubs,
-  toggleFilterEvents,
-  handleUserPress,
-  handleEasterEggPress,
-  realMeMarker,
-  fakeMeMarker,
-  clubPinsQuery,
-  lastSmallMapCenter,
   insets,
   setShowAreaModal,
   areaLabel,
@@ -110,70 +51,19 @@ export const HomeFullscreenMap: React.FC<HomeFullscreenMapProps> = ({
   onlineCount,
   bikerCount,
   zavCount,
-  mapFullscreenReady,
+  currentUserFullId,
   getUserIcon,
   getUserColor,
   getUserTypeLabel,
 }) => {
-  const router = useRouter();
-  const { user } = useAuth();
-
   return (
     <FullscreenMapModal
       visible={mapFullscreen}
       onClose={() => setMapFullscreen(false)}
-      mapRef={fullscreenMapRef}
-      users={usersWithSelf.filter(
-        (u) => u.latitude != null && u.longitude != null && !isNaN(u.latitude as number) && !isNaN(u.longitude as number)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapItem matches MapUser at runtime
-      ) as any}
-      workshops={((workshopsQuery.data as MapItem[]) ?? []).filter(
-        (w) => w.latitude != null && w.longitude != null && !isNaN(w.latitude as number) && !isNaN(w.longitude as number)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapItem matches MapWorkshop at runtime
-      ) as any}
-      easterEggs={((easterEggsQuery.data as MapItem[]) ?? []).filter(
-        (e) => e.latitude != null && e.longitude != null && !isNaN(e.latitude as number) && !isNaN(e.longitude as number)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapItem matches MapEasterEgg at runtime
-      ) as any}
-      activeSosRequests={((activeSosQuery.data as MapItem[]) ?? []).filter(
-        (s) => s.latitude != null && s.longitude != null
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapItem matches MapSosRequest at runtime
-      ) as any}
-      isAvailable={isAvailable}
-      ghostMode={isGhostMode}
-      searchRadiusKm={mySearchRadius}
-      filterBiker={filterBiker}
-      filterZavorrina={filterZavorrina}
-      filterClubs={filterClubs}
-      filterEvents={filterEvents}
-      onToggleFilterBiker={toggleFilterBiker}
-      onToggleFilterZavorrina={toggleFilterZavorrina}
-      onToggleFilterClubs={toggleFilterClubs}
-      onToggleFilterEvents={toggleFilterEvents}
-      onUserPress={handleUserPress}
-      onEasterEggPress={handleEasterEggPress}
-      onEventPress={(id) => {
-        setMapFullscreen(false);
-        router.push({ pathname: "/evento/[id]" as const, params: { id } });
-      }}
-      onClubPress={(club) => {
-        setMapFullscreen(false);
-        router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } });
-      }}
-      onProposeClubLocation={(club) => {
-        setMapFullscreen(false);
-        router.push({ pathname: "/motoclub/[id]" as const, params: { id: club.id } });
-      }}
-      currentUserId={user?.id ?? null}
-      realMeMarker={realMeMarker}
-      fakeMeMarker={fakeMeMarker}
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- clubPins from API
-      clubPins={(clubPinsQuery.data ?? []) as any}
-      initialCenterOverride={lastSmallMapCenter}
-      filterBarTopOffset={insets.top}
+      insetsTop={insets.top}
+      insetsBottom={insets.bottom}
       onShowAreaModal={() => setShowAreaModal(true)}
       areaLabel={areaLabel}
-      onRegionChangeComplete={undefined}
       searchText={searchText}
       onSearch={handleSearch}
       onClearSearch={() => {
@@ -181,22 +71,18 @@ export const HomeFullscreenMap: React.FC<HomeFullscreenMapProps> = ({
         setSearchResults([]);
         setShowSearchResults(false);
       }}
-      searchResults={searchResults}
+      searchResults={searchResults as MapUser[]}
       searchLoading={searchLoading}
       showSearchResults={showSearchResults}
       onSearchResultPress={handleSearchResultPress}
-      currentUserFullId={user?.id}
+      currentUserFullId={currentUserFullId}
       onlineCount={onlineCount}
       bikerCount={bikerCount}
       zavCount={zavCount}
-      insetsTop={insets.top}
-      insetsBottom={insets.bottom}
-      isReady={mapFullscreenReady}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any -- getUserIcon returns string matching union
       getUserIcon={getUserIcon as any}
       getUserColor={getUserColor}
       getUserTypeLabel={getUserTypeLabel}
-      showHazardReportButton={true}
     />
   );
 };

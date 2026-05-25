@@ -71,7 +71,6 @@ export function useHomeMapState() {
   const { positionReady: contextPositionReady, requestPermission } = useLocationGate();
 
   const [mapFullscreen, setMapFullscreen] = useState(false);
-  const [mapFullscreenReady, setMapFullscreenReady] = useState(false);
   const [selectedUser, setSelectedUser] = useState<MapUser | null>(null);
   const [selectedUserDetail, setSelectedUserDetail] = useState<MapUser | null>(null);
   const [selectedMapPhoto, setSelectedMapPhoto] = useState<string | null>(null);
@@ -92,7 +91,6 @@ export function useHomeMapState() {
   const sosEnabled = useSetting("sosEnabled");
   const [mapReady, setMapReady] = useState(false);
   const mapRef = useRef<InteractiveMapHandle>(null);
-  const fullscreenMapRef = useRef<InteractiveMapHandle>(null);
   const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
   const [showAreaModal, setShowAreaModal] = useState(false);
   const [countriesLoaded, setCountriesLoaded] = useState(false);
@@ -100,7 +98,6 @@ export function useHomeMapState() {
   const [lastSmallMapCenter, setLastSmallMapCenter] = useState<{ latitude: number; longitude: number } | null>(null);
   const lastFocusParamRef = useRef<string | null>(null);
   const [pendingFocusCoords, setPendingFocusCoords] = useState<{ lat: number; lng: number; userId?: string; nickname?: string } | null>(null);
-  const [, setPendingHighlight] = useState<{ lat: number; lng: number; userId: string } | null>(null);
   const [focusToast, setFocusToast] = useState<string | null>(null);
   const focusToastAnim = useRef(new Animated.Value(0)).current;
 
@@ -193,8 +190,7 @@ export function useHomeMapState() {
         const lat = parseFloat(focusLatParam);
         const lng = parseFloat(focusLngParam);
         if (!isNaN(lat) && !isNaN(lng)) {
-          const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
-          activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng });
+          mapRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng });
         }
       }
     }
@@ -203,18 +199,7 @@ export function useHomeMapState() {
     const { lat, lng, userId, nickname } = pendingFocusCoords;
     setPendingFocusCoords(null);
 
-    if (mapFullscreen && !mapFullscreenReady) {
-      // Fullscreen is open but the WebView is not ready yet — defer the highlight
-      // so it is consumed by handleFullscreenMapReady once the map initialises.
-      if (userId) setPendingHighlight({ lat, lng, userId });
-    } else {
-      const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
-      activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId });
-      if (!mapFullscreen && userId) {
-        // Small map → fullscreen will pick this up via handleFullscreenMapReady
-        setPendingHighlight({ lat, lng, userId });
-      }
-    }
+    mapRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId });
 
     if (nickname) {
       setFocusToast(`Vista centrata su ${nickname}`);
@@ -224,30 +209,7 @@ export function useHomeMapState() {
         Animated.timing(focusToastAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
       ]).start(() => setFocusToast(null));
     }
-  }, [mapReady, pendingFocusCoords, focusLatParam, focusLngParam, mapFullscreen, mapFullscreenReady, focusToastAnim]);
-
-  useEffect(() => {
-    if (mapFullscreen) {
-      const timer = setTimeout(() => setMapFullscreenReady(true), 400);
-      return () => clearTimeout(timer);
-    } else {
-      setMapFullscreenReady(false);
-      setPendingHighlight(null);
-    }
-  }, [mapFullscreen]);
-
-  const handleFullscreenMapReady = useCallback(() => {
-    setPendingHighlight((ph) => {
-      if (ph) {
-        fullscreenMapRef.current?.focusOnCoordinate({
-          latitude: ph.lat,
-          longitude: ph.lng,
-          userId: ph.userId,
-        });
-      }
-      return null;
-    });
-  }, []);
+  }, [mapReady, pendingFocusCoords, focusLatParam, focusLngParam, focusToastAnim]);
 
 
   useEffect(() => {
@@ -489,9 +451,8 @@ export function useHomeMapState() {
     const lat = Number(u.latitude);
     const lng = Number(u.longitude);
     setLastSmallMapCenter({ latitude: lat, longitude: lng });
-    const activeRef = mapFullscreen ? fullscreenMapRef : mapRef;
     setTimeout(() => {
-      activeRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId: String(u.id) });
+      mapRef.current?.focusOnCoordinate({ latitude: lat, longitude: lng, userId: String(u.id) });
       handleUserPress({ id: u.id, nickname: u.nickname, userType: u.userType, latitude: lat, longitude: lng });
       if (u.nickname) {
         setFocusToast(`Vista centrata su ${u.nickname}`);
@@ -502,7 +463,7 @@ export function useHomeMapState() {
         ]).start(() => setFocusToast(null));
       }
     }, 300);
-  }, [mapFullscreen, handleUserPress, focusToastAnim]);
+  }, [handleUserPress, focusToastAnim]);
 
   return {
     user,
@@ -513,7 +474,6 @@ export function useHomeMapState() {
     requestPermission,
     mapFullscreen,
     setMapFullscreen,
-    mapFullscreenReady,
     selectedUser,
     setSelectedUser,
     selectedUserDetail,
@@ -546,7 +506,6 @@ export function useHomeMapState() {
     mapReady,
     setMapReady,
     mapRef,
-    fullscreenMapRef,
     selectedCountries,
     showAreaModal,
     setShowAreaModal,
@@ -590,6 +549,5 @@ export function useHomeMapState() {
     myAds,
     focusToast,
     focusToastAnim,
-    handleFullscreenMapReady,
   };
 }
