@@ -11,6 +11,7 @@ import TrackingMap from "@/components/TrackingMap";
 import { getTileConfig } from "@/lib/map-tiles";
 import { useMapConfig } from "@/lib/map-context";
 import { useTrackingState } from "@/components/tracking/useTrackingState";
+import { apiRequest } from "@/lib/query-client";
 import { trackingStyles as styles } from "@/components/tracking/tracking-styles";
 import DebugPanel from "@/components/DebugPanel";
 
@@ -212,7 +213,33 @@ function TrackingScreenInner() {
         showMyRoute={state.showMyRoute}
         summaryRoutePoints={state.summaryRoutePoints}
         setRouteMapVisible={handlers.setRouteMapVisible}
-        onPublish={handlers.handlePublish}
+        onSave={async () => {
+          if (state.completedRouteId) {
+            try {
+              await apiRequest("PATCH", `/api/routes/${state.completedRouteId}`, { title: state.rideTitle });
+            } catch (_) {}
+          }
+          handlers.setSummaryVisible(false);
+        }}
+        onPublish={() => {
+          if (state.completedRouteId) {
+            const netMs = Math.max(state.totalMs - state.displayIdleMs, 0);
+            const computedAvg = netMs > 0 ? state.totalKm / (netMs / 3600000) : 0;
+            handlers.setPublishRecord({
+              id: state.completedRouteId,
+              title: state.rideTitle || undefined,
+              totalDistanceKm: state.totalKm,
+              maxSpeedKmh: state.maxSpeed,
+              avgSpeedKmh: computedAvg,
+              durationSeconds: Math.round(state.totalMs / 1000),
+              isSprint: state.is0100Enabled,
+              sprint0to100Ms: state.sprint0to100Ms,
+              maxAccelerationG: state.maxAccelG,
+              status: "completed",
+              createdAt: new Date().toISOString(),
+            });
+          }
+        }}
         onDelete={() => {
           if (state.completedRouteId) {
             handlers.handleDeleteRecord(state.completedRouteId);

@@ -1134,6 +1134,14 @@ const tr: Record<string, string> = {
   "compatibility.garageExplanation": "Birinizin motosikleti var, diğeri yolculuk arıyor. Bu Garaj Eşleşmesi, karşılıklı tercihlerinize göre bir bikerı bir yolcuyla buluşturur.",
   "compatibility.genericExplanation": "Önerileriniz uyumlu: aradığınız kullanıcı türleri ilgili profillerinizle örtüşüyor.",
   "compatibility.closeBtn": "Anladım",
+
+  "tracking.feature.sprint": "0→100 km/h ivmelenmeyi ölç",
+  "tracking.feature.sensors": "İvmeölçer ve jiroskop etkinleştir",
+  "tracking.feature.handsoff": "Yüksek hızda dokunmayı kilitle",
+  "tracking.feature.countdown": "Kalkıştan önce geri sayım",
+  "tracking.sensors": "Sensörler",
+  "tracking.history": "Geçmiş",
+  "tracking.save": "Kaydet",
 };
 
 export default tr;

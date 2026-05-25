@@ -1134,6 +1134,14 @@ const el: Record<string, string> = {
   "compatibility.garageExplanation": "Ο ένας από εσάς έχει μοτοσικλέτα και ο άλλος αναζητά διαδρομή. Αυτό το Garage Match συνδέει έναν biker με έναν επιβάτη βάσει των αμοιβαίων σας προτιμήσεων.",
   "compatibility.genericExplanation": "Οι προτάσεις σας είναι συμβατές: οι τύποι χρηστών που αναζητά ο καθένας αλληλεπικαλύπτονται με τα αντίστοιχα προφίλ σας.",
   "compatibility.closeBtn": "Κατάλαβα",
+
+  "tracking.feature.sprint": "Μέτρηση επιτάχυνσης 0→100 km/h",
+  "tracking.feature.sensors": "Ενεργοποίηση επιταχυνσιόμετρου και γυροσκοπίου",
+  "tracking.feature.handsoff": "Κλείδωμα αφής σε υψηλή ταχύτητα",
+  "tracking.feature.countdown": "Αντίστροφη μέτρηση πριν την εκκίνηση",
+  "tracking.sensors": "Αισθητήρες",
+  "tracking.history": "Ιστορικό",
+  "tracking.save": "Αποθήκευση",
 };
 
 export default el;

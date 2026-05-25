@@ -1200,6 +1200,14 @@ const en: Record<string, string> = {
   "compatibility.garageExplanation": "One of you has a motorcycle and the other is looking for a ride. This Garage Match pairs a biker with a passenger based on your mutual preferences.",
   "compatibility.genericExplanation": "Your proposals are compatible: the user types you are each looking for overlap with your respective profiles.",
   "compatibility.closeBtn": "Got it",
+
+  "tracking.feature.sprint": "Measure 0→100 km/h acceleration",
+  "tracking.feature.sensors": "Enable accelerometer and gyroscope",
+  "tracking.feature.handsoff": "Lock touch at high speed",
+  "tracking.feature.countdown": "Countdown before departure",
+  "tracking.sensors": "Sensors",
+  "tracking.history": "History",
+  "tracking.save": "Save",
 };
 
 export default en;

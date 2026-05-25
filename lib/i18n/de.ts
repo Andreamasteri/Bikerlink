@@ -1143,6 +1143,14 @@ const de: Record<string, string> = {
   "compatibility.garageExplanation": "Einer von euch hat ein Motorrad und der andere sucht eine Mitfahrgelegenheit. Dieses Garage Match verbindet einen Biker mit einem Mitfahrer basierend auf euren gegenseitigen Vorlieben.",
   "compatibility.genericExplanation": "Eure Vorschläge sind kompatibel: Die Nutzertypen, die ihr jeweils sucht, überschneiden sich mit euren Profilen.",
   "compatibility.closeBtn": "Verstanden",
+
+  "tracking.feature.sprint": "0→100 km/h Beschleunigung messen",
+  "tracking.feature.sensors": "Beschleunigungsmesser und Gyroskop aktivieren",
+  "tracking.feature.handsoff": "Touch bei hoher Geschwindigkeit sperren",
+  "tracking.feature.countdown": "Countdown vor der Abfahrt",
+  "tracking.sensors": "Sensoren",
+  "tracking.history": "Verlauf",
+  "tracking.save": "Speichern",
 };
 
 export default de;

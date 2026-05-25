@@ -37,6 +37,7 @@ interface SummaryModalProps {
   summaryRoutePoints: Array<{ lat: number; lng: number }>;
   setRouteMapVisible: (v: boolean) => void;
   onPublish: () => void;
+  onSave: () => void;
   onDelete: () => void;
   t: (key: string) => string;
 }
@@ -64,6 +65,7 @@ export function SummaryModal({
   summaryRoutePoints,
   setRouteMapVisible,
   onPublish,
+  onSave,
   onDelete,
   t
 }: SummaryModalProps) {
@@ -182,6 +184,14 @@ export function SummaryModal({
           </Text>
 
           <View style={styles.summaryActions}>
+            <TouchableOpacity
+              style={styles.summarySaveBtn}
+              onPress={onSave}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="checkmark-outline" size={18} color="#ffffff" />
+              <Text style={styles.summarySaveText}>{t("tracking.save")}</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.summaryPublishBtn}
               onPress={onPublish}
@@ -314,6 +324,21 @@ const styles = StyleSheet.create({
   summaryActions: {
     flexDirection: "row",
     gap: 10
+  },
+  summarySaveBtn: {
+    flex: 2,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.success,
+    borderRadius: 12,
+    paddingVertical: 14
+  },
+  summarySaveText: {
+    color: "#ffffff",
+    fontSize: 15,
+    fontFamily: "Inter_700Bold"
   },
   summaryPublishBtn: {
     flex: 2,
