@@ -234,6 +234,25 @@ import matchingRouter from './admin/matching';
 import otaRouter from './admin/ota';
 import mapsAdminRouter from './admin/maps/index';
 import telemetryAdminRouter from './admin/telemetry';
+
+router.post('/maps/osm-updated', async (req: Request, res: Response) => {
+  try {
+    const secret = process.env.OSM_UPDATE_SECRET;
+    const provided = req.headers["x-osm-update-secret"];
+    if (!secret || !provided || provided !== secret) {
+      return sendError(res, 401, "Non autorizzato");
+    }
+    const { updatedAt } = req.body as { updatedAt?: string };
+    const ts = updatedAt ?? new Date().toISOString();
+    await storage.upsertAppSetting("osm_last_updated_at", ts);
+    console.log(`[osm-updated] osm_last_updated_at aggiornato a ${ts}`);
+    return res.json({ ok: true, osm_last_updated_at: ts });
+  } catch (err) {
+    console.error("[osm-updated] error:", err);
+    return sendError(res, 500, "Errore aggiornamento data OSM");
+  }
+});
+
 router.use('/users', _requireAdmin, usersRouter);
 router.use('/settings', settingsRouter);
 router.use('/advertisements', _requireAdmin, adsRouter);

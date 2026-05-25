@@ -20,13 +20,14 @@ function isMapboxAvailable(): boolean {
 
 router.get("/config", async (_req: Request, res: Response) => {
   try {
-    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting] =
+    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting, osmSetting] =
       await Promise.all([
         storage.getAppSetting("maps_rollout"),
         storage.getAppSetting("maps_renderer"),
         storage.getAppSetting("maps_tile"),
         storage.getAppSetting("maps_routing_engine"),
         storage.getAppSetting("maps_routing_profile"),
+        storage.getAppSetting("osm_last_updated_at"),
       ]);
 
     const routing = (engineSetting?.value ?? DEFAULT_ENGINE) as RoutingEngineId;
@@ -53,6 +54,7 @@ router.get("/config", async (_req: Request, res: Response) => {
       profile: (profileSetting?.value ?? DEFAULT_PROFILE) as RoutingProfileId,
       renderer_notes: "Renderer sperimentali sono stub — delegano a Leaflet.",
       routing_notes: "Engine sperimentali sono stub — delegano a GraphHopper.",
+      osm_last_updated_at: osmSetting?.value ?? null,
       available_renderers: AVAILABLE_RENDERERS,
       available_tiles: AVAILABLE_TILES,
       available_engines: AVAILABLE_ENGINES,

@@ -18,6 +18,7 @@ interface AdminMapsConfig {
   profile: RoutingProfileId;
   renderer_notes: string;
   routing_notes: string;
+  osm_last_updated_at: string | null;
   mapbox_quota?: {
     used: number;
     limit: number;
@@ -126,6 +127,29 @@ export default function AdminMapsPage() {
       />
 
       <TileProvidersCard />
+
+      <View style={styles.osmBox}>
+        <Text style={styles.osmLabel}>Ultimo aggiornamento OSM</Text>
+        <Text style={styles.osmValue}>
+          {data.osm_last_updated_at
+            ? new Date(data.osm_last_updated_at).toLocaleString("it-IT", { dateStyle: "medium", timeStyle: "short" })
+            : "Mai eseguito"}
+        </Text>
+      </View>
+
+      <View style={styles.reminderBox}>
+        <Text style={styles.reminderTitle}>⚙️  TODO — Setup aggiornamento OSM mensile</Text>
+        <Text style={styles.reminderLine}>1. Copia <Text style={styles.reminderCode}>infra/osm/</Text> → server in <Text style={styles.reminderCode}>/opt/graphhopper/scripts/</Text></Text>
+        <Text style={styles.reminderLine}>2. Crea <Text style={styles.reminderCode}>/opt/graphhopper/scripts/.env</Text> con:</Text>
+        <Text style={styles.reminderCode2}>{"   OSM_UPDATE_SECRET=<segreto>"}</Text>
+        <Text style={styles.reminderCode2}>{"   SLACK_WEBHOOK_URL=https://hooks.slack.com/..."}</Text>
+        <Text style={styles.reminderCode2}>{"   BACKEND_URL=https://biker-link.replit.app"}</Text>
+        <Text style={styles.reminderLine}>3. Aggiungi <Text style={styles.reminderCode}>OSM_UPDATE_SECRET</Text> nei Secrets Replit</Text>
+        <Text style={styles.reminderLine}>4. Cron (root) — <Text style={styles.reminderCode}>sudo crontab -e</Text>:</Text>
+        <Text style={styles.reminderCode2}>{"   CRON_TZ=Europe/Rome"}</Text>
+        <Text style={styles.reminderCode2}>{"   0 2 1 * * /opt/graphhopper/scripts/update-osm.sh"}</Text>
+        <Text style={styles.reminderNote}>Istruzioni complete: infra/osm/README.md</Text>
+      </View>
     </ScrollView>
   );
 }
@@ -145,4 +169,28 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "30",
   },
   warningText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
+  osmBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  osmLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary },
+  osmValue: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
+  reminderBox: {
+    backgroundColor: "#1a1400",
+    borderRadius: 8,
+    padding: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: "#f59e0b40",
+  },
+  reminderTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#f59e0b", marginBottom: 10 },
+  reminderLine: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginBottom: 4, lineHeight: 18 },
+  reminderCode: { fontFamily: "Inter_500Medium", fontSize: 11, color: "#f59e0b" },
+  reminderCode2: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#a3a3a3", marginBottom: 2 },
+  reminderNote: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 8, fontStyle: "italic" },
 });
