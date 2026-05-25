@@ -227,6 +227,60 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     const { scheduleWeeklyCurvyScoreUpdate } = await import("./curvy-score-job");
     scheduleWeeklyCurvyScoreUpdate();
 
+    // Mapbox quota reset — 1° del mese alle 00:01 Europe/Rome
+    // Usa un checker orario (setInterval 1h) per evitare setTimeout overflow
+    // (Node.js clamps setTimeout > 2^31-1 ms ~24.8 giorni → firerebbe subito).
+    // Idempotenza: mapbox_quota_reset_month (YYYY-MM) in app_settings impedisce
+    // reset doppi se il server si riavvia il 1° del mese.
+    (() => {
+      /** Ritorna il mese corrente in Rome locale come "YYYY-MM". */
+      const romeYYYYMM = (d: Date): string => {
+        return new Intl.DateTimeFormat("sv-SE", {
+          timeZone: "Europe/Rome",
+          year: "numeric",
+          month: "2-digit",
+        }).format(d).substring(0, 7); // "YYYY-MM"
+      };
+
+      /** Ritorna il giorno (1-31) e l'ora (0-23) in Rome locale. */
+      const romeDayHour = (d: Date): { day: number; hour: number } => {
+        const parts = new Intl.DateTimeFormat("en-GB", {
+          timeZone: "Europe/Rome",
+          day: "numeric",
+          hour: "numeric",
+          hour12: false,
+        }).formatToParts(d);
+        return {
+          day: parseInt(parts.find((p) => p.type === "day")?.value ?? "2", 10),
+          hour: parseInt(parts.find((p) => p.type === "hour")?.value ?? "12", 10),
+        };
+      };
+
+      const runMapboxResetIfNeeded = async () => {
+        try {
+          const now = new Date();
+          const { day, hour } = romeDayHour(now);
+          // Esegui solo il 1° del mese, tra le 00:00 e le 00:59 Europe/Rome
+          if (day !== 1 || hour !== 0) return;
+          const thisMonth = romeYYYYMM(now);
+          const { storage: st } = await import("./storage");
+          const lastReset = await st.getAppSetting("mapbox_quota_reset_month");
+          if (lastReset?.value === thisMonth) return; // già fatto questo mese
+          const { resetMapboxMonthlyCounter } = await import("./mapbox-directions-client");
+          await resetMapboxMonthlyCounter();
+          await st.upsertAppSetting("mapbox_quota_reset_month", thisMonth);
+          console.log(`[MAPBOX-CRON] Quota mensile azzerata per ${thisMonth}`);
+        } catch (e) {
+          console.warn("[MAPBOX-CRON] reset mensile error:", e);
+        }
+      };
+
+      // Controlla ogni ora — nessun rischio overflow setTimeout
+      setInterval(runMapboxResetIfNeeded, 60 * 60 * 1000);
+      // Esegui subito al boot (gestisce riavvii del server il 1° del mese)
+      runMapboxResetIfNeeded().catch(() => {});
+    })();
+
     const { saveSchemaSnapshot } = await import("./scripts/snapshot-schema");
     // saveSchemaSnapshot is a dev/maintenance utility — non-essential at boot, fire-and-forget
     setImmediate(() => {

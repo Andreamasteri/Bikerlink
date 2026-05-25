@@ -124,7 +124,46 @@ export async function calculateRouteWithSelector(
     }
   }
 
-  // engine = "mapbox" | "tomtom" — stub: questi engine non sono ancora implementati
+  if (engine === "mapbox") {
+    const {
+      calculateRoute: mapboxCalculateRoute,
+      isMapboxConfigured,
+      isMapboxQuotaExhausted,
+    } = await import("../mapbox-directions-client");
+
+    if (!isMapboxConfigured) {
+      console.warn("[RouterSelector] Mapbox selezionato ma MAPBOX_ACCESS_TOKEN non configurato — fallback a GraphHopper");
+      if (expressRes) expressRes.setHeader("X-Routing-Fallback", "graphhopper");
+      const result = await ghCalculateRoute(req);
+      return { result, engineUsed: "graphhopper" };
+    }
+
+    // Blocco proattivo se la quota mensile è esaurita — non chiama Mapbox affatto
+    const quotaExhausted = await isMapboxQuotaExhausted();
+    if (quotaExhausted) {
+      console.warn("[RouterSelector] Mapbox quota mensile esaurita (>=100k) — fallback preventivo a GraphHopper");
+      if (expressRes) expressRes.setHeader("X-Routing-Fallback", "graphhopper");
+      const result = await ghCalculateRoute(req);
+      return { result, engineUsed: "graphhopper" };
+    }
+
+    try {
+      const result = await mapboxCalculateRoute(req);
+      return { result, engineUsed: "mapbox" };
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      // Log differenziato: 4xx = auth/quota, 5xx = infra
+      const is4xx = errMsg.includes("error 4");
+      console.warn(
+        `[RouterSelector] Mapbox fallito ${is4xx ? "(4xx — auth/quota)" : "(5xx/timeout)"} (${errMsg}) — fallback automatico a GraphHopper`,
+      );
+      if (expressRes) expressRes.setHeader("X-Routing-Fallback", "graphhopper");
+      const result = await ghCalculateRoute(req);
+      return { result, engineUsed: "graphhopper" };
+    }
+  }
+
+  // engine = "tomtom" — stub: non ancora implementato
   // Per ora fallback silenzioso a GraphHopper
   console.warn(`[RouterSelector] Engine "${engine}" non ancora implementato — fallback a GraphHopper`);
   if (expressRes) expressRes.setHeader("X-Routing-Fallback", "graphhopper");

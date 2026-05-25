@@ -81,7 +81,7 @@ export const TILE_OPTIONS: ReadonlyArray<MapsOption<MapsTileId>> = [
 export const ROUTING_OPTIONS: ReadonlyArray<MapsOption<RoutingEngineId>> = [
   { id: "graphhopper", label: "GraphHopper (classico)", description: "Engine routing attuale self-hosted. Default produzione.", implemented: true },
   { id: "valhalla", label: "Valhalla (self-hosted)", description: "Engine alternativo self-hosted con profili moto avanzati.", implemented: true },
-  { id: "mapbox", label: "Mapbox Directions", description: "Cloud Mapbox — backup d'emergenza, copertura globale.", implemented: false },
+  { id: "mapbox", label: "Mapbox Directions (cloud emergency)", description: "Cloud Mapbox Directions — backup emergenza quando self-hosted down. 100k req/mese free. Profilo 'driving' (no motorcycle nativo; exclude autostrade/traghetti per approssimare moto). Richiede MAPBOX_ACCESS_TOKEN (sk.*).", implemented: true },
   { id: "tomtom", label: "TomTom Routing", description: "Cloud TomTom — profilo moto + traffico EU real-time.", implemented: false },
 ];
 

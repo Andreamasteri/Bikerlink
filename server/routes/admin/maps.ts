@@ -64,12 +64,56 @@ async function readMapsConfig(): Promise<MapsConfig> {
 router.get("/config", async (_req: Request, res: Response) => {
   try {
     const cfg = await readMapsConfig();
+
+    // Quota Mapbox — sempre inclusa nel payload (Mapbox è in available_routings come implemented)
+    let mapbox_quota: { used: number; limit: number; percent: number; resets_at: string; warning_threshold: number } | undefined;
+    try {
+      const { getMapboxRequestCount } = await import("../../mapbox-directions-client");
+      const { storage: st } = await import("../../storage");
+      const [used, thresholdSetting] = await Promise.all([
+        getMapboxRequestCount(),
+        st.getAppSetting("mapbox_quota_warning_threshold"),
+      ]);
+      const limit = 100_000;
+      const warning_threshold = parseInt(thresholdSetting?.value ?? "80000", 10) || 80_000;
+      // Calcola "resets_at": 1° del mese prossimo alle 00:01 Europe/Rome
+      // Usa Intl.DateTimeFormat per determinare offset DST corretto (CET=+1 / CEST=+2)
+      const now = new Date();
+      const nextMonthUtcNaive = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 1, 0));
+      const offsetMin = (() => {
+        try {
+          const parts = new Intl.DateTimeFormat("en-GB", {
+            timeZone: "Europe/Rome",
+            timeZoneName: "shortOffset",
+          }).formatToParts(nextMonthUtcNaive);
+          const offsetPart = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT+1";
+          const match = offsetPart.match(/GMT([+-])(\d+)(?::(\d+))?/);
+          if (match) {
+            const sign = match[1] === "+" ? 1 : -1;
+            return sign * (parseInt(match[2], 10) * 60 + parseInt(match[3] ?? "0", 10));
+          }
+        } catch { /* fallback */ }
+        return 60; // CET fallback
+      })();
+      const resetDate = new Date(nextMonthUtcNaive.getTime() - offsetMin * 60_000);
+      mapbox_quota = {
+        used,
+        limit,
+        percent: Math.round((used / limit) * 100),
+        warning_threshold,
+        resets_at: resetDate.toISOString(),
+      };
+    } catch {
+      // quota non critica — ignora errori
+    }
+
     return res.json({
       ...cfg,
       available_renderers: RENDERER_OPTIONS,
       available_tiles: TILE_OPTIONS,
       available_routings: ROUTING_OPTIONS,
       available_profiles: ROUTING_PROFILE_OPTIONS,
+      ...(mapbox_quota ? { mapbox_quota } : {}),
     });
   } catch (err) {
     console.error("[admin/maps/config] error:", err);
@@ -175,6 +219,16 @@ router.get("/test-routing", async (_req: Request, res: Response) => {
         points: [MILANO, COMO],
         profile: "motorcycle",
       });
+    } else if (engine === "mapbox") {
+      const { calculateRoute: mapboxRoute, isMapboxConfigured, isMapboxQuotaExhausted } = await import("../../mapbox-directions-client");
+      if (!isMapboxConfigured) {
+        return res.json({ engine, ok: false, latencyMs: 0, error: "MAPBOX_ACCESS_TOKEN non configurato" });
+      }
+      const quotaExhausted = await isMapboxQuotaExhausted();
+      if (quotaExhausted) {
+        return res.json({ engine, ok: false, latencyMs: 0, error: "Quota mensile Mapbox esaurita (>=100k richieste)" });
+      }
+      result = await mapboxRoute({ points: [MILANO, COMO] });
     } else {
       const { calculateRoute: ghRoute, ROUTING_DISABLED } = await import("../../graphhopper-client");
       if (ROUTING_DISABLED) {
