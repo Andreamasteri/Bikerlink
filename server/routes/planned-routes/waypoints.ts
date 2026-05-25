@@ -13,7 +13,7 @@ const weatherWaypointsSchema = z.object({
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { haversineKm } from "../../geo";
 const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
-import { calculateRoute as ghCalculateRoute, isSelfHosted, ACTIVE_PROFILE } from "../../graphhopper-client";
+import { calculateRoute as ghCalculateRoute, isSelfHosted, ACTIVE_PROFILE, ROUTING_DISABLED } from "../../graphhopper-client";
 
 const router = Router();
 
@@ -371,6 +371,10 @@ router.post("/calculate", async (req: Request, res: Response) => {
     ];
   }
 
+  if (ROUTING_DISABLED) {
+    console.warn("[GraphHopper] routing disabilitato via kill-switch, uso percorso approssimativo");
+    return res.json(buildFallbackRoute(effectiveWaypoints));
+  }
   if (!isSelfHosted && !process.env.GRAPHHOPPER_API_KEY) {
     console.warn("[GraphHopper] non configurato, uso percorso approssimativo");
     return res.json(buildFallbackRoute(effectiveWaypoints));

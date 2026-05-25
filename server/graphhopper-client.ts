@@ -21,13 +21,27 @@ export const GH_BASE_URL = SELF_HOSTED_URL ?? CLOUD_URL;
 export const isSelfHosted = Boolean(SELF_HOSTED_URL);
 
 /**
+ * KILL-SWITCH ROUTING — BikerLink
+ *
+ * Quando true, TUTTE le chiamate a GraphHopper (route, map-matching, server-info)
+ * vengono bloccate. Le route che dipendono dal routing devono usare un fallback
+ * (es: buildFallbackRoute in waypoints.ts) oppure ritornare 503.
+ *
+ * Per riabilitare: impostare `ROUTING_DISABLED = false` o env `ROUTING_DISABLED=0`.
+ * Il sistema renderer mappa (Leaflet + Carto/Esri tiles) NON è impattato.
+ */
+export const ROUTING_DISABLED = process.env.ROUTING_DISABLED !== "0";
+
+/**
  * Profilo attivo: "motorcycle" quando si usa il server self-hosted,
  * "car" quando si usa la Cloud API (il piano gratuito non supporta motorcycle).
  */
 export const ACTIVE_PROFILE = isSelfHosted ? "motorcycle" : "car";
 
 // ─── Startup log ───────────────────────────────────────────────────────────────
-if (isSelfHosted) {
+if (ROUTING_DISABLED) {
+  console.warn("[GraphHopper] ROUTING DISABILITATO via kill-switch — tutte le chiamate verranno bloccate. Rendering mappa non impattato.");
+} else if (isSelfHosted) {
   console.log(`[GraphHopper] Self-hosted mode — URL: ${GH_BASE_URL} — profile: motorcycle`);
 } else if (CLOUD_API_KEY) {
   console.warn("[GraphHopper] Cloud API mode — profile forced to 'car' (motorcycle not available on free plan)");
@@ -109,6 +123,9 @@ export async function mapMatch(
   points: GHPoint[],
   profile = "motorcycle",
 ): Promise<MapMatchResult> {
+  if (ROUTING_DISABLED) {
+    throw new Error("Routing disabilitato via kill-switch (ROUTING_DISABLED).");
+  }
   if (!isSelfHosted && !CLOUD_API_KEY) {
     throw new Error(
       "GraphHopper non configurato: impostare GRAPHHOPPER_URL (self-hosted) o GRAPHHOPPER_API_KEY (cloud).",
@@ -168,6 +185,9 @@ export interface RouteResult {
  * Supporta sia self-hosted che Cloud API come fallback.
  */
 export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
+  if (ROUTING_DISABLED) {
+    throw new Error("Routing disabilitato via kill-switch (ROUTING_DISABLED).");
+  }
   if (!isSelfHosted && !CLOUD_API_KEY) {
     throw new Error(
       "GraphHopper non configurato: impostare GRAPHHOPPER_URL (self-hosted) o GRAPHHOPPER_API_KEY (cloud).",
@@ -213,6 +233,9 @@ export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
  * Per la Cloud API chiama /info.
  */
 export async function getServerInfo(): Promise<GHServerInfo> {
+  if (ROUTING_DISABLED) {
+    return { status: "disabled", graph_loaded: false, version: "routing-kill-switch" };
+  }
   try {
     const path = isSelfHosted ? "/health" : "/info";
     const res = await ghFetch(path, { method: "GET" });

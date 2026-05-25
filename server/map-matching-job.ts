@@ -24,7 +24,7 @@
 import { db } from "./db";
 import { rideTelemetry } from "@shared/db";
 import { eq, sql, and } from "drizzle-orm";
-import { mapMatch, isSelfHosted, GHPoint } from "./graphhopper-client";
+import { mapMatch, isSelfHosted, GHPoint, ROUTING_DISABLED } from "./graphhopper-client";
 import { storage } from "./storage";
 
 const LAST_RUN_KEY = "map_matching_last_run";
@@ -49,6 +49,10 @@ export async function runMapMatchingJob(): Promise<{
     return { processed: 0, skipped: 0, segments: 0, errors: ["Job already running"] };
   }
 
+  if (ROUTING_DISABLED) {
+    console.warn("[MAP-MATCH] Routing disabilitato via kill-switch. Job saltato.");
+    return { processed: 0, skipped: 0, segments: 0, errors: ["Routing kill-switch active"] };
+  }
   if (!isSelfHosted && !process.env.GRAPHHOPPER_API_KEY) {
     console.warn("[MAP-MATCH] GraphHopper non configurato (né GRAPHHOPPER_URL né GRAPHHOPPER_API_KEY). Job saltato.");
     return { processed: 0, skipped: 0, segments: 0, errors: ["GraphHopper not configured"] };
