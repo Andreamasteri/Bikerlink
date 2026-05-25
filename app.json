@@ -134,7 +134,7 @@
       "enabled": true,
       "url": "https://u.expo.dev/a25192d7-72e5-46af-97d0-2d38ed9b78e3",
       "fallbackToCacheTimeout": 0,
-      "checkAutomatically": "ON_LOAD"
+      "checkOnLaunch": "ALWAYS"
     },
     "runtimeVersion": "10.0.0",
     "extra": {

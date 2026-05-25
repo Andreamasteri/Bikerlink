@@ -12,6 +12,7 @@ export const otaReleases = pgTable("ota_releases", {
     .primaryKey()
     .default(sql`gen_random_uuid()`),
   easUpdateId: varchar("eas_update_id", { length: 200 }).notNull().unique(),
+  easGroupId: varchar("eas_group_id", { length: 200 }),
   channel: varchar("channel", { length: 50 }).notNull().default("staging"),
   runtimeVersion: varchar("runtime_version", { length: 50 }),
   message: text("message"),

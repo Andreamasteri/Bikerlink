@@ -46,6 +46,7 @@ async function syncStagingUpdates(): Promise<void> {
             name
             updates(offset: 0, limit: 20) {
               id
+              group
               message
               runtimeVersion
               createdAt
@@ -56,7 +57,7 @@ async function syncStagingUpdates(): Promise<void> {
     }
   `;
 
-  let data: { app?: { byId?: { updateBranches?: Array<{ id: string; name: string; updates?: Array<{ id: string; message?: string; runtimeVersion?: string; createdAt?: string }> }> } } };
+  let data: { app?: { byId?: { updateBranches?: Array<{ id: string; name: string; updates?: Array<{ id: string; group?: string; message?: string; runtimeVersion?: string; createdAt?: string }> }> } } };
   try {
     data = await easGraphQL(query, { appId: EAS_PROJECT_ID }) as typeof data;
   } catch (err) {
@@ -79,33 +80,41 @@ async function syncStagingUpdates(): Promise<void> {
 
     if (existing.length > 0) continue;
 
-    if (directApply) {
-      let promoted = false;
-      try {
-        await promoteToProduction(upd.id);
-        promoted = true;
-      } catch (err) {
-        console.warn("[ota-sync] direct-apply: EAS promote failed, inserting as pending:", err);
-      }
+    const easGroupId = upd.group ?? null;
 
-      if (promoted) {
-        await db.insert(otaReleases).values({
-          easUpdateId: upd.id,
-          channel: "production",
-          runtimeVersion: upd.runtimeVersion ?? null,
-          message: upd.message ?? null,
-          status: "approved",
-          publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
-          approvedAt: new Date(),
-          approvedBy: null,
-        }).onConflictDoNothing();
-        console.log("[ota-sync] direct-apply: auto-promoted", upd.id);
-        continue;
+    if (directApply) {
+      if (!easGroupId) {
+        console.warn("[ota-sync] direct-apply: update senza groupId, inserisco come pending:", upd.id);
+      } else {
+        let promoted = false;
+        try {
+          await promoteToProduction(easGroupId, upd.message ?? null);
+          promoted = true;
+        } catch (err) {
+          console.warn("[ota-sync] direct-apply: EAS promote failed, inserting as pending:", err);
+        }
+
+        if (promoted) {
+          await db.insert(otaReleases).values({
+            easUpdateId: upd.id,
+            easGroupId,
+            channel: "production",
+            runtimeVersion: upd.runtimeVersion ?? null,
+            message: upd.message ?? null,
+            status: "approved",
+            publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
+            approvedAt: new Date(),
+            approvedBy: null,
+          }).onConflictDoNothing();
+          console.log("[ota-sync] direct-apply: auto-promoted groupId", easGroupId, "updateId", upd.id);
+          continue;
+        }
       }
     }
 
     await db.insert(otaReleases).values({
       easUpdateId: upd.id,
+      easGroupId,
       channel: "staging",
       runtimeVersion: upd.runtimeVersion ?? null,
       message: upd.message ?? null,
@@ -115,15 +124,29 @@ async function syncStagingUpdates(): Promise<void> {
   }
 }
 
-async function promoteToProduction(easUpdateId: string): Promise<void> {
+async function promoteToProduction(easGroupId: string, message?: string | null): Promise<void> {
   const mutation = `
-    mutation RepublishUpdate($updateId: ID!, $branchName: String!, $message: String) {
-      updatePublishBranch(updateId: $updateId, branchName: $branchName) {
-        id
+    mutation RepublishUpdate($input: RepublishUpdateGroupInput!) {
+      update {
+        republishUpdateGroup(input: $input) {
+          id
+          group
+          message
+          runtimeVersion
+          branch {
+            name
+          }
+        }
       }
     }
   `;
-  await easGraphQL(mutation, { updateId: easUpdateId, branchName: "production" });
+  await easGraphQL(mutation, {
+    input: {
+      groupId: easGroupId,
+      branchName: "production",
+      message: message ?? undefined,
+    },
+  });
 }
 
 // GET /api/admin/ota/releases
@@ -161,8 +184,12 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
     if (!release) return sendError(res, 404, "OTA release non trovata");
     if (release.status !== "pending") return sendError(res, 400, `Stato non valido: ${release.status} (atteso: pending)`);
 
+    if (!release.easGroupId) {
+      return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
+    }
+
     try {
-      await promoteToProduction(release.easUpdateId);
+      await promoteToProduction(release.easGroupId, release.message);
     } catch (err) {
       console.error("[ota] EAS promote error:", err);
       return sendError(res, 502, "Errore promozione su EAS production: " + (err instanceof Error ? err.message : String(err)));
@@ -224,6 +251,7 @@ router.get("/:id/try", async (req: Request, res: Response) => {
 
     return res.json({
       easUpdateId: release.easUpdateId,
+      easGroupId: release.easGroupId,
       channel: release.channel,
       runtimeVersion: release.runtimeVersion,
       manifestUrl,
@@ -245,8 +273,12 @@ router.post("/:id/rollback", async (req: Request, res: Response) => {
     if (!release) return sendError(res, 404, "OTA release non trovata");
     if (release.status !== "approved") return sendError(res, 400, `Rollback disponibile solo per release approvate (stato attuale: ${release.status})`);
 
+    if (!release.easGroupId) {
+      return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
+    }
+
     try {
-      await promoteToProduction(release.easUpdateId);
+      await promoteToProduction(release.easGroupId, release.message);
     } catch (err) {
       console.error("[ota] EAS rollback promote error:", err);
       return sendError(res, 502, "Errore rollback su EAS production: " + (err instanceof Error ? err.message : String(err)));
