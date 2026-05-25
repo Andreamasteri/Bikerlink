@@ -13,7 +13,9 @@ const weatherWaypointsSchema = z.object({
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { haversineKm } from "../../geo";
 const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
-import { ACTIVE_PROFILE, calculateRoute } from "../../graphhopper-client";
+import { ACTIVE_PROFILE } from "../../graphhopper-client";
+import { getActiveRouter } from "../../routing/router-selector";
+import type { RouteRequest } from "../../routing/graphhopper-adapter";
 
 const router = Router();
 
@@ -445,9 +447,17 @@ router.post("/calculate", async (req: Request, res: Response) => {
       body.custom_model = { priority };
     }
 
-    const routeResult = await calculateRoute(
-      body as unknown as import("../../graphhopper-client").RouteRequest,
-    );
+    const { storage: _st } = await import("../../storage");
+    const [rolloutSetting, engineSetting, routeUser] = await Promise.all([
+      _st.getAppSetting("maps_rollout"),
+      _st.getAppSetting("maps_routing_engine"),
+      _st.getUser(userId),
+    ]);
+    const routeResult = await getActiveRouter(body as unknown as RouteRequest, {
+      rollout: (rolloutSetting?.value ?? "disabled") as import("@shared/maps-config").MapsRollout,
+      engine: (engineSetting?.value ?? "graphhopper") as import("@shared/maps-config").RoutingEngineId,
+      isMapTester: routeUser?.mapTester ?? false,
+    });
     const path = routeResult.paths[0];
 
     return res.json({

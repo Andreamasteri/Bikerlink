@@ -41,6 +41,7 @@ export const users = pgTable("users", {
   spokenLanguages: jsonb("spoken_languages").$type<string[]>().default([]),
   autoJoinClubs: boolean("auto_join_clubs").notNull().default(true),
   ghostMode: boolean("ghost_mode").notNull().default(false),
+  mapTester: boolean("map_tester").notNull().default(false),
   floatingWidgetEnabled: boolean("floating_widget_enabled").notNull().default(true),
   lastLoginAt: timestamp("last_login_at"),
   lastLogoutAt: timestamp("last_logout_at"),

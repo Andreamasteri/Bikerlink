@@ -420,17 +420,41 @@ export function registerClientSettingsRoutes(app: Express) {
 
   app.get("/api/settings/maps", async (_req, res) => {
     try {
-      const [enabledSetting, providerSetting] = await Promise.all([
+      const [enabledSetting, providerSetting, rolloutSetting, rendererSetting, engineSetting] = await Promise.all([
         storage.getAppSetting("maps_enabled"),
         storage.getAppSetting("maps_provider"),
+        storage.getAppSetting("maps_rollout"),
+        storage.getAppSetting("maps_renderer"),
+        storage.getAppSetting("maps_routing_engine"),
       ]);
       res.json({
         enabled: enabledSetting?.value !== "false",
         provider: providerSetting?.value || "carto_light",
+        rollout: rolloutSetting?.value ?? "disabled",
+        renderer: rendererSetting?.value ?? "leaflet",
+        engine: engineSetting?.value ?? "graphhopper",
       });
     } catch (err) {
       console.warn("[client-settings] Failed to fetch maps settings:", err);
-      res.json({ enabled: true, provider: "carto_light" });
+      res.json({ enabled: true, provider: "carto_light", rollout: "disabled", renderer: "leaflet", engine: "graphhopper" });
+    }
+  });
+
+  app.get("/api/settings/maps-rollout", async (_req, res) => {
+    try {
+      const [rolloutSetting, rendererSetting, engineSetting] = await Promise.all([
+        storage.getAppSetting("maps_rollout"),
+        storage.getAppSetting("maps_renderer"),
+        storage.getAppSetting("maps_routing_engine"),
+      ]);
+      res.json({
+        rollout: rolloutSetting?.value ?? "disabled",
+        renderer: rendererSetting?.value ?? "leaflet",
+        engine: engineSetting?.value ?? "graphhopper",
+      });
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch maps-rollout settings:", err);
+      res.json({ rollout: "disabled", renderer: "leaflet", engine: "graphhopper" });
     }
   });
 
