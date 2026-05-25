@@ -6,6 +6,7 @@ import * as path from "path";
 import { registerRoutes } from "./routes";
 import { registerSiteRoutes } from "./site/routes";
 import { registerLeafletMapRoutes } from "./routes/leaflet-maps";
+import tileProxyRouter from "./routes/maps/tile-proxy";
 import { storage } from "./storage";
 
 const log = console.log;
@@ -92,6 +93,9 @@ export function registerAllRoutes(app: express.Application) {
   
   // API Routes
   registerRoutes(expressApp);
+
+  // Tile proxy — forwards tile requests, detects 429/5xx from upstream
+  app.use("/api", tileProxyRouter);
 
   // Leaflet map HTML endpoints (served as URI to avoid large inline source={{ html }})
   registerLeafletMapRoutes(expressApp);

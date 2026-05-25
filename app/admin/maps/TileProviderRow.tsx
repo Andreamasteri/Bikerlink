@@ -5,6 +5,7 @@ import Colors from "@/constants/colors";
 import { TileThumbnail } from "./TileThumbnail";
 
 export type TileCategory = "base" | "topo" | "satellite" | "overlay";
+export type ProviderStatusValue = "active" | "quota_exceeded" | "unreachable";
 
 export interface ProviderItem {
   id: string;
@@ -14,6 +15,7 @@ export interface ProviderItem {
   keyRequired: boolean;
   keyAvailable: boolean;
   isActive: boolean;
+  status?: ProviderStatusValue;
 }
 
 const CATEGORY_COLORS: Record<TileCategory, string> = {
@@ -21,6 +23,12 @@ const CATEGORY_COLORS: Record<TileCategory, string> = {
   topo: "#22c55e",
   satellite: "#f97316",
   overlay: "#a855f7",
+};
+
+const STATUS_CONFIG: Record<ProviderStatusValue, { label: string; color: string; icon: "checkmark-circle-outline" | "alert-circle-outline" | "cloud-offline-outline" }> = {
+  active: { label: "Attivo", color: "#22c55e", icon: "checkmark-circle-outline" },
+  quota_exceeded: { label: "Quota esaurita", color: "#f59e0b", icon: "alert-circle-outline" },
+  unreachable: { label: "Irraggiungibile", color: "#ef4444", icon: "cloud-offline-outline" },
 };
 
 interface Props {
@@ -31,6 +39,9 @@ interface Props {
 
 export function TileProviderRow({ item, onSelect, isPending }: Props) {
   const catColor = CATEGORY_COLORS[item.category] ?? "#6b7280";
+  const statusKey = (item.status ?? "active") as ProviderStatusValue;
+  const statusCfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.active;
+  const showStatusBadge = statusKey !== "active" || item.isActive;
 
   return (
     <TouchableOpacity
@@ -60,6 +71,12 @@ export function TileProviderRow({ item, onSelect, isPending }: Props) {
               <Text style={[styles.keyText, !item.keyAvailable && styles.keyTextMissing]}>
                 {item.keyAvailable ? "API key" : "key missing"}
               </Text>
+            </View>
+          )}
+          {showStatusBadge && (
+            <View style={[styles.statusBadge, { backgroundColor: statusCfg.color + "20" }]}>
+              <Ionicons name={statusCfg.icon} size={10} color={statusCfg.color} />
+              <Text style={[styles.statusText, { color: statusCfg.color }]}>{statusCfg.label}</Text>
             </View>
           )}
         </View>
@@ -100,4 +117,13 @@ const styles = StyleSheet.create({
   keyText: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#f59e0b" },
   keyTextMissing: { color: "#ef4444" },
   check: { marginLeft: 4 },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  statusText: { fontFamily: "Inter_400Regular", fontSize: 10 },
 });

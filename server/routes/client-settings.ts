@@ -486,24 +486,36 @@ export function registerClientSettingsRoutes(app: Express) {
 
   app.get("/api/settings/tile-providers", async (_req, res) => {
     try {
+      const { getStatus } = await import("./maps/provider-status");
       const setting = await storage.getAppSetting("active_tile_provider");
       const activeId = setting?.value ?? DEFAULT_TILE_PROVIDER_ID;
-      const providers = TILE_PROVIDERS.map((p) => ({
-        id: p.id,
-        label: p.label,
-        category: p.category,
-        cost: p.cost,
-        maxZoom: p.maxZoom,
-        rendererCompat: p.rendererCompat,
-        urlTemplate: p.urlTemplate,
-        keyRequired: !!p.apiKeyEnvVar,
-        isActive: p.id === activeId,
-      }));
-      res.json({ providers, activeId, active: providers.find((p) => p.isActive) ?? providers[0] });
+
+      const providers = await Promise.all(
+        TILE_PROVIDERS.map(async (p) => {
+          const status = await getStatus(p.id);
+          return {
+            id: p.id,
+            label: p.label,
+            category: p.category,
+            cost: p.cost,
+            maxZoom: p.maxZoom,
+            rendererCompat: p.rendererCompat,
+            urlTemplate: p.urlTemplate,
+            keyRequired: !!p.apiKeyEnvVar,
+            isActive: p.id === activeId,
+            status,
+          };
+        }),
+      );
+
+      const activeProvider = providers.find((p) => p.isActive) ?? providers[0];
+      const fallbackActive = activeProvider?.status !== "active";
+
+      res.json({ providers, activeId, active: activeProvider, fallback_active: fallbackActive });
     } catch (err) {
       console.warn("[client-settings] Failed to fetch tile-providers:", err);
       const fallback = findTileProvider(DEFAULT_TILE_PROVIDER_ID)!;
-      res.json({ providers: [], activeId: DEFAULT_TILE_PROVIDER_ID, active: getPublicTileInfo(fallback) });
+      res.json({ providers: [], activeId: DEFAULT_TILE_PROVIDER_ID, active: getPublicTileInfo(fallback), fallback_active: false });
     }
   });
 
