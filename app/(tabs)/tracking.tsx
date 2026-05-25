@@ -8,7 +8,6 @@ import { useT } from "@/lib/language-context";
 import { useUnits } from "@/lib/units-context";
 import { convertSpeed, speedUnitLabel, getAccuracyTier } from "@/components/tracking/tracking-utils";
 import TrackingMap from "@/components/TrackingMap";
-import { getTileConfig } from "@/lib/map-tiles";
 import { useMapConfig } from "@/lib/map-context";
 import { useTrackingState } from "@/components/tracking/useTrackingState";
 import { apiRequest } from "@/lib/query-client";
@@ -31,8 +30,7 @@ function TrackingScreenInner() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { speedUnit, distanceUnit } = useUnits();
-  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
-  const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
+  const { activeTileUrl, activeTileMaxZoom } = useMapConfig();
 
   const { state, handlers } = useTrackingState();
   const handsOffAnim = React.useRef(new Animated.Value(1)).current;
@@ -258,8 +256,8 @@ function TrackingScreenInner() {
           handlers.setSummaryVisible(false);
         }}
         points={state.summaryRoutePoints}
-        tileUrl={tileConfig.urlTemplate}
-        tileMaxZoom={tileConfig.maximumZ}
+        tileUrl={activeTileUrl}
+        tileMaxZoom={activeTileMaxZoom}
         totalKm={state.totalKm}
         maxSpeed={state.maxSpeed}
         totalMs={state.totalMs}
@@ -275,8 +273,8 @@ function TrackingScreenInner() {
         onClose={() => handlers.setHistMapVisible(false)}
         onCloseAll={() => handlers.setHistMapVisible(false)}
         points={state.histMapPoints}
-        tileUrl={tileConfig.urlTemplate}
-        tileMaxZoom={tileConfig.maximumZ}
+        tileUrl={activeTileUrl}
+        tileMaxZoom={activeTileMaxZoom}
         totalKm={state.histMapRecord?.totalDistanceKm ?? 0}
         maxSpeed={state.histMapRecord?.maxSpeedKmh ?? 0}
         totalMs={(state.histMapRecord?.durationSeconds ?? 0) * 1000}

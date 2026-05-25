@@ -20,7 +20,7 @@ import { useColors } from "@/hooks/useColors";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { haversineM, closestPointIndexOnPolyline } from "@/lib/geo";
-import { getTileConfig } from "@/lib/map-tiles";
+import { useMapConfig } from "@/lib/map-context";
 import { useLocale, useT } from "@/lib/language-context";
 import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
 import { NavigationMap } from "@/components/navigate/NavigationMap";
@@ -112,7 +112,6 @@ function formatDuration(mins: number): string {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
-const TILE_CONFIG = getTileConfig("carto_dark");
 const ANNOUNCE_DISTANCE_FAR = 200;
 const ANNOUNCE_DISTANCE_NEAR = 50;
 const REROUTE_DISTANCE_M = 200;
@@ -120,6 +119,7 @@ const REROUTE_DELAY_MS = 5000;
 
 export default function NavigateScreen() {
   const colors = useColors();
+  const { activeTileUrl, activeTileMaxZoom } = useMapConfig();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -442,14 +442,15 @@ export default function NavigateScreen() {
     const base = getApiUrl() + "/leaflet-navigation-map.html";
     let uri =
       base +
-      "?tileUrl=" + encodeURIComponent(TILE_CONFIG.urlTemplate) +
+      "?tileUrl=" + encodeURIComponent(activeTileUrl) +
+      "&maxZoom=" + activeTileMaxZoom +
       "&routeCoords=" + encodeURIComponent(JSON.stringify(polylinePoints)) +
       "&stepCoords=" + encodeURIComponent(JSON.stringify(stepPoints));
     if (offline.status === "available" && offline.offlineTileBasePath) {
       uri += "&offlinePath=" + encodeURIComponent(offline.offlineTileBasePath);
     }
     return uri;
-  }, [polylinePoints, route?.navigationSteps, offline.status, offline.offlineTileBasePath]);
+  }, [polylinePoints, route?.navigationSteps, offline.status, offline.offlineTileBasePath, activeTileUrl, activeTileMaxZoom]);
 
   // ── Loading ────────────────────────────────────────────────────────────────
 

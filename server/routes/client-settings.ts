@@ -4,6 +4,8 @@ import { db } from "../db";
 import { users } from "@shared/db";
 import { ilike } from "drizzle-orm";
 import { sendSuccess, sendError } from "../lib/api-response";
+import { TILE_PROVIDERS, DEFAULT_TILE_PROVIDER_ID, findTileProvider } from "../../lib/maps/tile-providers";
+import { getPublicTileInfo } from "../../lib/maps/tile-for-renderer";
 
 export function registerClientSettingsRoutes(app: Express) {
   app.get("/api/settings/privacy-policy", async (_req, res) => {
@@ -420,23 +422,28 @@ export function registerClientSettingsRoutes(app: Express) {
 
   app.get("/api/settings/maps", async (_req, res) => {
     try {
-      const [enabledSetting, providerSetting, rolloutSetting, rendererSetting, engineSetting] = await Promise.all([
+      const [enabledSetting, providerSetting, rolloutSetting, rendererSetting, engineSetting, activeTileSetting] = await Promise.all([
         storage.getAppSetting("maps_enabled"),
         storage.getAppSetting("maps_provider"),
         storage.getAppSetting("maps_rollout"),
         storage.getAppSetting("maps_renderer"),
         storage.getAppSetting("maps_routing_engine"),
+        storage.getAppSetting("active_tile_provider"),
       ]);
+      const activeTileId = activeTileSetting?.value ?? DEFAULT_TILE_PROVIDER_ID;
+      const tileProviderObj = findTileProvider(activeTileId) ?? findTileProvider(DEFAULT_TILE_PROVIDER_ID)!;
       res.json({
         enabled: enabledSetting?.value !== "false",
         provider: providerSetting?.value || "carto_light",
         rollout: rolloutSetting?.value ?? "disabled",
         renderer: rendererSetting?.value ?? "leaflet",
         engine: engineSetting?.value ?? "graphhopper",
+        tile_provider: getPublicTileInfo(tileProviderObj),
       });
     } catch (err) {
       console.warn("[client-settings] Failed to fetch maps settings:", err);
-      res.json({ enabled: true, provider: "carto_light", rollout: "disabled", renderer: "leaflet", engine: "graphhopper" });
+      const fallback = findTileProvider(DEFAULT_TILE_PROVIDER_ID)!;
+      res.json({ enabled: true, provider: "carto_light", rollout: "disabled", renderer: "leaflet", engine: "graphhopper", tile_provider: getPublicTileInfo(fallback) });
     }
   });
 
@@ -474,6 +481,29 @@ export function registerClientSettingsRoutes(app: Express) {
       res.json({ provider: setting?.value || "carto_light" });
     } catch {
       res.json({ provider: "carto_light" });
+    }
+  });
+
+  app.get("/api/settings/tile-providers", async (_req, res) => {
+    try {
+      const setting = await storage.getAppSetting("active_tile_provider");
+      const activeId = setting?.value ?? DEFAULT_TILE_PROVIDER_ID;
+      const providers = TILE_PROVIDERS.map((p) => ({
+        id: p.id,
+        label: p.label,
+        category: p.category,
+        cost: p.cost,
+        maxZoom: p.maxZoom,
+        rendererCompat: p.rendererCompat,
+        urlTemplate: p.urlTemplate,
+        keyRequired: !!p.apiKeyEnvVar,
+        isActive: p.id === activeId,
+      }));
+      res.json({ providers, activeId, active: providers.find((p) => p.isActive) ?? providers[0] });
+    } catch (err) {
+      console.warn("[client-settings] Failed to fetch tile-providers:", err);
+      const fallback = findTileProvider(DEFAULT_TILE_PROVIDER_ID)!;
+      res.json({ providers: [], activeId: DEFAULT_TILE_PROVIDER_ID, active: getPublicTileInfo(fallback) });
     }
   });
 

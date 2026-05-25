@@ -20,7 +20,7 @@ import { useT } from "@/lib/language-context";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
-import { getTileConfig } from "@/lib/map-tiles";
+import { useMapConfig } from "@/lib/map-context";
 
 // Sub-components
 import { RouteOptionsPanel } from "@/components/routes/create/RouteOptionsPanel";
@@ -296,7 +296,7 @@ export default function CreateRouteScreen() {
   const canSave = title.trim().length > 0 && waypoints.length >= 2;
 
   // Curvature map
-  const tileConfig = useMemo(() => getTileConfig("carto_dark"), []);
+  const { activeTileUrl, activeTileMaxZoom } = useMapConfig();
   const [curvatureMapHtml, setCurvatureMapHtml] = useState<string>("");
   const curvatureMapMountedRef = useRef(false);
 
@@ -381,8 +381,8 @@ export default function CreateRouteScreen() {
     if (!curvatureMapMountedRef.current) {
       curvatureMapMountedRef.current = true;
       setCurvatureMapHtml(buildPlannerMapHtml(
-        tileConfig.urlTemplate,
-        19,
+        activeTileUrl,
+        activeTileMaxZoom,
         Colors.accent,
         waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude, name: wp.name })),
         waypoints.map((wp) => ({ lat: wp.latitude, lng: wp.longitude })),
@@ -418,7 +418,7 @@ export default function CreateRouteScreen() {
         routeAbortControllerRef.current = null;
       }
     };
-  }, [waypoints, tileConfig, injectWaypoints, calculateRealRoute, routeStyle]);
+  }, [waypoints, activeTileUrl, activeTileMaxZoom, injectWaypoints, calculateRealRoute, routeStyle]);
 
   return (
     <View style={[styles.container]}>

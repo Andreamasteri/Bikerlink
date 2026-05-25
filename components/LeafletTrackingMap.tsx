@@ -3,7 +3,6 @@ import { View, StyleSheet } from "react-native";
 import WebView from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
-import { getTileConfig } from "@/lib/map-tiles";
 import { getApiUrl } from "@/lib/query-client";
 import { buildLeafletTrackingMapHtml } from "@/lib/leaflet-tracking-map-html";
 import Colors from "@/constants/colors";
@@ -17,12 +16,13 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
   const webViewRef = useRef<WebView>(null);
   const [bridgeReady, setBridgeReady] = useState(false);
   const pendingRef = useRef<{ points: typeof points; currentLocation: typeof currentLocation } | null>(null);
-  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
-  const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
+  const { enabled: mapsEnabled, activeTileUrl, activeTileMaxZoom } = useMapConfig();
+  const tileUrl = mapsEnabled ? activeTileUrl : "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
+  const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
 
   const mapHtml = useMemo(
-    () => buildLeafletTrackingMapHtml(tileConfig.urlTemplate, tileConfig.maximumZ, Colors.accent, __DEV__),
-    [tileConfig.urlTemplate, tileConfig.maximumZ]
+    () => buildLeafletTrackingMapHtml(tileUrl, tileMaxZoom, Colors.accent, __DEV__),
+    [tileUrl, tileMaxZoom]
   );
   const mapBaseUrl = getApiUrl();
 

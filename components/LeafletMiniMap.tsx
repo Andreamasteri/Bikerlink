@@ -2,7 +2,6 @@ import React, { useMemo } from "react";
 import { View, StyleSheet } from "react-native";
 import WebView from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
-import { getTileConfig } from "@/lib/map-tiles";
 import { getApiUrl } from "@/lib/query-client";
 import { buildLeafletMiniMapHtml } from "@/lib/leaflet-mini-map-html";
 
@@ -13,12 +12,13 @@ interface LeafletMiniMapProps {
 }
 
 export default function LeafletMiniMap({ latitude, longitude, height = 180 }: LeafletMiniMapProps) {
-  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
-  const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
+  const { enabled: mapsEnabled, activeTileUrl, activeTileMaxZoom } = useMapConfig();
+  const tileUrl = mapsEnabled ? activeTileUrl : "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
+  const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
 
   const mapHtml = useMemo(
-    () => buildLeafletMiniMapHtml(tileConfig.urlTemplate, tileConfig.maximumZ, latitude, longitude),
-    [latitude, longitude, tileConfig.urlTemplate, tileConfig.maximumZ]
+    () => buildLeafletMiniMapHtml(tileUrl, tileMaxZoom, latitude, longitude),
+    [latitude, longitude, tileUrl, tileMaxZoom]
   );
   const mapBaseUrl = getApiUrl();
 

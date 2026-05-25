@@ -1,3 +1,5 @@
+import { TILE_PROVIDERS, DEFAULT_TILE_PROVIDER_ID, findTileProvider } from "./maps/tile-providers";
+
 export type MapProvider = "carto_light" | "carto_dark" | "esri_gray";
 
 export interface TileConfig {
@@ -12,7 +14,7 @@ export const SELF_HOSTED_TILES_URL: string | undefined =
 
 export const isTilesSelfHosted: boolean = Boolean(SELF_HOSTED_TILES_URL);
 
-const TILE_CONFIGS: Record<MapProvider, TileConfig> = {
+const LEGACY_TILE_CONFIGS: Record<MapProvider, TileConfig> = {
   carto_light: {
     urlTemplate: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
     maximumZ: 19,
@@ -43,5 +45,16 @@ export const MAP_PROVIDER_DESCRIPTIONS: Record<MapProvider, string> = {
 };
 
 export function getTileConfig(provider: MapProvider): TileConfig {
-  return TILE_CONFIGS[provider];
+  return LEGACY_TILE_CONFIGS[provider];
 }
+
+export function getTileConfigById(id: string): TileConfig {
+  const provider = findTileProvider(id) ?? findTileProvider(DEFAULT_TILE_PROVIDER_ID)!;
+  return {
+    urlTemplate: provider.urlTemplate,
+    maximumZ: provider.maxZoom,
+    shouldReplaceMapContent: true,
+  };
+}
+
+export { TILE_PROVIDERS, DEFAULT_TILE_PROVIDER_ID, findTileProvider };

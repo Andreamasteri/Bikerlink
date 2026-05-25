@@ -45,7 +45,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   onRegionChangeComplete, gpsFollowupEnabled = false,
   showHazardReportButton = false,
 }: InteractiveMapProps, ref) {
-  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
+  const { enabled: mapsEnabled, resolvedProvider, activeTileUrl, activeTileMaxZoom } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
   const initialCenterDoneRef = useRef(false);
@@ -120,7 +120,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   });
 
   useMapStateSync({
-    mapReady, inject, mapsEnabled, resolvedProvider, userLocation, isAvailable,
+    mapReady, inject, mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable,
     searchRadiusKm, filteredUsers, workshops, eventPins, showEventPins, filterEvents,
     clubPins, filterClubs, easterEggs, activeSosRequests, realMeMarker, fakeMeMarker,
     currentUserId,

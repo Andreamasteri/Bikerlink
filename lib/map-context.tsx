@@ -2,13 +2,20 @@ import React, { createContext, useContext, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import type { MapProvider } from "@/lib/map-tiles";
+import { getTileConfig } from "@/lib/map-tiles";
 
 const VALID_PROVIDERS: MapProvider[] = ["carto_light", "carto_dark", "esri_gray"];
+const CARTO_VARIANTS = new Set(["carto-light", "carto-dark"]);
+
+const CARTO_LIGHT_URL = "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png";
+const CARTO_DARK_URL = "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
 
 interface MapConfig {
   enabled: boolean;
   adminProvider: MapProvider;
   resolvedProvider: MapProvider;
+  activeTileUrl: string;
+  activeTileMaxZoom: number;
   isLoading: boolean;
 }
 
@@ -23,10 +30,23 @@ interface UserProfileResponse {
   } | null;
 }
 
+interface ActiveTileInfo {
+  id: string;
+  urlTemplate: string;
+  maxZoom: number;
+}
+
+interface TileProvidersResponse {
+  activeId: string;
+  active: ActiveTileInfo;
+}
+
 const defaultConfig: MapConfig = {
   enabled: true,
   adminProvider: "carto_light",
   resolvedProvider: "carto_light",
+  activeTileUrl: CARTO_LIGHT_URL,
+  activeTileMaxZoom: 19,
   isLoading: false,
 };
 
@@ -45,6 +65,13 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
   const { data: profileData, isLoading: profileLoading } = useQuery<UserProfileResponse>({
     queryKey: ["/api/users/me"],
     staleTime: 60000,
+    retry: false,
+    enabled: !!user,
+  });
+
+  const { data: tileData, isLoading: tileLoading } = useQuery<TileProvidersResponse>({
+    queryKey: ["/api/settings/tile-providers"],
+    staleTime: 120000,
     retry: false,
     enabled: !!user,
   });
@@ -72,11 +99,29 @@ export function MapSettingsProvider({ children }: { children: ReactNode }) {
     resolvedProvider = adminProvider;
   }
 
+  const activeTile = tileData?.active;
+  let activeTileUrl: string;
+  let activeTileMaxZoom: number;
+
+  if (!activeTile) {
+    const fallback = getTileConfig(resolvedProvider);
+    activeTileUrl = fallback.urlTemplate;
+    activeTileMaxZoom = fallback.maximumZ;
+  } else if (CARTO_VARIANTS.has(activeTile.id)) {
+    activeTileUrl = resolvedProvider === "carto_dark" ? CARTO_DARK_URL : CARTO_LIGHT_URL;
+    activeTileMaxZoom = 19;
+  } else {
+    activeTileUrl = activeTile.urlTemplate;
+    activeTileMaxZoom = activeTile.maxZoom;
+  }
+
   const value: MapConfig = {
     enabled: mapsEnabled,
     adminProvider,
     resolvedProvider,
-    isLoading: mapsLoading || profileLoading,
+    activeTileUrl,
+    activeTileMaxZoom,
+    isLoading: mapsLoading || profileLoading || tileLoading,
   };
 
   return <MapContext.Provider value={value}>{children}</MapContext.Provider>;

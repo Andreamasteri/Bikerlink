@@ -3,7 +3,6 @@ import { View, StyleSheet } from "react-native";
 import WebView from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
-import { getTileConfig } from "@/lib/map-tiles";
 import { getApiUrl } from "@/lib/query-client";
 import { buildLeafletPickerMapHtml } from "@/lib/leaflet-picker-map-html";
 import type { PickerWaypoint } from "@/lib/leaflet-picker-map-html";
@@ -27,18 +26,19 @@ export default function LeafletPickerMap({
   onCoordPicked,
 }: LeafletPickerMapProps) {
   const webViewRef = useRef<WebView>(null);
-  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
-  const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
+  const { enabled: mapsEnabled, activeTileUrl, activeTileMaxZoom } = useMapConfig();
+  const tileUrl = mapsEnabled ? activeTileUrl : "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
+  const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
 
   const initialCoordRef = useRef(selectedCoord);
 
   const mapHtml = useMemo(
     () => buildLeafletPickerMapHtml(
-      tileConfig.urlTemplate, tileConfig.maximumZ,
+      tileUrl, tileMaxZoom,
       initialLat, initialLng, initialZoom,
       existingWaypoints, initialCoordRef.current, Colors.accent
     ),
-    [tileConfig.urlTemplate, tileConfig.maximumZ, initialLat, initialLng, initialZoom, existingWaypoints]
+    [tileUrl, tileMaxZoom, initialLat, initialLng, initialZoom, existingWaypoints]
   );
   const mapBaseUrl = getApiUrl();
 

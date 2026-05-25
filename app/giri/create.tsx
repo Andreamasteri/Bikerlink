@@ -5,7 +5,7 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { buildPlannerMapHtml } from "@/lib/leaflet-route-map-html";
-import { getTileConfig } from "@/lib/map-tiles";
+import { useMapConfig } from "@/lib/map-context";
 import DebugPanel from "@/components/DebugPanel";
 import { useLanguage } from "@/lib/language-context";
 
@@ -74,7 +74,7 @@ export default function GiriCreateScreen() {
   const webviewRef = React.useRef<any>(null);
   const autoCalcTimeout = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const TILE = getTileConfig("carto_dark");
+  const { activeTileUrl, activeTileMaxZoom } = useMapConfig();
   const isApproxRoute = !!routeResult && (!!routeResult.approximate || !routeResult.encoded);
 
   const compassDirLabel: string | null =
@@ -84,14 +84,14 @@ export default function GiriCreateScreen() {
 
   const plannerMapHtml = useMemo(() => {
     return buildPlannerMapHtml(
-      TILE.urlTemplate,
-      TILE.maximumZ,
+      activeTileUrl,
+      activeTileMaxZoom,
       colors.accent,
       waypoints,
       undefined,
       compassDirLabel
     );
-  }, [waypoints, colors.accent, compassDirLabel, TILE.urlTemplate, TILE.maximumZ]);
+  }, [waypoints, colors.accent, compassDirLabel, activeTileUrl, activeTileMaxZoom]);
 
   useEffect(() => {
     const js = `(function(){ if(typeof window.updateCompassDirection==='function'){ window.updateCompassDirection(${JSON.stringify(compassDirLabel)}); } })(); true;`;

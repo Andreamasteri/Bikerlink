@@ -1,11 +1,11 @@
 import type {
   MapUser, MapWorkshop, MapEasterEgg, MapSosRequest, ClubMapPin, EventMapPin,
 } from "@/components/map/map-types";
-import { getTileConfig, type MapProvider } from "@/lib/map-tiles";
 
 interface BuildMapMarkersStateParams {
   mapsEnabled: boolean;
-  resolvedProvider: MapProvider;
+  activeTileUrl: string;
+  activeTileMaxZoom: number;
   userLocation: { latitude: number; longitude: number } | null;
   isAvailable: boolean;
   searchRadiusKm?: number | null;
@@ -23,12 +23,16 @@ interface BuildMapMarkersStateParams {
   currentUserId?: string | null;
 }
 
+const FALLBACK_TILE_URL = "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
+const FALLBACK_MAX_ZOOM = 19;
+
 export function buildMapMarkersState(p: BuildMapMarkersStateParams): string {
-  const tileConfig = p.mapsEnabled ? getTileConfig(p.resolvedProvider) : getTileConfig("carto_dark");
+  const tileUrl = p.mapsEnabled ? p.activeTileUrl : FALLBACK_TILE_URL;
+  const tileMaxZoom = p.mapsEnabled ? p.activeTileMaxZoom : FALLBACK_MAX_ZOOM;
   const loc = p.userLocation;
   const state = {
-    tileUrl: tileConfig.urlTemplate,
-    tileMaxZoom: tileConfig.maximumZ,
+    tileUrl,
+    tileMaxZoom,
     userLocation: loc ? { lat: loc.latitude, lng: loc.longitude } : null,
     searchRadius:
       p.isAvailable && loc && p.searchRadiusKm && p.searchRadiusKm > 0

@@ -17,7 +17,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
-import { getTileConfig } from "@/lib/map-tiles";
+import { useMapConfig } from "@/lib/map-context";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
 import { decodePolyline } from "@/lib/polyline";
 
@@ -114,12 +114,11 @@ function styleLabel(style: string): string {
   return map[style] ?? style;
 }
 
-const TILE_CONFIG = getTileConfig("carto_dark");
-
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function GiriDetailScreen() {
   const colors = useColors();
+  const { activeTileUrl, activeTileMaxZoom } = useMapConfig();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -198,14 +197,14 @@ export default function GiriDetailScreen() {
     const base = getApiUrl() + "/leaflet-curvature-map.html";
     let uri =
       base +
-      "?tileUrl=" + encodeURIComponent(TILE_CONFIG.urlTemplate) +
-      "&tileMaxZoom=" + TILE_CONFIG.maximumZ +
+      "?tileUrl=" + encodeURIComponent(activeTileUrl) +
+      "&tileMaxZoom=" + activeTileMaxZoom +
       "&points=" + encodeURIComponent(JSON.stringify(routePoints));
     if (offline.status === "available" && offline.offlineTileBasePath) {
       uri += "&offlinePath=" + encodeURIComponent(offline.offlineTileBasePath);
     }
     return uri;
-  }, [routePoints, offline.status, offline.offlineTileBasePath]);
+  }, [routePoints, offline.status, offline.offlineTileBasePath, activeTileUrl, activeTileMaxZoom]);
 
   const multiDayDays = useMemo(() => {
     if (!route?.isMultiDay) return null;

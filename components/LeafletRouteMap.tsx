@@ -3,7 +3,6 @@ import { View, StyleSheet, Animated } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
-import { getTileConfig } from "@/lib/map-tiles";
 import { getApiUrl } from "@/lib/query-client";
 import { buildLeafletRouteMapHtml } from "@/lib/leaflet-route-map-html";
 import type { RouteWaypoint } from "@/lib/leaflet-route-map-html";
@@ -18,15 +17,16 @@ interface LeafletRouteMapProps {
 }
 
 export default function LeafletRouteMap({ waypoints, height, typeColors, showMarkers = true, trackPoints }: LeafletRouteMapProps) {
-  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
-  const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
+  const { enabled: mapsEnabled, activeTileUrl, activeTileMaxZoom } = useMapConfig();
+  const tileUrl = mapsEnabled ? activeTileUrl : "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
+  const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
 
   const mapHtml = useMemo(
     () => buildLeafletRouteMapHtml(
-      tileConfig.urlTemplate, tileConfig.maximumZ,
+      tileUrl, tileMaxZoom,
       waypoints, Colors.accent, typeColors || {}, showMarkers, trackPoints || []
     ),
-    [tileConfig.urlTemplate, tileConfig.maximumZ, waypoints, typeColors, showMarkers, trackPoints]
+    [tileUrl, tileMaxZoom, waypoints, typeColors, showMarkers, trackPoints]
   );
   const mapBaseUrl = getApiUrl();
 

@@ -8,6 +8,7 @@ import type { MapsRollout, MapsRendererId, MapsTileId, RoutingEngineId, RoutingP
 import { RolloutCard } from "./RolloutCard";
 import { RendererCard } from "./RendererCard";
 import { RoutingCard } from "./RoutingCard";
+import { TileProvidersCard } from "./TileProvidersCard";
 
 interface AdminMapsConfig {
   rollout: MapsRollout;
@@ -123,6 +124,8 @@ export default function AdminMapsPage() {
         isPending={routingMutation.isPending}
         onRoutingChange={(engine, profile) => routingMutation.mutate({ engine, profile })}
       />
+
+      <TileProvidersCard />
     </ScrollView>
   );
 }
