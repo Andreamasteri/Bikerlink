@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   Pressable,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -149,14 +150,38 @@ function ImageMessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: b
   );
 }
 
-export function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn: boolean }) {
+export function MessageBubble({
+  message,
+  isOwn,
+  onDelete,
+}: {
+  message: ChatMessage;
+  isOwn: boolean;
+  onDelete?: (messageId: string) => void;
+}) {
   const hasHashtag =
     message.messageType === "text" &&
     message.content &&
     /#[a-zA-Z0-9_àèéìíîòóùúÀÈÉÌÍÎÒÓÙÚ]+/.test(message.content);
 
+  const handleLongPress = () => {
+    if (!isOwn || !onDelete) return;
+    Alert.alert("Messaggio", "Vuoi eliminare questo messaggio?", [
+      { text: "Annulla", style: "cancel" },
+      {
+        text: "Elimina",
+        style: "destructive",
+        onPress: () => onDelete(message.id),
+      },
+    ]);
+  };
+
   return (
-    <View style={[styles.bubbleContainer, isOwn ? styles.bubbleRight : styles.bubbleLeft]}>
+    <Pressable
+      onLongPress={handleLongPress}
+      delayLongPress={400}
+      style={[styles.bubbleContainer, isOwn ? styles.bubbleRight : styles.bubbleLeft]}
+    >
       {!isOwn && message.sender && (
         <Text style={[styles.senderName, { color: getUserTypeColor(message.sender.userType, message.sender.sex) }]}>
           {message.sender.nickname}
@@ -197,7 +222,7 @@ export function MessageBubble({ message, isOwn }: { message: ChatMessage; isOwn:
           {formatMessageTime(message.createdAt)}
         </Text>
       )}
-    </View>
+    </Pressable>
   );
 }
 

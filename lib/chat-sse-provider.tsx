@@ -3,9 +3,10 @@ import { AppState, type AppStateStatus } from "react-native";
 import { getApiUrl } from "@/lib/query-client";
 
 export interface ChatSseEvent {
-  type: "new_message" | "conversation_update";
+  type: "new_message" | "conversation_update" | "message_deleted";
   conversationId: string;
   message?: Record<string, unknown>;
+  messageId?: string;
 }
 
 type Listener = (e: ChatSseEvent) => void;

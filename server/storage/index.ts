@@ -96,7 +96,9 @@ export interface IStorage {
   getConversationParticipants(conversationId: string): Promise<ConversationParticipant[]>;
   addConversationParticipant(participant: InsertConversationParticipant): Promise<ConversationParticipant>;
   getMessages(conversationId: string, limit?: number, offset?: number): Promise<Message[]>;
+  getMessageById(messageId: string): Promise<Message | undefined>;
   createMessage(message: InsertMessage): Promise<Message>;
+  deleteMessage(messageId: string, senderId: string): Promise<boolean>;
   updateConversationLastRead(conversationId: string, userId: string): Promise<void>;
   updateConversationTimestamp(conversationId: string): Promise<void>;
   getRoutes(userId: string): Promise<Route[]>;

@@ -103,7 +103,9 @@ export default function ChatConversationScreen() {
   });
 
   useChatSSE((event) => {
-    if (event.conversationId === id) {
+    if (event.type === "message_deleted" && event.conversationId === id) {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+    } else if (event.conversationId === id) {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
     }
     queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
@@ -163,6 +165,22 @@ export default function ChatConversationScreen() {
       router.back();
     },
   });
+
+  const deleteMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      await apiRequest("DELETE", `/api/chat/messages/${messageId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+    },
+    onError: () => {
+      Alert.alert("Errore", "Impossibile eliminare il messaggio. Riprova.");
+    },
+  });
+
+  const handleDeleteMessage = useCallback((messageId: string) => {
+    deleteMessageMutation.mutate(messageId);
+  }, [deleteMessageMutation]);
 
   const { data: lastfmStatus } = useQuery<{ connected: boolean; trackCount?: number }>({
     queryKey: ["/api/lastfm/status"],
@@ -283,7 +301,7 @@ export default function ChatConversationScreen() {
         throw new Error((err as Error).message ?? t("chat.uploadPhotoError"));
       }
 
-      await queryClient.invalidateQueries({ queryKey: [`/api/chat/conversations/${id}/messages`] });
+      await queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
     } catch (err: unknown) {
       Alert.alert("Errore", (err instanceof Error ? err.message : null) ?? "Impossibile inviare la foto.");
     } finally {
@@ -313,9 +331,13 @@ export default function ChatConversationScreen() {
 
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => (
-      <MessageBubble message={item} isOwn={item.senderId === userId} />
+      <MessageBubble
+        message={item}
+        isOwn={item.senderId === userId}
+        onDelete={item.senderId === userId ? handleDeleteMessage : undefined}
+      />
     ),
-    [userId]
+    [userId, handleDeleteMessage]
   );
 
   return (

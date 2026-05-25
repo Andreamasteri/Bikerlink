@@ -59,6 +59,19 @@ export class ConversationsStorage extends AuthStorage {
     return message;
   }
 
+  async getMessageById(messageId: string): Promise<Message | undefined> {
+    const [msg] = await db.select().from(messages).where(eq(messages.id, messageId)).limit(1);
+    return msg;
+  }
+
+  async deleteMessage(messageId: string, senderId: string): Promise<boolean> {
+    const result = await db
+      .delete(messages)
+      .where(and(eq(messages.id, messageId), eq(messages.senderId, senderId)))
+      .returning({ id: messages.id });
+    return result.length > 0;
+  }
+
   async updateConversationLastRead(conversationId: string, userId: string): Promise<void> {
     await db.update(conversationParticipants).set({ lastReadAt: new Date() }).where(and(eq(conversationParticipants.conversationId, conversationId), eq(conversationParticipants.userId, userId)));
   }

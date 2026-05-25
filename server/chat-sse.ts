@@ -33,9 +33,10 @@ export function closeSseClient(userId: string): void {
 }
 
 export interface ChatSseEvent {
-  type: "new_message" | "conversation_update";
+  type: "new_message" | "conversation_update" | "message_deleted";
   conversationId: string;
   message?: object;
+  messageId?: string;
 }
 
 export function notifyChatEvent(participantIds: string[], event: ChatSseEvent): void {

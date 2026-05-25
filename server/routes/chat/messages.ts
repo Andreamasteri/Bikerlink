@@ -148,4 +148,38 @@ router.post("/conversations/:id/messages", async (req: Request, res: Response) =
   }
 });
 
+router.delete("/messages/:messageId", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const messageId = String(req.params.messageId);
+
+    const msg = await storage.getMessageById(messageId);
+    if (!msg) {
+      return sendError(res, 404, "Messaggio non trovato");
+    }
+    if (msg.senderId !== userId) {
+      return sendError(res, 403, "Non puoi eliminare messaggi di altri utenti");
+    }
+
+    const conversationId = msg.conversationId;
+    const deleted = await storage.deleteMessage(messageId, userId);
+    if (!deleted) {
+      return sendError(res, 404, "Messaggio non trovato o non autorizzato");
+    }
+
+    const participants = await storage.getConversationParticipants(conversationId);
+    notifyChatEvent(
+      participants.map((p) => p.userId),
+      { type: "message_deleted", conversationId, messageId }
+    );
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Delete message error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 export default router;
