@@ -42,6 +42,7 @@ export const users = pgTable("users", {
   autoJoinClubs: boolean("auto_join_clubs").notNull().default(true),
   ghostMode: boolean("ghost_mode").notNull().default(false),
   floatingWidgetEnabled: boolean("floating_widget_enabled").notNull().default(true),
+  mapTester: boolean("map_tester").notNull().default(false),
   lastLoginAt: timestamp("last_login_at"),
   lastLogoutAt: timestamp("last_logout_at"),
   lastAppCloseAt: timestamp("last_app_close_at"),

@@ -578,4 +578,40 @@ export function registerClientSettingsRoutes(app: Express) {
       });
     }
   });
+
+  app.get("/api/settings/maps-rollout", async (_req, res) => {
+    try {
+      const { DEFAULT_MAPS_CONFIG, isValidRollout, isValidRenderer, isValidTile, isValidRouting, isValidProfile } = await import("@shared/maps-config");
+      const [rollout, renderer, tile, routing, profile] = await Promise.all([
+        storage.getAppSetting("maps_rollout"),
+        storage.getAppSetting("maps_renderer"),
+        storage.getAppSetting("maps_tile"),
+        storage.getAppSetting("routing_engine"),
+        storage.getAppSetting("routing_profile"),
+      ]);
+      const r = rollout?.value?.trim();
+      const rend = renderer?.value?.trim();
+      const t = tile?.value?.trim();
+      const ro = routing?.value?.trim();
+      const p = profile?.value?.trim();
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        rollout: isValidRollout(r) ? r : DEFAULT_MAPS_CONFIG.rollout,
+        renderer: isValidRenderer(rend) ? rend : DEFAULT_MAPS_CONFIG.renderer,
+        tile: isValidTile(t) ? t : DEFAULT_MAPS_CONFIG.tile,
+        routing: isValidRouting(ro) ? ro : DEFAULT_MAPS_CONFIG.routing,
+        profile: isValidProfile(p) ? p : DEFAULT_MAPS_CONFIG.profile,
+      });
+    } catch {
+      const { DEFAULT_MAPS_CONFIG } = await import("@shared/maps-config");
+      res.setHeader("Cache-Control", "no-store");
+      res.json({
+        rollout: DEFAULT_MAPS_CONFIG.rollout,
+        renderer: DEFAULT_MAPS_CONFIG.renderer,
+        tile: DEFAULT_MAPS_CONFIG.tile,
+        routing: DEFAULT_MAPS_CONFIG.routing,
+        profile: DEFAULT_MAPS_CONFIG.profile,
+      });
+    }
+  });
 }
