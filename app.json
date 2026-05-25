@@ -102,7 +102,8 @@
         {
           "photosPermission": "BikerLink accede ai tuoi file audio e foto per riprodurre brani offline e caricare immagini del profilo.",
           "savePhotosPermission": "BikerLink salva file audio scaricati nella libreria multimediale del dispositivo.",
-          "isAccessMediaLocationEnabled": true
+          "isAccessMediaLocationEnabled": true,
+          "androidPermissions": ["READ_MEDIA_AUDIO", "READ_EXTERNAL_STORAGE"]
         }
       ],
       "expo-document-picker",
