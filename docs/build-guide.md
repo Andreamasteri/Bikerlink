@@ -278,9 +278,10 @@ come se fosse un nuovo update.
 ### Opzione C — Emergency (nessuna release sana disponibile)
 
 ```bash
-# Pubblica hotfix immediato
-eas update --channel production --message "Hotfix critico: ripristino funzionalità X"
+# Pubblica hotfix immediato sul canale staging (entra nella coda admin come sempre)
+eas update --channel staging --message "Hotfix critico: ripristino funzionalità X"
 # Poi approva immediatamente dal pannello admin
+# Admin BikerLink → /admin/maps → sezione OTA → pulsante "Sync" → Approva
 ```
 
 ---
