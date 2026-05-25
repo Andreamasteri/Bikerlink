@@ -173,7 +173,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       });
     } catch(e) {
       oms = null;
-      omsLoadError = "init_failed:" + (e && (e as Error).message ? (e as Error).message : "unknown");
+      omsLoadError = "init_failed:" + (e && e.message ? e.message : "unknown");
     }
   } else {
     omsLoadError = "constructor_undefined";
