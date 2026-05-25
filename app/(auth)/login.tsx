@@ -271,7 +271,7 @@ const styles = StyleSheet.create({
   },
   registerLink: {
     color: Colors.accent,
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: "600" as const,
   },
   forgotRow: {
