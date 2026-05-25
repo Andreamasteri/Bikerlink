@@ -2,8 +2,8 @@
  * Test routing endpoint — Admin
  *
  * GET /api/admin/maps/test-routing
- * Esegue una richiesta Milano → Como sull'engine attualmente configurato
- * e restituisce { engine, latency_ms, ok, distanceKm?, durationMinutes?, error? }.
+ * Esegue una richiesta Milano → Como sull'engine configurato e restituisce
+ * sia il risultato del percorso sia info diagnostiche (URL, self-hosted, ecc.).
  */
 
 import { Router, type Request, type Response } from "express";
@@ -11,13 +11,41 @@ import { storage } from "../../../storage";
 import { getActiveRouter } from "../../../routing/router-selector";
 import type { RouteRequest } from "../../../routing/graphhopper-adapter";
 import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
+import {
+  GH_BASE_URL, isSelfHosted, ROUTING_DISABLED, getServerInfo,
+  type GHServerInfo,
+} from "../../../graphhopper-client";
+import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-tiles";
 
 const router = Router();
 
 const MILANO: [number, number] = [9.19, 45.4642];
 const COMO: [number, number] = [9.0852, 45.808];
 
+function maskUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.hostname}`;
+  } catch {
+    return url.slice(0, 40);
+  }
+}
+
 router.get("/test-routing", async (req: Request, res: Response) => {
+  if (ROUTING_DISABLED) {
+    return res.json({
+      ok: false,
+      source: "disabled",
+      graphhopper_url: null,
+      tiles_url: null,
+      is_self_hosted: false,
+      is_tiles_self_hosted: false,
+      latency_ms: null,
+      status: "disabled",
+      message: "Routing disabilitato via kill-switch (ROUTING_DISABLED)",
+    });
+  }
+
   const start = Date.now();
 
   const [rolloutSetting, engineSetting] = await Promise.all([
@@ -35,6 +63,19 @@ router.get("/test-routing", async (req: Request, res: Response) => {
     calc_points: true,
     points_encoded: false,
     elevation: false,
+  };
+
+  const ghInfo: GHServerInfo = await getServerInfo().catch(() => ({ status: "error" }));
+
+  const diagnostics = {
+    source: isSelfHosted ? "self-hosted" : "cloud",
+    graphhopper_url: maskUrl(GH_BASE_URL),
+    tiles_url: isTilesSelfHosted && SELF_HOSTED_TILES_URL ? maskUrl(SELF_HOSTED_TILES_URL) : null,
+    is_self_hosted: isSelfHosted,
+    is_tiles_self_hosted: isTilesSelfHosted,
+    gh_status: ghInfo.status,
+    gh_graph_loaded: ghInfo.graph_loaded,
+    gh_version: ghInfo.version,
   };
 
   try {
@@ -57,6 +98,7 @@ router.get("/test-routing", async (req: Request, res: Response) => {
       latency_ms,
       distanceKm: path ? Math.round(path.distance / 100) / 10 : null,
       durationMinutes: path ? Math.round(path.time / 60000) : null,
+      ...diagnostics,
     });
   } catch (err: unknown) {
     const latency_ms = Date.now() - start;
@@ -67,6 +109,7 @@ router.get("/test-routing", async (req: Request, res: Response) => {
       engine,
       latency_ms,
       error: msg.slice(0, 300),
+      ...diagnostics,
     });
   }
 });

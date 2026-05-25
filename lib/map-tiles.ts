@@ -6,6 +6,12 @@ export interface TileConfig {
   shouldReplaceMapContent: boolean;
 }
 
+export const SELF_HOSTED_TILES_URL: string | undefined =
+  (typeof process !== "undefined" ? process.env?.TILES_URL : undefined) ??
+  (typeof process !== "undefined" ? process.env?.EXPO_PUBLIC_TILES_URL : undefined);
+
+export const isTilesSelfHosted: boolean = Boolean(SELF_HOSTED_TILES_URL);
+
 const TILE_CONFIGS: Record<MapProvider, TileConfig> = {
   carto_light: {
     urlTemplate: "https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",

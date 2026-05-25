@@ -241,6 +241,9 @@ BIKERLINK_ADMIN_EMAIL = "admin@bikerlink.it"
 BIKERLINK_BACKEND_URL = "https://biker-link.replit.app"
 EXPO_PUBLIC_DOMAIN = "biker-link.replit.app"
 VALHALLA_URL = ""
+GRAPHHOPPER_URL = "https://routing.bikerlink.app"
+TILES_URL = "https://tiles.bikerlink.app"
+ROUTING_DISABLED = "0"
 
 [userenv.development]
 EXPO_WEB_URL = "http://localhost:8081"
