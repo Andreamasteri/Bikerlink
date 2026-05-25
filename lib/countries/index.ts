@@ -24,16 +24,6 @@ export const EUROPEAN_COUNTRIES: CountryData[] = EUROPE_COUNTRIES;
 
 export const CONTINENT_MAP: ContinentData[] = [
   {
-    key: "AF",
-    label: "Africa",
-    countryCodes: ["AO","BF","BI","BJ","BW","CD","CF","CG","CI","CM","CV","DJ","DZ","EG","ER","ET","GA","GH","GM","GN","GQ","GW","KE","KM","LR","LS","LY","MA","MG","ML","MR","MU","MW","MZ","NA","NE","NG","RW","SC","SD","SL","SN","SO","SS","ST","SZ","TD","TG","TN","TZ","UG","ZA","ZM","ZW"],
-  },
-  {
-    key: "AS",
-    label: "Asia",
-    countryCodes: ["CN","ID","IN","JP","KR","MY","PH","SG","TH","VN"],
-  },
-  {
     key: "EU",
     label: "Europa",
     countryCodes: ["AD","AL","AM","AT","AZ","BA","BE","BG","BY","CH","CY","CZ","DE","DK","EE","ES","FI","FR","GB","GE","GR","HR","HU","IE","IS","IT","LI","LT","LU","LV","MC","MD","ME","MK","MT","NL","NO","PL","PT","RO","RS","RU","SE","SI","SK","SM","TR","UA","VA","XK"],
@@ -44,14 +34,24 @@ export const CONTINENT_MAP: ContinentData[] = [
     countryCodes: ["CA","US"],
   },
   {
+    key: "SA",
+    label: "Sud America",
+    countryCodes: ["AR","BO","BR","CL","CO","EC","GY","PE","PY","SR","UY","VE"],
+  },
+  {
     key: "OC",
     label: "Oceania",
     countryCodes: ["AU","FJ","FM","KI","MH","NR","NZ","PG","PW","SB","TO","TV","VU","WS"],
   },
   {
-    key: "SA",
-    label: "Sud America",
-    countryCodes: ["AR","BO","BR","CL","CO","EC","GY","PE","PY","SR","UY","VE"],
+    key: "AS",
+    label: "Asia",
+    countryCodes: ["CN","ID","IN","JP","KR","MY","PH","SG","TH","VN"],
+  },
+  {
+    key: "AF",
+    label: "Africa",
+    countryCodes: ["AO","BF","BI","BJ","BW","CD","CF","CG","CI","CM","CV","DJ","DZ","EG","ER","ET","GA","GH","GM","GN","GQ","GW","KE","KM","LR","LS","LY","MA","MG","ML","MR","MU","MW","MZ","NA","NE","NG","RW","SC","SD","SL","SN","SO","SS","ST","SZ","TD","TG","TN","TZ","UG","ZA","ZM","ZW"],
   },
 ];
 

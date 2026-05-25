@@ -105,7 +105,7 @@ export const HomeMapSection: React.FC<HomeMapSectionProps> = ({
         </View>
       )}
       <View style={styles.expandHint}>
-        <Ionicons name="expand" size={16} color={Colors.text} />
+        <Ionicons name="expand" size={16} color={Colors.accent} />
       </View>
     </Pressable>
   );
