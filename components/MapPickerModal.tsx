@@ -25,8 +25,10 @@ interface Props {
   existingWaypoints?: ExistingWaypoint[];
 }
 
-export default function MapPickerContent({ coord, onCoordChange, onConfirm, onClose, initialRegion, existingWaypoints = [] }: Props) {
+export default function MapPickerContent({ visible, coord, onCoordChange, onConfirm, onClose, initialRegion, existingWaypoints = [] }: Props) {
   const insets = useSafeAreaInsets();
+
+  if (visible === false) return null;
 
   const pickerWaypoints: PickerWaypoint[] = existingWaypoints.map((wp) => ({
     lat: wp.latitude,
