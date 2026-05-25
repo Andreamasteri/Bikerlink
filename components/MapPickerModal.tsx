@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import RendererPickerMap from "@/components/RendererPickerMap";
+import LeafletPickerMap from "@/components/LeafletPickerMap";
 import type { PickerWaypoint } from "@/lib/leaflet-picker-map-html";
 
 interface ExistingWaypoint {
@@ -61,7 +61,7 @@ export default function MapPickerContent({ coord, onCoordChange, onConfirm, onCl
           <Text style={[styles.mapConfirmText, !coord && { opacity: 0.4 }]}>Conferma</Text>
         </TouchableOpacity>
       </View>
-      <RendererPickerMap {...pickerMapProps} />
+      <LeafletPickerMap {...pickerMapProps} />
       {coord && (
         <View style={styles.mapCoordsBar}>
           <Text style={styles.mapCoordsText}>

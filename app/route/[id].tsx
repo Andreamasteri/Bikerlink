@@ -124,7 +124,11 @@ export default function RouteDetailScreen() {
       contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
     >
       <RouteMap
-        points={mappedPoints}
+        waypoints={mappedPoints.length > 0 ? [
+          { lat: mappedPoints[0].latitude, lng: mappedPoints[0].longitude, name: "Partenza", waypointType: "start" },
+          { lat: mappedPoints[mappedPoints.length - 1].latitude, lng: mappedPoints[mappedPoints.length - 1].longitude, name: "Arrivo", waypointType: "end" },
+        ] : []}
+        trackPoints={mappedPoints.map((p) => ({ lat: p.latitude, lng: p.longitude, speedKmh: p.speedKmh }))}
         height={260}
         showMarkers={true}
       />

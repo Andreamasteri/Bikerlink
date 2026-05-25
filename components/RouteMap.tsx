@@ -1,1 +1,1 @@
-export { default } from "@/components/RendererRouteMap";
+export { default } from "@/components/LeafletRouteMap";

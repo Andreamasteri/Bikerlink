@@ -13,8 +13,7 @@ const weatherWaypointsSchema = z.object({
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { haversineKm } from "../../geo";
 const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
-import { ACTIVE_PROFILE } from "../../graphhopper-client";
-import { calculateRouteWithSelector } from "../../routing/router-selector";
+import { ACTIVE_PROFILE, calculateRoute } from "../../graphhopper-client";
 
 const router = Router();
 
@@ -446,10 +445,8 @@ router.post("/calculate", async (req: Request, res: Response) => {
       body.custom_model = { priority };
     }
 
-    const { result: routeResult, engineUsed } = await calculateRouteWithSelector(
+    const routeResult = await calculateRoute(
       body as unknown as import("../../graphhopper-client").RouteRequest,
-      userId,
-      res,
     );
     const path = routeResult.paths[0];
 
@@ -461,7 +458,6 @@ router.post("/calculate", async (req: Request, res: Response) => {
       bikerScore: 0.8,
       elevation: extractElevationProfile(path.points as string, (path as { points_encoded?: boolean; points?: { coordinates?: number[][] } }).points_encoded === false ? (path.points as { coordinates?: number[][] })?.coordinates : undefined),
       warning: myStyleWarning,
-      routingEngine: engineUsed,
     });
   } catch (err: unknown) {
     console.error("[routing] error:", (err as Error)?.message ?? err);

@@ -1,9 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput, Switch, Alert } from "react-native";
+import { View, Text, StyleSheet, Modal, TouchableOpacity, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { apiRequest, queryClient } from "@/lib/query-client";
 import { AdminUser } from "./UserCard";
 
 interface UserEditModalProps {
@@ -37,19 +35,7 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
   onDeleteUser,
   getStatusColor,
 }) => {
-  const mapTesterMutation = useMutation({
-    mutationFn: async (vars: { id: string; enabled: boolean }) => {
-      const res = await apiRequest("PUT", `/api/admin/maps/users/${vars.id}/map-tester`, { enabled: vars.enabled });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-    },
-    onError: () => Alert.alert("Errore", "Impossibile aggiornare flag Map Tester"),
-  });
-
   if (!user) return null;
-  const mapTesterValue = !!(user as AdminUser & { mapTester?: boolean }).mapTester;
 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
@@ -101,18 +87,6 @@ export const UserEditModal: React.FC<UserEditModalProps> = ({
             <View style={styles.infoSection}>
               <Text style={styles.infoLabel}>Tipo</Text>
               <Text style={styles.infoValue}>{user.userType}</Text>
-            </View>
-
-            <View style={[styles.infoSection, { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 8 }]}>
-              <View style={{ flex: 1, paddingRight: 12 }}>
-                <Text style={styles.infoLabel}>Map Tester</Text>
-                <Text style={[styles.infoValue, { fontSize: 12 }]}>Accesso ai renderer/routing sperimentali quando rollout = &quot;tester&quot;.</Text>
-              </View>
-              <Switch
-                value={mapTesterValue}
-                disabled={mapTesterMutation.isPending}
-                onValueChange={(v) => mapTesterMutation.mutate({ id: user.id, enabled: v })}
-              />
             </View>
 
             <View style={styles.quickActions}>

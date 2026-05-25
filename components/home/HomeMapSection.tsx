@@ -2,7 +2,7 @@ import React from "react";
 import { View, ActivityIndicator, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import RendererInteractiveMap, { type InteractiveMapHandle } from "@/components/RendererInteractiveMap";
+import InteractiveMap, { type InteractiveMapHandle } from "@/components/InteractiveMap";
 
 interface GeoItem {
   id?: string | number;
@@ -64,7 +64,7 @@ export const HomeMapSection: React.FC<HomeMapSectionProps> = ({
   return (
     <Pressable style={styles.mapContainer} onPress={() => setMapFullscreen(true)}>
       {!mapFullscreen ? (
-        <RendererInteractiveMap
+        <InteractiveMap
           ref={mapRef}
           users={usersWithSelf.filter(
             (u) => u.latitude != null && u.longitude != null && !isNaN(u.latitude as number) && !isNaN(u.longitude as number)
