@@ -178,6 +178,12 @@ export default function ChatScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
     },
+    onError: (error: unknown) => {
+      const message = error instanceof Error && error.message
+        ? error.message
+        : "Impossibile eliminare la conversazione";
+      Alert.alert("Errore", message);
+    },
   });
 
   const handleDeleteConversation = useCallback((convId: string) => {

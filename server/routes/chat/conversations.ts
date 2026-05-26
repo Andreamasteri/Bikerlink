@@ -2,9 +2,9 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { users, conversationParticipants, messages } from "@shared/db";
+import { users, conversationParticipants, messages, motoClubs, motoClubMembers } from "@shared/db";
 import { createConversationSchema } from "@shared/validators";
-import { inArray, desc } from "drizzle-orm";
+import { inArray, desc, eq, and } from "drizzle-orm";
 import { convCacheKey, convCache, CONV_CACHE_TTL_MS, pruneConvCache, invalidateConvCache } from "./utils";
 import { requireAuth } from "./auth";
 
@@ -238,6 +238,82 @@ router.post("/", async (req: Request, res: Response) => {
     return res.status(201).json(conversation);
   } catch (error) {
     console.error("Create conversation error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.delete("/:id", async (req: Request, res: Response) => {
+  try {
+    const userId = requireAuth(req, res);
+    if (!userId) return;
+
+    const conversationId = req.params.id as string;
+
+    const conversation = await storage.getConversation(conversationId);
+    if (!conversation) {
+      return sendError(res, 404, "Conversazione non trovata");
+    }
+
+    const [myParticipant] = await db
+      .select()
+      .from(conversationParticipants)
+      .where(and(
+        eq(conversationParticipants.conversationId, conversationId),
+        eq(conversationParticipants.userId, userId),
+      ))
+      .limit(1);
+
+    if (!myParticipant) {
+      return sendError(res, 403, "Non sei partecipante di questa conversazione");
+    }
+
+    if (conversation.conversationType === "motoclub") {
+      const [club] = await db
+        .select({ id: motoClubs.id })
+        .from(motoClubs)
+        .where(eq(motoClubs.conversationId, conversationId))
+        .limit(1);
+
+      if (club) {
+        const [membership] = await db
+          .select({ role: motoClubMembers.role })
+          .from(motoClubMembers)
+          .where(and(
+            eq(motoClubMembers.clubId, club.id),
+            eq(motoClubMembers.userId, userId),
+            eq(motoClubMembers.status, "active"),
+          ))
+          .limit(1);
+
+        const role = membership?.role ?? "";
+        const isClubAdmin = role === "owner" || role === "admin" || role === "founder" || role === "president";
+        if (!isClubAdmin) {
+          return sendError(res, 403, "Solo l'owner o l'admin del club può eliminare la chat del motoclub");
+        }
+      }
+    }
+
+    const participants = await db
+      .select({ userId: conversationParticipants.userId })
+      .from(conversationParticipants)
+      .where(eq(conversationParticipants.conversationId, conversationId));
+
+    await storage.deleteConversation(conversationId);
+
+    if (conversation.conversationType === "motoclub") {
+      await db
+        .update(motoClubs)
+        .set({ conversationId: null, updatedAt: new Date() })
+        .where(eq(motoClubs.conversationId, conversationId));
+    }
+
+    for (const p of participants) {
+      invalidateConvCache(p.userId);
+    }
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error("Delete conversation error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
