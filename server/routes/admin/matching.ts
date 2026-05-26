@@ -58,7 +58,7 @@ router.get("/gps-rejections", async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/matching-stats", async (_req: Request, res: Response) => {
+async function getMatchingStats(_req: Request, res: Response) {
   try {
     const client = await pool.connect();
     try {
@@ -95,7 +95,45 @@ router.get("/matching-stats", async (_req: Request, res: Response) => {
   } catch (_error) {
     return sendError(res, 500, "Errore lettura statistiche matching");
   }
+}
+
+router.get("/stats", async (_req: Request, res: Response) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const bbRes = await client.query<{ cnt: string }>(`
+        SELECT COUNT(*) AS cnt FROM biker_biker_matches
+        WHERE motorcycle_brand NOT IN ('musica', 'musica_zav')
+      `);
+      const musicRes = await client.query<{ cnt: string }>(`
+        SELECT COUNT(*) AS cnt FROM biker_biker_matches
+        WHERE motorcycle_brand IN ('musica', 'musica_zav')
+      `);
+      const bzRes = await client.query<{ cnt: string }>(`
+        SELECT COUNT(*) AS cnt FROM biker_zavorrina_matches
+      `);
+      const lastRunRes = await client.query<{ last_run: string | null }>(`
+        SELECT MAX(created_at)::text AS last_run FROM (
+          SELECT created_at FROM biker_biker_matches
+          UNION ALL
+          SELECT created_at FROM biker_zavorrina_matches
+        ) t
+      `);
+      return res.json({
+        totalBikerBikerMatches: parseInt(bbRes.rows[0]?.cnt ?? "0", 10),
+        totalMusicMatches: parseInt(musicRes.rows[0]?.cnt ?? "0", 10),
+        totalZavarrinaMatches: parseInt(bzRes.rows[0]?.cnt ?? "0", 10),
+        lastRunAt: lastRunRes.rows[0]?.last_run ?? null,
+      });
+    } finally {
+      client.release();
+    }
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura statistiche matching");
+  }
 });
+
+router.get("/matching-stats", getMatchingStats);
 
 router.get("/match-settings", async (_req: Request, res: Response) => {
   try {
@@ -372,6 +410,15 @@ router.post("/matches/recalculate-all", async (_req: Request, res: Response) => 
 });
 
 router.post("/force-matching", async (_req: Request, res: Response) => {
+  try {
+    triggerMatchingRun();
+    return sendSuccess(res, { status: "triggered" });
+  } catch (_error) {
+    return sendError(res, 500, "Errore avvio matching");
+  }
+});
+
+router.post("/trigger", async (_req: Request, res: Response) => {
   try {
     triggerMatchingRun();
     return sendSuccess(res, { status: "triggered" });

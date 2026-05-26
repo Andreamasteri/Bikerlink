@@ -36,8 +36,13 @@ router.get("/", async (_req: Request, res: Response) => {
 
 router.get("/email-config", async (_req: Request, res: Response) => {
   try {
-    const setting = await storage.getAppSetting("email_config");
-    return res.json(setting?.value || {});
+    const userSetting = await storage.getAppSetting("gmail_user");
+    const passSetting = await storage.getAppSetting("gmail_app_password");
+    return res.json({
+      gmailUser: userSetting?.value || null,
+      gmailAppPassword: passSetting?.value ? "••••••••" : null,
+      configured: !!(userSetting?.value && passSetting?.value),
+    });
   } catch (_error) {
     return sendError(res, 500, "Errore lettura config email");
   }
@@ -47,8 +52,20 @@ router.put("/email-config", async (req: Request, res: Response) => {
   try {
     const parsedEc = emailConfigSchema.safeParse(req.body);
     if (!parsedEc.success) return sendError(res, 400, parsedEc.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("email_config", undefined, parsedEc.data);
-    return res.json(setting);
+    const { gmailUser, gmailAppPassword, adminPassword } = parsedEc.data;
+
+    const userId = req.session?.userId;
+    if (!userId) return sendError(res, 401, "Non autenticato");
+    const user = await storage.getUser(userId);
+    if (!user) return sendError(res, 401, "Utente non trovato");
+    if (user.role !== "admin") return sendError(res, 403, "Accesso riservato agli admin");
+    const valid = await bcrypt.compare(adminPassword, user.password);
+    if (!valid) return sendError(res, 403, "Password admin non valida");
+
+    if (gmailUser !== undefined) await storage.upsertAppSetting("gmail_user", gmailUser ?? "");
+    if (gmailAppPassword !== undefined) await storage.upsertAppSetting("gmail_app_password", gmailAppPassword ?? "");
+
+    return res.json({ ok: true });
   } catch (_error) {
     return sendError(res, 500, "Errore salvataggio config email");
   }
@@ -276,9 +293,21 @@ router.post("/privacy-policy/upload", eulaUpload.single("file"), async (req: Req
 router.get("/bg-location", async (_req: Request, res: Response) => {
   try {
     const setting = await storage.getAppSetting("bg_location_settings");
-    return res.json(setting?.value || {});
+    return res.json(setting?.valueJson || setting?.value || {});
   } catch (_error) {
     return sendError(res, 500, "Errore lettura bg-location settings");
+  }
+});
+
+router.patch("/bg-location", async (req: Request, res: Response) => {
+  try {
+    const current = await storage.getAppSetting("bg_location_settings");
+    const existing = (current?.valueJson as Record<string, unknown>) || {};
+    const updated = { ...existing, ...req.body };
+    await storage.upsertAppSetting("bg_location_settings", undefined, updated);
+    return res.json(updated);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio bg-location settings");
   }
 });
 
