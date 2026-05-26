@@ -1,6 +1,5 @@
 import React, { useRef, useCallback, useEffect, useState, forwardRef, useImperativeHandle } from "react";
-import { View, Pressable, StyleSheet, ActivityIndicator } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { View, StyleSheet, ActivityIndicator } from "react-native";
 import WebView from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
 import { getApiUrl } from "@/lib/query-client";
@@ -8,6 +7,7 @@ import { buildMapLibreInteractiveHtml } from "@/lib/maplibre/map-builder";
 import { getMapLibreStyleExpr, buildMapLibreStyle } from "@/lib/maplibre/tile-config";
 import { parseMessage } from "@/lib/maplibre/bridge-events";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
+import { MapControls } from "@/components/map/MapControls";
 import { MapStyleToggle } from "@/components/MapStyleToggle";
 import { useMapStyle } from "@/hooks/useMapStyle";
 import { MAP_STYLE_PRESETS } from "@/lib/maplibre/style-presets";
@@ -18,7 +18,7 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
   function MapLibreInteractiveMap(
     {
       users = [], easterEggs = [], workshops: _workshops = [], activeSosRequests: _activeSosRequests = [],
-      isAvailable: _isAvailable, ghostMode: _ghostMode = false, searchRadiusKm,
+      isAvailable, ghostMode = false, searchRadiusKm,
       filterBiker, filterZavorrina, filterBarTopOffset,
       onToggleFilterBiker, onToggleFilterZavorrina,
       onUserPress, onEasterEggPress, onReady, currentUserId,
@@ -140,11 +140,11 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
             <ActivityIndicator size="small" color={Colors.accent} />
           </View>
         )}
-        {realMeMarker && mapReady && (
-          <Pressable style={styles.centerBtn} onPress={handleCenterOnUser}>
-            <Ionicons name="locate" size={20} color={Colors.text} />
-          </Pressable>
-        )}
+        <MapControls
+          isAvailable={isAvailable}
+          ghostMode={ghostMode}
+          onCenterOnUser={handleCenterOnUser}
+        />
         {mapReady && (
           <MapStyleToggle currentStyleId={styleId} onSelectStyle={setStyle} />
         )}
@@ -170,21 +170,5 @@ const styles = StyleSheet.create({
   loadingOverlay: {
     position: "absolute", top: 16, right: 16,
     backgroundColor: Colors.surface, borderRadius: 20, padding: 8,
-  },
-  centerBtn: {
-    position: "absolute",
-    bottom: 80,
-    right: 16,
-    backgroundColor: Colors.surface,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
   },
 });
