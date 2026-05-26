@@ -254,6 +254,58 @@ router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/privacy-rules', _requireAdmin, async (_req: Request, res: Response) => {
+  try {
+    const [showDistance, offlineRandomize, mapFilter] = await Promise.all([
+      storage.getAppSetting("show_distance_counter"),
+      storage.getAppSetting("offline_position_randomize"),
+      storage.getAppSetting("map_visibility_filter"),
+    ]);
+    return res.json({
+      showDistanceInCounter: showDistance?.valueJson === true || showDistance?.value === "true" || (showDistance == null ? true : false),
+      offlinePositionRandomize: offlineRandomize?.valueJson === true || offlineRandomize?.value === "true" || (offlineRandomize == null ? true : false),
+      mapVisibilityFilter: (mapFilter?.value as string) || "all",
+    });
+  } catch (_error) {
+    console.error("[admin] GET /privacy-rules error:", _error);
+    return sendError(res, 500, "Errore lettura regole privacy");
+  }
+});
+
+router.patch('/privacy-rules', _requireAdmin, async (req: Request, res: Response) => {
+  try {
+    const { showDistanceInCounter, offlinePositionRandomize, mapVisibilityFilter } = req.body as {
+      showDistanceInCounter?: boolean;
+      offlinePositionRandomize?: boolean;
+      mapVisibilityFilter?: string;
+    };
+    const updates: Promise<unknown>[] = [];
+    if (typeof showDistanceInCounter === "boolean") {
+      updates.push(storage.upsertAppSetting("show_distance_counter", undefined, showDistanceInCounter));
+    }
+    if (typeof offlinePositionRandomize === "boolean") {
+      updates.push(storage.upsertAppSetting("offline_position_randomize", undefined, offlinePositionRandomize));
+    }
+    if (typeof mapVisibilityFilter === "string" && ["all", "online_only", "available_only"].includes(mapVisibilityFilter)) {
+      updates.push(storage.upsertAppSetting("map_visibility_filter", mapVisibilityFilter));
+    }
+    await Promise.all(updates);
+    const [showDistance, offlineRandomize, mapFilter] = await Promise.all([
+      storage.getAppSetting("show_distance_counter"),
+      storage.getAppSetting("offline_position_randomize"),
+      storage.getAppSetting("map_visibility_filter"),
+    ]);
+    return res.json({
+      showDistanceInCounter: showDistance?.valueJson === true || showDistance?.value === "true" || (showDistance == null ? true : false),
+      offlinePositionRandomize: offlineRandomize?.valueJson === true || offlineRandomize?.value === "true" || (offlineRandomize == null ? true : false),
+      mapVisibilityFilter: (mapFilter?.value as string) || "all",
+    });
+  } catch (_error) {
+    console.error("[admin] PATCH /privacy-rules error:", _error);
+    return sendError(res, 500, "Errore aggiornamento regole privacy");
+  }
+});
+
 router.use('/users', _requireAdmin, usersRouter);
 router.use('/settings', settingsRouter);
 router.use('/advertisements', _requireAdmin, adsRouter);

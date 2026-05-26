@@ -24,7 +24,7 @@ export default function AdminPrivacy() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
 
-  const { data, isLoading } = useQuery<PrivacyRules>({
+  const { data, isLoading, isError, refetch } = useQuery<PrivacyRules>({
     queryKey: ["/api/admin/privacy-rules"],
     staleTime: 30_000,
   });
@@ -44,10 +44,22 @@ export default function AdminPrivacy() {
     },
   });
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator color={colors.accent} />
+      </View>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <MaterialCommunityIcons name="alert-circle-outline" size={40} color={colors.textSecondary} />
+        <Text style={[styles.errorText, { color: colors.text }]}>Impossibile caricare le impostazioni</Text>
+        <TouchableOpacity onPress={() => refetch()} style={[styles.retryButton, { backgroundColor: colors.accent }]}>
+          <Text style={[styles.retryButtonText, { color: "#fff" }]}>Riprova</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -154,4 +166,7 @@ const styles = StyleSheet.create({
   optionDescription: { fontSize: 12, fontFamily: "Inter_400Regular", marginTop: 2 },
   savingRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 8 },
   savingText: { marginLeft: 8, fontSize: 13, fontFamily: "Inter_400Regular" },
+  errorText: { fontSize: 15, fontFamily: "Inter_500Medium", marginTop: 12, marginBottom: 20, textAlign: "center" },
+  retryButton: { paddingHorizontal: 24, paddingVertical: 10, borderRadius: 8 },
+  retryButtonText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });
