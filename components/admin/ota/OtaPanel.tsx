@@ -32,8 +32,12 @@ interface OtaRelease {
 
 function extractOtaNumber(release: OtaRelease, fallbackIndex: number): string {
   if (release.otaVersion) {
-    const match = release.otaVersion.match(/OTA-?(\d+)/i);
-    if (match) return match[1];
+    // Nuovo formato: BUILD.RUNTIME.OTA (es. 53.10.9) → terzo segmento
+    const triplet = release.otaVersion.match(/^\d+\.\d+\.(\d+)$/);
+    if (triplet) return triplet[1];
+    // Legacy: "OTA-9" o "OTA9"
+    const legacy = release.otaVersion.match(/OTA-?(\d+)/i);
+    if (legacy) return legacy[1];
   }
   return String(fallbackIndex);
 }

@@ -74,7 +74,7 @@ APPROVED_COUNT=$(psql "$DATABASE_URL" -tAc "
 NEXT_OTA=$(( APPROVED_COUNT + 1 ))
 BUILD_NUM=$(node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode || 53)" 2>/dev/null || echo "53")
 RUNTIME_VER=$(node -e "const a=require('./app.json'); const rv=a.expo.runtimeVersion||'10.0.0'; console.log(rv.split('.')[0])" 2>/dev/null || echo "10")
-VERSION="${BUILD_NUM}.${NEXT_OTA}.${RUNTIME_VER}"
+VERSION="${BUILD_NUM}.${RUNTIME_VER}.${NEXT_OTA}"
 
 log_info "Build: ${BUILD_NUM} | NEXT_OTA: ${NEXT_OTA} | Versione: ${VERSION}"
 

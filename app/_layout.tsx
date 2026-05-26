@@ -30,6 +30,7 @@ import "@/lib/background-telemetry-task";
 
 import { useAppBootstrap } from "@/hooks/useAppBootstrap";
 import { usePostUpdateRefresh } from "@/hooks/usePostUpdateRefresh";
+import { useOtaAutoUpdate } from "@/hooks/useOtaAutoUpdate";
 import { RootProviders } from "@/components/RootProviders";
 import { AppStateHandler } from "@/components/layout/AppStateHandler";
 import { BackgroundNotificationHandler } from "@/components/layout/BackgroundNotificationHandler";
@@ -231,6 +232,7 @@ function reportClientError(error: Error, componentStack: string) {
 
 export default function RootLayout() {
   const { ready } = useAppBootstrap();
+  useOtaAutoUpdate();
   usePostUpdateRefresh();
 
   useEffect(() => {
