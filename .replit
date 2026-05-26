@@ -47,14 +47,6 @@ args = "typecheck"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "file-conflict-guard"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "healthcheck"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "typecheck-server"
 
 [[workflows.workflow.tasks]]
@@ -67,15 +59,23 @@ args = "eslint"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
+args = "typecheck-client"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
 args = "apostrophe-check"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "hooks-check"
+args = "file-conflict-guard"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "typecheck-client"
+args = "healthcheck"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "hooks-check"
 
 [[workflows.workflow]]
 name = "Start App"
@@ -136,28 +136,6 @@ task = "shell.exec"
 args = "bash scripts/typecheck.sh"
 
 [[workflows.workflow]]
-name = "file-conflict-guard"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsx scripts/check-file-conflicts.ts"
-
-[[workflows.workflow]]
-name = "healthcheck"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/check-runtime-health.sh"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
 name = "typecheck-server"
 author = "agent"
 
@@ -191,6 +169,17 @@ task = "shell.exec"
 args = "bash scripts/eslint-hooks-check.sh"
 
 [[workflows.workflow]]
+name = "typecheck-client"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/typecheck-client.sh"
+
+[[workflows.workflow]]
 name = "apostrophe-check"
 author = "agent"
 
@@ -199,7 +188,29 @@ task = "shell.exec"
 args = "bash scripts/check-script-apostrophes.sh"
 
 [workflows.workflow.metadata]
-isValidation = true
+outputType = "console"
+
+[[workflows.workflow]]
+name = "file-conflict-guard"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/check-file-conflicts.ts"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "healthcheck"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "bash scripts/check-runtime-health.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[workflows.workflow]]
 name = "hooks-check"
@@ -210,18 +221,7 @@ task = "shell.exec"
 args = "bash scripts/eslint-hooks-check.sh"
 
 [workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
-name = "typecheck-client"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/typecheck-client.sh"
+outputType = "console"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
