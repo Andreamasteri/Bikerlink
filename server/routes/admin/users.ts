@@ -454,7 +454,7 @@ router.get("/match-summary", async (req: Request, res: Response) => {
       FROM users u
       LEFT JOIN LATERAL (
         SELECT COUNT(*) as cnt FROM biker_biker_matches m
-        WHERE m.biker_id_1 = u.id OR m.biker_id_2 = u.id
+        WHERE m.biker1_id = u.id OR m.biker2_id = u.id
       ) bb ON true
       LEFT JOIN LATERAL (
         SELECT COUNT(*) as cnt FROM biker_zavorrina_matches m
