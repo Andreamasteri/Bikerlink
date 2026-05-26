@@ -1,11 +1,25 @@
+// Terrarium tiles AWS Open Data — gratuiti, nessuna API key richiesta.
+// Fallback free OK per prototipo; in produzione preferire MapTiler terrain
+// (https://cloud.maptiler.com/tiles/terrain-rgb/) per risoluzione superiore.
 const FALLBACK_DEM_URL =
   "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png";
 
 const SATELLITE_TILES_URL =
   "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
+/**
+ * Restituisce l'URL dei DEM tiles per il terrain 3D.
+ * Usa `MAPLIBRE_DEM_URL` se configurato, altrimenti fallback ai terrarium tiles
+ * AWS Open Data (gratuiti, nessuna API key necessaria).
+ */
 export function getDem3dTileUrl(): string {
   return process.env.MAPLIBRE_DEM_URL ?? FALLBACK_DEM_URL;
+}
+
+/** Indica la sorgente DEM attiva: "custom" se MAPLIBRE_DEM_URL è impostata, "aws-free" altrimenti. */
+export function getDemSource(): "custom" | "aws-free" {
+  const url = process.env.MAPLIBRE_DEM_URL;
+  return url && url.length > 4 ? "custom" : "aws-free";
 }
 
 export function get3DInitScript(demUrl: string): string {

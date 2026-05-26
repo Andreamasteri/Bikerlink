@@ -11,6 +11,7 @@ interface RendererCardProps {
   rendererNotes: string;
   isPending: boolean;
   tileSourceStatus?: "maptiler" | "demo";
+  demSource?: "custom" | "aws-free";
   onRendererChange: (renderer: MapsRendererId, tile: MapsTileId) => void;
 }
 
@@ -54,7 +55,7 @@ function OptionRow<T extends string>({
   );
 }
 
-export function RendererCard({ renderer, tile, rendererNotes, isPending, tileSourceStatus, onRendererChange }: RendererCardProps) {
+export function RendererCard({ renderer, tile, rendererNotes, isPending, tileSourceStatus, demSource, onRendererChange }: RendererCardProps) {
   const [expanded, setExpanded] = React.useState(false);
   const [localTile, setLocalTile] = React.useState<MapsTileId>(tile);
 
@@ -88,6 +89,7 @@ export function RendererCard({ renderer, tile, rendererNotes, isPending, tileSou
             <Text style={styles.srcText}>{tileSourceStatus === "maptiler" ? "● MapTiler" : "● Demo"}</Text>
           </View>
         )}
+        {!!demSource && <View style={demSource === "custom" ? styles.srcMaptiler : styles.srcDemo}><Text style={styles.srcText}>{demSource === "custom" ? "DEM: custom" : "DEM: AWS free"}</Text></View>}
       </View>
 
       {!!rendererNotes && (

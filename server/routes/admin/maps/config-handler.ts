@@ -7,6 +7,7 @@ import {
 } from "./options";
 import type { MapsRendererId, MapsTileId, RoutingEngineId, RoutingProfileId, MapsRollout } from "@shared/maps-config";
 import { checkQuota } from "../../../routing/mapbox/quota-guard";
+import { getDemSource } from "../../../../lib/maplibre/style-3d";
 
 const router = Router();
 
@@ -57,6 +58,7 @@ router.get("/config", async (_req: Request, res: Response) => {
       routing,
       profile: (profileSetting?.value ?? DEFAULT_PROFILE) as RoutingProfileId,
       tile_source_status: tileSourceStatus,
+      dem_source: getDemSource(),
       renderer_notes: "Renderer sperimentali sono stub — delegano a Leaflet.",
       routing_notes: "Engine sperimentali sono stub — delegano a GraphHopper.",
       osm_last_updated_at: osmSetting?.value ?? null,

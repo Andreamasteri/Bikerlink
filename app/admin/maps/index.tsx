@@ -19,6 +19,7 @@ interface AdminMapsConfig {
   renderer_notes: string;
   routing_notes: string;
   tile_source_status?: "maptiler" | "demo";
+  dem_source?: "custom" | "aws-free";
   osm_last_updated_at: string | null;
   mapbox_quota?: {
     used: number;
@@ -115,6 +116,7 @@ export default function AdminMapsPage() {
         tile={data.tile}
         rendererNotes={data.renderer_notes}
         tileSourceStatus={data.tile_source_status}
+        demSource={data.dem_source}
         isPending={rendererMutation.isPending}
         onRendererChange={(renderer, tile) => rendererMutation.mutate({ renderer, tile })}
       />
