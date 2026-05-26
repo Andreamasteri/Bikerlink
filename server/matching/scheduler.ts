@@ -154,6 +154,24 @@ export function getLastMatchingCycleMeta() {
   return lastCycleMeta;
 }
 
+export function getMatchingLockState() {
+  return {
+    isRunning: isMatchingRunning,
+    lastStartAt: lastMatchingStart,
+    lastStartIso: lastMatchingStart ? new Date(lastMatchingStart).toISOString() : null,
+    elapsedMs: lastMatchingStart ? Date.now() - lastMatchingStart : null,
+  };
+}
+
+export function forceUnlockMatching(): { wasRunning: boolean; lastStartAt: number | null } {
+  const wasRunning = isMatchingRunning;
+  const lastStartAt = lastMatchingStart;
+  isMatchingRunning = false;
+  lastMatchingStart = null;
+  console.warn(`[Matching] forceUnlockMatching invocato — wasRunning=${wasRunning}, lastStartAt=${lastStartAt}`);
+  return { wasRunning, lastStartAt };
+}
+
 export function triggerMatchingRun(): { started: boolean; reason?: string } {
   if (isMatchingRunning) {
     return { started: false, reason: "already_running" };

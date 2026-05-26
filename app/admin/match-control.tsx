@@ -42,6 +42,13 @@ interface MatchingStatsResponse {
   bikerZavorrina: { new: number; accepted: number; rejected: number; total: number };
 }
 
+interface LockStateResponse {
+  isRunning: boolean;
+  lastStartAt: number | null;
+  lastStartIso: string | null;
+  elapsedMs: number | null;
+}
+
 function formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleString("it-IT", {
@@ -62,6 +69,8 @@ export default function MatchControlScreen() {
   const queryClient = useQueryClient();
   const [recalcStatus, setRecalcStatus] = useState<"idle" | "running" | "done">("idle");
   const [resetStatus, setResetStatus] = useState<"idle" | "running" | "done">("idle");
+  const [resetMatchesStatus, setResetMatchesStatus] = useState<"idle" | "running" | "done">("idle");
+  const [unlockStatus, setUnlockStatus] = useState<"idle" | "running" | "done">("idle");
 
   const { data, isLoading, refetch } = useQuery<MatchSettingsResponse>({
     queryKey: ["/api/admin/match-settings"],
@@ -73,6 +82,12 @@ export default function MatchControlScreen() {
     queryKey: ["/api/admin/matching-stats"],
     refetchInterval: 30000,
     staleTime: 10000,
+  });
+
+  const { data: lockState, refetch: refetchLock } = useQuery<LockStateResponse>({
+    queryKey: ["/api/admin/matching/lock-state"],
+    refetchInterval: 5000,
+    staleTime: 2000,
   });
 
   const toggleMutation = useMutation({
@@ -111,6 +126,80 @@ export default function MatchControlScreen() {
             } catch {
               setResetStatus("idle");
               Alert.alert("Errore", "Impossibile resettare le preferenze.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleForceUnlock = () => {
+    Alert.alert(
+      "Forza sblocco engine",
+      "Resetta il lock 'isMatchingRunning' senza riavviare il server. Usare se il motore risulta bloccato 'already_running' dopo un crash o un ciclo molto lungo.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Sblocca",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setUnlockStatus("running");
+              const res = await apiRequest("POST", "/api/admin/matching/force-unlock");
+              const json = await res.json();
+              setUnlockStatus("done");
+              const wasRunning = json?.before?.isRunning ?? json?.unlock?.wasRunning ?? false;
+              const elapsedSec = json?.before?.elapsedMs ? Math.round(json.before.elapsedMs / 1000) : null;
+              Alert.alert(
+                "Engine sbloccato",
+                wasRunning
+                  ? `Lock rimosso${elapsedSec != null ? ` (era bloccato da ${elapsedSec}s)` : ""}.`
+                  : "Il lock era già libero. Stato resettato comunque.",
+              );
+              setTimeout(() => setUnlockStatus("idle"), 3000);
+              refetchLock();
+            } catch {
+              setUnlockStatus("idle");
+              Alert.alert("Errore", "Impossibile sbloccare l'engine.");
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleResetMatches = () => {
+    Alert.alert(
+      "Reset completo match",
+      "ATTENZIONE: elimina TUTTE le righe da biker_biker_matches e biker_zavorrina_matches e sblocca l'engine. Gli utenti perderanno tutti i match esistenti (nuovi, accettati, rifiutati). Operazione irreversibile.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Elimina tutto",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              setResetMatchesStatus("running");
+              const res = await apiRequest("DELETE", "/api/admin/reset-matches");
+              const json = await res.json();
+              setResetMatchesStatus("done");
+              const bb = json?.deleted?.bikerBiker ?? 0;
+              const bz = json?.deleted?.bikerZavorrina ?? 0;
+              const wasRunning = json?.unlock?.wasRunning ?? false;
+              Alert.alert(
+                "Match eliminati",
+                `Eliminati ${bb} biker-biker + ${bz} biker-zavarrina (totale ${bb + bz}).${
+                  wasRunning ? "\nLock 'isMatchingRunning' rimosso." : ""
+                }`,
+              );
+              setTimeout(() => setResetMatchesStatus("idle"), 3000);
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/matching-stats"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/match-settings"] });
+              refetch();
+              refetchLock();
+            } catch {
+              setResetMatchesStatus("idle");
+              Alert.alert("Errore", "Impossibile eseguire il reset dei match.");
             }
           },
         },
@@ -270,9 +359,33 @@ export default function MatchControlScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Motore Matching</Text>
-          <TouchableOpacity onPress={() => refetch()} style={styles.refreshBtn}>
+          <TouchableOpacity onPress={() => { refetch(); refetchLock(); }} style={styles.refreshBtn}>
             <Ionicons name="refresh" size={15} color={Colors.accent} />
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.lockCard}>
+          <MaterialCommunityIcons
+            name={lockState?.isRunning ? "lock" : "lock-open-variant"}
+            size={20}
+            color={lockState?.isRunning ? Colors.warning : Colors.success}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.lockTitle}>
+              Lock engine: {lockState?.isRunning ? "BLOCCATO" : "libero"}
+            </Text>
+            {lockState?.isRunning && lockState.elapsedMs != null && (
+              <Text style={styles.lockSubtitle}>
+                In esecuzione da {Math.floor(lockState.elapsedMs / 1000)}s
+                {lockState.elapsedMs > 5 * 60 * 1000 && " — sospetto stallo"}
+              </Text>
+            )}
+            {!lockState?.isRunning && lockState?.lastStartIso && (
+              <Text style={styles.lockSubtitle}>
+                Ultimo avvio: {formatDate(lockState.lastStartIso)}
+              </Text>
+            )}
+          </View>
         </View>
 
         <TouchableOpacity
@@ -298,6 +411,58 @@ export default function MatchControlScreen() {
               : recalcStatus === "done"
               ? "Ciclo avviato!"
               : "Ricalcola tutto"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.unlockBtn,
+            unlockStatus === "running" && { opacity: 0.7 },
+            unlockStatus === "done" && { backgroundColor: Colors.success, borderColor: Colors.success },
+          ]}
+          onPress={handleForceUnlock}
+          disabled={unlockStatus === "running"}
+          activeOpacity={0.8}
+        >
+          {unlockStatus === "running" ? (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          ) : unlockStatus === "done" ? (
+            <Ionicons name="checkmark-circle" size={20} color="#fff" />
+          ) : (
+            <MaterialCommunityIcons name="lock-open-variant" size={20} color={Colors.accent} />
+          )}
+          <Text style={[styles.unlockText, unlockStatus === "done" && { color: "#fff" }]}>
+            {unlockStatus === "running"
+              ? "Sblocco in corso..."
+              : unlockStatus === "done"
+              ? "Engine sbloccato!"
+              : "Forza sblocco engine"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.dangerBtn,
+            resetMatchesStatus === "running" && { opacity: 0.7 },
+            resetMatchesStatus === "done" && { backgroundColor: Colors.success, borderColor: Colors.success },
+          ]}
+          onPress={handleResetMatches}
+          disabled={resetMatchesStatus === "running"}
+          activeOpacity={0.8}
+        >
+          {resetMatchesStatus === "running" ? (
+            <ActivityIndicator size="small" color={Colors.error} />
+          ) : resetMatchesStatus === "done" ? (
+            <Ionicons name="checkmark-circle" size={20} color="#fff" />
+          ) : (
+            <MaterialCommunityIcons name="delete-sweep" size={20} color={Colors.error} />
+          )}
+          <Text style={[styles.dangerText, resetMatchesStatus === "done" && { color: "#fff" }]}>
+            {resetMatchesStatus === "running"
+              ? "Eliminazione in corso..."
+              : resetMatchesStatus === "done"
+              ? "Match eliminati!"
+              : "Reset completo match (DB)"}
           </Text>
         </TouchableOpacity>
 
@@ -559,6 +724,46 @@ const styles = StyleSheet.create({
     borderColor: Colors.warning + "55",
   },
   resetAllText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.warning },
+  lockCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 12,
+  },
+  lockTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text },
+  lockSubtitle: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  unlockBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    backgroundColor: Colors.accent + "15",
+    borderRadius: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.accent + "55",
+  },
+  unlockText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.accent },
+  dangerBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    backgroundColor: Colors.error + "15",
+    borderRadius: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.error + "55",
+  },
+  dangerText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.error },
   anomalyBanner: {
     flexDirection: "row",
     alignItems: "center",

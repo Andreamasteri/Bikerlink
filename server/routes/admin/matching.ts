@@ -4,6 +4,7 @@ import { gpsRejectionStats, bikerZavarrinaMatches, bikerBikerMatches, matchPrefe
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { desc, sql } from "drizzle-orm";
 import { triggerMatchingRun, getLastMatchingCycleMeta } from "../../matching-engine";
+import { forceUnlockMatching, getMatchingLockState } from "../../matching/scheduler";
 import { storage } from "../../storage";
 import {
   captureSchemaSnapshot,
@@ -459,11 +460,43 @@ router.get("/matching/stats", async (_req: Request, res: Response) => {
 
 router.delete("/reset-matches", async (_req: Request, res: Response) => {
   try {
-    await db.delete(bikerZavarrinaMatches);
-    await db.delete(bikerBikerMatches);
-    return sendSuccess(res);
-  } catch (_error) {
+    const bzDeleted = await db.delete(bikerZavarrinaMatches).returning({ id: bikerZavarrinaMatches.id });
+    const bbDeleted = await db.delete(bikerBikerMatches).returning({ id: bikerBikerMatches.id });
+    const unlock = forceUnlockMatching();
+    console.log(
+      `[admin/reset-matches] biker_biker=${bbDeleted.length}, biker_zavorrina=${bzDeleted.length}, wasRunning=${unlock.wasRunning}`
+    );
+    return res.json({
+      success: true,
+      deleted: {
+        bikerBiker: bbDeleted.length,
+        bikerZavorrina: bzDeleted.length,
+        total: bbDeleted.length + bzDeleted.length,
+      },
+      unlock,
+    });
+  } catch (error) {
+    console.error("[admin/reset-matches] error:", error);
     return sendError(res, 500, "Errore reset match");
+  }
+});
+
+router.post("/matching/force-unlock", async (_req: Request, res: Response) => {
+  try {
+    const before = getMatchingLockState();
+    const unlock = forceUnlockMatching();
+    return res.json({ success: true, before, unlock });
+  } catch (error) {
+    console.error("[admin/matching/force-unlock] error:", error);
+    return sendError(res, 500, "Errore force-unlock matching");
+  }
+});
+
+router.get("/matching/lock-state", async (_req: Request, res: Response) => {
+  try {
+    return res.json(getMatchingLockState());
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura lock state");
   }
 });
 
