@@ -1,5 +1,45 @@
 import { htmlHead, mapScriptWrap } from "./map-builder";
 
+/**
+ * Snippet JS condiviso dalle mappe secondarie per emettere lo stato della
+ * camera (zoom/bearing/centro) verso React. Permette al MapZoomSlider e al
+ * MapNorthCompass di stare in sync senza polling.
+ */
+export const VIEW_STATE_BRIDGE_SCRIPT = `
+    function postViewState() {
+      var c = map.getCenter();
+      postMsg({
+        type: "viewState",
+        zoom: map.getZoom(),
+        minZoom: map.getMinZoom(),
+        maxZoom: map.getMaxZoom(),
+        bearing: map.getBearing(),
+        lat: c.lat,
+        lng: c.lng
+      });
+    }
+    map.on("zoomend", postViewState);
+    map.on("rotateend", postViewState);
+    map.on("moveend", postViewState);
+    postViewState();
+`;
+
+/**
+ * Handler bridge che MapZoomSlider/MapNorthCompass invocano per cambiare
+ * zoom/bearing. Vanno aggiunti dopo che `window.mlBridge` è stato definito.
+ */
+export const ZOOM_BEARING_BRIDGE_HANDLERS_SCRIPT = `
+    window.mlBridge = window.mlBridge || {};
+    window.mlBridge.setZoom = function(payload) {
+      var level = typeof payload === "object" && payload !== null ? payload.zoom : Number(payload);
+      if (typeof level !== "number" || !isFinite(level)) return;
+      map.setZoom(level);
+    };
+    window.mlBridge.resetBearing = function() {
+      map.easeTo({ bearing: 0, pitch: 0, duration: 400 });
+    };
+`;
+
 export function buildMapLibreRouteHtml(
   styleVar: string,
   waypoints: Array<{ lat: number; lng: number; name?: string }>,
@@ -44,6 +84,8 @@ ${mapScriptWrap(styleVar, "{}", `
       el.textContent = label;
       new maplibregl.Marker({ element: el }).setLngLat([wp.lng, wp.lat]).addTo(map);
     });
+    ${ZOOM_BEARING_BRIDGE_HANDLERS_SCRIPT}
+    ${VIEW_STATE_BRIDGE_SCRIPT}
 `)}`;
 }
 
@@ -103,6 +145,8 @@ ${mapScriptWrap(styleVar, `{ center: [${initialLng}, ${initialLat}], zoom: ${ini
         }
       },
     };
+    ${ZOOM_BEARING_BRIDGE_HANDLERS_SCRIPT}
+    ${VIEW_STATE_BRIDGE_SCRIPT}
 `)}`;
 }
 

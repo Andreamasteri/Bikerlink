@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback, useEffect } from "react";
+import React, { useMemo, useRef, useCallback, useEffect, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import WebView from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
@@ -8,6 +8,8 @@ import { getTileConfig } from "@/lib/map-tiles";
 import { buildMapLibrePickerHtml } from "@/lib/maplibre/secondary-builders";
 import { getMapLibreStyleExpr } from "@/lib/maplibre/tile-config";
 import { parseMessage } from "@/lib/maplibre/bridge-events";
+import { MapZoomSlider } from "@/components/map/MapZoomSlider";
+import { MapNorthCompass } from "@/components/map/MapNorthCompass";
 import Colors from "@/constants/colors";
 import type { PickerMapProps } from "@/lib/maps/types";
 
@@ -31,6 +33,9 @@ export default function MapLibrePickerMap({
   const initialCoordRef = useRef(selectedCoord);
   const onFatalErrorRef = useRef(onFatalError);
   onFatalErrorRef.current = onFatalError;
+  const [viewState, setViewState] = useState({
+    zoom: initialZoom, minZoom: 0, maxZoom: 22, bearing: 0, lat: initialLat, lng: initialLng,
+  });
 
   const mapHtml = useMemo(
     () => buildMapLibrePickerHtml(
@@ -55,6 +60,15 @@ export default function MapLibrePickerMap({
     if (!msg) return;
     if (msg.type === "coordPicked" && msg.lat != null && msg.lng != null) {
       onCoordPicked({ latitude: msg.lat, longitude: msg.lng });
+    } else if (msg.type === "viewState" && msg.zoom != null) {
+      setViewState({
+        zoom: msg.zoom,
+        minZoom: msg.minZoom ?? 0,
+        maxZoom: msg.maxZoom ?? 22,
+        bearing: msg.bearing ?? 0,
+        lat: msg.lat ?? 0,
+        lng: msg.lng ?? 0,
+      });
     } else if (msg.type === "error") {
       onFatalErrorRef.current?.();
     }
@@ -63,6 +77,17 @@ export default function MapLibrePickerMap({
   const handleWebViewError = useCallback(() => {
     onFatalErrorRef.current?.();
   }, []);
+
+  const handleZoomChange = useCallback((z: number) => {
+    setViewState((prev) => ({ ...prev, zoom: z }));
+    const payload = JSON.stringify({ zoom: z });
+    inject(`window.mlBridge && window.mlBridge.setZoom && window.mlBridge.setZoom(${payload})`);
+  }, [inject]);
+
+  const handleResetBearing = useCallback(() => {
+    setViewState((prev) => ({ ...prev, bearing: 0 }));
+    inject(`window.mlBridge && window.mlBridge.resetBearing && window.mlBridge.resetBearing()`);
+  }, [inject]);
 
   return (
     <View style={styles.fill}>
@@ -80,6 +105,19 @@ export default function MapLibrePickerMap({
         cacheEnabled={false}
         startInLoadingState={false}
         onError={handleWebViewError}
+      />
+      <MapZoomSlider
+        zoom={viewState.zoom}
+        minZoom={viewState.minZoom}
+        maxZoom={viewState.maxZoom}
+        latitude={viewState.lat}
+        topOffset={12}
+        onZoomChange={handleZoomChange}
+      />
+      <MapNorthCompass
+        bearing={viewState.bearing}
+        onResetBearing={handleResetBearing}
+        topOffset={12}
       />
     </View>
   );

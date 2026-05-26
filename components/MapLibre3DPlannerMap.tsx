@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback } from "react";
+import React, { useMemo, useRef, useCallback, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import WebView from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
@@ -11,6 +11,12 @@ import {
 } from "@/lib/maplibre/style-3d";
 import { get3DBridgeHandlersScript } from "@/lib/maplibre/layer-controls";
 import { parseMessage } from "@/lib/maplibre/bridge-events";
+import {
+  VIEW_STATE_BRIDGE_SCRIPT,
+  ZOOM_BEARING_BRIDGE_HANDLERS_SCRIPT,
+} from "@/lib/maplibre/secondary-builders";
+import { MapZoomSlider } from "@/components/map/MapZoomSlider";
+import { MapNorthCompass } from "@/components/map/MapNorthCompass";
 import MapLibre3DLayerControls from "./MapLibre3DLayerControls";
 
 interface Props {
@@ -69,6 +75,8 @@ function buildPlannerHtml(
       trackPoints = Array.isArray(data) ? data : [];
       renderTrack();
     };
+    ${ZOOM_BEARING_BRIDGE_HANDLERS_SCRIPT}
+    ${VIEW_STATE_BRIDGE_SCRIPT}
   `;
   return `${htmlHead()}<body><script>${webGlScript}</script><div id="map"></div>${mapScriptWrap(
     styleExpr, '{ pitch: 45, zoom: 10 }', bodyScript
@@ -79,16 +87,32 @@ export default function MapLibre3DPlannerMap({ height, waypoints = [], trackPoin
   const webViewRef = useRef<WebView>(null);
   const onFatalErrorRef = useRef(onFatalError);
   onFatalErrorRef.current = onFatalError;
+  const [viewState, setViewState] = useState({
+    zoom: 10, minZoom: 0, maxZoom: 22, bearing: 0, lat: 45.5, lng: 10.5,
+  });
 
   const styleExpr = getMapLibreStyleExpr();
   const demUrl = getDem3dTileUrl();
   const mapHtml = useMemo(() => buildPlannerHtml(styleExpr, demUrl, waypoints, trackPoints), [styleExpr, demUrl, waypoints, trackPoints]);
+
+  const inject = useCallback((js: string) => {
+    webViewRef.current?.injectJavaScript(js + ";true;");
+  }, []);
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     const msg = parseMessage(event.nativeEvent.data);
     if (!msg) return;
     if (msg.type === "tap" && msg.lat != null && msg.lng != null) {
       onWaypointAdd?.(msg.lat, msg.lng);
+    } else if (msg.type === "viewState" && msg.zoom != null) {
+      setViewState({
+        zoom: msg.zoom,
+        minZoom: msg.minZoom ?? 0,
+        maxZoom: msg.maxZoom ?? 22,
+        bearing: msg.bearing ?? 0,
+        lat: msg.lat ?? 0,
+        lng: msg.lng ?? 0,
+      });
     } else if (msg.type === "error") {
       onFatalErrorRef.current?.();
     }
@@ -99,6 +123,17 @@ export default function MapLibre3DPlannerMap({ height, waypoints = [], trackPoin
       `(function(){try{var m=JSON.parse(${JSON.stringify(cmd)});if(window.mlBridge&&m.cmd&&typeof window.mlBridge[m.cmd]==="function")window.mlBridge[m.cmd](m.payload);}catch(e){}})();true;`
     );
   }, []);
+
+  const handleZoomChange = useCallback((z: number) => {
+    setViewState((prev) => ({ ...prev, zoom: z }));
+    const payload = JSON.stringify({ zoom: z });
+    inject(`window.mlBridge && window.mlBridge.setZoom && window.mlBridge.setZoom(${payload})`);
+  }, [inject]);
+
+  const handleResetBearing = useCallback(() => {
+    setViewState((prev) => ({ ...prev, bearing: 0 }));
+    inject(`window.mlBridge && window.mlBridge.resetBearing && window.mlBridge.resetBearing()`);
+  }, [inject]);
 
   const containerStyle = height != null ? [styles.wrapper, { height }] : styles.fill;
   return (
@@ -118,6 +153,19 @@ export default function MapLibre3DPlannerMap({ height, waypoints = [], trackPoin
         onError={() => onFatalErrorRef.current?.()}
       />
       <MapLibre3DLayerControls onCommand={handleCommand} />
+      <MapZoomSlider
+        zoom={viewState.zoom}
+        minZoom={viewState.minZoom}
+        maxZoom={viewState.maxZoom}
+        latitude={viewState.lat}
+        topOffset={12}
+        onZoomChange={handleZoomChange}
+      />
+      <MapNorthCompass
+        bearing={viewState.bearing}
+        onResetBearing={handleResetBearing}
+        topOffset={130}
+      />
     </View>
   );
 }
