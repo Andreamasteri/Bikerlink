@@ -8,8 +8,9 @@
 #
 # Cosa fa questo script:
 #   - Legge il messaggio da .ota-message
-#   - Pubblica l'OTA su EAS (canale staging, bundle Metro)
-#   - Approva automaticamente la release nel DB (status='approved')
+#   - Pubblica l'OTA su EAS canale PRODUCTION (bundle Metro, ~5-8 min)
+#   - L'APK riceve l'OTA direttamente da EAS (u.expo.dev) al prossimo avvio
+#   - Salva la release nel DB (tracking per pannello admin)
 #   - Aggiorna APPLIED_OTA_NUMBER in constants/buildInfo.ts
 #   - Fa il push su GitHub
 
@@ -142,32 +143,11 @@ else
   log_warn "IDs non estratti — approva manualmente dal pannello admin /admin/ota"
 fi
 
-# ── 7. Approva in produzione tramite webhook ────────────────────────────────
-if [[ -n "${OTA_PUBLISH_SECRET:-}" ]]; then
-  PROD_URL="${BIKERLINK_BACKEND_URL:-https://biker-link.replit.app}"
-  log_info "Chiamata webhook production ${PROD_URL}..."
-
-  WEBHOOK_RESP=$(curl -s -X POST "${PROD_URL}/api/ota/force-approve" \
-    -H "Authorization: Bearer ${OTA_PUBLISH_SECRET}" \
-    -H "Content-Type: application/json" \
-    -d "{\"easGroupId\":\"${GROUP_ID:-}\"}" \
-    --max-time 30 2>&1) || WEBHOOK_RESP="timeout/connessione fallita"
-
-  if echo "$WEBHOOK_RESP" | grep -q '"success":true'; then
-    log_ok "Production: OTA approvata e distribuita"
-  else
-    log_warn "Production webhook: ${WEBHOOK_RESP:-no response}"
-    log_warn "Approva manualmente da https://biker-link.replit.app (admin → OTA)"
-  fi
-else
-  log_warn "OTA_PUBLISH_SECRET non impostato — production non aggiornata"
-fi
-
-# ── 8. Svuota .ota-message dopo pubblicazione riuscita ───────────────────────
+# ── 7. Svuota .ota-message dopo pubblicazione riuscita ───────────────────────
 echo "" > "$MSG_FILE"
 log_ok ".ota-message svuotato (pronto per il prossimo OTA)"
 
-# ── 9. Push su GitHub ─────────────────────────────────────────────────────────
+# ── 8. Push su GitHub ─────────────────────────────────────────────────────────
 if [[ -n "${GITHUB_PAT:-}" ]]; then
   log_info "Push su GitHub..."
   git -c "credential.helper=!f() { echo username=x; echo password=${GITHUB_PAT}; }; f" \

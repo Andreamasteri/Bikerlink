@@ -40,7 +40,10 @@ async function getDirectApplySetting(): Promise<boolean> {
   return row?.value === "true";
 }
 
-async function syncStagingUpdates(): Promise<void> {
+// Sincronizza il branch EAS `production` nel DB locale per tracking admin.
+// La distribuzione effettiva è gestita da EAS (`u.expo.dev`) direttamente —
+// questa funzione serve SOLO per popolare il pannello admin con la cronologia.
+async function syncProductionUpdates(): Promise<void> {
   const query = `
     query GetBranchUpdates($appId: String!) {
       app {
@@ -70,11 +73,9 @@ async function syncStagingUpdates(): Promise<void> {
   }
 
   const branches = data?.app?.byId?.updateBranches ?? [];
-  const stagingBranch = branches.find((b) => b.name === "staging");
-  const updates = stagingBranch?.updates ?? [];
+  const productionBranch = branches.find((b) => b.name === "production");
+  const updates = productionBranch?.updates ?? [];
   if (updates.length === 0) return;
-
-  const directApply = await getDirectApplySetting();
 
   for (const upd of updates) {
     const existing = await db.select({ id: otaReleases.id })
@@ -84,42 +85,22 @@ async function syncStagingUpdates(): Promise<void> {
 
     if (existing.length > 0) continue;
 
-    const easGroupId = upd.group ?? null;
-
-    if (directApply && easGroupId) {
-      // Architettura custom (Task #1150 + #2316): "promuovere" significa solo
-      // UPDATE DB status='approved'. Il manifest serving custom in
-      // server/routes/expo-updates.ts legge dal DB e costruisce il manifest
-      // dagli asset CDN EAS. Nessuna mutation GraphQL EAS richiesta.
-      await db.insert(otaReleases).values({
-        easUpdateId: upd.id,
-        easGroupId,
-        channel: "production",
-        runtimeVersion: upd.runtimeVersion ?? null,
-        message: upd.message ?? null,
-        status: "approved",
-        publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
-        approvedAt: new Date(),
-        approvedBy: null,
-      }).onConflictDoNothing();
-      console.log("[ota-sync] direct-apply: auto-approved groupId", easGroupId, "updateId", upd.id);
-      continue;
-    }
-    if (directApply && !easGroupId) {
-      console.warn("[ota-sync] direct-apply: update senza groupId, inserisco come pending:", upd.id);
-    }
-
+    // Tutti gli update sul branch production sono GIÀ distribuiti da EAS.
+    // Li salviamo come `approved` direttamente — nessun workflow di approvazione.
     await db.insert(otaReleases).values({
       easUpdateId: upd.id,
-      easGroupId,
-      channel: "staging",
+      easGroupId: upd.group ?? null,
+      channel: "production",
       runtimeVersion: upd.runtimeVersion ?? null,
       message: upd.message ?? null,
-      status: "pending",
+      status: "approved",
       publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
+      approvedAt: new Date(),
+      approvedBy: null,
     }).onConflictDoNothing();
   }
 
+  // Backfill groupId per record vecchi che ne erano sprovvisti
   for (const upd of updates) {
     if (!upd.group) continue;
     await db.update(otaReleases)
@@ -128,12 +109,6 @@ async function syncStagingUpdates(): Promise<void> {
   }
 }
 
-// Task #2316: la "promozione a production" è ora una pura operazione DB
-// (UPDATE ota_releases SET status='approved'). Il manifest serving custom
-// (`server/routes/expo-updates.ts`) legge dal DB e costruisce il manifest
-// dagli asset CDN EAS. NON aggiungere chiamate EAS GraphQL qui — la mutation
-// republishUpdateGroup non esiste nello schema EAS (rimossa, era 400).
-
 // GET /api/admin/ota/releases
 router.get("/releases", async (req: Request, res: Response) => {
   try {
@@ -141,7 +116,7 @@ router.get("/releases", async (req: Request, res: Response) => {
     const syncFirst = req.query.sync !== "false";
 
     if (syncFirst) {
-      await syncStagingUpdates().catch((err) => {
+      await syncProductionUpdates().catch((err) => {
         console.warn("[ota] sync warning:", err);
       });
     }
@@ -184,8 +159,6 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
       .where(eq(otaReleases.id, id))
       .returning();
 
-    try { (req.app.locals.invalidateExpoUpdateHash as undefined | ((id?: string) => void))?.(id); } catch { /* noop */ }
-
     return res.json(updated);
   } catch (err) {
     console.error("[ota] POST /:id/approve error:", err);
@@ -227,7 +200,7 @@ router.get("/:id/try", async (req: Request, res: Response) => {
     const [release] = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
     if (!release) return sendError(res, 404, "OTA release non trovata");
 
-    const manifestUrl = `https://u.expo.dev/${EAS_PROJECT_ID}?channel-name=staging&runtime-version=${encodeURIComponent(release.runtimeVersion ?? "10.0.0")}`;
+    const manifestUrl = `https://u.expo.dev/${EAS_PROJECT_ID}?channel-name=production&runtime-version=${encodeURIComponent(release.runtimeVersion ?? "10.0.0")}`;
 
     return res.json({
       easUpdateId: release.easUpdateId,
@@ -267,8 +240,6 @@ router.post("/:id/rollback", async (req: Request, res: Response) => {
       .where(eq(otaReleases.id, id))
       .returning();
 
-    try { (req.app.locals.invalidateExpoUpdateHash as undefined | ((id?: string) => void))?.(id); } catch { /* noop */ }
-
     return res.json(updated);
   } catch (err) {
     console.error("[ota] POST /:id/rollback error:", err);
@@ -279,7 +250,7 @@ router.post("/:id/rollback", async (req: Request, res: Response) => {
 // POST /api/admin/ota/sync — forza sync manuale da EAS
 router.post("/sync", async (_req: Request, res: Response) => {
   try {
-    await syncStagingUpdates();
+    await syncProductionUpdates();
     const rows = await db.select().from(otaReleases).orderBy(desc(otaReleases.publishedAt));
     return res.json({ synced: true, count: rows.length, releases: rows });
   } catch (err) {
@@ -318,4 +289,4 @@ router.post("/settings", async (req: Request, res: Response) => {
 });
 
 export default router;
-export { syncStagingUpdates };
+export { syncProductionUpdates };
