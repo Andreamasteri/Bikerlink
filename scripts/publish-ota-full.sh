@@ -30,10 +30,14 @@ if [[ ! -f "$MSG_FILE" ]]; then
   exit 1
 fi
 
-MESSAGE=$(cat "$MSG_FILE" | tr -d '\r' | sed '/^$/d' | head -1)
+# Ignora righe vuote e commenti (# ...)
+MESSAGE=$(grep -v '^\s*#' "$MSG_FILE" | tr -d '\r' | sed '/^[[:space:]]*$/d' | head -1)
+
+# Uscita silenziosa se nessun messaggio reale — protegge dall'auto-start di Replit
 if [[ -z "$MESSAGE" ]]; then
-  log_error ".ota-message è vuoto. Scrivi una descrizione del rilascio prima di procedere."
-  exit 1
+  echo "[OTA] Nessun messaggio in .ota-message — pubblicazione saltata."
+  echo "[OTA] Per pubblicare: scrivi una riga in .ota-message e riavvia il workflow."
+  exit 0
 fi
 
 log_info "Messaggio: ${MESSAGE}"
@@ -139,11 +143,26 @@ else
   log_warn "IDs non estratti — approva manualmente dal pannello admin /admin/ota"
 fi
 
-# ── 7. Invalida cache manifest del server ────────────────────────────────────
-curl -s -X POST "http://localhost:5000/api/admin/ota/sync" \
-  -H "Content-Type: application/json" \
-  --cookie "$(cat /tmp/admin-session.cookie 2>/dev/null || echo '')" \
-  -o /dev/null 2>/dev/null || true
+# ── 7. Approva in produzione tramite webhook ────────────────────────────────
+if [[ -n "${OTA_PUBLISH_SECRET:-}" ]]; then
+  PROD_URL="${BIKERLINK_BACKEND_URL:-https://biker-link.replit.app}"
+  log_info "Chiamata webhook production ${PROD_URL}..."
+
+  WEBHOOK_RESP=$(curl -s -X POST "${PROD_URL}/api/ota/force-approve" \
+    -H "Authorization: Bearer ${OTA_PUBLISH_SECRET}" \
+    -H "Content-Type: application/json" \
+    -d "{\"easGroupId\":\"${GROUP_ID:-}\"}" \
+    --max-time 30 2>&1) || WEBHOOK_RESP="timeout/connessione fallita"
+
+  if echo "$WEBHOOK_RESP" | grep -q '"success":true'; then
+    log_ok "Production: OTA approvata e distribuita"
+  else
+    log_warn "Production webhook: ${WEBHOOK_RESP:-no response}"
+    log_warn "Approva manualmente da https://biker-link.replit.app (admin → OTA)"
+  fi
+else
+  log_warn "OTA_PUBLISH_SECRET non impostato — production non aggiornata"
+fi
 
 # ── 8. Svuota .ota-message dopo pubblicazione riuscita ───────────────────────
 echo "" > "$MSG_FILE"
