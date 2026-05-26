@@ -25,12 +25,12 @@ export interface FallbackResult extends ResolvedTile {
  * Falls back to the default provider if everything else is unavailable.
  *
  * @param activeId    — the configured active provider id
- * @param renderer    — "leaflet" or "maplibre"
+ * @param renderer    — "leaflet", "maplibre", or "openlayers"
  * @param statuses    — map of providerId → status (defaults all to "active")
  */
 export function getActiveTileProviderWithFallback(
   activeId: string,
-  renderer: "leaflet" | "maplibre" = "leaflet",
+  renderer: "leaflet" | "maplibre" | "openlayers" = "leaflet",
   statuses: Record<string, ProviderStatusValue> = {},
 ): FallbackResult {
   const compatible = TILE_PROVIDERS.filter((p) => p.rendererCompat.includes(renderer));

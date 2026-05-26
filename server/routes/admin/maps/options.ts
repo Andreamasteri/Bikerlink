@@ -14,9 +14,9 @@ export const AVAILABLE_RENDERERS: OptionEntry<MapsRendererId>[] = [
 ];
 
 export const AVAILABLE_TILES: OptionEntry<MapsTileId>[] = [
-  { id: "carto_light", label: "Carto Light", implemented: true },
-  { id: "carto_dark", label: "Carto Dark", implemented: true },
-  { id: "osm", label: "OpenStreetMap", implemented: true },
+  { id: "carto-light", label: "Carto Light", implemented: true },
+  { id: "carto-dark", label: "Carto Dark", implemented: true },
+  { id: "osm-standard", label: "OpenStreetMap", implemented: true },
 ];
 
 export const AVAILABLE_ENGINES: OptionEntry<RoutingEngineId>[] = [
@@ -32,6 +32,6 @@ export const AVAILABLE_PROFILES: OptionEntry<RoutingProfileId>[] = [
 ];
 
 export const DEFAULT_RENDERER: MapsRendererId = "leaflet";
-export const DEFAULT_TILE: MapsTileId = "carto_light";
+export const DEFAULT_TILE: MapsTileId = "carto-light";
 export const DEFAULT_ENGINE: RoutingEngineId = "graphhopper";
 export const DEFAULT_PROFILE: RoutingProfileId = "motorcycle";

@@ -1,6 +1,6 @@
 export type MapsRollout = "disabled" | "tester" | "all";
 export type MapsRendererId = "leaflet" | "maplibre" | "openlayers" | "maplibre-full-3d";
-export type MapsTileId = "carto_light" | "carto_dark" | "osm";
+export type MapsTileId = "carto-light" | "carto-dark" | "osm-standard";
 export type RoutingEngineId = "graphhopper" | "valhalla" | "mapbox-directions" | "tomtom";
 export type RoutingProfileId = "motorcycle" | "car";
 
@@ -40,19 +40,19 @@ export const RENDERER_OPTIONS: MapsOption<MapsRendererId>[] = [
 
 export const TILE_OPTIONS: MapsOption<MapsTileId>[] = [
   {
-    id: "carto_light",
+    id: "carto-light",
     label: "Carto Light",
     description: "Tile chiaro CartoDB.",
     implemented: true,
   },
   {
-    id: "carto_dark",
+    id: "carto-dark",
     label: "Carto Dark",
     description: "Tile scuro CartoDB.",
     implemented: true,
   },
   {
-    id: "osm",
+    id: "osm-standard",
     label: "OpenStreetMap",
     description: "Tile standard OSM.",
     implemented: true,

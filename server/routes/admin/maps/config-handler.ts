@@ -33,6 +33,17 @@ router.get("/config", async (_req: Request, res: Response) => {
 
     const routing = (engineSetting?.value ?? DEFAULT_ENGINE) as RoutingEngineId;
 
+    const normalizeTileId = (v: string | undefined): MapsTileId => {
+      const legacy: Record<string, MapsTileId> = {
+        carto_light: "carto-light",
+        carto_dark: "carto-dark",
+        osm: "osm-standard",
+      };
+      const raw = v ?? DEFAULT_TILE;
+      return (legacy[raw] ?? raw) as MapsTileId;
+    };
+
+
     let mapbox_quota: object | undefined;
     if (isMapboxAvailable()) {
       const quota = await checkQuota().catch(() => null);
@@ -54,7 +65,7 @@ router.get("/config", async (_req: Request, res: Response) => {
     const payload: Record<string, unknown> = {
       rollout: (rolloutSetting?.value ?? "disabled") as MapsRollout,
       renderer: (rendererSetting?.value ?? DEFAULT_RENDERER) as MapsRendererId,
-      tile: (tileSetting?.value ?? DEFAULT_TILE) as MapsTileId,
+      tile: normalizeTileId(tileSetting?.value ?? undefined),
       routing,
       profile: (profileSetting?.value ?? DEFAULT_PROFILE) as RoutingProfileId,
       tile_source_status: tileSourceStatus,

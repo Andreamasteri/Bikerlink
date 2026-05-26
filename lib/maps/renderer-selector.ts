@@ -67,6 +67,8 @@ export function useMapRenderer() {
         : LazyLeafletMiniMap,
     PickerMapComponent: useMapLibreBase ? LazyMapLibrePickerMap : LazyLeafletPickerMap,
     TrackingMapComponent: useMapLibreBase ? LazyMapLibreTrackingMap : LazyLeafletTrackingMap,
+    // Note: OpenLayers PickerMap/TrackingMap components do not exist (task #2420 cancelled).
+    // When renderer === "openlayers", both fall back to Leaflet — correct intentional behaviour.
     PlannerMap3DComponent: LazyMapLibre3DPlannerMap,
   };
 }
