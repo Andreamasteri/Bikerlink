@@ -217,13 +217,30 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
     }
   })();
 
+  function postViewState() {
+    var c = map.getCenter();
+    postMsg({
+      type: "viewState",
+      zoom: map.getZoom(),
+      minZoom: map.getMinZoom(),
+      maxZoom: map.getMaxZoom(),
+      bearing: 0,
+      lat: c.lat,
+      lng: c.lng
+    });
+  }
+
   map.on("moveend", function() {
     var c = map.getCenter();
     postMsg({ type: "regionChange", lat: c.lat, lng: c.lng });
     updateLegendVisibility();
+    postViewState();
   });
 
-  map.on("zoomend", updateLegendVisibility);
+  map.on("zoomend", function() {
+    updateLegendVisibility();
+    postViewState();
+  });
 
   /* ── SVG icons ────────────────────────────────────────────────────── */
   var SVG = {
@@ -563,6 +580,16 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       map.setView([lat, lng], z < 13 ? 13 : z, { animate: true });
     },
 
+    setZoom: function(level) {
+      var z = Number(level);
+      if (!isFinite(z)) return;
+      map.setZoom(z, { animate: false });
+    },
+
+    resetBearing: function() {
+      /* Leaflet does not support rotation; no-op for API parity with MapLibre. */
+    },
+
     updateHazards: function(jsonStr) {
       hazardsLayer.clearLayers();
       var hazards;
@@ -607,6 +634,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   updateNickLabels();
 
   postMsg({ type: "mapReady" });
+  postViewState();
 })();
 </script>
 </body>

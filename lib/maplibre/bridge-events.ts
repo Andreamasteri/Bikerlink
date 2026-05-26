@@ -7,6 +7,7 @@ export type BridgeEventType =
   | "routeTap"
   | "coordPicked"
   | "regionChange"
+  | "viewState"
   | "trackingReady"
   | "error";
 
@@ -18,6 +19,9 @@ export interface BridgeEvent {
   eggId?: string;
   eventId?: string;
   zoom?: number;
+  minZoom?: number;
+  maxZoom?: number;
+  bearing?: number;
   message?: string;
 }
 
@@ -30,6 +34,8 @@ export type BridgeCommandType =
   | "centerOnUser"
   | "updateHazards"
   | "setStyle"
+  | "setZoom"
+  | "resetBearing"
   | "enableTerrain"
   | "disableTerrain"
   | "toggleHillshade"

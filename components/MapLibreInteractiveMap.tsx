@@ -8,6 +8,8 @@ import { getMapLibreStyleExpr, buildMapLibreStyle } from "@/lib/maplibre/tile-co
 import { parseMessage } from "@/lib/maplibre/bridge-events";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { MapControls } from "@/components/map/MapControls";
+import { MapZoomSlider } from "@/components/map/MapZoomSlider";
+import { MapNorthCompass } from "@/components/map/MapNorthCompass";
 import { MapStyleToggle } from "@/components/MapStyleToggle";
 import { useMapStyle } from "@/hooks/useMapStyle";
 import { MAP_STYLE_PRESETS } from "@/lib/maplibre/style-presets";
@@ -32,6 +34,14 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
   ) {
     const webViewRef = useRef<WebView>(null);
     const [mapReady, setMapReady] = useState(false);
+    const [viewState, setViewState] = useState({
+      zoom: 6,
+      minZoom: 0,
+      maxZoom: 22,
+      bearing: 0,
+      lat: 45.5,
+      lng: 10.5,
+    });
     const { styleId, setStyle } = useMapStyle();
     const styleExpr = getMapLibreStyleExpr();
     const initialCenterRef = useRef(
@@ -96,6 +106,15 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
         if (egg) onEasterEggPress?.(egg);
       } else if (msg.type === "regionChange" && msg.lat != null && msg.lng != null) {
         onRegionChangeComplete?.({ latitude: msg.lat, longitude: msg.lng });
+      } else if (msg.type === "viewState" && msg.zoom != null) {
+        setViewState({
+          zoom: msg.zoom,
+          minZoom: msg.minZoom ?? 0,
+          maxZoom: msg.maxZoom ?? 22,
+          bearing: msg.bearing ?? 0,
+          lat: msg.lat ?? 0,
+          lng: msg.lng ?? 0,
+        });
       } else if (msg.type === "error") {
         onFatalErrorRef.current?.();
       }
@@ -113,6 +132,17 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
       const payloadJson = JSON.stringify({ lat: realMeMarker.latitude, lng: realMeMarker.longitude });
       inject(`window.mlBridge && window.mlBridge.centerOnUser(${payloadJson})`);
     }, [realMeMarker, inject]);
+
+    const handleZoomChange = useCallback((z: number) => {
+      setViewState((prev) => ({ ...prev, zoom: z }));
+      const payload = JSON.stringify({ zoom: z });
+      inject(`window.mlBridge && window.mlBridge.setZoom(${payload})`);
+    }, [inject]);
+
+    const handleResetBearing = useCallback(() => {
+      setViewState((prev) => ({ ...prev, bearing: 0 }));
+      inject(`window.mlBridge && window.mlBridge.resetBearing()`);
+    }, [inject]);
 
     const handleWebViewError = useCallback(() => {
       onFatalErrorRef.current?.();
@@ -147,6 +177,23 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
         />
         {mapReady && (
           <MapStyleToggle currentStyleId={styleId} onSelectStyle={setStyle} />
+        )}
+        {mapReady && (
+          <MapZoomSlider
+            zoom={viewState.zoom}
+            minZoom={viewState.minZoom}
+            maxZoom={viewState.maxZoom}
+            latitude={viewState.lat}
+            topOffset={(filterBarTopOffset ?? 16) + 60}
+            onZoomChange={handleZoomChange}
+          />
+        )}
+        {mapReady && (
+          <MapNorthCompass
+            bearing={viewState.bearing}
+            onResetBearing={handleResetBearing}
+            topOffset={(filterBarTopOffset ?? 16) + 60}
+          />
         )}
         <MapFilterBar
           filterBiker={filterBiker} filterZavorrina={filterZavorrina}

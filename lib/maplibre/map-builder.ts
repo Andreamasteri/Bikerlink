@@ -130,13 +130,37 @@ ${mapScriptWrap(styleVar, options, `
         try { style = typeof payload === "string" ? JSON.parse(payload) : payload; } catch(e) { return; }
         map.setStyle(style);
       },
+      setZoom: function(payload) {
+        var level = typeof payload === "object" && payload !== null ? payload.zoom : Number(payload);
+        if (typeof level !== "number" || !isFinite(level)) return;
+        map.setZoom(level);
+      },
+      resetBearing: function() {
+        map.easeTo({ bearing: 0, pitch: 0, duration: 400 });
+      },
     };
+    function postViewState() {
+      var c = map.getCenter();
+      postMsg({
+        type: "viewState",
+        zoom: map.getZoom(),
+        minZoom: map.getMinZoom(),
+        maxZoom: map.getMaxZoom(),
+        bearing: map.getBearing(),
+        lat: c.lat,
+        lng: c.lng
+      });
+    }
     map.on("click", function(e) {
       postMsg({ type: "tap", lat: e.lngLat.lat, lng: e.lngLat.lng });
     });
     map.on("moveend", function() {
       var c = map.getCenter();
       postMsg({ type: "regionChange", lat: c.lat, lng: c.lng, zoom: map.getZoom() });
+      postViewState();
     });
+    map.on("zoomend", postViewState);
+    map.on("rotateend", postViewState);
+    postViewState();
 `)}`;
 }

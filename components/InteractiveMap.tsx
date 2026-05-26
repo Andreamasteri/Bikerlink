@@ -10,6 +10,8 @@ import { LEAFLET_MAP_HTML } from "@/lib/leaflet-map-html";
 import { useLocationWatch } from "@/hooks/useLocationWatch";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { MapControls } from "@/components/map/MapControls";
+import { MapZoomSlider } from "@/components/map/MapZoomSlider";
+import { MapNorthCompass } from "@/components/map/MapNorthCompass";
 import { MapStyleToggle } from "@/components/MapStyleToggle";
 import { useMapStyle } from "@/hooks/useMapStyle";
 import { MAP_STYLE_PRESETS } from "@/lib/maplibre/style-presets";
@@ -51,6 +53,14 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const webViewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapReadyEpoch, setMapReadyEpoch] = useState(0);
+  const [viewState, setViewState] = useState({
+    zoom: 6,
+    minZoom: 0,
+    maxZoom: 19,
+    bearing: 0,
+    lat: 41.9028,
+    lng: 12.4964,
+  });
   const initialCenterDoneRef = useRef(false);
   const gpsCenterDoneRef = useRef(false);
   const { userLocation, locationLoading } = useLocationWatch();
@@ -157,6 +167,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
       onHazardPress: (id) => setSelectedHazardId(id),
       onReady, onRegionChangeComplete, setMapReady,
       onMapReadyEpoch: () => setMapReadyEpoch((n) => n + 1),
+      onViewStateChange: (s) => setViewState(s),
     }),
     [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete],
   );
@@ -173,6 +184,15 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const centerOnUser = useCallback(() => {
     if (userLocation) inject("window.leafletBridge && window.leafletBridge.centerOnUser(" + userLocation.latitude + "," + userLocation.longitude + ")");
   }, [userLocation, inject]);
+
+  const handleZoomChange = useCallback((z: number) => {
+    setViewState((prev) => ({ ...prev, zoom: z }));
+    inject("window.leafletBridge && window.leafletBridge.setZoom(" + z + ")");
+  }, [inject]);
+
+  const handleResetBearing = useCallback(() => {
+    inject("window.leafletBridge && window.leafletBridge.resetBearing()");
+  }, [inject]);
 
   const mapHtml = LEAFLET_MAP_HTML;
   const mapBaseUrl = getApiUrl();
@@ -221,6 +241,24 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
       />
       {mapReady && (
         <MapStyleToggle currentStyleId={styleId} onSelectStyle={setStyle} />
+      )}
+      {mapReady && (
+        <MapZoomSlider
+          zoom={viewState.zoom}
+          minZoom={viewState.minZoom}
+          maxZoom={viewState.maxZoom}
+          latitude={viewState.lat}
+          topOffset={(filterBarTopOffset ?? 16) + 60}
+          onZoomChange={handleZoomChange}
+        />
+      )}
+      {mapReady && (
+        <MapNorthCompass
+          bearing={viewState.bearing}
+          onResetBearing={handleResetBearing}
+          topOffset={(filterBarTopOffset ?? 16) + 60}
+          disabled
+        />
       )}
       {showHazardReportButton && hazardsEnabled && (
         <TouchableOpacity

@@ -13,6 +13,14 @@ interface MapMessageHandlerOptions {
   onHazardPress?: (id: string) => void;
   onReady?: () => void;
   onRegionChangeComplete?: (coords: { latitude: number; longitude: number }) => void;
+  onViewStateChange?: (state: {
+    zoom: number;
+    minZoom: number;
+    maxZoom: number;
+    bearing: number;
+    lat: number;
+    lng: number;
+  }) => void;
   setMapReady: (ready: boolean) => void;
   onMapReadyEpoch?: () => void;
 }
@@ -24,6 +32,10 @@ export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
         type: string;
         lat?: number;
         lng?: number;
+        zoom?: number;
+        minZoom?: number;
+        maxZoom?: number;
+        bearing?: number;
         markerType?: string;
         id?: string;
         omsReady?: boolean;
@@ -31,7 +43,16 @@ export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
         error?: string;
       };
 
-      if (msg.type === "omsStatus") {
+      if (msg.type === "viewState" && msg.zoom != null) {
+        opts.onViewStateChange?.({
+          zoom: msg.zoom,
+          minZoom: msg.minZoom ?? 0,
+          maxZoom: msg.maxZoom ?? 19,
+          bearing: msg.bearing ?? 0,
+          lat: msg.lat ?? 0,
+          lng: msg.lng ?? 0,
+        });
+      } else if (msg.type === "omsStatus") {
         console.log("[InteractiveMap] omsStatus", {
           omsReady: msg.omsReady,
           nearbyDistance: msg.nearbyDistance,
