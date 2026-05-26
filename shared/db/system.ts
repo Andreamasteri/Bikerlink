@@ -322,6 +322,20 @@ export const backupFrequencySchema = z.object({
 }).passthrough();
 export type BackupFrequencyInput = z.infer<typeof backupFrequencySchema>;
 
+export const translationKeys = pgTable("translation_keys", {
+  key: varchar("key", { length: 200 }).primaryKey(),
+  position: varchar("position", { length: 200 }),
+  it: text("it"),
+  en: text("en"),
+  de: text("de"),
+  es: text("es"),
+  fr: text("fr"),
+  el: text("el"),
+  tr: text("tr"),
+});
+export type TranslationKey = typeof translationKeys.$inferSelect;
+export type InsertTranslationKey = typeof translationKeys.$inferInsert;
+
 export const translationKeySchema = z.object({
   key: z.string().min(1, "key mancante"),
   lang: z.string().min(1, "lang non valido"),

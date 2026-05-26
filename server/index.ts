@@ -4,6 +4,7 @@ import { createServer } from "http";
 import { initState } from "./init-state";
 import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount, seedGooglePlayReviewerAccount, ensureBikerLinkOfficialOnBoot } from "./auto-seed";
+import { seedTranslationKeys } from "./routes/admin/translations";
 import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 import { initUptimeTracking, startMetroMonitor, stopMetroMonitor } from "./uptime";
@@ -165,6 +166,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     await withPhaseTimeout("seedAppleReviewerAccount", seedAppleReviewerAccount());
     await withPhaseTimeout("seedGooglePlayReviewerAccount", seedGooglePlayReviewerAccount());
     await withPhaseTimeout("ensureBikerLinkOfficialOnBoot", ensureBikerLinkOfficialOnBoot());
+    await withPhaseTimeout("seedTranslationKeys", seedTranslationKeys());
     startMatchingEngine();
   } catch (err) {
     console.error("[INIT] FATAL — Phase 4 failed:", err);
