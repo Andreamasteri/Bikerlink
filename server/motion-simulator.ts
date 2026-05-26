@@ -778,6 +778,124 @@ export function clearSimulatorUsers(): void {
   _nicknames.clear();
 }
 
+/**
+ * Add a single fake user to the in-memory simulator state immediately.
+ * Call this right after inserting a new fake user in the DB so it starts
+ * moving without requiring a server restart or motion toggle cycle.
+ * No-op if the user is already tracked.
+ */
+export function addUserToSimulator(
+  userId: string,
+  nickname: string | null,
+  lat: number,
+  lng: number,
+): void {
+  if (_userStates.has(userId)) return;
+
+  const nowMs = Date.now();
+  const initProfile = pickSpeedProfile();
+  const schedule = generateSchedule();
+  const scheduleStartMs = nowMs - rand(0, 24 * 60 * 60 * 1000);
+  const state: UserMotionState = {
+    userId,
+    lat,
+    lng,
+    schedule,
+    scheduleStartMs,
+    currentSlotIdx: 0,
+    speedProfile: initProfile,
+    currentSpeedKph: randSpeedForProfile(initProfile),
+    targetSpeedKph: randSpeedForProfile(initProfile),
+    headingRad: randHeading(),
+    offsetLat: 0,
+    offsetLng: 0,
+    transitionPhase: null,
+    transitionCyclesLeft: 0,
+    transitionTotalCycles: 0,
+    rampStartSpeedKph: 0,
+  };
+  state.currentSlotIdx = resolveSlotIdx(state, nowMs);
+  _userStates.set(userId, state);
+  if (nickname) _nicknames.set(userId, nickname);
+
+  // Start the cron if the simulator is enabled but was previously idle (0 users)
+  if (_enabled && !_timer) {
+    _timer = setInterval(runCycle, MOTION_CRON_INTERVAL_MS);
+    console.log("[MOTION] Cron started after addUserToSimulator (first user)");
+  }
+}
+
+/**
+ * Incrementally sync the in-memory simulator state with the DB.
+ * Queries all fake users and adds only those NOT already tracked.
+ * Existing user states are left untouched (positions/schedules preserved).
+ * Call this after a mass-seed completes so newly created users start moving
+ * without a server restart.
+ */
+export async function reloadSimulatorUsers(): Promise<void> {
+  const rows = await db
+    .select({
+      id: users.id,
+      nickname: users.nickname,
+      lat: userProfiles.latitude,
+      lng: userProfiles.longitude,
+    })
+    .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(
+      and(
+        eq(users.isFake, true),
+        sql`${users.nickname} != 'BikerLink_Official'`,
+      ),
+    );
+
+  if (rows.length === 0) return;
+
+  const nowMs = Date.now();
+  let added = 0;
+
+  for (const row of rows) {
+    if (_userStates.has(row.id)) continue; // already tracked — preserve state
+
+    if (row.nickname) _nicknames.set(row.id, row.nickname);
+    const lat = row.lat ?? rand(37, 47);
+    const lng = row.lng ?? rand(7, 18);
+    const schedule = generateSchedule();
+    const scheduleStartMs = nowMs - rand(0, 24 * 60 * 60 * 1000);
+    const initProfile = pickSpeedProfile();
+    const state: UserMotionState = {
+      userId: row.id,
+      lat,
+      lng,
+      schedule,
+      scheduleStartMs,
+      currentSlotIdx: 0,
+      speedProfile: initProfile,
+      currentSpeedKph: randSpeedForProfile(initProfile),
+      targetSpeedKph: randSpeedForProfile(initProfile),
+      headingRad: randHeading(),
+      offsetLat: 0,
+      offsetLng: 0,
+      transitionPhase: null,
+      transitionCyclesLeft: 0,
+      transitionTotalCycles: 0,
+      rampStartSpeedKph: 0,
+    };
+    state.currentSlotIdx = resolveSlotIdx(state, nowMs);
+    _userStates.set(row.id, state);
+    added++;
+  }
+
+  if (added > 0) {
+    console.log(`[MOTION] reloadSimulatorUsers: +${added} new users (total: ${_userStates.size})`);
+    // Start the cron if enabled but previously idle (had 0 users)
+    if (_enabled && !_timer) {
+      _timer = setInterval(runCycle, MOTION_CRON_INTERVAL_MS);
+      console.log("[MOTION] Cron started after reloadSimulatorUsers");
+    }
+  }
+}
+
 export interface RiderPosition {
   userId: string;
   nickname: string | null;

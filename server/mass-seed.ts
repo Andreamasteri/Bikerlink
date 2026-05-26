@@ -17,6 +17,7 @@ import {
   buildSpecs, ensureOfficialAccount, cleanupOldSeedUsers, reconcileExistingUsers
 } from "./mass-seed/seed-users";
 import { seedClubMemberships } from "./mass-seed/seed-clubs";
+import { reloadSimulatorUsers } from "./motion-simulator";
 
 interface MassSeedStatus {
   running: boolean;
@@ -334,6 +335,9 @@ export async function massSeedFakeUsers(): Promise<void> {
     console.log(`[mass-seed] SUCCESS: Seeded ${massSeedStatus.created} users.`);
     massSeedStatus.running = false;
     storage.upsertAppSetting("mass_seed_created_checkpoint", massSeedStatus.created.toString()).catch(() => {});
+    reloadSimulatorUsers().catch((e: unknown) => {
+      console.error("[mass-seed] reloadSimulatorUsers error:", e);
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     massSeedStatus.error = msg;

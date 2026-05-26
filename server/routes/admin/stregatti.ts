@@ -7,7 +7,7 @@ import { eq, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { setMotionEnabled, getMotionStatus, getPositions, getBoundingBox, setBoundingBox, getUserSpeedMap, removeUserFromSimulator, clearSimulatorUsers } from "../../motion-simulator";
+import { setMotionEnabled, getMotionStatus, getPositions, getBoundingBox, setBoundingBox, getUserSpeedMap, removeUserFromSimulator, clearSimulatorUsers, addUserToSimulator } from "../../motion-simulator";
 
 const router = Router();
 
@@ -53,6 +53,7 @@ router.post("/", async (req: Request, res: Response) => {
       eulaAccepted: true,
       lastLoginAt: new Date(),
     });
+    addUserToSimulator(user.id, user.nickname, 42, 12);
     return res.status(201).json(user);
   } catch (_error) {
     console.error("Admin create stregatto error:", _error);
