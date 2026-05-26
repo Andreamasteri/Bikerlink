@@ -383,7 +383,11 @@ export function buildLeafletRouteMapHtml(
   const _colorsJson = JSON.stringify(resolvedTypeColors);
   const _showMarkersJs = showMarkers ? "true" : "false";
   const polylinePoints = trackPoints ?? waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
-  const _polylineJson = JSON.stringify(polylinePoints);
+  const polylineJson = JSON.stringify(polylinePoints);
+  const waypointsJson = _waypointsJson;
+  const colorsJson = _colorsJson;
+  const showMarkersJs = _showMarkersJs;
+  const accentColor = _accentColor;
 
   return `<!DOCTYPE html>
 <html>
@@ -391,18 +395,25 @@ export function buildLeafletRouteMapHtml(
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <style>${LEAFLET_CSS}</style>
-<style>\${MAP_STYLES}</style>
+<style>${MAP_STYLES}</style>
 </head>
 <body>
 <div id="map"></div>
 <script>${LEAFLET_JS}</script>
 <script>
 (function() {
-  \${MARKER_SCRIPTS}
-  var waypoints = \${waypointsJson};
-  var typeColors = \${colorsJson};
-  var accentColor = \${JSON.stringify(accentColor)};
-  var polylinePoints = \${polylineJson};
+  ${MARKER_SCRIPTS}
+  function postMsg(data) {
+    try {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(data));
+      }
+    } catch(e) {}
+  }
+  var waypoints = ${waypointsJson};
+  var typeColors = ${colorsJson};
+  var accentColor = ${JSON.stringify(accentColor)};
+  var polylinePoints = ${polylineJson};
 
   var map = L.map("map", {
     center: [41.9, 12.5],
@@ -411,7 +422,31 @@ export function buildLeafletRouteMapHtml(
     attributionControl: true
   });
 
-  L.tileLayer(\${JSON.stringify(tileUrl)}, { maxZoom: \${tileMaxZoom}, attribution: "" }).addTo(map);
+  L.tileLayer(${JSON.stringify(tileUrl)}, { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
+
+  function postViewState() {
+    var c = map.getCenter();
+    postMsg({
+      type: "viewState",
+      zoom: map.getZoom(),
+      minZoom: map.getMinZoom(),
+      maxZoom: map.getMaxZoom(),
+      bearing: 0,
+      lat: c.lat,
+      lng: c.lng
+    });
+  }
+  map.on("zoomend", postViewState);
+  map.on("moveend", postViewState);
+  map.whenReady(function() { postViewState(); });
+
+  window.leafletRouteBridge = {
+    setZoom: function(z) {
+      var clamped = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), Number(z)));
+      if (!isFinite(clamped)) return;
+      map.setZoom(clamped);
+    }
+  };
 
   function speedColor(kmh) {
     if (kmh == null || kmh < 0) return null;
@@ -450,7 +485,7 @@ export function buildLeafletRouteMapHtml(
       }
     }
 
-    if (\${showMarkersJs}) {
+    if (${showMarkersJs}) {
       waypoints.forEach(function(wp, idx) {
         var color = typeColors[wp.waypointType] || accentColor;
         var label = idx === 0 ? "A" : idx === waypoints.length - 1 ? "Z" : String(idx);

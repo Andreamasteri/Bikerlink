@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback, useEffect } from "react";
+import React, { useMemo, useRef, useCallback, useEffect, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import WebView from "react-native-webview";
 import type { WebViewMessageEvent } from "react-native-webview";
@@ -6,6 +6,7 @@ import { useMapConfig } from "@/lib/map-context";
 import { getApiUrl } from "@/lib/query-client";
 import { buildLeafletPickerMapHtml } from "@/lib/leaflet-picker-map-html";
 import type { PickerWaypoint } from "@/lib/leaflet-picker-map-html";
+import { MapZoomSlider } from "@/components/map/MapZoomSlider";
 import Colors from "@/constants/colors";
 
 interface LeafletPickerMapProps {
@@ -31,6 +32,10 @@ export default function LeafletPickerMap({
   const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
 
   const initialCoordRef = useRef(selectedCoord);
+  const [viewState, setViewState] = useState({
+    zoom: initialZoom, minZoom: 0, maxZoom: tileMaxZoom,
+    bearing: 0, lat: initialLat, lng: initialLng,
+  });
 
   const mapHtml = useMemo(
     () => buildLeafletPickerMapHtml(
@@ -60,16 +65,34 @@ export default function LeafletPickerMap({
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {
       try {
-        const msg = JSON.parse(event.nativeEvent.data) as { type: string; lat?: number; lng?: number };
+        const msg = JSON.parse(event.nativeEvent.data) as {
+          type: string;
+          lat?: number; lng?: number;
+          zoom?: number; minZoom?: number; maxZoom?: number; bearing?: number;
+        };
         if (msg.type === "coordPicked" && msg.lat != null && msg.lng != null) {
           onCoordPicked({ latitude: msg.lat, longitude: msg.lng });
+        } else if (msg.type === "viewState" && msg.zoom != null) {
+          setViewState({
+            zoom: msg.zoom,
+            minZoom: msg.minZoom ?? 0,
+            maxZoom: msg.maxZoom ?? tileMaxZoom,
+            bearing: msg.bearing ?? 0,
+            lat: msg.lat ?? 0,
+            lng: msg.lng ?? 0,
+          });
         }
       } catch {
         // no-op: ignore malformed bridge messages
       }
     },
-    [onCoordPicked]
+    [onCoordPicked, tileMaxZoom]
   );
+
+  const handleZoomChange = useCallback((z: number) => {
+    setViewState((prev) => ({ ...prev, zoom: z }));
+    inject("window.pickerBridge && window.pickerBridge.setZoom && window.pickerBridge.setZoom(" + z + ")");
+  }, [inject]);
 
   return (
     <View style={styles.fill}>
@@ -87,6 +110,14 @@ export default function LeafletPickerMap({
         cacheEnabled={false}
         startInLoadingState={false}
         onError={(e) => console.warn("[LeafletPickerMap] WebView error:", e.nativeEvent.description)}
+      />
+      <MapZoomSlider
+        zoom={viewState.zoom}
+        minZoom={viewState.minZoom}
+        maxZoom={viewState.maxZoom}
+        latitude={viewState.lat}
+        topOffset={12}
+        onZoomChange={handleZoomChange}
       />
     </View>
   );

@@ -1,11 +1,13 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { View, StyleSheet, Animated } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
+import type { WebViewMessageEvent } from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
 import { getApiUrl } from "@/lib/query-client";
 import { buildLeafletRouteMapHtml } from "@/lib/leaflet-route-map-html";
 import type { RouteWaypoint } from "@/lib/leaflet-route-map-html";
+import { MapZoomSlider } from "@/components/map/MapZoomSlider";
 import Colors from "@/constants/colors";
 
 interface LeafletRouteMapProps {
@@ -21,6 +23,7 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
   const tileUrl = mapsEnabled ? activeTileUrl : "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
   const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
 
+  const webViewRef = useRef<WebView>(null);
   const mapHtml = useMemo(
     () => buildLeafletRouteMapHtml(
       tileUrl, tileMaxZoom,
@@ -32,6 +35,10 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [skeletonVisible, setSkeletonVisible] = useState(true);
+  const [viewState, setViewState] = useState({
+    zoom: 6, minZoom: 0, maxZoom: tileMaxZoom,
+    bearing: 0, lat: 41.9, lng: 12.5,
+  });
 
   useEffect(() => {
     fadeAnim.setValue(0);
@@ -46,17 +53,50 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
     }).start(() => setSkeletonVisible(false));
   };
 
+  const inject = useCallback((js: string) => {
+    webViewRef.current?.injectJavaScript(js + ";true;");
+  }, []);
+
+  const handleMessage = useCallback((event: WebViewMessageEvent) => {
+    try {
+      const msg = JSON.parse(event.nativeEvent.data) as {
+        type: string;
+        zoom?: number; minZoom?: number; maxZoom?: number; bearing?: number;
+        lat?: number; lng?: number;
+      };
+      if (msg.type === "viewState" && msg.zoom != null) {
+        setViewState({
+          zoom: msg.zoom,
+          minZoom: msg.minZoom ?? 0,
+          maxZoom: msg.maxZoom ?? tileMaxZoom,
+          bearing: msg.bearing ?? 0,
+          lat: msg.lat ?? 0,
+          lng: msg.lng ?? 0,
+        });
+      }
+    } catch {
+      // no-op
+    }
+  }, [tileMaxZoom]);
+
+  const handleZoomChange = useCallback((z: number) => {
+    setViewState((prev) => ({ ...prev, zoom: z }));
+    inject("window.leafletRouteBridge && window.leafletRouteBridge.setZoom && window.leafletRouteBridge.setZoom(" + z + ")");
+  }, [inject]);
+
   const containerStyle = height != null ? [styles.wrapper, { height }] : styles.fill;
 
   return (
     <View style={containerStyle}>
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
         <WebView
+          ref={webViewRef}
           source={{ html: mapHtml, baseUrl: mapBaseUrl }}
           style={styles.map}
           javaScriptEnabled={true}
           domStorageEnabled={true}
           originWhitelist={["https://*", "http://*", "about:*"]}
+          onMessage={handleMessage}
           scrollEnabled={false}
           bounces={false}
           overScrollMode="never"
@@ -70,6 +110,16 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
         <View style={[StyleSheet.absoluteFill, styles.skeleton]}>
           <MaterialCommunityIcons name="map-outline" size={48} color={Colors.textSecondary} />
         </View>
+      )}
+      {!skeletonVisible && (
+        <MapZoomSlider
+          zoom={viewState.zoom}
+          minZoom={viewState.minZoom}
+          maxZoom={viewState.maxZoom}
+          latitude={viewState.lat}
+          topOffset={12}
+          onZoomChange={handleZoomChange}
+        />
       )}
     </View>
   );

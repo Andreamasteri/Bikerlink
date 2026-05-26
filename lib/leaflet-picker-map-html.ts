@@ -64,6 +64,22 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 
   L.tileLayer(tileUrl, { maxZoom: ${tileMaxZoom}, attribution: "" }).addTo(map);
 
+  function postViewState() {
+    var c = map.getCenter();
+    postMsg({
+      type: "viewState",
+      zoom: map.getZoom(),
+      minZoom: map.getMinZoom(),
+      maxZoom: map.getMaxZoom(),
+      bearing: 0,
+      lat: c.lat,
+      lng: c.lng
+    });
+  }
+  map.on("zoomend", postViewState);
+  map.on("moveend", postViewState);
+  map.whenReady(function() { postViewState(); });
+
   var WAYPOINT_COLORS = { start: "#4CAF50", stop: "#FF9800", poi: "#2196F3", end: "#E63946" };
 
   if (existingWaypoints.length > 1) {
@@ -111,6 +127,11 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
         icon: L.divIcon({ html: makeSelectedPin(), className: "", iconSize: [26, 26], iconAnchor: [13, 13] })
       }).addTo(map);
       map.setView([lat, lng], map.getZoom() < 12 ? 12 : map.getZoom(), { animate: true });
+    },
+    setZoom: function(z) {
+      var clamped = Math.max(map.getMinZoom(), Math.min(map.getMaxZoom(), Number(z)));
+      if (!isFinite(clamped)) return;
+      map.setZoom(clamped);
     }
   };
 
