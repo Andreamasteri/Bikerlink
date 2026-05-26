@@ -234,6 +234,7 @@ import matchingRouter from './admin/matching';
 import otaRouter from './admin/ota';
 import mapsAdminRouter from './admin/maps/index';
 import telemetryAdminRouter from './admin/telemetry';
+import dbAdminRouter from './admin/db';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -260,6 +261,7 @@ router.use('/analytics', _requireAdmin, analyticsRouter);
 router.use('/stregatti', _requireAdmin, stregattiRouter);
 router.use('/ota', _requireAdmin, otaRouter);
 router.use('/maps', _requireAdmin, mapsAdminRouter);
+router.use('/', _requireAdmin, dbAdminRouter);
 router.use('/', _requireAdmin, telemetryAdminRouter);
 router.use('/', _requireAdmin, miscRouter);
 router.use('/', matchingRouter);
