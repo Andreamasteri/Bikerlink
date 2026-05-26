@@ -132,6 +132,7 @@ let _userStates = new Map<string, UserMotionState>();
 let _nicknames = new Map<string, string>();
 let _lastCycleAt: Date | null = null;
 let _totalCycles = 0;
+let _lastCycleDurationMs = 0;
 
 export const MOTION_CRON_INTERVAL_MS = 30_000;
 
@@ -497,9 +498,11 @@ async function runCycle(): Promise<void> {
     return;
   }
   _cycleRunning = true;
+  const cycleStart = Date.now();
   try {
     await runCycleInner();
   } finally {
+    _lastCycleDurationMs = Date.now() - cycleStart;
     _cycleRunning = false;
   }
 }
@@ -741,6 +744,7 @@ export function getMotionStatus() {
     restingNow,
     lastCycleAt: _lastCycleAt?.toISOString() ?? null,
     totalCycles: _totalCycles,
+    lastCycleDurationMs: _lastCycleDurationMs,
     speedDistribution: {
       city: profileCounts.city,
       highway: profileCounts.highway,

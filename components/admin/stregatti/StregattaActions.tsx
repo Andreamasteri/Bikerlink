@@ -18,6 +18,7 @@ interface MotionStatus {
   restingNow: number;
   lastCycleAt: string | null;
   totalCycles: number;
+  lastCycleDurationMs?: number;
   speedDistribution?: { city: number; highway: number; mountain: number };
   averageSpeedKph?: number;
   convoiRiders?: number;
@@ -206,6 +207,23 @@ export function StregattaActions({
                 Cicli totali: {motionStatus.totalCycles}
               </Text>
             </View>
+            {motionStatus.totalCycles > 0 && (
+              <View style={styles.motionStatRow}>
+                <Ionicons
+                  name="timer-outline"
+                  size={12}
+                  color={(motionStatus.lastCycleDurationMs ?? 0) > 20000 ? Colors.error : Colors.textSecondary}
+                />
+                <Text
+                  style={[
+                    styles.motionStatText,
+                    (motionStatus.lastCycleDurationMs ?? 0) > 20000 && { color: Colors.error },
+                  ]}
+                >
+                  Durata ciclo: {motionStatus.lastCycleDurationMs ?? 0} ms
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
