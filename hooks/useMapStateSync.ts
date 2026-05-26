@@ -6,6 +6,7 @@ import type {
 
 interface UseMapStateSyncParams {
   mapReady: boolean;
+  mapReadyEpoch?: number;
   inject: (js: string) => void;
   mapsEnabled: boolean;
   activeTileUrl: string;
@@ -29,6 +30,7 @@ interface UseMapStateSyncParams {
 
 export function useMapStateSync({
   mapReady,
+  mapReadyEpoch,
   inject,
   mapsEnabled,
   activeTileUrl,
@@ -59,7 +61,7 @@ export function useMapStateSync({
     });
     inject("window.leafletBridge && window.leafletBridge.updateState(" + encoded + ")");
   }, [
-    mapReady, mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable, searchRadiusKm,
+    mapReady, mapReadyEpoch, mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable, searchRadiusKm,
     filteredUsers, workshops, eventPins, showEventPins, filterEvents,
     clubPins, filterClubs, easterEggs, activeSosRequests,
     realMeMarker, fakeMeMarker, currentUserId, inject,

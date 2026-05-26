@@ -14,6 +14,7 @@ interface MapMessageHandlerOptions {
   onReady?: () => void;
   onRegionChangeComplete?: (coords: { latitude: number; longitude: number }) => void;
   setMapReady: (ready: boolean) => void;
+  onMapReadyEpoch?: () => void;
 }
 
 export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
@@ -40,6 +41,7 @@ export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
         sendStartupBeacon("mapview_ready");
         opts.onReady?.();
         opts.setMapReady(true);
+        opts.onMapReadyEpoch?.();
       } else if (msg.type === "regionChange" && msg.lat != null && msg.lng != null) {
         opts.onRegionChangeComplete?.({ latitude: msg.lat, longitude: msg.lng });
       } else if (msg.type === "markerPress") {

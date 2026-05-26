@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
+import React, { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Text } from "react-native";
@@ -51,6 +51,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [mapReadyEpoch, setMapReadyEpoch] = useState(0);
   const initialCenterDoneRef = useRef(false);
   const gpsCenterDoneRef = useRef(false);
   const { userLocation, locationLoading } = useLocationWatch();
@@ -127,7 +128,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   });
 
   useMapStateSync({
-    mapReady, inject, mapsEnabled,
+    mapReady, mapReadyEpoch, inject, mapsEnabled,
     activeTileUrl: effectiveTileUrl,
     activeTileMaxZoom: effectiveTileMaxZoom,
     userLocation, isAvailable,
@@ -168,6 +169,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
       onUserPress, onClubPress, onEventPress, onEasterEggPress,
       onHazardPress: (id) => setSelectedHazardId(id),
       onReady, onRegionChangeComplete, setMapReady,
+      onMapReadyEpoch: () => setMapReadyEpoch((n) => n + 1),
     }),
     [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete],
   );
@@ -189,12 +191,21 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
 
   const mapHtml = LEAFLET_MAP_HTML;
   const mapBaseUrl = getApiUrl();
+  /* Memoize WebView source: react-native-webview shallow-compares the source
+     prop. A new object literal each render can trigger an unintended reload
+     of the WebView, which resets the embedded OverlappingMarkerSpiderfier
+     (vista ragno) and leaves the map empty until the next state push.
+     Keeping the object identity stable prevents the regression on Task #2484. */
+  const webViewSource = useMemo(
+    () => ({ html: mapHtml, baseUrl: mapBaseUrl }),
+    [mapHtml, mapBaseUrl],
+  );
 
   return (
     <View style={styles.container}>
       <WebView
         ref={webViewRef}
-        source={{ html: mapHtml, baseUrl: mapBaseUrl }}
+        source={webViewSource}
         style={styles.map}
         javaScriptEnabled={true}
         domStorageEnabled={true}
