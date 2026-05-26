@@ -25,6 +25,7 @@ export default function AdminMatchEngine() {
       bottomOffset={20}
     >
       <MatchingEngineSection
+        alwaysExpanded
         expanded={state.matchingEngineExpanded}
         onToggle={() => state.setMatchingEngineExpanded((v) => !v)}
         autoMatchEnabled={state.autoMatchEnabled}

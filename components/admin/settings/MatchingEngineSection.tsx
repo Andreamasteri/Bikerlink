@@ -110,6 +110,7 @@ const styles = StyleSheet.create({
 interface MatchingEngineSectionProps {
   expanded: boolean;
   onToggle: () => void;
+  alwaysExpanded?: boolean;
   autoMatchEnabled: boolean;
   onAutoMatchToggle: (val: boolean) => void;
   autoMatchPending: boolean;
@@ -137,6 +138,7 @@ interface MatchingEngineSectionProps {
 export function MatchingEngineSection({
   expanded,
   onToggle,
+  alwaysExpanded = false,
   autoMatchEnabled,
   onAutoMatchToggle,
   autoMatchPending,
@@ -188,15 +190,17 @@ export function MatchingEngineSection({
 
   return (
     <View style={styles.accordionPanel}>
-      <TouchableOpacity style={styles.accordionPanelHeader} onPress={onToggle}>
-        <View style={styles.synecoInfo}>
-          <Ionicons name="git-network" size={20} color={Colors.warning} />
-          <Text style={styles.accordionPanelTitle}>Matching Engine</Text>
-        </View>
-        <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
-      </TouchableOpacity>
-      {expanded && (
-        <View style={styles.accordionPanelContent}>
+      {!alwaysExpanded && (
+        <TouchableOpacity style={styles.accordionPanelHeader} onPress={onToggle}>
+          <View style={styles.synecoInfo}>
+            <Ionicons name="git-network" size={20} color={Colors.warning} />
+            <Text style={styles.accordionPanelTitle}>Matching Engine</Text>
+          </View>
+          <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={Colors.textSecondary} />
+        </TouchableOpacity>
+      )}
+      {(expanded || alwaysExpanded) && (
+        <View style={[styles.accordionPanelContent, alwaysExpanded && { borderTopWidth: 0 }]}>
           <View style={styles.paidCard}>
             <View style={styles.synecoHeader}>
               <View style={styles.synecoInfo}>
