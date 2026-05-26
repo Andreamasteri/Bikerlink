@@ -36,7 +36,7 @@ export default function FullscreenMapModal({
       {visible && (
         <>
           <Pressable
-            style={[styles.closeBtn, { top: insetsTop + 8 }]}
+            style={[styles.closeBtn, { top: insetsTop + 64 }]}
             onPress={onClose}
             hitSlop={12}
           >

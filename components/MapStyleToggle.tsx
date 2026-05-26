@@ -40,11 +40,13 @@ export function MapStyleToggle({ currentStyleId, onSelectStyle }: Props) {
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 46,
-    left: 16,
+    bottom: 84,
+    left: 12,
     backgroundColor: Colors.surface,
     borderRadius: 20,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,

@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { View, ActivityIndicator, StyleSheet, TouchableOpacity, Text } from "react-native";
 import WebView from "react-native-webview";
 import Colors from "@/constants/colors";
 import { useMapConfig } from "@/lib/map-context";
-import type { MapProvider } from "@/lib/map-tiles";
-import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
+import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { LEAFLET_MAP_HTML } from "@/lib/leaflet-map-html";
 import { useLocationWatch } from "@/hooks/useLocationWatch";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
@@ -48,7 +47,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   onRegionChangeComplete, gpsFollowupEnabled = false,
   showHazardReportButton = false,
 }: InteractiveMapProps, ref) {
-  const { enabled: mapsEnabled, resolvedProvider } = useMapConfig();
+  const { enabled: mapsEnabled } = useMapConfig();
   const webViewRef = useRef<WebView>(null);
   const [mapReady, setMapReady] = useState(false);
   const [mapReadyEpoch, setMapReadyEpoch] = useState(0);
@@ -103,18 +102,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     lng: h.lng,
     icon: HAZARD_ICONS[h.type as keyof typeof HAZARD_ICONS] ?? "⚠️",
   }));
-
-  const saveMapStyleMutation = useMutation({
-    mutationFn: async (style: MapProvider) => {
-      await apiRequest("PUT", "/api/users/profile/dynamic", { preferredMapStyle: style });
-    },
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["/api/users/me"] }); },
-  });
-
-  const handleToggleDayNight = useCallback(() => {
-    const next: MapProvider = resolvedProvider === "carto_light" ? "carto_dark" : "carto_light";
-    saveMapStyleMutation.mutate(next);
-  }, [resolvedProvider, saveMapStyleMutation]);
 
   const inject = useCallback((js: string) => {
     webViewRef.current?.injectJavaScript(js + ";true;");
@@ -187,8 +174,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     if (userLocation) inject("window.leafletBridge && window.leafletBridge.centerOnUser(" + userLocation.latitude + "," + userLocation.longitude + ")");
   }, [userLocation, inject]);
 
-  const showDayNightButton = mapsEnabled && (resolvedProvider === "carto_light" || resolvedProvider === "carto_dark");
-
   const mapHtml = LEAFLET_MAP_HTML;
   const mapBaseUrl = getApiUrl();
   /* Memoize WebView source: react-native-webview shallow-compares the source
@@ -232,9 +217,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
       />
       <MapControls
         isAvailable={isAvailable} ghostMode={ghostMode}
-        resolvedProvider={resolvedProvider} showDayNightButton={showDayNightButton}
-        isDayNightPending={saveMapStyleMutation.isPending}
-        onCenterOnUser={centerOnUser} onToggleDayNight={handleToggleDayNight}
+        onCenterOnUser={centerOnUser}
       />
       {mapReady && (
         <MapStyleToggle currentStyleId={styleId} onSelectStyle={setStyle} />

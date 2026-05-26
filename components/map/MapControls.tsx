@@ -3,26 +3,17 @@ import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
-import type { MapProvider } from "@/lib/map-tiles";
 
 interface MapControlsProps {
   isAvailable: boolean;
   ghostMode: boolean;
-  resolvedProvider: MapProvider;
-  showDayNightButton: boolean;
-  isDayNightPending: boolean;
   onCenterOnUser: () => void;
-  onToggleDayNight: () => void;
 }
 
 export function MapControls({
   isAvailable,
   ghostMode,
-  resolvedProvider,
-  showDayNightButton,
-  isDayNightPending,
   onCenterOnUser,
-  onToggleDayNight,
 }: MapControlsProps) {
   return (
     <>
@@ -31,23 +22,6 @@ export function MapControls({
           <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.accent} />
         </TouchableOpacity>
       </View>
-
-      {showDayNightButton && (
-        <View style={styles.dayNightContainer}>
-          <TouchableOpacity
-            style={styles.locationButton}
-            onPress={onToggleDayNight}
-            activeOpacity={0.7}
-            disabled={isDayNightPending}
-          >
-            <MaterialCommunityIcons
-              name={resolvedProvider === "carto_light" ? "weather-night" : "weather-sunny"}
-              size={22}
-              color={Colors.accent}
-            />
-          </TouchableOpacity>
-        </View>
-      )}
 
       <View style={styles.availabilityContainer}>
         <View style={styles.availabilityIndicator}>
@@ -76,12 +50,6 @@ const styles = StyleSheet.create({
     right: 12,
     gap: 10,
     alignItems: "flex-end",
-  },
-  dayNightContainer: {
-    position: "absolute",
-    top: 162,
-    left: 16,
-    zIndex: 10,
   },
   availabilityContainer: {
     position: "absolute",
