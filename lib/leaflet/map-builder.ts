@@ -369,25 +369,21 @@ export function buildLeafletRouteMapHtml(
   tileUrl: string,
   tileMaxZoom: number,
   waypoints: RouteWaypoint[],
-  _accentColor: string = "#FF6600",
+  accentColor: string = "#FF6600",
   typeColors?: Record<string, string>,
   showMarkers: boolean = true,
   trackPoints?: Array<{ lat: number; lng: number; speedKmh?: number | null }>
 ): string {
-  const _waypointsJson = JSON.stringify(waypoints);
   const resolvedTypeColors: Record<string, string> = {};
   for (const w of waypoints) {
     resolvedTypeColors[w.waypointType] =
       (typeColors && typeColors[w.waypointType]) || getWaypointColor(w.waypointType);
   }
-  const _colorsJson = JSON.stringify(resolvedTypeColors);
-  const _showMarkersJs = showMarkers ? "true" : "false";
   const polylinePoints = trackPoints ?? waypoints.map((w) => ({ lat: w.lat, lng: w.lng }));
+  const waypointsJson = JSON.stringify(waypoints);
+  const colorsJson = JSON.stringify(resolvedTypeColors);
   const polylineJson = JSON.stringify(polylinePoints);
-  const waypointsJson = _waypointsJson;
-  const colorsJson = _colorsJson;
-  const showMarkersJs = _showMarkersJs;
-  const accentColor = _accentColor;
+  const showMarkersJs = showMarkers ? "true" : "false";
 
   return `<!DOCTYPE html>
 <html>
