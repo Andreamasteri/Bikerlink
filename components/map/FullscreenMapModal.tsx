@@ -35,7 +35,11 @@ export default function FullscreenMapModal({
     >
       {visible && (
         <>
-          <Pressable style={[styles.closeBtn, { top: insetsTop + 32 }]} onPress={onClose}>
+          <Pressable
+            style={[styles.closeBtn, { top: insetsTop + 8 }]}
+            onPress={onClose}
+            hitSlop={12}
+          >
             <Ionicons name="close" size={28} color="#fff" />
           </Pressable>
 
@@ -81,13 +85,18 @@ const styles = StyleSheet.create({
   closeBtn: {
     position: "absolute",
     right: 8,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    borderRadius: 20,
-    width: 40,
-    height: 40,
+    backgroundColor: "rgba(0,0,0,0.75)",
+    borderRadius: 22,
+    width: 44,
+    height: 44,
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 10,
+    zIndex: 1000,
+    elevation: 12,
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
   },
   areaBtn: {
     position: "absolute",

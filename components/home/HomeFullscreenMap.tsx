@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { BackHandler, Platform } from "react-native";
 import FullscreenMapModal from "@/components/map/FullscreenMapModal";
 import type { MapUser } from "@/components/InteractiveMap";
 
@@ -56,6 +57,16 @@ export const HomeFullscreenMap: React.FC<HomeFullscreenMapProps> = ({
   getUserColor,
   getUserTypeLabel,
 }) => {
+  useEffect(() => {
+    if (Platform.OS !== "android") return;
+    if (!mapFullscreen) return;
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      setMapFullscreen(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [mapFullscreen, setMapFullscreen]);
+
   return (
     <FullscreenMapModal
       visible={mapFullscreen}
