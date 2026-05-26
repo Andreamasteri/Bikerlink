@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/query-client";
 import { PUSH_NOTIFICATIONS_ENABLED_KEY } from "@/lib/push-prefs";
@@ -61,13 +62,18 @@ export function PushTokenRegistrar() {
         }
         if (finalStatus !== "granted") return;
 
-        const tokenData = await Notifications.getExpoPushTokenAsync();
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+        if (!projectId) {
+          console.warn("[PushTokenRegistrar] projectId non trovato in Constants.expoConfig.extra.eas.projectId — token non registrato");
+          return;
+        }
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
         const token = tokenData.data;
         if (!token) return;
 
         await apiRequest("PUT", "/api/users/me/push-token", { token });
-      } catch {
-        // no-op: ignore push token registration failures
+      } catch (err) {
+        console.warn("[PushTokenRegistrar] Registrazione token push fallita:", err);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps

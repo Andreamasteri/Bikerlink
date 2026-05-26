@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { View, Text, Pressable, Switch, StyleSheet, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useMutation } from "@tanstack/react-query";
+import Constants from "expo-constants";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -78,9 +79,17 @@ export default function NotificationsPanel({ serverPushEnabled, serverNotifPrefs
             "Permesso richiesto",
             "Abilita le notifiche dalle impostazioni del telefono per ricevere gli avvisi di match.",
           );
+          setPushNotificationsEnabled(false);
+          await AsyncStorage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, "false").catch(() => {});
+          await apiRequest("PUT", "/api/users/profile/dynamic", { pushNotificationsEnabled: false }).catch(() => {});
+          queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
           return;
         }
-        const tokenData = await Notifications.getExpoPushTokenAsync();
+        const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+        if (!projectId) {
+          throw new Error("Configurazione notifiche mancante (projectId). Riprova o contatta il supporto.");
+        }
+        const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
         const token = tokenData?.data;
         if (!token) {
           throw new Error("Impossibile ottenere il token di notifica");
@@ -89,14 +98,18 @@ export default function NotificationsPanel({ serverPushEnabled, serverNotifPrefs
       } else {
         await apiRequest("PUT", "/api/users/me/push-token", { token: null });
       }
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
     } catch (e: unknown) {
-      Alert.alert("Errore", getMessage(e));
-      setPushNotificationsEnabled(!next);
+      Alert.alert("Errore notifiche", getMessage(e));
+      const reverted = !next;
+      setPushNotificationsEnabled(reverted);
       try {
-        await AsyncStorage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, !next ? "true" : "false");
+        await AsyncStorage.setItem(PUSH_NOTIFICATIONS_ENABLED_KEY, reverted ? "true" : "false");
       } catch {
         // no-op: ignore secondary storage failures during error handling
       }
+      apiRequest("PUT", "/api/users/profile/dynamic", { pushNotificationsEnabled: reverted }).catch(() => {});
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
     } finally {
       setPushTogglePending(false);
     }
