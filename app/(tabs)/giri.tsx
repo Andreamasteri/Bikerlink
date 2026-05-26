@@ -21,6 +21,7 @@ import { GiriListHeader } from "@/components/giri/list/GiriListHeader";
 import { GiriListFilters, FilterTab } from "@/components/giri/list/GiriListFilters";
 import { GiriListCard, PlannedRoute } from "@/components/giri/list/GiriListCard";
 import { GiriEmptyState } from "@/components/giri/list/GiriEmptyState";
+import OfflineMapsPanel from "@/components/profile/OfflineMapsPanel";
 
 export default function GiriScreen() {
   const colors = useColors();
@@ -137,6 +138,8 @@ export default function GiriScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
         showsVerticalScrollIndicator={false}
       >
+        <OfflineMapsPanel onIndexChanged={refreshOfflineIndex} />
+
         {isLoading ? (
           <View style={s.loadingState}>
             <ActivityIndicator size="large" color={colors.accent} />

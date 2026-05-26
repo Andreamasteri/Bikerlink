@@ -4,7 +4,11 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { loadIndex, deleteAllOfflineTiles, deleteTilesForRoute, type OfflineTilesIndex } from "@/lib/offline-tiles";
 
-export default function OfflineMapsPanel() {
+interface OfflineMapsPanelProps {
+  onIndexChanged?: () => void;
+}
+
+export default function OfflineMapsPanel({ onIndexChanged }: OfflineMapsPanelProps = {}) {
   const [offlineMapsExpanded, setOfflineMapsExpanded] = useState(false);
   const [offlineMapsIndex, setOfflineMapsIndex] = useState<OfflineTilesIndex>({});
 
@@ -69,6 +73,7 @@ export default function OfflineMapsPanel() {
                               await deleteTilesForRoute(entry.routeId);
                               const updated = await loadIndex();
                               setOfflineMapsIndex(updated);
+                              onIndexChanged?.();
                             },
                           },
                         ]
@@ -95,6 +100,7 @@ export default function OfflineMapsPanel() {
                           onPress: async () => {
                             await deleteAllOfflineTiles();
                             setOfflineMapsIndex({});
+                            onIndexChanged?.();
                           },
                         },
                       ]

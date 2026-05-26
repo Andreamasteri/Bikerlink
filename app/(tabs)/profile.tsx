@@ -24,7 +24,6 @@ import TelemetryPanel from "@/components/profile/TelemetryPanel";
 import PhotoGrid from "@/components/profile/PhotoGrid";
 import NotificationsPanel from "@/components/profile/NotificationsPanel";
 import MatchPrefsPanel from "@/components/profile/MatchPrefsPanel";
-import OfflineMapsPanel from "@/components/profile/OfflineMapsPanel";
 import ThemePanel from "@/components/profile/ThemePanel";
 import UnitsPanel from "@/components/profile/UnitsPanel";
 
@@ -310,7 +309,6 @@ export default function ProfileScreen() {
         />
 
         <MatchPrefsPanel />
-        <OfflineMapsPanel />
         <ThemePanel />
         <UnitsPanel />
         <ProfileActionsBar
