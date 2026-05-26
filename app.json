@@ -21,6 +21,8 @@
         "NSMotionUsageDescription": "BikerLink accede al sensore di movimento per rilevare i passi tramite il pedometro nel pannello diagnostica sensori.",
         "UIBackgroundModes": [
           "location",
+          "audio",
+          "location",
           "audio"
         ],
         "ITSAppUsesNonExemptEncryption": false
@@ -44,7 +46,24 @@
         "android.permission.ACCESS_MEDIA_LOCATION",
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.READ_MEDIA_AUDIO"
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
       "adaptiveIcon": {
         "backgroundColor": "#1A1A2E",
@@ -103,7 +122,10 @@
           "photosPermission": "BikerLink accede ai tuoi file audio e foto per riprodurre brani offline e caricare immagini del profilo.",
           "savePhotosPermission": "BikerLink salva file audio scaricati nella libreria multimediale del dispositivo.",
           "isAccessMediaLocationEnabled": true,
-          "androidPermissions": ["READ_MEDIA_AUDIO", "READ_EXTERNAL_STORAGE"]
+          "androidPermissions": [
+            "READ_MEDIA_AUDIO",
+            "READ_EXTERNAL_STORAGE"
+          ]
         }
       ],
       "expo-document-picker",
@@ -122,7 +144,8 @@
             "enableShrinkResourcesInReleaseBuilds": true,
             "buildArchs": [
               "arm64-v8a"
-            ]
+            ],
+            "enableMinifyInReleaseBuilds": true
           }
         }
       ],
@@ -133,7 +156,7 @@
     },
     "updates": {
       "enabled": true,
-      "url": "https://biker-link.replit.app/api/expo-updates",
+      "url": "https://u.expo.dev/a25192d7-72e5-46af-97d0-2d38ed9b78e3",
       "channel": "production",
       "fallbackToCacheTimeout": 0,
       "checkAutomatically": "ON_LOAD"
