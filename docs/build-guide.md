@@ -139,13 +139,13 @@ Il server BikerLink sincronizza automaticamente le nuove release da EAS ogni vol
 che si apre il pannello admin OTA. In alternativa, forzare la sincronizzazione:
 
 ```
-Admin BikerLink → /admin/maps → sezione OTA → pulsante "Sync"
+Admin BikerLink → /admin/ota → pulsante "Sync"
 ```
 
 ### Step 3 — Approva la release
 
 ```
-Admin BikerLink → /admin/maps → sezione OTA → lista release pending → "Approva"
+Admin BikerLink → /admin/ota → lista release pending → "Approva"
 ```
 
 Solo dopo l'approvazione la release viene promossa a `production` nel DB e diventa
@@ -258,7 +258,7 @@ APK/AAB caricato su Play Store. Non può tornare indietro.
 ### Opzione A — Disattiva la release difettosa (rapido)
 
 ```
-Admin BikerLink → /admin/maps → sezione OTA → release approvata → "Rifiuta"
+Admin BikerLink → /admin/ota → release approvata → "Rifiuta"
 ```
 
 Una volta rifiutata, il server smette di servirla. Gli utenti che l'hanno già
@@ -268,7 +268,7 @@ ma i nuovi avvii non riceveranno più l'update.
 ### Opzione B — Ri-approva una release precedente buona
 
 ```
-Admin BikerLink → /admin/maps → sezione OTA → release precedente → "Rollback"
+Admin BikerLink → /admin/ota → release precedente → "Rollback"
 ```
 
 Il server inizia a servire la versione precedente come aggiornamento attivo.
@@ -281,7 +281,7 @@ come se fosse un nuovo update.
 # Pubblica hotfix immediato sul canale staging (entra nella coda admin come sempre)
 eas update --channel staging --message "Hotfix critico: ripristino funzionalità X"
 # Poi approva immediatamente dal pannello admin
-# Admin BikerLink → /admin/maps → sezione OTA → pulsante "Sync" → Approva
+# Admin BikerLink → /admin/ota → pulsante "Sync" → Approva
 ```
 
 ---
