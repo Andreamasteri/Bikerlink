@@ -199,7 +199,6 @@ VALHALLA_URL = ""
 GRAPHHOPPER_URL = "https://routing.bikerlink.app"
 TILES_URL = "https://tiles.bikerlink.app"
 ROUTING_DISABLED = "0"
-OTA_PUBLISH_SECRET = "413aabc0e957d2d9c3ebb5293035fec19d027426cf9be8a1ff6c42a520855224"
 
 [userenv.development]
 EXPO_WEB_URL = "http://localhost:8081"
