@@ -512,11 +512,11 @@ export default function MatchScreen() {
   const newPropProfileMatches = useMemo(() => propProfileMatches?.filter(m => m.status === "new") || [], [propProfileMatches]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
-    { key: "zavorrine", label: t("match.tabZavorrine"), icon: "person", count: newGarageMatches.length },
     { key: "biker", label: t("match.tabBiker"), icon: "bicycle", count: newBikerMatches.length },
+    { key: "zavorrine", label: t("match.tabZavorrine"), icon: "person", count: newGarageMatches.length },
+    { key: "music", label: t("match.tabMusic"), icon: "musical-notes", count: 0 },
     { key: "proposals", label: t("match.tabProposals"), icon: "flash", count: newProposalMatches.length },
     { key: "propProfile", label: t("match.tabPropProfile"), icon: "location", count: newPropProfileMatches.length },
-    { key: "music", label: t("match.tabMusic"), icon: "musical-notes", count: 0 },
     { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: 0 },
     { key: "blacklist", label: t("match.tabBlacklist"), icon: "ban", count: 0 },
   ];
@@ -561,7 +561,7 @@ export default function MatchScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: colors.background }]}>
       <InlineMiniPlayer />
-      <MatchHeader title={t("match.title")} systemDesc={t("match.systemDesc")} />
+      <MatchHeader title={t("match.title")} />
 
       <MatchFiltersPanel 
         distanceMode={distanceMode}

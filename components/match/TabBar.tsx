@@ -11,94 +11,99 @@ interface TabBarProps {
   tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[];
 }
 
-export function TabBar({ activeTab, setActiveTab, tabs }: TabBarProps) {
+function TabItem({
+  tab,
+  active,
+  onPress,
+}: {
+  tab: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number };
+  active: boolean;
+  onPress: () => void;
+}) {
+  const showIcon = tab.key !== "biker" && tab.key !== "zavorrine";
+
   return (
-    <View style={styles.tabRowSpaced}>
-      <View style={styles.tabRow}>
-        {tabs.slice(0, 4).map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            {tab.key !== "zavorrine" && tab.key !== "biker" && (
-              <Ionicons
-                name={tab.icon}
-                size={13}
-                color={activeTab === tab.key ? Colors.accent : Colors.textSecondary}
-              />
-            )}
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
-            {tab.count > 0 && (
-              <View style={[styles.countBadge, { backgroundColor: Colors.accentRed }]}>
-                <Text style={[styles.countBadgeText, { color: "#fff" }]}>
-                  {tab.count}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
+    <TouchableOpacity
+      style={[styles.tab, active && styles.tabActive]}
+      onPress={onPress}
+    >
+      {showIcon && (
+        <Ionicons
+          name={tab.icon}
+          size={13}
+          color={active ? Colors.accent : Colors.textSecondary}
+        />
+      )}
+      <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+        {tab.label}
+      </Text>
+      {tab.count > 0 && (
+        <View style={[styles.countBadge, { backgroundColor: Colors.accentRed }]}>
+          <Text style={[styles.countBadgeText, { color: "#fff" }]}>
+            {tab.count}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+export function TabBar({ activeTab, setActiveTab, tabs }: TabBarProps) {
+  const row1 = tabs.slice(0, 3);
+  const row2 = tabs.slice(3, 5);
+  const row3 = tabs.slice(5, 7);
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.row}>
+        {row1.map((tab) => (
+          <TabItem key={tab.key} tab={tab} active={activeTab === tab.key} onPress={() => setActiveTab(tab.key)} />
         ))}
       </View>
-      <View style={[styles.tabRow, styles.tabRowSecond]}>
-        {tabs.slice(4).map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, styles.tabSecond, activeTab === tab.key && styles.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
-          >
-            <Ionicons
-              name={tab.icon}
-              size={14}
-              color={activeTab === tab.key ? Colors.accent : Colors.textSecondary}
-            />
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
-            {tab.count > 0 && (
-              <View style={[styles.countBadge, { backgroundColor: Colors.accentRed }]}>
-                <Text style={[styles.countBadgeText, { color: "#fff" }]}>
-                  {tab.count}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
+      <View style={styles.row}>
+        <View style={styles.innerRowCentered}>
+          {row2.map((tab) => (
+            <TabItem key={tab.key} tab={tab} active={activeTab === tab.key} onPress={() => setActiveTab(tab.key)} />
+          ))}
+        </View>
+      </View>
+      <View style={styles.row}>
+        <View style={styles.innerRowCentered}>
+          {row3.map((tab) => (
+            <TabItem key={tab.key} tab={tab} active={activeTab === tab.key} onPress={() => setActiveTab(tab.key)} />
+          ))}
+        </View>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  tabRowSpaced: {
+  container: {
     marginTop: 4,
+    gap: 4,
   },
-  tabRow: {
+  row: {
     flexDirection: "row",
     paddingHorizontal: 6,
-    paddingVertical: 4,
     gap: 4,
-    alignItems: "center",
   },
-  tabRowSecond: {
+  innerRowCentered: {
+    flex: 1,
+    flexDirection: "row",
     justifyContent: "center",
-    paddingTop: 0,
+    gap: 4,
   },
   tab: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 2,
-    paddingVertical: 5,
-    paddingHorizontal: 2,
+    gap: 3,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
     borderRadius: 10,
     backgroundColor: Colors.surface,
-  },
-  tabSecond: {
-    flex: 0,
-    width: "45%",
   },
   tabActive: {
     backgroundColor: Colors.accent + "20",
@@ -106,9 +111,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "40",
   },
   tabText: {
-    fontSize: 16,
+    fontSize: 13,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
+    flexShrink: 1,
   },
   tabTextActive: {
     color: Colors.accent,
@@ -116,14 +122,14 @@ const styles = StyleSheet.create({
   },
   countBadge: {
     borderRadius: 9,
-    minWidth: 18,
-    height: 18,
+    minWidth: 17,
+    height: 17,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
   },
   countBadgeText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "700",
   },
 });
