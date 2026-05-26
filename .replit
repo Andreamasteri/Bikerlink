@@ -8,7 +8,7 @@ packages = ["freetype", "glibcLocales", "lcms2", "libimagequant", "libjpeg", "li
 [deployment]
 deploymentTarget = "autoscale"
 build = ["bash", "scripts/deploy-build.sh"]
-run = ["node", "server_dist/index.js"]
+run = ["bash", "-c", "PORT=8081 node server_dist/index.js"]
 
 [env]
 PORT = "5000"

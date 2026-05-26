@@ -121,7 +121,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   }
 
   // ── Phase 2: HTTP Listen ──────────────────────────────────────────────────
-  const PORT = 5000;
+  const PORT = parseInt(process.env.PORT ?? "5000", 10);
   bootLog(2, TOTAL, "HTTP Listen", `binding 0.0.0.0:${PORT}`);
   await new Promise<void>((resolve) => {
     server.listen(PORT, "0.0.0.0", () => {
