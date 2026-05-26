@@ -51,11 +51,11 @@ Il progetto usa il bare workflow (directory `android/` committata). I tre file d
 
 | File | Campo | Valore corrente |
 |---|---|---|
-| `app.json` | `expo.version` | `52.3.10` |
-| `app.json` | `expo.android.versionCode` | `52` |
+| `app.json` | `expo.version` | `53.1.10` |
+| `app.json` | `expo.android.versionCode` | `53` |
 | `app.json` | `expo.runtimeVersion` | `10.0.0` |
-| `android/app/build.gradle` | `versionCode` | `52` |
-| `android/app/build.gradle` | `versionName` | `"52.3.10"` |
+| `android/app/build.gradle` | `versionCode` | `53` |
+| `android/app/build.gradle` | `versionName` | `"53.1.10"` |
 | `android/app/src/main/res/values/strings.xml` | `expo_runtime_version` | `10.0.0` |
 
 ⚠️ **Aggiornare sempre tutti e tre i file contemporaneamente.** Un disallineamento causa errori di update check a runtime.
@@ -97,7 +97,8 @@ La versione OTA segue la formula `<build>.<updateNumber>.<ciclo>` (hardcodata ne
 | v49 | 49 | 49.0.10 | 10.0.0 | 10.x | — | SDK 56 compliance, New Arch, arm64 — standalone (no OTA) |
 | v50 | 50 | 50.0.10 | 10.0.0 | 10.x | OTA-1 | OTA attiva, staged rollout, arm64 |
 | v51 | 51 | 51.1.10 | 10.0.0 | 10.x | OTA-1 inglobata | Fix mappa/offline/RoadHazards/profilo |
-| v52 | 52 | 52.3.10 | 10.0.0 | 10.x | OTA-3 inglobata | **Corrente** — Fix mappa nera Android (OTA2), pulsante Forza OTA (OTA3), fix mutation GraphQL promozione staging→production |
+| v52 | 52 | 52.3.10 | 10.0.0 | 10.x | OTA-3 inglobata | Fix mappa nera Android (OTA2), pulsante Forza OTA (OTA3), fix mutation GraphQL promozione staging→production |
+| v53 | 53 | 53.1.10 | 10.0.0 | 10.x | OTA-1 inglobata | **Corrente** — Fix sistema mappe (tile ID, normalizeTileId, OpenLayers type), fix admin DB Debug/Dimensioni, SQL injection visitatori |
 
 > **Cicli precedenti** (schema vecchio `major.minor.patch` senza significato semantico):
 > - Ciclo 2.x: rv 2.0.0

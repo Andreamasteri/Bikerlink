@@ -2,14 +2,14 @@
   "expo": {
     "name": "BikerLink",
     "slug": "bikerlink",
-    "version": "52.3.10",
+    "version": "53.1.10",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "bikerlink",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": false,
-      "buildNumber": "34",
+      "buildNumber": "35",
       "bundleIdentifier": "com.bikerlink.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "BikerLink usa la tua posizione GPS per mostrare i motociclisti vicini, registrare i tuoi percorsi in moto e ricevere avvisi SOS dalla community.",
@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "com.bikerlink.app",
-      "versionCode": 52,
+      "versionCode": 53,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
