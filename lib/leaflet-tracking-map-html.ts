@@ -100,14 +100,38 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
   var pendingUpdate = null;
   var bridgeReady = false;
 
+  function postViewState() {
+    var c = map.getCenter();
+    postMsg({
+      type: "viewState",
+      zoom: map.getZoom(),
+      minZoom: map.getMinZoom(),
+      maxZoom: map.getMaxZoom(),
+      bearing: 0,
+      lat: c.lat,
+      lng: c.lng
+    });
+  }
+
   window.trackingBridge = {
     updateLocation: function(json) {
       var data;
       try { data = JSON.parse(json); } catch(e) { return; }
       if (!bridgeReady) { pendingUpdate = data; return; }
       applyUpdate(data);
-    }
+    },
+    setZoom: function(payload) {
+      var data;
+      try { data = typeof payload === "string" ? JSON.parse(payload) : payload; } catch(e) { return; }
+      var level = data && typeof data === "object" ? data.zoom : Number(data);
+      if (typeof level !== "number" || !isFinite(level)) return;
+      map.setZoom(level);
+    },
+    resetBearing: function() {}
   };
+
+  map.on("zoomend", postViewState);
+  map.on("moveend", postViewState);
 
   function postMsg(obj) {
     try {
@@ -133,6 +157,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 
   bridgeReady = true;
   if (pendingUpdate) { applyUpdate(pendingUpdate); pendingUpdate = null; }
+  postViewState();
   postMsg({ type: "trackingReady" });
 })();
 </script>

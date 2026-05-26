@@ -5,6 +5,7 @@ import type { WebViewMessageEvent } from "react-native-webview";
 import { useMapConfig } from "@/lib/map-context";
 import { getApiUrl } from "@/lib/query-client";
 import { buildLeafletTrackingMapHtml } from "@/lib/leaflet-tracking-map-html";
+import { MapZoomSlider } from "@/components/map/MapZoomSlider";
 import Colors from "@/constants/colors";
 
 interface TrackingMapProps {
@@ -19,6 +20,9 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
   const { enabled: mapsEnabled, activeTileUrl, activeTileMaxZoom } = useMapConfig();
   const tileUrl = mapsEnabled ? activeTileUrl : "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png";
   const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
+  const [viewState, setViewState] = useState({
+    zoom: 14, minZoom: 0, maxZoom: 22, lat: 0, lng: 0,
+  });
 
   const mapHtml = useMemo(
     () => buildLeafletTrackingMapHtml(tileUrl, tileMaxZoom, Colors.accent, __DEV__),
@@ -62,6 +66,16 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
           pushUpdate(pendingRef.current.points, pendingRef.current.currentLocation);
           pendingRef.current = null;
         }
+      } else if (msg.type === "viewState") {
+        const zoom = typeof msg.zoom === "number" ? msg.zoom : null;
+        if (zoom == null) return;
+        setViewState({
+          zoom,
+          minZoom: typeof msg.minZoom === "number" ? msg.minZoom : 0,
+          maxZoom: typeof msg.maxZoom === "number" ? msg.maxZoom : 22,
+          lat: typeof msg.lat === "number" ? msg.lat : 0,
+          lng: typeof msg.lng === "number" ? msg.lng : 0,
+        });
       } else if (__DEV__ && msg.type === "trackingCoordError") {
         console.warn("[LeafletTrackingMap] malformed location payload:", JSON.stringify(msg));
       }
@@ -69,6 +83,12 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
       // no-op: ignore malformed bridge messages
     }
   }, [pushUpdate]);
+
+  const handleZoomChange = useCallback((z: number) => {
+    setViewState((prev) => ({ ...prev, zoom: z }));
+    const payload = JSON.stringify({ zoom: z });
+    inject("window.trackingBridge && window.trackingBridge.setZoom && window.trackingBridge.setZoom(" + payload + ")");
+  }, [inject]);
 
   return (
     <View style={styles.wrapper}>
@@ -87,6 +107,16 @@ export default function LeafletTrackingMap({ points, currentLocation }: Tracking
         startInLoadingState={false}
         onError={(e) => console.warn("[LeafletTrackingMap] WebView error:", e.nativeEvent.description)}
       />
+      {bridgeReady && (
+        <MapZoomSlider
+          zoom={viewState.zoom}
+          minZoom={viewState.minZoom}
+          maxZoom={viewState.maxZoom}
+          latitude={viewState.lat}
+          topOffset={12}
+          onZoomChange={handleZoomChange}
+        />
+      )}
     </View>
   );
 }
