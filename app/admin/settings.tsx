@@ -7,7 +7,6 @@ import { useT } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 
 import { EmailStatusCard } from "@/components/admin/settings/EmailStatusCard";
-import { MatchingEngineSection } from "@/components/admin/settings/MatchingEngineSection";
 import { CoordinateHistorySection } from "@/components/admin/settings/CoordinateHistorySection";
 import { SosBikerSection } from "@/components/admin/settings/SosBikerSection";
 import { MusicSystemSection } from "@/components/admin/settings/MusicSystemSection";
@@ -76,49 +75,6 @@ export default function AdminSettings() {
           unitsPrefEnabled={state.unitsPrefEnabled}
           onUnitsPrefToggle={(val) => state.protectedToggleMutation.mutate({ key: "units_preference_enabled", value: val ? "true" : "false" })}
           unitsPrefLoading={state.protectedToggleMutation.isPending}
-        />
-
-        <MatchingEngineSection
-          expanded={state.matchingEngineExpanded}
-          onToggle={() => state.setMatchingEngineExpanded((v) => !v)}
-          autoMatchEnabled={state.autoMatchEnabled}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- state from useAdminSettingsState
-          onAutoMatchToggle={(val) => (state as any).autoMatchMutation.mutate(val)}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- state from useAdminSettingsState
-          autoMatchPending={(state as any).autoMatchMutation.isPending}
-          showSearchPrefEnabled={state.showSearchPrefEnabled}
-          onShowSearchPrefToggle={(val) => state.showSearchPrefMutation.mutate(val)}
-          showSearchPrefPending={state.showSearchPrefMutation.isPending}
-          matchPrefVisibleEnabled={state.matchPrefVisibleEnabled}
-          onMatchPrefVisibleToggle={(val) => state.matchPrefVisibleMutation.mutate(val)}
-          matchPrefVisiblePending={state.matchPrefVisibleMutation.isPending}
-          searchPrefLockedEnabled={state.searchPrefLockedEnabled}
-          onSearchPrefLockedToggle={(val) => state.searchPrefLockedMutation.mutate(val)}
-          searchPrefLockedPending={state.searchPrefLockedMutation.isPending}
-          refetchIntervalInput={state.refetchIntervalInput}
-          setRefetchIntervalInput={state.setRefetchIntervalInput}
-          onRefetchIntervalEndEditing={() => {
-            const val = parseInt(state.refetchIntervalInput, 10);
-            if (!isNaN(val) && val >= 5) {
-              state.refetchIntervalMutation.mutate(val);
-            } else {
-              state.setRefetchIntervalInput(String(state.refetchIntervalData?.seconds ?? 30));
-            }
-          }}
-          coordMaxAgeInput={state.coordMaxAgeInput}
-          setCoordMaxAgeInput={state.setCoordMaxAgeInput}
-          onCoordMaxAgeEndEditing={() => {
-            const val = parseInt(state.coordMaxAgeInput, 10);
-            if (!isNaN(val) && val >= 10) {
-              state.coordMaxAgeMutation.mutate(val);
-            } else {
-              state.setCoordMaxAgeInput(String(state.coordMaxAgeData?.value ?? 300));
-            }
-          }}
-          motoclubCreationEnabled={state.motoclubCreationEnabled}
-          onMotoclubCreationToggle={(val) => state.motoclubCreationMutation.mutate(val)}
-          motoclubCreationPending={state.motoclubCreationMutation.isPending}
-          matchingTriggerFeedback={state.matchingTriggerFeedback}
         />
 
         <CoordinateHistorySection
