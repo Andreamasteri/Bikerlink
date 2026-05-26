@@ -89,6 +89,7 @@ log_info "Pubblicazione bundle su EAS production (Metro in corso — attendi 5-8
 EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" \
   eas update \
     --channel production \
+    --environment production \
     --message "${MESSAGE}" \
     --non-interactive 2>&1) || {
   log_error "eas update fallito:"
