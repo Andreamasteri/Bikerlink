@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   },
   hazardFab: {
     position: "absolute",
-    bottom: 155,
+    bottom: 175,
     right: 12,
     backgroundColor: Colors.surface,
     width: 44,

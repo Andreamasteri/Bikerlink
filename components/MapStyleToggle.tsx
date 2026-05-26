@@ -40,7 +40,7 @@ export function MapStyleToggle({ currentStyleId, onSelectStyle }: Props) {
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 16,
+    top: 46,
     right: 16,
     backgroundColor: Colors.surface,
     borderRadius: 20,

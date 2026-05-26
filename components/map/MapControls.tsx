@@ -70,14 +70,14 @@ export function MapControls({
 const styles = StyleSheet.create({
   controlsContainer: {
     position: "absolute",
-    bottom: 97,
+    bottom: 117,
     right: 12,
     gap: 10,
     alignItems: "flex-end",
   },
   availabilityContainer: {
     position: "absolute",
-    bottom: 98,
+    bottom: 118,
     left: 12,
     zIndex: 10,
   },
