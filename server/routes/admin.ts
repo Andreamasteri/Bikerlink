@@ -318,6 +318,6 @@ router.use('/maps', _requireAdmin, mapsAdminRouter);
 router.use('/', _requireAdmin, dbAdminRouter);
 router.use('/', _requireAdmin, telemetryAdminRouter);
 router.use('/', _requireAdmin, miscRouter);
-router.use('/', matchingRouter);
+router.use('/', _requireAdmin, matchingRouter);
 
 export default router;

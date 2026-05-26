@@ -55,6 +55,22 @@ function logSeedError(context: string, err: unknown): void {
 
 async function cleanAllFakeUsers(): Promise<void> {
   console.log("[mass-seed] Cleaning all fake users from DB...");
+
+  const mismarkedResult = await pool.query<{ cnt: string }>(`
+    SELECT COUNT(*) AS cnt FROM users
+    WHERE is_fake = true
+      AND role NOT IN ('admin', 'moderator')
+      AND email NOT LIKE '%@fakeuser.bikerlink.it'
+      AND (invitation_code IS NULL OR invitation_code NOT LIKE 'mass_seed%')
+  `);
+  const mismarkedCount = parseInt(mismarkedResult.rows[0]?.cnt ?? "0", 10);
+  if (mismarkedCount > 0) {
+    throw new Error(
+      `[mass-seed] BLOCKED: ${mismarkedCount} real user(s) are incorrectly marked as isFake=true. ` +
+      `Run POST /api/admin/users/fix-isfake to remediate before seeding.`
+    );
+  }
+
   await pool.query("DELETE FROM users WHERE is_fake = true");
   await pool.query(`
     DELETE FROM conversations

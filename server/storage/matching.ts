@@ -106,7 +106,7 @@ export class MatchingStorage extends ContestStorage {
   }
 
   async getAllWishlistMotosWithUsers(countries?: string[]): Promise<{ wishlistMoto: import("@shared/db").ZavarrinaWishlistMoto; userId: string }[]> {
-    const baseCondition = and(...systemAccountConditions(users))!;
+    const baseCondition = and(eq(users.isFake, false), eq(users.status, "active"), ...systemAccountConditions(users))!;
     const condition = countries && countries.length > 0 ? and(baseCondition, inArray(users.country, countries)) : baseCondition;
     return db.select({ wishlistMoto: zavarrinaWishlistMotos, userId: zavarrinaWishlists.userId })
       .from(zavarrinaWishlistMotos)
@@ -116,7 +116,7 @@ export class MatchingStorage extends ContestStorage {
   }
 
   async getAllBikerMotorcyclesWithUsers(countries?: string[]): Promise<{ motorcycle: import("@shared/db").UserMotorcycle; userId: string }[]> {
-    const baseCondition = and(or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!, ...systemAccountConditions(users))!;
+    const baseCondition = and(eq(users.isFake, false), eq(users.status, "active"), or(eq(users.userType, "biker"), eq(users.userType, "coppia"))!, ...systemAccountConditions(users))!;
     const condition = countries && countries.length > 0 ? and(baseCondition, inArray(users.country, countries)) : baseCondition;
     const results = await db.select({ motorcycle: userMotorcycles, userId: userMotorcycles.userId })
       .from(userMotorcycles)

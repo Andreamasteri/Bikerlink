@@ -19,30 +19,68 @@ router.get("/unread-total", async (req: Request, res: Response) => {
     const convs = await storage.getConversations(userId);
     let total = 0;
 
+    const convIds = convs.map(c => c.id);
+    if (convIds.length === 0) return res.json({ count: 0 });
+
+    const [allParticipants, lastMsgs] = await Promise.all([
+      db.select().from(conversationParticipants).where(inArray(conversationParticipants.conversationId, convIds)),
+      db.selectDistinctOn([messages.conversationId], {
+        conversationId: messages.conversationId,
+        senderId: messages.senderId,
+        createdAt: messages.createdAt,
+      }).from(messages)
+        .where(inArray(messages.conversationId, convIds))
+        .orderBy(messages.conversationId, desc(messages.createdAt)),
+    ]);
+
+    const participantsByConv = new Map<string, typeof allParticipants>();
+    for (const p of allParticipants) {
+      if (!participantsByConv.has(p.conversationId)) participantsByConv.set(p.conversationId, []);
+      participantsByConv.get(p.conversationId)!.push(p);
+    }
+    const lastMsgMap = new Map(lastMsgs.map(m => [m.conversationId, m]));
+
+    const allOtherParticipantIds = [...new Set(
+      allParticipants.filter(p => p.userId !== userId).map(p => p.userId)
+    )];
+    const existingUsersResult = allOtherParticipantIds.length > 0
+      ? await db.select({ id: users.id }).from(users).where(inArray(users.id, allOtherParticipantIds))
+      : [];
+    const existingUserSet = new Set(existingUsersResult.map(r => r.id));
+
+    const orphanResets: Promise<void>[] = [];
+
     for (const conv of convs) {
-      const participants = await storage.getConversationParticipants(conv.id);
+      const participants = participantsByConv.get(conv.id) ?? [];
 
       const isDirectConv = conv.conversationType === "direct" || conv.conversationType === "private" || conv.conversationType === "contact";
       if (isDirectConv) {
         const otherParticipantIds = participants.filter(p => p.userId !== userId).map(p => p.userId);
-        if (otherParticipantIds.some(id => blockedIds.has(id))) {
+        if (otherParticipantIds.some(id => blockedIds.has(id))) continue;
+        if (otherParticipantIds.length > 0 && otherParticipantIds.every(id => !existingUserSet.has(id))) {
+          orphanResets.push(storage.updateConversationLastRead(conv.id, userId));
           continue;
         }
       }
 
       const myParticipant = participants.find((p) => p.userId === userId);
-      const msgs = await storage.getMessages(conv.id, 1, 0);
-      const lastMessage = msgs[0] || null;
+      const lastMessage = lastMsgMap.get(conv.id) ?? null;
 
-      if (lastMessage && lastMessage.senderId !== userId) {
-        if (myParticipant?.lastReadAt) {
-          if (new Date(lastMessage.createdAt) > new Date(myParticipant.lastReadAt)) {
-            total++;
-          }
-        } else {
+      if (!lastMessage) continue;
+      if (lastMessage.senderId === userId) continue;
+      if (lastMessage.senderId && !existingUserSet.has(lastMessage.senderId)) continue;
+
+      if (myParticipant?.lastReadAt) {
+        if (new Date(lastMessage.createdAt) > new Date(myParticipant.lastReadAt)) {
           total++;
         }
+      } else {
+        total++;
       }
+    }
+
+    if (orphanResets.length > 0) {
+      await Promise.allSettled(orphanResets);
     }
 
     return res.json({ count: total });

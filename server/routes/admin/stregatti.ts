@@ -34,6 +34,10 @@ router.post("/", async (req: Request, res: Response) => {
       return sendError(res, 409, "Nickname già in uso");
     }
     const email = `fake_${nickname.toLowerCase().replace(/[^a-z0-9]/g, "")}@fakeuser.bikerlink.it`;
+    const existingEmail = await storage.getUserByEmail(email);
+    if (existingEmail && !existingEmail.isFake) {
+      return sendError(res, 409, "Questo account esiste già come utente reale");
+    }
     const fakeSecret = crypto.randomBytes(32).toString("base64url");
     const hashedPassword = await bcrypt.hash(fakeSecret, 10);
     const country = countryField || "IT";
@@ -75,6 +79,19 @@ router.put("/toggle-all", async (req: Request, res: Response) => {
 
 router.delete("/", async (_req: Request, res: Response) => {
   try {
+    const realUsersMismarked = await db.execute(sql`
+      SELECT COUNT(*) AS cnt FROM users
+      WHERE is_fake = true
+        AND role NOT IN ('admin', 'moderator')
+        AND email NOT LIKE '%@fakeuser.bikerlink.it'
+        AND (invitation_code IS NULL OR invitation_code NOT LIKE 'mass_seed%')
+    `);
+    type CntRow = { cnt: string };
+    const mismarkedCount = parseInt((realUsersMismarked.rows[0] as CntRow)?.cnt ?? "0", 10);
+    if (mismarkedCount > 0) {
+      console.error(`[stregatti-delete] BLOCKED: ${mismarkedCount} real user(s) incorrectly marked as isFake=true would be deleted. Run /api/admin/users/fix-isfake first.`);
+      return sendError(res, 409, `Impossibile eliminare: ${mismarkedCount} utenti reali risultano erroneamente marcati come fake. Esegui prima /api/admin/users/fix-isfake.`);
+    }
     const countResult = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(eq(users.isFake, true));
     const deleted = countResult[0]?.count ?? 0;
     await db.delete(users).where(eq(users.isFake, true));
