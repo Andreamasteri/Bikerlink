@@ -19,6 +19,7 @@ import { LanguageTable } from "@/components/admin/tabella-lingue/LanguageTable";
 import { LanguageFilters } from "@/components/admin/tabella-lingue/LanguageFilters";
 import { LanguageAiStats } from "@/components/admin/tabella-lingue/LanguageAiStats";
 import { LanguageEditModal, EditModalData } from "@/components/admin/tabella-lingue/LanguageEditModal";
+import { AddKeyModal, AddKeyFormData } from "@/components/admin/tabella-lingue/AddKeyModal";
 
 const HEADER_ROW_HEIGHT = 36;
 
@@ -36,6 +37,10 @@ export default function TabellaLingue() {
   const [recentlySaved, setRecentlySaved] = useState<Set<string>>(new Set());
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState("");
 
   const loadTable = useCallback(async () => {
     setLoading(true);
@@ -155,6 +160,58 @@ export default function TabellaLingue() {
     }
   }, [editModal, draftValue, closeModal]);
 
+  const handleAddKey = useCallback(async (data: AddKeyFormData) => {
+    setAddSaving(true);
+    setAddError("");
+    try {
+      const resp = await apiRequest("POST", "/api/admin/translations/keys", data);
+      const json = await resp.json();
+      if (!resp.ok) throw new Error(json?.message || "Errore creazione chiave");
+      setTableData((prev) => {
+        const newRow: TableRow = {
+          key: json.key,
+          position: json.position ?? "",
+          it: json.it ?? "",
+          en: json.en ?? "",
+          de: json.de ?? "",
+          es: json.es ?? "",
+          fr: json.fr ?? "",
+          el: json.el ?? "",
+          tr: json.tr ?? "",
+        };
+        return [...prev, newRow];
+      });
+      setAddModalVisible(false);
+    } catch (e: unknown) {
+      setAddError(e instanceof Error ? (e as Error).message : "Errore sconosciuto");
+    } finally {
+      setAddSaving(false);
+    }
+  }, []);
+
+  const handleDeleteRow = useCallback(async (key: string) => {
+    const snapshotIndex = tableData.findIndex((r) => r.key === key);
+    const snapshot = snapshotIndex >= 0 ? tableData[snapshotIndex] : null;
+    setTableData((prev) => prev.filter((r) => r.key !== key));
+    try {
+      const resp = await apiRequest("DELETE", `/api/admin/translations/keys/${encodeURIComponent(key)}`);
+      if (!resp.ok) {
+        throw new Error(`Errore ${resp.status}`);
+      }
+    } catch {
+      if (snapshot) {
+        setTableData((prev) => {
+          const next = [...prev];
+          const insertAt = Math.min(snapshotIndex, next.length);
+          next.splice(insertAt, 0, snapshot);
+          return next;
+        });
+      }
+      setSaveError(`Eliminazione fallita per "${key}". Riprova.`);
+      setTimeout(() => setSaveError(""), 5000);
+    }
+  }, [tableData]);
+
   if (loading) {
     return (
       <View style={[styles.centered, { paddingTop: insets.top + 20 }]}>
@@ -192,6 +249,21 @@ export default function TabellaLingue() {
         onAiComplete={handleAiComplete}
       />
 
+      <View style={styles.addKeyRow}>
+        <TouchableOpacity
+          style={styles.addKeyBtn}
+          onPress={() => {
+            setAddError("");
+            setAddModalVisible(true);
+          }}
+          activeOpacity={0.8}
+        >
+          <MaterialIcons name="add" size={16} color="#fff" />
+          <Text style={styles.addKeyBtnText}>Aggiungi chiave</Text>
+        </TouchableOpacity>
+        <Text style={styles.addKeyHint}>Tieni premuto una riga per eliminarla</Text>
+      </View>
+
       {saveError ? (
         <TouchableOpacity style={styles.saveErrorBanner} onPress={() => setSaveError("")} activeOpacity={0.8}>
           <MaterialCommunityIcons name="alert-circle" size={16} color="#fff" />
@@ -209,6 +281,7 @@ export default function TabellaLingue() {
           tableAreaHeight={tableAreaHeight}
           recentlySaved={recentlySaved}
           onOpenModal={openModal}
+          onDeleteRow={handleDeleteRow}
           headerRowHeight={HEADER_ROW_HEIGHT}
         />
       </View>
@@ -221,6 +294,14 @@ export default function TabellaLingue() {
         onClose={closeModal}
         onSave={handleSave}
         saving={saving}
+      />
+
+      <AddKeyModal
+        visible={addModalVisible}
+        saving={addSaving}
+        error={addError}
+        onClose={() => setAddModalVisible(false)}
+        onSave={handleAddKey}
       />
     </View>
   );
@@ -260,6 +341,35 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontFamily: "Inter_600SemiBold",
     fontSize: 14,
+  },
+  addKeyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border ?? "#2a2a2a",
+    gap: 12,
+  },
+  addKeyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+    gap: 5,
+  },
+  addKeyBtnText: {
+    color: "#fff",
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+  addKeyHint: {
+    color: Colors.textSecondary,
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    flex: 1,
   },
   tableArea: {
     flex: 1,

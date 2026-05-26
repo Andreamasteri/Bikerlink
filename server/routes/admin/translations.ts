@@ -45,6 +45,56 @@ router.patch("/key", async (req: Request, res: Response) => {
   }
 });
 
+router.post("/keys", async (req: Request, res: Response) => {
+  try {
+    const { key, position, it } = req.body as { key?: string; position?: string; it?: string };
+
+    if (!key || typeof key !== "string" || !key.trim()) {
+      return sendError(res, 400, "Il campo 'key' è obbligatorio");
+    }
+    if (!it || typeof it !== "string" || !it.trim()) {
+      return sendError(res, 400, "Il valore italiano è obbligatorio");
+    }
+
+    const trimmedKey = key.trim();
+    const trimmedPosition = (position ?? "").trim();
+    const trimmedIt = it.trim();
+
+    const [inserted] = await db
+      .insert(translationKeys)
+      .values({ key: trimmedKey, position: trimmedPosition, it: trimmedIt })
+      .returning();
+
+    return res.status(201).json(inserted);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "";
+    if (message.includes("unique") || message.includes("duplicate")) {
+      return sendError(res, 409, "Chiave già esistente");
+    }
+    console.error("[translations] POST /keys error:", err);
+    return sendError(res, 500, "Errore creazione chiave");
+  }
+});
+
+router.delete("/keys/:key", async (req: Request, res: Response) => {
+  try {
+    const { key } = req.params;
+    if (!key) return sendError(res, 400, "Chiave mancante");
+
+    const [deleted] = await db
+      .delete(translationKeys)
+      .where(sql`${translationKeys.key} = ${key}`)
+      .returning();
+
+    if (!deleted) return sendError(res, 404, `Chiave non trovata: ${key}`);
+
+    return res.json({ deleted: true, key: deleted.key });
+  } catch (err) {
+    console.error("[translations] DELETE /keys/:key error:", err);
+    return sendError(res, 500, "Errore eliminazione chiave");
+  }
+});
+
 router.post("/ai-complete", async (_req: Request, res: Response) => {
   try {
     const openaiKey = process.env.OPENAI_API_KEY;

@@ -15,6 +15,7 @@ interface LanguageTableProps {
   tableAreaHeight: number;
   recentlySaved: Set<string>;
   onOpenModal: (row: TableRow, lang: { code: string; label: string }) => void;
+  onDeleteRow: (key: string) => void;
   headerRowHeight: number;
 }
 
@@ -23,6 +24,7 @@ export const LanguageTable: React.FC<LanguageTableProps> = ({
   tableAreaHeight,
   recentlySaved,
   onOpenModal,
+  onDeleteRow,
   headerRowHeight,
 }) => {
   const totalWidth = COL_POSITION + COL_IT + TABLE_LANGS.length * COL_LANG;
@@ -58,6 +60,7 @@ export const LanguageTable: React.FC<LanguageTableProps> = ({
                   totalWidth={totalWidth}
                   recentlySaved={recentlySaved}
                   onOpenModal={onOpenModal}
+                  onDeleteRow={onDeleteRow}
                 />
               )}
               nestedScrollEnabled
