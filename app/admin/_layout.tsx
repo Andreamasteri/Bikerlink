@@ -49,6 +49,7 @@ export default function AdminLayout() {
       <Stack.Screen name="match-preferences-edit" options={{ title: "Preferenze Matching" }} />
       <Stack.Screen name="ota" options={{ title: "Controllo OTA" }} />
       <Stack.Screen name="maps" options={{ title: "Sistema Mappe" }} />
+      <Stack.Screen name="device-stats" options={{ title: "Dispositivi Utenti" }} />
     </Stack>
   );
 }

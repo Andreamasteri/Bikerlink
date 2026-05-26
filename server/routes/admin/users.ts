@@ -432,6 +432,61 @@ router.post("/fix-isfake", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/stats/devices", async (req: Request, res: Response) => {
+  try {
+    const days = parseInt(req.query.days as string) || 0;
+
+    const dateFilter = days > 0
+      ? sql`AND last_login_at >= NOW() - INTERVAL '1 day' * ${days}`
+      : sql``;
+
+    const platformResult = await db.execute(sql`
+      SELECT
+        COALESCE(last_platform, 'unknown') AS platform,
+        COUNT(*)::int AS count
+      FROM users
+      WHERE role NOT IN ('admin', 'moderator')
+        ${dateFilter}
+      GROUP BY last_platform
+      ORDER BY count DESC
+    `);
+
+    const modelsResult = await db.execute(sql`
+      SELECT
+        COALESCE(last_device_model, 'Sconosciuto') AS model,
+        COALESCE(last_platform, 'unknown') AS platform,
+        COUNT(*)::int AS count
+      FROM users
+      WHERE role NOT IN ('admin', 'moderator')
+        AND last_device_model IS NOT NULL
+        ${dateFilter}
+      GROUP BY last_device_model, last_platform
+      ORDER BY count DESC
+      LIMIT 30
+    `);
+
+    const totalResult = await db.execute(sql`
+      SELECT COUNT(*)::int AS total
+      FROM users
+      WHERE role NOT IN ('admin', 'moderator')
+        ${dateFilter}
+    `);
+
+    type PlatformRow = { platform: string; count: number };
+    type ModelRow = { model: string; platform: string; count: number };
+    type TotalRow = { total: number };
+
+    const total = (totalResult.rows[0] as TotalRow)?.total ?? 0;
+    const platforms = platformResult.rows as PlatformRow[];
+    const models = modelsResult.rows as ModelRow[];
+
+    return res.json({ total, platforms, models });
+  } catch (err) {
+    console.error("[admin] device stats error:", err);
+    return sendError(res, 500, "Errore statistiche dispositivi");
+  }
+});
+
 router.get("/match-summary", async (req: Request, res: Response) => {
   try {
     const page = parseInt(req.query.page as string) || 1;

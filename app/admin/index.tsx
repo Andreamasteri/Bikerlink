@@ -226,6 +226,7 @@ const adminGroups: AdminGroup[] = [
       { key: "moderator-logs", label: "Log Moderatori", icon: "shield-account-outline", iconSet: "MaterialCommunityIcons", route: "/admin/moderator-logs" },
       { key: "crash-logs", label: "Log Riavvii", icon: "phone-alert", iconSet: "MaterialCommunityIcons", route: "/admin/crash-logs", accentColor: "#FF6B35" },
       { key: "visitatori", label: "Visitatori Sito", icon: "web", iconSet: "MaterialCommunityIcons", route: "/admin/visitatori", accentColor: "#22C55E" },
+      { key: "device-stats", label: "Dispositivi", icon: "cellphone-check", iconSet: "MaterialCommunityIcons", route: "/admin/device-stats", accentColor: "#6366F1" },
     ],
   },
   {
