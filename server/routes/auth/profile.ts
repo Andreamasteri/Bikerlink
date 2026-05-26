@@ -35,7 +35,7 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return sendError(res, 401, "Non autenticato");
-    const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown };
+    const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown; deviceModel?: unknown };
     const semverRe = /^\d+\.\d+\.\d+$/;
     const platformAllowed = new Set(["android", "ios", "web"]);
     const lastAppVersion =
@@ -46,11 +46,16 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
       typeof body.platform === "string" && platformAllowed.has(body.platform)
         ? body.platform
         : "unknown";
-    await storage.updateUser(userId, {
-      lastLoginAt: new Date(),
-      lastAppVersion,
-      lastPlatform,
-    });
+    const updatePayload: {
+      lastLoginAt: Date;
+      lastAppVersion: string;
+      lastPlatform: string;
+      lastDeviceModel?: string;
+    } = { lastLoginAt: new Date(), lastAppVersion, lastPlatform };
+    if (typeof body.deviceModel === "string" && body.deviceModel.trim().length > 0) {
+      updatePayload.lastDeviceModel = body.deviceModel.trim().slice(0, 100);
+    }
+    await storage.updateUser(userId, updatePayload);
     onlineTracker.touch(userId);
     return sendSuccess(res);
   } catch {

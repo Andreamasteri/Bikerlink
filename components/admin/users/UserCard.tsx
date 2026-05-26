@@ -14,6 +14,8 @@ export interface AdminUser {
   createdAt: string;
   lastLoginAt?: string | null;
   lastAppVersion?: string | null;
+  lastPlatform?: string | null;
+  lastDeviceModel?: string | null;
   isFake?: boolean;
   isPrimal?: boolean;
   hasLastfmData?: boolean;
@@ -107,6 +109,11 @@ export const UserCard: React.FC<UserCardProps> = ({
             </Text>
           );
         })()}
+        {(item.lastDeviceModel || item.lastPlatform) && (
+          <Text style={styles.deviceModel} numberOfLines={1}>
+            {[item.lastPlatform, item.lastDeviceModel].filter(Boolean).join(" · ")}
+          </Text>
+        )}
       </View>
       <View style={styles.actions}>
         <TouchableOpacity onPress={() => onOpenEdit(item)} style={styles.actionBtn}>
@@ -175,6 +182,7 @@ const styles = StyleSheet.create({
   lastLogin: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 6 },
   versionBadge: { fontFamily: "Inter_500Medium", fontSize: 11, marginTop: 3 },
   versionMissing: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 3 },
+  deviceModel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
   actions: { flexDirection: "column", gap: 10 },
   actionBtn: { padding: 4 },
 });

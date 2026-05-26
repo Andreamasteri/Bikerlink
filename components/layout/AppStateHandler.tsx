@@ -13,6 +13,7 @@ import {
   isBackgroundLocationSupported,
 } from "@/lib/background-location-task";
 import Constants from "expo-constants";
+import { getDeviceModel } from "@/lib/device-model";
 
 const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
 
@@ -20,7 +21,10 @@ async function sendHeartbeat() {
   try {
     const appVersion = Constants.expoConfig?.version ?? "0.0.0";
     const platform = Platform.OS;
-    await apiRequest("POST", "/api/auth/heartbeat", { appVersion, platform });
+    const deviceModel = getDeviceModel();
+    const payload: Record<string, string> = { appVersion, platform };
+    if (deviceModel) payload.deviceModel = deviceModel;
+    await apiRequest("POST", "/api/auth/heartbeat", payload);
   } catch {
     // no-op: ignore heartbeat failures
   }
