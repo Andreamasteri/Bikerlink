@@ -41,7 +41,7 @@ const styles = StyleSheet.create({
   container: {
     position: "absolute",
     top: 46,
-    right: 16,
+    left: 16,
     backgroundColor: Colors.surface,
     borderRadius: 20,
     overflow: "hidden",

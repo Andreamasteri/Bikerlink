@@ -227,8 +227,8 @@ export function useHomeMapState() {
       } catch {
         // no-op: ignore JSON parsing or storage read errors
       }
-      setSelectedCountries(["IT"]);
-      try { await AsyncStorage.setItem("map_area_countries", JSON.stringify(["IT"])); } catch {
+      setSelectedCountries([]);
+      try { await AsyncStorage.setItem("map_area_countries", JSON.stringify([])); } catch {
         // no-op: ignore storage write failures
       }
       setCountriesLoaded(true);

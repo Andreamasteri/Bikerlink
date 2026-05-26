@@ -30,8 +30,10 @@ export function MapControls({
         <TouchableOpacity style={styles.locationButton} onPress={onCenterOnUser} activeOpacity={0.7}>
           <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.accent} />
         </TouchableOpacity>
+      </View>
 
-        {showDayNightButton && (
+      {showDayNightButton && (
+        <View style={styles.dayNightContainer}>
           <TouchableOpacity
             style={styles.locationButton}
             onPress={onToggleDayNight}
@@ -44,8 +46,8 @@ export function MapControls({
               color={Colors.accent}
             />
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      )}
 
       <View style={styles.availabilityContainer}>
         <View style={styles.availabilityIndicator}>
@@ -75,9 +77,15 @@ const styles = StyleSheet.create({
     gap: 10,
     alignItems: "flex-end",
   },
+  dayNightContainer: {
+    position: "absolute",
+    top: 162,
+    left: 16,
+    zIndex: 10,
+  },
   availabilityContainer: {
     position: "absolute",
-    bottom: 118,
+    bottom: 12,
     left: 12,
     zIndex: 10,
   },
