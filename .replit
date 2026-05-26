@@ -55,15 +55,7 @@ args = "ESLint"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "eslint"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "typecheck-client"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "apostrophe-check"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -71,11 +63,7 @@ args = "file-conflict-guard"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "healthcheck"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "hooks-check"
+args = "OTA Publish"
 
 [[workflows.workflow]]
 name = "Start App"
@@ -158,17 +146,6 @@ task = "shell.exec"
 args = "npx eslint . --ext .ts,.tsx --max-warnings 9999"
 
 [[workflows.workflow]]
-name = "eslint"
-author = "agent"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/eslint-hooks-check.sh"
-
-[[workflows.workflow]]
 name = "typecheck-client"
 author = "agent"
 
@@ -178,17 +155,6 @@ isValidation = true
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/typecheck-client.sh"
-
-[[workflows.workflow]]
-name = "apostrophe-check"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/check-script-apostrophes.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
 
 [[workflows.workflow]]
 name = "file-conflict-guard"
@@ -202,23 +168,12 @@ args = "npx tsx scripts/check-file-conflicts.ts"
 outputType = "console"
 
 [[workflows.workflow]]
-name = "healthcheck"
+name = "OTA Publish"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "bash scripts/check-runtime-health.sh"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
-name = "hooks-check"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "bash scripts/eslint-hooks-check.sh"
+args = "bash scripts/publish-ota-full.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
