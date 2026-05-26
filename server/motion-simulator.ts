@@ -605,27 +605,37 @@ async function runCycleInner(): Promise<void> {
     return;
   }
 
-  // Step 4: batch-update coordinates in DB (chunked)
-  const CHUNK = 200;
+  // Step 4: batch-update coordinates in DB using a single VALUES query per chunk.
+  // This replaces N individual UPDATEs with one UPDATE … FROM (VALUES …) statement,
+  // reducing round-trips from O(N) to O(N/CHUNK).
+  const CHUNK = 500;
+  const now = new Date();
+
   for (let i = 0; i < updates.length; i += CHUNK) {
-    const chunk = updates.slice(i, i + CHUNK);
-    await Promise.allSettled(
-      chunk.map(({ userId, lat, lng }) =>
-        db
-          .update(userProfiles)
-          .set({ latitude: lat, longitude: lng, coordinatesUpdatedAt: new Date() })
-          .where(eq(userProfiles.userId, userId)),
-      ),
+    const batch = updates.slice(i, i + CHUNK);
+    const valuesSql = sql.join(
+      batch.map(({ userId, lat, lng }) => sql`(${userId}::uuid, ${lat}::float8, ${lng}::float8)`),
+      sql`, `,
     );
+    await db.execute(sql`
+      UPDATE user_profiles AS up
+      SET latitude = v.lat,
+          longitude = v.lng,
+          coordinates_updated_at = ${now}
+      FROM (VALUES ${valuesSql}) AS v(user_id, lat, lng)
+      WHERE up.user_id = v.user_id
+    `);
   }
 
-  // Step 5: batch-update lastLoginAt for moving users (heartbeat)
-  for (let i = 0; i < movingIds.length; i += CHUNK) {
-    const chunk = movingIds.slice(i, i + CHUNK);
-    await db
-      .update(users)
-      .set({ lastLoginAt: new Date() })
-      .where(and(eq(users.isFake, true), inArray(users.id, chunk)));
+  // Step 5: single UPDATE for all moving users' lastLoginAt (heartbeat)
+  if (movingIds.length > 0) {
+    for (let i = 0; i < movingIds.length; i += CHUNK) {
+      const chunk = movingIds.slice(i, i + CHUNK);
+      await db
+        .update(users)
+        .set({ lastLoginAt: now })
+        .where(and(eq(users.isFake, true), inArray(users.id, chunk)));
+    }
   }
 
   _lastCycleAt = new Date();
@@ -746,6 +756,26 @@ export function stopMotionSimulator(): void {
     clearInterval(_timer);
     _timer = null;
   }
+}
+
+/**
+ * Remove a single fake user from the in-memory simulator state.
+ * Call this after deleting a user from the DB so the next cycle
+ * does not try to update a non-existent row.
+ */
+export function removeUserFromSimulator(userId: string): void {
+  _userStates.delete(userId);
+  _nicknames.delete(userId);
+}
+
+/**
+ * Clear ALL fake users from the in-memory simulator state.
+ * Call this after a mass-delete so the cycle does not update
+ * non-existent rows.
+ */
+export function clearSimulatorUsers(): void {
+  _userStates.clear();
+  _nicknames.clear();
 }
 
 export interface RiderPosition {

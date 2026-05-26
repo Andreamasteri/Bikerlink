@@ -7,7 +7,7 @@ import { eq, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { setMotionEnabled, getMotionStatus, getPositions, getBoundingBox, setBoundingBox, getUserSpeedMap } from "../../motion-simulator";
+import { setMotionEnabled, getMotionStatus, getPositions, getBoundingBox, setBoundingBox, getUserSpeedMap, removeUserFromSimulator, clearSimulatorUsers } from "../../motion-simulator";
 
 const router = Router();
 
@@ -72,14 +72,15 @@ router.put("/toggle-all", async (req: Request, res: Response) => {
   }
 });
 
-router.delete("/", async (req: Request, res: Response) => {
+router.delete("/", async (_req: Request, res: Response) => {
   try {
-    const fakes = await db.select({ id: users.id }).from(users).where(eq(users.isFake, true));
-    for (const f of fakes) {
-      await storage.deleteUser(f.id);
-    }
-    return sendSuccess(res, { deleted: fakes.length });
+    const countResult = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(eq(users.isFake, true));
+    const deleted = countResult[0]?.count ?? 0;
+    await db.delete(users).where(eq(users.isFake, true));
+    clearSimulatorUsers();
+    return sendSuccess(res, { deleted });
   } catch (_error) {
+    console.error("Admin delete all stregatti error:", _error);
     return sendError(res, 500, "Errore eliminazione globale");
   }
 });
@@ -169,6 +170,21 @@ router.put("/motion/bbox", async (req: Request, res: Response) => {
   } catch (_error) {
     console.error("[MOTION] bbox update error:", _error);
     return sendError(res, 500, "Errore aggiornamento bounding box");
+  }
+});
+
+router.delete("/:id", async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const user = await storage.getUser(id);
+    if (!user) return sendError(res, 404, "Utente non trovato");
+    if (!user.isFake) return sendError(res, 403, "Non è uno stregatto");
+    await storage.deleteUser(id);
+    removeUserFromSimulator(id);
+    return sendSuccess(res, { deleted: id });
+  } catch (_error) {
+    console.error("Admin delete stregatto error:", _error);
+    return sendError(res, 500, "Errore eliminazione stregatto");
   }
 });
 
