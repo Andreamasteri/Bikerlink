@@ -16,6 +16,7 @@ export interface GeoZone {
 
 export interface SessionItem {
   sid: string;
+  displaySid?: string;
   sessionType: string;
   expiry: string | null;
 }
@@ -101,19 +102,21 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
   getRoleColor,
   getStatusColor,
 }) => {
-  if (!user) return null;
-
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === "ios" ? "formSheet" : undefined} onRequestClose={onClose}>
       <View style={statsStyles.modalContainer}>
         <View style={statsStyles.modalHeader}>
-          <Text style={statsStyles.modalTitle}>{user.nickname}</Text>
+          <Text style={statsStyles.modalTitle}>{user?.nickname ?? ""}</Text>
           <TouchableOpacity onPress={onClose}>
             <Ionicons name="close" size={24} color={Colors.text} />
           </TouchableOpacity>
         </View>
 
-        {isLoadingStats ? (
+        {!visible || !user ? (
+          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+            <Text style={{ color: Colors.textSecondary }}>Nessun utente selezionato</Text>
+          </View>
+        ) : isLoadingStats ? (
           <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
             <Text style={{ color: Colors.textSecondary }}>Caricamento...</Text>
           </View>
@@ -307,7 +310,7 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
                             color={Colors.textSecondary}
                           />
                           <Text style={sessionStyles.sessionSid} numberOfLines={1}>
-                            ID: {sess.sid}
+                            ID: {sess.displaySid ?? sess.sid}
                           </Text>
                         </View>
                         {sess.expiry && (

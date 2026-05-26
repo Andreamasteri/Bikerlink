@@ -222,8 +222,7 @@ export default function AdminUsers() {
 
   const revokeSessionMutation = useMutation({
     mutationFn: async ({ userId, sid }: { userId: string; sid: string }) => {
-      const cleanSid = sid.startsWith("…") ? sid.slice(1) : sid;
-      const res = await apiRequest("DELETE", `/api/admin/users/${userId}/sessions/${encodeURIComponent(cleanSid)}`);
+      const res = await apiRequest("DELETE", `/api/admin/users/${userId}/sessions/${encodeURIComponent(sid)}`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
@@ -398,13 +397,13 @@ export default function AdminUsers() {
         }
       />
 
-      <ErrorBoundary>
+      <ErrorBoundary onError={(err, stack) => console.error("[UserDetailModal crash]", err.message, stack)}>
         <UserDetailModal
           visible={statsModalVisible}
           onClose={() => setStatsModalVisible(false)}
           user={selectedUser}
           stats={statsQuery.data}
-          isLoadingStats={statsQuery.isPending}
+          isLoadingStats={statsQuery.isFetching}
           fzEnabled={fzEnabled}
           setFzEnabled={setFzEnabled}
           fzData={fzData}

@@ -1,9 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { users, userLastfmSessions, userMusicTracks } from "@shared/db";
+import { users, userLastfmSessions, userMusicTracks, proposals, conversationParticipants, messages, reports, moderatorLogs, adClicks, adCampaigns } from "@shared/db";
 import { userStatusSchema, userRoleSchema, userEmailAdminSchema, adminSetPasswordSchema, primalSchema } from "@shared/validators";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, sql, count } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { isProtectedUser } from "../../constants";
 import { closeSseClient } from "../../chat-sse";
@@ -337,9 +337,107 @@ router.get("/match-summary", async (req: Request, res: Response) => {
 
 router.get("/:id/stats", async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
-    return res.json({ userId: id, stats: {} });
+    const id = String(req.params.id);
+
+    const [user, profile] = await Promise.all([
+      storage.getUser(id),
+      storage.getUserProfile(id),
+    ]);
+    if (!user) return sendError(res, 404, "Utente non trovato");
+
+    const [
+      proposalsCreatedRows,
+      conversationsRows,
+      messagesSentRows,
+      reportsFiledRows,
+      reportsReceivedRows,
+      motorcycles,
+      moderatorLogsRows,
+      adClicksRows,
+    ] = await Promise.all([
+      db.select({ cnt: count() }).from(proposals).where(eq(proposals.userId, id)),
+      db.select({ cnt: count() }).from(conversationParticipants).where(eq(conversationParticipants.userId, id)),
+      db.select({ cnt: count() }).from(messages).where(eq(messages.senderId, id)),
+      db.select({ cnt: count() }).from(reports).where(eq(reports.reporterId, id)),
+      db.select({ cnt: count() }).from(reports).where(eq(reports.reportedUserId, id)),
+      storage.getUserMotorcycles(id),
+      db.select({
+        action: moderatorLogs.action,
+        createdAt: moderatorLogs.createdAt,
+        moderatorId: moderatorLogs.moderatorId,
+      }).from(moderatorLogs).where(eq(moderatorLogs.targetId, id)).orderBy(moderatorLogs.createdAt),
+      db.select({
+        id: adClicks.id,
+        clickedAt: adClicks.createdAt,
+        adTitle: adCampaigns.name,
+      }).from(adClicks)
+        .leftJoin(adCampaigns, eq(adClicks.campaignId, adCampaigns.id))
+        .where(eq(adClicks.userId, id))
+        .orderBy(adClicks.createdAt),
+    ]);
+
+    const moderatorNicknameMap: Record<string, string> = {};
+    const moderatorIds = [...new Set(moderatorLogsRows.map((l) => l.moderatorId).filter(Boolean))] as string[];
+    if (moderatorIds.length > 0) {
+      const mods = await storage.getUsersByIds(moderatorIds);
+      for (const mod of mods) {
+        moderatorNicknameMap[mod.id] = mod.nickname;
+      }
+    }
+
+    const { password: _pw, ...safeUser } = user;
+
+    return res.json({
+      user: {
+        id: safeUser.id,
+        nickname: safeUser.nickname,
+        email: safeUser.email,
+        userType: safeUser.userType,
+        role: safeUser.role,
+        status: safeUser.status,
+        createdAt: safeUser.createdAt,
+        lastLoginAt: safeUser.lastLoginAt ?? null,
+        lastLogoutAt: safeUser.lastLogoutAt ?? null,
+        lastAppCloseAt: safeUser.lastAppCloseAt ?? null,
+        ghostMode: safeUser.ghostMode ?? false,
+        isOnline: false,
+        isFake: safeUser.isFake ?? false,
+        isPrimal: safeUser.isPrimal ?? false,
+        totalKm: profile?.totalKm ?? null,
+        totalRides: profile?.totalRides ?? null,
+        isAvailable: profile?.isAvailable ?? false,
+        bio: profile?.bio ?? null,
+        latitude: profile?.latitude ?? null,
+        longitude: profile?.longitude ?? null,
+      },
+      stats: {
+        proposalsCreated: proposalsCreatedRows[0]?.cnt ?? 0,
+        conversationsCount: conversationsRows[0]?.cnt ?? 0,
+        messagesSent: messagesSentRows[0]?.cnt ?? 0,
+        reportsFiled: reportsFiledRows[0]?.cnt ?? 0,
+        reportsReceived: reportsReceivedRows[0]?.cnt ?? 0,
+      },
+      adClicks: adClicksRows.map((c) => ({
+        id: c.id,
+        adTitle: c.adTitle ?? "Sconosciuto",
+        clickedAt: c.clickedAt,
+      })),
+      motorcycles: motorcycles.map((m) => ({
+        brand: m.brand,
+        model: m.model,
+        year: m.year,
+        displacement: m.displacement ?? 0,
+        motorcycleType: m.motorcycleType ?? "",
+        ridingStyle: m.ridingStyle ?? "",
+      })),
+      moderatorLogs: moderatorLogsRows.map((l) => ({
+        action: l.action,
+        createdAt: l.createdAt,
+        moderatorNickname: l.moderatorId ? (moderatorNicknameMap[l.moderatorId] ?? l.moderatorId) : "Sistema",
+      })),
+    });
   } catch (_error) {
+    console.error("Admin get user stats error:", _error);
     return sendError(res, 500, "Errore lettura statistiche");
   }
 });
@@ -356,8 +454,35 @@ router.get("/:id/geo-insights", async (req: Request, res: Response) => {
 router.get("/:userId/sessions", async (req: Request, res: Response) => {
   try {
     const userId = req.params.userId;
-    const sessions = await db.execute(sql`SELECT sid, sess->'userId' as user_id, expire FROM session WHERE sess->>'userId' = ${userId}`);
-    return res.json(sessions.rows);
+    const result = await db.execute(sql`
+      SELECT
+        sid,
+        sess->>'sessionType' as session_type,
+        expire
+      FROM session
+      WHERE sess->>'userId' = ${userId}
+      ORDER BY expire DESC
+    `);
+
+    type SessionRow = { sid: string; session_type: string | null; expire: string | null };
+    const rows = result.rows as SessionRow[];
+
+    const sessionItems = rows.map((r) => ({
+      sid: r.sid,
+      displaySid: `…${r.sid.slice(-8)}`,
+      sessionType: r.session_type ?? "web",
+      expiry: r.expire ?? null,
+    }));
+
+    const webCount = sessionItems.filter((s) => s.sessionType === "web").length;
+    const mobileCount = sessionItems.filter((s) => s.sessionType !== "web").length;
+
+    return res.json({
+      sessions: sessionItems,
+      webCount,
+      mobileCount,
+      total: sessionItems.length,
+    });
   } catch (_error) {
     return sendError(res, 500, "Errore lettura sessioni");
   }
