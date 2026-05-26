@@ -188,6 +188,8 @@ ${mapScriptWrap(styleVar, "{}", `
         updateTrack(data);
       },
     };
+    ${ZOOM_BEARING_BRIDGE_HANDLERS_SCRIPT}
+    ${VIEW_STATE_BRIDGE_SCRIPT}
     postMsg({ type: "trackingReady" });
 `)}`;
 }
