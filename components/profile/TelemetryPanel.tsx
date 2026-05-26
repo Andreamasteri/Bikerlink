@@ -49,6 +49,19 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Ionicons name="speedometer-outline" size={16} color={Colors.accent} />
             <Text style={styles.telemetryTitle}>Telemetria raccolta</Text>
+            <TouchableOpacity
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              onPress={(e) => {
+                e.stopPropagation();
+                Alert.alert(
+                  "Come raccogliere telemetria",
+                  "• Avvia il tracking GPS durante un'uscita in moto reale.\n\n• I km vengono contati solo con movimento reale rilevato dai sensori — non durante soste o tragitti a piedi.\n\n• Il target è 1000 km totali raccolti per sbloccare le funzionalità avanzate di analisi.",
+                  [{ text: "Capito", style: "default" }]
+                );
+              }}
+            >
+              <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
+            </TouchableOpacity>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
             <Text style={styles.telemetryPct}>{telemetryStats.progress_pct}%</Text>
