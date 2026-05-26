@@ -6,6 +6,11 @@ import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 import { apiRequest } from "@/lib/query-client";
 
+interface EmailConfig {
+  gmailUser: string | null;
+  gmailAppPassword: string | null;
+  configured: boolean;
+}
 interface EmailDiagnostics {
   credentials: { present: boolean; source: "db" | "env" | "none"; maskedUser: string | null };
   lastSend: {
@@ -56,6 +61,13 @@ export const emailStatusStyles = StyleSheet.create({
   btnText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
 });
 
+const configBadgeStyles = StyleSheet.create({
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  badgeOk: { backgroundColor: "rgba(34,197,94,0.15)" },
+  badgeMissing: { backgroundColor: "rgba(239,68,68,0.15)" },
+  badgeText: { fontFamily: "Inter_700Bold", fontSize: 11, color: Colors.text, letterSpacing: 0.5 },
+});
+
 const smtpStyles = StyleSheet.create({
   expandRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 10, marginTop: 4, borderTopWidth: 1, borderTopColor: Colors.border },
   expandLabel: { flex: 1, fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent },
@@ -79,6 +91,10 @@ export function EmailStatusCard() {
   const [savingSmtp, setSavingSmtp] = useState(false);
   const [smtpSaveResult, setSmtpSaveResult] = useState<{ ok: boolean; message: string } | null>(null);
 
+  const { data: emailConfig, refetch: refetchEmailConfig } = useQuery<EmailConfig>({
+    queryKey: ["/api/admin/settings/email-config"],
+    refetchInterval: 30000,
+  });
   const { data: diag, refetch: refetchDiag, isLoading: loadingDiag } = useQuery<EmailDiagnostics>({
     queryKey: ["/api/admin/email-status"],
     refetchInterval: 30000,
@@ -105,6 +121,7 @@ export function EmailStatusCard() {
       setSmtpUser("");
       setSmtpPassword("");
       setSmtpAdminPwd("");
+      refetchEmailConfig();
       refetchDiag();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Salvataggio fallito";
@@ -176,7 +193,10 @@ export function EmailStatusCard() {
       <View style={emailStatusStyles.headerRow}>
         <Ionicons name="mail" size={20} color={Colors.accent} />
         <Text style={emailStatusStyles.title}>Stato email</Text>
-        <TouchableOpacity onPress={() => { refetchDiag(); refetchRL(); }} style={emailStatusStyles.iconBtn}>
+        <View style={[configBadgeStyles.badge, emailConfig?.configured ? configBadgeStyles.badgeOk : configBadgeStyles.badgeMissing]}>
+          <Text style={configBadgeStyles.badgeText}>{emailConfig?.configured ? "CONFIGURATO" : "MANCANTI"}</Text>
+        </View>
+        <TouchableOpacity onPress={() => { refetchEmailConfig(); refetchDiag(); refetchRL(); }} style={emailStatusStyles.iconBtn}>
           <Ionicons name="refresh" size={18} color={Colors.textSecondary} />
         </TouchableOpacity>
       </View>
@@ -206,6 +226,16 @@ export function EmailStatusCard() {
             <View style={{ flex: 1 }}>
               <Text style={emailStatusStyles.rowLabel}>Credenziali Gmail</Text>
               <Text style={emailStatusStyles.rowValue}>{credLabel}</Text>
+              {emailConfig?.gmailUser ? (
+                <Text style={emailStatusStyles.rowValue}>
+                  Email: {emailConfig.gmailUser}
+                </Text>
+              ) : null}
+              {emailConfig?.gmailAppPassword ? (
+                <Text style={emailStatusStyles.rowValue}>
+                  App Password: {emailConfig.gmailAppPassword}
+                </Text>
+              ) : null}
             </View>
           </View>
 
