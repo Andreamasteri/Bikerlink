@@ -119,16 +119,14 @@ function SectionCard({
 
 export default function MatchHealthScreen() {
   const insets = useSafeAreaInsets();
-  const [refreshKey, setRefreshKey] = useState(0);
 
   const { data, isLoading, isFetching, error, refetch } = useQuery<MatchHealthResponse>({
-    queryKey: ["/api/admin/match-health", refreshKey],
+    queryKey: ["/api/admin/match-health"],
     staleTime: 0,
     retry: false,
   });
 
   const handleRunCheck = () => {
-    setRefreshKey((k) => k + 1);
     refetch();
   };
 
