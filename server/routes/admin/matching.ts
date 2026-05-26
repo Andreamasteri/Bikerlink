@@ -418,14 +418,44 @@ router.post("/force-matching", async (_req: Request, res: Response) => {
   }
 });
 
-router.post("/trigger", async (_req: Request, res: Response) => {
+router.post("/matching/trigger", async (_req: Request, res: Response) => {
   try {
     triggerMatchingRun();
-    return sendSuccess(res, { status: "triggered" });
+    return res.json({ status: "triggered" });
   } catch (_error) {
     return sendError(res, 500, "Errore avvio matching");
   }
 });
+
+router.get("/matching/stats", async (_req: Request, res: Response) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const bzRes = await client.query<{ cnt: string }>(
+        `SELECT COUNT(*) AS cnt FROM biker_zavorrina_matches`
+      );
+      const bbRes = await client.query<{ cnt: string }>(
+        `SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand NOT IN ('musica','musica_zav')`
+      );
+      const musicRes = await client.query<{ cnt: string }>(
+        `SELECT COUNT(*) AS cnt FROM biker_biker_matches WHERE motorcycle_brand IN ('musica','musica_zav')`
+      );
+
+      const totalZavarrinaMatches = parseInt(bzRes.rows[0]?.cnt ?? "0", 10);
+      const totalBikerBikerMatches = parseInt(bbRes.rows[0]?.cnt ?? "0", 10);
+      const totalMusicMatches = parseInt(musicRes.rows[0]?.cnt ?? "0", 10);
+      const cycleMeta = getLastMatchingCycleMeta();
+      const lastRunAt = cycleMeta?.completedAt ?? null;
+
+      return res.json({ totalZavarrinaMatches, totalBikerBikerMatches, totalMusicMatches, lastRunAt });
+    } finally {
+      client.release();
+    }
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura statistiche matching");
+  }
+});
+
 
 router.delete("/reset-matches", async (_req: Request, res: Response) => {
   try {
