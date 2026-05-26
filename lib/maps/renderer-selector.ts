@@ -1,4 +1,5 @@
 import React from "react";
+import { Platform } from "react-native";
 import { useMapsRollout } from "./useMapsRollout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import type { ErrorFallbackProps } from "@/components/ErrorFallback";
@@ -27,6 +28,14 @@ export const LazyMapLibrePickerMap = React.lazy(() => import("@/components/MapLi
 
 export const LazyLeafletTrackingMap = React.lazy(() => import("@/components/LeafletTrackingMap"));
 export const LazyMapLibreTrackingMap = React.lazy(() => import("@/components/MapLibreTrackingMap"));
+
+export function useRendererSelector() {
+  const { renderer } = useMapsRollout();
+  return {
+    shouldUseFull3d: (_context: "planner" | "preview") =>
+      renderer === "maplibre-full-3d" && Platform.OS === "web",
+  };
+}
 
 export function useMapRenderer() {
   const { renderer } = useMapsRollout();

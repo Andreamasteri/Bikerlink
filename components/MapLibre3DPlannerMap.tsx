@@ -16,6 +16,7 @@ import MapLibre3DLayerControls from "./MapLibre3DLayerControls";
 interface Props {
   height?: number;
   waypoints?: Array<{ lat: number; lng: number }>;
+  trackPoints?: Array<{ lat: number; lng: number }>;
   onWaypointAdd?: (lat: number, lng: number) => void;
   onFatalError?: () => void;
 }
@@ -23,7 +24,8 @@ interface Props {
 function buildPlannerHtml(
   styleExpr: string,
   demUrl: string,
-  waypoints: Array<{ lat: number; lng: number }>
+  waypoints: Array<{ lat: number; lng: number }>,
+  trackPoints: Array<{ lat: number; lng: number }>
 ): string {
   const webGlScript = get3DWebGLCheckInlineScript();
   const bodyScript = `
@@ -31,6 +33,7 @@ function buildPlannerHtml(
     ${get3DBuildingsScript()}
     ${get3DBridgeHandlersScript()}
     var waypoints = ${JSON.stringify(waypoints)};
+    var trackPoints = ${JSON.stringify(trackPoints)};
     var waypointMarkers = [];
     function renderWaypoints() {
       waypointMarkers.forEach(function(m) { m.remove(); });
@@ -41,12 +44,30 @@ function buildPlannerHtml(
         waypointMarkers.push(new maplibregl.Marker({ element: el }).setLngLat([wp.lng, wp.lat]).addTo(map));
       });
     }
-    renderWaypoints();
+    function renderTrack() {
+      if (map.getLayer("plan-route")) map.removeLayer("plan-route");
+      if (map.getSource("plan-route")) map.removeSource("plan-route");
+      if (trackPoints.length < 2) return;
+      map.addSource("plan-route", { type: "geojson", data: {
+        type: "Feature", geometry: { type: "LineString",
+          coordinates: trackPoints.map(function(p) { return [p.lng, p.lat]; }) }
+      }});
+      map.addLayer({ id: "plan-route", type: "line", source: "plan-route",
+        layout: { "line-join": "round", "line-cap": "round" },
+        paint: { "line-color": "#FF6600", "line-width": 4, "line-opacity": 0.9 }
+      });
+    }
+    map.on("load", function() { renderWaypoints(); renderTrack(); });
     map.on("click", function(e) { postMsg({ type: "tap", lat: e.lngLat.lat, lng: e.lngLat.lng }); });
     window.mlBridge.updateWaypoints = function(payload) {
       var data = typeof payload === "string" ? JSON.parse(payload) : payload;
       waypoints = Array.isArray(data) ? data : [];
       renderWaypoints();
+    };
+    window.mlBridge.updateTrackPoints = function(payload) {
+      var data = typeof payload === "string" ? JSON.parse(payload) : payload;
+      trackPoints = Array.isArray(data) ? data : [];
+      renderTrack();
     };
   `;
   return `${htmlHead()}<body><script>${webGlScript}</script><div id="map"></div>${mapScriptWrap(
@@ -54,14 +75,14 @@ function buildPlannerHtml(
   )}`;
 }
 
-export default function MapLibre3DPlannerMap({ height, waypoints = [], onWaypointAdd, onFatalError }: Props) {
+export default function MapLibre3DPlannerMap({ height, waypoints = [], trackPoints = [], onWaypointAdd, onFatalError }: Props) {
   const webViewRef = useRef<WebView>(null);
   const onFatalErrorRef = useRef(onFatalError);
   onFatalErrorRef.current = onFatalError;
 
   const styleExpr = getMapLibreStyleExpr();
   const demUrl = getDem3dTileUrl();
-  const mapHtml = useMemo(() => buildPlannerHtml(styleExpr, demUrl, waypoints), [styleExpr, demUrl, waypoints]);
+  const mapHtml = useMemo(() => buildPlannerHtml(styleExpr, demUrl, waypoints, trackPoints), [styleExpr, demUrl, waypoints, trackPoints]);
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     const msg = parseMessage(event.nativeEvent.data);

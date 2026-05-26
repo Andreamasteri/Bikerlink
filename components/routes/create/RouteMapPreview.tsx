@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "rea
 import { Ionicons } from "@expo/vector-icons";
 import WebView from "react-native-webview";
 import Colors from "@/constants/colors";
+import { useRendererSelector } from "@/lib/maps/renderer-selector";
 
 const MapLibre3DRoutePreviewMap = React.lazy(() => import("@/components/MapLibre3DRoutePreviewMap"));
 
@@ -16,29 +17,23 @@ interface RouteMapPreviewProps {
   setRouteStyle: (style: "curvy" | "balanced" | "fastest") => void;
   isCalculatingRoute: boolean;
   routeStats: { distanceKm: number; durationMinutes: number } | null;
-  renderer?: string;
   trackPoints3D?: Array<{ lat: number; lng: number }>;
 }
 
 export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
   waypoints, curvatureMapHtml, webviewRef, handleMapLoaded,
-  routeStyle, setRouteStyle, isCalculatingRoute, routeStats,
-  renderer, trackPoints3D,
+  routeStyle, setRouteStyle, isCalculatingRoute, routeStats, trackPoints3D,
 }) => {
+  const { shouldUseFull3d } = useRendererSelector();
+  const use3DPreview = shouldUseFull3d("preview") && (trackPoints3D?.length ?? 0) > 1;
+
   if (waypoints.length < 2) return null;
 
-  if (renderer === "maplibre-full-3d") {
-    return (
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Anteprima percorso 3D</Text>
-        <View style={{ height: 200, borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: Colors.border }}>
-          <Suspense fallback={<ActivityIndicator style={{ flex: 1 }} />}>
-            <MapLibre3DRoutePreviewMap trackPoints={trackPoints3D} height={200} />
-          </Suspense>
-        </View>
-      </View>
-    );
-  }
+  const styleMeta = {
+    curvy: { label: "Panoramico", icon: "terrain" as const, color: "#4CAF50" },
+    balanced: { label: "Bilanciato", icon: "swap-horizontal" as const, color: Colors.accent },
+    fastest: { label: "Veloce", icon: "flash" as const, color: "#FF9800" },
+  }[routeStyle];
 
   return (
     <>
@@ -59,7 +54,7 @@ export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
                 onPress={() => setRouteStyle(s)}
                 testID={`route-style-${s}`}
               >
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ionicons name subset */}
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 <Ionicons name={meta.icon as any} size={18} color={isActive ? meta.color : Colors.textSecondary} />
                 <Text style={[styles.styleBtnText, isActive && { color: meta.color, fontWeight: "700" as const }]}>
                   {meta.label}
@@ -70,10 +65,21 @@ export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
         </View>
       </View>
 
-      {curvatureMapHtml !== "" && (
+      {use3DPreview && (
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Anteprima percorso 3D</Text>
+          <View style={styles.mapContainer}>
+            <Suspense fallback={<ActivityIndicator style={{ flex: 1 }} />}>
+              <MapLibre3DRoutePreviewMap trackPoints={trackPoints3D} height={200} />
+            </Suspense>
+          </View>
+        </View>
+      )}
+
+      {!use3DPreview && curvatureMapHtml !== "" && (
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Anteprima percorso (curvatura)</Text>
-          <View style={{ height: 200, borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: Colors.border }}>
+          <View style={styles.mapContainer}>
             <WebView
               ref={webviewRef}
               source={{ html: curvatureMapHtml, baseUrl: "" }}
@@ -83,40 +89,33 @@ export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
               originWhitelist={["*"]}
               onLoadEnd={handleMapLoaded}
             />
-            {/* Style badge overlay */}
-            {(() => {
-              const styleMeta = {
-                curvy: { label: "Panoramico", icon: "terrain", color: "#4CAF50" },
-                balanced: { label: "Bilanciato", icon: "swap-horizontal", color: Colors.accent },
-                fastest: { label: "Veloce", icon: "flash", color: "#FF9800" },
-              }[routeStyle];
-              return (
-                <View style={[styles.styleBadge, { backgroundColor: styleMeta.color + "DD" }]}>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- Ionicons name subset */}
-                  <Ionicons name={styleMeta.icon as any} size={12} color="#fff" />
-                  <Text style={styles.styleBadgeText}>{styleMeta.label}</Text>
-                </View>
-              );
-            })()}
+            <View style={[styles.styleBadge, { backgroundColor: styleMeta.color + "DD" }]}>
+              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+              <Ionicons name={styleMeta.icon as any} size={12} color="#fff" />
+              <Text style={styles.styleBadgeText}>{styleMeta.label}</Text>
+            </View>
             {isCalculatingRoute && (
-              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center", alignItems: "center" }}>
+              <View style={styles.calcOverlay}>
                 <ActivityIndicator size="small" color="#fff" />
               </View>
             )}
           </View>
-          {routeStats && !isCalculatingRoute && (
-            <View style={styles.routeStatsRow}>
-              <Ionicons name="navigate" size={14} color={Colors.accent} />
-              <Text style={styles.routeStatText}>{routeStats.distanceKm % 1 === 0 ? routeStats.distanceKm : routeStats.distanceKm.toFixed(1)} km</Text>
-              <Text style={styles.routeStatSep}>·</Text>
-              <Ionicons name="time-outline" size={14} color={Colors.accent} />
-              <Text style={styles.routeStatText}>
-                {routeStats.durationMinutes >= 60
-                  ? `${Math.floor(routeStats.durationMinutes / 60)}h ${routeStats.durationMinutes % 60 > 0 ? `${routeStats.durationMinutes % 60} min` : ""}`.trim()
-                  : `${routeStats.durationMinutes} min`}
-              </Text>
-            </View>
-          )}
+        </View>
+      )}
+
+      {routeStats && !isCalculatingRoute && (
+        <View style={styles.routeStatsRow}>
+          <Ionicons name="navigate" size={14} color={Colors.accent} />
+          <Text style={styles.routeStatText}>
+            {routeStats.distanceKm % 1 === 0 ? routeStats.distanceKm : routeStats.distanceKm.toFixed(1)} km
+          </Text>
+          <Text style={styles.routeStatSep}>·</Text>
+          <Ionicons name="time-outline" size={14} color={Colors.accent} />
+          <Text style={styles.routeStatText}>
+            {routeStats.durationMinutes >= 60
+              ? `${Math.floor(routeStats.durationMinutes / 60)}h ${routeStats.durationMinutes % 60 > 0 ? `${routeStats.durationMinutes % 60} min` : ""}`.trim()
+              : `${routeStats.durationMinutes} min`}
+          </Text>
         </View>
       )}
     </>
@@ -125,68 +124,23 @@ export const RouteMapPreview: React.FC<RouteMapPreviewProps> = ({
 
 const styles = StyleSheet.create({
   section: { marginBottom: 16 },
-  sectionLabel: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginBottom: 6,
-    fontWeight: "600" as const,
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.5,
-  },
-  styleSelector: {
-    flexDirection: "row" as const,
-    gap: 8,
-    marginTop: 4,
-  },
+  sectionLabel: { fontSize: 13, color: Colors.textSecondary, marginBottom: 6, fontWeight: "600" as const, textTransform: "uppercase" as const, letterSpacing: 0.5 },
+  styleSelector: { flexDirection: "row" as const, gap: 8, marginTop: 4 },
   styleBtn: {
-    flex: 1,
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    justifyContent: "center" as const,
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-    borderRadius: 10,
-    paddingVertical: 10,
+    flex: 1, flexDirection: "row" as const, alignItems: "center" as const,
+    justifyContent: "center" as const, gap: 6, borderWidth: 1.5,
+    borderColor: Colors.border, borderRadius: 10, paddingVertical: 10,
     backgroundColor: Colors.surfaceLight,
   },
-  styleBtnText: {
-    fontSize: 13,
-    fontWeight: "500" as const,
-    color: Colors.textSecondary,
-  },
+  styleBtnText: { fontSize: 13, fontWeight: "500" as const, color: Colors.textSecondary },
+  mapContainer: { height: 200, borderRadius: 12, overflow: "hidden" as const, borderWidth: 1, borderColor: Colors.border },
   styleBadge: {
-    position: "absolute" as const,
-    bottom: 8,
-    left: 8,
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 20,
+    position: "absolute" as const, bottom: 8, left: 8, flexDirection: "row" as const,
+    alignItems: "center" as const, gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20,
   },
-  styleBadgeText: {
-    fontSize: 11,
-    fontWeight: "700" as const,
-    color: "#fff",
-    letterSpacing: 0.3,
-  },
-  routeStatsRow: {
-    flexDirection: "row" as const,
-    alignItems: "center" as const,
-    gap: 6,
-    marginTop: 8,
-    paddingHorizontal: 4,
-  },
-  routeStatText: {
-    fontSize: 13,
-    fontWeight: "600" as const,
-    color: Colors.text,
-  },
-  routeStatSep: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginHorizontal: 2,
-  },
+  styleBadgeText: { fontSize: 11, fontWeight: "700" as const, color: "#fff", letterSpacing: 0.3 },
+  calcOverlay: { position: "absolute" as const, top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.35)", justifyContent: "center" as const, alignItems: "center" as const },
+  routeStatsRow: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6, marginTop: 8, paddingHorizontal: 4, marginBottom: 16 },
+  routeStatText: { fontSize: 13, fontWeight: "600" as const, color: Colors.text },
+  routeStatSep: { fontSize: 13, color: Colors.textSecondary, marginHorizontal: 2 },
 });
