@@ -118,11 +118,17 @@ export default function TabLayout() {
     }
   }, [globalHandsOffActive, handsOffBlinkAnim]);
 
+  const [hasWaited, setHasWaited] = useState(false);
   useEffect(() => {
-    if (!isLoading && user === null) {
+    const timer = setTimeout(() => setHasWaited(true), 150);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && hasWaited && user === null) {
       router.replace("/(auth)/login");
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, hasWaited, router]);
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
   const isZavorrina = user?.userType === "zavorrina";

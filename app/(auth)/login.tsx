@@ -44,7 +44,7 @@ export default function LoginScreen() {
         onSuccess: async () => {
           sendStartupBeacon("login_4_success");
           setIsSubmitting(false);
-          router.replace("/(tabs)");
+          router.replace("/");
         },
         onError: (err: Error) => {
           sendStartupBeacon("login_5_error");
