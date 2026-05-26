@@ -122,7 +122,7 @@ a.back:hover{color:var(--accent)}
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});}
 
   function loadSummary(){
-    fetch('/api/admin/site-visits/summary',{credentials:'include'})
+    fetch('/api/admin/analytics/site-visits/summary',{credentials:'include'})
       .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
       .then(function(d){
         document.getElementById('v-today').textContent = d.views.today;
@@ -162,7 +162,7 @@ a.back:hover{color:var(--accent)}
   function loadRows(){
     var tbody = document.getElementById('rows');
     tbody.innerHTML = '<tr><td colspan="9" class="empty">Caricamento…</td></tr>';
-    fetch('/api/admin/site-visits?' + buildQS(),{credentials:'include'})
+    fetch('/api/admin/analytics/site-visits?' + buildQS(),{credentials:'include'})
       .then(function(r){if(!r.ok)throw new Error('http '+r.status);return r.json();})
       .then(function(d){
         lastTotal = d.total || 0;
