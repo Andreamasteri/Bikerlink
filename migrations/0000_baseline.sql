@@ -809,10 +809,13 @@ ALTER TABLE "event_images" ADD CONSTRAINT "event_images_event_id_events_id_fk" F
 ALTER TABLE "event_participants" ADD CONSTRAINT "event_participants_event_id_events_id_fk" FOREIGN KEY ("event_id") REFERENCES "public"."events"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "event_participants" ADD CONSTRAINT "event_participants_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "events" ADD CONSTRAINT "events_creator_id_users_id_fk" FOREIGN KEY ("creator_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "events" ADD COLUMN IF NOT EXISTS "approved_by" varchar(36);--> statement-breakpoint
 ALTER TABLE "events" ADD CONSTRAINT "events_approved_by_users_id_fk" FOREIGN KEY ("approved_by") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fake_user_interactions" ADD CONSTRAINT "fake_user_interactions_fake_user_id_users_id_fk" FOREIGN KEY ("fake_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "fake_user_interactions" ADD CONSTRAINT "fake_user_interactions_real_user_id_users_id_fk" FOREIGN KEY ("real_user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "feedback_tickets" ADD CONSTRAINT "feedback_tickets_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invitation_codes" ADD COLUMN IF NOT EXISTS "created_by" varchar(36);--> statement-breakpoint
+ALTER TABLE "invitation_codes" ADD COLUMN IF NOT EXISTS "used_by" varchar(36);--> statement-breakpoint
 ALTER TABLE "invitation_codes" ADD CONSTRAINT "invitation_codes_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "invitation_codes" ADD CONSTRAINT "invitation_codes_used_by_users_id_fk" FOREIGN KEY ("used_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "messages" ADD CONSTRAINT "messages_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -823,12 +826,17 @@ ALTER TABLE "moto_club_invites" ADD CONSTRAINT "moto_club_invites_club_id_moto_c
 ALTER TABLE "moto_club_invites" ADD CONSTRAINT "moto_club_invites_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "moto_club_members" ADD CONSTRAINT "moto_club_members_club_id_moto_clubs_id_fk" FOREIGN KEY ("club_id") REFERENCES "public"."moto_clubs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "moto_club_members" ADD CONSTRAINT "moto_club_members_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "moto_club_requests" ADD COLUMN IF NOT EXISTS "requested_by" varchar(36);--> statement-breakpoint
+ALTER TABLE "moto_club_requests" ADD COLUMN IF NOT EXISTS "reviewed_by" varchar(36);--> statement-breakpoint
 ALTER TABLE "moto_club_requests" ADD CONSTRAINT "moto_club_requests_requested_by_users_id_fk" FOREIGN KEY ("requested_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "moto_club_requests" ADD CONSTRAINT "moto_club_requests_reviewed_by_users_id_fk" FOREIGN KEY ("reviewed_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "moto_clubs" ADD COLUMN IF NOT EXISTS "created_by" varchar(36);--> statement-breakpoint
+ALTER TABLE "moto_clubs" ADD COLUMN IF NOT EXISTS "proposed_by" varchar(36);--> statement-breakpoint
 ALTER TABLE "moto_clubs" ADD CONSTRAINT "moto_clubs_proposed_by_users_id_fk" FOREIGN KEY ("proposed_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "moto_clubs" ADD CONSTRAINT "moto_clubs_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "motorcycle_photos" ADD CONSTRAINT "motorcycle_photos_motorcycle_id_user_motorcycles_id_fk" FOREIGN KEY ("motorcycle_id") REFERENCES "public"."user_motorcycles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "notifications" ADD CONSTRAINT "notifications_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "ota_releases" ADD COLUMN IF NOT EXISTS "created_by" varchar(36);--> statement-breakpoint
 ALTER TABLE "ota_releases" ADD CONSTRAINT "ota_releases_created_by_users_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."users"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "password_reset_tokens" ADD CONSTRAINT "password_reset_tokens_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "photo_contest_entries" ADD CONSTRAINT "photo_contest_entries_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
