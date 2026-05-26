@@ -82,14 +82,13 @@ BUILD_INFO="constants/buildInfo.ts"
 sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${NEXT_OTA};/" "$BUILD_INFO"
 log_ok "APPLIED_OTA_NUMBER aggiornato → ${NEXT_OTA}"
 
-# ── 5. Pubblica su EAS staging ───────────────────────────────────────────────
-log_info "Pubblicazione bundle su EAS staging (Metro in corso — attendi 5-8 minuti)..."
+# ── 5. Pubblica su EAS production ────────────────────────────────────────────
+log_info "Pubblicazione bundle su EAS production (Metro in corso — attendi 5-8 minuti)..."
 
 EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" \
   eas update \
-    --channel staging \
+    --channel production \
     --message "${MESSAGE}" \
-    --environment production \
     --non-interactive 2>&1) || {
   log_error "eas update fallito:"
   echo "$EAS_OUTPUT"
