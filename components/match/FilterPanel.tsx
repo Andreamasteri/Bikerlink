@@ -103,15 +103,17 @@ const styles = StyleSheet.create({
   distanceFilterRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 12,
-    paddingBottom: 4,
+    paddingHorizontal: 8,
+    paddingBottom: 2,
     gap: 6,
   },
   distanceModeBtn: {
-    paddingVertical: 5,
+    height: 38,
     paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: Colors.surface,
+    justifyContent: "center",
+    alignItems: "center",
   },
   distanceModeBtnActive: {
     backgroundColor: Colors.accent + "20",
@@ -119,9 +121,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "40",
   },
   distanceModeBtnText: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
+    textAlign: "center",
   },
   distanceModeBtnTextActive: {
     color: Colors.accent,
@@ -147,7 +150,7 @@ const styles = StyleSheet.create({
     }),
   },
   distanceKmApplyBtn: {
-    height: 34,
+    height: 38,
     paddingHorizontal: 12,
     borderRadius: 8,
     backgroundColor: Colors.accent,

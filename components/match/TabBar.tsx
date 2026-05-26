@@ -30,7 +30,7 @@ function TabItem({
       {showIcon && (
         <Ionicons
           name={tab.icon}
-          size={13}
+          size={15}
           color={active ? Colors.accent : Colors.textSecondary}
         />
       )}
@@ -80,8 +80,8 @@ export function TabBar({ activeTab, setActiveTab, tabs }: TabBarProps) {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 4,
-    gap: 4,
+    marginTop: 2,
+    gap: 3,
   },
   row: {
     flexDirection: "row",
@@ -99,9 +99,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
-    paddingVertical: 6,
-    paddingHorizontal: 4,
+    gap: 4,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
     borderRadius: 10,
     backgroundColor: Colors.surface,
   },
@@ -111,10 +111,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "40",
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 15,
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
     flexShrink: 1,
+    textAlign: "center",
   },
   tabTextActive: {
     color: Colors.accent,

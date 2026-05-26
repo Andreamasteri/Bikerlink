@@ -22,24 +22,24 @@ export const MatchEmptyState: React.FC<MatchEmptyStateProps> = ({ icon, title, d
 const styles = StyleSheet.create({
   empty: {
     flex: 1,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
-    marginTop: 60,
-    paddingHorizontal: 40,
+    marginTop: 24,
+    paddingHorizontal: 24,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: Colors.text,
-    marginTop: 16,
+    marginTop: 14,
     textAlign: "center",
   },
   emptyDesc: {
-    fontSize: 16,
+    fontSize: 17,
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     marginTop: 8,
     textAlign: "center",
-    lineHeight: 22,
+    lineHeight: 24,
   },
 });

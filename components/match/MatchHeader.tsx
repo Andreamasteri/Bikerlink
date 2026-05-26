@@ -47,8 +47,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 4,
+    paddingTop: 6,
+    paddingBottom: 2,
   },
   inlineTitle: {
     fontSize: 26,
