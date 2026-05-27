@@ -193,6 +193,26 @@ export const motorcyclePhotos = pgTable("motorcycle_photos", {
   index("motorcycle_photos_motorcycle_id_idx").on(table.motorcycleId),
 ]);
 
+export const userTimeProfile = pgTable("user_time_profile", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  histogram: jsonb("histogram").$type<number[]>().notNull(),
+  totalRides: integer("total_rides").notNull().default(0),
+  label: varchar("label", { length: 50 }),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_time_profile_user_id_idx").on(table.userId),
+  index("user_time_profile_label_idx").on(table.label),
+]);
+
+export type UserTimeProfile = typeof userTimeProfile.$inferSelect;
+export type InsertUserTimeProfile = typeof userTimeProfile.$inferInsert;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type UserPhoto = typeof userPhotos.$inferSelect;

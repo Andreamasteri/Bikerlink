@@ -2,6 +2,7 @@ import { storage } from "../storage";
 import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
+import { getMultiplierForPair } from "./time-profile";
 
 export async function runBikerBikerMatching(): Promise<number> {
   try {
@@ -71,6 +72,13 @@ export async function runBikerBikerMatching(): Promise<number> {
 
           if (isPairBlocked(m1.userId, m2.userId)) { skipCount++; continue; }
           if (!bothPrefsEnabled(prefsMap, m1.userId, m2.userId, "bikerBikerBrand")) { skipCount++; continue; }
+
+          // Task #2521 — time-profile multiplier: applichiamo come gate
+          // probabilistico in [min, max] (default 0.7..1.3). Profili senza
+          // overlap perdono ~30% di probabilità di match, profili sovrapposti
+          // ne guadagnano ~30%. Cold start → 1.0 (neutro).
+          const timeMult = await getMultiplierForPair(m1.userId, m2.userId);
+          if (timeMult < 1.0 && Math.random() > timeMult) { skipCount++; continue; }
 
           const isSupermatch = !!(
             m1.model && m2.model &&

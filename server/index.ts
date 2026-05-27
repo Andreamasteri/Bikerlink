@@ -241,6 +241,9 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     const { scheduleWeeklyCurvyScoreUpdate } = await import("./curvy-score-job");
     scheduleWeeklyCurvyScoreUpdate();
 
+    const { scheduleDailyUserTimeProfileJob } = await import("./matching/time-profile");
+    scheduleDailyUserTimeProfileJob();
+
     const { scheduleMonthlyReset: scheduleMapboxQuotaReset } = await import("./routing/mapbox/quota-guard");
     scheduleMapboxQuotaReset();
     console.log("[INIT] Mapbox quota monthly reset scheduled");

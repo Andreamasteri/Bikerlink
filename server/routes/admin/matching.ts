@@ -5,6 +5,11 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 import { desc, sql } from "drizzle-orm";
 import { triggerMatchingRun, getLastMatchingCycleMeta } from "../../matching-engine";
 import { forceUnlockMatching, getMatchingLockState } from "../../matching/scheduler";
+import {
+  getTimeProfileLabelDistribution,
+  runUserTimeProfileJob,
+  isTimeProfileJobRunning,
+} from "../../matching/time-profile";
 import { storage } from "../../storage";
 import {
   captureSchemaSnapshot,
@@ -734,6 +739,26 @@ router.get("/notifications/stats", async (_req: Request, res: Response) => {
     console.error("[admin] notifications stats error:", error);
     return sendError(res, 500, "Errore stats notifiche");
   }
+});
+
+router.get("/time-profile-distribution", async (_req: Request, res: Response) => {
+  try {
+    const data = await getTimeProfileLabelDistribution();
+    return res.json(data);
+  } catch (err) {
+    console.error("[admin] time-profile-distribution error:", err);
+    return sendError(res, 500, "Errore lettura distribuzione profili orari");
+  }
+});
+
+router.post("/time-profile/run", async (_req: Request, res: Response) => {
+  if (isTimeProfileJobRunning()) {
+    return res.status(409).json({ message: "Job profilo orario già in esecuzione." });
+  }
+  runUserTimeProfileJob().catch((err) =>
+    console.error("[admin/time-profile/run] background error:", err)
+  );
+  return sendSuccess(res, { started: true });
 });
 
 export default router;

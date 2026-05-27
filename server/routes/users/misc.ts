@@ -116,4 +116,45 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+router.get("/:id/time-profile", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const requesterId = req.session.userId!;
+    const userId = req.params.id as string;
+    const user = await storage.getUser(userId);
+    if (!user) return sendError(res, 404, "Utente non trovato");
+    const blocked = await storage.hasBlockedUser(userId, requesterId);
+    if (blocked) return sendError(res, 403, "Non puoi visualizzare questo profilo");
+    const { db } = await import("../../db");
+    const { userTimeProfile } = await import("@shared/db");
+    const { sql } = await import("drizzle-orm");
+    const rows = await db
+      .select()
+      .from(userTimeProfile)
+      .where(sql`${userTimeProfile.userId} = ${userId}`)
+      .limit(1);
+    if (rows.length === 0) {
+      return res.json({
+        userId,
+        histogram: null,
+        totalRides: 0,
+        label: null,
+        coldStart: true,
+        updatedAt: null,
+      });
+    }
+    const row = rows[0];
+    return res.json({
+      userId,
+      histogram: row.histogram,
+      totalRides: row.totalRides,
+      label: row.label,
+      coldStart: false,
+      updatedAt: row.updatedAt,
+    });
+  } catch (error) {
+    console.error("Get time profile error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 export default router;

@@ -21,6 +21,7 @@ import { useUnits } from "@/lib/units-context";
 
 import type { ProfileData } from "@/components/profile/types";
 import TelemetryPanel from "@/components/profile/TelemetryPanel";
+import TimeHeatmap from "@/components/profile/TimeHeatmap";
 import PhotoGrid from "@/components/profile/PhotoGrid";
 import NotificationsPanel from "@/components/profile/NotificationsPanel";
 import MatchPrefsPanel from "@/components/profile/MatchPrefsPanel";
@@ -275,6 +276,8 @@ export default function ProfileScreen() {
         />
 
         {telemetryStats != null && <TelemetryPanel telemetryStats={telemetryStats} />}
+
+        {user?.id && <TimeHeatmap userId={user.id} />}
 
         <ProfileDeletionBanner
           deletionRequestedAt={profile?.deletionRequestedAt}
