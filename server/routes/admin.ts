@@ -232,6 +232,7 @@ import stregattiRouter from './admin/stregatti';
 import miscRouter from './admin/misc';
 import matchingRouter from './admin/matching';
 import otaRouter from './admin/ota';
+import otaAssistantRouter from './admin/ota-assistant';
 import mapsAdminRouter from './admin/maps/index';
 import telemetryAdminRouter from './admin/telemetry';
 import dbAdminRouter from './admin/db';
@@ -313,6 +314,9 @@ router.use('/settings', settingsRouter);
 router.use('/advertisements', _requireAdmin, adsRouter);
 router.use('/analytics', _requireAdmin, analyticsRouter);
 router.use('/stregatti', _requireAdmin, stregattiRouter);
+// L'ordine importa: il sub-router /ota/assistant deve essere registrato PRIMA di /ota
+// per evitare che le rotte come /:id/approve di otaRouter catturino "assistant" come id.
+router.use('/ota/assistant', _requireAdmin, otaAssistantRouter);
 router.use('/ota', _requireAdmin, otaRouter);
 router.use('/maps', _requireAdmin, mapsAdminRouter);
 router.use('/', _requireAdmin, dbAdminRouter);

@@ -14,6 +14,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Updates from "expo-updates";
 import { useTheme } from "@/lib/theme-context";
 import { apiRequest } from "@/lib/query-client";
+import OtaAssistantChat from "./OtaAssistantChat";
 
 interface OtaRelease {
   id: string;
@@ -386,6 +387,7 @@ export default function OtaPanel() {
 
   return (
     <View>
+      <OtaAssistantChat />
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.text }]}>OTA Releases</Text>
         <View style={styles.headerActions}>

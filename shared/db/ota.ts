@@ -63,3 +63,46 @@ export type OtaRelease = typeof otaReleases.$inferSelect;
 export type InsertOtaRelease = typeof otaReleases.$inferInsert;
 export type OtaBootEvent = typeof otaBootEvents.$inferSelect;
 export type InsertOtaBootEvent = typeof otaBootEvents.$inferInsert;
+
+// Task #2535 — AI Orchestrator OTA: audit di ogni interazione con l'assistente.
+export const otaAssistantRuns = pgTable("ota_assistant_runs", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  adminId: varchar("admin_id", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  prompt: text("prompt").notNull(),
+  response: text("response"),
+  toolCalls: text("tool_calls"),
+  status: varchar("status", { length: 20 }).notNull().default("completed"),
+  error: text("error"),
+  logPath: text("log_path"),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  finishedAt: timestamp("finished_at"),
+}, (table) => [
+  index("ota_assistant_runs_started_at_idx").on(table.startedAt),
+  index("ota_assistant_runs_admin_id_idx").on(table.adminId),
+]);
+
+export type OtaAssistantRun = typeof otaAssistantRuns.$inferSelect;
+export type InsertOtaAssistantRun = typeof otaAssistantRuns.$inferInsert;
+
+// Task #2535 — Snapshot persistente del watchdog post-publish, generato dall'AI
+// orchestrator quando l'admin chiede "ci sono release da rollbackare?" o
+// quando una propose-rollback produce candidati. Permette di interrogare
+// lo storico delle anomalie indipendentemente dalla chat.
+export const otaWatchdogReports = pgTable("ota_watchdog_reports", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  generatedAt: timestamp("generated_at").notNull().defaultNow(),
+  triggeredBy: varchar("triggered_by", { length: 36 }).references(() => users.id, { onDelete: "set null" }),
+  candidateCount: integer("candidate_count").notNull().default(0),
+  payload: text("payload").notNull(),
+  threshold: integer("threshold").notNull(),
+  minDownloads: integer("min_downloads").notNull(),
+}, (table) => [
+  index("ota_watchdog_reports_generated_at_idx").on(table.generatedAt),
+]);
+
+export type OtaWatchdogReport = typeof otaWatchdogReports.$inferSelect;
+export type InsertOtaWatchdogReport = typeof otaWatchdogReports.$inferInsert;
