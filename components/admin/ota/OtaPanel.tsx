@@ -329,10 +329,10 @@ export default function OtaPanel() {
             ? null
             : directApply
               ? <Text style={[styles.directApplyNote, { color: colors.success }]}>
-                  Attiva — ricevi le OTA in stato pending su questo device per testarle prima dell'approvazione
+                  Attiva — le OTA pubblicate restano in pending finché un admin non le testa e approva. Solo allora vengono distribuite a tutti gli utenti.
                 </Text>
               : <Text style={[styles.directApplyNote, { color: colors.textSecondary }]}>
-                  Disattiva — ricevi solo le OTA già approvate, come gli altri utenti
+                  Disattiva — le OTA pubblicate vengono distribuite direttamente a tutti gli utenti, senza ciclo di approvazione.
                 </Text>}
         </View>
         {settingsLoading
