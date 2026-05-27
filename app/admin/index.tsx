@@ -197,6 +197,7 @@ const adminGroups: AdminGroup[] = [
       { key: "stregatti", label: "Stregatti", icon: "robot", iconSet: "MaterialCommunityIcons", route: "/admin/stregatti" },
       { key: "blocks", label: "Blocchi", icon: "ban", iconSet: "Ionicons", route: "/admin/blocks" },
       { key: "reports", label: "Bugs & Co", icon: "flag", iconSet: "MaterialIcons", route: "/admin/reports" },
+      { key: "false-reports", label: "False Segnalazioni", icon: "shield-alert-outline", iconSet: "MaterialCommunityIcons", route: "/admin/false-reports", accentColor: "#FF9500" },
     ],
   },
   {

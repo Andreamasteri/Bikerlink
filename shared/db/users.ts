@@ -53,6 +53,10 @@ export const users = pgTable("users", {
   ghostMode: boolean("ghost_mode").notNull().default(false),
   mapTester: boolean("map_tester").notNull().default(false),
   floatingWidgetEnabled: boolean("floating_widget_enabled").notNull().default(true),
+  // Task #2530 — shadow-ban morbido per moderazione segnalazioni
+  shadowBannedAt: timestamp("shadow_banned_at"),
+  shadowBanReason: text("shadow_ban_reason"),
+  shadowBannedUntil: timestamp("shadow_banned_until"),
   lastLoginAt: timestamp("last_login_at"),
   lastLogoutAt: timestamp("last_logout_at"),
   lastAppCloseAt: timestamp("last_app_close_at"),

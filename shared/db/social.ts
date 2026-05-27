@@ -10,6 +10,44 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+
+// Task #2530 — categorie/contesti segnalazione (lato server/UI: i valori sono
+// validati anche da Zod in shared/validators/users.ts).
+export const REPORT_CATEGORIES = [
+  "aggressive",
+  "harassment",
+  "fake_profile",
+  "no_show",
+  "opportunist",
+  "group_misconduct",
+  "dangerous_riding",
+  "other",
+] as const;
+export type ReportCategory = (typeof REPORT_CATEGORIES)[number];
+
+export const REPORT_CONTEXTS = [
+  "match",
+  "chat",
+  "profile",
+  "post_meetup",
+  "other",
+] as const;
+export type ReportContext = (typeof REPORT_CONTEXTS)[number];
+
+export const REPORT_SEVERITIES = ["low", "medium", "high", "critical"] as const;
+export type ReportSeverity = (typeof REPORT_SEVERITIES)[number];
+
+export function categoryToSeverity(cat: ReportCategory): ReportSeverity {
+  switch (cat) {
+    case "dangerous_riding": return "critical";
+    case "harassment":
+    case "aggressive": return "high";
+    case "fake_profile":
+    case "opportunist":
+    case "group_misconduct": return "medium";
+    default: return "low";
+  }
+}
 import { z } from "zod";
 import { users } from "./users";
 
@@ -62,8 +100,33 @@ export const reports = pgTable("reports", {
     .references(() => users.id, { onDelete: "set null" }),
   resolvedAt: timestamp("resolved_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
+  // Task #2530
+  category: varchar("category", { length: 40 }),
+  context: varchar("context", { length: 20 }),
+  contextId: varchar("context_id", { length: 64 }),
+  reportedUserRole: varchar("reported_user_role", { length: 20 }),
+  severity: varchar("severity", { length: 10 }).notNull().default("low"),
+  affectedFeedbackLoop: boolean("affected_feedback_loop").notNull().default(false),
+  reporterTrustScore: doublePrecision("reporter_trust_score").notNull().default(1.0),
 }, (table) => [
   index("reports_status_idx").on(table.status),
+  index("reports_category_idx").on(table.category),
+  index("reports_reported_user_idx").on(table.reportedUserId),
+  index("reports_severity_status_idx").on(table.severity, table.status),
+  index("reports_reporter_idx").on(table.reporterId),
+]);
+
+// Task #2530 — soglie configurabili (biker/zavorrina) per notify/shadow_ban.
+export const moderationThresholds = pgTable("moderation_thresholds", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  targetRole: varchar("target_role", { length: 20 }).notNull(),
+  action: varchar("action", { length: 20 }).notNull(),
+  threshold: integer("threshold").notNull(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("moderation_thresholds_role_action_idx").on(table.targetRole, table.action),
 ]);
 
 export const moderatorLogs = pgTable("moderator_logs", {
@@ -136,6 +199,8 @@ export type CollectedEasterEgg = typeof collectedEasterEggs.$inferSelect;
 export type InsertCollectedEasterEgg = typeof collectedEasterEggs.$inferInsert;
 export type Report = typeof reports.$inferSelect;
 export type InsertReport = typeof reports.$inferInsert;
+export type ModerationThreshold = typeof moderationThresholds.$inferSelect;
+export type InsertModerationThreshold = typeof moderationThresholds.$inferInsert;
 export type ModeratorLog = typeof moderatorLogs.$inferSelect;
 export type InsertModeratorLog = typeof moderatorLogs.$inferInsert;
 export type FakeUserInteraction = typeof fakeUserInteractions.$inferSelect;

@@ -118,4 +118,32 @@ export class SocialStorage extends TextAliasesStorage {
     const result = await db.select({ count: sql<number>`count(*)::int` }).from(reports).where(eq(reports.status, "pending"));
     return result[0]?.count ?? 0;
   }
+
+  // Task #2530 — filtri estesi per admin/moderator
+  async getReportsFiltered(opts: {
+    status?: string;
+    category?: string;
+    severity?: string;
+    context?: string;
+    reportedUserId?: string;
+    limit?: number;
+  } = {}): Promise<Report[]> {
+    const conds = [] as ReturnType<typeof eq>[];
+    if (opts.status) conds.push(eq(reports.status, opts.status));
+    if (opts.category) conds.push(eq(reports.category, opts.category));
+    if (opts.severity) conds.push(eq(reports.severity, opts.severity));
+    if (opts.context) conds.push(eq(reports.context, opts.context));
+    if (opts.reportedUserId) conds.push(eq(reports.reportedUserId, opts.reportedUserId));
+    const q = db.select().from(reports);
+    const qWithWhere = conds.length ? q.where(and(...conds)) : q;
+    return qWithWhere.orderBy(desc(reports.createdAt)).limit(opts.limit ?? 200);
+  }
+
+  async resolveReport(id: string, opts: { status: "resolved" | "dismissed"; resolvedBy: string }): Promise<Report | undefined> {
+    const [report] = await db.update(reports)
+      .set({ status: opts.status, resolvedBy: opts.resolvedBy, resolvedAt: new Date() })
+      .where(eq(reports.id, id))
+      .returning();
+    return report;
+  }
 }

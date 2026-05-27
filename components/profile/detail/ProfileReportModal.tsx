@@ -1,17 +1,41 @@
+/**
+ * Task #2530 — ProfileReportModal aggiornato con le 8 categorie segnalazione
+ * standard. Il chiamante (app/profile/[id].tsx) può passare la categoria
+ * selezionata al backend via `onReasonSelect(reason, category)`. Il payload
+ * resta backward-compat: se il chiamante non passa la categoria, il backend
+ * non-block.
+ */
 import React from "react";
 import { View, Text, StyleSheet, Modal, Pressable, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 
-const REPORT_REASONS = [
-  "Spam",
-  "Comportamento inappropriato",
-  "Profilo falso/bot",
-  "Molestia",
-  "Contenuto offensivo",
-  "Altro",
+export type ReportCategoryKey =
+  | "aggressive"
+  | "harassment"
+  | "fake_profile"
+  | "no_show"
+  | "opportunist"
+  | "group_misconduct"
+  | "dangerous_riding"
+  | "other";
+
+// Esposto per i chiamanti che vogliono leggere la categoria dalla reason label.
+export const REPORT_CATEGORY_OPTIONS: Array<{ key: ReportCategoryKey; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
+  { key: "aggressive",       label: "Comportamento aggressivo",       icon: "flame-outline" },
+  { key: "harassment",       label: "Molestia / contatti insistenti", icon: "alert-circle-outline" },
+  { key: "fake_profile",     label: "Profilo falso / bot",            icon: "person-remove-outline" },
+  { key: "no_show",          label: "Non si è presentato",            icon: "time-outline" },
+  { key: "opportunist",      label: "Opportunista / scrocco",         icon: "cash-outline" },
+  { key: "group_misconduct", label: "Comportamento in gruppo",        icon: "people-outline" },
+  { key: "dangerous_riding", label: "Guida pericolosa",               icon: "warning-outline" },
+  { key: "other",            label: "Altro",                          icon: "ellipsis-horizontal" },
 ];
+
+export function reasonToCategory(reason: string): ReportCategoryKey | undefined {
+  return REPORT_CATEGORY_OPTIONS.find((c) => c.label === reason)?.key;
+}
 
 interface ProfileReportModalProps {
   visible: boolean;
@@ -57,21 +81,25 @@ export const ProfileReportModal: React.FC<ProfileReportModalProps> = ({
           ) : (
             <>
               <Text style={styles.reportTitle}>Segnala {profileName}</Text>
-              <Text style={styles.reportSubtitle}>Seleziona il motivo della segnalazione</Text>
+              <Text style={styles.reportSubtitle}>
+                Le segnalazioni sono private: il segnalato non vedrà chi le invia.
+              </Text>
               <View style={styles.reasonList}>
-                {REPORT_REASONS.map((r) => (
-                  <TouchableOpacity
-                    key={r}
-                    style={[styles.reasonItem, selectedReason === r && styles.reasonItemSelected]}
-                    onPress={() => onReasonSelect(r)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.reasonRadio, selectedReason === r && styles.reasonRadioSelected]}>
-                      {selectedReason === r && <View style={styles.reasonRadioDot} />}
-                    </View>
-                    <Text style={[styles.reasonText, selectedReason === r && styles.reasonTextSelected]}>{r}</Text>
-                  </TouchableOpacity>
-                ))}
+                {REPORT_CATEGORY_OPTIONS.map((c) => {
+                  const selected = selectedReason === c.label;
+                  return (
+                    <TouchableOpacity
+                      key={c.key}
+                      style={[styles.reasonItem, selected && styles.reasonItemSelected]}
+                      onPress={() => onReasonSelect(c.label)}
+                      activeOpacity={0.7}
+                      testID={`profile-report-cat-${c.key}`}
+                    >
+                      <Ionicons name={c.icon} size={18} color={selected ? Colors.accent : Colors.textSecondary} />
+                      <Text style={[styles.reasonText, selected && styles.reasonTextSelected]}>{c.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
               <TextInput
                 style={styles.reportInput}
@@ -104,90 +132,23 @@ export const ProfileReportModal: React.FC<ProfileReportModalProps> = ({
 };
 
 const styles = StyleSheet.create({
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  menuHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: Colors.border,
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  reportSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 12,
-    paddingHorizontal: 20,
-    maxHeight: "85%",
-  },
+  menuOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+  menuHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: "center", marginBottom: 16 },
+  reportSheet: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 12, paddingHorizontal: 20, maxHeight: "90%" },
   reportTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text, marginBottom: 4 },
-  reportSubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginBottom: 16 },
+  reportSubtitle: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginBottom: 14, lineHeight: 18 },
   reasonList: { gap: 4, marginBottom: 14 },
-  reasonItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    backgroundColor: Colors.background,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  reasonItemSelected: {
-    borderColor: Colors.accent,
-    backgroundColor: Colors.accent + "15",
-  },
-  reasonRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reasonRadioSelected: { borderColor: Colors.accent },
-  reasonRadioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.accent },
+  reasonItem: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, backgroundColor: Colors.background, borderWidth: 1, borderColor: Colors.border },
+  reasonItemSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" },
   reasonText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.text, flex: 1 },
   reasonTextSelected: { fontFamily: "Inter_500Medium", color: Colors.accent },
-  reportInput: {
-    backgroundColor: Colors.background,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 12,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
-    minHeight: 72,
-    textAlignVertical: "top",
-    marginBottom: 16,
-  },
-  reportSubmitBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
+  reportInput: { backgroundColor: Colors.background, borderRadius: 10, borderWidth: 1, borderColor: Colors.border, padding: 12, fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.text, minHeight: 72, textAlignVertical: "top", marginBottom: 16 },
+  reportSubmitBtn: { backgroundColor: Colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
   reportSubmitBtnDisabled: { opacity: 0.5 },
   reportSubmitBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.background },
   reportSuccess: { alignItems: "center", paddingVertical: 24, gap: 12 },
   reportSuccessTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text },
   reportSuccessText: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", lineHeight: 20 },
-  reportCloseBtn: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginTop: 8,
-  },
+  reportCloseBtn: { backgroundColor: Colors.surface, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 32, borderWidth: 1, borderColor: Colors.border, marginTop: 8 },
   reportCloseBtnText: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.text },
 });

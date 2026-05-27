@@ -306,6 +306,51 @@ export async function getGpsRejectionThreshold(): Promise<number> {
   return 100;
 }
 
+// Task #2530 — notifica i moderatori quando una segnalazione supera la soglia
+// "notify" oppure ha severity high/critical. Mai inviata al reporter o al
+// segnalato.
+export async function sendModeratorReportPush(opts: {
+  reportedNickname: string;
+  category: string;
+  severity: string;
+  reportedUserId: string;
+  reportId: string;
+}): Promise<void> {
+  try {
+    const modRows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(inArray(users.role, ["admin", "moderator"]));
+    const userIdByToken = new Map<string, string>();
+    const msgs: ExpoPushMessage[] = [];
+    const sevIcon = opts.severity === "critical" ? "🚨"
+      : opts.severity === "high" ? "⚠️"
+      : "📢";
+    for (const row of modRows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        msgs.push({
+          to: row.expoPushToken,
+          title: `${sevIcon} Nuova segnalazione (${opts.severity})`,
+          body: `${opts.reportedNickname} — categoria: ${opts.category}`,
+          sound: "default" as const,
+          data: {
+            type: "moderator_report",
+            reportId: opts.reportId,
+            reportedUserId: opts.reportedUserId,
+            severity: opts.severity,
+          },
+          channelId: "matches",
+        });
+      }
+    }
+    if (msgs.length === 0) return;
+    await sendExpoMessages(msgs, userIdByToken);
+  } catch (err) {
+    console.warn("[Push] sendModeratorReportPush error (non-fatal):", err);
+  }
+}
+
 export async function sendGpsRejectionAlertToAdmins(
   offenderNickname: string,
   rejectionCount: number,

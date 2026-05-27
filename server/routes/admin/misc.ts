@@ -86,29 +86,127 @@ router.get("/campaigns", async (_req: Request, res: Response) => {
   }
 });
 
-// Reports
+// Task #2530 — Reports: filtri estesi + masking reporter + fix resolve bug
 router.get("/reports", async (req: Request, res: Response) => {
   try {
-    const reports = await storage.getReports();
-    return res.json(reports);
-  } catch (_error) {
+    const { maskReporterId } = await import("../../services/reportingService");
+    const viewerId = req.session?.userId as string | undefined;
+    const viewer = viewerId ? await storage.getUser(viewerId) : null;
+    const viewerRole = viewer?.role;
+
+    const filtered = await storage.getReportsFiltered({
+      status: typeof req.query.status === "string" ? req.query.status : undefined,
+      category: typeof req.query.category === "string" ? req.query.category : undefined,
+      severity: typeof req.query.severity === "string" ? req.query.severity : undefined,
+      context: typeof req.query.context === "string" ? req.query.context : undefined,
+      reportedUserId: typeof req.query.reportedUserId === "string" ? req.query.reportedUserId : undefined,
+      limit: req.query.limit ? Math.min(500, parseInt(String(req.query.limit), 10) || 200) : 200,
+    });
+
+    const masked = filtered.map((r) => ({
+      ...r,
+      reporterId: maskReporterId(r.reporterId, viewerRole),
+      _reporterMasked: viewerRole !== "admin",
+    }));
+    return res.json(masked);
+  } catch (err) {
+    console.error("[Admin] getReports error:", err);
     return sendError(res, 500, "Errore lettura segnalazioni");
   }
 });
 
 router.put("/reports/:id/resolve", async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = String(req.params.id ?? "");
     const parsed = reportResolveSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    // Assuming resolveReport exists or using a generic update
-    const [report] = await db.update(moderatorLogs)
-        .set({ details: `resolved at ${new Date().toISOString()}` })
-        .where(eq(moderatorLogs.id, id as string))
-        .returning();
+    const modId = (req.session?.userId as string | undefined) ?? "system";
+    const report = await storage.resolveReport(id, { status: parsed.data.status, resolvedBy: modId });
+    if (!report) return sendError(res, 404, "Segnalazione non trovata");
+    // Audit log (non-fatal)
+    storage.createModeratorLog({
+      moderatorId: modId,
+      action: parsed.data.status === "resolved" ? "report_resolved" : "report_dismissed",
+      targetType: "report",
+      targetId: id,
+      details: `report->${parsed.data.status}; reportedUserId=${report.reportedUserId}`,
+    }).catch(() => {});
     return res.json(report);
-  } catch (_error) {
+  } catch (err) {
+    console.error("[Admin] resolveReport error:", err);
     return sendError(res, 500, "Errore risoluzione segnalazione");
+  }
+});
+
+// Task #2530 — Reporter "abusivi" (>=2 dismissed): pannello dedicato
+router.get("/false-reports", async (req: Request, res: Response) => {
+  try {
+    const { getFalseReporters } = await import("../../services/reportingService");
+    const limit = req.query.limit ? Math.min(200, parseInt(String(req.query.limit), 10) || 100) : 100;
+    const rows = await getFalseReporters({ limit });
+    return res.json({ reporters: rows, total: rows.length });
+  } catch (err) {
+    console.error("[Admin] false-reports error:", err);
+    return sendError(res, 500, "Errore lettura false segnalazioni");
+  }
+});
+
+// Task #2530 — soglie configurabili (read/write) per ruolo
+router.get("/moderation-thresholds", async (_req: Request, res: Response) => {
+  try {
+    const { moderationThresholds } = await import("@shared/db");
+    const rows = await db.select().from(moderationThresholds);
+    return res.json({ thresholds: rows });
+  } catch (err) {
+    console.error("[Admin] thresholds get error:", err);
+    return sendError(res, 500, "Errore lettura soglie");
+  }
+});
+
+router.put("/moderation-thresholds", async (req: Request, res: Response) => {
+  try {
+    const { moderationThresholds } = await import("@shared/db");
+    const { targetRole, action, threshold } = req.body ?? {};
+    if (!["biker", "zavorrina"].includes(String(targetRole))) return sendError(res, 400, "targetRole non valido");
+    if (!["notify", "shadow_ban"].includes(String(action))) return sendError(res, 400, "action non valida");
+    const t = parseInt(String(threshold), 10);
+    if (!Number.isFinite(t) || t < 1 || t > 100) return sendError(res, 400, "threshold deve essere 1..100");
+    const [row] = await db.insert(moderationThresholds)
+      .values({ targetRole, action, threshold: t, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: [moderationThresholds.targetRole, moderationThresholds.action],
+        set: { threshold: t, updatedAt: new Date() },
+      })
+      .returning();
+    return res.json({ threshold: row });
+  } catch (err) {
+    console.error("[Admin] thresholds put error:", err);
+    return sendError(res, 500, "Errore aggiornamento soglie");
+  }
+});
+
+// Task #2530 — lift shadow-ban manuale
+router.post("/users/:id/unshadowban", async (req: Request, res: Response) => {
+  try {
+    const { users } = await import("@shared/db");
+    const targetId = String(req.params.id);
+    const modId = (req.session?.userId as string | undefined) ?? "system";
+    const [updated] = await db.update(users)
+      .set({ shadowBannedAt: null, shadowBanReason: null, shadowBannedUntil: null })
+      .where(eq(users.id, targetId))
+      .returning();
+    if (!updated) return sendError(res, 404, "Utente non trovato");
+    storage.createModeratorLog({
+      moderatorId: modId,
+      action: "shadow_ban_lifted",
+      targetType: "user",
+      targetId,
+      details: "moderatore ha rimosso lo shadow-ban",
+    }).catch(() => {});
+    return sendSuccess(res, { id: targetId });
+  } catch (err) {
+    console.error("[Admin] unshadowban error:", err);
+    return sendError(res, 500, "Errore rimozione shadow-ban");
   }
 });
 

@@ -191,12 +191,15 @@ router.get("/blocked", requireAuth, async (req: Request, res: Response) => {
 });
 
 router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
+  // Task #2530 — legacy endpoint: delega al nuovo flusso categorizzato in
+  // server/routes/reports.ts riusando il servizio reporting. Lasciato attivo per
+  // backward compat con client più vecchi che non conoscono `POST /api/reports`.
   try {
     const reporterId = req.session.userId!;
     const reportedUserId = req.params.id as string;
     const parsedRep = userReportSchema.safeParse(req.body);
     if (!parsedRep.success) return sendError(res, 400, parsedRep.error.issues[0].message);
-    const { reason, description } = parsedRep.data;
+    const { reason, description, category, context, contextId } = parsedRep.data;
 
     const ip = getTrustedClientIp(req) ?? "";
     if (reportRateLimiter.isOverLimit(reporterId, ip)) {
@@ -207,26 +210,26 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
       return sendError(res, 400, "Non puoi segnalare te stesso");
     }
 
-    const validReasons = [
-      "Spam",
-      "Comportamento inappropriato",
-      "Profilo falso/bot",
-      "Molestia",
-      "Contenuto offensivo",
-      "Altro",
-    ];
-    if (!reason || !validReasons.includes(reason)) {
-      return sendError(res, 400, "Motivo non valido");
-    }
-
-    if (description && typeof description === "string" && description.length > 500) {
-      return sendError(res, 400, "La descrizione non può superare 500 caratteri");
-    }
-
     const targetUser = await storage.getUser(reportedUserId);
-    if (!targetUser) {
-      return sendError(res, 404, "Utente non trovato");
-    }
+    if (!targetUser) return sendError(res, 404, "Utente non trovato");
+
+    const { computeTrustScore, evaluateAutoActions, hookFeedbackLoop } =
+      await import("../../services/reportingService");
+    const { categoryToSeverity } = await import("@shared/db");
+    const { sendModeratorReportPush } = await import("../../push-notifications");
+
+    const cat = category;
+    const severity = cat ? categoryToSeverity(cat) : "low";
+    const trustScore = await computeTrustScore(reporterId);
+    const affectedFeedbackLoop = cat
+      ? await hookFeedbackLoop({
+          reporterId,
+          reportedUserId,
+          category: cat,
+          context: context ?? "profile",
+          contextId: contextId ?? null,
+        })
+      : false;
 
     const reportData: InsertReport = {
       reporterId,
@@ -234,8 +237,29 @@ router.post("/:id/report", requireAuth, async (req: Request, res: Response) => {
       reason,
       description: (description && typeof description === "string") ? description : null,
       status: "pending",
+      category: cat ?? null,
+      context: context ?? "profile",
+      contextId: contextId ?? null,
+      reportedUserRole: targetUser.userType,
+      severity,
+      affectedFeedbackLoop,
+      reporterTrustScore: trustScore,
     };
-    await storage.createReport(reportData);
+    const report = await storage.createReport(reportData);
+
+    evaluateAutoActions(reportedUserId)
+      .then(async (out) => {
+        if (out.notified || severity === "high" || severity === "critical") {
+          await sendModeratorReportPush({
+            reportedNickname: targetUser.nickname ?? "Utente",
+            category: cat ?? reason,
+            severity,
+            reportedUserId,
+            reportId: report.id,
+          });
+        }
+      })
+      .catch((err) => console.warn("[Reports legacy] evaluateAutoActions failed:", err));
 
     return sendSuccess(res, undefined, "Segnalazione inviata con successo");
   } catch (error) {

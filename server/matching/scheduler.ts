@@ -506,6 +506,28 @@ export function startMatchingEngine(): void {
   }, 24 * 60 * 60 * 1000));
   console.log("[Matching] Daily user-match-profile recompute scheduled");
 
+  // Task #2530 — Recompute giornaliero del trust score reporter (snapshot sui
+  // report pending). Inizia 7 min dopo il boot, poi ogni 24h.
+  setTimeout(() => {
+    import("../services/reportingService").then(({ recomputeAllTrustScores }) =>
+      recomputeAllTrustScores()
+        .then((r) => {
+          if (r.updated > 0) console.log(`[Reports] Trust score ricalcolato — ${r.updated} report aggiornati`);
+        })
+        .catch((err) => console.error("[Reports] trust recompute startup failed:", err)),
+    ).catch((err) => console.error("[Reports] trust import failed:", err));
+  }, 7 * 60 * 1000);
+  _engineTimers.push(setInterval(() => {
+    import("../services/reportingService").then(({ recomputeAllTrustScores }) =>
+      recomputeAllTrustScores()
+        .then((r) => {
+          if (r.updated > 0) console.log(`[Reports] daily trust score: ${r.updated} report aggiornati`);
+        })
+        .catch((err) => console.error("[Reports] daily trust recompute failed:", err)),
+    ).catch(() => {});
+  }, 24 * 60 * 60 * 1000));
+  console.log("[Matching] Daily reporter trust-score recompute scheduled");
+
   // Task #2515 — Bio Affinity matching: lower frequency (30 min)
   // perché basato su embeddings (più costoso/lento).
   const runBioAffinitySafe = async () => {

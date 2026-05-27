@@ -146,8 +146,10 @@ export interface IStorage {
   getCollectedEasterEggs(userId: string): Promise<CollectedEasterEgg[]>;
   hasCollectedEasterEgg(easterEggId: string, userId: string): Promise<boolean>;
   getReports(status?: string): Promise<Report[]>;
+  getReportsFiltered(opts?: { status?: string; category?: string; severity?: string; context?: string; reportedUserId?: string; limit?: number }): Promise<Report[]>;
   createReport(report: InsertReport): Promise<Report>;
   updateReport(id: string, data: Partial<InsertReport>): Promise<Report | undefined>;
+  resolveReport(id: string, opts: { status: "resolved" | "dismissed"; resolvedBy: string }): Promise<Report | undefined>;
   createModeratorLog(log: InsertModeratorLog): Promise<ModeratorLog>;
   getActiveCampaigns(): Promise<AdCampaign[]>;
   getActiveAdsByUserType(userType: string): Promise<AdCampaign[]>;

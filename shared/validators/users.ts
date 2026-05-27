@@ -170,9 +170,33 @@ export const privacySettingsSchema = z.object({
 }).passthrough();
 export type PrivacySettingsInput = z.infer<typeof privacySettingsSchema>;
 
+// Task #2530 — categorie/contesti accettati dal backend (vedi shared/db/social.ts
+// REPORT_CATEGORIES / REPORT_CONTEXTS). Tenuti come literal qui per evitare
+// dipendenze circolari validators → db.
+const REPORT_CATEGORY_VALUES = [
+  "aggressive",
+  "harassment",
+  "fake_profile",
+  "no_show",
+  "opportunist",
+  "group_misconduct",
+  "dangerous_riding",
+  "other",
+] as const;
+const REPORT_CONTEXT_VALUES = [
+  "match",
+  "chat",
+  "profile",
+  "post_meetup",
+  "other",
+] as const;
+
 export const userReportSchema = z.object({
-  reason: z.string().min(1, "Motivo obbligatorio"),
-  description: z.string().max(500).optional(),
+  reason: z.string().min(1, "Motivo obbligatorio").max(100),
+  description: z.string().max(2000).optional(),
+  category: z.enum(REPORT_CATEGORY_VALUES).optional(),
+  context: z.enum(REPORT_CONTEXT_VALUES).optional(),
+  contextId: z.string().max(64).optional(),
 });
 export type UserReportInput = z.infer<typeof userReportSchema>;
 

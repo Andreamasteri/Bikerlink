@@ -468,3 +468,58 @@ Da 995 a ~890 righe estraendo sotto-componenti < 250 righe ciascuno in `componen
 ### Script sync `scripts/check-match-preferences-sync.ts`
 
 Confronta colonne fisiche `match_preferences` (schema drizzle) vs `MATCHING_REGISTRY.prefColumn` vs chiavi referenziate in `app/admin/match-preferences-edit.tsx`. Exit code != 0 su divergenze. Eseguibile come `npx tsx scripts/check-match-preferences-sync.ts`.
+
+## Task #2530 — Segnalazioni Private + Moderazione (Biker / Zavorrine)
+
+Sistema di segnalazione utenti categorizzato con moderazione asimmetrica per ruolo, hook al feedback-loop matching, trust score reporter e shadow-ban automatico.
+
+### Schema DB (`migrations/0039_reports_extension.sql`)
+
+Estende `reports` con: `category` (8 valori), `context` (match|chat|profile|post_meetup|other), `context_id`, `reported_user_role`, `severity` (low|medium|high|critical), `affected_feedback_loop`, `reporter_trust_score` (snapshot al momento del report). Indici su category/severity/reported_user_id/reporter_id.
+
+Nuova tabella `moderation_thresholds` (`target_role`, `action`, `threshold`) con seed asimmetrico:
+- **zavorrina**: notify@2 / shadow_ban@4 (più protette)
+- **biker**: notify@4 / shadow_ban@8
+
+`users` estesa con `shadow_banned_at`, `shadow_ban_reason`, `shadow_banned_until` (shadow-ban morbido: l'utente non viene avvisato, esce dai pool di match/listing).
+
+### Service `server/services/reportingService.ts`
+
+- `computeTrustScore(reporterId)`: +0.1 per ogni report risolto, -0.2 per ogni dismissed, clamp [0.1, 2.0], default 1.0.
+- `getThresholdsFor(role)`: legge da `moderation_thresholds`, fallback hard-coded.
+- `getWeightedReportCount(uid)`: somma report pending+resolved pesati per `reporter_trust_score`.
+- `hookFeedbackLoop(opts)`: per categorie "soft" (no_show, opportunist, group_misconduct) inserisce un `match_feedback` (action=block) + `match_negative_preference` (kind=blocked_user) per evitare di riproporre l'utente al reporter — integrazione diretta con Task #2519/#2523.
+- `evaluateAutoActions(reportedUserId)`: applica shadow-ban automatico al raggiungimento della soglia configurata, ritorna anche flag `notified` per push moderatori.
+- `maskReporterId(id, viewerRole)`: admin vede ID reale, tutti gli altri vedono `anon_XXXXXX` (hash deterministico). Privacy del segnalante è garantita.
+- `getFalseReporters()`: query reporter con ≥2 dismissed, ordinati per dismissed desc, con trust score live.
+- `recomputeAllTrustScores()`: job giornaliero, aggiorna trust snapshot sui report pending.
+
+### Routes
+
+- `POST /api/reports` (`server/routes/reports.ts`) — endpoint principale: accetta `category`, `context`, `contextId`, calcola severity, snapshotta trust score, chiama `hookFeedbackLoop` + `evaluateAutoActions` async, invia email admin + push moderatori (se notify-threshold o severity high/critical).
+- `POST /api/users/:id/report` (legacy in `users/actions.ts`) — stesso flusso ma backward-compat con client più vecchi.
+- `GET /api/admin/reports` — filtri `status`, `category`, `severity`, `context`, `reportedUserId`, `limit`; reporter masking automatico per non-admin.
+- `PUT /api/admin/reports/:id/resolve` — fix bug pre-esistente (aggiornava `moderator_logs` invece di `reports`). Ora usa `storage.resolveReport()` + audit log.
+- `GET /api/admin/false-reports` — reporter abusivi con trust score.
+- `GET/PUT /api/admin/moderation-thresholds` — lettura/scrittura soglie per role+action.
+- `POST /api/admin/users/:id/unshadowban` — lift manuale shadow-ban con audit log.
+
+### Push moderatori
+
+`sendModeratorReportPush(...)` in `server/push-notifications.ts` — filtra utenti con `role IN ('admin','moderator')`, channelId `matches`, icona variabile per severity (🚨 critical, ⚠️ high, 📢 medium). Triggerata da POST /api/reports quando: severity >= high, oppure peso cumulativo report >= soglia notify configurata per il ruolo del segnalato.
+
+### UI
+
+- `components/ReportButton.tsx` — componente riusabile (props: `reportedUserId`, `context`, `contextId`, `reportedNickname`, `label`, `iconSize`, `iconColor`). Sheet con 8 categorie + descrizione opzionale. Pronto per essere droppato in chat/match/post-meetup.
+- `components/profile/detail/ProfileReportModal.tsx` — refit con 8 categorie standard + export `REPORT_CATEGORY_OPTIONS` e `reasonToCategory()`.
+- `app/profile/[id].tsx` — `reportMutation` ora invia `category`+`context:'profile'`+`contextId:id`.
+- `app/admin/reports.tsx` — riscritto con tre righe di filtri (status / severity / category), badge severity colorato, info trust score, info hook→matching.
+- `app/admin/false-reports.tsx` (nuovo) — lista reporter a basso trust, registrato in `_layout.tsx` + voce in `app/admin/index.tsx`.
+
+### Cron giornaliero
+
+`server/matching/scheduler.ts` registra recompute trust score (7 min dopo boot, poi ogni 24h) tramite import dinamico per non rompere il bundle se il modulo cambia.
+
+### Smoke test
+
+`scripts/smoke-reports.ts` — pure logic, niente DB. Verifica mapping categorie→severity, validator Zod (accetta payload nuovo + legacy, rifiuta categorie invalide, rifiuta description > 2000), masking deterministico. Eseguibile via `npx tsx scripts/smoke-reports.ts`.

@@ -224,7 +224,19 @@ export default function PublicProfileScreen() {
 
   const reportMutation = useMutation({
     mutationFn: async ({ reason, description }: { reason: string; description: string }) => {
-      const res = await apiRequest("POST", `/api/users/${id}/report`, { reason, description: description || undefined });
+      // Task #2530 — risali alla categoria standard dalla label scelta; se
+      // l'utente ha selezionato una vecchia label custom, category resta
+      // undefined e il backend salva il report come "uncategorized" (severity
+      // low).
+      const { reasonToCategory } = await import("@/components/profile/detail/ProfileReportModal");
+      const category = reasonToCategory(reason);
+      const res = await apiRequest("POST", `/api/users/${id}/report`, {
+        reason,
+        description: description || undefined,
+        category,
+        context: "profile",
+        contextId: id,
+      });
       return res.json();
     },
     onSuccess: () => {
