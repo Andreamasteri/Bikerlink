@@ -333,6 +333,17 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI Watchdog scheduler failed (non-fatal):", e);
     }
 
+    // Task #2536 — AI DB Integrity scheduler + worker BullMQ.
+    try {
+      const { startDbIntegrityScheduler } = await import("./ai/db-integrity/scheduler");
+      startDbIntegrityScheduler();
+      const { startDbIntegrityWorker } = await import("./ai/db-integrity/worker");
+      startDbIntegrityWorker();
+      console.log("[INIT] AI DB Integrity scheduler + worker started");
+    } catch (e) {
+      console.warn("[INIT] AI DB Integrity scheduler failed (non-fatal):", e);
+    }
+
     // Motion simulator for fake users — fire-and-forget so it cannot hang boot
     import("./motion-simulator")
       .then(({ startMotionSimulator }) => startMotionSimulator())

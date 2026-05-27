@@ -12,6 +12,34 @@ import { collectLatency } from "./collectors/latency-collector";
 import { collectErrors } from "./collectors/error-collector";
 import { recordSignals } from "./signals";
 import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
+import { collectDbIntegrity } from "../db-integrity/collector";
+
+// Task #2536 — wrapper che traduce lo snapshot db-integrity in Signal[] per
+// l'aggregator. Mappa severity → watchdog severity (info/warn/high/critical).
+async function collectDbIntegritySignals(): Promise<Signal[]> {
+  try {
+    const snap = await collectDbIntegrity();
+    if (!snap.hasRun) return [];
+    const out: Signal[] = [];
+    if (snap.bySeverity.critical > 0) {
+      out.push({ source: "db", metric: "db_integrity.critical_violations",
+        severity: "critical", value: snap.bySeverity.critical,
+        details: { samples: snap.criticalSamples, lastRunAt: snap.lastRunAt } });
+    }
+    if (snap.bySeverity.high > 0) {
+      out.push({ source: "db", metric: "db_integrity.high_violations",
+        severity: "high", value: snap.bySeverity.high });
+    }
+    if (snap.bySeverity.medium > 0) {
+      out.push({ source: "db", metric: "db_integrity.medium_violations",
+        severity: "warn", value: snap.bySeverity.medium });
+    }
+    return out;
+  } catch (err) {
+    return [{ source: "db", metric: "collector.error", severity: "warn",
+      details: { collector: "db-integrity", error: (err as Error).message?.slice(0, 200) } }];
+  }
+}
 
 const SEVERITY_WEIGHT: Record<Severity, number> = { info: 0, warn: 5, high: 18, critical: 40 };
 
@@ -86,6 +114,7 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
   const collectors = await Promise.allSettled([
     collectBullMq(), collectScheduler(), collectDb(),
     collectRedis(), collectLatency(), collectErrors(),
+    collectDbIntegritySignals(),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {

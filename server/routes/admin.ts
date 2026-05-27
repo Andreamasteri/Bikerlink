@@ -244,6 +244,7 @@ import tagsRouter from './admin/tags';
 import textAliasesRouter from './admin/text-aliases';
 import aiModerationRouter from './admin/ai-moderation';
 import aiWatchdogRouter from './admin/ai-watchdog';
+import dbIntegrityRouter from './admin/db-integrity';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -339,5 +340,7 @@ router.use('/embeddings', _requireAdmin, embeddingsRouter);
 router.use('/', _requireAdmin, aiModerationRouter);
 // Task #2533 — AI System Watchdog.
 router.use('/', _requireAdmin, aiWatchdogRouter);
+// Task #2536 — AI Database Integrity.
+router.use('/', _requireAdmin, dbIntegrityRouter);
 
 export default router;

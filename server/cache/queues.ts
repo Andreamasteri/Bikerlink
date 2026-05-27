@@ -10,9 +10,9 @@ import { getRawRedis, isRedisAvailable } from "./redis";
  * are added by the individual job owners (#2515/#2516/#2520/#2523/#2526).
  */
 
-export type QueueName = "embeddings" | "recap" | "route-fingerprint" | "pattern-detect";
+export type QueueName = "embeddings" | "recap" | "route-fingerprint" | "pattern-detect" | "db-integrity-expensive";
 
-const ALL_QUEUES: QueueName[] = ["embeddings", "recap", "route-fingerprint", "pattern-detect"];
+const ALL_QUEUES: QueueName[] = ["embeddings", "recap", "route-fingerprint", "pattern-detect", "db-integrity-expensive"];
 
 const queues = new Map<QueueName, Queue>();
 
