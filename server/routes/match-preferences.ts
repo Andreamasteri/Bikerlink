@@ -27,8 +27,8 @@ export const DEFAULT_PREFS = {
   bikerBikerDayTime: true,
   bikerBikerEvents: true,
   routeAffinity: true,
-  // Task #2516 — match basato su embedding gusti musicali + tag combinati.
   musicAffinity: true,
+  bioAffinity: true,
   directMatch: true,
   topMatchesOnly: false,
   weeklyRecap: true,
@@ -68,6 +68,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         bikerBikerEvents: row.bikerBikerEvents,
         routeAffinity: row.routeAffinity,
         musicAffinity: row.musicAffinity ?? true,
+        bioAffinity: row.bioAffinity ?? true,
         directMatch: row.directMatch,
         topMatchesOnly: row.topMatchesOnly ?? false,
         weeklyRecap: row.weeklyRecap ?? true,

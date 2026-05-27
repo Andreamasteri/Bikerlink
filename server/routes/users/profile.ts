@@ -5,6 +5,8 @@ import { onlineTracker } from "../../online-tracker";
 import { applyFakeZones, applyPositionFuzz, captureFirstAvailabilityLocation } from "../users";
 import { createRegionalClubInvite } from "../motoclubs/utils";
 import { triggerProposalProfileMatchingForZavorrina } from "../../matching-engine";
+import { enqueueBioEmbedding } from "../../embeddings/bio-queue";
+import { deleteEmbedding } from "../../embeddings";
 import type { InsertUser, InsertUserProfile } from "@shared/db";
 
 import { requireAuth } from "../../lib/auth-middleware";
@@ -146,6 +148,23 @@ router.put("/me", requireAuth, async (req: Request, res: Response) => {
         await storage.updateUserProfile(userId, profileUpdate);
       } else {
         await storage.createUserProfile({ userId, ...profileUpdate } as InsertUserProfile);
+      }
+
+      // Task #2515 — sincronizza embedding bio con il valore corrente.
+      //   • bio cambiata e non vuota → enqueue rigenerazione
+      //   • bio svuotata (null/"") → cancella l'embedding esistente per
+      //     evitare match "fantasma" su testo che l'utente ha rimosso
+      //     (privacy / data minimization).
+      if (b.bio !== undefined) {
+        const newBio = (b.bio ?? "").trim();
+        const oldBio = (existingProfileMe?.bio ?? "").trim();
+        if (newBio && newBio !== oldBio) {
+          enqueueBioEmbedding(userId, newBio);
+        } else if (!newBio && oldBio) {
+          deleteEmbedding("user", userId, "bio").catch((err) =>
+            console.error(`[BioEmbed] delete failed for user ${userId}:`, err),
+          );
+        }
       }
     }
 

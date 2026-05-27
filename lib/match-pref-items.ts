@@ -17,6 +17,7 @@ export type MatchPrefsPayload = {
   bikerBikerDayTime: boolean;
   bikerBikerEvents: boolean;
   routeAffinity: boolean;
+  bioAffinity: boolean;
   directMatch: boolean;
   topMatchesOnly: boolean;
   weeklyRecap: boolean;
@@ -41,6 +42,7 @@ export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
   bikerBikerDayTime: true,
   bikerBikerEvents: true,
   routeAffinity: true,
+  bioAffinity: true,
   directMatch: true,
   topMatchesOnly: false,
   weeklyRecap: true,
@@ -65,5 +67,6 @@ export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string }[]
   { key: "bikerBikerDayTime", label: "Biker ↔ Biker — Giorno/Fascia oraria" },
   { key: "bikerBikerEvents", label: "Biker ↔ Biker — Raduni frequentati" },
   { key: "routeAffinity", label: "Biker ↔ Biker — Similarità percorsi GPS" },
+  { key: "bioAffinity", label: "Biker ↔ Biker — Affinità bio (testo libero)" },
   { key: "directMatch", label: "Match Diretto (Richiedi Match)" },
 ];

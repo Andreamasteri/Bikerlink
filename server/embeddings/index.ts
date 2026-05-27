@@ -8,6 +8,7 @@ export {
 export {
   upsertEmbedding,
   findSimilar,
+  deleteEmbedding,
   type UpsertEmbeddingResult,
   type SimilarHit,
 } from "./store";

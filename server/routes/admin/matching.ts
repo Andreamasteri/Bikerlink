@@ -1165,6 +1165,62 @@ router.get("/matching/explain", async (req: Request, res: Response) => {
     breakdown.musicWeightTag = musicAffinity?.weightTag;
     breakdown.musicWeightEmbedding = musicAffinity?.weightEmbedding;
 
+    // Task #2515 — bio similarity (cosine on text-embedding vectors).
+    // Best-effort: if either user lacks a bio embedding, returns null.
+    const bioAffinity: {
+      similarity: number | null;
+      threshold: number;
+      bioA: string | null;
+      bioB: string | null;
+      model: string | null;
+    } = { similarity: null, threshold: 0.78, bioA: null, bioB: null, model: null };
+    try {
+      const bioRowsRes = await db.execute<{
+        user_id: string;
+        bio: string | null;
+        embedding: string | null;
+        model: string | null;
+      }>(sql`
+        SELECT
+          up.user_id AS user_id,
+          up.bio AS bio,
+          e.embedding::text AS embedding,
+          e.model AS model
+        FROM user_profiles up
+        LEFT JOIN embeddings e
+          ON e.entity_type = 'user'
+         AND e.entity_id = up.user_id
+         AND e.field = 'bio'
+        WHERE up.user_id IN (${userA}, ${userB})
+      `);
+      const bioRows = (bioRowsRes.rows ?? bioRowsRes) as Array<{
+        user_id: string;
+        bio: string | null;
+        embedding: string | null;
+        model: string | null;
+      }>;
+      const aRow = bioRows.find((r) => r.user_id === userA);
+      const bRow = bioRows.find((r) => r.user_id === userB);
+      const snippet = (s: string | null | undefined, n = 240) =>
+        s ? (s.length > n ? s.slice(0, n) + "…" : s) : null;
+      bioAffinity.bioA = snippet(aRow?.bio ?? null);
+      bioAffinity.bioB = snippet(bRow?.bio ?? null);
+      bioAffinity.model = aRow?.model ?? bRow?.model ?? null;
+
+      if (aRow?.embedding && bRow?.embedding) {
+        const simRes = await db.execute<{ sim: number }>(sql`
+          SELECT 1 - (
+            ${aRow.embedding}::vector <=> ${bRow.embedding}::vector
+          ) AS sim
+        `);
+        const simRow = (simRes.rows ?? simRes)[0] as { sim: number | string } | undefined;
+        if (simRow != null) {
+          bioAffinity.similarity = Number(Number(simRow.sim).toFixed(4));
+        }
+      }
+    } catch (bioErr) {
+      console.error("[admin] explain bio similarity error:", bioErr);
+    }
     return sendSuccess(res, {
       userA, userB,
       categories,
@@ -1172,6 +1228,7 @@ router.get("/matching/explain", async (req: Request, res: Response) => {
       minCategories,
       isSupermatch,
       musicAffinity,
+      bioAffinity,
       breakdown,
     });
   } catch (err) {

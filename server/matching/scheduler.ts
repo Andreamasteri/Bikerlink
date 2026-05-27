@@ -13,6 +13,7 @@ import { runWeeklyRecapJob } from "./jobs/weekly-recap";
 import { Cron } from "croner";
 import { runDetectNegativePatternsJob } from "./jobs/detect-negative-patterns";
 import { runRouteSimilarityMatching } from "./run-route-similarity";
+import { runBioAffinityMatching } from "./run-bio-affinity";
 import { runDistanceMatching, runRouteTypeZoneMatching } from "./run-distance";
 import { runProposalToProfileMatching } from "./run-profile";
 import { runProposalZoneNotifications, runProposalMatchingForUser } from "./run-proposals";
@@ -476,6 +477,22 @@ export function startMatchingEngine(): void {
     );
   }, 24 * 60 * 60 * 1000));
   console.log("[Matching] Daily user-match-profile recompute scheduled");
+
+  // Task #2515 — Bio Affinity matching: lower frequency (30 min)
+  // perché basato su embeddings (più costoso/lento).
+  const runBioAffinitySafe = async () => {
+    try {
+      const count = await runBioAffinityMatching();
+      if (count > 0) {
+        console.log(`[Matching] BioAffinity ciclo: ${count} nuovi match`);
+      }
+    } catch (err) {
+      console.error("[Matching] BioAffinity ciclo errore:", err);
+    }
+  };
+  setTimeout(() => { runBioAffinitySafe(); }, 2 * 60 * 1000);
+  _engineTimers.push(setInterval(runBioAffinitySafe, 30 * 60 * 1000));
+  console.log("[Matching] BioAffinity matcher schedulato (30 min)");
 }
 
 export function stopMatchingEngine(): void {

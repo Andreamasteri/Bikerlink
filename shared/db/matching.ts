@@ -167,6 +167,7 @@ export const matchPreferences = pgTable("match_preferences", {
   // Task #2516 — abilita matcher per affinità musicale combinata
   // (tag-overlap + embedding similarity sui gusti musicali liberi).
   musicAffinity: boolean("music_affinity").notNull().default(true),
+  bioAffinity: boolean("bio_affinity").notNull().default(true),
   directMatch: boolean("direct_match").notNull().default(true),
   topMatchesOnly: boolean("top_matches_only").notNull().default(false),
   weeklyRecap: boolean("weekly_recap").notNull().default(true),
@@ -295,6 +296,37 @@ export type GeoCellLabel = typeof geoCellLabels.$inferSelect;
 export type InsertGeoCellLabel = typeof geoCellLabels.$inferInsert;
 export type RouteAffinityMatch = typeof routeAffinityMatches.$inferSelect;
 export type InsertRouteAffinityMatch = typeof routeAffinityMatches.$inferInsert;
+
+/**
+ * Task #2515 — Bio affinity matches (cosine similarity on user bio embeddings).
+ * userA/userB are stored sorted via the LEAST/GREATEST unique index.
+ */
+export const bioAffinityMatches = pgTable("bio_affinity_matches", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userAId: varchar("user_a_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  userBId: varchar("user_b_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  similarity: doublePrecision("similarity").notNull(),
+  model: varchar("model", { length: 80 }),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("bio_affinity_user_a_idx").on(table.userAId),
+  index("bio_affinity_user_b_idx").on(table.userBId),
+  uniqueIndex("bio_affinity_symmetric_idx").on(
+    sql`LEAST(${table.userAId}, ${table.userBId})`,
+    sql`GREATEST(${table.userAId}, ${table.userBId})`,
+  ),
+]);
+
+export type BioAffinityMatch = typeof bioAffinityMatches.$inferSelect;
+export type InsertBioAffinityMatch = typeof bioAffinityMatches.$inferInsert;
 
 export type ZavarrinaWishlist = typeof zavarrinaWishlists.$inferSelect;
 export type InsertZavarrinaWishlist = typeof zavarrinaWishlists.$inferInsert;
