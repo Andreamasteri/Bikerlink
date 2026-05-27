@@ -242,11 +242,14 @@ const adminGroups: AdminGroup[] = [
     headerIcon: "link-variant",
     headerIconSet: "MaterialCommunityIcons",
     items: [
+      // Task #2527 — Hub sempre come prima voce del gruppo Matching.
+      { key: "matching-hub", label: "Hub Matching", icon: "view-dashboard-variant", iconSet: "MaterialCommunityIcons", route: "/admin/matching-hub", accentColor: "#0EA5E9" },
       { key: "match-engine", label: "Motore Matching", icon: "engine", iconSet: "MaterialCommunityIcons", route: "/admin/match-engine", accentColor: "#FF9500" },
       { key: "match-rules", label: "Regole Matching", icon: "table-large", iconSet: "MaterialCommunityIcons", route: "/admin/match-rules", accentColor: "#10B981" },
       { key: "match-inspector", label: "Match Inspector", icon: "account-search", iconSet: "MaterialCommunityIcons", route: "/admin/match-inspector", accentColor: "#2196F3" },
       { key: "match-control", label: "Controllo Sistema", icon: "tune-variant", iconSet: "MaterialCommunityIcons", route: "/admin/match-control", accentColor: "#9C27B0" },
       { key: "match-health", label: "Match Health", icon: "heart-pulse", iconSet: "MaterialCommunityIcons", route: "/admin/match-health", accentColor: "#4CAF50" },
+      { key: "matching-telemetry", label: "Telemetria", icon: "chart-line", iconSet: "MaterialCommunityIcons", route: "/admin/matching-telemetry", accentColor: "#22C55E" },
       { key: "ab", label: "A/B Esperimenti", icon: "flask-outline", iconSet: "MaterialCommunityIcons", route: "/admin/ab", accentColor: "#E91E63" },
     ],
   },

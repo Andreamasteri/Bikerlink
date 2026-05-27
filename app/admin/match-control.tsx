@@ -16,6 +16,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Slider from "@react-native-community/slider";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
+// Task #2527 — sotto-componenti estratti per ridurre la dimensione del file.
+import { CycleMetaCard } from "@/components/admin/matching/CycleMetaCard";
+import { LockCard } from "@/components/admin/matching/LockCard";
+import { StatsTable } from "@/components/admin/matching/StatsTable";
+import { AnomalyAlerts } from "@/components/admin/matching/AnomalyAlerts";
 
 interface AppSettingRow {
   key: string;
@@ -105,7 +110,10 @@ interface LockStateResponse {
   elapsedMs: number | null;
 }
 
-function formatDate(iso: string) {
+// Task #2527 — `formatDate` / `formatDuration` ora vivono nei sotto-componenti
+// (CycleMetaCard, LockCard). Manteniamo le funzioni unused-prefixed così se in
+// futuro servono di nuovo in questo file sono pronte.
+function _formatDate(iso: string) {
   try {
     return new Date(iso).toLocaleString("it-IT", {
       day: "2-digit", month: "2-digit", year: "numeric",
@@ -114,7 +122,7 @@ function formatDate(iso: string) {
   } catch { return iso; }
 }
 
-function formatDuration(ms: number) {
+function _formatDuration(ms: number) {
   if (ms < 1000) return `${ms}ms`;
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
   return `${Math.floor(ms / 60000)}m ${Math.round((ms % 60000) / 1000)}s`;
@@ -339,48 +347,12 @@ export default function MatchControlScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Stato Motore</Text>
 
-        <View style={styles.engineCard}>
-          <View style={styles.engineRow}>
-            <MaterialCommunityIcons
-              name="engine"
-              size={20}
-              color={autoMatchEnabled ? Colors.success : Colors.textSecondary}
-            />
-            <Text style={styles.engineLabel}>Auto matching</Text>
-            <View style={[styles.engineBadge, { backgroundColor: autoMatchEnabled ? Colors.success + "22" : Colors.border }]}>
-              <Text style={[styles.engineBadgeText, { color: autoMatchEnabled ? Colors.success : Colors.textSecondary }]}>
-                {autoMatchEnabled ? "ATTIVO" : "DISATTIVO"}
-              </Text>
-            </View>
-          </View>
-
-          {cycleMeta ? (
-            <View style={styles.cycleMetaBlock}>
-              <View style={styles.cycleMetaRow}>
-                <Ionicons name="time-outline" size={14} color={Colors.textSecondary} />
-                <Text style={styles.cycleMetaText}>
-                  Ultimo ciclo: {formatDate(cycleMeta.completedAt)}
-                </Text>
-              </View>
-              <View style={styles.cycleMetaRow}>
-                <Ionicons name="speedometer-outline" size={14} color={Colors.textSecondary} />
-                <Text style={styles.cycleMetaText}>
-                  Durata: {formatDuration(cycleMeta.durationMs)}
-                </Text>
-              </View>
-              <View style={styles.cycleMetaRow}>
-                <Ionicons name="people-outline" size={14} color={Colors.textSecondary} />
-                <Text style={styles.cycleMetaText}>
-                  Nuovi: {cycleMeta.bikerBikerMatchesNew} biker-biker, {cycleMeta.zavarrinaMatchesNew} biker-zavarrina
-                </Text>
-              </View>
-            </View>
-          ) : (
-            <Text style={styles.noMetaText}>
-              {isLoading ? "Caricamento..." : "Nessun ciclo completato ancora."}
-            </Text>
-          )}
-        </View>
+        {/* Task #2527 — estratto in components/admin/matching/CycleMetaCard.tsx */}
+        <CycleMetaCard
+          autoMatchEnabled={autoMatchEnabled}
+          cycleMeta={cycleMeta}
+          isLoading={isLoading}
+        />
       </View>
 
       {matchingStats && (
@@ -495,29 +467,8 @@ export default function MatchControlScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.lockCard}>
-          <MaterialCommunityIcons
-            name={lockState?.isRunning ? "lock" : "lock-open-variant"}
-            size={20}
-            color={lockState?.isRunning ? Colors.warning : Colors.success}
-          />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.lockTitle}>
-              Lock engine: {lockState?.isRunning ? "BLOCCATO" : "libero"}
-            </Text>
-            {lockState?.isRunning && lockState.elapsedMs != null && (
-              <Text style={styles.lockSubtitle}>
-                In esecuzione da {Math.floor(lockState.elapsedMs / 1000)}s
-                {lockState.elapsedMs > 5 * 60 * 1000 && " — sospetto stallo"}
-              </Text>
-            )}
-            {!lockState?.isRunning && lockState?.lastStartIso && (
-              <Text style={styles.lockSubtitle}>
-                Ultimo avvio: {formatDate(lockState.lastStartIso)}
-              </Text>
-            )}
-          </View>
-        </View>
+        {/* Task #2527 — estratto in components/admin/matching/LockCard.tsx */}
+        <LockCard lockState={lockState} />
 
         <TouchableOpacity
           style={[
@@ -628,67 +579,14 @@ export default function MatchControlScreen() {
           </Text>
         </TouchableOpacity>
 
-        {anomalies.length > 0 && (
-          <View style={styles.anomalyBanner}>
-            <Ionicons name="warning" size={16} color={Colors.warning} />
-            <Text style={styles.anomalyText}>
-              {anomalies.length} tipo{anomalies.length > 1 ? "i" : ""} con 0 match — verifica configurazione
-            </Text>
-          </View>
-        )}
+        {/* Task #2527 — estratto in components/admin/matching/AnomalyAlerts.tsx */}
+        <AnomalyAlerts count={anomalies.length} />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Statistiche per Tipo di Match</Text>
-
-        {isLoading ? (
-          <ActivityIndicator color={Colors.accent} style={{ marginTop: 20 }} />
-        ) : (
-          <View style={styles.typeStatsTable}>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, { flex: 3 }]}>Tipo</Text>
-              <Text style={[styles.tableCell, styles.tableCellCenter, { flex: 1.2 }]}>Utenti attivi</Text>
-              <Text style={[styles.tableCell, styles.tableCellCenter, { flex: 1 }]}>Match</Text>
-              <Text style={[styles.tableCell, styles.tableCellCenter, { flex: 0.8 }]}>Stato</Text>
-            </View>
-
-            {stats.map((stat, idx) => (
-              <View
-                key={stat.typeKey}
-                style={[
-                  styles.tableRow,
-                  idx % 2 === 0 && { backgroundColor: Colors.surfaceLight + "44" },
-                  stat.isAnomaly && styles.anomalyRow,
-                ]}
-              >
-                <Text style={[styles.tableCell, styles.tableTypeName, { flex: 3 }]} numberOfLines={2}>
-                  {stat.typeName}
-                </Text>
-                <Text style={[styles.tableCell, styles.tableCellCenter, { flex: 1.2 }]}>
-                  {stat.usersActive}
-                </Text>
-                <Text
-                  style={[
-                    styles.tableCell,
-                    styles.tableCellCenter,
-                    { flex: 1 },
-                    stat.isAnomaly && { color: Colors.warning },
-                  ]}
-                >
-                  {stat.totalMatches}
-                </Text>
-                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- StyleSheet style merging */}
-                <View style={[styles.tableCell, styles.tableCellCenter as any, { flex: 0.8 }]}>
-                  {stat.isAnomaly ? (
-                    <Ionicons name="warning" size={14} color={Colors.warning} />
-                  ) : (
-                    <Ionicons name="checkmark-circle" size={14} color={Colors.success} />
-                  )}
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
+        {/* Task #2527 — estratto in components/admin/matching/StatsTable.tsx */}
+        <StatsTable stats={stats} isLoading={isLoading} />
       </View>
     </ScrollView>
   );
@@ -989,6 +887,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.text,
   },
-  tableCellCenter: { textAlign: "center", alignItems: "center", justifyContent: "center" },
+  tableCellCenter: { textAlign: "center" },
+  tableCellCenterView: { alignItems: "center", justifyContent: "center" },
   tableTypeName: { fontFamily: "Inter_500Medium", fontSize: 12 },
 });

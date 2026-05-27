@@ -1,6 +1,12 @@
 import { Router, type Request, type Response } from "express";
 import { db, pool } from "../../db";
 import { gpsRejectionStats, bikerZavarrinaMatches, bikerBikerMatches, matchPreferences, matchRules, updateMatchRuleSchema, appSettings } from "@shared/db";
+import {
+  MATCHING_REGISTRY,
+  getCountableMatchingTypes,
+  getRegistryPrefColumns,
+} from "@shared/matching-registry";
+import { getMatchingMetrics } from "../../matching/metrics";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { desc, eq, sql } from "drizzle-orm";
 import { invalidateMatchRulesCache } from "../../matching/rules-cache";
@@ -41,32 +47,25 @@ const router = Router();
 // Apply rate limiter to ALL admin matching routes (Task #2509).
 router.use(adminMatchingRateLimiter);
 
-const MATCH_TYPES: Array<{
+// Task #2527 — i tipi sono ora nel registry centralizzato (`shared/matching-registry.ts`).
+// `MATCH_TYPES` rimane come adapter di sola lettura per non rompere i call-site
+// esistenti: espone gli stessi campi `{id,key,label,table,filter,prefColumn}` ma
+// derivati dalla sorgente unica.
+const MATCH_TYPES: ReadonlyArray<{
   id: number;
   key: string;
   label: string;
   table: string;
   filter: string;
   prefColumn: string;
-}> = [
-  { id: 1, key: "bikerBikerBrand", label: "Biker-Biker Brand", table: "biker_biker_matches", filter: "motorcycle_brand NOT LIKE '%:%' AND motorcycle_brand NOT IN ('musica','musica_zav','distanza','distanza_zav','eventi') AND motorcycle_brand NOT LIKE 'gps_%' AND motorcycle_brand NOT LIKE 'zona_%' AND motorcycle_brand NOT LIKE 'percorso%'", prefColumn: "biker_biker_brand" },
-  { id: 2, key: "bikerZavorrinaBrand", label: "Biker-Zavarrina Brand", table: "biker_zavorrina_matches", filter: "1=1", prefColumn: "biker_zavorrina_brand" },
-  { id: 3, key: "bikerClubBrand", label: "Biker-Club Brand", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'club:%' AND motorcycle_brand NOT LIKE 'club_zav:%'", prefColumn: "biker_club_brand" },
-  { id: 4, key: "zavarrinaClubBrand", label: "Zavarrina-Club Brand", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'club_zav:%'", prefColumn: "zavorrina_club_brand" },
-  { id: 5, key: "bikerBikerTypeStyle", label: "Biker-Biker Type+Style", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'tipo:%' AND motorcycle_brand NOT LIKE 'tipo_zav:%'", prefColumn: "biker_biker_type_style" },
-  { id: 6, key: "bikerZavarrinaTypeStyle", label: "Biker-Zavarrina Type+Style", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'tipo_zav:%'", prefColumn: "biker_zavorrina_type_style" },
-  { id: 7, key: "bikerBikerDistance", label: "Biker-Biker Distance", table: "biker_biker_matches", filter: "motorcycle_brand = 'distanza'", prefColumn: "biker_biker_distance" },
-  { id: 8, key: "bikerZavarrinaDistance", label: "Biker-Zavarrina Distance", table: "biker_biker_matches", filter: "motorcycle_brand = 'distanza_zav'", prefColumn: "biker_zavorrina_distance" },
-  { id: 9, key: "bikerBikerMusic", label: "Biker-Biker Music Affinity", table: "biker_biker_matches", filter: "motorcycle_brand = 'musica'", prefColumn: "biker_biker_music" },
-  { id: 10, key: "bikerZavarrinaMusic", label: "Biker-Zavarrina Music Affinity", table: "biker_biker_matches", filter: "motorcycle_brand = 'musica_zav'", prefColumn: "biker_zavorrina_music" },
-  { id: 11, key: "bikerBikerLeanAngle", label: "Biker-Biker Lean Angle (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_tilt', 'gps_full')", prefColumn: "biker_biker_lean_angle" },
-  { id: 12, key: "bikerBikerRouteTypeZone", label: "Biker-Biker Route Type+Zone", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'zona_bb:%' OR motorcycle_brand LIKE 'percorso:%'", prefColumn: "biker_biker_route_type_zone" },
-  { id: 13, key: "bikerZavarrinaRouteTypeZone", label: "Biker-Zavarrina Route Type+Zone", table: "biker_biker_matches", filter: "motorcycle_brand LIKE 'zona_zav:%' OR motorcycle_brand LIKE 'percorso_zav:%'", prefColumn: "biker_zavorrina_route_type_zone" },
-  { id: 14, key: "bikerBikerAvgSpeed", label: "Biker-Biker Avg Speed (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_speed', 'gps_full')", prefColumn: "biker_biker_avg_speed" },
-  { id: 15, key: "bikerBikerAvgDuration", label: "Biker-Biker Avg Duration (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_speed', 'gps_full')", prefColumn: "biker_biker_avg_duration" },
-  { id: 16, key: "bikerBikerDayTime", label: "Biker-Biker Day+Time (GPS)", table: "biker_biker_matches", filter: "motorcycle_brand IN ('gps_day', 'gps_full')", prefColumn: "biker_biker_day_time" },
-  { id: 17, key: "bikerBikerEvents", label: "Biker-Biker Events", table: "biker_biker_matches", filter: "motorcycle_brand = 'eventi'", prefColumn: "biker_biker_events" },
-];
+}> = getCountableMatchingTypes().map((t) => ({
+  id: t.id,
+  key: t.key,
+  label: t.label,
+  table: t.table as string,
+  filter: t.brandPattern as string,
+  prefColumn: t.prefColumn,
+}));
 
 router.get("/gps-errors", async (_req: Request, res: Response) => {
   try {
@@ -160,6 +159,9 @@ router.get("/stats", async (_req: Request, res: Response) => {
   }
 });
 
+// Task #2527 — `/matching-stats` mantiene compatibilità con i client legacy;
+// la sorgente unica è `/matching/stats` (vedi sotto). Entrambi gli endpoint
+// continuano a rispondere finché non vengono migrati tutti i client.
 router.get("/matching-stats", getMatchingStats);
 
 router.get("/match-settings", async (_req: Request, res: Response) => {
@@ -398,30 +400,32 @@ router.get("/match-health", async (_req: Request, res: Response) => {
 
 router.post("/match-settings/reset-all", async (_req: Request, res: Response) => {
   try {
-    const result = await db.execute(sql`
-      UPDATE match_preferences
-      SET
-        biker_biker_brand = true,
-        biker_zavorrina_brand = true,
-        biker_club_brand = true,
-        zavorrina_club_brand = true,
-        biker_biker_type_style = true,
-        biker_zavorrina_type_style = true,
-        biker_biker_distance = true,
-        biker_zavorrina_distance = true,
-        biker_biker_music = true,
-        biker_zavorrina_music = true,
-        biker_biker_lean_angle = true,
-        biker_biker_route_type_zone = true,
-        biker_zavorrina_route_type_zone = true,
-        biker_biker_avg_speed = true,
-        biker_biker_avg_duration = true,
-        biker_biker_day_time = true,
-        biker_biker_events = true,
-        updated_at = NOW()
-    `);
+    // Task #2527 — derivato dal registry (niente più lista hardcoded).
+    // Filtra solo le colonne effettivamente presenti su `match_preferences`
+    // (gli slot affinity senza colonna fisica vengono ignorati a runtime).
+    const client = await pool.connect();
+    let schemaCols: Set<string>;
+    try {
+      const schemaRes = await client.query<{ column_name: string }>(
+        `SELECT column_name FROM information_schema.columns
+         WHERE table_schema='public' AND table_name='match_preferences'`
+      );
+      schemaCols = new Set(schemaRes.rows.map((r) => r.column_name));
+    } finally {
+      client.release();
+    }
+    const cols = MATCHING_REGISTRY
+      .map((t) => t.prefColumn)
+      .filter((c) => schemaCols.has(c));
+    if (cols.length === 0) {
+      return sendError(res, 500, "Nessuna colonna da resettare");
+    }
+    const setExpr = cols.map((c) => `${c} = true`).join(", ");
+    const result = await db.execute(sql.raw(
+      `UPDATE match_preferences SET ${setExpr}, updated_at = NOW()`
+    ));
     const affected = (result.rowCount as number | null) ?? 0;
-    return res.json({ success: true, affected });
+    return res.json({ success: true, affected, columns: cols.length });
   } catch (_error) {
     return sendError(res, 500, "Errore reset settings matching");
   }
@@ -483,6 +487,148 @@ router.get("/matching/stats", async (_req: Request, res: Response) => {
   }
 });
 
+
+// ──────────────────────────────────────────────────────────────────────────
+// Task #2527 — Registry / Audit / Metrics
+// ──────────────────────────────────────────────────────────────────────────
+
+router.get("/matching/registry", (_req: Request, res: Response) => {
+  return res.json({
+    types: MATCHING_REGISTRY,
+    totalTypes: MATCHING_REGISTRY.length,
+    countableTypes: getCountableMatchingTypes().length,
+  });
+});
+
+router.get("/matching/audit", async (_req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    const checkedAt = new Date().toISOString();
+    const issues: Array<{ severity: "error" | "warn" | "info"; category: string; message: string; details?: unknown }> = [];
+
+    // (a) match_preferences: colonne attese vs colonne reali
+    const prefCols = await client.query<{ column_name: string }>(`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='match_preferences'
+        AND column_name NOT IN ('id','user_id','updated_at','direct_match','top_matches_only','weekly_recap')
+      ORDER BY ordinal_position
+    `);
+    const dbCols = new Set(prefCols.rows.map((r) => r.column_name));
+    const expectedCols = new Set(getRegistryPrefColumns());
+    const missingFromDb = [...expectedCols].filter((c) => !dbCols.has(c));
+    const unknownInDb = [...dbCols].filter((c) => !expectedCols.has(c));
+    if (missingFromDb.length > 0) {
+      issues.push({
+        severity: "error",
+        category: "preferences",
+        message: `Colonne preferenze attese mancanti nel DB: ${missingFromDb.join(", ")}`,
+        details: { missingFromDb },
+      });
+    }
+    if (unknownInDb.length > 0) {
+      issues.push({
+        severity: "warn",
+        category: "preferences",
+        message: `Colonne preferenze nel DB non presenti nel registry: ${unknownInDb.join(", ")}`,
+        details: { unknownInDb },
+      });
+    }
+
+    // (b) motorcycle_brand: pattern sconosciuti
+    const brandsRes = await client.query<{ motorcycle_brand: string | null; cnt: string }>(`
+      SELECT motorcycle_brand, COUNT(*) AS cnt FROM biker_biker_matches
+      GROUP BY motorcycle_brand
+    `);
+    const knownPrefixes = ["club:", "club_zav:", "tipo:", "tipo_zav:", "zona_bb:", "zona_zav:", "percorso:", "percorso_zav:"];
+    const knownExact = new Set(["distanza", "distanza_zav", "musica", "musica_zav", "eventi", "gps_tilt", "gps_full", "gps_speed", "gps_day"]);
+    const unknownBrands: Array<{ brand: string | null; count: number }> = [];
+    for (const row of brandsRes.rows) {
+      const b = row.motorcycle_brand;
+      const cnt = parseInt(row.cnt, 10);
+      if (b == null) continue;
+      if (knownExact.has(b)) continue;
+      if (knownPrefixes.some((p) => b.startsWith(p))) continue;
+      if (!b.includes(":") && !b.startsWith("gps_") && !b.startsWith("zona_") && !b.startsWith("percorso")) continue;
+      unknownBrands.push({ brand: b, count: cnt });
+    }
+    if (unknownBrands.length > 0) {
+      issues.push({
+        severity: "warn",
+        category: "brand_pattern",
+        message: `${unknownBrands.length} pattern motorcycle_brand sconosciuti`,
+        details: unknownBrands.slice(0, 20),
+      });
+    }
+
+    // (c) Tipi nel registry senza match negli ultimi N giorni
+    const orphanTypes: Array<{ key: string; label: string }> = [];
+    for (const t of getCountableMatchingTypes()) {
+      const r = await client.query<{ cnt: string }>(
+        `SELECT COUNT(*) AS cnt FROM ${t.table} WHERE ${t.brandPattern}`
+      );
+      if (parseInt(r.rows[0]?.cnt ?? "0", 10) === 0) {
+        orphanTypes.push({ key: t.key, label: t.label });
+      }
+    }
+    if (orphanTypes.length > 0) {
+      issues.push({
+        severity: "info",
+        category: "orphan_types",
+        message: `${orphanTypes.length} tipi nel registry senza alcun match in DB`,
+        details: orphanTypes,
+      });
+    }
+
+    // (d) settings duplicati: stesse chiavi multiple in app_settings
+    const dupRes = await client.query<{ key: string; cnt: string }>(`
+      SELECT key, COUNT(*) AS cnt FROM app_settings GROUP BY key HAVING COUNT(*) > 1
+    `);
+    if (dupRes.rows.length > 0) {
+      issues.push({
+        severity: "error",
+        category: "settings",
+        message: `${dupRes.rows.length} chiavi duplicate in app_settings`,
+        details: dupRes.rows,
+      });
+    }
+
+    const overallStatus: "ok" | "warn" | "error" =
+      issues.some((i) => i.severity === "error") ? "error" :
+      issues.some((i) => i.severity === "warn") ? "warn" : "ok";
+
+    return res.json({
+      checkedAt,
+      overallStatus,
+      issuesCount: issues.length,
+      issues,
+      registryStats: {
+        totalTypes: MATCHING_REGISTRY.length,
+        countableTypes: getCountableMatchingTypes().length,
+        expectedPrefColumns: [...expectedCols],
+      },
+    });
+  } catch (error) {
+    console.error("[admin/matching/audit] error:", error);
+    return sendError(res, 500, "Errore esecuzione audit matching");
+  } finally {
+    client.release();
+  }
+});
+
+router.get("/matching/metrics", async (_req: Request, res: Response) => {
+  const metrics = await getMatchingMetrics();
+  if (!metrics) {
+    return res.status(503).type("text/plain").send("# prom-client non disponibile\n");
+  }
+  try {
+    const body = await metrics.register.metrics();
+    res.setHeader("Content-Type", metrics.register.contentType);
+    return res.send(body);
+  } catch (error) {
+    console.error("[admin/matching/metrics] error:", error);
+    return sendError(res, 500, "Errore serializzazione metriche");
+  }
+});
 
 router.delete("/reset-matches", async (_req: Request, res: Response) => {
   try {

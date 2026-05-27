@@ -18,6 +18,8 @@ export type MatchPrefsPayload = {
   bikerBikerEvents: boolean;
   routeAffinity: boolean;
   bioAffinity: boolean;
+  musicAffinity: boolean;
+  timeOverlap: boolean;
   directMatch: boolean;
   topMatchesOnly: boolean;
   weeklyRecap: boolean;
@@ -43,6 +45,8 @@ export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
   bikerBikerEvents: true,
   routeAffinity: true,
   bioAffinity: true,
+  musicAffinity: true,
+  timeOverlap: true,
   directMatch: true,
   topMatchesOnly: false,
   weeklyRecap: true,
@@ -68,5 +72,7 @@ export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string }[]
   { key: "bikerBikerEvents", label: "Biker ↔ Biker — Raduni frequentati" },
   { key: "routeAffinity", label: "Biker ↔ Biker — Similarità percorsi GPS" },
   { key: "bioAffinity", label: "Biker ↔ Biker — Affinità bio (testo libero)" },
+  { key: "musicAffinity", label: "Biker ↔ Biker — Affinità musicale (combinata)" },
+  { key: "timeOverlap", label: "Biker ↔ Biker — Sovrapposizione fasce orarie" },
   { key: "directMatch", label: "Match Diretto (Richiedi Match)" },
 ];

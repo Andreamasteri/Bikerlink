@@ -23,6 +23,13 @@ import { PhaseRecorder } from "./perf-metrics";
 import { schedulerLogger } from "../lib/logger";
 import { prettyMs, memoryRssPretty } from "../lib/format";
 import { withMatchingLock, forceUnlockMatchingLock, getMatchingLockStatus } from "../cache/matching-lock";
+import {
+  recordMatchingCycle,
+  recordMatchesCreated,
+  recordCycleError,
+  setMatchingLockState,
+} from "./metrics";
+import { captureMatchingError } from "../sentry";
 
 const MATCH_DEBOUNCE_MS = 10_000;
 
@@ -205,8 +212,11 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
   const owner = `${process.pid}@${new Date().toISOString()}`;
 
   (async () => {
+    const cycleStartedAt = Date.now();
+    let cycleStatus: "ok" | "error" = "ok";
     try {
     const lockOutcome = await withMatchingLock(owner, async () => {
+    void setMatchingLockState(true);
     const recorder = new PhaseRecorder("on-demand");
     schedulerLogger.info({ event: "cycle_start", trigger: "on-demand" }, "Ciclo on-demand avviato");
 
@@ -252,6 +262,10 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         bikerBikerMatchCount = await recorder.time("biker_biker_matching", () => runBikerBikerMatching());
         totalMatches += bikerBikerMatchCount;
         if (bikerBikerMatchCount > 0) schedulerLogger.info({ bikerBikerMatchCount }, "new biker-biker matches");
+        // Task #2527 — metriche Prometheus per match creati per fase.
+        void recordMatchesCreated("proposal", matches);
+        void recordMatchesCreated("garage", garageMatches);
+        void recordMatchesCreated("biker_biker", bikerBikerMatchCount);
 
         const safePhases: Array<[string, () => Promise<number | void>]> = [
           ["biker_biker_type_style", runBikerBikerTypeStyleMatching],
@@ -273,9 +287,14 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
             if (typeof count === "number" && count > 0) {
               totalMatches += count;
               schedulerLogger.info({ phase: name, count }, "phase produced matches");
+              // Task #2527 — metrica match creati per matcher/fase.
+              void recordMatchesCreated(name, count);
             }
           } catch (err) {
             schedulerLogger.error({ err, phase: name }, "phase failed (non-blocking)");
+            // Task #2527 — Sentry + Prometheus per errori di fase.
+            void recordCycleError(name);
+            void captureMatchingError(err, { phase: name, trigger: "on-demand" });
           }
         }
 
@@ -308,6 +327,9 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
     } catch (err) {
       schedulerLogger.error({ err }, "Errore nel ciclo on-demand");
       recorder.finish(totalMatches);
+      cycleStatus = "error";
+      void recordCycleError("cycle_root");
+      void captureMatchingError(err, { trigger: "on-demand", phase: "cycle_root" });
     }
     });
     if (!lockOutcome.acquired) {
@@ -315,7 +337,13 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
     }
     } catch (err) {
       schedulerLogger.error({ err }, "Errore non gestito attorno a withMatchingLock");
+      cycleStatus = "error";
+      void recordCycleError("lock_wrapper");
+      void captureMatchingError(err, { trigger: "on-demand", phase: "lock_wrapper" });
     } finally {
+      // Task #2527 — chiusura ciclo: durata + status + lock state per Prometheus.
+      void recordMatchingCycle(cycleStatus, Date.now() - cycleStartedAt);
+      void setMatchingLockState(false);
       // Guaranteed reset even if withMatchingLock / runtime throws unexpectedly.
       cycleInFlight = false;
     }

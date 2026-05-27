@@ -57,17 +57,26 @@ export function useMatchingState(t: (k: string) => string) {
     onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
   });
 
-  const triggerMatchingMutation = useMutation({
-    mutationFn: async (data: { force?: boolean; country?: string }) => {
+  interface TriggerMatchingResponse {
+    count?: number;
+    [key: string]: unknown;
+  }
+  const triggerMatchingMutation = useMutation<TriggerMatchingResponse, Error, { force?: boolean; country?: string }>({
+    mutationFn: async (data) => {
       const res = await apiRequest("POST", "/api/admin/matching/trigger", data);
-      return res;
+      // Task #2527 — apiRequest può restituire un Response oppure il payload già parsato;
+      // normalizziamo a JSON tipizzato.
+      const r = res as Response | TriggerMatchingResponse;
+      if (typeof (r as Response).json === "function") {
+        return (await (r as Response).json()) as TriggerMatchingResponse;
+      }
+      return r as TriggerMatchingResponse;
     },
     onSuccess: (data) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matching trigger response from API
-      setMatchingTriggerFeedback(`${t("admin.matchingTriggered")}: ${(data as any).count} ${t("admin.matchesCreated")}`);
+      setMatchingTriggerFeedback(`${t("admin.matchingTriggered")}: ${data.count ?? 0} ${t("admin.matchesCreated")}`);
       setTimeout(() => setMatchingTriggerFeedback(null), 5000);
     },
-    onError: (e: Error) => Alert.alert("Errore", (e as Error).message),
+    onError: (e: Error) => Alert.alert("Errore", e.message),
   });
 
   return {

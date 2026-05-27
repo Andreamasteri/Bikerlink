@@ -1,0 +1,249 @@
+/**
+ * Task #2527 — Hub Matching.
+ *
+ * Dashboard di ingresso al gruppo "Matching" del pannello admin. Mostra in
+ * un'unica schermata: stato del ciclo, lock engine, audit alert e quick links
+ * alle sotto-sezioni (Engine, Control, Health, Inspector, Preferences,
+ * Rules, Tags, Embeddings, Feedback, Route Sim, Time Profile, ecc.).
+ */
+import React from "react";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Colors from "@/constants/colors";
+
+interface AuditIssue {
+  severity: "error" | "warn" | "info";
+  category: string;
+  message: string;
+}
+interface AuditResponse {
+  overallStatus: "ok" | "warn" | "error";
+  issuesCount: number;
+  issues: AuditIssue[];
+  registryStats: { totalTypes: number; countableTypes: number; expectedPrefColumns: string[] };
+}
+
+interface LockState {
+  isRunning: boolean;
+  lastStartIso: string | null;
+  elapsedMs: number | null;
+}
+
+interface StatsResponse {
+  totalZavarrinaMatches: number;
+  totalBikerBikerMatches: number;
+  totalMusicMatches: number;
+  lastRunAt: string | null;
+}
+
+interface QuickLink {
+  key: string;
+  label: string;
+  icon: string;
+  iconSet: "Ionicons" | "MaterialCommunityIcons";
+  route: string;
+  color: string;
+}
+
+const QUICK_LINKS: QuickLink[] = [
+  { key: "engine", label: "Motore", icon: "engine", iconSet: "MaterialCommunityIcons", route: "/admin/match-engine", color: "#FF9500" },
+  { key: "control", label: "Controllo", icon: "tune-variant", iconSet: "MaterialCommunityIcons", route: "/admin/match-control", color: "#9C27B0" },
+  { key: "health", label: "Health", icon: "heart-pulse", iconSet: "MaterialCommunityIcons", route: "/admin/match-health", color: "#4CAF50" },
+  { key: "inspector", label: "Inspector", icon: "account-search", iconSet: "MaterialCommunityIcons", route: "/admin/match-inspector", color: "#2196F3" },
+  { key: "preferences", label: "Preferenze", icon: "tune", iconSet: "MaterialCommunityIcons", route: "/admin/match-preferences-edit", color: "#10B981" },
+  { key: "rules", label: "Regole", icon: "table-large", iconSet: "MaterialCommunityIcons", route: "/admin/match-rules", color: "#10B981" },
+  { key: "telemetry", label: "Telemetria", icon: "chart-line", iconSet: "MaterialCommunityIcons", route: "/admin/matching-telemetry", color: "#22C55E" },
+  { key: "ab", label: "A/B", icon: "flask-outline", iconSet: "MaterialCommunityIcons", route: "/admin/ab", color: "#E91E63" },
+  { key: "negative", label: "Pref. Negative", icon: "minus-circle-outline", iconSet: "MaterialCommunityIcons", route: "/admin/negative-pref-patterns", color: "#F44336" },
+];
+
+function formatDate(iso: string | null) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("it-IT", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch { return iso; }
+}
+
+function severityColor(s: AuditIssue["severity"]) {
+  if (s === "error") return Colors.error;
+  if (s === "warn") return Colors.warning;
+  return Colors.textSecondary;
+}
+
+export default function MatchingHubScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const { data: audit, isLoading: auditLoading } = useQuery<AuditResponse>({
+    queryKey: ["/api/admin/matching/audit"],
+    refetchInterval: 60000,
+    staleTime: 30000,
+  });
+  const { data: lock } = useQuery<LockState>({
+    queryKey: ["/api/admin/matching/lock-state"],
+    refetchInterval: 5000,
+    staleTime: 2000,
+  });
+  const { data: stats } = useQuery<StatsResponse>({
+    queryKey: ["/api/admin/matching/stats"],
+    refetchInterval: 30000,
+    staleTime: 10000,
+  });
+
+  const overallColor =
+    audit?.overallStatus === "error" ? Colors.error :
+    audit?.overallStatus === "warn" ? Colors.warning : Colors.success;
+
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+    >
+      {/* Stato ciclo */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Stato Ciclo</Text>
+        <View style={styles.cardRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats?.totalBikerBikerMatches ?? "—"}</Text>
+            <Text style={styles.statLabel}>Biker-Biker</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats?.totalZavarrinaMatches ?? "—"}</Text>
+            <Text style={styles.statLabel}>Garage</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statValue}>{stats?.totalMusicMatches ?? "—"}</Text>
+            <Text style={styles.statLabel}>Music</Text>
+          </View>
+        </View>
+        <Text style={styles.lastRun}>
+          Ultimo ciclo: {formatDate(stats?.lastRunAt ?? null)}
+        </Text>
+      </View>
+
+      {/* Lock engine */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Lock Engine</Text>
+        <View style={styles.lockCard}>
+          <MaterialCommunityIcons
+            name={lock?.isRunning ? "lock" : "lock-open-variant"}
+            size={22}
+            color={lock?.isRunning ? Colors.warning : Colors.success}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.lockTitle}>
+              {lock?.isRunning ? "BLOCCATO" : "Libero"}
+            </Text>
+            {lock?.isRunning && lock.elapsedMs != null && (
+              <Text style={styles.lockSub}>In esecuzione da {Math.floor(lock.elapsedMs / 1000)}s</Text>
+            )}
+            {!lock?.isRunning && lock?.lastStartIso && (
+              <Text style={styles.lockSub}>Ultimo avvio: {formatDate(lock.lastStartIso)}</Text>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Audit alerts */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Audit</Text>
+          {audit && (
+            <View style={[styles.statusBadge, { backgroundColor: overallColor + "22" }]}>
+              <Text style={[styles.statusBadgeText, { color: overallColor }]}>
+                {audit.overallStatus.toUpperCase()} · {audit.issuesCount}
+              </Text>
+            </View>
+          )}
+        </View>
+        {auditLoading && <ActivityIndicator color={Colors.accent} style={{ marginTop: 10 }} />}
+        {audit && audit.issues.length === 0 && (
+          <View style={styles.okCard}>
+            <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
+            <Text style={styles.okText}>Nessuna anomalia rilevata. Registry: {audit.registryStats.totalTypes} tipi.</Text>
+          </View>
+        )}
+        {audit?.issues.slice(0, 8).map((issue, idx) => (
+          <View key={idx} style={[styles.issueCard, { borderLeftColor: severityColor(issue.severity) }]}>
+            <Text style={[styles.issueCat, { color: severityColor(issue.severity) }]}>
+              {issue.severity.toUpperCase()} · {issue.category}
+            </Text>
+            <Text style={styles.issueMsg}>{issue.message}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Quick links */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Sezioni Matching</Text>
+        <View style={styles.linksGrid}>
+          {QUICK_LINKS.map((link) => (
+            <TouchableOpacity
+              key={link.key}
+              style={styles.linkCard}
+              onPress={() => router.push(link.route as never)}
+              activeOpacity={0.7}
+            >
+              {link.iconSet === "Ionicons" ? (
+                <Ionicons name={link.icon as never} size={22} color={link.color} />
+              ) : (
+                <MaterialCommunityIcons name={link.icon as never} size={22} color={link.color} />
+              )}
+              <Text style={styles.linkLabel}>{link.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: Colors.background },
+  section: { marginHorizontal: 12, marginTop: 16 },
+  sectionHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  sectionTitle: {
+    fontFamily: "Inter_700Bold", fontSize: 13, color: Colors.textSecondary,
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 10,
+  },
+  cardRow: { flexDirection: "row", gap: 8 },
+  statCard: {
+    flex: 1, backgroundColor: Colors.surface, borderRadius: 12, padding: 14,
+    alignItems: "center", borderWidth: 1, borderColor: Colors.border,
+  },
+  statValue: { fontFamily: "Inter_700Bold", fontSize: 20, color: Colors.text },
+  statLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 4 },
+  lastRun: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 8, textAlign: "center" },
+  lockCard: {
+    flexDirection: "row", alignItems: "center", gap: 12, padding: 14,
+    backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.border,
+  },
+  lockTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  lockSub: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  statusBadge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
+  statusBadgeText: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.5 },
+  okCard: {
+    flexDirection: "row", alignItems: "center", gap: 8, padding: 12,
+    backgroundColor: Colors.success + "11", borderRadius: 10,
+  },
+  okText: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, flex: 1 },
+  issueCard: {
+    padding: 12, backgroundColor: Colors.surface, borderRadius: 10,
+    borderLeftWidth: 4, marginBottom: 8, borderWidth: 1, borderColor: Colors.border,
+  },
+  issueCat: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 0.5, marginBottom: 4 },
+  issueMsg: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.text },
+  linksGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  linkCard: {
+    width: "31%", aspectRatio: 1, backgroundColor: Colors.surface,
+    borderRadius: 12, alignItems: "center", justifyContent: "center", gap: 6,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  linkLabel: { fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.text, textAlign: "center" },
+});

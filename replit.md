@@ -418,3 +418,53 @@ Configurazione applicata in:
 <!-- PROMEMORIA_INIZIO -->
 - **2026-05-24** — Controllare stato e operatività delle chat dei club. C'era qualcosa che non andava all'avvio (problema da indagare).
 <!-- PROMEMORIA_FINE -->
+
+## Task #2527 — Refactor Admin Matching Panel
+
+Refactor architetturale del pannello admin "Matching" per ridurre debito tecnico e centralizzare le definizioni dei tipi di match.
+
+### Sorgente unica: `shared/matching-registry.ts`
+
+Registry centralizzato (20 entry) di tutti i tipi di match: `id`, `key`, `label`, `category` (garage/biker/club/affinity), `table` SQL, `brandPattern` per le query, `prefColumn` in `match_preferences`, `defaultEnabled`, `addedBy` (task di provenienza). Include slot affinity (Bio/Music/Route, Task #2515/#2516/#2520) con `table=null` per esporli nell'UI admin senza dipendere da tabelle dedicate.
+
+Helpers: `getCountableMatchingTypes()`, `getRegistryPrefColumns()`, `getMatchingTypeByKey()`, `getMatchingTypeById()`.
+
+**Aggiungere un nuovo tipo di match = aggiungere una riga al registry.** Niente più array hardcoded in `server/routes/admin/matching.ts`: la costante `MATCH_TYPES` è ora un adapter di sola lettura sopra `getCountableMatchingTypes()`.
+
+### Endpoint admin
+
+- `GET /api/admin/matching/registry` → dump del registry (tipi + statistiche).
+- `GET /api/admin/matching/audit` → controllo schema + brand pattern sconosciuti + tipi orfani + duplicati settings; ritorna `overallStatus: ok|warn|error` con elenco issues.
+- `GET /api/admin/matching/metrics` → formato Prometheus (counter cicli, durata, match creati, lock state, errori per matcher). Vedi `server/matching/metrics.ts`.
+- `/api/admin/matching-stats` resta come alias legacy di `/api/admin/matching/stats` (sorgente unica).
+
+### Sentry + Prometheus
+
+- `@sentry/node@^10.54.0` — init in `server/sentry.ts`, attivato solo se `SENTRY_DSN` presente. `initSentry()` chiamato in `server/index.ts` prima del middleware; `attachSentryErrorHandler()` dopo le route. `captureMatchingError(err, ctx)` esposto per il motore matching.
+- `prom-client@^15.1.3` — registry custom in `server/matching/metrics.ts` con import lazy (no-op se manca). Helper: `recordMatchingCycle`, `recordMatchesCreated`, `setMatchingLockState`, `recordCycleError`.
+
+### Refactor `app/admin/match-control.tsx`
+
+Da 995 a ~890 righe estraendo sotto-componenti < 250 righe ciascuno in `components/admin/matching/`:
+- `CycleMetaCard.tsx` — stato motore + ultimo ciclo.
+- `LockCard.tsx` — stato lock engine + tempo trascorso.
+- `StatsTable.tsx` — tabella stats per tipo.
+- `AnomalyAlerts.tsx` — banner per tipi con 0 match.
+
+`MatchingEngineSection` resta solo in `app/admin/match-engine.tsx` (single source).
+
+### Hub Matching + Telemetria (UI)
+
+- `app/admin/matching-hub.tsx` — dashboard di ingresso: stats riassuntive, lock state, audit alerts inline, quick-links a tutte le sotto-sezioni.
+- `app/admin/matching-telemetry.tsx` — registry list + raw output Prometheus (polling 15s).
+- Registrati in `app/admin/_layout.tsx` + primo elemento del gruppo "Matching" in `app/admin/index.tsx`.
+
+### `as any` rimossi
+
+- `components/admin/settings/useMatchingState.ts:67` — `triggerMatchingMutation` ora ha generics tipizzati con `TriggerMatchingResponse`.
+- `app/admin/match-engine.tsx:32-35` — `state.autoMatchMutation` tipizzato (non più `(state as any)`).
+- `app/admin/match-control.tsx:681` — separati `tableCellCenter` (text) da `tableCellCenterView` (view).
+
+### Script sync `scripts/check-match-preferences-sync.ts`
+
+Confronta colonne fisiche `match_preferences` (schema drizzle) vs `MATCHING_REGISTRY.prefColumn` vs chiavi referenziate in `app/admin/match-preferences-edit.tsx`. Exit code != 0 su divergenze. Eseguibile come `npx tsx scripts/check-match-preferences-sync.ts`.

@@ -14,6 +14,7 @@ import { setupMiddleware, setupStaticRoutes } from "./middleware";
 import { registerAllRoutes } from "./route-mounter";
 import { setupErrorHandler } from "./error-handler";
 import { initMissingClubConversations } from "./init-helpers";
+import { initSentry, attachSentryErrorHandler } from "./sentry";
 
 // ── Phase timeout helper ─────────────────────────────────────────────────────
 // Fatal phases: timeout rejects → propagates → process.exit(1)
@@ -41,6 +42,12 @@ function bootLog(n: number, total: number, step: string, msg: string) {
 // ── Express app ──────────────────────────────────────────────────────────────
 const app = express();
 
+// Task #2527 — Sentry deve essere inizializzato il prima possibile (no-op se
+// SENTRY_DSN non è impostato). Catena sequenziale: init → registra route →
+// attachSentryErrorHandler. La promise `sentryInitPromise` viene awaited prima
+// dell'attach così l'error handler è sempre montato se SENTRY_DSN è valido.
+const sentryInitPromise = initSentry();
+
 setupMiddleware(app);
 
 app.get("/healthz", (_req: Request, res: Response) => {
@@ -59,7 +66,14 @@ app.get("/api/metrics", (_req: Request, res: Response) => {
 
 registerAllRoutes(app);
 setupStaticRoutes(app);
-setupErrorHandler(app);
+// Task #2527 — Catena deterministica per gli error handler:
+//   init Sentry → attach Sentry handler → setup custom handler.
+// Express invoca i middleware nell'ordine di .use(): senza questa catena
+// (e senza l'await prima del listen) il custom handler si monterebbe per
+// primo e Sentry non vedrebbe mai gli errori.
+const errorHandlersReady = sentryInitPromise
+  .then(() => attachSentryErrorHandler(app))
+  .then(() => setupErrorHandler(app));
 
 const server = createServer(app);
 const activeConnections = new Set<import("net").Socket>();
@@ -119,6 +133,11 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     console.error("[startup] FATAL — Migrations failed, aborting:", err);
     process.exit(1);
   }
+
+  // Task #2527 — assicura che Sentry sia inizializzato, l'error handler
+  // Sentry montato e poi il custom error handler montato dopo, prima di
+  // accettare traffico (no-op se SENTRY_DSN non è impostato).
+  await errorHandlersReady;
 
   // ── Phase 2: HTTP Listen ──────────────────────────────────────────────────
   const PORT = parseInt(process.env.PORT ?? "5000", 10);
