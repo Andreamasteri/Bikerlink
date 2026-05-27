@@ -53,6 +53,25 @@ ${matchSubnav("/matching/come-impara")}
         <p style="margin-top:16px">Esempio reale: hai ignorato 5 scooter di fila? Il sistema abbassa automaticamente il peso del brand "scooter" nel tuo profilo — senza che tu debba configurare nulla.</p>
       </div>
       <div>
+        <!-- SVG feedback loop circolare -->
+        <svg viewBox="0 0 340 280" role="img" aria-labelledby="loop-svg-title loop-svg-desc" style="width:100%;max-width:340px;height:auto;display:block;margin:0 auto 16px" xmlns="http://www.w3.org/2000/svg">
+          <title id="loop-svg-title">Ciclo di feedback loop del matching</title>
+          <desc id="loop-svg-desc">Diagramma circolare a 4 nodi: Proposta match → Interazione utente → Aggiornamento pesi → Match migliori, e ritorno</desc>
+          <defs>
+            <marker id="loop-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#FF3B30"/>
+            </marker>
+          </defs>
+          ${(()=>{
+            const cx=170,cy=140,R=95;
+            const nodes=[{l:"Proposta",s:"match"},{l:"Interazione",s:"like/skip"},{l:"Aggiorna",s:"pesi"},{l:"Migliori",s:"match"}];
+            let s="";
+            nodes.forEach((n,i)=>{const a=-Math.PI/2+i*Math.PI/2;const x=cx+Math.cos(a)*R;const y=cy+Math.sin(a)*R;s+=`<circle cx="${x}" cy="${y}" r="42" fill="#1A1A1A" stroke="#FF3B30" stroke-width="2"/><text x="${x}" y="${y-3}" text-anchor="middle" fill="#F0F0F0" font-size="13" font-weight="700">${n.l}</text><text x="${x}" y="${y+13}" text-anchor="middle" fill="#999" font-size="11">${n.s}</text>`;});
+            for(let i=0;i<4;i++){const a1=-Math.PI/2+i*Math.PI/2;const a2=-Math.PI/2+(i+1)*Math.PI/2;const x1=cx+Math.cos(a1)*(R-40);const y1=cy+Math.sin(a1)*(R-40);const x2=cx+Math.cos(a2)*(R-40);const y2=cy+Math.sin(a2)*(R-40);s+=`<path d="M ${x1} ${y1} A ${R-40} ${R-40} 0 0 1 ${x2} ${y2}" fill="none" stroke="#FF3B30" stroke-width="2" marker-end="url(#loop-arrow)" opacity="0.7"/>`;}
+            s+=`<text x="${cx}" y="${cy+4}" text-anchor="middle" fill="#FF3B30" font-size="11" font-weight="700" letter-spacing="2">LOOP</text>`;
+            return s;
+          })()}
+        </svg>
         <div class="match-arch" style="text-align:left">
           <div style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text3);margin-bottom:18px">Ciclo di apprendimento</div>
           <div class="steps" style="gap:10px">

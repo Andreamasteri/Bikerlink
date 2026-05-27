@@ -72,7 +72,25 @@ ${matchSubnav("/matching/come-funziona")}
     <span class="section-eyebrow">Il flow</span>
     <h2 class="section-title" id="flow-h2">5 fasi.<br/><span class="accent">1 risultato.</span></h2>
 
-    <!-- Mermaid flow diagram -->
+    <!-- Inline SVG 5-step flow (statico, accessibile, SEO-friendly) -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:28px 20px;margin:36px 0;overflow-x:auto">
+      <svg viewBox="0 0 760 180" role="img" aria-labelledby="flow-svg-title flow-svg-desc" style="width:100%;max-width:760px;height:auto;display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">
+        <title id="flow-svg-title">Flow del matching BikerLink in 5 step</title>
+        <desc id="flow-svg-desc">Profilo → Tracking GPS → Engine scoring → Filtri → Top match con badge di trasparenza</desc>
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="#FF3B30"/>
+          </marker>
+        </defs>
+        ${["👤 Profilo","📍 Tracking","⚙️ Engine","🔧 Filtri","🏍️ Match"].map((label,i)=>{
+          const x = 20 + i*150;
+          const accent = i===2;
+          return `<g><rect x="${x}" y="50" width="130" height="80" rx="4" fill="#1A1A1A" stroke="${accent?'#FF3B30':'#333'}" stroke-width="${accent?2:1}"/><text x="${x+65}" y="85" text-anchor="middle" fill="${accent?'#FF3B30':'#F0F0F0'}" font-size="14" font-weight="700">${label.split(' ')[0]}</text><text x="${x+65}" y="108" text-anchor="middle" fill="#999" font-size="12">${label.split(' ').slice(1).join(' ')}</text><text x="${x+65}" y="35" text-anchor="middle" fill="#666" font-size="11" font-weight="700" letter-spacing="2">0${i+1}</text></g>${i<4?`<line x1="${x+130}" y1="90" x2="${x+150}" y2="90" stroke="#FF3B30" stroke-width="2" marker-end="url(#arrow)"/>`:''}`;
+        }).join("")}
+      </svg>
+    </div>
+
+    <!-- Mermaid flow diagram (interattivo) -->
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:28px 20px;margin:36px 0;overflow-x:auto">
       <div class="mermaid" style="max-width:700px;margin:0 auto">
 flowchart TD
@@ -113,6 +131,16 @@ flowchart TD
         <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:16px 20px;margin:12px 0;font-family:monospace;font-size:15px;color:var(--accent)">
           score = Σ(w<sub>i</sub> × S<sub>i</sub>) / Σ(w<sub>i</sub>)
         </div>
+        <svg viewBox="0 0 460 150" role="img" aria-labelledby="score-svg-title score-svg-desc" style="width:100%;max-width:460px;height:auto;display:block;margin:18px auto" xmlns="http://www.w3.org/2000/svg">
+          <title id="score-svg-title">Visualizzazione contributo segnali allo score finale</title>
+          <desc id="score-svg-desc">Barre orizzontali che mostrano il peso relativo di 4 categorie di segnali sullo score finale del matching</desc>
+          ${[
+            {l:"Geo-temporali", w:35, c:"#FF3B30"},
+            {l:"Telemetrici", w:25, c:"#FF3B30"},
+            {l:"Semantici (bio/musica)", w:22, c:"#888"},
+            {l:"Diretti (brand/tag)", w:18, c:"#888"},
+          ].map((b,i)=>`<text x="10" y="${22+i*32}" fill="#F0F0F0" font-size="12" font-weight="600">${b.l}</text><rect x="170" y="${12+i*32}" width="240" height="14" rx="2" fill="#1A1A1A" stroke="#333"/><rect x="170" y="${12+i*32}" width="${b.w*6.8}" height="14" rx="2" fill="${b.c}" opacity="0.85"/><text x="420" y="${22+i*32}" fill="#999" font-size="11">${b.w}%</text>`).join("")}
+        </svg>
         <p>I pesi <code>w<sub>i</sub></code> sono configurabili dall'admin e — parzialmente — dall'utente stesso. I segnali con più dati disponibili pesano di più; quelli senza dati (es. tracking non attivo) pesano zero.</p>
         <h3 style="margin-top:24px">Embeddings semantici</h3>
         <p>Per bio e musica usiamo embeddings vettoriali (OpenAI text-embedding-3-large + fallback self-hosted). Due biker con bio diverse ma simili concettualmente (es. "amo le montagne" e "appassionato di passi alpini") risultano compatibili anche senza parole identiche.</p>

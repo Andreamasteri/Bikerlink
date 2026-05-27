@@ -63,6 +63,26 @@ ${matchSubnav("/matching/tipi-di-match")}
     <h2 class="section-title" id="types-grid-h2">17 dimensioni.<br/><span class="accent">1 punteggio.</span></h2>
     <p class="section-lead">Ogni segnale ha un peso configurabile e — in futuro — un toggle utente per attivarlo o disattivarlo. Puoi scegliere cosa conta di più per te.</p>
 
+    <!-- SVG categorization: 17 segnali raggruppati in 5 famiglie -->
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:24px;margin:28px 0;overflow-x:auto">
+      <svg viewBox="0 0 720 220" role="img" aria-labelledby="cat-svg-title cat-svg-desc" style="width:100%;max-width:720px;height:auto;display:block;margin:0 auto" xmlns="http://www.w3.org/2000/svg">
+        <title id="cat-svg-title">I 17 segnali raggruppati per famiglia</title>
+        <desc id="cat-svg-desc">Distribuzione dei 17 segnali in 5 famiglie: Geo, Tempo, Musica/Bio, Strade/Telemetria, Behavior</desc>
+        ${[
+          {l:"GEO",       n:3, c:"#FF3B30", items:"distanza · zona · lingua"},
+          {l:"TEMPO",     n:2, c:"#FF6B5B", items:"orari · decay"},
+          {l:"SEMANTICA", n:3, c:"#FF8A7A", items:"bio · musica · tag"},
+          {l:"STRADE",    n:5, c:"#FFA99A", items:"route · lean · G-force · stile · brand"},
+          {l:"BEHAVIOR",  n:4, c:"#FFC6BA", items:"club · prefer · feedback · reput."},
+        ].map((cat,i)=>{
+          const x = 20 + i*140;
+          const h = cat.n*22;
+          return `<g><rect x="${x}" y="${190-h}" width="120" height="${h}" fill="${cat.c}" opacity="0.85" rx="2"/><text x="${x+60}" y="${185-h}" text-anchor="middle" fill="${cat.c}" font-size="13" font-weight="700" letter-spacing="1">${cat.l}</text><text x="${x+60}" y="${170-h}" text-anchor="middle" fill="#999" font-size="11">${cat.n} segnali</text><text x="${x+60}" y="208" text-anchor="middle" fill="#666" font-size="10">${cat.items}</text></g>`;
+        }).join("")}
+        <line x1="10" y1="190" x2="710" y2="190" stroke="#333" stroke-width="1"/>
+      </svg>
+    </div>
+
     <div class="match-types-grid" role="list">
       ${types.map((t, i) => `
       <div class="match-type-card" role="listitem">
@@ -90,10 +110,34 @@ ${matchSubnav("/matching/tipi-di-match")}
         </ul>
         <p>Il risultato: un sistema che parte ottimizzato per la media, ma si adatta al tuo profilo specifico nel tempo.</p>
       </div>
-      <div class="steps">
-        <div class="step"><h3>Primo giorno</h3><p>Pesi standard ottimizzati per la community media. Già buoni risultati dal primo utilizzo.</p></div>
-        <div class="step"><h3>Dopo 1 settimana</h3><p>Il feedback loop ha già aggiustato 3–5 segnali basandosi sui tuoi like e ignora.</p></div>
-        <div class="step"><h3>Dopo 1 mese</h3><p>Il tuo profilo di preferenze è stabile. I match sono altamente personalizzati sul tuo stile.</p></div>
+      <div>
+        <!-- Radar chart: confronto pesi default vs personalizzato -->
+        <svg viewBox="0 0 320 320" role="img" aria-labelledby="radar-svg-title radar-svg-desc" style="width:100%;max-width:320px;height:auto;display:block;margin:0 auto 18px" xmlns="http://www.w3.org/2000/svg">
+          <title id="radar-svg-title">Radar chart: pesi default vs profilo personalizzato</title>
+          <desc id="radar-svg-desc">Confronto su 6 assi (Moto, Geo, Musica, Tempo, Telemetria, Behavior) tra il peso default del sistema e un esempio di profilo utente personalizzato</desc>
+          ${(()=>{
+            const cx=160,cy=160,R=110;
+            const axes=["Moto","Geo","Musica","Tempo","Telemetria","Behavior"];
+            const def=[0.7,0.7,0.7,0.7,0.7,0.7];
+            const user=[0.95,0.5,0.4,0.85,0.9,0.6];
+            const pt=(v:number,i:number)=>{const a=-Math.PI/2+i*Math.PI*2/6;return [cx+Math.cos(a)*R*v,cy+Math.sin(a)*R*v];};
+            let s="";
+            [0.25,0.5,0.75,1].forEach(r=>{const pts=axes.map((_,i)=>pt(r,i).join(",")).join(" ");s+=`<polygon points="${pts}" fill="none" stroke="#333" stroke-width="1"/>`;});
+            axes.forEach((_,i)=>{const [x,y]=pt(1,i);s+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#333" stroke-width="1"/>`;});
+            const defPts=def.map((v,i)=>pt(v,i).join(",")).join(" ");
+            const userPts=user.map((v,i)=>pt(v,i).join(",")).join(" ");
+            s+=`<polygon points="${defPts}" fill="#888" fill-opacity="0.15" stroke="#888" stroke-width="1.5"/>`;
+            s+=`<polygon points="${userPts}" fill="#FF3B30" fill-opacity="0.25" stroke="#FF3B30" stroke-width="2"/>`;
+            axes.forEach((lbl,i)=>{const [x,y]=pt(1.18,i);s+=`<text x="${x}" y="${y+4}" text-anchor="middle" fill="#F0F0F0" font-size="11" font-weight="600">${lbl}</text>`;});
+            return s;
+          })()}
+        </svg>
+        <div style="display:flex;gap:18px;justify-content:center;font-size:12px;color:var(--text3);margin-bottom:18px"><span><span style="display:inline-block;width:10px;height:10px;background:#888;margin-right:6px;vertical-align:middle"></span>Default</span><span><span style="display:inline-block;width:10px;height:10px;background:#FF3B30;margin-right:6px;vertical-align:middle"></span>Tuo profilo</span></div>
+        <div class="steps">
+          <div class="step"><h3>Primo giorno</h3><p>Pesi standard ottimizzati per la community media. Già buoni risultati dal primo utilizzo.</p></div>
+          <div class="step"><h3>Dopo 1 settimana</h3><p>Il feedback loop ha già aggiustato 3–5 segnali basandosi sui tuoi like e ignora.</p></div>
+          <div class="step"><h3>Dopo 1 mese</h3><p>Il tuo profilo di preferenze è stabile. I match sono altamente personalizzati sul tuo stile.</p></div>
+        </div>
       </div>
     </div>
   </div>

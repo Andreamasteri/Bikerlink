@@ -35,6 +35,20 @@ ${matchSubnav("/matching/privacy")}
   <div class="match-hero-eyebrow">Trasparenza</div>
   <h1 id="priv-h1">COSA SAPPIAMO<br/><span class="accent">DI TE</span><br/>E PERCHÉ</h1>
   <p class="lead">Nessuna sorpresa. Nessuna vendita. Ecco esattamente cosa raccogliamo per farti incontrare i biker giusti, cosa non facciamo mai, e come controllare tutto.</p>
+
+  <!-- SVG: Cosa raccogliamo vs Cosa NON facciamo -->
+  <svg viewBox="0 0 720 240" role="img" aria-labelledby="priv-compare-title priv-compare-desc" style="width:100%;max-width:720px;height:auto;display:block;margin:32px auto 0" xmlns="http://www.w3.org/2000/svg">
+    <title id="priv-compare-title">Confronto: cosa raccogliamo vs cosa non facciamo mai</title>
+    <desc id="priv-compare-desc">Due colonne contrapposte: a sinistra in verde i dati che raccogliamo solo con consenso esplicito; a destra in rosso le pratiche che non facciamo mai.</desc>
+    <rect x="20" y="20" width="320" height="200" fill="#0E1A12" stroke="#2EBD5D" stroke-width="1.5" rx="4"/>
+    <text x="180" y="48" text-anchor="middle" fill="#2EBD5D" font-size="14" font-weight="700" letter-spacing="2">COSA RACCOGLIAMO</text>
+    <text x="180" y="64" text-anchor="middle" fill="#999" font-size="11">solo con consenso esplicito</text>
+    ${["Profilo dichiarato","GPS (se attivo)","Telemetria (se attiva)","Bio &amp; musica","Feedback like/skip"].map((t,i)=>`<text x="40" y="${95+i*22}" fill="#F0F0F0" font-size="13">✓ ${t}</text>`).join("")}
+    <rect x="380" y="20" width="320" height="200" fill="#1A0E0D" stroke="#FF3B30" stroke-width="1.5" rx="4"/>
+    <text x="540" y="48" text-anchor="middle" fill="#FF3B30" font-size="14" font-weight="700" letter-spacing="2">COSA NON FACCIAMO</text>
+    <text x="540" y="64" text-anchor="middle" fill="#999" font-size="11">linee rosse, mai negoziabili</text>
+    ${["Vendere dati a terzi","Profilare per pubblicità","Tracking in background","Condividere identità","AI autonoma su dati sensibili"].map((t,i)=>`<text x="400" y="${95+i*22}" fill="#F0F0F0" font-size="13">✗ ${t}</text>`).join("")}
+  </svg>
 </section>
 
 <section class="section" aria-labelledby="collect-h2">
@@ -95,6 +109,34 @@ ${matchSubnav("/matching/privacy")}
       <h3 style="font-family:var(--font-display);font-size:20px;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px">Eliminazione completa</h3>
       <p style="font-size:14px;color:var(--text2);line-height:1.7">Puoi eliminare il tuo account e tutti i dati associati in qualsiasi momento: dall'app vai su <strong>Profilo → Modifica → Elimina account</strong>. I dati vengono rimossi entro 30 giorni (esclusi i log obbligatori per legge). In alternativa, scrivi a <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>.</p>
     </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="anon-h2">
+  <div class="section-inner">
+    <span class="section-eyebrow">Anonimizzazione</span>
+    <h2 class="section-title" id="anon-h2">Dai dati grezzi<br/><span class="accent">all'aggregato.</span></h2>
+    <p class="section-lead">I tuoi dati di matching non vengono mai esposti in chiaro a terzi o usati per analitiche pubbliche senza prima passare attraverso un processo di anonimizzazione e aggregazione.</p>
+
+    <svg viewBox="0 0 760 200" role="img" aria-labelledby="anon-svg-title anon-svg-desc" style="width:100%;max-width:760px;height:auto;display:block;margin:24px auto" xmlns="http://www.w3.org/2000/svg">
+      <title id="anon-svg-title">Pipeline di anonimizzazione e aggregazione dei dati</title>
+      <desc id="anon-svg-desc">Quattro step: dati grezzi personali → rimozione identificatori → aggregazione per coorte → statistiche pubblicabili. Solo l'ultima fase può essere condivisa o usata per analytics.</desc>
+      <defs>
+        <marker id="anon-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#FF3B30"/>
+        </marker>
+      </defs>
+      ${[
+        {l:"DATI GREZZI", s:"con identità", c:"#FF3B30", icon:"🔒"},
+        {l:"PSEUDONIMI", s:"hash + salt", c:"#FF8A7A", icon:"🎭"},
+        {l:"AGGREGATI", s:"coorti ≥ 50 utenti", c:"#888", icon:"📊"},
+        {l:"PUBBLICABILI", s:"solo statistiche", c:"#2EBD5D", icon:"🌍"},
+      ].map((b,i)=>{
+        const x = 20 + i*185;
+        return `<g><rect x="${x}" y="50" width="160" height="100" rx="4" fill="#1A1A1A" stroke="${b.c}" stroke-width="1.5"/><text x="${x+80}" y="80" text-anchor="middle" font-size="24">${b.icon}</text><text x="${x+80}" y="108" text-anchor="middle" fill="${b.c}" font-size="13" font-weight="700" letter-spacing="1">${b.l}</text><text x="${x+80}" y="128" text-anchor="middle" fill="#999" font-size="11">${b.s}</text><text x="${x+80}" y="40" text-anchor="middle" fill="#666" font-size="11" font-weight="700">${i+1}</text></g>${i<3?`<line x1="${x+160}" y1="100" x2="${x+185}" y2="100" stroke="#FF3B30" stroke-width="2" marker-end="url(#anon-arrow)"/>`:''}`;
+      }).join("")}
+      <text x="380" y="185" text-anchor="middle" fill="#666" font-size="11">Nessun dato personale lascia mai gli step 1–2 senza autenticazione interna</text>
+    </svg>
   </div>
 </section>
 
