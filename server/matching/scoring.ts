@@ -1,10 +1,135 @@
 import { haversineDistance } from "../geo";
-import { type Proposal } from "@shared/db";
-import { sql, type SQL } from "drizzle-orm";
+import { matchThresholds, appSettings, type Proposal } from "@shared/db";
+import { eq, sql, type SQL } from "drizzle-orm";
 import { sameDay, timeRangesOverlap } from "./filters";
 import { areCompatibleByRule, getRuleWeight as _getRuleWeight } from "./rules-cache";
+import { db } from "../db";
 
 export { _getRuleWeight as getRuleWeight };
+
+/* ============================================================================
+ * Tag-overlap scoring (Task #2513)
+ *
+ * Le categorie tag (musica, stile_guida, tipo_moto) sono normalizzate dal
+ * sistema tag generico (task #2512). Per ogni coppia di utenti calcoliamo:
+ *   - common  : numero di tag in comune
+ *   - jaccard : |A ∩ B| / |A ∪ B|         (0 se entrambi vuoti)
+ *   - overlap : |A ∩ B| / min(|A|,|B|)    (0 se uno dei due è vuoto)
+ *
+ * La soglia di compatibilità per categoria è caricata da `match_thresholds`
+ * con cache in-process invalidabile via `invalidateMatchThresholdsCache()`.
+ * Un match è "Supermatch" se almeno N categorie (default 3, configurabile
+ * via app_settings `match_supermatch_min_categories`) superano la soglia.
+ * ============================================================================ */
+
+export type TagOverlap = { common: number; jaccard: number; overlap: number };
+
+export function tagOverlap(tagsA: Iterable<string>, tagsB: Iterable<string>): TagOverlap {
+  const setA = tagsA instanceof Set ? tagsA : new Set(tagsA);
+  const setB = tagsB instanceof Set ? tagsB : new Set(tagsB);
+  if (setA.size === 0 && setB.size === 0) return { common: 0, jaccard: 0, overlap: 0 };
+  let common = 0;
+  for (const t of setA) if (setB.has(t)) common++;
+  const union = setA.size + setB.size - common;
+  const jaccard = union > 0 ? common / union : 0;
+  const minSize = Math.min(setA.size, setB.size);
+  const overlap = minSize > 0 ? common / minSize : 0;
+  return { common, jaccard, overlap };
+}
+
+export type CategoryThreshold = { jaccardThreshold: number; minCommonTags: number };
+export type ThresholdsMap = Map<string, CategoryThreshold>;
+
+const DEFAULT_THRESHOLDS: ThresholdsMap = new Map([
+  ["musica",      { jaccardThreshold: 0.25, minCommonTags: 1 }],
+  ["stile_guida", { jaccardThreshold: 0.30, minCommonTags: 1 }],
+  ["tipo_moto",   { jaccardThreshold: 0.30, minCommonTags: 1 }],
+]);
+
+let thresholdsCache: ThresholdsMap | null = null;
+let supermatchMinCategoriesCache: number | null = null;
+
+export function invalidateMatchThresholdsCache(): void {
+  thresholdsCache = null;
+  supermatchMinCategoriesCache = null;
+}
+
+export async function loadMatchThresholds(): Promise<ThresholdsMap> {
+  if (thresholdsCache) return thresholdsCache;
+  try {
+    const rows = await db.select().from(matchThresholds);
+    const map: ThresholdsMap = new Map(DEFAULT_THRESHOLDS);
+    for (const r of rows) {
+      map.set(r.category, {
+        jaccardThreshold: r.jaccardThreshold,
+        minCommonTags: r.minCommonTags,
+      });
+    }
+    thresholdsCache = map;
+    return map;
+  } catch {
+    return DEFAULT_THRESHOLDS;
+  }
+}
+
+export function getThresholdSync(category: string, thresholds: ThresholdsMap): CategoryThreshold {
+  return thresholds.get(category) ?? DEFAULT_THRESHOLDS.get(category) ?? { jaccardThreshold: 0.3, minCommonTags: 1 };
+}
+
+export async function getSupermatchMinCategories(): Promise<number> {
+  if (supermatchMinCategoriesCache != null) return supermatchMinCategoriesCache;
+  try {
+    const [row] = await db.select().from(appSettings).where(eq(appSettings.key, "match_supermatch_min_categories")).limit(1);
+    const raw = row?.value ?? "3";
+    const parsed = parseInt(String(raw), 10);
+    supermatchMinCategoriesCache = Number.isFinite(parsed) && parsed >= 1 ? parsed : 3;
+  } catch {
+    supermatchMinCategoriesCache = 3;
+  }
+  return supermatchMinCategoriesCache;
+}
+
+/**
+ * Score breakdown persistito nella colonna `score_breakdown jsonb`. Tutti
+ * i campi sono opzionali — vengono valorizzati solo per le categorie che
+ * partecipano al matcher in corso.
+ */
+export type ScoreBreakdown = {
+  musicScore?: number;        // jaccard 0..1
+  styleScore?: number;        // jaccard 0..1
+  bikeTypeScore?: number;     // jaccard 0..1
+  musicCommon?: number;
+  styleCommon?: number;
+  bikeTypeCommon?: number;
+};
+
+/**
+ * Conta quante categorie nel breakdown superano la soglia. Una categoria
+ * non presente nel breakdown non viene contata.
+ */
+export function countCategoriesAboveThreshold(
+  breakdown: ScoreBreakdown,
+  thresholds: ThresholdsMap,
+): number {
+  let n = 0;
+  const check = (score: number | undefined, common: number | undefined, cat: string) => {
+    if (score == null) return;
+    const t = getThresholdSync(cat, thresholds);
+    if (score >= t.jaccardThreshold && (common ?? 0) >= t.minCommonTags) n++;
+  };
+  check(breakdown.musicScore, breakdown.musicCommon, "musica");
+  check(breakdown.styleScore, breakdown.styleCommon, "stile_guida");
+  check(breakdown.bikeTypeScore, breakdown.bikeTypeCommon, "tipo_moto");
+  return n;
+}
+
+export function isSupermatchByBreakdown(
+  breakdown: ScoreBreakdown,
+  thresholds: ThresholdsMap,
+  minCategories: number,
+): boolean {
+  return countCategoriesAboveThreshold(breakdown, thresholds) >= minCategories;
+}
 
 /**
  * Freshness/Decay configuration (task 2524).

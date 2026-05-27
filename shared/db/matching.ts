@@ -76,6 +76,7 @@ export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
     .references(() => zavarrinaWishlistMotos.id, { onDelete: "cascade" }),
   status: varchar("status", { length: 20 }).notNull().default("new"),
   isSupermatch: boolean("is_supermatch").notNull().default(false),
+  scoreBreakdown: jsonb("score_breakdown").notNull().default(sql`'{}'::jsonb`),
   notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
   notifiedAt: timestamp("notified_at"),
   archivedAt: timestamp("archived_at"),
@@ -102,6 +103,7 @@ export const bikerBikerMatches = pgTable("biker_biker_matches", {
   status: varchar("status", { length: 20 }).notNull().default("new"),
   isSupermatch: boolean("is_supermatch").notNull().default(false),
   pairType: varchar("pair_type", { length: 10 }).notNull().default("bb"),
+  scoreBreakdown: jsonb("score_breakdown").notNull().default(sql`'{}'::jsonb`),
   notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
   notifiedAt: timestamp("notified_at"),
   archivedAt: timestamp("archived_at"),
@@ -387,6 +389,25 @@ export const matchRules = pgTable("match_rules", {
 
 export type MatchRuleRow = typeof matchRules.$inferSelect;
 export type InsertMatchRule = typeof matchRules.$inferInsert;
+
+/**
+ * Task #2513 — soglie configurabili per il tag-overlap scoring.
+ *
+ * Una riga per categoria di tag (musica, stile_guida, tipo_moto). Il match
+ * viene considerato "compatibile" per quella categoria se l'overlap Jaccard
+ * fra i tag dei due utenti è >= jaccard_threshold E le coppie hanno almeno
+ * min_common_tags tag in comune. Modificabile a runtime dall'admin senza
+ * deploy.
+ */
+export const matchThresholds = pgTable("match_thresholds", {
+  category: varchar("category", { length: 40 }).primaryKey(),
+  jaccardThreshold: doublePrecision("jaccard_threshold").notNull().default(0.3),
+  minCommonTags: integer("min_common_tags").notNull().default(1),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type MatchThreshold = typeof matchThresholds.$inferSelect;
+export type InsertMatchThreshold = typeof matchThresholds.$inferInsert;
 
 export const updateMatchRuleSchema = z.object({
   compatible: z.boolean().optional(),

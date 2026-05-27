@@ -74,14 +74,18 @@ export class BikerMatchesStorage extends MatchingStorage {
     const isSupermatch = data.isSupermatch ?? false;
     const status = data.status || "new";
     const pairType = data.pairType ?? "bb";
+    // Task #2513: score_breakdown è jsonb. Lo passiamo serializzato e
+    // castato esplicitamente per evitare ambiguità (parametro text → jsonb).
+    const scoreBreakdownJson = JSON.stringify(data.scoreBreakdown ?? {});
     const result = await db.execute(sql`
-      INSERT INTO biker_biker_matches (id, biker1_id, biker2_id, motorcycle_brand, status, is_supermatch, pair_type)
-      VALUES (gen_random_uuid(), ${idA}, ${idB}, ${data.motorcycleBrand}, ${status}, ${isSupermatch}, ${pairType})
+      INSERT INTO biker_biker_matches (id, biker1_id, biker2_id, motorcycle_brand, status, is_supermatch, pair_type, score_breakdown)
+      VALUES (gen_random_uuid(), ${idA}, ${idB}, ${data.motorcycleBrand}, ${status}, ${isSupermatch}, ${pairType}, ${scoreBreakdownJson}::jsonb)
       ON CONFLICT (LEAST(biker1_id, biker2_id), GREATEST(biker1_id, biker2_id), motorcycle_brand)
       DO UPDATE SET
         status = 'new',
         is_supermatch = EXCLUDED.is_supermatch,
-        pair_type = EXCLUDED.pair_type
+        pair_type = EXCLUDED.pair_type,
+        score_breakdown = EXCLUDED.score_breakdown
       WHERE biker_biker_matches.status = 'rejected'
       RETURNING *`);
     if (!result.rows || result.rows.length === 0) return undefined;
@@ -89,7 +93,9 @@ export class BikerMatchesStorage extends MatchingStorage {
     return {
       id: row.id, biker1Id: row.biker1_id, biker2Id: row.biker2_id,
       motorcycleBrand: row.motorcycle_brand, status: row.status,
-      isSupermatch: row.is_supermatch, pairType: row.pair_type ?? "bb", createdAt: row.created_at,
+      isSupermatch: row.is_supermatch, pairType: row.pair_type ?? "bb",
+      scoreBreakdown: row.score_breakdown ?? {},
+      createdAt: row.created_at,
     } as BikerBikerMatch;
   }
 

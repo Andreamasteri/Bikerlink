@@ -12,6 +12,16 @@ interface MatchItem {
   status: string;
   isSupermatch: boolean;
   createdAt: string;
+  // Task #2513 — breakdown jaccard per categoria. Reso opzionale per
+  // retro-compatibilità con i match esistenti senza breakdown.
+  scoreBreakdown?: {
+    musicScore?: number;
+    styleScore?: number;
+    bikeTypeScore?: number;
+    musicCommon?: number;
+    styleCommon?: number;
+    bikeTypeCommon?: number;
+  } | null;
 }
 
 interface MatchListItemProps {
@@ -47,6 +57,25 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, formatDate,
               <Text style={styles.superText}>⭐</Text>
             </View>
           )}
+          {match.scoreBreakdown ? (
+            <View style={styles.breakdownRow}>
+              {match.scoreBreakdown.musicScore != null && (
+                <Text style={styles.breakdownBadge} testID={`bd-music-${match.id}`}>
+                  M{Math.round((match.scoreBreakdown.musicScore ?? 0) * 100)}
+                </Text>
+              )}
+              {match.scoreBreakdown.styleScore != null && (
+                <Text style={styles.breakdownBadge} testID={`bd-style-${match.id}`}>
+                  S{Math.round((match.scoreBreakdown.styleScore ?? 0) * 100)}
+                </Text>
+              )}
+              {match.scoreBreakdown.bikeTypeScore != null && (
+                <Text style={styles.breakdownBadge} testID={`bd-type-${match.id}`}>
+                  T{Math.round((match.scoreBreakdown.bikeTypeScore ?? 0) * 100)}
+                </Text>
+              )}
+            </View>
+          ) : null}
         </View>
       </View>
       <View style={[styles.statusDot, { backgroundColor: statusColor(match.status) }]} />
@@ -83,5 +112,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFD70022",
   },
   superText: { fontSize: 10 },
+  breakdownRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  breakdownBadge: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: Colors.text,
+    backgroundColor: Colors.surfaceLight,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
 });

@@ -4,6 +4,16 @@ import { gpsRejectionStats, bikerZavarrinaMatches, bikerBikerMatches, matchPrefe
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { desc, eq, sql } from "drizzle-orm";
 import { invalidateMatchRulesCache } from "../../matching/rules-cache";
+import {
+  tagOverlap,
+  loadMatchThresholds,
+  getThresholdSync,
+  getSupermatchMinCategories,
+  isSupermatchByBreakdown,
+  type ScoreBreakdown,
+} from "../../matching/scoring";
+import { entityTags, tags as tagsTable, tagCategories } from "@shared/db";
+import { and, inArray } from "drizzle-orm";
 import { triggerMatchingRun, getLastMatchingCycleMeta } from "../../matching-engine";
 import { forceUnlockMatching, getMatchingLockState, getMatchingLockStatus } from "../../matching/scheduler";
 import { getRedisStatus } from "../../cache/redis";
@@ -981,6 +991,118 @@ router.patch("/match-rules/:id", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[admin] PATCH /match-rules/:id error:", err);
     return sendError(res, 500, "Errore aggiornamento regola");
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Task #2513 — match explain endpoint.
+// Calcola al volo il breakdown jaccard (musica / stile_guida / tipo_moto)
+// per una coppia di utenti, senza richiedere che esista un match già
+// salvato. Utile per il match-inspector dell'admin: capire perché due
+// utenti hanno (o non hanno) generato un supermatch.
+//   - musica:      tag su entity_type='user'
+//   - stile_guida + tipo_moto: aggregati su TUTTE le moto degli utenti
+//     (union per ciascun utente).
+// ──────────────────────────────────────────────────────────────────────────
+router.get("/matching/explain", async (req: Request, res: Response) => {
+  try {
+    const rawA = req.query.userA;
+    const rawB = req.query.userB;
+    const userA = typeof rawA === "string" ? rawA : null;
+    const userB = typeof rawB === "string" ? rawB : null;
+    if (!userA || !userB) return sendError(res, 400, "userA e userB sono obbligatori");
+    if (userA === userB) return sendError(res, 400, "userA e userB devono essere diversi");
+
+    const motoRows = await db.execute<{ id: string; user_id: string }>(sql`
+      SELECT id, user_id FROM user_motorcycles WHERE user_id IN (${userA}, ${userB})
+    `);
+    const motoIdsA: string[] = [];
+    const motoIdsB: string[] = [];
+    for (const r of motoRows.rows) {
+      if (r.user_id === userA) motoIdsA.push(String(r.id));
+      else if (r.user_id === userB) motoIdsB.push(String(r.id));
+    }
+
+    type TagRow = { entityType: string; entityId: string; slug: string; catSlug: string };
+    const collectTags = async (entityType: "user" | "motorcycle", ids: string[]): Promise<TagRow[]> => {
+      if (ids.length === 0) return [];
+      return db.select({
+        entityType: entityTags.entityType,
+        entityId: entityTags.entityId,
+        slug: tagsTable.slug,
+        catSlug: tagCategories.slug,
+      })
+        .from(entityTags)
+        .innerJoin(tagsTable, eq(tagsTable.id, entityTags.tagId))
+        .innerJoin(tagCategories, eq(tagCategories.id, tagsTable.categoryId))
+        .where(and(eq(entityTags.entityType, entityType), inArray(entityTags.entityId, ids)));
+    };
+
+    const [userTags, motoTagsA, motoTagsB] = await Promise.all([
+      collectTags("user", [userA, userB]),
+      collectTags("motorcycle", motoIdsA),
+      collectTags("motorcycle", motoIdsB),
+    ]);
+
+    const aggregate = (rows: TagRow[], filterEntityId?: string) => {
+      const map: Record<string, Set<string>> = { musica: new Set(), stile_guida: new Set(), tipo_moto: new Set() };
+      for (const r of rows) {
+        if (filterEntityId && r.entityId !== filterEntityId) continue;
+        if (map[r.catSlug]) map[r.catSlug].add(r.slug);
+      }
+      return map;
+    };
+    const aUser = aggregate(userTags, userA);
+    const bUser = aggregate(userTags, userB);
+    const aMoto = aggregate(motoTagsA);
+    const bMoto = aggregate(motoTagsB);
+
+    const thresholds = await loadMatchThresholds();
+    const minCategories = await getSupermatchMinCategories();
+
+    const buildCategory = (cat: string, tagsA: Set<string>, tagsB: Set<string>) => {
+      const ov = tagOverlap(tagsA, tagsB);
+      const thr = getThresholdSync(cat, thresholds);
+      const passes = ov.jaccard >= thr.jaccardThreshold && ov.common >= thr.minCommonTags;
+      return {
+        tagsA: [...tagsA].sort(),
+        tagsB: [...tagsB].sort(),
+        common: ov.common,
+        jaccard: Number(ov.jaccard.toFixed(4)),
+        overlap: Number(ov.overlap.toFixed(4)),
+        threshold: thr.jaccardThreshold,
+        minCommonTags: thr.minCommonTags,
+        passes,
+      };
+    };
+
+    const categories = {
+      musica: buildCategory("musica", aUser.musica, bUser.musica),
+      stile_guida: buildCategory("stile_guida", aMoto.stile_guida, bMoto.stile_guida),
+      tipo_moto: buildCategory("tipo_moto", aMoto.tipo_moto, bMoto.tipo_moto),
+    };
+
+    const breakdown: ScoreBreakdown = {
+      musicScore: categories.musica.jaccard,
+      musicCommon: categories.musica.common,
+      styleScore: categories.stile_guida.jaccard,
+      styleCommon: categories.stile_guida.common,
+      bikeTypeScore: categories.tipo_moto.jaccard,
+      bikeTypeCommon: categories.tipo_moto.common,
+    };
+    const categoriesAbove = (Object.values(categories) as Array<{ passes: boolean }>).filter(c => c.passes).length;
+    const isSupermatch = isSupermatchByBreakdown(breakdown, thresholds, minCategories);
+
+    return sendSuccess(res, {
+      userA, userB,
+      categories,
+      categoriesAboveThreshold: categoriesAbove,
+      minCategories,
+      isSupermatch,
+    });
+  } catch (err) {
+    console.error("[admin] GET /matching/explain error:", err);
+    return sendError(res, 500, "Errore calcolo explain");
   }
 });
 

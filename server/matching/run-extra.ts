@@ -2,18 +2,57 @@ import { db } from "../db";
 import { storage } from "../storage";
 import {
   users,
-  userMusicTracks,
   routes,
   proposals,
   zavarrinaWishlists,
   zavarrinaWishlistMotos,
   eventParticipants,
+  entityTags,
+  tags,
+  tagCategories,
 } from "@shared/db";
-import { and, eq, isNotNull, gt } from "drizzle-orm";
+import { and, eq, isNotNull, gt, inArray } from "drizzle-orm";
 import { loadMatchPreferencesMap, bothPrefsEnabled, prefEnabled } from "./filters";
 import { getVariantConfig, trackAbEvent } from "./ab";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
+import {
+  tagOverlap,
+  loadMatchThresholds,
+  getThresholdSync,
+  getSupermatchMinCategories,
+  isSupermatchByBreakdown,
+  type ScoreBreakdown,
+} from "./scoring";
+
+/**
+ * Carica i tag di una categoria per un insieme di entità (user o motorcycle).
+ * Ritorna Map<entityId, Set<tagSlug>>.
+ */
+async function loadTagSetsByCategory(
+  entityType: "user" | "motorcycle",
+  entityIds: string[],
+  categorySlug: string,
+): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  if (entityIds.length === 0) return out;
+  const rows = await db
+    .select({ entityId: entityTags.entityId, slug: tags.slug })
+    .from(entityTags)
+    .innerJoin(tags, eq(tags.id, entityTags.tagId))
+    .innerJoin(tagCategories, eq(tagCategories.id, tags.categoryId))
+    .where(and(
+      eq(entityTags.entityType, entityType),
+      inArray(entityTags.entityId, entityIds),
+      eq(tagCategories.slug, categorySlug),
+    ));
+  for (const r of rows) {
+    let set = out.get(r.entityId);
+    if (!set) { set = new Set(); out.set(r.entityId, set); }
+    set.add(r.slug);
+  }
+  return out;
+}
 
 // A/B experiment key for music affinity threshold tuning. Variants:
 //   - control:     threshold = 0.65 (default)
@@ -30,42 +69,40 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
       allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
     );
 
-    const allTrackRows = await db
-      .selectDistinct({ userId: userMusicTracks.userId, userType: users.userType })
-      .from(userMusicTracks)
-      .innerJoin(users, eq(userMusicTracks.userId, users.id))
-      .where(eq(users.isFake, false));
+    // Task #2513: caricamento via tag musica (entity_type='user') invece
+    // di lastfm track ID. Un utente entra nel pool se ha almeno 1 tag musica.
+    const userRows = await db
+      .selectDistinct({ userId: entityTags.entityId, userType: users.userType })
+      .from(entityTags)
+      .innerJoin(tags, eq(tags.id, entityTags.tagId))
+      .innerJoin(tagCategories, and(eq(tagCategories.id, tags.categoryId), eq(tagCategories.slug, "musica")))
+      .innerJoin(users, eq(users.id, entityTags.entityId))
+      .where(and(eq(entityTags.entityType, "user"), eq(users.isFake, false)));
 
-    if (allTrackRows.length < 2) return 0;
+    if (userRows.length < 2) return 0;
 
-    const tracksByUser = new Map<string, Set<string>>();
     const userTypeMap = new Map<string, string>();
-    for (const row of allTrackRows) {
-      userTypeMap.set(row.userId, row.userType);
-      const tracks = await db
-        .select({ lastfmTrackId: userMusicTracks.lastfmTrackId })
-        .from(userMusicTracks)
-        .where(eq(userMusicTracks.userId, row.userId));
-      if (tracks.length > 0) {
-        tracksByUser.set(row.userId, new Set(tracks.map(t => t.lastfmTrackId)));
-      }
-    }
+    for (const r of userRows) userTypeMap.set(r.userId, r.userType);
+    const userIds = userRows.map(r => r.userId);
+    const tagsByUser = await loadTagSetsByCategory("user", userIds, "musica");
 
-    const userArr = allTrackRows.map(r => r.userId);
+    const thresholds = await loadMatchThresholds();
+    const musicThreshold = getThresholdSync("musica", thresholds);
+    const minCategories = await getSupermatchMinCategories();
+
     let matchCount = 0;
     let skipCount = 0;
-    const THRESHOLD = 0.65;
     const MAX_MATCHES = 200;
 
     const isBikerType = (t: string) => t === "biker" || t === "coppia";
     const isZavType = (t: string) => t === "zavorrina" || t === "coppia";
 
     outer:
-    for (let i = 0; i < userArr.length; i++) {
-      for (let j = i + 1; j < userArr.length; j++) {
+    for (let i = 0; i < userIds.length; i++) {
+      for (let j = i + 1; j < userIds.length; j++) {
         if (matchCount >= MAX_MATCHES) break outer;
-        const uid1 = userArr[i];
-        const uid2 = userArr[j];
+        const uid1 = userIds[i];
+        const uid2 = userIds[j];
         if (blockedSet.has(`${uid1}:${uid2}`)) { skipCount++; continue; }
 
         const t1 = userTypeMap.get(uid1) ?? "";
@@ -81,18 +118,23 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
           brand = "musica_zav"; musicPairType = "bz";
         } else { skipCount++; continue; }
 
-        const set1 = tracksByUser.get(uid1);
-        const set2 = tracksByUser.get(uid2);
+        const set1 = tagsByUser.get(uid1);
+        const set2 = tagsByUser.get(uid2);
         if (!set1 || !set2) { skipCount++; continue; }
 
-        const shared = [...set2].filter(t => set1.has(t)).length;
-        const smaller = Math.min(set1.size, set2.size);
-        // A/B branching: variant config { weight: number } scales the base threshold.
-        // weight=1.0 -> control (0.65); weight=1.4 -> stricter (0.91).
+        const ov = tagOverlap(set1, set2);
+        // A/B branching: variant config { weight: number } scales the base
+        // Jaccard threshold. weight=1.0 -> default; weight=1.4 -> più severo.
         const variantA = await getVariantConfig(uid1, MUSIC_AFFINITY_EXPERIMENT);
         const weight = typeof variantA.config.weight === "number" ? variantA.config.weight : 1.0;
-        const threshold = Math.min(0.99, THRESHOLD * weight);
-        if (smaller === 0 || shared / smaller < threshold) { skipCount++; continue; }
+        const threshold = Math.min(0.99, musicThreshold.jaccardThreshold * weight);
+        if (ov.common < musicThreshold.minCommonTags || ov.jaccard < threshold) { skipCount++; continue; }
+
+        const breakdown: ScoreBreakdown = {
+          musicScore: Number(ov.jaccard.toFixed(4)),
+          musicCommon: ov.common,
+        };
+        const isSupermatch = isSupermatchByBreakdown(breakdown, thresholds, minCategories);
 
         const idA = uid1 < uid2 ? uid1 : uid2;
         const idB = uid1 < uid2 ? uid2 : uid1;
@@ -101,8 +143,9 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
           biker2Id: idB,
           motorcycleBrand: brand,
           status: "new",
-          isSupermatch: false,
+          isSupermatch,
           pairType: musicPairType,
+          scoreBreakdown: breakdown,
         });
         if (inserted) {
           matchCount++;
@@ -110,7 +153,8 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
             table: "biker_biker_matches",
             matchId: inserted.id,
             userIds: [idA, idB],
-            priority: classifyMatch({}),
+            priority: classifyMatch({ isSupermatch }),
+            isSupermatch,
           });
           if (brand === "musica") {
             void trackAbEvent(idA, MUSIC_AFFINITY_EXPERIMENT, "match_created", { matchId: inserted.id, brand });
@@ -120,7 +164,7 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
       }
     }
 
-    console.log(`[MusicMatch] ${matchCount} music affinity matches (≥65% overlap), saltati: ${skipCount}`);
+    console.log(`[MusicMatch] ${matchCount} music affinity matches (tag-overlap jaccard≥${musicThreshold.jaccardThreshold}), saltati: ${skipCount}`);
     return matchCount;
   } catch (error) {
     console.error("[MusicMatch] error:", error);
@@ -368,38 +412,65 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
 
     const zavWishRows = await db
       .select({
+        wishId: zavarrinaWishlistMotos.id,
+        userId: zavarrinaWishlists.userId,
+      })
+      .from(zavarrinaWishlists)
+      .innerJoin(zavarrinaWishlistMotos, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id));
+
+    if (zavWishRows.length === 0) return 0;
+
+    // Task #2513: scoring per tag-overlap (stile_guida + tipo_moto). I tag
+    // sono associati alle moto biker (entity 'motorcycle') e — per le
+    // wishlist — temporaneamente derivate dai campi motorcycle_type /
+    // riding_style della wishlist (in attesa del task tagging wishlist).
+    const thresholds = await loadMatchThresholds();
+    const tipoThreshold = getThresholdSync("tipo_moto", thresholds);
+    const stileThreshold = getThresholdSync("stile_guida", thresholds);
+    const minCategories = await getSupermatchMinCategories();
+
+    const motoIds = bikerMotorcycles.map(b => b.motorcycle.id);
+    const [motoTipoTags, motoStileTags] = await Promise.all([
+      loadTagSetsByCategory("motorcycle", motoIds, "tipo_moto"),
+      loadTagSetsByCategory("motorcycle", motoIds, "stile_guida"),
+    ]);
+
+    // Wishlist: aggregato per utente (Set di tipo_moto / stile_guida slug).
+    const zavTipoByUser = new Map<string, Set<string>>();
+    const zavStileByUser = new Map<string, Set<string>>();
+    const wishRowsFull = await db
+      .select({
         userId: zavarrinaWishlists.userId,
         motorcycleType: zavarrinaWishlistMotos.motorcycleType,
         ridingStyle: zavarrinaWishlistMotos.ridingStyle,
       })
       .from(zavarrinaWishlists)
-      .innerJoin(zavarrinaWishlistMotos, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id))
-      .where(and(isNotNull(zavarrinaWishlistMotos.motorcycleType), isNotNull(zavarrinaWishlistMotos.ridingStyle)));
-
-    if (zavWishRows.length === 0) return 0;
-
-    const zavByTypeStyle = new Map<string, string[]>();
-    for (const row of zavWishRows) {
-      if (!row.motorcycleType || !row.ridingStyle) continue;
-      const key = `${row.motorcycleType.toLowerCase()}|${row.ridingStyle.toLowerCase()}`;
-      if (!zavByTypeStyle.has(key)) zavByTypeStyle.set(key, []);
-      zavByTypeStyle.get(key)!.push(row.userId);
+      .innerJoin(zavarrinaWishlistMotos, eq(zavarrinaWishlistMotos.wishlistId, zavarrinaWishlists.id));
+    for (const r of wishRowsFull) {
+      if (r.motorcycleType) {
+        const s = zavTipoByUser.get(r.userId) ?? new Set<string>();
+        s.add(r.motorcycleType.toLowerCase());
+        zavTipoByUser.set(r.userId, s);
+      }
+      if (r.ridingStyle) {
+        const s = zavStileByUser.get(r.userId) ?? new Set<string>();
+        s.add(r.ridingStyle.toLowerCase());
+        zavStileByUser.set(r.userId, s);
+      }
     }
 
     let matchCount = 0;
     let skipCount = 0;
     const MAX = 200;
+    const zavIds = [...new Set(zavWishRows.map(r => r.userId))];
 
     for (const bm of bikerMotorcycles) {
       if (matchCount >= MAX) break;
-      const mtype = bm.motorcycle.motorcycleType?.toLowerCase();
-      const rstyle = bm.motorcycle.ridingStyle?.toLowerCase();
-      if (!mtype || !rstyle) continue;
       if (!prefEnabled(prefsMap, bm.userId, "bikerZavarrinaTypeStyle")) continue;
-
-      const key = `${mtype}|${rstyle}`;
-      const zavIds = zavByTypeStyle.get(key);
-      if (!zavIds || zavIds.length === 0) continue;
+      const motoTipo = motoTipoTags.get(bm.motorcycle.id) ?? new Set<string>();
+      const motoStile = motoStileTags.get(bm.motorcycle.id) ?? new Set<string>();
+      if (motoTipo.size === 0 && motoStile.size === 0) continue;
+      const primaryTipo = bm.motorcycle.motorcycleType?.toLowerCase() ?? "x";
 
       for (const zavId of zavIds) {
         if (matchCount >= MAX) break;
@@ -407,15 +478,33 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
         if (blockedSet.has(`${bm.userId}:${zavId}`)) { skipCount++; continue; }
         if (!prefEnabled(prefsMap, zavId, "bikerZavarrinaTypeStyle")) { skipCount++; continue; }
 
+        const zavTipo = zavTipoByUser.get(zavId) ?? new Set<string>();
+        const zavStile = zavStileByUser.get(zavId) ?? new Set<string>();
+        const tipoOv = tagOverlap(motoTipo, zavTipo);
+        const stileOv = tagOverlap(motoStile, zavStile);
+
+        const tipoOk = tipoOv.common >= tipoThreshold.minCommonTags && tipoOv.jaccard >= tipoThreshold.jaccardThreshold;
+        const stileOk = stileOv.common >= stileThreshold.minCommonTags && stileOv.jaccard >= stileThreshold.jaccardThreshold;
+        if (!tipoOk && !stileOk) { skipCount++; continue; }
+
+        const breakdown: ScoreBreakdown = {
+          bikeTypeScore: Number(tipoOv.jaccard.toFixed(4)),
+          bikeTypeCommon: tipoOv.common,
+          styleScore: Number(stileOv.jaccard.toFixed(4)),
+          styleCommon: stileOv.common,
+        };
+        const isSupermatch = isSupermatchByBreakdown(breakdown, thresholds, minCategories);
+
         const idA = bm.userId < zavId ? bm.userId : zavId;
         const idB = bm.userId < zavId ? zavId : bm.userId;
         const inserted = await storage.createBikerBikerMatch({
           biker1Id: idA,
           biker2Id: idB,
-          motorcycleBrand: `tipo_zav:${mtype}`,
+          motorcycleBrand: `tipo_zav:${primaryTipo}`,
           status: "new",
-          isSupermatch: false,
+          isSupermatch,
           pairType: "bz",
+          scoreBreakdown: breakdown,
         });
         if (inserted) {
           matchCount++;

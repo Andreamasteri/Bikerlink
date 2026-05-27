@@ -8,7 +8,19 @@ import {
   getActiveClubMembershipKeys,
   clubScopeAllows 
 } from "./filters";
-import { areCompatible, baseModelName } from "./scoring";
+import {
+  areCompatible,
+  baseModelName,
+  tagOverlap,
+  loadMatchThresholds,
+  getThresholdSync,
+  getSupermatchMinCategories,
+  isSupermatchByBreakdown,
+  type ScoreBreakdown,
+} from "./scoring";
+import { db } from "../db";
+import { entityTags, tags as tagsTable, tagCategories } from "@shared/db";
+import { and, eq, inArray } from "drizzle-orm";
 import { bboxAround } from "../lib/geo-bbox";
 import { createUserLoader } from "../lib/user-loader";
 import { matchingLogger } from "../lib/logger";
@@ -189,6 +201,35 @@ export async function runWishlistMatching(): Promise<number> {
 
     const prefsMap = await loadMatchPreferencesMap();
     const existingKeys = await storage.getAllExistingBikerZavarrinaMatchKeys();
+
+    // Task #2513: precarica i tag delle moto biker coinvolte per
+    // calcolare il breakdown jaccard senza N+1 query.
+    const motoIds = [...new Set(shuffled.map(p => p.motorcycle.id))];
+    const tagsByMoto = await (async () => {
+      const out = new Map<string, { tipo: Set<string>; stile: Set<string> }>();
+      if (motoIds.length === 0) return out;
+      const rows = await db
+        .select({ entityId: entityTags.entityId, slug: tagsTable.slug, catSlug: tagCategories.slug })
+        .from(entityTags)
+        .innerJoin(tagsTable, eq(tagsTable.id, entityTags.tagId))
+        .innerJoin(tagCategories, eq(tagCategories.id, tagsTable.categoryId))
+        .where(and(
+          eq(entityTags.entityType, "motorcycle"),
+          inArray(entityTags.entityId, motoIds),
+          inArray(tagCategories.slug, ["tipo_moto", "stile_guida"]),
+        ));
+      for (const r of rows) {
+        let m = out.get(r.entityId);
+        if (!m) { m = { tipo: new Set(), stile: new Set() }; out.set(r.entityId, m); }
+        if (r.catSlug === "tipo_moto") m.tipo.add(r.slug);
+        else if (r.catSlug === "stile_guida") m.stile.add(r.slug);
+      }
+      return out;
+    })();
+    const thresholds = await loadMatchThresholds();
+    const minCategories = await getSupermatchMinCategories();
+    // Per le wishlist (in attesa di tagging dedicato) deriviamo i tag dai
+    // campi motorcycleType / ridingStyle come singolo slug normalizzato.
     let matchCount = 0;
     let skipCount = 0;
     const MAX_MATCHES_PER_RUN = 500;
@@ -207,20 +248,28 @@ export async function runWishlistMatching(): Promise<number> {
         const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
         if (existingKeys.has(key)) { skipCount++; continue; }
 
-        const isSupermatch = !!(
-          wish.brand &&
-          moto.brand &&
-          wish.brand.toLowerCase() === moto.brand.toLowerCase() &&
-          wish.model &&
-          moto.model &&
-          baseModelName(wish.model) === baseModelName(moto.model) &&
-          wish.motorcycleType &&
-          moto.motorcycleType &&
-          wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase() &&
-          wish.ridingStyle &&
-          moto.ridingStyle &&
-          wish.ridingStyle.toLowerCase() === moto.ridingStyle.toLowerCase()
+        // Task #2513: il vecchio supermatch richiedeva match esatto su
+        // brand + base-model + motorcycleType + ridingStyle. Ora richiediamo
+        // brand + base-model identici (gating naturale) PIÙ ≥N categorie
+        // sopra soglia jaccard nel breakdown tag (tipo_moto + stile_guida).
+        const motoTags = tagsByMoto.get(moto.id) ?? { tipo: new Set<string>(), stile: new Set<string>() };
+        const wishTipo = wish.motorcycleType ? new Set([wish.motorcycleType.toLowerCase()]) : new Set<string>();
+        const wishStile = wish.ridingStyle ? new Set([wish.ridingStyle.toLowerCase()]) : new Set<string>();
+        const tipoOv = tagOverlap(motoTags.tipo, wishTipo);
+        const stileOv = tagOverlap(motoTags.stile, wishStile);
+        const breakdown: ScoreBreakdown = {
+          bikeTypeScore: Number(tipoOv.jaccard.toFixed(4)),
+          bikeTypeCommon: tipoOv.common,
+          styleScore: Number(stileOv.jaccard.toFixed(4)),
+          styleCommon: stileOv.common,
+        };
+        const brandModelMatch = !!(
+          wish.brand && moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase() &&
+          wish.model && moto.model && baseModelName(wish.model) === baseModelName(moto.model)
         );
+        const isSupermatch = brandModelMatch && isSupermatchByBreakdown(breakdown, thresholds, minCategories);
+        // suppress "unused" warning until thresholds in supermatch fully wired
+        void getThresholdSync;
 
         const inserted = await storage.createMatch({
           bikerId,
@@ -229,6 +278,7 @@ export async function runWishlistMatching(): Promise<number> {
           wishlistMotoId: wish.id,
           status: "new",
           isSupermatch,
+          scoreBreakdown: breakdown,
         });
 
         existingKeys.add(key);
