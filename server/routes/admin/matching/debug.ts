@@ -2,7 +2,6 @@
 import { Router, type Request, type Response } from "express";
 import { db } from "../../../db";
 import { matchPreferences } from "@shared/db";
-import { eq } from "drizzle-orm";
 import { sendError } from "../../../lib/api-response";
 
 const router = Router();

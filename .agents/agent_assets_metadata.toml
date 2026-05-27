@@ -619,19 +619,7 @@ type = "pdf"
 title = "BikerLink — Sistema Mappe v2 (con Cesium, costi, LOC)"
 
 [[outputs]]
-id = "Wbp4kk8j-aLIWCorS0bVo"
-uri = "file://attached_assets/Turnistica_e_Maree_2026_compressed.pdf"
-type = "pdf"
-title = "Turnistica e Maree 2026 (compresso)"
-
-[[outputs]]
 id = "uxtjE7i_B2gcJBGUHAru-"
 uri = "file://attached_assets/manualeMatching-rev0_1779889176543.pdf"
 type = "pdf"
 title = "Manuale Matching System – rev 0"
-
-[[outputs]]
-id = "N7h-o3CSykIPTsjQ-ukc-"
-uri = "file://attached_assets/Turnistica_e_Maree_2026_1779892159389.pdf"
-type = "pdf"
-title = "Turnistica e Maree 2026"
