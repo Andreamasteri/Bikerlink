@@ -344,6 +344,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI DB Integrity scheduler failed (non-fatal):", e);
     }
 
+    // Task #2537 — AI App Integrity scheduler (nightly 04:00 cheap, Sun 05:00 expensive).
+    try {
+      const { startAppIntegrityScheduler } = await import("./ai/integrity/scheduler");
+      startAppIntegrityScheduler();
+      console.log("[INIT] AI App Integrity scheduler started");
+    } catch (e) {
+      console.warn("[INIT] AI App Integrity scheduler failed (non-fatal):", e);
+    }
+
     // Motion simulator for fake users — fire-and-forget so it cannot hang boot
     import("./motion-simulator")
       .then(({ startMotionSimulator }) => startMotionSimulator())

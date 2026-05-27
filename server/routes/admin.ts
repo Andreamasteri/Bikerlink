@@ -245,6 +245,7 @@ import textAliasesRouter from './admin/text-aliases';
 import aiModerationRouter from './admin/ai-moderation';
 import aiWatchdogRouter from './admin/ai-watchdog';
 import dbIntegrityRouter from './admin/db-integrity';
+import appIntegrityRouter from './admin/app-integrity';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -342,5 +343,6 @@ router.use('/', _requireAdmin, aiModerationRouter);
 router.use('/', _requireAdmin, aiWatchdogRouter);
 // Task #2536 — AI Database Integrity.
 router.use('/', _requireAdmin, dbIntegrityRouter);
+router.use('/', _requireAdmin, appIntegrityRouter);
 
 export default router;

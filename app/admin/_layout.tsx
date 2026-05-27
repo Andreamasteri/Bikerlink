@@ -68,6 +68,7 @@ export default function AdminLayout() {
       <Stack.Screen name="ai-moderation-settings" options={{ title: "Co-Pilot AI — Settings" }} />
       <Stack.Screen name="db-integrity" options={{ title: "AI DB Integrity" }} />
       <Stack.Screen name="db-integrity-quarantine" options={{ title: "DB Integrity — Quarantena" }} />
+      <Stack.Screen name="app-integrity" options={{ title: "AI App Integrity" }} />
     </Stack>
   );
 }
