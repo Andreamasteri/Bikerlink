@@ -1,6 +1,77 @@
 import { haversineDistance } from "../geo";
 import { type Proposal } from "@shared/db";
+import { sql, type SQL } from "drizzle-orm";
 import { sameDay, timeRangesOverlap, MATCH_RULES } from "./filters";
+
+/**
+ * Freshness/Decay configuration (task 2524).
+ *
+ * I match perdono rilevanza nel tempo seguendo una decadenza esponenziale:
+ *   freshness(ageDays) = 0.5 ^ (ageDays / halfLife)
+ *
+ * Half-life di default:
+ *   - generic (biker-biker, biker-zavorrina): 7 giorni
+ *   - proposal (proposte di uscita, scadono in fretta): 2 giorni
+ *
+ * Override globali via app_settings:
+ *   - match_freshness_halflife_generic_days
+ *   - match_freshness_halflife_proposal_days
+ *   - match_archive_after_days
+ */
+export const FRESHNESS_DEFAULTS = {
+  halfLifeGenericDays: 7,
+  halfLifeProposalDays: 2,
+  archiveAfterDays: 30,
+  freshThreshold: 0.6,
+} as const;
+
+export type FreshnessKind = "generic" | "proposal";
+
+export function freshnessMultiplier(
+  ageDays: number,
+  kind: FreshnessKind = "generic",
+  halfLifeOverrideDays?: number,
+): number {
+  const halfLife =
+    halfLifeOverrideDays && halfLifeOverrideDays > 0
+      ? halfLifeOverrideDays
+      : kind === "proposal"
+        ? FRESHNESS_DEFAULTS.halfLifeProposalDays
+        : FRESHNESS_DEFAULTS.halfLifeGenericDays;
+  const age = Math.max(0, ageDays);
+  return Math.pow(0.5, age / halfLife);
+}
+
+/**
+ * Costruisce l'espressione SQL per la freshness di un match basata su
+ * `created_at`. Restituisce un valore in [0, 1].
+ *
+ *   EXP( -LN(2) * ageDays / halfLife )
+ *   = 0.5 ^ (ageDays / halfLife)
+ */
+export function freshnessSql(createdAtCol: SQL | unknown, halfLifeDays: number): SQL {
+  const hl = Math.max(0.01, halfLifeDays);
+  return sql`EXP(
+    -0.6931471805599453 *
+    (EXTRACT(EPOCH FROM (NOW() - ${createdAtCol as SQL})) / 86400.0) /
+    ${hl}
+  )`;
+}
+
+/**
+ * Score dinamico = baseScore * freshness. baseScore di default = 1 (oppure 2
+ * per i supermatch); la dimensione "anzianità" è gestita esclusivamente dalla
+ * freshness, quindi `ORDER BY dynamicScore DESC` restituisce i match più
+ * pertinenti prima.
+ */
+export function dynamicScoreSql(
+  createdAtCol: SQL | unknown,
+  halfLifeDays: number,
+  baseScoreSql?: SQL,
+): SQL {
+  const base = baseScoreSql ?? sql`1.0`;
+  return sql`(${base}) * ${freshnessSql(createdAtCol, halfLifeDays)}`;
+}
 
 type ProposalWithAuthor = Proposal & { authorUserType?: string | null };
 

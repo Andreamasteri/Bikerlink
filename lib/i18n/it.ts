@@ -235,6 +235,10 @@ const it: Record<string, string> = {
   "proposal.targetHotcher": "Hotcher",
   "proposal.targetHotcherDesc": "Cerca chi offre un passaggio",
 
+  "match.newBadge": "Nuovo!",
+  "match.archived": "Archiviati",
+  "match.reactivate": "Riattiva",
+  "match.archivedEmpty": "Nessun match archiviato",
   "match.accepted": "Accettato",
   "match.rejected": "Rifiutato",
   "match.pending": "In attesa",

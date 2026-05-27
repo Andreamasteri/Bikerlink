@@ -78,7 +78,10 @@ export interface IStorage {
   getProposalParticipants(proposalId: string): Promise<ProposalParticipant[]>;
   addProposalParticipant(participant: InsertProposalParticipant): Promise<ProposalParticipant>;
   removeProposalParticipant(id: string): Promise<void>;
-  getProposalMatches(userId: string): Promise<ProposalMatch[]>;
+  getProposalMatches(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<ProposalMatch[]>;
+  archiveStaleProposalMatches(afterDays?: number): Promise<number>;
+  reactivateProposalMatch(id: string, userId: string): Promise<boolean>;
+  getFreshProposalMatchesForUser(userId: string, options?: { threshold?: number; halfLifeDays?: number; limit?: number }): Promise<Array<ProposalMatch & { freshness: number }>>;
   getProposalMatch(id: string): Promise<ProposalMatch | undefined>;
   createProposalMatch(match: InsertProposalMatch): Promise<ProposalMatch>;
   updateProposalMatch(id: string, data: Partial<InsertProposalMatch>): Promise<ProposalMatch | undefined>;
@@ -211,7 +214,12 @@ export interface IStorage {
   findMatchingWishlistMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<Array<ZavarrinaWishlistMoto & { userId: string }>>;
   findMatchingBikerMotos(brand: string, model: string, ridingStyle: string, motorcycleType: string): Promise<UserMotorcycle[]>;
   createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch | null>;
-  getMatchesForUser(userId: string): Promise<BikerZavarrinaMatch[]>;
+  getMatchesForUser(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<BikerZavarrinaMatch[]>;
+  archiveStaleBikerZavarrinaMatches(afterDays?: number): Promise<number>;
+  reactivateGarageMatch(id: string, userId: string): Promise<boolean>;
+  getFreshMatchesForUser(userId: string, options?: { threshold?: number; halfLifeDays?: number; limit?: number }): Promise<Array<BikerZavarrinaMatch & { freshness: number }>>;
+  getFreshBikerBikerMatchesForUser(userId: string, options?: { threshold?: number; halfLifeDays?: number; limit?: number }): Promise<Array<BikerBikerMatch & { freshness: number }>>;
+  getFreshProposalProfileMatchesForUser(userId: string, options?: { threshold?: number; halfLifeDays?: number; limit?: number }): Promise<Array<ProposalProfileMatch & { freshness: number }>>;
   getGarageMatch(id: string): Promise<BikerZavarrinaMatch | undefined>;
   updateGarageMatch(id: string, data: Partial<InsertBikerZavarrinaMatch>): Promise<BikerZavarrinaMatch | undefined>;
   deleteGarageMatch(id: string, userId: string): Promise<boolean>;
@@ -223,7 +231,9 @@ export interface IStorage {
   findExistingBikerZavarrinaMatch(bikerId: string, zavarrinaId: string, bikerMotorcycleId: string, wishlistMotoId: string): Promise<BikerZavarrinaMatch | undefined>;
   getAllExistingBikerZavarrinaMatchKeys(): Promise<Set<string>>;
   getAllExistingProposalMatchKeys(): Promise<Set<string>>;
-  getBikerBikerMatchesForUser(userId: string): Promise<BikerBikerMatch[]>;
+  getBikerBikerMatchesForUser(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<BikerBikerMatch[]>;
+  archiveStaleBikerBikerMatches(afterDays?: number): Promise<number>;
+  reactivateBikerBikerMatch(id: string, userId: string): Promise<boolean>;
   createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch | undefined>;
   getBikerBikerMatch(id: string): Promise<BikerBikerMatch | undefined>;
   updateBikerBikerMatch(id: string, data: Partial<InsertBikerBikerMatch>): Promise<BikerBikerMatch | undefined>;
@@ -299,7 +309,9 @@ export interface IStorage {
   getAllExistingProposalProfileMatchKeys(): Promise<Set<string>>;
   getActedUponBikerZavarrinaPairs(): Promise<Set<string>>;
   createProposalProfileMatch(data: InsertProposalProfileMatch): Promise<ProposalProfileMatch | null>;
-  getProposalProfileMatchesForUser(userId: string): Promise<ProposalProfileMatch[]>;
+  getProposalProfileMatchesForUser(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<ProposalProfileMatch[]>;
+  archiveStaleProposalProfileMatches(afterDays?: number): Promise<number>;
+  reactivateProposalProfileMatch(id: string, userId: string): Promise<boolean>;
   getProposalProfileMatch(id: string): Promise<ProposalProfileMatch | undefined>;
   updateProposalProfileMatch(id: string, data: Partial<InsertProposalProfileMatch>): Promise<ProposalProfileMatch | undefined>;
   getPendingReportsCount(): Promise<number>;

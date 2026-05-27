@@ -341,6 +341,28 @@ export function startMatchingEngine(): void {
   }, 60 * 60 * 1000));
   console.log("[Matching] Ciclo di matching automatico orario avviato");
 
+  const runArchiveStaleMatches = async () => {
+    try {
+      const afterSetting = await storage.getAppSetting("match_archive_after_days");
+      const afterDays = afterSetting?.value ? Math.max(1, parseInt(afterSetting.value, 10)) : 30;
+      const [bz, bb, pp, pm] = await Promise.all([
+        storage.archiveStaleBikerZavarrinaMatches(afterDays),
+        storage.archiveStaleBikerBikerMatches(afterDays),
+        storage.archiveStaleProposalProfileMatches(afterDays),
+        storage.archiveStaleProposalMatches(afterDays),
+      ]);
+      const total = bz + bb + pp + pm;
+      if (total > 0) {
+        console.log(`[Archive] Archiviati ${total} match 'new'/'pending' più vecchi di ${afterDays}gg (bz=${bz}, bb=${bb}, pp=${pp}, pm=${pm})`);
+      }
+    } catch (err) {
+      console.error("[Archive] Errore archiviazione match stale:", err);
+    }
+  };
+  setImmediate(runArchiveStaleMatches);
+  _engineTimers.push(setInterval(runArchiveStaleMatches, 24 * 60 * 60 * 1000));
+  console.log("[Matching] Archiviazione giornaliera match 'new' stale avviata");
+
   _engineTimers.push(setInterval(async () => {
     try {
       const expired = await runCleanup();

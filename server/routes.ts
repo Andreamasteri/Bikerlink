@@ -236,6 +236,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.use("/api/motorcycles", motorcycleRoutes);
   app.use("/api/proposals", proposalRoutes);
+  app.get("/api/matches/fresh", (req, res, next) => {
+    req.url = "/matches/fresh";
+    return (proposalRoutes as unknown as (req: Request, res: Response, next: NextFunction) => void)(req, res, next);
+  });
   app.use("/api/chat", chatRoutes);
   app.use("/api/notifications", notificationRoutes);
   app.use("/api/reports", reportRoutes);

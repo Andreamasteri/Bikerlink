@@ -21,6 +21,16 @@ async function getCoordinatesMaxAgeSec(): Promise<number> {
   return isNaN(val) ? 300 : val;
 }
 
+async function getHalfLifeDays(kind: "generic" | "proposal"): Promise<number | undefined> {
+  const key = kind === "proposal"
+    ? "match_freshness_halflife_proposal_days"
+    : "match_freshness_halflife_generic_days";
+  const setting = await storage.getAppSetting(key);
+  if (!setting?.value) return undefined;
+  const n = Number(setting.value);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 function isCoordOld(updatedAt: Date | null | undefined, maxAgeSec: number): boolean {
   if (!updatedAt) return true;
   return (Date.now() - new Date(updatedAt).getTime()) > maxAgeSec * 1000;
@@ -42,7 +52,8 @@ async function isActiveClubMember(userId: string, clubId: string): Promise<boole
 router.get("/matches", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const matches = await storage.getProposalMatches(userId);
+    const halfLifeDays = await getHalfLifeDays("proposal");
+    const matches = await storage.getProposalMatches(userId, { halfLifeDays });
 
     const userMemberships = await db
       .select({ clubId: motoClubMembers.clubId })
@@ -89,7 +100,8 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
       try {
         const userId = req.session.userId as string;
         const blockedIds = new Set(await storage.getBlockedUserIds(userId));
-        const garageMatches = await storage.getMatchesForUser(userId);
+        const halfLifeDays = await getHalfLifeDays("generic");
+        const garageMatches = await storage.getMatchesForUser(userId, { halfLifeDays });
 
         const countrySetting = await storage.getAppSetting("matching_countries");
         let allowedCountries: string[] = [];
@@ -412,7 +424,8 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
       try {
         const userId = req.session.userId as string;
         const blockedIds = new Set(await storage.getBlockedUserIds(userId));
-        const bikerMatchesList = await storage.getBikerBikerMatchesForUser(userId);
+        const halfLifeDays = await getHalfLifeDays("generic");
+        const bikerMatchesList = await storage.getBikerBikerMatchesForUser(userId, { halfLifeDays });
 
         const countrySetting = await storage.getAppSetting("matching_countries");
         let allowedCountries: string[] = [];
@@ -652,7 +665,8 @@ router.post("/trigger-matching", requireAuth, async (req: Request, res: Response
 router.get("/proposal-profile-matches", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
-    const matches = await storage.getProposalProfileMatchesForUser(userId);
+    const halfLifeDays = await getHalfLifeDays("proposal");
+    const matches = await storage.getProposalProfileMatchesForUser(userId, { halfLifeDays });
 
     const results = await allLimited(
       matches.map((match) => async () => {
@@ -710,6 +724,191 @@ router.post("/proposal-profile-matches/:id/reject", requireAuth, async (req: Req
     return res.json(updated);
   } catch (error) {
     console.error("Reject proposal-profile match error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+// --- Task 2524: Decay/Freshness — archive list, reactivate, fresh feed ---
+
+router.get("/garage-matches/archived", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const matches = await storage.getMatchesForUser(userId, { includeArchived: true });
+    const enriched = await allLimited(
+      matches.map((match) => async () => {
+        const other = await storage.getUser(
+          match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+        );
+        if (!other || isSystemAccount(other)) return null;
+        const bikerMoto = await storage.getUserMotorcycle(match.bikerMotorcycleId);
+        const wishlistMoto = await storage.getWishlistMoto(match.wishlistMotoId);
+        return {
+          ...match,
+          otherUserId: other.id,
+          otherNickname: other.nickname,
+          otherType: other.userType,
+          bikerMoto: bikerMoto ? { brand: bikerMoto.brand, model: bikerMoto.model } : null,
+          wishlistMoto: wishlistMoto ? { brand: wishlistMoto.brand, model: wishlistMoto.model } : null,
+        };
+      }),
+    );
+    return res.json(enriched.filter(Boolean));
+  } catch (error) {
+    console.error("Get archived garage matches error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.get("/biker-matches/archived", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const matches = await storage.getBikerBikerMatchesForUser(userId, { includeArchived: true });
+    const enriched = await allLimited(
+      matches.map((match) => async () => {
+        const other = await storage.getUser(
+          match.biker1Id === userId ? match.biker2Id : match.biker1Id,
+        );
+        if (!other || isSystemAccount(other)) return null;
+        return {
+          ...match,
+          otherUserId: other.id,
+          otherNickname: other.nickname,
+          otherType: other.userType,
+        };
+      }),
+    );
+    return res.json(enriched.filter(Boolean));
+  } catch (error) {
+    console.error("Get archived biker matches error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.post("/garage-matches/:id/reactivate", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const id = req.params.id as string;
+    const ok = await storage.reactivateGarageMatch(id, userId);
+    if (!ok) return sendError(res, 404, "Match non trovato o non autorizzato");
+    return sendSuccess(res, { reactivated: true });
+  } catch (error) {
+    console.error("Reactivate garage match error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.post("/biker-matches/:id/reactivate", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const id = req.params.id as string;
+    const ok = await storage.reactivateBikerBikerMatch(id, userId);
+    if (!ok) return sendError(res, 404, "Match non trovato o non autorizzato");
+    return sendSuccess(res, { reactivated: true });
+  } catch (error) {
+    console.error("Reactivate biker match error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+/**
+ * GET /api/proposals/matches/fresh
+ * Restituisce i match (biker-zavorrina) con freshness > 0.6 — usato per
+ * badge "Nuovo!" sulle card.
+ */
+router.get("/matches/fresh", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const halfLifeGeneric = await getHalfLifeDays("generic");
+    const halfLifeProposal = await getHalfLifeDays("proposal");
+    const [bz, bb, pp, pm] = await Promise.all([
+      storage.getFreshMatchesForUser(userId, { halfLifeDays: halfLifeGeneric }),
+      storage.getFreshBikerBikerMatchesForUser(userId, { halfLifeDays: halfLifeGeneric }),
+      storage.getFreshProposalProfileMatchesForUser(userId, { halfLifeDays: halfLifeProposal }),
+      storage.getFreshProposalMatchesForUser(userId, { halfLifeDays: halfLifeProposal }),
+    ]);
+    const all = [
+      ...bz.map((m) => ({ id: m.id, kind: "garage" as const, freshness: m.freshness, createdAt: m.createdAt })),
+      ...bb.map((m) => ({ id: m.id, kind: "biker" as const, freshness: m.freshness, createdAt: m.createdAt })),
+      ...pp.map((m) => ({ id: m.id, kind: "proposalProfile" as const, freshness: m.freshness, createdAt: m.createdAt })),
+      ...pm.map((m) => ({ id: m.id, kind: "proposal" as const, freshness: m.freshness, createdAt: m.createdAt })),
+    ];
+    return res.json(all);
+  } catch (error) {
+    console.error("Get fresh matches error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.get("/proposal-profile-matches/archived", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const matches = await storage.getProposalProfileMatchesForUser(userId, { includeArchived: true });
+    const enriched = await allLimited(
+      matches.map((match) => async () => {
+        const other = await storage.getUser(
+          match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+        );
+        if (!other || isSystemAccount(other)) return null;
+        return {
+          ...match,
+          otherUserId: other.id,
+          otherNickname: other.nickname,
+          otherType: other.userType,
+        };
+      }),
+    );
+    return res.json(enriched.filter(Boolean));
+  } catch (error) {
+    console.error("Get archived proposal-profile matches error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.get("/matches/archived", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const matches = await storage.getProposalMatches(userId, { includeArchived: true });
+    const enriched = await allLimited(
+      matches.map((match) => async () => {
+        const other = await storage.getUser(match.userId1 === userId ? match.userId2 : match.userId1);
+        if (!other || isSystemAccount(other)) return null;
+        return {
+          ...match,
+          otherUserId: other.id,
+          otherNickname: other.nickname,
+          otherType: other.userType,
+        };
+      }),
+    );
+    return res.json(enriched.filter(Boolean));
+  } catch (error) {
+    console.error("Get archived proposal matches error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.post("/matches/:id/reactivate", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const id = req.params.id as string;
+    const ok = await storage.reactivateProposalMatch(id, userId);
+    if (!ok) return sendError(res, 404, "Match non trovato o non autorizzato");
+    return sendSuccess(res, { reactivated: true });
+  } catch (error) {
+    console.error("Reactivate proposal match error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.post("/proposal-profile-matches/:id/reactivate", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const id = req.params.id as string;
+    const ok = await storage.reactivateProposalProfileMatch(id, userId);
+    if (!ok) return sendError(res, 404, "Match non trovato o non autorizzato");
+    return sendSuccess(res, { reactivated: true });
+  } catch (error) {
+    console.error("Reactivate proposal-profile match error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
 });

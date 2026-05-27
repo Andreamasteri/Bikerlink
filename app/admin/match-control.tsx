@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -10,10 +10,66 @@ import {
   Alert,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Slider from "@react-native-community/slider";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
+
+interface AppSettingRow {
+  key: string;
+  value: string | null;
+}
+
+const FRESHNESS_KEYS = {
+  halflifeGeneric: "match_freshness_halflife_generic_days",
+  halflifeProposal: "match_freshness_halflife_proposal_days",
+  archiveAfter: "match_archive_after_days",
+} as const;
+
+function FreshnessSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  unit,
+  onCommit,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  unit: string;
+  onCommit: (v: number) => void;
+}) {
+  const [local, setLocal] = useState(value);
+  useEffect(() => setLocal(value), [value]);
+  return (
+    <View style={styles.sliderRow}>
+      <View style={styles.sliderLabelRow}>
+        <Text style={styles.sliderLabel}>{label}</Text>
+        <Text style={styles.sliderValue}>
+          {local} {unit}
+        </Text>
+      </View>
+      <Slider
+        style={{ width: "100%", height: 36 }}
+        minimumValue={min}
+        maximumValue={max}
+        step={step}
+        value={local}
+        onValueChange={setLocal}
+        onSlidingComplete={(v) => onCommit(Math.round(v * 10) / 10)}
+        minimumTrackTintColor={Colors.accent}
+        maximumTrackTintColor={Colors.border}
+        thumbTintColor={Colors.accent}
+      />
+    </View>
+  );
+}
 
 interface MatchStat {
   typeKey: string;
@@ -67,6 +123,7 @@ function formatDuration(ms: number) {
 export default function MatchControlScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const router = useRouter();
   const [recalcStatus, setRecalcStatus] = useState<"idle" | "running" | "done">("idle");
   const [resetStatus, setResetStatus] = useState<"idle" | "running" | "done">("idle");
   const [resetMatchesStatus, setResetMatchesStatus] = useState<"idle" | "running" | "done">("idle");
@@ -239,6 +296,35 @@ export default function MatchControlScreen() {
     );
   };
 
+  const { data: allSettings, refetch: refetchSettings } = useQuery<AppSettingRow[]>({
+    queryKey: ["/api/admin/settings"],
+    staleTime: 30000,
+  });
+
+  const freshness = useMemo(() => {
+    const find = (k: string) => allSettings?.find((s) => s.key === k)?.value;
+    const num = (v: string | null | undefined, dflt: number) => {
+      const n = v != null ? Number(v) : NaN;
+      return Number.isFinite(n) ? n : dflt;
+    };
+    return {
+      halflifeGeneric: num(find(FRESHNESS_KEYS.halflifeGeneric), 7),
+      halflifeProposal: num(find(FRESHNESS_KEYS.halflifeProposal), 2),
+      archiveAfter: num(find(FRESHNESS_KEYS.archiveAfter), 30),
+    };
+  }, [allSettings]);
+
+  const settingMutation = useMutation({
+    mutationFn: async (vars: { key: string; value: number }) => {
+      await apiRequest("PUT", `/api/admin/settings/${vars.key}`, { value: String(vars.value) });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/settings"] });
+      refetchSettings();
+    },
+    onError: () => Alert.alert("Errore", "Impossibile salvare l'impostazione"),
+  });
+
   const visible = data?.visible ?? false;
   const autoMatchEnabled = data?.autoMatchEnabled ?? true;
   const cycleMeta = data?.cycleMeta ?? null;
@@ -325,6 +411,51 @@ export default function MatchControlScreen() {
           </View>
         </View>
       )}
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Freshness & Archiviazione Match</Text>
+        <View style={styles.freshnessCard}>
+          <Text style={styles.freshnessHelp}>
+            I match vengono ordinati per dynamicScore = baseScore × decadimento esponenziale.
+            Più basso il half-life, più rapido il decadimento.
+          </Text>
+          <FreshnessSlider
+            label="Half-life generico (biker-biker, garage)"
+            value={freshness.halflifeGeneric}
+            min={1}
+            max={30}
+            step={0.5}
+            unit="giorni"
+            onCommit={(v) => settingMutation.mutate({ key: FRESHNESS_KEYS.halflifeGeneric, value: v })}
+          />
+          <FreshnessSlider
+            label="Half-life proposte"
+            value={freshness.halflifeProposal}
+            min={0.5}
+            max={14}
+            step={0.5}
+            unit="giorni"
+            onCommit={(v) => settingMutation.mutate({ key: FRESHNESS_KEYS.halflifeProposal, value: v })}
+          />
+          <FreshnessSlider
+            label="Auto-archivia match 'new' dopo"
+            value={freshness.archiveAfter}
+            min={7}
+            max={120}
+            step={1}
+            unit="giorni"
+            onCommit={(v) => settingMutation.mutate({ key: FRESHNESS_KEYS.archiveAfter, value: v })}
+          />
+        </View>
+        <TouchableOpacity
+          style={styles.archiveLinkBtn}
+          onPress={() => router.push("/match/archived" as never)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="archive-outline" size={18} color={Colors.accent} />
+          <Text style={styles.archiveLinkText}>Visualizza match archiviati</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Visibilità Preferenze</Text>
@@ -579,6 +710,58 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginBottom: 10,
+  },
+  freshnessCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 10,
+  },
+  freshnessHelp: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 16,
+    marginBottom: 4,
+  },
+  sliderRow: {
+    gap: 4,
+  },
+  sliderLabelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sliderLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.text,
+    flex: 1,
+    paddingRight: 8,
+  },
+  sliderValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: Colors.accent,
+  },
+  archiveLinkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.surface,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: 8,
+  },
+  archiveLinkText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.accent,
   },
   engineCard: {
     backgroundColor: Colors.surface,

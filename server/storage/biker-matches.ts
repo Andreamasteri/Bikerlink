@@ -1,4 +1,4 @@
-import { eq, and, or, sql, asc, inArray } from "drizzle-orm";
+import { eq, and, or, sql, desc, inArray, isNull, isNotNull, lt } from "drizzle-orm";
 import { db } from "../db";
 import {
   bikerBikerMatches, userBlocks, users,
@@ -6,15 +6,66 @@ import {
   type UserBlock,
 } from "@shared/db";
 import { MatchingStorage } from "./matching";
+import { dynamicScoreSql, FRESHNESS_DEFAULTS } from "../matching/scoring";
 
 export class BikerMatchesStorage extends MatchingStorage {
-  async getBikerBikerMatchesForUser(userId: string): Promise<BikerBikerMatch[]> {
-    return db.select().from(bikerBikerMatches).where(
-      or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId))
-    ).orderBy(
+  async getBikerBikerMatchesForUser(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<BikerBikerMatch[]> {
+    const halfLife = options?.halfLifeDays ?? FRESHNESS_DEFAULTS.halfLifeGenericDays;
+    const archivedCond = options?.includeArchived
+      ? isNotNull(bikerBikerMatches.archivedAt)
+      : isNull(bikerBikerMatches.archivedAt);
+    return db.select().from(bikerBikerMatches).where(and(
+      or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId)),
+      archivedCond,
+    )).orderBy(
       sql`CASE WHEN ${bikerBikerMatches.status} = 'accepted' THEN 0 WHEN ${bikerBikerMatches.status} = 'new' THEN 1 ELSE 2 END`,
-      asc(bikerBikerMatches.id)
+      desc(dynamicScoreSql(
+        sql`${bikerBikerMatches.createdAt}`,
+        halfLife,
+        sql`CASE WHEN ${bikerBikerMatches.isSupermatch} THEN 2.0 ELSE 1.0 END`,
+      )),
     ).limit(2000);
+  }
+
+  async archiveStaleBikerBikerMatches(afterDays: number = FRESHNESS_DEFAULTS.archiveAfterDays): Promise<number> {
+    const cutoff = new Date(Date.now() - afterDays * 24 * 60 * 60 * 1000);
+    const result = await db.update(bikerBikerMatches)
+      .set({ archivedAt: new Date() })
+      .where(and(
+        eq(bikerBikerMatches.status, "new"),
+        isNull(bikerBikerMatches.archivedAt),
+        lt(bikerBikerMatches.createdAt, cutoff),
+      ))
+      .returning({ id: bikerBikerMatches.id });
+    return result.length;
+  }
+
+  async reactivateBikerBikerMatch(id: string, userId: string): Promise<boolean> {
+    const [match] = await db.select().from(bikerBikerMatches).where(eq(bikerBikerMatches.id, id));
+    if (!match) return false;
+    if (match.biker1Id !== userId && match.biker2Id !== userId) return false;
+    if (!match.archivedAt) return false;
+    await db.update(bikerBikerMatches)
+      .set({ status: "new", archivedAt: null, createdAt: new Date() })
+      .where(and(eq(bikerBikerMatches.id, id), isNotNull(bikerBikerMatches.archivedAt)));
+    return true;
+  }
+
+  async getFreshBikerBikerMatchesForUser(userId: string, options?: { threshold?: number; halfLifeDays?: number; limit?: number }): Promise<Array<BikerBikerMatch & { freshness: number }>> {
+    const threshold = options?.threshold ?? FRESHNESS_DEFAULTS.freshThreshold;
+    const halfLife = options?.halfLifeDays ?? FRESHNESS_DEFAULTS.halfLifeGenericDays;
+    const limit = options?.limit ?? 50;
+    const freshExpr = dynamicScoreSql(sql`${bikerBikerMatches.createdAt}`, halfLife);
+    const rows = await db.select({
+      match: bikerBikerMatches,
+      freshness: sql<number>`${freshExpr}`.as("freshness"),
+    }).from(bikerBikerMatches).where(and(
+      or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId)),
+      isNull(bikerBikerMatches.archivedAt),
+      eq(bikerBikerMatches.status, "new"),
+      sql`${freshExpr} > ${threshold}`,
+    )).orderBy(desc(sql`${freshExpr}`)).limit(limit);
+    return rows.map((r) => ({ ...r.match, freshness: Number(r.freshness) }));
   }
 
   async createBikerBikerMatch(data: InsertBikerBikerMatch): Promise<BikerBikerMatch | undefined> {

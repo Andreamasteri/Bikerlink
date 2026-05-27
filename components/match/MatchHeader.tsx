@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 
@@ -10,15 +11,27 @@ interface MatchHeaderProps {
 
 export function MatchHeader({ title }: MatchHeaderProps) {
   const t = useT();
+  const router = useRouter();
   const [infoVisible, setInfoVisible] = useState(false);
 
   return (
     <>
       <View style={styles.inlineHeader}>
         <Text style={styles.inlineTitle}>{title}</Text>
-        <TouchableOpacity onPress={() => setInfoVisible(true)} style={styles.infoButton} hitSlop={10}>
-          <Ionicons name="information-circle-outline" size={26} color={Colors.accent} />
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            onPress={() => router.push("/match/archived" as never)}
+            style={styles.infoButton}
+            hitSlop={10}
+            testID="match-archived-link"
+            accessibilityLabel={t("match.archived")}
+          >
+            <Ionicons name="archive-outline" size={24} color={Colors.accent} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setInfoVisible(true)} style={styles.infoButton} hitSlop={10}>
+            <Ionicons name="information-circle-outline" size={26} color={Colors.accent} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Modal
@@ -57,6 +70,11 @@ const styles = StyleSheet.create({
   },
   infoButton: {
     padding: 4,
+  },
+  actions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   overlay: {
     flex: 1,

@@ -265,6 +265,33 @@ const compatBadgeStyles = StyleSheet.create({
 
 export const SUPERMATCH_COLOR = "#FF8C00";
 
+function NuovoBadge({ t }: { t: (k: string) => string }) {
+  return (
+    <View style={nuovoBadgeStyles.badge}>
+      <Ionicons name="sparkles" size={10} color="#FFFFFF" />
+      <Text style={nuovoBadgeStyles.text}>{t("match.newBadge")}</Text>
+    </View>
+  );
+}
+
+const nuovoBadgeStyles = StyleSheet.create({
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: SUPERMATCH_COLOR,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  text: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: 0.3,
+  },
+});
+
 const sharedStyles = StyleSheet.create({
   matchCard: {
     backgroundColor: Colors.surface,
@@ -422,6 +449,7 @@ export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onCh
         <Ionicons name={statusIcon} size={16} color={statusColor} />
         <Text style={[sharedStyles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
         {createdDate && <Text style={sharedStyles.matchDate}>{createdDate}</Text>}
+          {match.isFresh && isNew && <NuovoBadge t={t} />}
         {isAccepted && onRemove && (
           <TouchableOpacity onPress={onRemove} style={sharedStyles.removeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="trash-outline" size={16} color={Colors.accentRed} />
@@ -539,6 +567,7 @@ export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, 
         <Ionicons name={statusIcon} size={16} color={statusColor} />
         <Text style={[sharedStyles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
         {createdDate && <Text style={sharedStyles.matchDate}>{createdDate}</Text>}
+          {match.isFresh && isNew && <NuovoBadge t={t} />}
         {isAccepted && onRemove && (
           <TouchableOpacity onPress={onRemove} style={sharedStyles.removeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="trash-outline" size={16} color={Colors.accentRed} />
@@ -631,6 +660,7 @@ export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onRej
         <Ionicons name={statusIcon} size={16} color={statusColor} />
         <Text style={[sharedStyles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
         {createdDate && <Text style={sharedStyles.matchDate}>{createdDate}</Text>}
+          {match.isFresh && isNew && <NuovoBadge t={t} />}
       </View>
 
       <TouchableOpacity
@@ -716,6 +746,7 @@ export function MatchCardFull({ match, currentUserId, onAccept, onReject, onRemo
   const isAccepted = match.status === "accepted";
   const isRejected = match.status === "rejected";
   const isExpired = match.status === "expired";
+  const isNew = match.status === "new" || match.status === "pending";
 
   const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : isExpired ? Colors.textSecondary : Colors.accent;
   const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : isExpired ? t("match.expired") : t("match.pending");
@@ -743,6 +774,7 @@ export function MatchCardFull({ match, currentUserId, onAccept, onReject, onRemo
         <Ionicons name={statusIcon} size={18} color={statusColor} />
         <Text style={[sharedStyles.statusLabel, { color: statusColor }]}>{statusLabel}</Text>
         {createdDate && <Text style={sharedStyles.matchDate}>{createdDate}</Text>}
+          {match.isFresh && isNew && <NuovoBadge t={t} />}
         {isAccepted && onRemove && (
           <TouchableOpacity onPress={onRemove} style={sharedStyles.removeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
             <Ionicons name="trash-outline" size={16} color={Colors.accentRed} />

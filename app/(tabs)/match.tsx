@@ -105,6 +105,17 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
+  const { data: freshMatchesList } = useQuery<Array<{ id: string; freshness: number }>>({
+    queryKey: ["/api/proposals/matches/fresh"],
+    enabled: !!user,
+    refetchInterval: 60000,
+    refetchOnMount: true,
+  });
+  const freshIds = useMemo(
+    () => new Set((freshMatchesList ?? []).map((m) => m.id)),
+    [freshMatchesList],
+  );
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- user list shape
   const { data: blockedUsers, isLoading: blockedLoading, refetch: blockedRefetch, isRefetching: blockedRefetching } = useQuery<any[]>({
     queryKey: ["/api/users/blocked"],
@@ -394,7 +405,7 @@ export default function MatchScreen() {
       const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
       return (
         <ProposalProfileMatchCard
-          match={item}
+          match={{ ...item, isFresh: freshIds.has(item.id) }}
           currentUserId={user?.id || ""}
           onAccept={() => {
             setPropProfilePendingId(item.id);
@@ -415,7 +426,7 @@ export default function MatchScreen() {
         const otherUserId = isBiker1 ? item.biker2Id : item.biker1Id;
         return (
           <BikerBikerMatchCard
-            match={item}
+            match={{ ...item, isFresh: freshIds.has(item.id) }}
             currentUserId={user?.id || ""}
             onAccept={() => {}}
             onReject={() => {}}
@@ -433,7 +444,7 @@ export default function MatchScreen() {
         const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
         return (
           <GarageMatchCard
-            match={item}
+            match={{ ...item, isFresh: freshIds.has(item.id) }}
             currentUserId={user?.id || ""}
             onAccept={() => {}}
             onReject={() => {}}
@@ -449,7 +460,7 @@ export default function MatchScreen() {
         const otherUserId = item.bikerId === user?.id ? item.zavarrinaId : item.bikerId;
         return (
           <ProposalProfileMatchCard
-            match={item}
+            match={{ ...item, isFresh: freshIds.has(item.id) }}
             currentUserId={user?.id || ""}
             onAccept={() => {}}
             onReject={() => {}}
@@ -478,7 +489,7 @@ export default function MatchScreen() {
       }
       return (
         <MatchCardFull
-          match={item}
+          match={{ ...item, isFresh: freshIds.has(item.id) }}
           currentUserId={user?.id || ""}
           onAccept={() => {}}
           onReject={() => {}}
@@ -516,7 +527,7 @@ export default function MatchScreen() {
       const otherUserId = isBiker1 ? item.biker2Id : item.biker1Id;
       return (
         <BikerBikerMatchCard
-          match={item}
+          match={{ ...item, isFresh: freshIds.has(item.id) }}
           currentUserId={user?.id || ""}
           onAccept={() => {
             setPendingMatchId(item.id);
@@ -544,7 +555,7 @@ export default function MatchScreen() {
       const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
       return (
         <GarageMatchCard
-          match={item}
+          match={{ ...item, isFresh: freshIds.has(item.id) }}
           currentUserId={user?.id || ""}
           onAccept={() => {
             setPendingMatchId(item.id);
@@ -561,7 +572,7 @@ export default function MatchScreen() {
     }
     return (
       <MatchCardFull
-        match={item}
+        match={{ ...item, isFresh: freshIds.has(item.id) }}
         currentUserId={user?.id || ""}
         onAccept={() => {
           setPendingMatchId(item.id);
@@ -575,7 +586,7 @@ export default function MatchScreen() {
         locale={locale}
       />
     );
-  }, [activeTab, user?.id, pendingMatchId, propProfilePendingId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, blockFromMatchMutation, acceptMutation, rejectMutation, acceptPropProfileMutation, rejectPropProfileMutation, acceptRouteAffinityMutation, rejectRouteAffinityMutation, removeRouteAffinityMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, handleUnblock, router, t, locale]);
+  }, [activeTab, user?.id, pendingMatchId, propProfilePendingId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, blockFromMatchMutation, acceptMutation, rejectMutation, acceptPropProfileMutation, rejectPropProfileMutation, acceptRouteAffinityMutation, rejectRouteAffinityMutation, removeRouteAffinityMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, handleUnblock, router, t, locale, freshIds]);
 
   const newGarageMatches = useMemo(() => garageMatches?.filter(m => m.status === "new") || [], [garageMatches]);
   const newBikerMatches = useMemo(() => bikerMatches?.filter(m => m.status === "new") || [], [bikerMatches]);

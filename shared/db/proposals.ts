@@ -92,12 +92,14 @@ export const proposalMatches = pgTable("proposal_matches", {
   conversationId: varchar("conversation_id", { length: 36 }),
   notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
   notifiedAt: timestamp("notified_at"),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("proposal_matches_user1_idx").on(table.userId1),
   index("proposal_matches_user2_idx").on(table.userId2),
   index("proposal_matches_status_idx").on(table.status),
   index("proposal_matches_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
+  index("proposal_matches_archived_at_idx").on(table.archivedAt),
 ]);
 
 export const proposalZoneNotifications = pgTable("proposal_zone_notifications", {
@@ -133,6 +135,7 @@ export const proposalProfileMatches = pgTable("proposal_profile_matches", {
   status: varchar("status", { length: 20 }).notNull().default("new"),
   notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
   notifiedAt: timestamp("notified_at"),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("ppm_biker_id_idx").on(table.bikerId),
@@ -143,6 +146,7 @@ export const proposalProfileMatches = pgTable("proposal_profile_matches", {
   uniqueIndex("ppm_biker_zavorrina_active_idx")
     .on(table.bikerId, table.zavarrinaId)
     .where(sql`${table.status} = 'new'`),
+  index("ppm_archived_at_idx").on(table.archivedAt),
 ]);
 
 export type Proposal = typeof proposals.$inferSelect;

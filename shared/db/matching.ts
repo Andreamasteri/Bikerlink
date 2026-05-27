@@ -73,12 +73,14 @@ export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
   isSupermatch: boolean("is_supermatch").notNull().default(false),
   notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
   notifiedAt: timestamp("notified_at"),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("matches_biker_id_idx").on(table.bikerId),
   index("matches_zavorrina_id_idx").on(table.zavarrinaId),
   index("matches_bz_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
   uniqueIndex("matches_unique_combo_idx").on(table.bikerId, table.zavarrinaId, table.bikerMotorcycleId, table.wishlistMotoId),
+  index("bz_matches_archived_at_idx").on(table.archivedAt),
 ]);
 
 export const bikerBikerMatches = pgTable("biker_biker_matches", {
@@ -97,11 +99,13 @@ export const bikerBikerMatches = pgTable("biker_biker_matches", {
   pairType: varchar("pair_type", { length: 10 }).notNull().default("bb"),
   notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
   notifiedAt: timestamp("notified_at"),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("biker_biker_biker1_idx").on(table.biker1Id),
   index("biker_biker_biker2_idx").on(table.biker2Id),
   index("biker_biker_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
+  index("bb_matches_archived_at_idx").on(table.archivedAt),
   uniqueIndex("biker_biker_symmetric_idx").on(
     sql`LEAST(${table.biker1Id}, ${table.biker2Id})`,
     sql`GREATEST(${table.biker1Id}, ${table.biker2Id})`,

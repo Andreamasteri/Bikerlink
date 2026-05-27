@@ -1,4 +1,4 @@
-import { eq, and, or, sql, desc, lte, inArray } from "drizzle-orm";
+import { eq, and, or, sql, desc, lte, lt, inArray, isNull, isNotNull } from "drizzle-orm";
 import { db } from "../db";
 import { systemAccountConditions } from "../lib/system-account-filter";
 import {
@@ -8,6 +8,7 @@ import {
   type ProposalMatch, type InsertProposalMatch,
 } from "@shared/db";
 import { ConversationsStorage } from "./conversations";
+import { dynamicScoreSql, FRESHNESS_DEFAULTS } from "../matching/scoring";
 
 export class ProposalsStorage extends ConversationsStorage {
   async getProposals(filters?: { status?: string }): Promise<Proposal[]> {
@@ -63,10 +64,58 @@ export class ProposalsStorage extends ConversationsStorage {
     return results.map(r => r.proposal);
   }
 
-  async getProposalMatches(userId: string): Promise<ProposalMatch[]> {
-    return db.select().from(proposalMatches).where(
-      or(eq(proposalMatches.userId1, userId), eq(proposalMatches.userId2, userId))
-    ).orderBy(desc(proposalMatches.createdAt));
+  async getProposalMatches(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<ProposalMatch[]> {
+    const halfLife = options?.halfLifeDays ?? FRESHNESS_DEFAULTS.halfLifeProposalDays;
+    const archivedCond = options?.includeArchived
+      ? isNotNull(proposalMatches.archivedAt)
+      : isNull(proposalMatches.archivedAt);
+    return db.select().from(proposalMatches).where(and(
+      or(eq(proposalMatches.userId1, userId), eq(proposalMatches.userId2, userId)),
+      archivedCond,
+    )).orderBy(desc(dynamicScoreSql(sql`${proposalMatches.createdAt}`, halfLife)));
+  }
+
+  async archiveStaleProposalMatches(afterDays: number = FRESHNESS_DEFAULTS.archiveAfterDays): Promise<number> {
+    const cutoff = new Date(Date.now() - afterDays * 24 * 60 * 60 * 1000);
+    const result = await db.update(proposalMatches)
+      .set({ archivedAt: new Date() })
+      .where(and(
+        eq(proposalMatches.status, "pending"),
+        eq(proposalMatches.acceptedByUser1, false),
+        eq(proposalMatches.acceptedByUser2, false),
+        isNull(proposalMatches.archivedAt),
+        lt(proposalMatches.createdAt, cutoff),
+      ))
+      .returning({ id: proposalMatches.id });
+    return result.length;
+  }
+
+  async reactivateProposalMatch(id: string, userId: string): Promise<boolean> {
+    const [match] = await db.select().from(proposalMatches).where(eq(proposalMatches.id, id));
+    if (!match) return false;
+    if (match.userId1 !== userId && match.userId2 !== userId) return false;
+    if (!match.archivedAt) return false;
+    await db.update(proposalMatches)
+      .set({ status: "pending", archivedAt: null, createdAt: new Date() })
+      .where(and(eq(proposalMatches.id, id), isNotNull(proposalMatches.archivedAt)));
+    return true;
+  }
+
+  async getFreshProposalMatchesForUser(userId: string, options?: { threshold?: number; halfLifeDays?: number; limit?: number }): Promise<Array<ProposalMatch & { freshness: number }>> {
+    const threshold = options?.threshold ?? FRESHNESS_DEFAULTS.freshThreshold;
+    const halfLife = options?.halfLifeDays ?? FRESHNESS_DEFAULTS.halfLifeProposalDays;
+    const limit = options?.limit ?? 50;
+    const freshExpr = dynamicScoreSql(sql`${proposalMatches.createdAt}`, halfLife);
+    const rows = await db.select({
+      match: proposalMatches,
+      freshness: sql<number>`${freshExpr}`.as("freshness"),
+    }).from(proposalMatches).where(and(
+      or(eq(proposalMatches.userId1, userId), eq(proposalMatches.userId2, userId)),
+      isNull(proposalMatches.archivedAt),
+      eq(proposalMatches.status, "pending"),
+      sql`${freshExpr} > ${threshold}`,
+    )).orderBy(desc(sql`${freshExpr}`)).limit(limit);
+    return rows.map((r) => ({ ...r.match, freshness: Number(r.freshness) }));
   }
 
   async getProposalMatch(id: string): Promise<ProposalMatch | undefined> {
