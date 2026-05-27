@@ -115,6 +115,22 @@ Il matching engine usa un **lock distribuito Redis** (Redlock) per evitare cicli
 ### Refactor scheduler
 `triggerMatchingRun()` in `server/matching/scheduler.ts` ora avvolge il ciclo in `withMatchingLock`. Se un'altra istanza tiene il lock, il ciclo viene saltato con log `Ciclo skippato — lock già attivo`. `forceUnlockMatching()` rilascia sia il lock in-memory che la chiave Redis.
 
+## Preferenze Negative + Blocklist Intelligente (Task #2523)
+
+Filtri esclusivi opzionali che pre-filtrano i candidati prima dello scoring (es. "no scooter", "no <25 anni", "no >100km"). Differenza vs preferenze positive: queste **escludono** invece di pesare, riducendo il pool senza distorcere i ranking.
+
+**Anti-abuso — `FORBIDDEN_NEGATIVE_KINDS`** (definito in `shared/db/matching.ts`): impedisce di creare filtri esclusivi su `gender`, `ethnicity`, `religion`, `political_orientation`, `sexual_orientation`. Il server respinge POST con 400 se `kind` rientra nella blocklist. Da NON rimuovere senza policy review.
+
+**Suggerimenti automatici**: il job `detect-negative-patterns.ts` (eseguito ogni 24h, +10 min dopo startup, schedulato in `server/matching/scheduler.ts`) analizza i rifiuti degli ultimi 30 giorni. Se un utente ha ≥5 rifiuti e ≥60% di rate su una stessa categoria (es. "scooter"), inserisce un record in `pending_auto_suggestions`. L'utente lo vede in `app/profile/negative-preferences.tsx` e può `accept`/`dismiss`.
+
+**File chiave**:
+- `shared/db/matching.ts` — tabelle `match_negative_preferences`, `pending_auto_suggestions`
+- `server/matching/negative-filters.ts` — `loadNegativePreferencesMap`, `isExcludedByNegativePrefs`
+- `server/matching/run-user.ts` — pre-scoring guard nei loop candidati
+- `server/routes/match-negative-preferences.ts` — CRUD utente + accept/dismiss suggerimenti
+- `server/routes/admin/matching.ts` — endpoint `GET /api/admin/matching/negative-pref-patterns` per stats community
+- `app/admin/negative-pref-patterns.tsx` — UI admin
+
 ## Framework A/B Testing Matching (Task #2525)
 
 Permette di testare varianti dell'algoritmo di matching su sottogruppi di utenti

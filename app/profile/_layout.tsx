@@ -8,6 +8,17 @@ export default function ProfileLayout() {
         headerShown: false,
         contentStyle: { backgroundColor: Colors.background },
       }}
-    />
+    >
+      <Stack.Screen
+        name="negative-preferences"
+        options={{
+          headerShown: true,
+          title: "Preferenze negative",
+          headerStyle: { backgroundColor: Colors.surface },
+          headerTintColor: Colors.accent,
+          headerTitleStyle: { color: Colors.text },
+        }}
+      />
+    </Stack>
   );
 }

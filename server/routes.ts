@@ -39,6 +39,7 @@ import friendsRoutes from "./routes/friends";
 import { handleMusicMatch } from "./routes/music-match";
 import matchPreferencesRoutes from "./routes/match-preferences";
 import recapRoutes from "./routes/recap";
+import matchNegativePreferencesRoutes from "./routes/match-negative-preferences";
 import lastfmRoutes from "./routes/lastfm";
 import radioRoutes from "./routes/radio";
 import eventsRoutes from "./routes/events";
@@ -185,7 +186,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.use("/api/match-preferences", matchPreferencesRoutes);
+<<<<<<< HEAD
   app.use("/api/recap", recapRoutes);
+=======
+  app.use("/api/match-negative-preferences", matchNegativePreferencesRoutes);
+>>>>>>> bd1e5af2 (Add intelligent negative filtering to improve user matching)
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
   // Task #2503 — endpoint pubblici OTA (gating manifest + telemetria boot)

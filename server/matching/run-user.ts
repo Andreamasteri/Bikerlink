@@ -4,6 +4,7 @@ import { haversineDistance } from "../geo";
 import { routes, routePoints, users } from "@shared/db";
 import { and, avg, eq, isNotNull } from "drizzle-orm";
 import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
+import { loadNegativePreferencesMap, loadCandidateProfiles, isExcludedByNegativePrefs } from "./negative-filters";
 import { baseModelName, routeProfileOf } from "./scoring";
 import { MatchResult } from "./types";
 import { classifyMatch } from "./notifications/classify";
@@ -26,6 +27,23 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
       allBlockedPairs.flatMap(b => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`])
     );
 
+    // Task #2523 — Pre-scoring negative preferences filter.
+    // Loaded once for both observer (userId) and all candidates so that
+    // candidates excluded by either side's negative prefs are skipped before
+    // any scoring work. Cheaper than recomputing per-pair.
+    const candidateIds = Array.from(new Set([
+      ...allBikerMotorcycles.map((bm) => bm.userId),
+      ...allWishlistMotos.map((wm) => wm.userId),
+    ])).filter((id) => id !== userId);
+    const negPrefsMap = await loadNegativePreferencesMap([userId, ...candidateIds]);
+    const candidateProfiles = await loadCandidateProfiles([userId, ...candidateIds]);
+    const myPrefs = negPrefsMap.get(userId);
+    const isNegExcluded = (otherId: string): boolean => {
+      if (isExcludedByNegativePrefs(myPrefs, candidateProfiles.get(otherId))) return true;
+      if (isExcludedByNegativePrefs(negPrefsMap.get(otherId), candidateProfiles.get(userId))) return true;
+      return false;
+    };
+
     let bikerBikerCount = 0;
     let zavCount = 0;
 
@@ -33,6 +51,7 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
       for (const bm of allBikerMotorcycles) {
         if (bm.userId === userId) continue;
         if (blockedSet.has(`${userId}:${bm.userId}`)) continue;
+        if (isNegExcluded(bm.userId)) continue;
 
         let match = false;
         let isSupermatch = false;
@@ -72,6 +91,7 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
       for (const wm of allWishlistMotos) {
         if (wm.userId === userId) continue;
         if (blockedSet.has(`${userId}:${wm.userId}`)) continue;
+        if (isNegExcluded(wm.userId)) continue;
 
         let match = false;
         let isSupermatch = false;
@@ -114,6 +134,7 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
       for (const bm of allBikerMotorcycles) {
         if (bm.userId === userId) continue;
         if (blockedSet.has(`${userId}:${bm.userId}`)) continue;
+        if (isNegExcluded(bm.userId)) continue;
 
         let match = false;
         let isSupermatch = false;

@@ -9,6 +9,7 @@ import { runMusicMatchBikerZavarrina, runGpsBasedMatching, runEventMatching, run
 import { runExtractRouteCellsJob } from "./jobs/extract-route-cells";
 import { runWeeklyRecapJob } from "./jobs/weekly-recap";
 import { Cron } from "croner";
+import { runDetectNegativePatternsJob } from "./jobs/detect-negative-patterns";
 import { runRouteSimilarityMatching } from "./run-route-similarity";
 import { runDistanceMatching, runRouteTypeZoneMatching } from "./run-distance";
 import { runProposalToProfileMatching } from "./run-profile";
@@ -427,6 +428,28 @@ export function startMatchingEngine(): void {
     );
   }, 60 * 60 * 1000));
   console.log("[Matching] Cleanup orario proposte scadute avviato");
+
+  // Task #2523 — Daily detection of recurring reject patterns →
+  // pending_auto_suggestions. Runs ~10 minutes after startup, then every 24h.
+  setTimeout(() => {
+    runDetectNegativePatternsJob()
+      .then((r) => {
+        if (r.suggestionsInserted > 0) {
+          console.log(`[NegPattern] ${r.suggestionsInserted} suggerimenti inseriti su ${r.usersProcessed} utenti`);
+        }
+      })
+      .catch((err) => console.error("[NegPattern] startup run failed:", err));
+  }, 10 * 60 * 1000);
+  _engineTimers.push(setInterval(() => {
+    runDetectNegativePatternsJob()
+      .then((r) => {
+        if (r.suggestionsInserted > 0) {
+          console.log(`[NegPattern] daily: ${r.suggestionsInserted} suggerimenti inseriti su ${r.usersProcessed} utenti`);
+        }
+      })
+      .catch((err) => console.error("[NegPattern] daily run failed:", err));
+  }, 24 * 60 * 60 * 1000));
+  console.log("[Matching] Daily negative-pattern detection scheduled");
 
   // Daily recompute of per-user match feedback profiles (24h interval).
   // Runs once shortly after startup, then every 24 hours.

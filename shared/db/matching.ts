@@ -369,6 +369,77 @@ export type InsertMatchFeedback = typeof matchFeedback.$inferInsert;
 export type UserMatchProfile = typeof userMatchProfile.$inferSelect;
 export type InsertUserMatchProfile = typeof userMatchProfile.$inferInsert;
 
+export const matchNegativePreferences = pgTable("match_negative_preferences", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  kind: varchar("kind", { length: 40 }).notNull(),
+  value: jsonb("value").notNull(),
+  source: varchar("source", { length: 20 }).notNull().default("manual"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("match_neg_prefs_user_idx").on(table.userId),
+  uniqueIndex("match_neg_prefs_unique_idx").on(table.userId, table.kind, sql`(value::text)`),
+]);
+
+export const pendingAutoSuggestions = pgTable("pending_auto_suggestions", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  kind: varchar("kind", { length: 40 }).notNull(),
+  value: jsonb("value").notNull(),
+  rejectCount: integer("reject_count").notNull().default(0),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  resolvedAt: timestamp("resolved_at"),
+}, (table) => [
+  index("pending_auto_suggestions_user_idx").on(table.userId, table.status),
+  uniqueIndex("pending_auto_suggestions_unique_idx").on(table.userId, table.kind, sql`(value::text)`),
+]);
+
+export type MatchNegativePreference = typeof matchNegativePreferences.$inferSelect;
+export type InsertMatchNegativePreference = typeof matchNegativePreferences.$inferInsert;
+export type PendingAutoSuggestion = typeof pendingAutoSuggestions.$inferSelect;
+export type InsertPendingAutoSuggestion = typeof pendingAutoSuggestions.$inferInsert;
+
+export const NEGATIVE_PREF_KINDS = [
+  "bike_type",
+  "age_range",
+  "max_distance",
+  "requires_photo",
+  "requires_verified",
+  "exclude_user_type",
+  "exclude_region",
+] as const;
+export type NegativePrefKind = typeof NEGATIVE_PREF_KINDS[number];
+
+export const FORBIDDEN_NEGATIVE_KINDS = [
+  "ethnicity",
+  "race",
+  "religion",
+  "sexual_orientation",
+  "nationality",
+  "political",
+  "disability",
+] as const;
+
+export const negativePrefSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("bike_type"), value: z.object({ type: z.string().min(1).max(50) }) }),
+  z.object({ kind: z.literal("age_range"), value: z.object({ min: z.number().int().min(18).max(99).optional(), max: z.number().int().min(18).max(99).optional() }) }),
+  z.object({ kind: z.literal("max_distance"), value: z.object({ km: z.number().int().min(1).max(20000) }) }),
+  z.object({ kind: z.literal("requires_photo"), value: z.object({ enabled: z.boolean() }) }),
+  z.object({ kind: z.literal("requires_verified"), value: z.object({ enabled: z.boolean() }) }),
+  z.object({ kind: z.literal("exclude_user_type"), value: z.object({ userType: z.enum(["biker", "zavarrina"]) }) }),
+  z.object({ kind: z.literal("exclude_region"), value: z.object({ region: z.string().min(1).max(100) }) }),
+]);
+export type NegativePrefInput = z.infer<typeof negativePrefSchema>;
+
 export type FeatureWeights = Record<string, number>;
 export type FeatureStats = Record<string, { accepts: number; rejects: number; ignores: number; total: number; acceptRate: number }>;
 

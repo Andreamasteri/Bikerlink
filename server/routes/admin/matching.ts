@@ -959,6 +959,7 @@ router.get("/weights-distribution", async (_req: Request, res: Response) => {
   }
 });
 
+<<<<<<< HEAD
 // ──────────────────────────────────────────────────────────────────────────
 // Match Rules (Task #2511) — configurable compatibility matrix.
 // GET lists all pairs; PATCH updates a single rule and invalidates the cache.
@@ -1103,6 +1104,36 @@ router.get("/matching/explain", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[admin] GET /matching/explain error:", err);
     return sendError(res, 500, "Errore calcolo explain");
+  }
+});
+
+// Task #2523 — Global view of community negative-preference patterns.
+// Helps the team understand which exclusion categories are most used so the
+// product can react (e.g. add native filter UI for a popular category).
+router.get("/negative-pref-patterns", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.execute(sql`
+      SELECT kind, value, source, COUNT(*)::int AS user_count
+      FROM match_negative_preferences
+      GROUP BY kind, value, source
+      ORDER BY user_count DESC
+      LIMIT 200
+    `);
+    const pending = await db.execute(sql`
+      SELECT kind, value, COUNT(*)::int AS user_count, AVG(reject_count)::int AS avg_rejects
+      FROM pending_auto_suggestions
+      WHERE status = 'pending'
+      GROUP BY kind, value
+      ORDER BY user_count DESC
+      LIMIT 100
+    `);
+    return res.json({
+      active: rows.rows,
+      pendingSuggestions: pending.rows,
+    });
+  } catch (error) {
+    console.error("[admin] negative-pref-patterns error:", error);
+    return sendError(res, 500, "Errore lettura pattern preferenze negative");
   }
 });
 
