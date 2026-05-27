@@ -89,6 +89,30 @@ export function setupMiddleware(app: express.Application) {
 
   app.use(express.urlencoded({ extended: false }));
 
+  // Task #2533 — Watchdog latency + error tracker (best-effort, non-fatal).
+  app.use((req, res, next) => {
+    try {
+      // dynamic import sync via require-like fallback: usiamo import statico tipo
+      // best-effort: se il modulo non esiste, no-op.
+      const lat = require("./ai/watchdog/collectors/latency-collector") as {
+        latencyMiddleware: (req: unknown, res: unknown, next: () => void) => void;
+      };
+      lat.latencyMiddleware(req, res, next);
+    } catch { next(); }
+  });
+  app.use((req, res, next) => {
+    res.on("finish", () => {
+      try {
+        if (!req.path.startsWith("/api")) return;
+        const err = require("./ai/watchdog/collectors/error-collector") as {
+          recordHttpError: (status: number) => void;
+        };
+        err.recordHttpError(res.statusCode);
+      } catch { /* ignore */ }
+    });
+    next();
+  });
+
   // Request logging
   app.use((req, res, next) => {
     const start = Date.now();

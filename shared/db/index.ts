@@ -19,3 +19,4 @@ export * from "./road-hazards";
 export * from "./ota";
 export * from "./tags";
 export * from "./embeddings";
+export * from "./watchdog";

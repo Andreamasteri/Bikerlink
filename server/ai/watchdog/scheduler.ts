@@ -1,0 +1,71 @@
+// Task #2533 — Scheduler in-process del watchdog. Ogni 60s: aggregator → auto-fix
+// → (se serve) proposer → alerts. Cleanup signals 1x/h. Weekly report via cron sep.
+import { runAggregatorCycle } from "./aggregator";
+import { runAutoFix } from "./auto-fix";
+import { runProposer } from "./proposer";
+import { dispatchAlerts } from "./alerts";
+import { cleanupOldSignals } from "./signals";
+import { isWatchdogEnabled } from "./kill-switch";
+import { startWeeklyReportScheduler } from "./weekly-report";
+
+const TICK_MS = 60_000;
+const CLEANUP_MS = 60 * 60_000;
+let tickTimer: NodeJS.Timeout | null = null;
+let cleanupTimer: NodeJS.Timeout | null = null;
+
+let lastError: { at: string; message: string } | null = null;
+let totalCycles = 0;
+let totalAutoFixesApplied = 0;
+let totalProposalsCreated = 0;
+let totalAlertsSent = 0;
+
+async function tick(): Promise<void> {
+  if (!(await isWatchdogEnabled())) return;
+  totalCycles++;
+  try {
+    const snap = await runAggregatorCycle();
+    const fixes = await runAutoFix(snap);
+    totalAutoFixesApplied += fixes.filter((f) => f.applied).length;
+
+    // Proposer solo se ci sono problemi high/critical residui.
+    const stillHigh = snap.problems.some((p) => p.severity === "high" || p.severity === "critical");
+    if (stillHigh) {
+      const prop = await runProposer(snap);
+      if (prop) totalProposalsCreated += prop.proposals.length;
+    }
+
+    const alerts = await dispatchAlerts(snap);
+    totalAlertsSent += alerts.sent;
+  } catch (err) {
+    lastError = { at: new Date().toISOString(), message: (err as Error).message?.slice(0, 300) ?? "unknown" };
+    console.warn("[watchdog/scheduler] tick error:", err);
+  }
+}
+
+export function startWatchdogScheduler(): void {
+  if (tickTimer) return;
+  // Primo tick dopo 5s per consentire al server di stabilizzarsi.
+  setTimeout(() => { tick().catch(() => {}); }, 5_000);
+  tickTimer = setInterval(() => { tick().catch(() => {}); }, TICK_MS);
+  tickTimer.unref?.();
+  cleanupTimer = setInterval(() => {
+    cleanupOldSignals().then((n) => {
+      if (n > 0) console.log(`[watchdog/scheduler] cleanup signals: ${n} righe rimosse`);
+    }).catch(() => {});
+  }, CLEANUP_MS);
+  cleanupTimer.unref?.();
+  startWeeklyReportScheduler();
+  console.log("[watchdog/scheduler] avviato (tick=60s)");
+}
+
+export function stopWatchdogScheduler(): void {
+  if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
+  if (cleanupTimer) { clearInterval(cleanupTimer); cleanupTimer = null; }
+}
+
+export function getWatchdogStats() {
+  return {
+    totalCycles, totalAutoFixesApplied, totalProposalsCreated, totalAlertsSent,
+    lastError, running: !!tickTimer,
+  };
+}

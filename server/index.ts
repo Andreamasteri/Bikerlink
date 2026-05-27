@@ -324,6 +324,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI moderation schedulers failed (non-fatal):", e);
     }
 
+    // Task #2533 — AI System Watchdog scheduler.
+    try {
+      const { startWatchdogScheduler } = await import("./ai/watchdog/scheduler");
+      startWatchdogScheduler();
+      console.log("[INIT] AI Watchdog scheduler started");
+    } catch (e) {
+      console.warn("[INIT] AI Watchdog scheduler failed (non-fatal):", e);
+    }
+
     // Motion simulator for fake users — fire-and-forget so it cannot hang boot
     import("./motion-simulator")
       .then(({ startMotionSimulator }) => startMotionSimulator())
