@@ -8,9 +8,10 @@ import {
   type Proposal,
 } from "@shared/db";
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
-import { sendMatchPushNotifications } from "../push-notifications";
 import it from "../../lib/i18n/it";
 import { systemAccountConditions } from "../lib/system-account-filter";
+import { classifyMatch } from "./notifications/classify";
+import { dispatchMatchNotification } from "./notifications/dispatcher";
 
 /**
  * Proposal-to-Profile matching: for each active find_a_guest / hitcher proposal,
@@ -120,7 +121,13 @@ export async function runProposalToProfileMatching(
           } catch (notifErr) {
             console.error("[ProposalProfileMatching] Error sending notifications:", notifErr);
           }
-          sendMatchPushNotifications([proposal.userId, zav.userId]);
+          await dispatchMatchNotification({
+            table: "proposal_profile_matches",
+            matchId: created.id,
+            userIds: [proposal.userId, zav.userId],
+            priority: classifyMatch({ isFreshProposal: true, distanceKm: distKm }),
+            distanceKm: distKm,
+          });
         }
       }
     }

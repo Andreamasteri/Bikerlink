@@ -17,6 +17,7 @@ export type MatchPrefsPayload = {
   bikerBikerDayTime: boolean;
   bikerBikerEvents: boolean;
   directMatch: boolean;
+  topMatchesOnly: boolean;
 };
 
 export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
@@ -38,6 +39,7 @@ export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
   bikerBikerDayTime: true,
   bikerBikerEvents: true,
   directMatch: true,
+  topMatchesOnly: false,
 };
 
 export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string }[] = [

@@ -168,6 +168,18 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     await withPhaseTimeout("ensureBikerLinkOfficialOnBoot", ensureBikerLinkOfficialOnBoot());
     await withPhaseTimeout("seedTranslationKeys", seedTranslationKeys());
     startMatchingEngine();
+    try {
+      const { startNotificationJobs } = await import("./matching/notifications/digest-job");
+      startNotificationJobs();
+    } catch (e) {
+      console.warn("[INIT] notification jobs scheduling failed (non-fatal):", e);
+    }
+    try {
+      const { attachAdminNotificationsWS } = await import("./matching/notifications/ws-server");
+      attachAdminNotificationsWS(server);
+    } catch (e) {
+      console.warn("[INIT] admin notifications WS attach failed (non-fatal):", e);
+    }
   } catch (err) {
     console.error("[INIT] FATAL — Phase 4 failed:", err);
     process.exit(1);

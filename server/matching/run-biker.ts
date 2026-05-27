@@ -1,6 +1,7 @@
 import { storage } from "../storage";
-import { sendMatchPushNotifications } from "../push-notifications";
 import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
+import { classifyMatch } from "./notifications/classify";
+import { dispatchMatchNotification } from "./notifications/dispatcher";
 
 export async function runBikerBikerMatching(): Promise<number> {
   try {
@@ -89,7 +90,13 @@ export async function runBikerBikerMatching(): Promise<number> {
           });
           if (inserted) {
             matchCount++; bucketCount++;
-            sendMatchPushNotifications([idA, idB]);
+            await dispatchMatchNotification({
+              table: "biker_biker_matches",
+              matchId: inserted.id,
+              userIds: [idA, idB],
+              priority: classifyMatch({ isSupermatch }),
+              isSupermatch,
+            });
           } else skipCount++;
         }
       }
@@ -159,7 +166,12 @@ export async function runBikerBikerTypeStyleMatching(): Promise<number> {
           });
           if (inserted) {
             matchCount++; bucketCount++;
-            sendMatchPushNotifications([idA, idB]);
+            await dispatchMatchNotification({
+              table: "biker_biker_matches",
+              matchId: inserted.id,
+              userIds: [idA, idB],
+              priority: classifyMatch({}),
+            });
           } else skipCount++;
         }
       }

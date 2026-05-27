@@ -10,9 +10,10 @@ import {
   eventParticipants,
 } from "@shared/db";
 import { and, eq, isNotNull, gt } from "drizzle-orm";
-import { sendMatchPushNotifications } from "../push-notifications";
 import { loadMatchPreferencesMap, bothPrefsEnabled, prefEnabled } from "./filters";
 import { getVariantConfig, trackAbEvent } from "./ab";
+import { classifyMatch } from "./notifications/classify";
+import { dispatchMatchNotification } from "./notifications/dispatcher";
 
 // A/B experiment key for music affinity threshold tuning. Variants:
 //   - control:     threshold = 0.65 (default)
@@ -105,7 +106,12 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
         });
         if (inserted) {
           matchCount++;
-          sendMatchPushNotifications([idA, idB]);
+          await dispatchMatchNotification({
+            table: "biker_biker_matches",
+            matchId: inserted.id,
+            userIds: [idA, idB],
+            priority: classifyMatch({}),
+          });
           if (brand === "musica") {
             void trackAbEvent(idA, MUSIC_AFFINITY_EXPERIMENT, "match_created", { matchId: inserted.id, brand });
             void trackAbEvent(idB, MUSIC_AFFINITY_EXPERIMENT, "match_created", { matchId: inserted.id, brand });
@@ -257,7 +263,14 @@ export async function runGpsBasedMatching(): Promise<number> {
         });
         if (inserted) {
           matchCount++;
-          sendMatchPushNotifications([idA, idB]);
+          const isSupermatch = gpsLabel === "gps_full";
+          await dispatchMatchNotification({
+            table: "biker_biker_matches",
+            matchId: inserted.id,
+            userIds: [idA, idB],
+            priority: classifyMatch({ isSupermatch }),
+            isSupermatch,
+          });
         } else skipCount++;
       }
     }
@@ -323,7 +336,12 @@ export async function runEventMatching(): Promise<number> {
           });
           if (inserted) {
             matchCount++;
-            sendMatchPushNotifications([idA, idB]);
+            await dispatchMatchNotification({
+              table: "biker_biker_matches",
+              matchId: inserted.id,
+              userIds: [idA, idB],
+              priority: classifyMatch({}),
+            });
           } else skipCount++;
         }
       }
@@ -399,8 +417,15 @@ export async function runBikerZavarrinaTypeStyleMatching(): Promise<number> {
           isSupermatch: false,
           pairType: "bz",
         });
-        if (inserted) { matchCount++; sendMatchPushNotifications([idA, idB]); }
-        else skipCount++;
+        if (inserted) {
+          matchCount++;
+          await dispatchMatchNotification({
+            table: "biker_biker_matches",
+            matchId: inserted.id,
+            userIds: [idA, idB],
+            priority: classifyMatch({}),
+          });
+        } else skipCount++;
       }
     }
 

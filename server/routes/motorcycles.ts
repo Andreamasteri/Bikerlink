@@ -7,7 +7,8 @@ import { userMotorcycles } from "@shared/db";
 import { createMotorcycleSchema, updateMotorcycleSchema, uploadPhotoSchema } from "@shared/validators";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
-import { sendMatchPushNotifications } from "../push-notifications";
+import { classifyMatch } from "../matching/notifications/classify";
+import { dispatchMatchNotification } from "../matching/notifications/dispatcher";
 import { sendSuccess, sendError } from "../lib/api-response";
 
 import { requireAuth } from "../lib/auth-middleware";
@@ -83,7 +84,7 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
       for (const wm of wishlistMotos) {
         if (wm.userId === userId) continue;
         if (!wm.userId) continue;
-        await storage.createMatch({
+        const createdMatch = await storage.createMatch({
           bikerId: userId,
           zavarrinaId: wm.userId,
           bikerMotorcycleId: motorcycle.id,
@@ -107,7 +108,14 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
           referenceType: "user",
           referenceId: userId,
         });
-        sendMatchPushNotifications([userId, wm.userId]);
+        if (createdMatch) {
+          await dispatchMatchNotification({
+            table: "biker_zavorrina_matches",
+            matchId: createdMatch.id,
+            userIds: [userId, wm.userId],
+            priority: classifyMatch({}),
+          });
+        }
         matches.push({ zavarrinaNickname: zavarrinaUser?.nickname, brand, model, ridingStyle });
       }
     }

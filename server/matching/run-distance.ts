@@ -3,9 +3,10 @@ import { db } from "../db";
 import { haversineDistance } from "../geo";
 import { routes, routePoints, users } from "@shared/db";
 import { and, avg, eq, isNotNull } from "drizzle-orm";
-import { sendMatchPushNotifications } from "../push-notifications";
 import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
 import { routeProfileOf } from "./scoring";
+import { classifyMatch } from "./notifications/classify";
+import { dispatchMatchNotification } from "./notifications/dispatcher";
 
 export async function runDistanceMatching(): Promise<number> {
   try {
@@ -80,8 +81,16 @@ export async function runDistanceMatching(): Promise<number> {
           isSupermatch: false,
           pairType,
         });
-        if (inserted) { matchCount++; sendMatchPushNotifications([idA, idB]); }
-        else skipCount++;
+        if (inserted) {
+          matchCount++;
+          await dispatchMatchNotification({
+            table: "biker_biker_matches",
+            matchId: inserted.id,
+            userIds: [idA, idB],
+            priority: classifyMatch({ distanceKm: distKm }),
+            distanceKm: distKm,
+          });
+        } else skipCount++;
       }
     }
 
@@ -170,8 +179,16 @@ export async function runRouteTypeZoneMatching(): Promise<number> {
           isSupermatch: false,
           pairType,
         });
-        if (inserted) { matchCount++; sendMatchPushNotifications([idA, idB]); }
-        else skipCount++;
+        if (inserted) {
+          matchCount++;
+          await dispatchMatchNotification({
+            table: "biker_biker_matches",
+            matchId: inserted.id,
+            userIds: [idA, idB],
+            priority: classifyMatch({ distanceKm: dist }),
+            distanceKm: dist,
+          });
+        } else skipCount++;
       }
     }
 

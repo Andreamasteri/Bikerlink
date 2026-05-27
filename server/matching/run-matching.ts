@@ -1,6 +1,7 @@
 import { storage } from "../storage";
-import { sendMatchPushNotifications } from "../push-notifications";
 import it from "../../lib/i18n/it";
+import { classifyMatch } from "./notifications/classify";
+import { dispatchMatchNotification } from "./notifications/dispatcher";
 import { 
   loadMatchPreferencesMap, 
   bothPrefsEnabled, 
@@ -79,7 +80,12 @@ export async function runMatching(): Promise<number> {
         } catch (notifErr) {
           console.error("[ProposalMatching] Error sending match notifications:", notifErr);
         }
-        sendMatchPushNotifications([p1.userId, p2.userId]);
+        await dispatchMatchNotification({
+          table: "proposal_matches",
+          matchId: newMatch.id,
+          userIds: [p1.userId, p2.userId],
+          priority: classifyMatch({ isFreshProposal: true }),
+        });
       }
     }
 
@@ -172,7 +178,15 @@ export async function runWishlistMatching(): Promise<number> {
 
         existingKeys.add(key);
         matchCount++;
-        if (inserted) sendMatchPushNotifications([bikerId, zavarrinaId]);
+        if (inserted) {
+          await dispatchMatchNotification({
+            table: "biker_zavorrina_matches",
+            matchId: inserted.id,
+            userIds: [bikerId, zavarrinaId],
+            priority: classifyMatch({ isSupermatch }),
+            isSupermatch,
+          });
+        }
       }
     }
 

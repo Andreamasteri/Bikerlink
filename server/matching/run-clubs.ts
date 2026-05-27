@@ -2,8 +2,9 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { motoClubs, motoClubMembers, users } from "@shared/db";
 import { and, eq, isNotNull, sql } from "drizzle-orm";
-import { sendMatchPushNotifications } from "../push-notifications";
 import { loadMatchPreferencesMap, prefEnabled } from "./filters";
+import { classifyMatch } from "./notifications/classify";
+import { dispatchMatchNotification } from "./notifications/dispatcher";
 
 export async function runClubBrandMatching(): Promise<number> {
   try {
@@ -67,7 +68,12 @@ export async function runClubBrandMatching(): Promise<number> {
           });
           if (inserted) {
             matchCount++;
-            sendMatchPushNotifications([idA, idB]);
+            await dispatchMatchNotification({
+              table: "biker_biker_matches",
+              matchId: inserted.id,
+              userIds: [idA, idB],
+              priority: classifyMatch({}),
+            });
           } else skipCount++;
         }
       }
@@ -140,8 +146,15 @@ export async function runZavTypeStyleMatching(): Promise<number> {
           isSupermatch: false,
           pairType: "bz",
         });
-        if (inserted) { matchCount++; sendMatchPushNotifications([idA, idB]); }
-        else skipCount++;
+        if (inserted) {
+          matchCount++;
+          await dispatchMatchNotification({
+            table: "biker_biker_matches",
+            matchId: inserted.id,
+            userIds: [idA, idB],
+            priority: classifyMatch({}),
+          });
+        } else skipCount++;
       }
     }
 

@@ -1,5 +1,32 @@
 import { db } from "./db";
 import { sql } from "drizzle-orm";
+import cookie from "cookie";
+import signature from "cookie-signature";
+
+/**
+ * Parse the `connect.sid` cookie out of the raw cookie header, validate the
+ * signature with SESSION_SECRET, and return the userId stored in the session row.
+ * Returns null on any failure.
+ */
+export async function getUserIdFromCookieHeader(cookieHeader: string): Promise<string | null> {
+  try {
+    const cookies = cookie.parse(cookieHeader);
+    const raw = cookies["connect.sid"];
+    if (!raw || !raw.startsWith("s:")) return null;
+    const secret = process.env.SESSION_SECRET;
+    if (!secret) return null;
+    const unsigned = signature.unsign(raw.slice(2), secret);
+    if (!unsigned) return null;
+
+    type SessRow = { sess: { userId?: string } | null };
+    const r = await db.execute(sql`SELECT sess FROM session WHERE sid = ${unsigned} LIMIT 1`);
+    const row = (r.rows as SessRow[])[0];
+    const userId = row?.sess?.userId;
+    return typeof userId === "string" && userId.length > 0 ? userId : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function revokeAllUserSessions(
   userId: string,

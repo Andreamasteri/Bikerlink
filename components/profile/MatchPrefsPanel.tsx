@@ -62,6 +62,34 @@ export default function MatchPrefsPanel() {
           <Text style={{ fontSize: 11, color: Colors.textSecondary, fontFamily: "Inter_400Regular", marginBottom: 8 }}>
             Scegli i criteri con cui vuoi essere abbinato/a. Disabilitando un tipo di match non comparirai nei risultati di quella categoria.
           </Text>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingVertical: 10,
+              marginBottom: 6,
+              borderBottomWidth: 1,
+              borderBottomColor: Colors.border,
+              backgroundColor: "transparent",
+            }}
+          >
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
+                Solo match top
+              </Text>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
+                Ricevi push solo per Supermatch o match prioritari (le altre confluiscono nei digest).
+              </Text>
+            </View>
+            <Switch
+              value={matchPrefs.topMatchesOnly}
+              onValueChange={(val) => toggleMatchPref("topMatchesOnly", val)}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor="#fff"
+              disabled={saveMatchPrefMutation.isPending}
+            />
+          </View>
           {MATCH_PREF_ITEMS.map((item) => (
             <View
               key={item.key}

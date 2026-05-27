@@ -1,0 +1,5 @@
+export type MatchTable =
+  | "biker_zavorrina_matches"
+  | "biker_biker_matches"
+  | "proposal_matches"
+  | "proposal_profile_matches";

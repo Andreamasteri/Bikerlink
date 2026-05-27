@@ -40,6 +40,7 @@
     "@types/nodemailer": "^8.0.0",
     "@types/sharp": "^0.31.1",
     "@types/supertest": "^7.2.0",
+    "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.59.4",
     "@typescript-eslint/parser": "^8.59.4",
     "@xmldom/xmldom": "^0.9.10",
@@ -48,6 +49,8 @@
     "bcryptjs": "^3.0.3",
     "compression": "^1.8.1",
     "connect-pg-simple": "^10.0.0",
+    "croner": "^10.0.1",
+    "date-fns-tz": "^3.2.0",
     "docx": "^9.6.1",
     "drizzle-orm": "^0.45.2",
     "eslint-plugin-unused-imports": "^4.4.1",
@@ -119,6 +122,7 @@
     "tsx": "^4.22.3",
     "undici": "^7.25.0",
     "vitest": "^4.1.7",
+    "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

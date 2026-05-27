@@ -3,7 +3,8 @@ import path from "path";
 import fs from "fs";
 import { storage } from "../storage";
 import { createClubInvitesForMoto } from "./motoclubs";
-import { sendMatchPushNotifications } from "../push-notifications";
+import { classifyMatch } from "../matching/notifications/classify";
+import { dispatchMatchNotification } from "../matching/notifications/dispatcher";
 import { updateWishlistSchema, uploadPhotoSchema, addWishlistMotoSchema, updateWishlistMotoSchema } from "@shared/validators";
 
 import { requireAuth } from "../lib/auth-middleware";
@@ -138,7 +139,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
       for (const bikerMoto of bikerMotos) {
         if (bikerMoto.userId === userId) continue;
         if (!bikerMoto.userId) continue;
-        await storage.createMatch({
+        const createdMatch = await storage.createMatch({
           bikerId: bikerMoto.userId,
           zavarrinaId: userId,
           bikerMotorcycleId: bikerMoto.id,
@@ -162,7 +163,14 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
           referenceType: "user",
           referenceId: bikerMoto.userId,
         });
-        sendMatchPushNotifications([bikerMoto.userId, userId]);
+        if (createdMatch) {
+          await dispatchMatchNotification({
+            table: "biker_zavorrina_matches",
+            matchId: createdMatch.id,
+            userIds: [bikerMoto.userId, userId],
+            priority: classifyMatch({}),
+          });
+        }
         matches.push({ bikerNickname: bikerUser?.nickname, brand: brand ?? null, model: model ?? null, ridingStyle });
       }
     }

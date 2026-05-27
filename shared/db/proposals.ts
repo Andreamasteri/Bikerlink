@@ -90,11 +90,14 @@ export const proposalMatches = pgTable("proposal_matches", {
   acceptedByUser1: boolean("accepted_by_user_1").notNull().default(false),
   acceptedByUser2: boolean("accepted_by_user_2").notNull().default(false),
   conversationId: varchar("conversation_id", { length: 36 }),
+  notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
+  notifiedAt: timestamp("notified_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("proposal_matches_user1_idx").on(table.userId1),
   index("proposal_matches_user2_idx").on(table.userId2),
   index("proposal_matches_status_idx").on(table.status),
+  index("proposal_matches_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
 ]);
 
 export const proposalZoneNotifications = pgTable("proposal_zone_notifications", {
@@ -128,11 +131,14 @@ export const proposalProfileMatches = pgTable("proposal_profile_matches", {
     .references(() => users.id, { onDelete: "cascade" }),
   distanceKm: doublePrecision("distance_km"),
   status: varchar("status", { length: 20 }).notNull().default("new"),
+  notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
+  notifiedAt: timestamp("notified_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("ppm_biker_id_idx").on(table.bikerId),
   index("ppm_zavorrina_id_idx").on(table.zavarrinaId),
   index("ppm_proposal_id_idx").on(table.proposalId),
+  index("ppm_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
   uniqueIndex("ppm_proposal_zavorrina_unique_idx").on(table.proposalId, table.zavarrinaId),
   uniqueIndex("ppm_biker_zavorrina_active_idx")
     .on(table.bikerId, table.zavarrinaId)

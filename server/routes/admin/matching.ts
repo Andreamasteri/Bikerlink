@@ -652,4 +652,88 @@ router.get("/matching/debug", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/notifications/stats", async (_req: Request, res: Response) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const perPriorityRes = await client.query<{ day: string; priority: string; cnt: string }>(`
+        SELECT to_char(created_at, 'YYYY-MM-DD') AS day,
+               notification_priority AS priority,
+               COUNT(*) AS cnt
+          FROM (
+            SELECT created_at, notification_priority FROM biker_zavorrina_matches
+            UNION ALL
+            SELECT created_at, notification_priority FROM biker_biker_matches
+            UNION ALL
+            SELECT created_at, notification_priority FROM proposal_matches
+            UNION ALL
+            SELECT created_at, notification_priority FROM proposal_profile_matches
+          ) s
+         WHERE created_at >= NOW() - INTERVAL '7 days'
+         GROUP BY day, priority
+         ORDER BY day DESC, priority
+      `);
+
+      const budgetExhaustedRes = await client.query<{ day: string; users: string }>(`
+        SELECT to_char(day, 'YYYY-MM-DD') AS day, COUNT(*) AS users
+          FROM daily_push_counts
+         WHERE individual_count >= 3
+           AND day >= (CURRENT_DATE - INTERVAL '7 days')
+         GROUP BY day
+         ORDER BY day DESC
+      `);
+
+      // Pending = participants of match rows at this priority WITHOUT an
+      // entry in match_notification_deliveries. Mirrors the dispatcher logic.
+      const pendingRes = await client.query<{ priority: string; cnt: string }>(`
+        WITH participants AS (
+          SELECT notification_priority AS priority, 'biker_zavorrina_matches' AS t, id::text AS mid, biker_id AS uid FROM biker_zavorrina_matches
+          UNION ALL
+          SELECT notification_priority, 'biker_zavorrina_matches', id::text, zavorrina_id FROM biker_zavorrina_matches
+          UNION ALL
+          SELECT notification_priority, 'biker_biker_matches', id::text, biker1_id FROM biker_biker_matches
+          UNION ALL
+          SELECT notification_priority, 'biker_biker_matches', id::text, biker2_id FROM biker_biker_matches
+          UNION ALL
+          SELECT notification_priority, 'proposal_matches', id::text, user_id_1 FROM proposal_matches
+          UNION ALL
+          SELECT notification_priority, 'proposal_matches', id::text, user_id_2 FROM proposal_matches
+          UNION ALL
+          SELECT notification_priority, 'proposal_profile_matches', id::text, biker_id FROM proposal_profile_matches
+          UNION ALL
+          SELECT notification_priority, 'proposal_profile_matches', id::text, zavorrina_id FROM proposal_profile_matches
+        )
+        SELECT priority, COUNT(*)::text AS cnt
+          FROM participants p
+         WHERE p.uid IS NOT NULL
+           AND NOT EXISTS (
+             SELECT 1 FROM match_notification_deliveries d
+              WHERE d.match_table = p.t AND d.match_id = p.mid AND d.user_id = p.uid
+           )
+         GROUP BY priority
+      `);
+
+      return res.json({
+        perPriorityPerDay: perPriorityRes.rows.map(r => ({
+          day: r.day,
+          priority: r.priority,
+          count: parseInt(r.cnt, 10),
+        })),
+        budgetExhaustedPerDay: budgetExhaustedRes.rows.map(r => ({
+          day: r.day,
+          users: parseInt(r.users, 10),
+        })),
+        pendingByPriority: Object.fromEntries(
+          pendingRes.rows.map(r => [r.priority, parseInt(r.cnt, 10)])
+        ),
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("[admin] notifications stats error:", error);
+    return sendError(res, 500, "Errore stats notifiche");
+  }
+});
+
 export default router;

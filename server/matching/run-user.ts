@@ -3,10 +3,11 @@ import { db } from "../db";
 import { haversineDistance } from "../geo";
 import { routes, routePoints, users } from "@shared/db";
 import { and, avg, eq, isNotNull } from "drizzle-orm";
-import { sendMatchPushNotifications } from "../push-notifications";
 import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
 import { baseModelName, routeProfileOf } from "./scoring";
 import { MatchResult } from "./types";
+import { classifyMatch } from "./notifications/classify";
+import { dispatchMatchNotification } from "./notifications/dispatcher";
 
 export async function runMatchingForUser(userId: string): Promise<MatchResult> {
   try {
@@ -57,7 +58,13 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
           });
           if (inserted) {
             bikerBikerCount++;
-            sendMatchPushNotifications([userId, bm.userId]);
+            await dispatchMatchNotification({
+              table: "biker_biker_matches",
+              matchId: inserted.id,
+              userIds: [userId, bm.userId],
+              priority: classifyMatch({ isSupermatch }),
+              isSupermatch,
+            });
           }
         }
       }
@@ -91,7 +98,13 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
           });
           if (inserted) {
             zavCount++;
-            sendMatchPushNotifications([userId, wm.userId]);
+            await dispatchMatchNotification({
+              table: "biker_zavorrina_matches",
+              matchId: inserted.id,
+              userIds: [userId, wm.userId],
+              priority: classifyMatch({ isSupermatch }),
+              isSupermatch,
+            });
           }
         }
       }
@@ -127,7 +140,13 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
           });
           if (inserted) {
             zavCount++;
-            sendMatchPushNotifications([userId, bm.userId]);
+            await dispatchMatchNotification({
+              table: "biker_zavorrina_matches",
+              matchId: inserted.id,
+              userIds: [userId, bm.userId],
+              priority: classifyMatch({ isSupermatch }),
+              isSupermatch,
+            });
           }
         }
       }
@@ -218,7 +237,13 @@ export async function runMatchingForUser(userId: string): Promise<MatchResult> {
           });
           if (inserted) {
             if (pairType === "bb") bikerBikerCount++; else zavCount++;
-            sendMatchPushNotifications([userId, row.userId]);
+            await dispatchMatchNotification({
+              table: "biker_biker_matches",
+              matchId: inserted.id,
+              userIds: [userId, row.userId],
+              priority: classifyMatch({ distanceKm: dist }),
+              distanceKm: dist,
+            });
           }
         }
       }

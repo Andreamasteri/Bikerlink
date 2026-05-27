@@ -3,8 +3,9 @@ import { db } from "../db";
 import { haversineDistance } from "../geo";
 import { proposalZoneNotifications, users, userProfiles, type Proposal } from "@shared/db";
 import { and, eq, isNotNull, gt } from "drizzle-orm";
-import { sendMatchPushNotifications } from "../push-notifications";
 import it from "../../lib/i18n/it";
+import { classifyMatch } from "./notifications/classify";
+import { dispatchMatchNotification } from "./notifications/dispatcher";
 import { 
   loadMatchPreferencesMap, 
   bothPrefsEnabled, 
@@ -82,7 +83,12 @@ export async function runProposalMatchingForUser(userId: string): Promise<number
         } catch (notifErr) {
           console.error("[ProposalMatchingForUser] Notification error:", notifErr);
         }
-        sendMatchPushNotifications([p1.userId, p2.userId]);
+        await dispatchMatchNotification({
+          table: "proposal_matches",
+          matchId: newMatch.id,
+          userIds: [p1.userId, p2.userId],
+          priority: classifyMatch({ isFreshProposal: true }),
+        });
       }
     }
     return matchCount;
