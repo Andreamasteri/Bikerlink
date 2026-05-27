@@ -36,25 +36,27 @@ The table below lists all match types active in the system, with the exact crite
 
 | # | Match Type | Roles Involved | Criterion | Data Used | Notes |
 |---|-----------|----------------|-----------|-----------|-------|
-| 1 | **Motorcycle Brand (BB)** | Biker ↔ Biker | Same motorcycle brand in the garage | `user_motorcycles` table, `brand` field | Supermatch if model + type + riding style also coincide |
-| 2 | **Wishlist / Garage (BZ)** | Biker ↔ Zavorrina | The biker's bike brand or type matches the zavorrina's wishlist | `user_motorcycles` and `zavorrina_wishlist_motos` tables | Supermatch if brand + model + type + style coincide |
-| 3 | **Club Brand — Biker** | Biker ↔ Club Member | The biker owns a motorcycle of a club's official brand, and is matched with that club's members | `user_motorcycles` and `moto_clubs` tables (`brand_name` field) | The club must be approved by the admin |
-| 4 | **Club Brand — Zavorrina** | Zavorrina ↔ Club Member | The zavorrina has a club's official brand on her wishlist, and is matched with that club's members | `zavorrina_wishlist_motos` and `moto_clubs` tables | Same mechanism as #3, zavorrina side |
-| 5 | **Type + Riding Style (BB)** | Biker ↔ Biker | Same motorcycle type (e.g. naked, enduro) and same riding style | `user_motorcycles` table, `motorcycle_type` and `riding_style` fields | Both fields must match exactly |
-| 6 | **Type + Riding Style (BZ)** | Biker ↔ Zavorrina | The biker's bike type and style match the zavorrina's wishlist preference | `user_motorcycles` and `zavorrina_wishlist_motos` tables | Both fields must be present in the wishlist |
-| 7 | **Route Distance (BB)** | Biker ↔ Biker | The geographic centroid of the two bikers' recorded routes is within 150 km | `routes` and `route_points` tables (average GPS centroid) | Also active as a criterion in biker↔biker trip proposals |
-| 8 | **Route Distance (BZ)** | Biker ↔ Zavorrina | Same logic as #7, between biker and zavorrina | `routes` and `route_points` tables | Also active as a criterion in biker↔zavorrina proposals |
-| 9 | **Music Affinity (BB)** | Biker ↔ Biker | At least 65% of tracks in common relative to the smaller library | `user_music_tracks` table, `lastfm_track_id` field | Requires Last.fm connection on both accounts |
-| 10 | **Music Affinity (BZ)** | Biker ↔ Zavorrina | Same logic as #9, between biker and zavorrina | `user_music_tracks` table | Requires Last.fm on both accounts |
-| 11 | **Lean Angle (GPS)** | Biker ↔ Biker | Same average lean angle "bucket" (low / medium / high), with at least 3 recorded routes each | `routes` table, `max_tilt_deg` field (averaged across all routes) | Thresholds: low <20°, medium 20–35°, high >35°. If the phone has no gyroscope the field is 0 (low bucket) |
-| 12 | **Zone + Route Profile (BB)** | Biker ↔ Biker | GPS centroid within 50 km AND same route profile (curvy / highway / city / mixed) | `routes` and `route_points` tables | Profile computed from: average speed, average lean angle, average distance |
-| 13 | **Zone + Route Profile (BZ)** | Biker ↔ Zavorrina | Same logic as #12, between biker and zavorrina | `routes` and `route_points` tables | The zavorrina must have recorded routes |
-| 14 | **Average GPS Speed** | Biker ↔ Biker | Same average speed "bucket" (slow / medium / fast) | `routes` table, `avg_speed_kmh` field | Thresholds: slow <50 km/h, medium 50–80, fast >80 |
-| 15 | **Average GPS Duration** | Biker ↔ Biker | Same average ride duration "bucket" (short / medium / long) | `routes` table, `duration_seconds` field | Thresholds: short <2h, medium 2–6h, long >6h |
-| 16 | **Preferred GPS Time** | Biker ↔ Biker | Same day of the week and time of day (morning / afternoon / evening) | `proposals` table (departure timestamp `scheduled_at` / `departure_time_from`) | Computed on the median of the times of the user's created proposals |
-| 17 | **Rally / Event Attendance** | Biker ↔ Biker | Both attended the same rally or event in the app | `event_participants` table | Matches are created between all participants of the same event |
+| 1 | **Motorcycle Brand (BB)** | Biker <-> Biker | Same motorcycle brand in the garage | `user_motorcycles` table, `brand` field | Supermatch if model + type + riding style also coincide |
+| 2 | **Wishlist / Garage (BZ)** | Biker <-> Zavorrina | The biker's bike brand or type matches the zavorrina's wishlist | `user_motorcycles` and `zavorrina_wishlist_motos` tables | Supermatch if brand + model + type + style coincide |
+| 3 | **Club Brand — Biker** | Biker <-> Club Member | The biker owns a motorcycle of a club's official brand, and is matched with that club's members | `user_motorcycles` and `moto_clubs` tables (`brand_name` field) | The club must be approved by the admin |
+| 4 | **Club Brand — Zavorrina** | Zavorrina <-> Club Member | The zavorrina has a club's official brand on her wishlist, and is matched with that club's members | `zavorrina_wishlist_motos` and `moto_clubs` tables | Same mechanism as #3, zavorrina side |
+| 5 | **Type + Riding Style (BB)** | Biker <-> Biker | Same motorcycle type (e.g. naked, enduro) and same riding style | `user_motorcycles` table, `motorcycle_type` and `riding_style` fields | Both fields must match exactly |
+| 6 | **Type + Riding Style (BZ)** | Biker <-> Zavorrina | The biker's bike type and style match the zavorrina's wishlist preference | `user_motorcycles` and `zavorrina_wishlist_motos` tables | Both fields must be present in the wishlist |
+| 7 | **Route Distance (BB)** | Biker <-> Biker | The geographic centroid of the two bikers' recorded routes is within 150 km | `routes` and `route_points` tables (average GPS centroid) | Also active as a criterion in biker<->biker trip proposals |
+| 8 | **Route Distance (BZ)** | Biker <-> Zavorrina | Same logic as #7, between biker and zavorrina | `routes` and `route_points` tables | Also active as a criterion in biker<->zavorrina proposals |
+| 9 | **Music Affinity (BB)** | Biker <-> Biker | At least 65% of tracks in common relative to the smaller library | `user_music_tracks` table, `lastfm_track_id` field | Requires Last.fm connection on both accounts |
+| 10 | **Music Affinity (BZ)** | Biker <-> Zavorrina | Same logic as #9, between biker and zavorrina | `user_music_tracks` table | Requires Last.fm on both accounts |
+| 11 | **Lean Angle (GPS)** | Biker <-> Biker | Same average lean angle "bucket" (low / medium / high), with at least 3 recorded routes each | `routes` table, `max_tilt_deg` field (averaged across all routes) | Thresholds: low <20°, medium 20-35°, high >35°. If the phone has no gyroscope the field is 0 (low bucket) |
+| 12 | **Zone + Route Profile (BB)** | Biker <-> Biker | GPS centroid within 50 km AND same route profile (curvy / highway / city / mixed) | `routes` and `route_points` tables | Profile computed from: average speed, average lean angle, average distance |
+| 13 | **Zone + Route Profile (BZ)** | Biker <-> Zavorrina | Same logic as #12, between biker and zavorrina | `routes` and `route_points` tables | The zavorrina must have recorded routes |
+| 14 | **Average GPS Speed** | Biker <-> Biker | Same average speed "bucket" (slow / medium / fast) | `routes` table, `avg_speed_kmh` field | Thresholds: slow <50 km/h, medium 50-80, fast >80 |
+| 15 | **Average GPS Duration** | Biker <-> Biker | Same average ride duration "bucket" (short / medium / long) | `routes` table, `duration_seconds` field | Thresholds: short <2h, medium 2-6h, long >6h |
+| 16 | **Preferred GPS Time** | Biker <-> Biker | Same day of the week and time of day (morning / afternoon / evening) | `proposals` table (departure timestamp `scheduled_at` / `departure_time_from`) | Computed on the median of the times of the user's created proposals |
+| 17 | **Rally / Event Attendance** | Biker <-> Biker | Both attended the same motorcycle rally or event in the app | `event_participants` table | Matches are created between all participants of the same event |
 
 > **Supermatch:** a special match generated when two users meet stricter criteria (e.g. same brand + same model + same type + same style). Supermatches are visually highlighted in the app.
+
+> **GPS Supermatch:** some GPS-based match types (#11, #14, #15, #16 — lean angle, average speed, average duration, and preferred time) can combine into a single "behavioural supermatch" when all GPS criteria coincide simultaneously. This advanced pairing is identified internally by the key `gps_full` and represents the highest riding-style affinity between two bikers.
 
 > **Trip proposals:** proposals (e.g. "looking for a companion for Saturday morning") generate an additional type of match called a "proposal match". They are matched automatically between users compatible by role, area, and time window. The `bikerBikerDistance` and `bikerZavarrinaDistance` preferences also control this type of match.
 
@@ -124,9 +126,9 @@ This match compares the average lean angle of the motorcycle on recorded routes.
 
 ### Rallies and Events (Type #17)
 
-The rally match pairs all users who attended the same motorcycle event or rally registered in the app. **It requires:**
+The rally match pairs all users who attended the same motorcycle rally or event registered in the app. **It requires:**
 - Events (rallies) to be created and approved in the app
-- Users to sign up for events through the dedicated feature
+- Users to sign up for events through the dedicated events feature
 
 **Status:** the code is active, but only generates matches if there is a sufficient number of events with attendees. In this early stage, the events feature is operational but lightly used.
 
@@ -140,10 +142,55 @@ The music match compares songs listened to via **Last.fm**, the music scrobbling
 
 ---
 
-## 8. FAQ
+## 8. Privacy and Data Protection
+
+BikerLink collects and uses personal data exclusively to operate the matching system and its connected features. The following is a summary of the principles applied, consistent with the full privacy policy available at `/privacy`.
+
+### Data collected for matching
+
+The matching engine uses the following data categories:
+
+- **GPS position:** current geographic coordinates and position history during recorded routes.
+- **Riding data:** average speed, maximum lean angle, duration, and profile of motorcycle rides.
+- **Times and habits:** days of the week and time-of-day of rides, computed from the trip proposals created by the user.
+- **Recorded routes:** complete GPS traces of motorcycle rides, from which the geographic centroid is calculated for zone-based matching.
+- **Motorcycle preferences:** brand, model, type, and riding style (biker garage or zavorrina wishlist).
+- **Music data:** Last.fm library, only if the user voluntarily links their account.
+
+### Legal basis and consent
+
+Processing is carried out on the basis of:
+- **Performance of a contract** (Art. 6.1.b GDPR): profile and motorcycle data are necessary to deliver the matching service.
+- **Explicit consent** (Art. 6.1.a GDPR): GPS route tracking and the Last.fm integration require active user consent, requested at first app launch or when the feature is enabled.
+
+Users may withdraw consent at any time from the app settings, without affecting the lawfulness of prior processing.
+
+### Anonymisation and aggregation
+
+For matching statistics (route type, speed bucket, preferred time), GPS data is aggregated and reduced to anonymous categorical values (e.g. "curvy", "slow", "morning"). Precise coordinates are never shared with other users: only the approximate riding area is visible to other bikers.
+
+### Retention periods
+
+- **GPS position history:** retained for 90 days from the last recording.
+- **Routes and riding data:** retained while the user keeps their account active.
+- **Matching data:** deleted within 30 days of account closure or deletion.
+
+### User rights (GDPR)
+
+Every user has the right to:
+- **Access (Art. 15):** request a copy of their personal data.
+- **Rectification (Art. 16):** correct inaccurate or incomplete data.
+- **Erasure (Art. 17):** request deletion of all personal data.
+- **Portability (Art. 20):** receive their data in a structured, machine-readable format.
+
+To exercise these rights or for any privacy-related question: **bikerlinkapp@gmail.com**.
+
+---
+
+## 9. FAQ
 
 **Why don't I have any matches yet?**  
-Matches are generated automatically every time a user logs into the app (with a minimum 2-minute interval per user). If you don't have any matches yet, there probably aren't enough compatible users in your area, or your profile is incomplete (missing garage or wishlist).
+Matches are generated through two distinct mechanisms: a global cycle that processes all active users system-wide every 5 minutes, and a personalised cycle that runs within 2 minutes of each individual user logging in. If you don't have any matches yet, there probably aren't enough compatible users in your area, or your profile is incomplete (missing garage or wishlist).
 
 **Does music matching require Last.fm?**  
 Yes. Match types #9 and #10 require you to have linked your Last.fm account in your profile settings. Without Last.fm, these matches are never generated for you, but all other types remain active.
@@ -161,7 +208,7 @@ A Supermatch is generated when compatibility is maximum: same motorcycle brand, 
 It depends on the admin's configuration. By default, matching can be limited to certain countries. If you are in an uncovered country, you may not receive matches until your country is enabled.
 
 **How often does the matching engine run?**  
-The engine is triggered every time a user logs into the app, with a minimum of 5 minutes between global cycles. A user receives personalized matches within 2 minutes of connecting.
+The system operates on two levels: the global engine runs every 5 minutes and reprocesses pairs across all active users system-wide; the personalised cycle runs within 2 minutes of a single user logging in and updates that person's specific matches. The two levels are independent and complement each other.
 
 **What role does a Club play in matching?**  
 A Club on BikerLink is often associated with a motorcycle brand (e.g. "Honda Club Rome"). When a biker owns a bike of that brand, they are matched with the club's members — and vice versa for zavorrine who have that brand on their wishlist. The Club is not a user but a catalyst for matches between people with the same motorcycle.
@@ -171,6 +218,8 @@ A Club on BikerLink is often associated with a motorcycle brand (e.g. "Honda Clu
 <details>
 <summary><strong>Technical Appendix</strong> — Details for developers and the technical team</summary>
 
+> **Internal technical references — optional for non-developer readers.** The sections below contain database table names, API endpoints, SQL fields, and TypeScript function names. They are intended for the development team and are included for documentary completeness; a non-technical reader can skip them without losing any understanding of the system.
+
 ## Database Tables
 
 | Table | Contents |
@@ -179,8 +228,8 @@ A Club on BikerLink is often associated with a motorcycle brand (e.g. "Honda Clu
 | `user_motorcycles` | Biker garage: brand, model, motorcycle_type, riding_style |
 | `zavorrina_wishlists` | Zavorrina wishlist (container) |
 | `zavorrina_wishlist_motos` | Individual wishlist entries: brand, model, motorcycle_type, riding_style |
-| `biker_zavorrina_matches` | Biker↔zavorrina matches from wishlist/garage (**only type #2**): bikerId, zavarrinaId, bikerMotorcycleId, wishlistMotoId |
-| `biker_biker_matches` | All other matches (types #1, #3–#17): biker↔biker and generic biker↔zavorrina — distinguishable by the `motorcycle_brand` and `pair_type` fields |
+| `biker_zavorrina_matches` | Biker<->zavorrina matches from wishlist/garage (**only type #2**): bikerId, zavorrinaId, bikerMotorcycleId, wishlistMotoId |
+| `biker_biker_matches` | All other matches (types #1, #3-#17): biker<->biker and generic biker<->zavorrina — distinguishable by the `motorcycle_brand` and `pair_type` fields |
 | `proposals` | Trip proposals: search_type, departure coords, time window, club_id |
 | `proposal_matches` | Matches between compatible proposals |
 | `match_preferences` | Match-type preferences, one row per user |
@@ -193,7 +242,7 @@ A Club on BikerLink is often associated with a motorcycle brand (e.g. "Honda Clu
 | `user_blocks` | Blocked pairs: blocker_id, blocked_id |
 | `app_settings` | Global settings: `auto_matching_enabled`, `matching_countries`, `fake_users_enabled` |
 
-> **Important:** the `biker_biker_matches` table is used both for biker↔biker pairs (pair_type='bb') and for biker↔zavorrina pairs (pair_type='bz') generated by all matching engines except wishlist/garage (type #2). The distinction is read from the `pair_type` field and the `motorcycle_brand` value.
+> **Important:** the `biker_biker_matches` table is used both for biker<->biker pairs (pair_type='bb') and for biker<->zavorrina pairs (pair_type='bz') generated by all matching engines except wishlist/garage (type #2). The distinction is read from the `pair_type` field and the `motorcycle_brand` value.
 
 ## Match Types — Internal Keys (`motorcycle_brand` in `biker_biker_matches`)
 
@@ -243,9 +292,9 @@ A Club on BikerLink is often associated with a motorcycle brand (e.g. "Honda Clu
 
 | Metric | Bucket thresholds |
 |--------|-------------------|
-| Average GPS speed | slow <50 km/h · medium 50–80 · fast >80 |
-| Average ride duration | short <7,200 s (2h) · medium 7,200–21,600 s (2–6h) · long >21,600 s |
-| Average lean angle | low <20° · medium 20–35° · high >35° |
+| Average GPS speed | slow <50 km/h · medium 50-80 · fast >80 |
+| Average ride duration | short <7,200 s (2h) · medium 7,200-21,600 s (2-6h) · long >21,600 s |
+| Average lean angle | low <20° · medium 20-35° · high >35° |
 | Route profile | curvy (tilt>30°) · highway (speed>100 km/h) · city (dist<30 km) · mixed |
 | BB centroid distance threshold | 150 km |
 | Zone distance threshold (type+zone) | 50 km |
@@ -268,14 +317,14 @@ A Club on BikerLink is often associated with a motorcycle brand (e.g. "Honda Clu
 | `runDistanceMatching()` | #7 and #8 — Route distance → `biker_biker_matches` |
 | `runRouteTypeZoneMatching()` | #12 and #13 — Zone+Profile → `biker_biker_matches` |
 | `triggerMatchingRun()` | Global on-demand cycle (5-min debounce) |
-| `triggerMatchingForUser(userId)` | Personalized cycle per user (2-min debounce) |
+| `triggerMatchingForUser(userId)` | Personalised cycle per user (2-min debounce) |
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `GET /api/matches` | GET | User's biker↔zavorrina match list (`biker_zavorrina_matches`) |
-| `GET /api/biker-biker-matches` | GET | User's biker↔biker match list (and generic bz) |
+| `GET /api/matches` | GET | User's biker<->zavorrina match list (`biker_zavorrina_matches`) |
+| `GET /api/biker-biker-matches` | GET | User's biker<->biker match list (and generic bz) |
 | `GET /api/proposals/matches` | GET | Matches between the user's trip proposals |
 | `GET /api/match/music` | GET | On-demand music matches via Last.fm (`server/routes/music-match.ts`) |
 | `GET /api/match-preferences` | GET | Match preferences of the authenticated user |

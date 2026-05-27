@@ -24,6 +24,7 @@ const BORDER = '#E5D5C5';
 
 function stripInline(text) {
   return text
+    .replace(/↔/g, '<->')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/`([^`]+)`/g, '$1')
@@ -159,7 +160,7 @@ function renderCover(doc) {
   doc.fill(WHITE).font('Helvetica-Bold').fontSize(48)
      .text('BikerLink', 0, 170, { align: 'center' });
   doc.fill(WHITE).font('Helvetica-Oblique').fontSize(16)
-     .text("U'll never ride alone", 0, 232, { align: 'center' });
+     .text("You'll never ride alone", 0, 232, { align: 'center' });
 
   doc.moveTo(80, 275).lineTo(doc.page.width - 80, 275)
      .strokeColor(WHITE).lineWidth(1).stroke();
@@ -196,7 +197,7 @@ function renderFooter(doc, pageNum, totalPages) {
   doc.moveTo(left, bottom - 6).lineTo(right, bottom - 6)
      .strokeColor('#DDDDDD').lineWidth(0.5).stroke();
   doc.fill(LGRAY).font('Helvetica').fontSize(8)
-     .text("BikerLink — U'll never ride alone", left, bottom, {
+     .text("BikerLink — You'll never ride alone", left, bottom, {
        continued: true,
        width: right - left,
      })
@@ -212,23 +213,32 @@ function renderTOC(doc, chapters, appendixChapters) {
      .strokeColor(ORANGE).lineWidth(1).stroke();
   doc.moveDown(0.8);
 
-  doc.fill(DARK).font('Helvetica-Bold').fontSize(13).text('Parte I — Documento principale');
-  doc.moveDown(0.4);
+  const tocLeft = doc.page.margins.left;
+  const tocRight = doc.page.width - doc.page.margins.right;
+  const tocWidth = tocRight - tocLeft;
+  const numColW = 36;
+  const titleColX = tocLeft + numColW;
+  const titleColW = tocWidth - numColW;
+
+  doc.fill(DARK).font('Helvetica-Bold').fontSize(13).text('Parte I — Documento principale', { lineBreak: false });
+  doc.moveDown(0.5);
   chapters.forEach(ch => {
+    const yPos = doc.y;
     doc.fill(DARK).font('Helvetica-Bold').fontSize(11)
-       .text(`${ch.num}.`, doc.page.margins.left, doc.y, { continued: true, width: 30 });
-    doc.fill(DARK).font('Helvetica').fontSize(11).text(ch.title);
-    doc.moveDown(0.25);
+       .text(`${ch.num}.`, tocLeft, yPos, { width: numColW, lineBreak: false });
+    doc.fill(DARK).font('Helvetica').fontSize(11)
+       .text(ch.title, titleColX, yPos, { width: titleColW, lineBreak: false });
+    doc.moveDown(0.45);
   });
 
   if (appendixChapters.length > 0) {
-    doc.moveDown(0.8);
-    doc.fill(DARK).font('Helvetica-Bold').fontSize(13).text('Parte II — Appendice tecnica');
-    doc.moveDown(0.4);
+    doc.moveDown(0.9);
+    doc.fill(DARK).font('Helvetica-Bold').fontSize(13).text('Parte II — Appendice tecnica', { lineBreak: false });
+    doc.moveDown(0.5);
     appendixChapters.forEach(ch => {
       doc.fill(DARK).font('Helvetica').fontSize(11)
-         .text(`•  ${ch.title}`, doc.page.margins.left, doc.y, { indent: 6 });
-      doc.moveDown(0.2);
+         .text(`\u2022  ${ch.title}`, tocLeft + 10, doc.y, { width: tocWidth - 10, lineBreak: false });
+      doc.moveDown(0.35);
     });
   }
 }
