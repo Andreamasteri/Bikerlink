@@ -14,6 +14,16 @@ export function buildMatchingTypes(baseUrl: string): { meta: PageMeta; body: str
         { name: "Matching", path: "/matching" },
         { name: "I 17 tipi", path: "/matching/tipi-di-match" },
       ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: "I 17 tipi di match di BikerLink",
+        description: "Tutti i tipi di match calcolati da BikerLink: stile di guida, moto, percorsi, esperienza e altri segnali.",
+        url: `${baseUrl}/matching/tipi-di-match`,
+        inLanguage: "it-IT",
+        publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        mainEntityOfPage: `${baseUrl}/matching/tipi-di-match`,
+      },
     ],
   };
 

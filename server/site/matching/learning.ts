@@ -14,6 +14,16 @@ export function buildMatchingLearning(baseUrl: string): { meta: PageMeta; body: 
         { name: "Matching", path: "/matching" },
         { name: "Come impara", path: "/matching/come-impara" },
       ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "Article",
+        headline: "Come impara il matching di BikerLink",
+        description: "Come il sistema di matching di BikerLink apprende dai tuoi feedback e migliora i suggerimenti nel tempo.",
+        url: `${baseUrl}/matching/come-impara`,
+        inLanguage: "it-IT",
+        publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        mainEntityOfPage: `${baseUrl}/matching/come-impara`,
+      },
     ],
   };
 
