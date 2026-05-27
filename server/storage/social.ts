@@ -9,9 +9,9 @@ import {
   type Report, type InsertReport,
   type ModeratorLog, type InsertModeratorLog,
 } from "@shared/db";
-import { TrackingStorage } from "./tracking";
+import { TagsStorage } from "./tags";
 
-export class SocialStorage extends TrackingStorage {
+export class SocialStorage extends TagsStorage {
   async getWorkshops(approved?: boolean): Promise<Workshop[]> {
     if (approved !== undefined) {
       return db.select().from(workshops).where(eq(workshops.isApproved, approved));

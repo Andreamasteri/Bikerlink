@@ -17,3 +17,4 @@ export * from "./events";
 export * from "./gps";
 export * from "./road-hazards";
 export * from "./ota";
+export * from "./tags";

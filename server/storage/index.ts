@@ -323,6 +323,16 @@ export interface IStorage {
   getProposalProfileMatch(id: string): Promise<ProposalProfileMatch | undefined>;
   updateProposalProfileMatch(id: string, data: Partial<InsertProposalProfileMatch>): Promise<ProposalProfileMatch | undefined>;
   getPendingReportsCount(): Promise<number>;
+  // Tag system (Task #2512)
+  listTagCategories(): Promise<import("@shared/db").TagCategory[]>;
+  getTagCategoryBySlug(slug: string): Promise<import("@shared/db").TagCategory | undefined>;
+  listTagsByCategorySlug(slug: string): Promise<import("@shared/db").Tag[]>;
+  listAllTagsWithCategory(): Promise<Array<{ tag: import("@shared/db").Tag; category: import("@shared/db").TagCategory }>>;
+  getTagById(id: string): Promise<import("@shared/db").Tag | undefined>;
+  createTag(data: import("@shared/db").InsertTag): Promise<import("@shared/db").Tag>;
+  deleteTag(id: string): Promise<boolean>;
+  getTagsForEntity(entityType: string, entityId: string): Promise<Array<import("@shared/db").Tag & { categorySlug: string; categoryLabel: string }>>;
+  setTagsForEntity(entityType: string, entityId: string, tagIds: string[], options?: { categorySlug?: string }): Promise<import("@shared/db").EntityTag[]>;
 }
 
 export class DatabaseStorage extends FakeUsersStorage implements IStorage {}
