@@ -150,6 +150,41 @@ export interface IStorage {
   createReport(report: InsertReport): Promise<Report>;
   updateReport(id: string, data: Partial<InsertReport>): Promise<Report | undefined>;
   resolveReport(id: string, opts: { status: "resolved" | "dismissed"; resolvedBy: string }): Promise<Report | undefined>;
+  // Task #2531 — Hub Moderazione (Pannello Admin Report)
+  getReportsHubSummary(): Promise<{
+    byStatus: Record<string, number>;
+    byCategory: Record<string, number>;
+    byRole: Record<string, number>;
+    bySeverity: Record<string, number>;
+    topPatterns: Array<{ reportedUserId: string; count: number; weight: number }>;
+    criticalOpenOver1h: number;
+    activeBansLast24h: number;
+    unclaimedPending: number;
+    totalPending: number;
+    generatedAt: string;
+  }>;
+  getReportsPatterns(opts?: { minCount?: number; days?: number; limit?: number }): Promise<Array<{
+    reportedUserId: string;
+    nickname: string | null;
+    userType: string | null;
+    count: number;
+    weight: number;
+    lastReportAt: string | null;
+    statusBreakdown: Record<string, number>;
+  }>>;
+  getActiveBans(): Promise<Array<{
+    userId: string;
+    nickname: string;
+    userType: string | null;
+    type: "shadow" | "suspended" | "blocked";
+    reason: string | null;
+    shadowBannedAt: string | null;
+    shadowBannedUntil: string | null;
+    updatedAt: string | null;
+  }>>;
+  claimReport(id: string, moderatorId: string): Promise<Report | null>;
+  unclaimReport(id: string, moderatorId: string): Promise<Report | null>;
+  unbanUser(userId: string): Promise<boolean>;
   createModeratorLog(log: InsertModeratorLog): Promise<ModeratorLog>;
   getActiveCampaigns(): Promise<AdCampaign[]>;
   getActiveAdsByUserType(userType: string): Promise<AdCampaign[]>;

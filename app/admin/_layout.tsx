@@ -38,6 +38,12 @@ export default function AdminLayout() {
       <Stack.Screen name="sensors" options={{ headerShown: false }} />
       <Stack.Screen name="moderator-logs" options={{ title: "Log Moderatori" }} />
       <Stack.Screen name="false-reports" options={{ title: "False Segnalazioni" }} />
+      <Stack.Screen name="reports-hub" options={{ title: "Hub Report" }} />
+      <Stack.Screen name="reports-by-category" options={{ title: "Report per Categoria" }} />
+      <Stack.Screen name="reports-by-role" options={{ title: "Report per Ruolo" }} />
+      <Stack.Screen name="reports-patterns" options={{ title: "Pattern Segnalazioni" }} />
+      <Stack.Screen name="active-bans" options={{ title: "Ban Attivi" }} />
+      <Stack.Screen name="reports-thresholds" options={{ title: "Soglie & Policy" }} />
       <Stack.Screen name="blocks" options={{ title: "Blocchi tra utenti" }} />
       <Stack.Screen name="crash-logs" options={{ title: "Log Riavvii App" }} />
       <Stack.Screen name="newsletter" options={{ title: "Iscritti Newsletter" }} />

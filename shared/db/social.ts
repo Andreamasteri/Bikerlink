@@ -108,12 +108,16 @@ export const reports = pgTable("reports", {
   severity: varchar("severity", { length: 10 }).notNull().default("low"),
   affectedFeedbackLoop: boolean("affected_feedback_loop").notNull().default(false),
   reporterTrustScore: doublePrecision("reporter_trust_score").notNull().default(1.0),
+  // Task #2531 — claim system: ogni report può essere preso in carico da un moderatore.
+  assignedModeratorId: varchar("assigned_moderator_id", { length: 36 }),
+  assignedAt: timestamp("assigned_at"),
 }, (table) => [
   index("reports_status_idx").on(table.status),
   index("reports_category_idx").on(table.category),
   index("reports_reported_user_idx").on(table.reportedUserId),
   index("reports_severity_status_idx").on(table.severity, table.status),
   index("reports_reporter_idx").on(table.reporterId),
+  index("reports_assigned_moderator_idx").on(table.assignedModeratorId),
 ]);
 
 // Task #2530 — soglie configurabili (biker/zavorrina) per notify/shadow_ban.

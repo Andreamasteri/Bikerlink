@@ -196,8 +196,23 @@ const adminGroups: AdminGroup[] = [
       { key: "users", label: "Utenti", icon: "people", iconSet: "MaterialIcons", route: "/admin/users" },
       { key: "stregatti", label: "Stregatti", icon: "robot", iconSet: "MaterialCommunityIcons", route: "/admin/stregatti" },
       { key: "blocks", label: "Blocchi", icon: "ban", iconSet: "Ionicons", route: "/admin/blocks" },
-      { key: "reports", label: "Bugs & Co", icon: "flag", iconSet: "MaterialIcons", route: "/admin/reports" },
-      { key: "false-reports", label: "False Segnalazioni", icon: "shield-alert-outline", iconSet: "MaterialCommunityIcons", route: "/admin/false-reports", accentColor: "#FF9500" },
+    ],
+  },
+  // Task #2531 — gruppo "Report" autonomo: hub + tutte le sotto-viste.
+  {
+    title: "Report",
+    headerIcon: "flag-variant",
+    headerIconSet: "MaterialCommunityIcons",
+    items: [
+      { key: "reports-hub", label: "Hub Report", icon: "view-dashboard-variant", iconSet: "MaterialCommunityIcons", route: "/admin/reports-hub", accentColor: "#FF3B30" },
+      { key: "reports", label: "Coda Segnalazioni", icon: "flag", iconSet: "MaterialIcons", route: "/admin/reports", accentColor: "#FF9500" },
+      { key: "reports-by-category", label: "Per Categoria", icon: "shape-outline", iconSet: "MaterialCommunityIcons", route: "/admin/reports-by-category", accentColor: "#0EA5E9" },
+      { key: "reports-by-role", label: "Per Ruolo", icon: "account-group-outline", iconSet: "MaterialCommunityIcons", route: "/admin/reports-by-role", accentColor: "#10B981" },
+      { key: "reports-patterns", label: "Pattern", icon: "chart-bell-curve", iconSet: "MaterialCommunityIcons", route: "/admin/reports-patterns", accentColor: "#E91E63" },
+      { key: "false-reports", label: "Falsi Report", icon: "shield-alert-outline", iconSet: "MaterialCommunityIcons", route: "/admin/false-reports", accentColor: "#9C27B0" },
+      { key: "active-bans", label: "Ban Attivi", icon: "account-cancel-outline", iconSet: "MaterialCommunityIcons", route: "/admin/active-bans", accentColor: "#FF3B30" },
+      { key: "moderator-logs", label: "Log Moderatori", icon: "shield-account-outline", iconSet: "MaterialCommunityIcons", route: "/admin/moderator-logs", accentColor: "#6366F1" },
+      { key: "reports-thresholds", label: "Soglie & Policy", icon: "tune-variant", iconSet: "MaterialCommunityIcons", route: "/admin/reports-thresholds", accentColor: "#22C55E" },
     ],
   },
   {
