@@ -1,8 +1,12 @@
 import { Router, type Request, type Response } from "express";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { db } from "../../db";
-import { otaReleases, appSettings } from "@shared/db";
+import { otaReleases } from "@shared/db";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
+
+const execFileAsync = promisify(execFile);
 
 const router = Router();
 
@@ -32,19 +36,9 @@ async function easGraphQL(query: string, variables?: Record<string, unknown>): P
   return json.data;
 }
 
-async function getDirectApplySetting(): Promise<boolean> {
-  const [row] = await db.select({ value: appSettings.value })
-    .from(appSettings)
-    .where(eq(appSettings.key, "ota_direct_apply"))
-    .limit(1);
-  // Default ON: gli admin ricevono le OTA pending per testarle prima dell'approvazione.
-  if (!row) return true;
-  return row.value === "true";
-}
-
 // Sincronizza il branch EAS `production` nel DB locale per tracking admin.
-// La distribuzione effettiva è gestita da EAS (`u.expo.dev`) direttamente —
-// questa funzione serve SOLO per popolare il pannello admin con la cronologia.
+// Task #2503: i nuovi update sincronizzati da EAS finiscono come `pending` —
+// l'admin li approva poi manualmente dal pannello.
 async function syncProductionUpdates(): Promise<void> {
   const query = `
     query GetBranchUpdates($appId: String!) {
@@ -87,18 +81,16 @@ async function syncProductionUpdates(): Promise<void> {
 
     if (existing.length > 0) continue;
 
-    // Tutti gli update sul branch production sono GIÀ distribuiti da EAS.
-    // Li salviamo come `approved` direttamente — nessun workflow di approvazione.
+    // Task #2503: i nuovi update vengono sempre inseriti come `pending`.
+    // L'admin li testa via cold-start su account admin e poi approva dal pannello.
     await db.insert(otaReleases).values({
       easUpdateId: upd.id,
       easGroupId: upd.group ?? null,
       channel: "production",
       runtimeVersion: upd.runtimeVersion ?? null,
       message: upd.message ?? null,
-      status: "approved",
+      status: "pending",
       publishedAt: upd.createdAt ? new Date(upd.createdAt) : new Date(),
-      approvedAt: new Date(),
-      approvedBy: null,
     }).onConflictDoNothing();
   }
 
@@ -111,7 +103,7 @@ async function syncProductionUpdates(): Promise<void> {
   }
 }
 
-// GET /api/admin/ota/releases
+// GET /api/admin/ota/releases — restituisce tutto lo storico release con telemetria
 router.get("/releases", async (req: Request, res: Response) => {
   try {
     const status = typeof req.query.status === "string" ? req.query.status : undefined;
@@ -136,7 +128,7 @@ router.get("/releases", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/ota/:id/approve
+// POST /api/admin/ota/:id/approve — promuove la release a `approved` (visibile a tutti gli utenti)
 router.post("/:id/approve", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -150,6 +142,7 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
       return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
     }
 
+    // UPDATE atomico con guard sullo status — previene race con worker auto-rollback o doppio click
     const [updated] = await db
       .update(otaReleases)
       .set({
@@ -158,9 +151,14 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
         approvedBy: userId,
         channel: "production",
       })
-      .where(eq(otaReleases.id, id))
+      .where(and(eq(otaReleases.id, id), eq(otaReleases.status, "pending")))
       .returning();
 
+    if (!updated) {
+      return sendError(res, 409, "Lo stato della release è cambiato (race con altro admin o auto-rollback). Ricarica e riprova.");
+    }
+
+    console.log(`[ota][AUDIT] release ${id} (${release.easUpdateId}) APPROVED by user ${userId}`);
     return res.json(updated);
   } catch (err) {
     console.error("[ota] POST /:id/approve error:", err);
@@ -168,7 +166,7 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/ota/:id/reject
+// POST /api/admin/ota/:id/reject — marca come rifiutata (nessun utente, neanche admin, la riceve)
 router.post("/:id/reject", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -178,6 +176,7 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
     if (!release) return sendError(res, 404, "OTA release non trovata");
     if (release.status !== "pending") return sendError(res, 400, `Stato non valido: ${release.status} (atteso: pending)`);
 
+    // UPDATE atomico con guard sullo status — previene race con worker auto-rollback o doppio click
     const [updated] = await db
       .update(otaReleases)
       .set({
@@ -185,9 +184,14 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
         rejectedAt: new Date(),
         rejectedBy: userId,
       })
-      .where(eq(otaReleases.id, id))
+      .where(and(eq(otaReleases.id, id), eq(otaReleases.status, "pending")))
       .returning();
 
+    if (!updated) {
+      return sendError(res, 409, "Lo stato della release è cambiato (race con altro admin o auto-rollback). Ricarica e riprova.");
+    }
+
+    console.log(`[ota][AUDIT] release ${id} (${release.easUpdateId}) REJECTED by user ${userId}`);
     return res.json(updated);
   } catch (err) {
     console.error("[ota] POST /:id/reject error:", err);
@@ -195,7 +199,7 @@ router.post("/:id/reject", async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/admin/ota/:id/try
+// GET /api/admin/ota/:id/try — utility legacy per costruire URL manifest manuale
 router.get("/:id/try", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -218,7 +222,9 @@ router.get("/:id/try", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/admin/ota/:id/rollback — ri-promuove una release approvata su production
+// POST /api/admin/ota/:id/rollback
+// Task #2503: rollback VERO — ri-pubblica su EAS production il bundle della release indicata
+// via `eas update --republish --group=<groupId>` e inserisce una nuova riga `approved` nel DB.
 router.post("/:id/rollback", async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
@@ -226,30 +232,128 @@ router.post("/:id/rollback", async (req: Request, res: Response) => {
 
     const [release] = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
     if (!release) return sendError(res, 404, "OTA release non trovata");
-    if (release.status !== "approved") return sendError(res, 400, `Rollback disponibile solo per release approvate (stato attuale: ${release.status})`);
-
+    if (release.status !== "approved") {
+      return sendError(res, 400, `Rollback disponibile solo per release approvate (stato attuale: ${release.status})`);
+    }
     if (!release.easGroupId) {
       return sendError(res, 400, "Questa release non ha un groupId EAS. Ri-sincronizza prima dal pannello admin (pulsante Sync).");
     }
+    if (!process.env.EAS_TOKEN) {
+      return sendError(res, 500, "EAS_TOKEN non configurato sul server — impossibile eseguire republish");
+    }
 
-    const [updated] = await db
-      .update(otaReleases)
-      .set({
+    const rollbackMessage = `Rollback to ${release.otaVersion ?? release.easUpdateId.slice(0, 8)} (by admin)`;
+
+    let stdoutText = "";
+    let stderrText = "";
+    try {
+      const { stdout, stderr } = await execFileAsync(
+        "npx",
+        [
+          "eas",
+          "update",
+          "--republish",
+          "--group",
+          release.easGroupId,
+          "--message",
+          rollbackMessage,
+          "--non-interactive",
+        ],
+        {
+          env: {
+            ...process.env,
+            EXPO_TOKEN: process.env.EAS_TOKEN,
+            EAS_NO_VCS: "1",
+            EAS_SKIP_AUTO_FINGERPRINT: "1",
+          },
+          timeout: 120_000,
+          maxBuffer: 10 * 1024 * 1024,
+        },
+      );
+      stdoutText = stdout || "";
+      stderrText = stderr || "";
+    } catch (err) {
+      const e = err as { stdout?: string; stderr?: string; message?: string };
+      console.error("[ota] rollback eas update --republish FAILED:", e.message, e.stdout, e.stderr);
+      return sendError(res, 500, `EAS republish fallito: ${(e.stderr || e.message || "errore sconosciuto").slice(0, 400)}`);
+    }
+
+    const output = `${stdoutText}\n${stderrText}`;
+    // Parsing STRICT: l'output di `eas update --republish` deve contenere chiaramente
+    // l'updateId e il groupId nuovi. Se non li troviamo non possiamo inventarli —
+    // un fake updateId rompe il gating client-side (`incomingId !== allowedEasUpdateId` sempre).
+    const updateIdMatch = output.match(/Android update ID\s+([a-f0-9-]{36})/i)
+      ?? output.match(/iOS update ID\s+([a-f0-9-]{36})/i)
+      ?? output.match(/Update ID\s+([a-f0-9-]{36})/i);
+    const groupIdMatch = output.match(/Update group ID\s+([a-f0-9-]{36})/i);
+    if (!updateIdMatch || !groupIdMatch) {
+      console.error("[ota] rollback parse FAILED — output:\n", output.slice(0, 4000));
+      return sendError(res, 500, "EAS republish completato ma impossibile parsare updateId/groupId dall'output. Verifica manualmente su EAS e ri-esegui Sync.");
+    }
+    const newUpdateId = updateIdMatch[1];
+    const newGroupId = groupIdMatch[1];
+
+    // Inserisci la nuova riga (status approved → distribuita subito a tutti)
+    const [inserted] = await db.insert(otaReleases).values({
+      easUpdateId: newUpdateId,
+      easGroupId: newGroupId,
+      channel: "production",
+      runtimeVersion: release.runtimeVersion,
+      message: rollbackMessage,
+      otaVersion: release.otaVersion ? `${release.otaVersion}-rb` : null,
+      status: "approved",
+      publishedAt: new Date(),
+      approvedAt: new Date(),
+      approvedBy: userId,
+    }).onConflictDoUpdate({
+      target: otaReleases.easUpdateId,
+      set: {
+        status: "approved",
         approvedAt: new Date(),
         approvedBy: userId,
         channel: "production",
-      })
-      .where(eq(otaReleases.id, id))
-      .returning();
+        easGroupId: newGroupId,
+      },
+    }).returning();
 
-    return res.json(updated);
+    console.log(`[ota][AUDIT] rollback to release ${id} (${release.easUpdateId}) by user ${userId} → new updateId ${newUpdateId}`);
+    return res.json({ ok: true, rolledBackFrom: id, newRelease: inserted, output: output.slice(0, 2000) });
   } catch (err) {
     console.error("[ota] POST /:id/rollback error:", err);
     return sendError(res, 500, "Errore rollback OTA");
   }
 });
 
-// POST /api/admin/ota/sync — forza sync manuale da EAS
+// POST /api/admin/ota/:id/auto-rollback — toggle/aggiorna config auto-rollback per la release
+router.post("/:id/auto-rollback", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const body = req.body as {
+      enabled?: unknown;
+      threshold?: unknown;
+      minDownloads?: unknown;
+      windowMinutes?: unknown;
+    };
+
+    const patch: Partial<typeof otaReleases.$inferInsert> = {};
+    if (typeof body.enabled === "boolean") patch.autoRollbackEnabled = body.enabled;
+    if (typeof body.threshold === "number" && body.threshold >= 1 && body.threshold <= 100) patch.autoRollbackThreshold = Math.round(body.threshold);
+    if (typeof body.minDownloads === "number" && body.minDownloads >= 1) patch.autoRollbackMinDownloads = Math.round(body.minDownloads);
+    if (typeof body.windowMinutes === "number" && body.windowMinutes >= 1) patch.autoRollbackWindowMinutes = Math.round(body.windowMinutes);
+
+    if (Object.keys(patch).length === 0) return sendError(res, 400, "Nessun campo valido da aggiornare");
+
+    const [updated] = await db.update(otaReleases).set(patch).where(eq(otaReleases.id, id)).returning();
+    if (!updated) return sendError(res, 404, "OTA release non trovata");
+
+    return res.json(updated);
+  } catch (err) {
+    console.error("[ota] POST /:id/auto-rollback error:", err);
+    return sendError(res, 500, "Errore aggiornamento config auto-rollback");
+  }
+});
+
+// POST /api/admin/ota/sync — sync manuale da EAS
 router.post("/sync", async (_req: Request, res: Response) => {
   try {
     await syncProductionUpdates();
@@ -258,35 +362,6 @@ router.post("/sync", async (_req: Request, res: Response) => {
   } catch (err) {
     console.error("[ota] POST /sync error:", err);
     return sendError(res, 500, "Errore sync OTA da EAS");
-  }
-});
-
-// GET /api/admin/ota/settings — legge il setting ota_direct_apply
-router.get("/settings", async (_req: Request, res: Response) => {
-  try {
-    const directApply = await getDirectApplySetting();
-    return res.json({ directApply });
-  } catch (err) {
-    console.error("[ota] GET /settings error:", err);
-    return sendError(res, 500, "Errore lettura impostazioni OTA");
-  }
-});
-
-// POST /api/admin/ota/settings — upsert ota_direct_apply
-router.post("/settings", async (req: Request, res: Response) => {
-  try {
-    const { directApply } = req.body as { directApply?: unknown };
-    if (typeof directApply !== "boolean") {
-      return sendError(res, 400, "Campo 'directApply' obbligatorio (booleano)");
-    }
-    const value = directApply ? "true" : "false";
-    await db.insert(appSettings)
-      .values({ key: "ota_direct_apply", value, description: "Applica OTA direttamente in production senza approvazione manuale" })
-      .onConflictDoUpdate({ target: [appSettings.key], set: { value, updatedAt: new Date() } });
-    return res.json({ directApply });
-  } catch (err) {
-    console.error("[ota] POST /settings error:", err);
-    return sendError(res, 500, "Errore salvataggio impostazioni OTA");
   }
 });
 

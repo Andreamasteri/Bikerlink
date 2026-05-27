@@ -85,6 +85,21 @@ Dopo la scheda, l'agente chiede: **"Hai preferenze su come risolvere, o procedo 
 
 **"Pubblica l'OTA"** significa SOLO pubblicare una OTA (Over-the-Air update). NON avviare mai una build EAS (APK/AAB) in risposta a questo comando. La build EAS è un'operazione separata e richiede autorizzazione esplicita come da sezione "APK Build — Regola Obbligatoria".
 
+## Sistema OTA — Approvazione Admin (Task #2503)
+
+Il sistema OTA di BikerLink usa un **flusso fisso a singolo binario, senza toggle e senza modalità alternative**:
+
+1. **Publish** (`scripts/publish-ota-full.sh`): ordine atomico — prima `eas update --channel production`, parse `easUpdateId`/`easGroupId`, poi INSERT in `ota_releases` con `status='pending'` (sempre, senza condizioni), poi aggiorna `constants/buildInfo.ts` e push GitHub. Se EAS fallisce, `buildInfo.ts` NON viene modificato e niente git push.
+2. **Gating server-side** (`GET /api/ota/manifest`): il client chiama questo endpoint PRIMA di parlare con EAS. Admin (`role='admin'`) riceve l'ultima release con status IN (`pending`, `approved`). Utenti normali e anonimi ricevono solo `approved`. Se l'updateId riportato da expo-updates non combacia con `allowedEasUpdateId`, il client annulla il download.
+3. **Telemetria** (`POST /api/ota/event`): il client emette `downloaded` al fetch e `boot_success` dopo 8s di app stabile sul nuovo bundle. Dedup per `(release_id, device_id, event_type)` via UNIQUE INDEX.
+4. **Approve/Reject** dal pannello `/admin/ota`. Il **Rollback** ri-esegue `eas update --republish --group=<groupId>` via `execFile` server-side e inserisce una nuova riga `approved`.
+5. **Auto-rollback** è opt-in per singola release (OFF di default): se `auto_rollback_enabled=true` e `(boot_success_count/download_count)*100 < threshold` con `download_count >= min_downloads` e `age > window_minutes`, un worker (`server/jobs/ota-auto-rollback.ts`, schedule 5 min) marca automaticamente la release come `rejected`. Non interrompe download in corso.
+
+**Regole obbligatorie:**
+- **Bump runtimeVersion**: se aggiungi un modulo nativo (qualsiasi `expo-*` non puramente JS, o pacchetti con codice nativo Android/iOS), bumpa `runtimeVersion` in `app.json` E richiedi una nuova build nativa PRIMA di pubblicare OTA. Una OTA con runtimeVersion incompatibile crasha il device.
+- **Nessun toggle bypass**: il flusso `pending → admin testa → approved` è sempre obbligatorio. Non esiste più il setting `ota_direct_apply` né gli endpoint `GET/POST /api/admin/ota/settings`. Non re-introdurli.
+- **`checkAutomatically: "NEVER"`** in `app.json` — disabilita l'auto-check nativo di expo-updates. Ha effetto solo dalla prossima build nativa: utenti su build pre-`NEVER` potrebbero ancora ricevere il pending bundle nativamente (gating lato client mitiga ma non elimina del tutto).
+
 ## NOTA CRITICA — Dispositivo utente
 **L'utente usa ANDROID** come dispositivo principale di test. Tutte le funzionalità devono essere verificate su Android prima di tutto. iOS è secondario. Non assumere mai che qualcosa funzioni "su iOS quindi funzionerà su Android" — testare sempre il contrario.
 

@@ -262,6 +262,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     }, FIFTEEN_MIN_MS);
     console.log("[INIT] OTA cron scheduled every 15 min");
 
+    // Task #2503 — worker auto-rollback OTA (ogni 5 min). Marca come rejected le release
+    // con auto_rollback_enabled=true se boot success rate < soglia con abbastanza download.
+    const FIVE_MIN_MS = 5 * 60 * 1000;
+    const { runOtaAutoRollback } = await import("./jobs/ota-auto-rollback");
+    setInterval(() => {
+      runOtaAutoRollback().catch((e) => console.warn("[OTA-AUTO-ROLLBACK] worker error:", e));
+    }, FIVE_MIN_MS);
+    console.log("[INIT] OTA auto-rollback worker scheduled every 5 min");
+
     // Motion simulator for fake users — fire-and-forget so it cannot hang boot
     import("./motion-simulator")
       .then(({ startMotionSimulator }) => startMotionSimulator())

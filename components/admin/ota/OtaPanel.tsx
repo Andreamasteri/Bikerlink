@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Platform,
+  TextInput,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Updates from "expo-updates";
@@ -28,14 +29,20 @@ interface OtaRelease {
   approvedBy: string | null;
   rejectedAt: string | null;
   rejectedBy: string | null;
+  bootSuccessCount: number;
+  bootFailureCount: number;
+  downloadCount: number;
+  autoRollbackEnabled: boolean;
+  autoRollbackThreshold: number;
+  autoRollbackMinDownloads: number;
+  autoRollbackWindowMinutes: number;
+  autoRolledBackAt: string | null;
 }
 
 function extractOtaNumber(release: OtaRelease, fallbackIndex: number): string {
   if (release.otaVersion) {
-    // Nuovo formato: BUILD.RUNTIME.OTA (es. 53.10.9) → terzo segmento
     const triplet = release.otaVersion.match(/^\d+\.\d+\.(\d+)$/);
     if (triplet) return triplet[1];
-    // Legacy: "OTA-9" o "OTA9"
     const legacy = release.otaVersion.match(/OTA-?(\d+)/i);
     if (legacy) return legacy[1];
   }
@@ -64,6 +71,11 @@ function formatDate(dateStr: string | null): string {
   } catch { return dateStr; }
 }
 
+function bootSuccessRate(r: OtaRelease): number | null {
+  if (r.downloadCount <= 0) return null;
+  return Math.round((r.bootSuccessCount / r.downloadCount) * 100);
+}
+
 export default function OtaPanel() {
   const { colors } = useTheme();
   const qc = useQueryClient();
@@ -72,8 +84,8 @@ export default function OtaPanel() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rollingBackId, setRollingBackId] = useState<string | null>(null);
   const [forcingUpdate, setForcingUpdate] = useState(false);
-
   const [syncing, setSyncing] = useState(false);
+  const [expandedAutoId, setExpandedAutoId] = useState<string | null>(null);
 
   const { data: releases, isLoading, refetch, isFetching } = useQuery<OtaRelease[]>({
     queryKey: ["/api/admin/ota/releases"],
@@ -102,22 +114,6 @@ export default function OtaPanel() {
       ]
     );
   }, [qc]);
-
-  const { data: settings, isLoading: settingsLoading } = useQuery<{ directApply: boolean }>({
-    queryKey: ["/api/admin/ota/settings"],
-  });
-
-  const settingsMutation = useMutation({
-    mutationFn: (directApply: boolean) =>
-      apiRequest("POST", "/api/admin/ota/settings", { directApply }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/admin/ota/settings"] });
-    },
-    onError: (err: Error) => {
-      Alert.alert("Errore", err.message || "Impossibile salvare le impostazioni");
-      qc.invalidateQueries({ queryKey: ["/api/admin/ota/settings"] });
-    },
-  });
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => apiRequest("POST", `/api/admin/ota/${id}/approve`),
@@ -148,10 +144,22 @@ export default function OtaPanel() {
     onSuccess: () => {
       setRollingBackId(null);
       qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+      Alert.alert("Rollback eseguito", "La release è stata ri-pubblicata su EAS production. Gli utenti la riceveranno al prossimo cold start.");
     },
     onError: (err: Error) => {
       setRollingBackId(null);
       Alert.alert("Errore rollback", err.message || "Impossibile eseguire il rollback");
+    },
+  });
+
+  const autoRollbackMutation = useMutation({
+    mutationFn: (params: { id: string; patch: Record<string, unknown> }) =>
+      apiRequest("POST", `/api/admin/ota/${params.id}/auto-rollback`, params.patch),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] });
+    },
+    onError: (err: Error) => {
+      Alert.alert("Errore", err.message || "Impossibile aggiornare config auto-rollback");
     },
   });
 
@@ -175,7 +183,7 @@ export default function OtaPanel() {
   const handleReject = useCallback((release: OtaRelease) => {
     Alert.alert(
       "Rifiuta OTA",
-      "L'OTA verrà archiviata e non distribuita.",
+      "L'OTA verrà archiviata e non distribuita a nessun utente (nemmeno admin).",
       [
         { text: "Annulla", style: "cancel" },
         {
@@ -192,8 +200,8 @@ export default function OtaPanel() {
 
   const handleRollback = useCallback((release: OtaRelease) => {
     Alert.alert(
-      "Rollback OTA",
-      `Ri-promuovere questa release su production?\n\nVersione: ${release.otaVersion ?? release.easUpdateId.slice(0, 8)}\nMessaggio: ${release.message ?? "—"}\n\nGli utenti riceveranno questa versione precedente.`,
+      "Rollback su EAS production",
+      `Ri-pubblicare il bundle di questa release su production?\n\nVersione: ${release.otaVersion ?? release.easUpdateId.slice(0, 8)}\nMessaggio: ${release.message ?? "—"}\n\nViene chiamato 'eas update --republish' sul server: gli utenti riceveranno questo bundle al prossimo cold start.`,
       [
         { text: "Annulla", style: "cancel" },
         {
@@ -255,7 +263,7 @@ export default function OtaPanel() {
           [{ text: "Riavvia", onPress: () => Updates.reloadAsync() }]
         );
       } else {
-        Alert.alert("Nessun aggiornamento", "Nessun nuovo update trovato su staging.");
+        Alert.alert("Nessun aggiornamento", "Bundle già presente o gating server non autorizza il download.");
       }
     } catch (err: unknown) {
       Alert.alert("Errore", err instanceof Error ? err.message : "Impossibile scaricare l'OTA");
@@ -284,7 +292,97 @@ export default function OtaPanel() {
   const pending = (releases ?? []).filter((r) => r.status === "pending");
   const history = (releases ?? []).filter((r) => r.status !== "pending");
 
-  const directApply = settings?.directApply ?? false;
+  const renderCounters = (release: OtaRelease) => {
+    const rate = bootSuccessRate(release);
+    return (
+      <View style={styles.countersRow}>
+        <View style={[styles.counterChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
+          <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Download</Text>
+          <Text style={[styles.counterValue, { color: colors.text }]}>{release.downloadCount}</Text>
+        </View>
+        <View style={[styles.counterChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
+          <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Boot OK</Text>
+          <Text style={[styles.counterValue, { color: colors.success }]}>{release.bootSuccessCount}</Text>
+        </View>
+        <View style={[styles.counterChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
+          <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Boot FAIL</Text>
+          <Text style={[styles.counterValue, { color: release.bootFailureCount > 0 ? colors.error : colors.text }]}>{release.bootFailureCount}</Text>
+        </View>
+        <View style={[styles.counterChip, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
+          <Text style={[styles.counterLabel, { color: colors.textSecondary }]}>Success rate</Text>
+          <Text style={[styles.counterValue, { color: rate == null ? colors.textSecondary : rate >= 70 ? colors.success : colors.error }]}>
+            {rate == null ? "—" : `${rate}%`}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderAutoRollback = (release: OtaRelease) => {
+    const expanded = expandedAutoId === release.id;
+    return (
+      <View style={[styles.autoRollbackBox, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
+        <View style={styles.autoRollbackHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.autoRollbackTitle, { color: colors.text }]}>Auto-rollback</Text>
+            <Text style={[styles.autoRollbackHint, { color: colors.textSecondary }]}>
+              {release.autoRollbackEnabled
+                ? `ATTIVO — se boot success <${release.autoRollbackThreshold}% con ≥${release.autoRollbackMinDownloads} download dopo ${release.autoRollbackWindowMinutes}min → auto-reject`
+                : "OFF — rollback solo manuale da questo pannello"}
+            </Text>
+            {release.autoRolledBackAt && (
+              <Text style={[styles.autoRollbackHint, { color: colors.error }]}>
+                ⚠ Auto-rollback eseguito il {formatDate(release.autoRolledBackAt)}
+              </Text>
+            )}
+          </View>
+          <Switch
+            value={release.autoRollbackEnabled}
+            onValueChange={(val) => autoRollbackMutation.mutate({ id: release.id, patch: { enabled: val } })}
+            disabled={autoRollbackMutation.isPending}
+            trackColor={{ false: colors.border, true: colors.success }}
+            thumbColor={release.autoRollbackEnabled ? "#fff" : colors.textSecondary}
+          />
+        </View>
+        {release.autoRollbackEnabled && (
+          <>
+            <TouchableOpacity onPress={() => setExpandedAutoId(expanded ? null : release.id)} style={styles.expandToggle}>
+              <Text style={[styles.expandToggleText, { color: colors.accent }]}>{expanded ? "▲ Nascondi parametri" : "▼ Modifica parametri"}</Text>
+            </TouchableOpacity>
+            {expanded && (
+              <View style={styles.autoRollbackFields}>
+                <AutoRollbackField
+                  label="Soglia % boot success"
+                  value={release.autoRollbackThreshold}
+                  onCommit={(n) => autoRollbackMutation.mutate({ id: release.id, patch: { threshold: n } })}
+                  min={1}
+                  max={100}
+                  suffix="%"
+                  colors={colors}
+                />
+                <AutoRollbackField
+                  label="Min downloads"
+                  value={release.autoRollbackMinDownloads}
+                  onCommit={(n) => autoRollbackMutation.mutate({ id: release.id, patch: { minDownloads: n } })}
+                  min={1}
+                  max={1000}
+                  colors={colors}
+                />
+                <AutoRollbackField
+                  label="Finestra (min)"
+                  value={release.autoRollbackWindowMinutes}
+                  onCommit={(n) => autoRollbackMutation.mutate({ id: release.id, patch: { windowMinutes: n } })}
+                  min={1}
+                  max={1440}
+                  colors={colors}
+                />
+              </View>
+            )}
+          </>
+        )}
+      </View>
+    );
+  };
 
   return (
     <View>
@@ -312,6 +410,15 @@ export default function OtaPanel() {
         </View>
       </View>
 
+      <View style={[styles.infoBanner, { backgroundColor: colors.accent + "11", borderColor: colors.accent + "55" }]}>
+        <Text style={[styles.infoBannerText, { color: colors.text }]}>
+          <Text style={{ fontWeight: "700" }}>Flusso OTA</Text> — Quando pubblichi una OTA è{" "}
+          <Text style={{ fontWeight: "700" }}>pending</Text>: solo gli account admin la ricevono al cold start per testarla.
+          Dopo aver verificato che funziona, click <Text style={{ fontWeight: "700" }}>Approva</Text> e la OTA viene distribuita a tutti gli utenti al loro prossimo cold start.
+          Se rilevi un problema, click <Text style={{ fontWeight: "700" }}>Rifiuta</Text>. Il flusso è fisso: non esiste un toggle per saltare la fase di test.
+        </Text>
+      </View>
+
       <TouchableOpacity
         style={[styles.forceUpdateBtn, { backgroundColor: colors.accent }]}
         onPress={handleForceUpdate}
@@ -322,35 +429,11 @@ export default function OtaPanel() {
           : <Text style={styles.forceUpdateText}>⚡ Forza Aggiornamento OTA su questo dispositivo</Text>}
       </TouchableOpacity>
 
-      <View style={[styles.directApplyRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={styles.directApplyLeft}>
-          <Text style={[styles.directApplyLabel, { color: colors.text }]}>Approvazione admin</Text>
-          {settingsLoading
-            ? null
-            : directApply
-              ? <Text style={[styles.directApplyNote, { color: colors.success }]}>
-                  Attiva — le OTA pubblicate restano in pending finché un admin non le testa e approva. Solo allora vengono distribuite a tutti gli utenti.
-                </Text>
-              : <Text style={[styles.directApplyNote, { color: colors.textSecondary }]}>
-                  Disattiva — le OTA pubblicate vengono distribuite direttamente a tutti gli utenti, senza ciclo di approvazione.
-                </Text>}
-        </View>
-        {settingsLoading
-          ? <ActivityIndicator size="small" color={colors.accent} />
-          : <Switch
-              value={directApply}
-              onValueChange={(val) => settingsMutation.mutate(val)}
-              disabled={settingsMutation.isPending}
-              trackColor={{ false: colors.border, true: colors.success }}
-              thumbColor={directApply ? "#fff" : colors.textSecondary}
-            />}
-      </View>
-
       {pending.length === 0 && (
         <View style={[styles.emptyBox, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Nessuna OTA in attesa</Text>
           <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-            Pubblica con: ./scripts/publish-ota.sh --message "..."
+            Pubblica con: ./scripts/publish-ota-full.sh
           </Text>
         </View>
       )}
@@ -397,6 +480,9 @@ export default function OtaPanel() {
             {release.runtimeVersion && (
               <Text style={[styles.metaText, { color: colors.textSecondary }]}>Runtime: {release.runtimeVersion}</Text>
             )}
+
+            {renderCounters(release)}
+            {renderAutoRollback(release)}
 
             {!hasGroupId && (
               <View style={[styles.warningBox, { backgroundColor: colors.error + "11", borderColor: colors.error + "44" }]}>
@@ -489,6 +575,9 @@ export default function OtaPanel() {
                   </Text>
                 )}
 
+                {renderCounters(release)}
+                {release.status === "approved" && renderAutoRollback(release)}
+
                 {release.status === "approved" && (
                   <TouchableOpacity
                     style={[styles.rollbackBtn, { borderColor: colors.accent }]}
@@ -497,7 +586,7 @@ export default function OtaPanel() {
                   >
                     {rollingBackId === release.id
                       ? <ActivityIndicator size="small" color={colors.accent} />
-                      : <Text style={[styles.rollbackBtnText, { color: colors.accent }]}>↩ Rollback su Production</Text>}
+                      : <Text style={[styles.rollbackBtnText, { color: colors.accent }]}>↩ Rollback (eas update --republish)</Text>}
                   </TouchableOpacity>
                 )}
               </View>
@@ -505,6 +594,43 @@ export default function OtaPanel() {
           })}
         </>
       )}
+    </View>
+  );
+}
+
+interface AutoRollbackFieldProps {
+  label: string;
+  value: number;
+  onCommit: (n: number) => void;
+  min: number;
+  max: number;
+  suffix?: string;
+  colors: { text: string; textSecondary: string; surface: string; border: string };
+}
+
+function AutoRollbackField({ label, value, onCommit, min, max, suffix, colors }: AutoRollbackFieldProps) {
+  const [draft, setDraft] = useState(String(value));
+  return (
+    <View style={styles.autoFieldRow}>
+      <Text style={[styles.autoFieldLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <View style={[styles.autoFieldInputWrap, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <TextInput
+          style={[styles.autoFieldInput, { color: colors.text }]}
+          value={draft}
+          onChangeText={setDraft}
+          onBlur={() => {
+            const n = parseInt(draft, 10);
+            if (Number.isFinite(n) && n >= min && n <= max && n !== value) {
+              onCommit(n);
+            } else {
+              setDraft(String(value));
+            }
+          }}
+          keyboardType="number-pad"
+          returnKeyType="done"
+        />
+        {suffix ? <Text style={[styles.autoFieldSuffix, { color: colors.textSecondary }]}>{suffix}</Text> : null}
+      </View>
     </View>
   );
 }
@@ -574,27 +700,61 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700" as const,
   },
-  directApplyRow: {
+  infoBanner: {
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 12,
+  },
+  infoBannerText: {
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  countersRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  counterChip: {
+    flexGrow: 1,
+    minWidth: 70,
+    borderRadius: 6,
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    alignItems: "center",
+  },
+  counterLabel: { fontSize: 10, fontWeight: "600" as const, letterSpacing: 0.3, textTransform: "uppercase" },
+  counterValue: { fontSize: 16, fontWeight: "700" as const, marginTop: 2 },
+  autoRollbackBox: {
+    borderRadius: 6,
+    borderWidth: 1,
+    padding: 10,
+    marginTop: 10,
+  },
+  autoRollbackHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    borderRadius: 8,
+  },
+  autoRollbackTitle: { fontSize: 13, fontWeight: "700" as const },
+  autoRollbackHint: { fontSize: 11, marginTop: 2, lineHeight: 15 },
+  expandToggle: { marginTop: 8 },
+  expandToggleText: { fontSize: 12, fontWeight: "600" as const },
+  autoRollbackFields: { marginTop: 8, gap: 6 },
+  autoFieldRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
+  autoFieldLabel: { fontSize: 12, flex: 1 },
+  autoFieldInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 5,
     borderWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 80,
   },
-  directApplyLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
-  directApplyLabel: {
-    fontSize: 14,
-    fontWeight: "600" as const,
-    marginBottom: 2,
-  },
-  directApplyNote: {
-    fontSize: 11,
-    lineHeight: 15,
-  },
+  autoFieldInput: { fontSize: 13, padding: 0, minWidth: 40, textAlign: "right" },
+  autoFieldSuffix: { fontSize: 11, marginLeft: 4 },
 } as const);

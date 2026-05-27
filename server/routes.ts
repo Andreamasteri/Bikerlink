@@ -186,6 +186,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/match-preferences", matchPreferencesRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
+  // Task #2503 — endpoint pubblici OTA (gating manifest + telemetria boot)
+  const { default: otaPublicRouter } = await import("./routes/ota-public");
+  app.use("/api/ota", otaPublicRouter);
 
   app.get("/api/user/position", async (req: Request, res: Response) => {
     if (!req.session.userId) return res.status(401).json({ message: "Non autenticato" });

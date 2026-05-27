@@ -1,18 +1,15 @@
 #!/usr/bin/env bash
-# scripts/publish-ota-full.sh — BikerLink OTA publish completo
+# scripts/publish-ota-full.sh — BikerLink OTA publish atomico (Task #2503)
 #
-# COME USARLO:
-#   1. Scrivi il messaggio in .ota-message (nella root del progetto)
-#   2. Riavvia il workflow "OTA Publish" dal pannello Replit
-#   3. Monitora i log — tutto automatico
+# Ordine atomico:
+#   1. Pubblica su EAS production (può fallire → exit senza toccare buildInfo né git)
+#   2. Estrae UPDATE_ID + GROUP_ID dall'output EAS
+#   3. Inserisce riga in ota_releases con status='pending' (sempre, senza condizioni)
+#   4. SOLO ORA aggiorna constants/buildInfo.ts + push GitHub
 #
-# Cosa fa questo script:
-#   - Legge il messaggio da .ota-message
-#   - Pubblica l'OTA su EAS canale PRODUCTION (bundle Metro, ~5-8 min)
-#   - L'APK riceve l'OTA direttamente da EAS (u.expo.dev) al prossimo avvio
-#   - Salva la release nel DB (tracking per pannello admin)
-#   - Aggiorna APPLIED_OTA_NUMBER in constants/buildInfo.ts
-#   - Fa il push su GitHub
+# Flusso post-publish: la release resta `pending` finché un admin non clicca
+# "Approva" dal pannello /admin/ota. Solo dopo l'approvazione gli utenti normali
+# la ricevono. Gli account admin la ricevono già dal cold start successivo per testarla.
 
 set -euo pipefail
 
@@ -31,10 +28,8 @@ if [[ ! -f "$MSG_FILE" ]]; then
   exit 1
 fi
 
-# Ignora righe vuote e commenti (# ...)
 MESSAGE=$(grep -v '^\s*#' "$MSG_FILE" | tr -d '\r' | sed '/^[[:space:]]*$/d' | head -1)
 
-# Uscita silenziosa se nessun messaggio reale — protegge dall'auto-start di Replit
 if [[ -z "$MESSAGE" ]]; then
   echo "[OTA] Nessun messaggio in .ota-message — pubblicazione saltata."
   echo "[OTA] Per pubblicare: scrivi una riga in .ota-message e riavvia il workflow."
@@ -55,35 +50,19 @@ fi
 
 log_info "EAS_TOKEN: ${#EAS_TOKEN} chars — OK"
 
-# ── 3. Calcola NEXT_OTA dal DB ───────────────────────────────────────────────
-CURRENT_MAX=$(psql "$DATABASE_URL" -tAc "
-  SELECT COALESCE(MAX(
-    CASE WHEN eas_update_id ~ '^[0-9a-f-]{36}$' THEN 0
-         ELSE 0
-    END
-  ), 0)
-  FROM ota_releases
-  WHERE status IN ('approved','pending')
+# ── 3. Calcola numero OTA (informativo) ─────────────────────────────────────
+PENDING_PLUS_APPROVED_COUNT=$(psql "$DATABASE_URL" -tAc "
+  SELECT COUNT(*) FROM ota_releases WHERE status IN ('approved','pending')
 " 2>/dev/null || echo "0")
-
-# Conta le release approvate per derivare il prossimo numero OTA
-APPROVED_COUNT=$(psql "$DATABASE_URL" -tAc "
-  SELECT COUNT(*) FROM ota_releases WHERE status = 'approved'
-" 2>/dev/null || echo "0")
-
-NEXT_OTA=$(( APPROVED_COUNT + 1 ))
+NEXT_OTA=$(( PENDING_PLUS_APPROVED_COUNT + 1 ))
 BUILD_NUM=$(node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode || 53)" 2>/dev/null || echo "53")
-RUNTIME_VER=$(node -e "const a=require('./app.json'); const rv=a.expo.runtimeVersion||'10.0.0'; console.log(rv.split('.')[0])" 2>/dev/null || echo "10")
+RUNTIME_FULL=$(node -e "const a=require('./app.json'); console.log(a.expo.runtimeVersion||'10.0.0')" 2>/dev/null || echo "10.0.0")
+RUNTIME_VER=$(echo "$RUNTIME_FULL" | cut -d. -f1)
 VERSION="${BUILD_NUM}.${RUNTIME_VER}.${NEXT_OTA}"
 
 log_info "Build: ${BUILD_NUM} | NEXT_OTA: ${NEXT_OTA} | Versione: ${VERSION}"
 
-# ── 4. Aggiorna APPLIED_OTA_NUMBER in buildInfo.ts ──────────────────────────
-BUILD_INFO="constants/buildInfo.ts"
-sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${NEXT_OTA};/" "$BUILD_INFO"
-log_ok "APPLIED_OTA_NUMBER aggiornato → ${NEXT_OTA}"
-
-# ── 5. Pubblica su EAS production ────────────────────────────────────────────
+# ── 4. EAS publish FIRST (atomico: se fallisce, niente buildInfo/git) ───────
 log_info "Pubblicazione bundle su EAS production (Metro in corso — attendi 5-8 minuti)..."
 
 EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" \
@@ -92,7 +71,7 @@ EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" 
     --environment production \
     --message "${MESSAGE}" \
     --non-interactive 2>&1) || {
-  log_error "eas update fallito:"
+  log_error "eas update fallito — buildInfo NON modificato, git NON aggiornato:"
   echo "$EAS_OUTPUT"
   exit 1
 }
@@ -113,36 +92,41 @@ fi
 log_ok "Android Update ID : ${UPDATE_ID:-'(vedi output sopra)'}"
 log_ok "Group ID          : ${GROUP_ID:-'(vedi output sopra)'}"
 
-# ── 6. Approva nel DB (status='approved') ────────────────────────────────────
-if [[ -n "$UPDATE_ID" && -n "$GROUP_ID" ]]; then
-  RUNTIME_FULL=$(node -e "const a=require('./app.json'); console.log(a.expo.runtimeVersion||'10.0.0')" 2>/dev/null || echo "10.0.0")
-
-  psql "$DATABASE_URL" -c "
-    INSERT INTO ota_releases (
-      id, eas_update_id, eas_group_id, channel, runtime_version,
-      message, ota_version, status, published_at, approved_at
-    ) VALUES (
-      gen_random_uuid(),
-      '${UPDATE_ID}',
-      '${GROUP_ID}',
-      'production',
-      '${RUNTIME_FULL}',
-      \$\$${MESSAGE}\$\$,
-      '${VERSION}',
-      'approved',
-      NOW(),
-      NOW()
-    )
-    ON CONFLICT (eas_update_id) DO UPDATE SET
-      status       = 'approved',
-      approved_at  = NOW(),
-      channel      = 'production',
-      eas_group_id = EXCLUDED.eas_group_id,
-      ota_version  = EXCLUDED.ota_version;
-  " -q 2>&1 && log_ok "DB: release approvata (${UPDATE_ID})" || log_warn "DB insert fallito — approva manualmente dal pannello admin"
-else
-  log_warn "IDs non estratti — approva manualmente dal pannello admin /admin/ota"
+if [[ -z "$UPDATE_ID" || -z "$GROUP_ID" ]]; then
+  log_error "Impossibile estrarre UPDATE_ID o GROUP_ID dall'output EAS — buildInfo NON modificato"
+  exit 1
 fi
+
+# ── 5. Insert in DB come PENDING (Task #2503: sempre pending, nessuna scorciatoia) ───
+psql "$DATABASE_URL" -c "
+  INSERT INTO ota_releases (
+    id, eas_update_id, eas_group_id, channel, runtime_version,
+    message, ota_version, status, published_at
+  ) VALUES (
+    gen_random_uuid(),
+    '${UPDATE_ID}',
+    '${GROUP_ID}',
+    'production',
+    '${RUNTIME_FULL}',
+    \$\$${MESSAGE}\$\$,
+    '${VERSION}',
+    'pending',
+    NOW()
+  )
+  ON CONFLICT (eas_update_id) DO UPDATE SET
+    status       = 'pending',
+    channel      = 'production',
+    eas_group_id = EXCLUDED.eas_group_id,
+    ota_version  = EXCLUDED.ota_version;
+" -q 2>&1 && log_ok "DB: release inserita come PENDING (${UPDATE_ID}) — admin la testerà al cold-start" || {
+  log_error "DB insert fallito — buildInfo NON modificato"
+  exit 1
+}
+
+# ── 6. Aggiorna APPLIED_OTA_NUMBER in buildInfo.ts (SOLO dopo successo EAS + DB) ──
+BUILD_INFO="constants/buildInfo.ts"
+sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${NEXT_OTA};/" "$BUILD_INFO"
+log_ok "APPLIED_OTA_NUMBER aggiornato → ${NEXT_OTA}"
 
 # ── 7. Svuota .ota-message dopo pubblicazione riuscita ───────────────────────
 echo "" > "$MSG_FILE"
@@ -162,9 +146,10 @@ fi
 # ── Riepilogo finale ──────────────────────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-log_ok "OTA pubblicata con successo!"
+log_ok "OTA pubblicata come PENDING!"
 echo -e "  ${BLUE}Versione OTA${NC}  : ${VERSION}"
-echo -e "  ${BLUE}Update ID${NC}     : ${UPDATE_ID:-'vedi sopra'}"
+echo -e "  ${BLUE}Update ID${NC}     : ${UPDATE_ID}"
 echo -e "  ${BLUE}Messaggio${NC}     : ${MESSAGE}"
-echo -e "  ${BLUE}Stato DB${NC}      : approved → distribuito a tutti gli utenti Android"
+echo -e "  ${BLUE}Stato DB${NC}      : pending → ricevuta SOLO dagli account admin al prossimo cold start"
+echo -e "  ${YELLOW}Prossimo step${NC} : admin testa la OTA, poi click 'Approva' su /admin/ota per distribuirla a tutti"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
