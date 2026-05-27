@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import * as Updates from "expo-updates";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
 const DEVICE_ID_KEY = "@bikerlink/ota_device_id";
 const PENDING_RELEASE_KEY = "@bikerlink/ota_pending_release_id";
@@ -30,7 +30,8 @@ async function postOtaEvent(payload: {
   try {
     await fetch(new URL("/api/ota/event", getApiUrl()).toString(), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // Auth via Bearer (cookie persistence può fallire al cold start in produzione)
+      headers: authFetchHeaders({ "Content-Type": "application/json" }),
       credentials: "include",
       body: JSON.stringify({
         ...payload,
@@ -58,6 +59,9 @@ async function fetchManifest(): Promise<ManifestResponse | null> {
   try {
     const res = await fetch(new URL("/api/ota/manifest", getApiUrl()).toString(), {
       method: "GET",
+      // Auth via Bearer + cookie: senza Bearer un admin con cookie scaduto viene
+      // trattato come utente normale e NON riceve la pending da testare.
+      headers: authFetchHeaders(),
       credentials: "include",
     });
     if (!res.ok) return null;
