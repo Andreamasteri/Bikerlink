@@ -8,22 +8,36 @@ interface MapControlsProps {
   isAvailable: boolean;
   ghostMode: boolean;
   onCenterOnUser: () => void;
+  availabilityBottomOffset?: number;
+  locationButtonBottomOffset?: number;
 }
 
 export function MapControls({
   isAvailable,
   ghostMode,
   onCenterOnUser,
+  availabilityBottomOffset,
+  locationButtonBottomOffset,
 }: MapControlsProps) {
   return (
     <>
-      <View style={styles.controlsContainer}>
+      <View
+        style={[
+          styles.controlsContainer,
+          locationButtonBottomOffset != null && { bottom: locationButtonBottomOffset },
+        ]}
+      >
         <TouchableOpacity style={styles.locationButton} onPress={onCenterOnUser} activeOpacity={0.7}>
           <MaterialCommunityIcons name="crosshairs-gps" size={22} color={Colors.accent} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.availabilityContainer}>
+      <View
+        style={[
+          styles.availabilityContainer,
+          availabilityBottomOffset != null && { bottom: availabilityBottomOffset },
+        ]}
+      >
         <View style={styles.availabilityIndicator}>
           <View style={styles.indicatorRow}>
             <View style={[styles.statusDot, { backgroundColor: isAvailable ? Colors.success : Colors.accentRed }]} />

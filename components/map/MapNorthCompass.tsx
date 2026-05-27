@@ -7,6 +7,7 @@ interface Props {
   onResetBearing: () => void;
   topOffset?: number;
   rightOffset?: number;
+  leftOffset?: number;
   disabled?: boolean;
 }
 
@@ -15,13 +16,14 @@ export function MapNorthCompass({
   onResetBearing,
   topOffset,
   rightOffset,
+  leftOffset,
   disabled,
 }: Props) {
-  const containerStyle = [
-    styles.container,
-    topOffset != null && { top: topOffset },
-    rightOffset != null && { right: rightOffset },
-  ];
+  const positionStyle =
+    leftOffset != null
+      ? { top: topOffset ?? 16, left: leftOffset }
+      : { top: topOffset ?? 16, right: rightOffset ?? 12 };
+  const containerStyle = [styles.container, positionStyle];
   return (
     <TouchableOpacity
       style={containerStyle}
@@ -49,8 +51,6 @@ const SIZE = 44;
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    top: 16,
-    right: 12,
     width: SIZE,
     height: SIZE,
     borderRadius: SIZE / 2,

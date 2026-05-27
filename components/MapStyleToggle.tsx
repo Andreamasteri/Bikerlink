@@ -7,13 +7,14 @@ import { MAP_STYLE_PRESETS, type MapStyleId } from "@/lib/maplibre/style-presets
 interface Props {
   currentStyleId: MapStyleId;
   onSelectStyle: (id: MapStyleId) => void;
+  bottomOffset?: number;
 }
 
 const STYLE_ORDER: MapStyleId[] = ["day", "night", "satellite"];
 
-export function MapStyleToggle({ currentStyleId, onSelectStyle }: Props) {
+export function MapStyleToggle({ currentStyleId, onSelectStyle, bottomOffset }: Props) {
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, bottomOffset != null && { bottom: bottomOffset }]}>
       {STYLE_ORDER.map((id) => {
         const preset = MAP_STYLE_PRESETS[id];
         const active = id === currentStyleId;

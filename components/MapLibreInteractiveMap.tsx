@@ -174,25 +174,34 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
           isAvailable={isAvailable}
           ghostMode={ghostMode}
           onCenterOnUser={handleCenterOnUser}
+          availabilityBottomOffset={filterBarTopOffset != null ? 100 : undefined}
+          locationButtonBottomOffset={filterBarTopOffset != null ? 205 : undefined}
         />
         {mapReady && (
-          <MapStyleToggle currentStyleId={styleId} onSelectStyle={setStyle} />
+          <MapStyleToggle
+            currentStyleId={styleId}
+            onSelectStyle={setStyle}
+            bottomOffset={filterBarTopOffset != null ? 160 : undefined}
+          />
         )}
-        {mapReady && (
+        {mapReady && filterBarTopOffset != null && (
           <MapZoomSlider
             zoom={viewState.zoom}
             minZoom={viewState.minZoom}
             maxZoom={viewState.maxZoom}
             latitude={viewState.lat}
-            topOffset={(filterBarTopOffset ?? 16) + 60}
+            topOffset={filterBarTopOffset + 72}
+            bottomOffset={313}
+            leftOffset={12}
             onZoomChange={handleZoomChange}
           />
         )}
-        {mapReady && (
+        {mapReady && filterBarTopOffset != null && (
           <MapNorthCompass
             bearing={viewState.bearing}
             onResetBearing={handleResetBearing}
-            topOffset={(filterBarTopOffset ?? 16) + 60}
+            topOffset={filterBarTopOffset + 18}
+            leftOffset={12}
           />
         )}
         <MapFilterBar
