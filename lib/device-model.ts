@@ -5,7 +5,7 @@ import { Platform } from "react-native";
 // In build futuri con il modulo nativo, Device sarà popolato correttamente.
 let Device: { modelName?: string | null; manufacturer?: string | null } = {};
 try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+   
   Device = require("expo-device");
 } catch {
   Device = {};

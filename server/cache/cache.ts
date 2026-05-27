@@ -53,7 +53,7 @@ export async function cacheDel(namespace: string, key: string): Promise<void> {
   if (!r) return;
   try {
     await r.del(k(namespace, key));
-  } catch (err) {
+  } catch {
     recordError(namespace);
   }
 }
@@ -74,7 +74,7 @@ export async function cacheDelNamespace(namespace: string): Promise<number> {
         total += keys.length;
       }
     } while (cursor !== "0");
-  } catch (err) {
+  } catch {
     recordError(namespace);
   }
   return total;

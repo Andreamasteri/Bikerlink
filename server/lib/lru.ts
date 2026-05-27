@@ -1,6 +1,6 @@
 import { LRUCache } from "lru-cache";
 
-export type LruOptions<K extends {}, V extends {}> = {
+export type LruOptions<_K extends {}, _V extends {}> = {
   max?: number;
   ttlMs?: number;
 };

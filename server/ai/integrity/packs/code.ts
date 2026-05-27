@@ -186,7 +186,7 @@ const codeDuplicationCheck: AppIntegrityCheck = {
   description: "Detection blocchi duplicati >50 token con jscpd su server/app/lib/hooks/components/shared.",
   async query(ctx) {
     try {
-      const mod: any = await import("jscpd").catch(() => null);
+      const mod = (await import("jscpd").catch(() => null)) as { JSCPD?: new (opts: unknown) => { detect: (paths: string[]) => Promise<unknown> } } | null;
       if (!mod?.JSCPD) {
         return { ok: true, count: 0, sample: [], details: { skipped: "jscpd non installato" } };
       }
@@ -212,8 +212,10 @@ const codeDuplicationCheck: AppIntegrityCheck = {
         absolute: false,
         gitignore: true,
       });
-      const clones: any[] = await withTimeout(jscpd.detect(existing), EXPENSIVE_TIMEOUT_MS, "jscpd");
-      const list = Array.isArray(clones) ? clones : [];
+      type ClonePos = { sourceId?: string; start?: { line?: number }; end?: { line?: number } };
+      type Clone = { duplicationA?: ClonePos; duplicationB?: ClonePos; lines?: number; tokens?: number };
+      const clones = await withTimeout(jscpd.detect(existing), EXPENSIVE_TIMEOUT_MS, "jscpd") as unknown;
+      const list: Clone[] = Array.isArray(clones) ? (clones as Clone[]) : [];
       const offenders = list.map((c) => {
         const a = c?.duplicationA ?? {};
         const b = c?.duplicationB ?? {};
@@ -253,8 +255,8 @@ const circularImportsCheck: AppIntegrityCheck = {
   async query(ctx) {
     try {
       // @ts-ignore optional expensive dependency, no type declarations
-      const mod: any = await import("madge").catch(() => null);
-      const madge = mod?.default ?? mod;
+      const mod = (await import("madge").catch(() => null)) as { default?: unknown } | unknown;
+      const madge = (mod as { default?: unknown })?.default ?? mod;
       if (typeof madge !== "function") {
         return { ok: true, count: 0, sample: [], details: { skipped: "madge non installato" } };
       }
@@ -269,12 +271,12 @@ const circularImportsCheck: AppIntegrityCheck = {
       let tsConfig: string | undefined;
       try { await fs.access(tsConfigPath); tsConfig = tsConfigPath; } catch { /* skip */ }
 
-      const res: any = await withTimeout(madge(targets, {
+      const res = await withTimeout((madge as (targets: string[], opts: unknown) => Promise<unknown>)(targets, {
         fileExtensions: ["ts", "tsx"],
         excludeRegExp: [/node_modules/, /\.expo\//, /server_dist\//, /\bdist\b/, /\bbuild\b/],
         tsConfig,
         detectiveOptions: { ts: { skipTypeImports: true }, tsx: { skipTypeImports: true } },
-      }), EXPENSIVE_TIMEOUT_MS, "madge");
+      }), EXPENSIVE_TIMEOUT_MS, "madge") as { circular?: () => string[][] } | null;
       const cycles: string[][] = typeof res?.circular === "function" ? res.circular() : [];
       const offenders = (cycles ?? []).map((cycle, idx) => ({
         pk: cycle.join(" → "),
@@ -338,23 +340,30 @@ const unusedExportsCheck: AppIntegrityCheck = {
         return { ok: true, count: 0, sample: [], details: { tool: "knip", exit: code, note: "no stdout" } };
       }
       // knip JSON: { files: [...], issues: [ { file, exports: [...], types: [...], ...}, ... ] }
-      let parsed: any;
-      try { parsed = JSON.parse(stdout); } catch {
+      type KnipIssue = {
+        file?: string;
+        exports?: Array<{ name?: string } | string>;
+        types?: Array<{ name?: string } | string>;
+        enumMembers?: Array<Record<string, unknown>>;
+      };
+      type KnipReport = { files?: string[]; issues?: KnipIssue[] };
+      let parsed: KnipReport | null = null;
+      try { parsed = JSON.parse(stdout) as KnipReport; } catch {
         // knip può anteporre log non-json — prendi l'ultima riga JSON-like
         const lastBrace = stdout.lastIndexOf("{");
-        parsed = lastBrace >= 0 ? JSON.parse(stdout.slice(lastBrace)) : null;
+        parsed = lastBrace >= 0 ? (JSON.parse(stdout.slice(lastBrace)) as KnipReport) : null;
       }
       const offenders: { pk: string; data: Record<string, unknown> }[] = [];
-      const orphanFiles: string[] = Array.isArray(parsed?.files) ? parsed.files : [];
+      const orphanFiles: string[] = Array.isArray(parsed?.files) ? parsed!.files! : [];
       for (const f of orphanFiles) {
         offenders.push({ pk: f, data: { path: f, kind: "unused-file" } });
       }
-      const issues: any[] = Array.isArray(parsed?.issues) ? parsed.issues : [];
+      const issues: KnipIssue[] = Array.isArray(parsed?.issues) ? parsed!.issues! : [];
       for (const it of issues) {
         const filePath = it?.file ?? "(unknown)";
-        const exp = (it?.exports ?? []).map((e: any) => e?.name ?? e).filter(Boolean);
-        const types = (it?.types ?? []).map((e: any) => e?.name ?? e).filter(Boolean);
-        const enums = (it?.enumMembers ?? []).flatMap((e: any) => Object.values(e ?? {}));
+        const exp = (it?.exports ?? []).map((e) => (typeof e === "object" ? e?.name : e) ?? e).filter(Boolean);
+        const types = (it?.types ?? []).map((e) => (typeof e === "object" ? e?.name : e) ?? e).filter(Boolean);
+        const enums = (it?.enumMembers ?? []).flatMap((e) => Object.values(e ?? {}));
         const total = exp.length + types.length + enums.length;
         if (total === 0) continue;
         offenders.push({

@@ -67,7 +67,7 @@ async function pushCriticalAlerts(violations: Array<{ checkId: string; name: str
 export async function runIntegrityScan(opts: RunOptions = {}): Promise<RunSummary> {
   const trigger = opts.trigger ?? "manual";
   const expensive = !!opts.includeExpensive;
-  const ctx = { dryRun: !!opts.dryRun };
+  const _ctx = { dryRun: !!opts.dryRun };
   const useLock = !opts.skipLock;
 
   if (useLock) {

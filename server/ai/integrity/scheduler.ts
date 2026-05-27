@@ -3,8 +3,9 @@
 import { runIntegrityScan } from "./runner";
 import { purgeExpired } from "./quarantine";
 
-let nightly: any = null;
-let weekly: any = null;
+type CronLike = { stop?: () => void; nextRun?: () => Date | null };
+let nightly: CronLike | NodeJS.Timeout | null = null;
+let weekly: CronLike | NodeJS.Timeout | null = null;
 let nightlyNext: Date | null = null;
 let weeklyNext: Date | null = null;
 let lastRunAt: Date | null = null;
@@ -19,12 +20,13 @@ export function startAppIntegrityScheduler(): void {
 }
 
 export function stopAppIntegrityScheduler(): void {
-  try { nightly?.stop?.(); weekly?.stop?.(); } catch { /* ignore */ }
+  try { (nightly as CronLike | null)?.stop?.(); (weekly as CronLike | null)?.stop?.(); } catch { /* ignore */ }
   nightly = null; weekly = null; started = false;
 }
 
 async function bootCron() {
-  const cronMod: any = await import("croner").catch(() => null);
+  // @ts-expect-error croner is an optional dependency; falls back to setInterval if missing
+  const cronMod = (await import("croner").catch(() => null)) as { Cron?: new (expr: string, opts: unknown, fn: () => void) => CronLike } | null;
   const runCheap = async () => {
     lastRunAt = new Date();
     try { await runIntegrityScan({ trigger: "scheduled", includeExpensive: false, applySafeAutofix: true }); }
@@ -40,8 +42,8 @@ async function bootCron() {
   if (cronMod?.Cron) {
     nightly = new cronMod.Cron("0 4 * * *", { timezone: "Europe/Rome" }, runCheap);
     weekly = new cronMod.Cron("0 5 * * 0", { timezone: "Europe/Rome" }, runExpensive);
-    nightlyNext = nightly.nextRun?.() ?? null;
-    weeklyNext = weekly.nextRun?.() ?? null;
+    nightlyNext = (nightly as CronLike).nextRun?.() ?? null;
+    weeklyNext = (weekly as CronLike).nextRun?.() ?? null;
   } else {
     // Fallback minimal: 24h e 7d interval. Non sincronizzato sull'orario; informativo.
     nightly = setInterval(() => { void runCheap(); }, 24 * 3600_000);

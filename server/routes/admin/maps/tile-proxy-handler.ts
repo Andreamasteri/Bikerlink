@@ -62,7 +62,7 @@ router.get("/tile-preview/:providerId/:z/:x/:y", async (req: Request, res: Respo
     res.set("Content-Type", contentType);
     res.set("Cache-Control", "public, max-age=300");
     return res.send(buffer);
-  } catch (err) {
+  } catch {
     return res.status(502).json({ error: "Fetch failed" });
   }
 });

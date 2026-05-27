@@ -143,7 +143,7 @@ export class MatchingStorage extends ContestStorage {
       ? sql`AND wu.country = ANY(${countries}::text[]) AND mu.country = ANY(${countries}::text[])`
       : sql``;
 
-    const rows = await db.execute<any>(sql`
+    const rows = await db.execute<Record<string, unknown>>(sql`
       SELECT
         w.id AS w_id, w.wishlist_id AS w_wishlist_id, w.brand AS w_brand,
         w.model AS w_model, w.motorcycle_type AS w_motorcycle_type,
@@ -178,7 +178,7 @@ export class MatchingStorage extends ContestStorage {
         ${countryFilter}
     `);
 
-    return (rows.rows as any[]).map((r) => ({
+    return (rows.rows as Record<string, unknown>[]).map((r) => ({
       zavarrinaId: r.zavarrina_id as string,
       bikerId: r.biker_id as string,
       wishlistMoto: {

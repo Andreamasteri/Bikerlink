@@ -3,10 +3,23 @@ import path from "path";
 import type { AppIntegrityCheck } from "../types";
 import { readSafe, pathExists } from "../fs-helpers";
 
-async function readJson(root: string, rel: string): Promise<any | null> {
+// Generic JSON reader: returns a permissive shape since multiple call sites
+// access varying nested keys (app.json, package.json, ...).
+type JsonObj = {
+  version?: string;
+  name?: string;
+  expo?: {
+    version?: string;
+    slug?: string;
+    runtimeVersion?: string | { policy?: string };
+    ios?: { bundleIdentifier?: string };
+    android?: { package?: string };
+  };
+};
+async function readJson(root: string, rel: string): Promise<JsonObj | null> {
   const txt = await readSafe(path.join(root, rel));
   if (!txt) return null;
-  try { return JSON.parse(txt); } catch { return null; }
+  try { return JSON.parse(txt) as JsonObj; } catch { return null; }
 }
 
 const appJsonCoherence: AppIntegrityCheck = {

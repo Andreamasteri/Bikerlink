@@ -100,7 +100,7 @@ const missingAssetRef: AppIntegrityCheck = {
       if (!txt) continue;
       let m: RegExpExecArray | null;
       while ((m = re.exec(txt))) {
-        let p = m[1];
+        const p = m[1];
         let abs: string;
         if (p.startsWith("@/")) abs = path.join(ctx.projectRoot, p.slice(2));
         else if (p.startsWith(".")) abs = path.resolve(path.dirname(f.absPath), p);

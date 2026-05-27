@@ -115,7 +115,7 @@ export async function runDetectNegativePatternsJob(): Promise<DetectionResult> {
             WHERE pending_auto_suggestions.status NOT IN ('accepted', 'rejected')
           `);
           suggestionsInserted++;
-        } catch (err) {
+        } catch {
           // Unique constraint or other — ignore silently for this user.
         }
       }

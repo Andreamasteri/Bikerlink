@@ -106,7 +106,7 @@ function ruleBasedTriage(ctx: ReportContext): TriageOutput {
   // Retaliatorio = trust basso + reporter molto attivo.
   const isRetaliatoryProbability = trust < 0.5 ? 0.6 : trust < 0.7 ? 0.3 : 0.1;
 
-  let severitySuggested: TriageOutput["severitySuggested"] = (r.severity as TriageOutput["severitySuggested"]) ?? "low";
+  const severitySuggested: TriageOutput["severitySuggested"] = (r.severity as TriageOutput["severitySuggested"]) ?? "low";
   let suggestedAction: TriageOutput["suggestedAction"] = "none";
   let suggestedBanDays = 0;
 

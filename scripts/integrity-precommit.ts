@@ -11,7 +11,7 @@ async function main() {
   const onlyFamilies: Family[] = ALL_FAMILIES.filter((f) =>
     argv.size === 0 ? true : argv.has(f) || argv.has(`--${f}`),
   );
-  const blockOn: Set<string> = new Set(["critical", "high"]);
+  const _blockOn: Set<string> = new Set(["critical", "high"]);
   let totalCritical = 0;
   let totalHigh = 0;
 

@@ -17,16 +17,21 @@ export async function explainViolation(input: ExplainInput): Promise<ExplainOk |
   if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
     return { ok: false, reason: "Nessun API key AI configurato (OPENAI_API_KEY o ANTHROPIC_API_KEY)" };
   }
-  const ai: any = await import("ai").catch(() => null);
+  type AiModule = {
+    generateText?: (opts: unknown) => Promise<{ text?: string; usage?: { promptTokens?: number; completionTokens?: number } }>;
+  };
+  type ProviderFactory = (name: string) => unknown;
+  const ai = (await import("ai").catch(() => null)) as AiModule | null;
   if (!ai?.generateText) return { ok: false, reason: "Pacchetto 'ai' non installato" };
 
-  let model: any = null; let modelName = "";
+  let model: unknown = null; let modelName = "";
   if (process.env.ANTHROPIC_API_KEY) {
-    const anth: any = await import("@ai-sdk/anthropic").catch(() => null);
+    // @ts-expect-error optional dependency, may not be installed
+    const anth = (await import("@ai-sdk/anthropic").catch(() => null)) as { anthropic?: ProviderFactory } | null;
     if (anth?.anthropic) { model = anth.anthropic("claude-sonnet-4-20250514"); modelName = "claude-sonnet-4"; }
   }
   if (!model && process.env.OPENAI_API_KEY) {
-    const oai: any = await import("@ai-sdk/openai").catch(() => null);
+    const oai = (await import("@ai-sdk/openai").catch(() => null)) as { openai?: ProviderFactory } | null;
     if (oai?.openai) { model = oai.openai("gpt-4o-mini"); modelName = "gpt-4o-mini"; }
   }
   if (!model) return { ok: false, reason: "Nessun provider AI installato" };

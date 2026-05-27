@@ -69,8 +69,15 @@ const appIconPresence: AppIntegrityCheck = {
   async query(ctx) {
     const txt = await readSafe(path.join(ctx.projectRoot, "app.json"));
     if (!txt) return { ok: true, count: 0, sample: [] };
-    let appj: any;
-    try { appj = JSON.parse(txt); } catch { return { ok: true, count: 0, sample: [] }; }
+    type AppJson = {
+      expo?: {
+        icon?: string;
+        ios?: { icon?: string };
+        android?: { icon?: string; adaptiveIcon?: { foregroundImage?: string } };
+      };
+    };
+    let appj: AppJson | null = null;
+    try { appj = JSON.parse(txt) as AppJson; } catch { return { ok: true, count: 0, sample: [] }; }
     const hits: { pk: string; data: Record<string, unknown> }[] = [];
     const candidates: Array<[string, string | undefined]> = [
       ["expo.icon", appj?.expo?.icon],
@@ -80,7 +87,7 @@ const appIconPresence: AppIntegrityCheck = {
     ];
     for (const [k, v] of candidates) {
       if (!v) continue;
-      let p = v.replace(/^\.\//, "");
+      const p = v.replace(/^\.\//, "");
       const abs = path.join(ctx.projectRoot, p);
       if (!(await pathExists(abs))) hits.push({ pk: k, data: { key: k, missing: v } });
     }

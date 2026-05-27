@@ -7,13 +7,13 @@ const FORBIDDEN_PACKAGES = new Set([
   "uuid", // skill expo: vietato (crash iOS/Android) — usare Date.now+Math.random o expo-crypto
 ]);
 
-async function readPackageJson(root: string): Promise<{ deps: Set<string>; devDeps: Set<string>; raw: any } | null> {
+async function readPackageJson(root: string): Promise<{ deps: Set<string>; devDeps: Set<string>; raw: Record<string, unknown> } | null> {
   const txt = await readSafe(path.join(root, "package.json"));
   if (!txt) return null;
   try {
-    const raw = JSON.parse(txt);
-    const deps = new Set<string>(Object.keys(raw.dependencies ?? {}));
-    const devDeps = new Set<string>(Object.keys(raw.devDependencies ?? {}));
+    const raw = JSON.parse(txt) as Record<string, unknown>;
+    const deps = new Set<string>(Object.keys((raw.dependencies as Record<string, unknown>) ?? {}));
+    const devDeps = new Set<string>(Object.keys((raw.devDependencies as Record<string, unknown>) ?? {}));
     return { deps, devDeps, raw };
   } catch { return null; }
 }
@@ -62,8 +62,13 @@ const depcheckUnused: AppIntegrityCheck = {
   description: "Analisi statica con depcheck: pacchetti in dependencies/devDependencies senza alcun import nel codice.",
   async query(ctx) {
     try {
-      const mod: any = await import("depcheck").catch(() => null);
-      const depcheck = mod?.default ?? mod;
+      type DepcheckLib = ((root: string, opts: unknown) => Promise<{ dependencies?: string[]; devDependencies?: string[] }>) & {
+        parser: Record<string, unknown>;
+        detector: Record<string, unknown>;
+        special: Record<string, unknown>;
+      };
+      const mod = (await import("depcheck").catch(() => null)) as { default?: DepcheckLib } | DepcheckLib | null;
+      const depcheck = ((mod as { default?: DepcheckLib } | null)?.default ?? mod) as DepcheckLib | null;
       if (typeof depcheck !== "function") {
         return { ok: true, count: 0, sample: [], details: { skipped: "depcheck non installato" } };
       }
@@ -98,11 +103,12 @@ const depcheckUnused: AppIntegrityCheck = {
         ],
       };
 
-      const result: any = await new Promise((resolve, reject) => {
+      type DepcheckResult = { dependencies?: string[]; devDependencies?: string[] };
+      const result: DepcheckResult = await new Promise((resolve, reject) => {
         const to = setTimeout(() => reject(new Error(`depcheck timeout dopo ${DEPCHECK_TIMEOUT_MS}ms`)), DEPCHECK_TIMEOUT_MS);
         depcheck(ctx.projectRoot, options)
-          .then((r: any) => { clearTimeout(to); resolve(r); })
-          .catch((e: any) => { clearTimeout(to); reject(e); });
+          .then((r) => { clearTimeout(to); resolve(r); })
+          .catch((e: unknown) => { clearTimeout(to); reject(e); });
       });
 
       const unusedDeps: string[] = result?.dependencies ?? [];
@@ -199,8 +205,8 @@ const privateFlag: AppIntegrityCheck = {
   async query(ctx) {
     const pkg = await readPackageJson(ctx.projectRoot);
     if (!pkg) return { ok: true, count: 0, sample: [] };
-    if (pkg.raw.private !== true) {
-      return { ok: false, count: 1, sample: [{ pk: "private", data: { current: pkg.raw.private ?? false } }] };
+    if ((pkg.raw as { private?: boolean }).private !== true) {
+      return { ok: false, count: 1, sample: [{ pk: "private", data: { current: (pkg.raw as { private?: boolean }).private ?? false } }] };
     }
     return { ok: true, count: 0, sample: [] };
   },
@@ -234,7 +240,7 @@ const overridesPresence: AppIntegrityCheck = {
   async query(ctx) {
     const pkg = await readPackageJson(ctx.projectRoot);
     if (!pkg) return { ok: true, count: 0, sample: [] };
-    const ov = pkg.raw.overrides ?? {};
+    const ov = ((pkg.raw as { overrides?: Record<string, unknown> }).overrides) ?? {};
     const hits = Object.entries(ov).slice(0, 50).map(([k, v]) => ({ pk: k, data: { package: k, override: v } }));
     return { ok: true, count: hits.length === 0 ? 0 : 0, sample: hits.slice(0, 5), details: { totalOverrides: Object.keys(ov).length } };
     // Solo informativo: count=0 = non blocca, ma sample mostrato per audit

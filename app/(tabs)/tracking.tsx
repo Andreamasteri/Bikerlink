@@ -215,7 +215,9 @@ function TrackingScreenInner() {
           if (state.completedRouteId) {
             try {
               await apiRequest("PATCH", `/api/routes/${state.completedRouteId}`, { title: state.rideTitle });
-            } catch (_) {}
+            } catch (_) {
+              // best-effort PATCH; ignore failures
+            }
           }
           handlers.setSummaryVisible(false);
         }}

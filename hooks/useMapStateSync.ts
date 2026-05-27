@@ -30,7 +30,7 @@ interface UseMapStateSyncParams {
 
 export function useMapStateSync({
   mapReady,
-  mapReadyEpoch,
+  mapReadyEpoch: _mapReadyEpoch,
   inject,
   mapsEnabled,
   activeTileUrl,
@@ -61,7 +61,7 @@ export function useMapStateSync({
     });
     inject("window.leafletBridge && window.leafletBridge.updateState(" + encoded + ")");
   }, [
-    mapReady, mapReadyEpoch, mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable, searchRadiusKm,
+    mapReady, mapsEnabled, activeTileUrl, activeTileMaxZoom, userLocation, isAvailable, searchRadiusKm,
     filteredUsers, workshops, eventPins, showEventPins, filterEvents,
     clubPins, filterClubs, easterEggs, activeSosRequests,
     realMeMarker, fakeMeMarker, currentUserId, inject,

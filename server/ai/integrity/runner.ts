@@ -7,7 +7,7 @@ import { ALL_FAMILIES } from "./types";
 import { loadAllChecks, loadFamilyChecks } from "./registry";
 import { executeCheck, executeAutofix, hashViolation } from "./framework";
 
-const SEV_RANK: Record<Severity, number> = { low: 1, medium: 2, high: 3, critical: 4 };
+const _SEV_RANK: Record<Severity, number> = { low: 1, medium: 2, high: 3, critical: 4 };
 
 export interface RunOptions {
   trigger?: "manual" | "scheduled" | "expensive" | "precommit";

@@ -64,14 +64,14 @@ export function classifyLabel(hist: Histogram): TimeProfileLabel {
   let afterWork = 0;    // 17-20
   let night = 0;        // 22-5
   let sundayMass = 0;
-  let saturdayMass = 0;
+  let _saturdayMass = 0;
 
   for (let d = 0; d < 7; d++) {
     for (let h = 0; h < 24; h++) {
       const v = hist[d * 24 + h] || 0;
       if (d === 0 || d === 6) weekendMass += v; else weekdayMass += v;
       if (d === 0) sundayMass += v;
-      if (d === 6) saturdayMass += v;
+      if (d === 6) _saturdayMass += v;
       if (h >= 6 && h < 9) earlyMorning += v;
       if (h >= 12 && h < 14) lunch += v;
       if (h >= 17 && h < 20) afterWork += v;
@@ -150,7 +150,7 @@ export async function timeOverlapMultiplier(
 
 // ─── Aggregazione ──────────────────────────────────────────────────────────
 
-interface RidePointRow {
+interface _RidePointRow {
   user_id: string;
   ts: Date;
   ride_age_days: number;
