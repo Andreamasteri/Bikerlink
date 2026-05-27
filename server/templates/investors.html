@@ -348,6 +348,63 @@
       </div>
     </div>
 
+    <!-- Matching System -->
+    <div class="section">
+      <h2>🎯 Sistema di Matching — Deep Tech</h2>
+      <p class="section-desc">
+        Il cuore differenziante di BikerLink: un engine di matching a 17 segnali con embeddings semantici, telemetria reale (lean angle, G-force), feedback loop continuo e 6 AI specializzate in cascata. Nessun competitor nel settore moto lo fa.
+      </p>
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-value">17</div>
+          <div class="metric-label">Segnali di affinità (brand, musica, percorsi, stile guida…)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">&lt;200ms</div>
+          <div class="metric-label">Latenza engine (P99)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">6</div>
+          <div class="metric-label">AI specializzate (moderazione, watchdog, routing, embeddings…)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">4</div>
+          <div class="metric-label">Provider AI in failover (Anthropic → OpenAI → Google → self-hosted)</div>
+        </div>
+      </div>
+      <div class="diff-list" style="margin-top:20px">
+        <div class="diff-item">
+          <div class="diff-icon">🧠</div>
+          <div class="diff-content">
+            <h3>Embeddings semantici su corpus biker italiano</h3>
+            <p>Bio e gusti musicali vengono trasformati in vettori 1536-dim (OpenAI text-embedding-3-large + fallback self-hosted). "Amo i passi" e "appassionato di montagna" risultano compatibili senza parole identiche.</p>
+          </div>
+        </div>
+        <div class="diff-item">
+          <div class="diff-icon">📐</div>
+          <div class="diff-content">
+            <h3>Telemetria reale: lean angle &amp; G-force</h3>
+            <p>Dal giroscopio e accelerometro del telefono estraiamo lo stile di guida reale — non quello dichiarato. Il moat tecnologico cresce con i dati: ogni giro registrato rende il matching più preciso.</p>
+          </div>
+        </div>
+        <div class="diff-item">
+          <div class="diff-icon">🔄</div>
+          <div class="diff-content">
+            <h3>Feedback loop + decay temporale</h3>
+            <p>Ogni like, ignora e block ricalibra i pesi personali. I profili inattivi decadono esponenzialmente (λ-decay). A/B testing continuo su % configurabile degli utenti.</p>
+          </div>
+        </div>
+      </div>
+      <div class="cta-row" style="margin-top:20px">
+        <a href="/matching/per-investitori" class="cta-primary">
+          📊 Leggi il Technical Deep Dive
+        </a>
+        <a href="/matching/pdf" target="_blank" rel="noopener" class="cta-outline">
+          📄 PDF tecnico matching
+        </a>
+      </div>
+    </div>
+
     <!-- Analisi Competitor -->
     <div class="section">
       <h2>Analisi Competitor</h2>

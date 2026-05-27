@@ -18,6 +18,13 @@ import {
   buildAbout,
   buildFaq,
   buildContact,
+  buildMatchingOverview,
+  buildMatchingHowItWorks,
+  buildMatchingTypes,
+  buildMatchingLearning,
+  buildMatchingAI,
+  buildMatchingPrivacy,
+  buildMatchingInvestors,
 } from "./pages";
 
 // Cache for landing images (recomputed every 5 min so changes propagate quickly).
@@ -69,6 +76,13 @@ const PAGES: { route: string; build: Builder; sitemap: { priority: number; chang
   { route: "/about", build: buildAbout, sitemap: { priority: 0.6, changefreq: "monthly" } },
   { route: "/faq", build: buildFaq, sitemap: { priority: 0.6, changefreq: "monthly" } },
   { route: "/contact", build: buildContact, sitemap: { priority: 0.6, changefreq: "yearly" } },
+  { route: "/matching", build: buildMatchingOverview, sitemap: { priority: 0.9, changefreq: "monthly" } },
+  { route: "/matching/come-funziona", build: buildMatchingHowItWorks, sitemap: { priority: 0.8, changefreq: "monthly" } },
+  { route: "/matching/tipi-di-match", build: buildMatchingTypes, sitemap: { priority: 0.8, changefreq: "monthly" } },
+  { route: "/matching/come-impara", build: buildMatchingLearning, sitemap: { priority: 0.8, changefreq: "monthly" } },
+  { route: "/matching/intelligenza-artificiale", build: buildMatchingAI, sitemap: { priority: 0.8, changefreq: "monthly" } },
+  { route: "/matching/privacy", build: buildMatchingPrivacy, sitemap: { priority: 0.7, changefreq: "monthly" } },
+  { route: "/matching/per-investitori", build: buildMatchingInvestors, sitemap: { priority: 0.7, changefreq: "monthly" } },
 ];
 
 const STATIC_HTML_PAGES: Record<string, string> = {
@@ -235,6 +249,144 @@ export function registerSiteRoutes(app: Express) {
       }
     });
   }
+
+  // Matching PDF — printable version of the investors tech deep-dive.
+  app.get("/matching/pdf", (req: Request, res: Response) => {
+    const baseUrl = getBaseUrl(req);
+    const html = `<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<title>BikerLink — Matching Manual Tecnico</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+@page{margin:20mm}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#111;background:#fff;font-size:13px;line-height:1.6}
+h1{font-size:28px;font-weight:900;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+h2{font-size:18px;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin:28px 0 8px;border-bottom:2px solid #FF3B30;padding-bottom:4px}
+h3{font-size:14px;font-weight:700;margin:16px 0 4px;text-transform:uppercase;letter-spacing:.5px}
+p{margin-bottom:10px;color:#333}
+ul{margin:8px 0 12px 20px}
+li{margin-bottom:4px;color:#333}
+.hero{background:#0A0A0A;color:#fff;padding:32px 40px;margin-bottom:24px}
+.hero h1{color:#fff}.accent{color:#FF3B30}
+.stat-row{display:flex;gap:24px;flex-wrap:wrap;margin:16px 0}
+.stat{flex:1;min-width:120px;background:#f5f5f5;border-left:3px solid #FF3B30;padding:12px 16px;border-radius:2px}
+.stat-val{font-size:24px;font-weight:900;color:#FF3B30;line-height:1}
+.stat-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#666;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin:12px 0}
+th{background:#0A0A0A;color:#fff;padding:8px 12px;text-align:left;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+td{padding:8px 12px;border-bottom:1px solid #eee}
+tr:nth-child(even) td{background:#fafafa}
+code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-family:monospace}
+.section{margin-bottom:28px}
+.no-break{page-break-inside:avoid}
+.footer{margin-top:32px;padding-top:16px;border-top:1px solid #ddd;font-size:11px;color:#888;text-align:center}
+@media print{.no-break{page-break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="hero">
+  <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:#FF3B30;margin-bottom:12px">BIKERLINK — MATCHING MANUAL TECNICO</div>
+  <h1>Sistema di Matching<br/><span class="accent">Technical Deep Dive</span></h1>
+  <p style="color:#aaa;margin-top:8px;font-size:14px">Architettura completa · KPI · Stack · Vantaggio competitivo</p>
+</div>
+
+<div class="stat-row">
+  <div class="stat"><div class="stat-val">17</div><div class="stat-lbl">Segnali di affinità</div></div>
+  <div class="stat"><div class="stat-val">&lt;200ms</div><div class="stat-lbl">Latenza engine P99</div></div>
+  <div class="stat"><div class="stat-val">6</div><div class="stat-lbl">AI specializzate</div></div>
+  <div class="stat"><div class="stat-val">8</div><div class="stat-lbl">Modelli orchestrati</div></div>
+  <div class="stat"><div class="stat-val">4</div><div class="stat-lbl">Provider AI failover</div></div>
+  <div class="stat"><div class="stat-val">99.95%</div><div class="stat-lbl">Uptime atteso</div></div>
+</div>
+
+<div class="section no-break">
+<h2>1. I 17 Segnali di Affinità</h2>
+<table>
+<thead><tr><th>#</th><th>Segnale</th><th>Fonte dati</th><th>Tipo</th></tr></thead>
+<tbody>
+<tr><td>01</td><td>Brand moto</td><td>Profilo utente</td><td>Diretto</td></tr>
+<tr><td>02</td><td>Distanza geohash</td><td>GPS / zona residenza</td><td>Geo-spaziale</td></tr>
+<tr><td>03</td><td>Affinità musicale</td><td>Profilo testo libero + embeddings</td><td>Semantico</td></tr>
+<tr><td>04</td><td>Lean angle (piega)</td><td>Telemetria giroscopio</td><td>Telemetrico</td></tr>
+<tr><td>05</td><td>G-force laterale</td><td>Telemetria accelerometro</td><td>Telemetrico</td></tr>
+<tr><td>06</td><td>Route affinity</td><td>Percorsi GPS storici</td><td>Geo-spaziale</td></tr>
+<tr><td>07</td><td>Overlap orario</td><td>Timestamp sessioni GPS</td><td>Temporale</td></tr>
+<tr><td>08</td><td>Stile di guida</td><td>Velocità + accelerazioni aggregate</td><td>Telemetrico</td></tr>
+<tr><td>09</td><td>Club condivisi</td><td>MotoClub membership</td><td>Diretto</td></tr>
+<tr><td>10</td><td>Tag comuni</td><td>Hashtag profilo</td><td>Diretto</td></tr>
+<tr><td>11</td><td>Affinità bio</td><td>Bio testo libero + embeddings</td><td>Semantico</td></tr>
+<tr><td>12</td><td>Lingua e zona</td><td>Impostazioni profilo + GPS</td><td>Diretto</td></tr>
+<tr><td>13</td><td>Fascia d'età</td><td>Profilo utente (opzionale)</td><td>Diretto</td></tr>
+<tr><td>14</td><td>Reputazione biker</td><td>Feedback utenti + segnalazioni</td><td>Comportamentale</td></tr>
+<tr><td>15</td><td>Preferenze dichiarate</td><td>Settings matching</td><td>Diretto</td></tr>
+<tr><td>16</td><td>Feedback storico</td><td>Like / ignora / block</td><td>Comportamentale</td></tr>
+<tr><td>17</td><td>Decay temporale</td><td>Timestamp ultima attività</td><td>Temporale</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="section no-break">
+<h2>2. Stack Tecnico</h2>
+<table>
+<thead><tr><th>Layer</th><th>Tecnologia</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>Database</td><td><code>PostgreSQL 16 + PostGIS + pgvector</code></td><td>Dati utente, percorsi, embeddings 1536-dim</td></tr>
+<tr><td>Cache & Code</td><td><code>Redis 7 + BullMQ</code></td><td>Cache score, code ricalcolo, lock distribuiti</td></tr>
+<tr><td>Scoring Engine</td><td><code>Express + TypeScript</code></td><td>17 segnali, pesi configurabili, feedback loop</td></tr>
+<tr><td>Embeddings</td><td><code>OpenAI text-embedding-3-large + multilingual-e5-small</code></td><td>Bio e musica, fallback self-hosted</td></tr>
+<tr><td>AI Orchestration</td><td><code>Anthropic Claude → OpenAI GPT → Google Gemini</code></td><td>Cascata failover, 99.95% uptime atteso</td></tr>
+<tr><td>Geo</td><td><code>PostGIS + H3 geohash</code></td><td>Distanze reali, zone di guida, route affinity</td></tr>
+<tr><td>Client</td><td><code>React Native (Expo) + React Query</code></td><td>iOS/Android, aggiornamenti OTA via EAS</td></tr>
+<tr><td>A/B Testing</td><td><code>Framework interno + Redis flag</code></td><td>Split test algoritmi su % utenti configurabile</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="section no-break">
+<h2>3. I 6 Sottosistemi AI</h2>
+<table>
+<thead><tr><th>Nome</th><th>Ruolo</th><th>Azioni autonome</th></tr></thead>
+<tbody>
+<tr><td>AI Moderazione</td><td>Analizza segnalazioni, distingue spam da casi reali</td><td>Solo suggerimenti — decisioni al moderatore umano</td></tr>
+<tr><td>AI Watchdog Sistema</td><td>Monitora metriche 24/7, auto-corregge problemi noti</td><td>Auto-fix documentati; allerta admin per anomalie nuove</td></tr>
+<tr><td>AI Orchestrator OTA</td><td>Gestisce rilascio aggiornamenti app, rollout e rollback</td><td>Rollback automatico su metriche fuori soglia</td></tr>
+<tr><td>AI Integrità Database</td><td>Controllo coerenza dati tra tabelle e microservizi</td><td>Ripara incongruenze minori; segnala quelle grandi</td></tr>
+<tr><td>AI Integrità App</td><td>Analisi codice, traduzioni, configurazioni</td><td>Report — nessuna modifica autonoma al codice</td></tr>
+<tr><td>AI Console Unificata</td><td>Chat admin con tutti i 5 sistemi, correlazione eventi</td><td>Interfaccia unificata — risponde in linguaggio naturale</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="section no-break">
+<h2>4. Formula di Scoring</h2>
+<p>Il punteggio finale è una media pesata dei 17 segnali normalizzati [0,1]:</p>
+<p style="font-family:monospace;font-size:14px;background:#f5f5f5;padding:10px 16px;border-radius:2px;border-left:3px solid #FF3B30">
+  score = Σ(w<sub>i</sub> × S<sub>i</sub>) / Σ(w<sub>i</sub>)
+</p>
+<p style="margin-top:10px">Il decay temporale viene applicato come moltiplicatore finale: <code>decay = e^(−λ × giorni_inattivi)</code>. Con λ default: ~50% dopo 30gg, ~10% dopo 60gg, ~0% dopo 90gg.</p>
+</div>
+
+<div class="section no-break">
+<h2>5. Vantaggio Competitivo (Moat)</h2>
+<ul>
+<li><strong>Telemetria reale</strong> — Lean angle e G-force da giroscopio/accelerometro. Nessun competitor usa questo dato per matching. Richiede anni di raccolta per essere significativo.</li>
+<li><strong>Embeddings su corpus biker italiano</strong> — Il nostro corpus di bio e gusti musicali di motociclisti italiani è unico. Un modello generico fa peggio su questo dominio specifico.</li>
+<li><strong>Feedback loop + dati storici</strong> — Ogni interazione migliora il modello. Un nuovo competitor partirebbe da zero.</li>
+<li><strong>Verticale moto — zero distrazione</strong> — Il contesto "motociclista" è nativo in ogni feature. Tinder e app generaliste non ottimizzeranno mai per il biker italiano.</li>
+</ul>
+</div>
+
+<div class="footer">
+  BikerLink · ${baseUrl}/matching/per-investitori · invest@bikerlink.app · Confidenziale — Non distribuire
+</div>
+</body>
+</html>`;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.status(200).send(html);
+  });
 
   // 301 redirects for legacy URLs.
   for (const [from, to] of Object.entries(PERMANENT_REDIRECTS)) {

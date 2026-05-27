@@ -79,6 +79,7 @@ function footer(): string {
       <h2 style="font-size:13px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--text);margin-bottom:14px" data-i18n="footer.product">Prodotto</h2>
       <ul>
         <li><a href="/features" data-i18n="footer.features">Funzionalità</a></li>
+        <li><a href="/matching" data-i18n="footer.matching">Matching</a></li>
         <li><a href="/sos" data-i18n="footer.sos">SOS Biker</a></li>
         <li><a href="/motoclub" data-i18n="footer.motoclub">MotoClub</a></li>
         <li><a href="/community" data-i18n="footer.community">Community</a></li>

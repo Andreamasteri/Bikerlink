@@ -7,3 +7,4 @@ export * from "./pages-community";
 export * from "./pages-download";
 export * from "./pages-info";
 export * from "./pages-faq";
+export * from "./pages-matching";

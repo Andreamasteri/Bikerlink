@@ -10,6 +10,7 @@ export function navbar(currentPath: string): string {
     <button class="nav-burger" id="navBurger" aria-label="Menu" aria-controls="navLinks" aria-expanded="false"><span aria-hidden="true">☰</span><span class="sr-only">Menu</span></button>
     <nav id="navLinks" class="nav-links" aria-label="Navigazione principale">
       ${link("/features", "Funzionalità", "nav.features")}
+      ${link("/matching", "Matching", "nav.matching")}
       ${link("/sos", "SOS", "nav.sos")}
       ${link("/motoclub", "MotoClub", "nav.motoclub")}
       ${link("/community", "Community", "nav.community")}
@@ -49,12 +50,12 @@ export function navbar(currentPath: string): string {
 
   var T={
     it:{
-      'nav.features':'Funzionalità','nav.sos':'SOS','nav.motoclub':'MotoClub',
+      'nav.features':'Funzionalità','nav.matching':'Matching','nav.sos':'SOS','nav.motoclub':'MotoClub',
       'nav.community':'Community','nav.about':'About','nav.faq':'FAQ',
       'nav.planner':'🤖 Pianifica Giro',
       'nav.download':'Scarica app',
       'footer.product':'Prodotto','footer.company':'Azienda','footer.legal':'Legale',
-      'footer.features':'Funzionalità','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
+      'footer.features':'Funzionalità','footer.matching':'Matching','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
       'footer.community':'Community','footer.dl':"Scarica l'app",
       'footer.about':'Chi siamo','footer.faq':'Domande frequenti',
       'footer.contact':'Contatti','footer.investors':'Investitori',
@@ -66,12 +67,12 @@ export function navbar(currentPath: string): string {
       'footer.tagline':'Made for riders, by riders.'
     },
     en:{
-      'nav.features':'Features','nav.sos':'SOS','nav.motoclub':'MotoClub',
+      'nav.features':'Features','nav.matching':'Matching','nav.sos':'SOS','nav.motoclub':'MotoClub',
       'nav.community':'Community','nav.about':'About','nav.faq':'FAQ',
       'nav.planner':'🤖 AI Planner',
       'nav.download':'Download app',
       'footer.product':'Product','footer.company':'Company','footer.legal':'Legal',
-      'footer.features':'Features','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
+      'footer.features':'Features','footer.matching':'Matching','footer.sos':'SOS Biker','footer.motoclub':'MotoClub',
       'footer.community':'Community','footer.dl':'Download app',
       'footer.about':'About us','footer.faq':'FAQ',
       'footer.contact':'Contact','footer.investors':'Investors',

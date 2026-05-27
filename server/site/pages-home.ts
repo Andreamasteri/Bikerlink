@@ -117,6 +117,17 @@ const HOME_CSS = `<style>
 .card .card-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s}
 @media (hover:hover) and (pointer:fine){.card:hover .card-img img{transform:scale(1.04)}}
 
+/* ── MATCHING SECTION ────────────────────────────────────── */
+.home-matching{padding:80px 24px;background:var(--bg-alt);border-bottom:1px solid var(--border)}
+.home-matching-inner{max-width:var(--max);margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:72px;align-items:center}
+.home-matching-signals{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:28px}
+.home-matching-signal{background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:12px 10px;display:flex;align-items:center;gap:8px;transition:border-color .2s}
+@media (hover:hover) and (pointer:fine){.home-matching-signal:hover{border-color:rgba(255,59,48,.35)}}
+.home-matching-signal-icon{font-size:16px;flex-shrink:0}
+.home-matching-signal-name{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text2)}
+@media(max-width:860px){.home-matching-inner{grid-template-columns:1fr;gap:36px}.home-matching-signals{grid-template-columns:1fr 1fr 1fr}}
+@media(max-width:560px){.home-matching-signals{grid-template-columns:1fr 1fr}}
+
 /* ── AI TRIP PLANNING ────────────────────────────────────── */
 .home-ai-plan{padding:0;overflow:hidden;border-top:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--surface)}
 .home-ai-plan-inner{display:grid;grid-template-columns:1fr 1fr;max-width:var(--max);margin:0 auto;min-height:560px}
@@ -348,6 +359,57 @@ export function buildHome(baseUrl: string, images?: LandingImages): { meta: Page
     </div>
     <div class="home-tele-photo">
       <img src="/assets/images/telemetry-dash.webp" srcset="/assets/images/telemetry-dash-sm.webp 512w, /assets/images/telemetry-dash.webp 1024w" sizes="(max-width: 860px) 100vw, 50vw" alt="Dashboard telemetria BikerLink — velocità e G-force" width="1024" height="1024" loading="lazy" />
+    </div>
+  </div>
+</section>
+
+<!-- ── MATCHING SECTION ── -->
+<section class="home-matching" aria-labelledby="matching-home-heading">
+  <div class="home-matching-inner">
+    <div>
+      <span class="section-eyebrow">Matching intelligente</span>
+      <h2 class="section-title" id="matching-home-heading">Non a caso.<br/><span class="accent">Per davvero.</span></h2>
+      <p class="section-lead" style="margin-top:16px">17 segnali di affinità — moto, musica, percorsi, stile di guida, orari — per proporti solo i biker davvero compatibili con te.</p>
+      <div class="home-matching-signals" role="list" aria-label="Segnali di matching">
+        <div class="home-matching-signal" role="listitem"><span class="home-matching-signal-icon" aria-hidden="true">🏍️</span><span class="home-matching-signal-name">Brand moto</span></div>
+        <div class="home-matching-signal" role="listitem"><span class="home-matching-signal-icon" aria-hidden="true">🎵</span><span class="home-matching-signal-name">Musica</span></div>
+        <div class="home-matching-signal" role="listitem"><span class="home-matching-signal-icon" aria-hidden="true">📐</span><span class="home-matching-signal-name">Lean angle</span></div>
+        <div class="home-matching-signal" role="listitem"><span class="home-matching-signal-icon" aria-hidden="true">🗺️</span><span class="home-matching-signal-name">Percorsi</span></div>
+        <div class="home-matching-signal" role="listitem"><span class="home-matching-signal-icon" aria-hidden="true">⏰</span><span class="home-matching-signal-name">Orari guida</span></div>
+        <div class="home-matching-signal" role="listitem"><span class="home-matching-signal-icon" aria-hidden="true">💨</span><span class="home-matching-signal-name">G-force</span></div>
+        <div class="home-matching-signal" role="listitem"><span class="home-matching-signal-icon" aria-hidden="true">📍</span><span class="home-matching-signal-name">Zona</span></div>
+        <div class="home-matching-signal" role="listitem"><span class="home-matching-signal-icon" aria-hidden="true">🏛️</span><span class="home-matching-signal-name">Club</span></div>
+      </div>
+      <div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap">
+        <a class="btn btn-primary" href="/matching">Scopri come funziona →</a>
+        <a class="btn btn-outline" href="/matching/tipi-di-match">I 17 segnali</a>
+      </div>
+    </div>
+    <div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:28px 24px">
+        <div style="font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:var(--text3);margin-bottom:20px">Match con @marco_v4</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          ${[
+            { label: "Stessa moto (Ducati Streetfighter V4)", pct: 100 },
+            { label: "Musica simile (Rock / Metal)", pct: 88 },
+            { label: "Percorsi sovrapposti (Dolomiti)", pct: 76 },
+            { label: "Stesso lean angle medio (38°)", pct: 91 },
+            { label: "Stessa fascia oraria (domenica AM)", pct: 83 },
+          ].map(s => `
+          <div>
+            <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+              <span style="font-size:12px;color:var(--text2)">${s.label}</span>
+              <span style="font-size:12px;font-weight:700;color:var(--accent)">${s.pct}%</span>
+            </div>
+            <div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden">
+              <div style="height:3px;width:${s.pct}%;background:var(--accent);border-radius:2px"></div>
+            </div>
+          </div>`).join("")}
+        </div>
+        <div style="margin-top:20px;padding:12px 16px;background:rgba(255,59,48,.08);border:1px solid rgba(255,59,48,.2);border-radius:3px;font-size:13px;color:var(--accent);font-weight:600;text-align:center">
+          Affinità totale: 87% — Top match 🏆
+        </div>
+      </div>
     </div>
   </div>
 </section>
