@@ -7,19 +7,32 @@ const MIGRATIONS_DIR = path.resolve(process.cwd(), "migrations");
 const MIGRATIONS_HASH_CACHE = path.resolve(process.cwd(), "server_dist", ".migrations-hash");
 
 /**
- * PostgreSQL error codes that mean "this object already exists".
- * These are safe to skip when bootstrapping on an existing database.
+ * PostgreSQL error codes that are safe to skip when bootstrapping on an existing
+ * database whose schema_migrations table is empty (legacy DB pre-tracking).
  *
+ * "Already exists" — the object was created by a previous manual apply:
  *   42P07 — duplicate_table     (CREATE TABLE)
  *   42701 — duplicate_column    (ALTER TABLE ADD COLUMN)
  *   42710 — duplicate_object    (CREATE TYPE, CREATE INDEX, CREATE SEQUENCE)
  *   42P16 — invalid_table_definition (CREATE TABLE LIKE / partition-related duplicates)
+ *
+ * "Does not exist" — the object was DROPPED by a later migration that's also
+ * pending in this same batch. Example: 0000_baseline creates an index on
+ * `motorcycle_model`, and 0009_drop_motorcycle_model_column.sql later drops
+ * the column. On a legacy prod DB where 0009 was already applied manually,
+ * the old baseline CREATE INDEX hits 42703 — safe to skip, the later
+ * migration in this batch is the source of truth.
+ *   42703 — undefined_column  (CREATE INDEX/CONSTRAINT on dropped column)
+ *   42P01 — undefined_table   (operation on dropped table)
  */
-const ALREADY_EXISTS_CODES = new Set(["42P07", "42701", "42710", "42P16"]);
+const SKIPPABLE_ERROR_CODES = new Set([
+  "42P07", "42701", "42710", "42P16",
+  "42703", "42P01",
+]);
 
-function isAlreadyExistsError(err: unknown): boolean {
+function isSkippableError(err: unknown): boolean {
   const code = (err as { code?: string })?.code;
-  return typeof code === "string" && ALREADY_EXISTS_CODES.has(code);
+  return typeof code === "string" && SKIPPABLE_ERROR_CODES.has(code);
 }
 
 /**
@@ -127,7 +140,10 @@ async function applyMigration(
         await client.query(stmt);
         await client.query(`RELEASE SAVEPOINT ${sp}`);
       } catch (err) {
-        if (isAlreadyExistsError(err)) {
+        if (isSkippableError(err)) {
+          const code = (err as { code?: string }).code;
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[migrate]   skip stmt #${i + 1} in ${filename} (code ${code}): ${msg}`);
           await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
           await client.query(`RELEASE SAVEPOINT ${sp}`);
           skipped++;
