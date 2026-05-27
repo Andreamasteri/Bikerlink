@@ -16,6 +16,7 @@ export const integrityRuns = pgTable("integrity_runs", {
   checksRun: integer("checks_run").notNull().default(0),
   violationsFound: integer("violations_found").notNull().default(0),
   autoFixed: integer("auto_fixed").notNull().default(0),
+  autoResolved: integer("auto_resolved").notNull().default(0),
   manualPending: integer("manual_pending").notNull().default(0),
   expensive: boolean("expensive").notNull().default(false),
   notes: text("notes"),

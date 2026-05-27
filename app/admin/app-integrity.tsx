@@ -28,7 +28,7 @@ interface FamilyChecks {
 interface Status {
   summary: null | {
     id: string; runAt: string; durationMs: number; trigger: string;
-    checksRun: number; violationsFound: number; autoFixed: number; manualPending: number;
+    checksRun: number; violationsFound: number; autoFixed: number; autoResolved: number; manualPending: number;
     bySeverity: Record<Severity, number>;
     byFamily: Record<Family, number>;
     health: Health;
@@ -129,7 +129,7 @@ export default function AppIntegrityScreen() {
             </View>
             {data.summary ? (
               <Text style={styles.cardMeta}>
-                Ultimo run {new Date(data.summary.runAt).toLocaleString("it-IT")} · {data.summary.checksRun} check · {data.summary.violationsFound} violazioni · {data.summary.autoFixed} fix auto · {data.summary.manualPending} pending
+                Ultimo run {new Date(data.summary.runAt).toLocaleString("it-IT")} · {data.summary.checksRun} check · {data.summary.violationsFound} violazioni · {data.summary.autoFixed} fix auto · {data.summary.autoResolved ?? 0} risolte auto · {data.summary.manualPending} pending
               </Text>
             ) : (
               <Text style={styles.cardMeta}>Nessun run eseguito ancora.</Text>

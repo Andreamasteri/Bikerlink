@@ -344,10 +344,7 @@ router.use('/', _requireAdmin, aiModerationRouter);
 router.use('/', _requireAdmin, aiWatchdogRouter);
 // Task #2536 — AI Database Integrity.
 router.use('/', _requireAdmin, dbIntegrityRouter);
-<<<<<<< HEAD
 router.use('/', _requireAdmin, appIntegrityRouter);
-=======
 router.use('/', _requireAdmin, metricsRouter);
->>>>>>> 77bc9f2a (Task #2561 — batch sub-tasks #2540-#2556 (admin matching, AI moderation digest, watchdog auto-fix, system-health trends))
 
 export default router;

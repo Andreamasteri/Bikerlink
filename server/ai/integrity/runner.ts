@@ -1,7 +1,7 @@
 // Task #2537 — Runner: esegue tutti i check (o famiglia singola), persiste run + violazioni.
 import { db } from "../../db";
 import { integrityRuns, integrityViolations } from "@shared/db";
-import { desc, eq, isNull, inArray } from "drizzle-orm";
+import { desc, eq, isNull, inArray, and, notInArray } from "drizzle-orm";
 import type { AppIntegrityCheck, Family, RunSummary, Severity } from "./types";
 import { ALL_FAMILIES } from "./types";
 import { loadAllChecks, loadFamilyChecks } from "./registry";
@@ -46,6 +46,8 @@ export async function runIntegrityScan(opts: RunOptions = {}): Promise<RunSummar
   let autoFixed = 0;
   const byFamily: Record<Family, number> = ALL_FAMILIES.reduce((a, f) => { a[f] = 0; return a; }, {} as Record<Family, number>);
   const bySeverity: Record<Severity, number> = { low: 0, medium: 0, high: 0, critical: 0 };
+  const currentHashes: string[] = [];
+  const scannedCheckIds = checks.map((c) => c.id);
 
   for (const check of checks) {
     const { result } = await executeCheck(check, { dryRun: !!opts.dryRun, projectRoot });
@@ -54,6 +56,7 @@ export async function runIntegrityScan(opts: RunOptions = {}): Promise<RunSummar
     byFamily[check.family]++;
     bySeverity[check.severity]++;
     const hash = hashViolation(check.id, result);
+    currentHashes.push(hash);
 
     // Tentativo autofix safe se richiesto
     let autoFixSummary: string | null = null; let didFix = false;
@@ -80,26 +83,65 @@ export async function runIntegrityScan(opts: RunOptions = {}): Promise<RunSummar
     });
   }
 
+  // Riconciliazione auto: violazioni "open" precedenti che non sono più riprodotte
+  // dai check eseguiti in questo run vengono marcate "auto_resolved".
+  const autoResolved = await reconcileAutoResolved(runRow.id, scannedCheckIds, currentHashes);
+  if (trigger === "scheduled" || trigger === "expensive") {
+    console.log(`[app-integrity ${trigger}] reconciliation: ${autoResolved} violation(s) auto-resolved, ${violationsFound} new found, ${autoFixed} auto-fixed`);
+  }
+
   const manualPending = violationsFound - autoFixed;
   await db.update(integrityRuns).set({
     durationMs: Date.now() - start,
     checksRun: checks.length,
     violationsFound,
     autoFixed,
+    autoResolved,
     manualPending,
   }).where(eq(integrityRuns.id, runRow.id));
 
-  return buildSummary(runRow.id, checks.length, violationsFound, autoFixed, manualPending, bySeverity, byFamily, start, trigger, family, includeExpensive);
+  return buildSummary(runRow.id, checks.length, violationsFound, autoFixed, autoResolved, manualPending, bySeverity, byFamily, start, trigger, family, includeExpensive);
+}
+
+async function reconcileAutoResolved(
+  currentRunId: string,
+  scannedCheckIds: string[],
+  currentHashes: string[],
+): Promise<number> {
+  if (!scannedCheckIds.length) return 0;
+  // Seleziona le violazioni "open" dei check coperti da questo run che NON
+  // sono presenti tra gli hash correnti (problema scomparso).
+  const stale = await db.select({ id: integrityViolations.id }).from(integrityViolations)
+    .where(
+      currentHashes.length
+        ? and(
+            eq(integrityViolations.status, "open"),
+            inArray(integrityViolations.checkId, scannedCheckIds),
+            notInArray(integrityViolations.hash, currentHashes),
+          )
+        : and(
+            eq(integrityViolations.status, "open"),
+            inArray(integrityViolations.checkId, scannedCheckIds),
+          ),
+    );
+  if (!stale.length) return 0;
+  const ids = stale.map((r) => r.id);
+  await db.update(integrityViolations).set({
+    status: "auto_resolved",
+    autoFixSummary: `Risolto automaticamente: il problema non è più riprodotto dal run ${currentRunId}.`,
+    resolvedAt: new Date(),
+  }).where(inArray(integrityViolations.id, ids));
+  return ids.length;
 }
 
 function buildSummary(
-  id: string, checksRun: number, violationsFound: number, autoFixed: number, manualPending: number,
+  id: string, checksRun: number, violationsFound: number, autoFixed: number, autoResolved: number, manualPending: number,
   bySeverity: Record<Severity, number>, byFamily: Record<Family, number>,
   start: number, trigger: string, family: string, expensive: boolean,
 ): RunSummary {
   return {
     id, runAt: new Date(start).toISOString(), durationMs: Date.now() - start,
-    trigger, expensive, family, checksRun, violationsFound, autoFixed, manualPending,
+    trigger, expensive, family, checksRun, violationsFound, autoFixed, autoResolved, manualPending,
     byFamily, bySeverity, health: computeHealth(bySeverity, violationsFound),
   };
 }
@@ -131,6 +173,7 @@ export async function getLatestRunSummary(): Promise<RunSummary | null> {
     checksRun: row.checksRun,
     violationsFound: row.violationsFound,
     autoFixed: row.autoFixed,
+    autoResolved: row.autoResolved ?? 0,
     manualPending: row.manualPending,
     byFamily: byFam, bySeverity: bySev,
     health: computeHealth(bySev, row.violationsFound),

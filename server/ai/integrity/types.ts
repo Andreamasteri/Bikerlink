@@ -76,6 +76,7 @@ export interface RunSummary {
   checksRun: number;
   violationsFound: number;
   autoFixed: number;
+  autoResolved: number;
   manualPending: number;
   byFamily: Record<Family, number>;
   bySeverity: Record<Severity, number>;
