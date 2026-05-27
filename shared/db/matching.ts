@@ -164,6 +164,9 @@ export const matchPreferences = pgTable("match_preferences", {
   bikerBikerDayTime: boolean("biker_biker_day_time").notNull().default(true),
   bikerBikerEvents: boolean("biker_biker_events").notNull().default(true),
   routeAffinity: boolean("route_affinity").notNull().default(true),
+  // Task #2516 — abilita matcher per affinità musicale combinata
+  // (tag-overlap + embedding similarity sui gusti musicali liberi).
+  musicAffinity: boolean("music_affinity").notNull().default(true),
   directMatch: boolean("direct_match").notNull().default(true),
   topMatchesOnly: boolean("top_matches_only").notNull().default(false),
   weeklyRecap: boolean("weekly_recap").notNull().default(true),
@@ -193,6 +196,45 @@ export const weeklyRecaps = pgTable("weekly_recaps", {
 
 export type WeeklyRecap = typeof weeklyRecaps.$inferSelect;
 export type InsertWeeklyRecap = typeof weeklyRecaps.$inferInsert;
+
+/**
+ * Task #2516 — Match per affinità musicale combinata.
+ *
+ * Combina tag-overlap (Jaccard sui tag della categoria "musica") con la
+ * similarità coseno dell'embedding `music_taste` (testo libero + tag).
+ * Score finale: tagScore * w1 + embeddingScore * w2 (default 0.5/0.5).
+ */
+export const musicAffinityMatches = pgTable("music_affinity_matches", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userAId: varchar("user_a_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  userBId: varchar("user_b_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  tagScore: doublePrecision("tag_score").notNull().default(0),
+  embeddingScore: doublePrecision("embedding_score").notNull().default(0),
+  combinedScore: doublePrecision("combined_score").notNull(),
+  tagCommon: integer("tag_common").notNull().default(0),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
+  notifiedAt: timestamp("notified_at"),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("music_affinity_user_a_idx").on(table.userAId),
+  index("music_affinity_user_b_idx").on(table.userBId),
+  index("music_affinity_archived_at_idx").on(table.archivedAt),
+  uniqueIndex("music_affinity_symmetric_idx").on(
+    sql`LEAST(${table.userAId}, ${table.userBId})`,
+    sql`GREATEST(${table.userAId}, ${table.userBId})`,
+  ),
+]);
+
+export type MusicAffinityMatch = typeof musicAffinityMatches.$inferSelect;
+export type InsertMusicAffinityMatch = typeof musicAffinityMatches.$inferInsert;
 
 export const userRouteFingerprints = pgTable("user_route_fingerprints", {
   id: varchar("id", { length: 36 })

@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db, pool } from "../../db";
-import { gpsRejectionStats, bikerZavarrinaMatches, bikerBikerMatches, matchPreferences, matchRules, updateMatchRuleSchema } from "@shared/db";
+import { gpsRejectionStats, bikerZavarrinaMatches, bikerBikerMatches, matchPreferences, matchRules, updateMatchRuleSchema, appSettings } from "@shared/db";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { desc, eq, sql } from "drizzle-orm";
 import { invalidateMatchRulesCache } from "../../matching/rules-cache";
@@ -10,6 +10,7 @@ import {
   getThresholdSync,
   getSupermatchMinCategories,
   isSupermatchByBreakdown,
+  combinedMusicScore,
   type ScoreBreakdown,
 } from "../../matching/scoring";
 import { entityTags, tags as tagsTable, tagCategories } from "@shared/db";
@@ -1094,12 +1095,85 @@ router.get("/matching/explain", async (req: Request, res: Response) => {
     const categoriesAbove = (Object.values(categories) as Array<{ passes: boolean }>).filter(c => c.passes).length;
     const isSupermatch = isSupermatchByBreakdown(breakdown, thresholds, minCategories);
 
+    // Task #2516 — affinità musicale combinata: aggiunge embedding cosine
+    // e combined score al payload explain (best-effort, non blocca se
+    // mancano embedding o tabella).
+    let musicAffinity: {
+      tagJaccard: number;
+      embeddingScore: number | null;
+      combinedScore: number | null;
+      weightTag: number;
+      weightEmbedding: number;
+      threshold: number;
+      passes: boolean;
+      reason?: string;
+    } | null = null;
+    try {
+      const embRes = await db.execute<{ sim: number | string | null }>(sql`
+        SELECT 1 - (a.embedding <=> b.embedding) AS sim
+        FROM embeddings a
+        INNER JOIN embeddings b ON b.entity_type = 'user'
+          AND b.field = 'music_taste'
+          AND b.entity_id = ${userB}
+        WHERE a.entity_type = 'user'
+          AND a.field = 'music_taste'
+          AND a.entity_id = ${userA}
+        LIMIT 1
+      `);
+      const simRaw = embRes.rows[0]?.sim;
+      const embeddingScore = simRaw == null
+        ? null
+        : Math.max(0, Math.min(1, Number(simRaw)));
+
+      const [wTagRow] = await db
+        .select()
+        .from(appSettings)
+        .where(eq(appSettings.key, "match_music_combined_weight_tag"))
+        .limit(1);
+      const [wEmbRow] = await db
+        .select()
+        .from(appSettings)
+        .where(eq(appSettings.key, "match_music_combined_weight_embedding"))
+        .limit(1);
+      const wTag = Number.isFinite(parseFloat(String(wTagRow?.value ?? "")))
+        ? parseFloat(String(wTagRow!.value))
+        : 0.5;
+      const wEmb = Number.isFinite(parseFloat(String(wEmbRow?.value ?? "")))
+        ? parseFloat(String(wEmbRow!.value))
+        : 0.5;
+      const combinedThr = thresholds.get("music_taste_combined")?.jaccardThreshold ?? 0.55;
+
+      const combined = embeddingScore == null
+        ? null
+        : Number(combinedMusicScore(categories.musica.jaccard, embeddingScore, wTag, wEmb).toFixed(4));
+
+      musicAffinity = {
+        tagJaccard: categories.musica.jaccard,
+        embeddingScore: embeddingScore == null ? null : Number(embeddingScore.toFixed(4)),
+        combinedScore: combined,
+        weightTag: wTag,
+        weightEmbedding: wEmb,
+        threshold: combinedThr,
+        passes: combined != null && combined >= combinedThr,
+        reason: embeddingScore == null ? "embedding `music_taste` mancante per uno o entrambi gli utenti" : undefined,
+      };
+    } catch (err) {
+      console.warn("[admin/matching/explain] music_affinity calc failed:", err);
+    }
+
+    breakdown.musicEmbeddingScore = musicAffinity?.embeddingScore ?? undefined;
+    breakdown.combinedMusicScore = musicAffinity?.combinedScore ?? undefined;
+    breakdown.musicWeightTag = musicAffinity?.weightTag;
+    breakdown.musicWeightEmbedding = musicAffinity?.weightEmbedding;
+
     return sendSuccess(res, {
       userA, userB,
       categories,
       categoriesAboveThreshold: categoriesAbove,
       minCategories,
       isSupermatch,
+      musicAffinity,
+      breakdown,
     });
   } catch (err) {
     console.error("[admin] GET /matching/explain error:", err);

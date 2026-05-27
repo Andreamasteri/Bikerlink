@@ -1,6 +1,7 @@
 import { eq, and, sql, desc, asc, inArray } from "drizzle-orm";
 import { db } from "../db";
 import { systemAccountConditions } from "../lib/system-account-filter";
+import { enqueueMusicTasteEmbedding } from "../embeddings/music-text";
 import {
   users, userPhotos, userMotorcycles, userProfiles, motorcyclePhotos,
   type User, type InsertUser,
@@ -160,6 +161,10 @@ export class UsersStorage {
 
   async updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile | undefined> {
     const [profile] = await db.update(userProfiles).set({ ...data, updatedAt: new Date() }).where(eq(userProfiles.userId, userId)).returning();
+    // Task #2516 — rigenera embedding `music_taste` quando cambia il testo libero.
+    if (Object.prototype.hasOwnProperty.call(data, "musicTasteText")) {
+      enqueueMusicTasteEmbedding(userId);
+    }
     return profile;
   }
 
@@ -169,6 +174,9 @@ export class UsersStorage {
       .values({ userId, ...data })
       .onConflictDoUpdate({ target: userProfiles.userId, set: { ...data, updatedAt: new Date() } })
       .returning();
+    if (Object.prototype.hasOwnProperty.call(data, "musicTasteText")) {
+      enqueueMusicTasteEmbedding(userId);
+    }
     return profile;
   }
 

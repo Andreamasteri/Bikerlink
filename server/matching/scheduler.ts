@@ -6,6 +6,8 @@ import { runMatching, runWishlistMatching, getLastProposalMatchingStats, getLast
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";
 import { runClubBrandMatching } from "./run-clubs";
 import { runMusicMatchBikerZavarrina, runGpsBasedMatching, runEventMatching, runBikerZavarrinaTypeStyleMatching } from "./run-extra";
+import { runMusicAffinityMatching } from "./run-music-affinity";
+import { runMusicEmbeddingsBackfill } from "./jobs/backfill-music-embeddings";
 import { runExtractRouteCellsJob } from "./jobs/extract-route-cells";
 import { runWeeklyRecapJob } from "./jobs/weekly-recap";
 import { Cron } from "croner";
@@ -254,6 +256,8 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           ["biker_biker_type_style", runBikerBikerTypeStyleMatching],
           ["club_brand", runClubBrandMatching],
           ["music_biker_zav", runMusicMatchBikerZavarrina],
+          // Task #2516 — match per affinità musicale combinata (K=10/user).
+          ["music_affinity", runMusicAffinityMatching],
           ["gps_based", runGpsBasedMatching],
           ["event_matching", runEventMatching],
           ["biker_zav_type_style", runBikerZavarrinaTypeStyleMatching],
@@ -323,6 +327,14 @@ const _engineCrons: Cron[] = [];
 
 export function startMatchingEngine(): void {
   console.log("[Matching] Engine avviato — modalità on-demand (trigger da login utente)");
+
+  // Task #2516 — backfill embedding `music_taste` (one-shot, best-effort).
+  // Eseguito in background con ritardo per non rallentare il boot.
+  setTimeout(() => {
+    runMusicEmbeddingsBackfill().catch((err) => {
+      console.error("[Matching] MusicEmbeddings backfill error (non-blocking):", err);
+    });
+  }, 30_000);
 
   (async () => {
     try {

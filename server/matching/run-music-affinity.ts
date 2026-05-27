@@ -1,0 +1,200 @@
+import { and, eq, inArray, sql } from "drizzle-orm";
+import { db } from "../db";
+import { storage } from "../storage";
+import {
+  entityTags,
+  musicAffinityMatches,
+  tagCategories,
+  tags,
+  users,
+  appSettings,
+} from "@shared/db";
+import { findSimilar } from "../embeddings";
+import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
+import { tagOverlap, getThresholdSync, loadMatchThresholds } from "./scoring";
+
+/**
+ * Task #2516 — Matcher per affinità musicale combinata.
+ *
+ * Per ogni utente che ha un embedding `music_taste`, recupera i K vicini
+ * più simili (cosine), poi calcola lo score combinato:
+ *   combined = tagJaccard * w1 + embeddingSim * w2
+ * Default w1=w2=0.5, override da app_settings (`match_music_combined_weight_tag`
+ * / `match_music_combined_weight_embedding`). Crea match quando il combined
+ * supera la soglia `music_taste_combined` (default 0.55).
+ *
+ * Complementa — non sostituisce — `runMusicMatchBikerZavarrina` (tag-only).
+ */
+
+const DEFAULT_K = 10;
+const DEFAULT_MIN_SIMILARITY = 0.55;
+const DEFAULT_W_TAG = 0.5;
+const DEFAULT_W_EMB = 0.5;
+
+async function loadWeight(key: string, fallback: number): Promise<number> {
+  try {
+    const [row] = await db
+      .select()
+      .from(appSettings)
+      .where(eq(appSettings.key, key))
+      .limit(1);
+    const v = parseFloat(String(row?.value ?? ""));
+    if (Number.isFinite(v) && v >= 0 && v <= 1) return v;
+  } catch {
+    /* fall through */
+  }
+  return fallback;
+}
+
+async function loadCombinedThreshold(): Promise<number> {
+  try {
+    const thresholds = await loadMatchThresholds();
+    const t = thresholds.get("music_taste_combined");
+    if (t) return t.jaccardThreshold;
+  } catch {
+    /* fall through */
+  }
+  return DEFAULT_MIN_SIMILARITY;
+}
+
+interface UserMusicEmbedding {
+  userId: string;
+  vector: number[];
+}
+
+async function loadEmbeddingsForUsers(): Promise<UserMusicEmbedding[]> {
+  const result = await db.execute<{ entity_id: string; vec: string }>(sql`
+    SELECT e.entity_id, e.embedding::text AS vec
+    FROM embeddings e
+    INNER JOIN users u ON u.id = e.entity_id
+    WHERE e.entity_type = 'user'
+      AND e.field = 'music_taste'
+      AND u.is_fake = false
+      AND u.status = 'active'
+  `);
+  const rows = (result.rows ?? result) as Array<{ entity_id: string; vec: string }>;
+  return rows.map((r) => ({
+    userId: r.entity_id,
+    vector: parsePgVector(r.vec),
+  }));
+}
+
+function parsePgVector(s: string): number[] {
+  // pgvector ::text returns "[v1,v2,...]"
+  const trimmed = s.trim();
+  if (!trimmed || trimmed[0] !== "[") return [];
+  return trimmed
+    .slice(1, -1)
+    .split(",")
+    .map((x) => Number(x));
+}
+
+async function loadMusicTagsByUser(userIds: string[]): Promise<Map<string, Set<string>>> {
+  const out = new Map<string, Set<string>>();
+  if (userIds.length === 0) return out;
+  const rows = await db
+    .select({ entityId: entityTags.entityId, slug: tags.slug })
+    .from(entityTags)
+    .innerJoin(tags, eq(tags.id, entityTags.tagId))
+    .innerJoin(tagCategories, and(
+      eq(tagCategories.id, tags.categoryId),
+      eq(tagCategories.slug, "musica"),
+    ))
+    .where(and(
+      eq(entityTags.entityType, "user"),
+      inArray(entityTags.entityId, userIds),
+    ));
+  for (const r of rows) {
+    let s = out.get(r.entityId);
+    if (!s) { s = new Set(); out.set(r.entityId, s); }
+    s.add(r.slug);
+  }
+  return out;
+}
+
+export async function runMusicAffinityMatching(): Promise<number> {
+  try {
+    const [embeddingsList, prefsMap, blocked, wTag, wEmb, minCombined] = await Promise.all([
+      loadEmbeddingsForUsers(),
+      loadMatchPreferencesMap(),
+      storage.getAllBlockedPairs(),
+      loadWeight("match_music_combined_weight_tag", DEFAULT_W_TAG),
+      loadWeight("match_music_combined_weight_embedding", DEFAULT_W_EMB),
+      loadCombinedThreshold(),
+    ]);
+
+    if (embeddingsList.length < 2) {
+      console.log("[MusicAffinity] meno di 2 embedding `music_taste`, skip.");
+      return 0;
+    }
+
+    const blockedSet = new Set(
+      blocked.flatMap((b) => [`${b.blockerId}:${b.blockedId}`, `${b.blockedId}:${b.blockerId}`]),
+    );
+
+    const userIds = embeddingsList.map((e) => e.userId);
+    const tagSetsByUser = await loadMusicTagsByUser(userIds);
+
+    let matchCount = 0;
+    let attempted = 0;
+    let skipped = 0;
+    const MAX_TOTAL_MATCHES = 1000;
+
+    outer:
+    for (const { userId: uidA, vector } of embeddingsList) {
+      // Solo utenti che hanno il toggle musicAffinity attivo (default true)
+      const prefA = prefsMap.get(uidA);
+      if (prefA && prefA.musicAffinity === false) continue;
+
+      const neighbors = await findSimilar("user", "music_taste", vector, DEFAULT_K + 1, 0);
+      // Skip the user itself (similarity = 1)
+      const setA = tagSetsByUser.get(uidA) ?? new Set<string>();
+
+      for (const hit of neighbors) {
+        if (matchCount >= MAX_TOTAL_MATCHES) break outer;
+        const uidB = hit.entityId;
+        if (!uidB || uidB === uidA) continue;
+        if (blockedSet.has(`${uidA}:${uidB}`)) { skipped++; continue; }
+        if (!bothPrefsEnabled(prefsMap, uidA, uidB, "musicAffinity")) { skipped++; continue; }
+
+        const setB = tagSetsByUser.get(uidB) ?? new Set<string>();
+        const ov = tagOverlap(setA, setB);
+        const embSim = Math.max(0, Math.min(1, hit.similarity));
+        const combined = ov.jaccard * wTag + embSim * wEmb;
+        attempted++;
+        if (combined < minCombined) { skipped++; continue; }
+
+        const idA = uidA < uidB ? uidA : uidB;
+        const idB = uidA < uidB ? uidB : uidA;
+        try {
+          const inserted = await db
+            .insert(musicAffinityMatches)
+            .values({
+              userAId: idA,
+              userBId: idB,
+              tagScore: Number(ov.jaccard.toFixed(4)),
+              embeddingScore: Number(embSim.toFixed(4)),
+              combinedScore: Number(combined.toFixed(4)),
+              tagCommon: ov.common,
+              status: "new",
+            })
+            .onConflictDoNothing()
+            .returning({ id: musicAffinityMatches.id });
+          if (inserted.length > 0) matchCount++;
+          else skipped++;
+        } catch (err) {
+          console.error("[MusicAffinity] insert err:", err);
+          skipped++;
+        }
+      }
+    }
+
+    console.log(
+      `[MusicAffinity] ${matchCount} match (combined>=${minCombined}, w_tag=${wTag}, w_emb=${wEmb}); valutati=${attempted}, saltati=${skipped}`,
+    );
+    return matchCount;
+  } catch (err) {
+    console.error("[MusicAffinity] error:", err);
+    return 0;
+  }
+}

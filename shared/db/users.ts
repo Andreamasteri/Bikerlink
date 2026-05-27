@@ -172,6 +172,9 @@ export const userProfiles = pgTable("user_profiles", {
   mapFilters: jsonb("map_filters").$type<{ biker?: boolean; zavorrina?: boolean; clubs?: boolean; events?: boolean } | null>(),
   coordinatesUpdatedAt: timestamp("coordinates_updated_at"),
   adminOverrideUntil: timestamp("admin_override_until"),
+  // Task #2516 — testo libero "gusti musicali" usato in aggiunta ai tag
+  // della categoria "musica" per costruire l'embedding `music_taste`.
+  musicTasteText: text("music_taste_text"),
   // Task #2510: colonna PostGIS generata sempre da (longitude, latitude).
   geom: geographyPoint("geom"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

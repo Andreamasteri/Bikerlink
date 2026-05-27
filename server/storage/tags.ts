@@ -11,6 +11,7 @@ import {
 } from "@shared/db";
 import { TrackingStorage } from "./tracking";
 import { cacheGet, cacheSet, cacheDel } from "../cache/cache";
+import { enqueueMusicTasteEmbedding } from "../embeddings/music-text";
 
 const TAGS_CACHE_NS = "tags-for-entity";
 const TAGS_CACHE_TTL_S = 120;
@@ -204,6 +205,16 @@ export class TagsStorage extends TrackingStorage {
         .onConflictDoNothing()
         .returning();
       return inserted;
+    }).then((res) => {
+      // Task #2516 — se sono cambiati i tag musicali di un utente, accoda
+      // la rigenerazione dell'embedding `music_taste` (fire-and-forget).
+      // Per categorySlug='musica' triggera sempre; per replace-all (nessuna
+      // categorySlug) triggera comunque perché potrebbe aver rimosso tag
+      // musica precedenti — la coda è idempotente via source-hash.
+      if (entityType === "user" && (options?.categorySlug === "musica" || !options?.categorySlug)) {
+        enqueueMusicTasteEmbedding(entityId);
+      }
+      return res;
     });
   }
 }

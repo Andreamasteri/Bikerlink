@@ -101,7 +101,30 @@ export type ScoreBreakdown = {
   musicCommon?: number;
   styleCommon?: number;
   bikeTypeCommon?: number;
+  // Task #2516 — affinità musicale combinata (tag + embedding).
+  musicEmbeddingScore?: number; // cosine 0..1
+  combinedMusicScore?: number;  // tagJaccard*w1 + embSim*w2, 0..1
+  musicWeightTag?: number;      // w1 effettivo usato (per audit)
+  musicWeightEmbedding?: number; // w2 effettivo usato (per audit)
 };
+
+/**
+ * Task #2516 — Combina tag-overlap musicale e cosine-similarity
+ * dell'embedding `music_taste` in un singolo score 0..1.
+ * Default pesi 0.5/0.5; valori fuori [0,1] vengono clampati.
+ */
+export function combinedMusicScore(
+  tagJaccard: number,
+  embeddingSim: number,
+  weightTag = 0.5,
+  weightEmbedding = 0.5,
+): number {
+  const wt = Math.max(0, Math.min(1, weightTag));
+  const we = Math.max(0, Math.min(1, weightEmbedding));
+  const tj = Math.max(0, Math.min(1, tagJaccard));
+  const es = Math.max(0, Math.min(1, embeddingSim));
+  return tj * wt + es * we;
+}
 
 /**
  * Conta quante categorie nel breakdown superano la soglia. Una categoria
