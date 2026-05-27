@@ -1,0 +1,12 @@
+# .large-files-allow.txt
+# Lista chiusa di file TypeScript autorizzati a superare il limite di 600 righe
+# tramite marker `// LARGE-FILE-ALLOW: <motivo>` in prima riga.
+#
+# Formato: un path per riga, relativo alla root del repo.
+# Sono ammessi commenti che iniziano con `#`. Righe vuote ignorate.
+#
+# Auto-discovery PROIBITA: un file con marker LARGE-FILE-ALLOW non presente
+# qui fa fallire il gate (`scripts/check-large-files-ratchet.sh`).
+# Aggiunte a questa lista richiedono un task utente esplicito.
+#
+# Vedi `replit.md` → sezione "⛔ REGOLA FERREA — Limite 600 righe per file".

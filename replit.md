@@ -113,6 +113,78 @@ I prefer detailed explanations and iterative development. Ask before making majo
 
 **Debug errori strani — Prima azione obbligatoria**: svuotare la cache e riavviare (Metro cache, workflow, ecc.) PRIMA di qualsiasi altra analisi o modifica al codice. Se l'errore persiste, usare il runtime reale (Chrome V8 inspector / log browser) per trovare la riga esatta — NON analizzare il codice staticamente per primo.
 
+## ⛔ REGOLA FERREA — Limite 600 righe per file
+
+**Motivazione**: file > 600 righe diventano monoliti illeggibili, ingestibili a code-review, fonte di merge-conflict e di bug nascosti. La regola è cablata come **gate CI ratchet** (stesso schema di `eslint-hooks-check.sh`): la soglia "dura" è **600 righe per file TypeScript** (`.ts`/`.tsx`); il debito legacy esistente è cristallizzato in una baseline e qualsiasi regressione è bloccata.
+
+### File chiave
+- `scripts/check-large-files.ts` — diagnostica standalone (marker-aware).
+- `scripts/check-large-files-ratchet.sh` / `scripts/check-large-files-ratchet.ts` — gate ratchet (CI).
+- `scripts/lib/large-files-core.ts` — logica condivisa scansione + parsing marker.
+- `.large-files-baseline` — snapshot legacy `>600` senza marker. Versionato. Formato `<path> <linecount>` per riga.
+- `.large-files-allow.txt` — lista CHIUSA dei path autorizzati al marker `LARGE-FILE-ALLOW`. Versionato. (Popolato dal task #2605.)
+
+### Gate registrati (3 punti obbligatori, ognuno con `exit 1` su fallimento)
+1. Workflow `file-conflict-guard` — invocato in coda a `scripts/check-file-conflicts.ts`.
+2. `scripts/pre-commit` — invocato dopo `detect-secrets`, prima dell'`exit 0`.
+3. `scripts/post-merge.sh` — invocato come ultimo step, subito dopo il merge.
+
+### Marker (sempre **UPPERCASE**, in **prima riga** del file)
+- `// LARGE-FILE-ALLOW: <motivo>` → file escluso dal conteggio (solo se path presente in `.large-files-allow.txt`).
+- `// LARGE-FILE-LOCKED — limite: <N>` → limite specifico `<N>`. **Seconda riga obbligatoria**: `// Aggiungi nuove funzionalità in: <companion-path>`.
+- Sintassi commento per estensioni non-JS: `#` per `.sh`/`.sql`/`.py`/`.yml`; `<!-- ... -->` per `.html`.
+
+### Le 6 REGOLE FERREE — non negoziabili (task agent, code reviewer, main agent)
+1. **Il gate va eseguito nei 3 punti elencati sopra**, ognuno con `exit 1` su fallimento. Non disabilitarli.
+2. **`--update-baseline` è riservato all'operatore umano (utente)**. Vietato a qualsiasi agente. Se invocato senza `BIKERLINK_HUMAN_BASELINE_UPDATE=1`, lo script rifiuta con: "❌ Solo l'utente può aggiornare la baseline. Se il file si è ridotto, chiedi all'utente di eseguire `BIKERLINK_HUMAN_BASELINE_UPDATE=1 bash scripts/check-large-files-ratchet.sh --update-baseline`."
+3. **Vietati i bypass cosmetici**. Un agente non può: (a) aggiungere `LARGE-FILE-ALLOW` a un file non in `.large-files-allow.txt`; (b) alzare il limite `<N>` di un file LOCKED; (c) splittare un file LOCKED senza task esplicito; (d) rinominare un file per resettare il conteggio. Il ratchet rileva (a) e (b) e blocca.
+4. **Drift detection sui marker LOCKED**. `<N>` deve corrispondere al conteggio reale ±5 righe: oltre +5 blocca; sotto -5 segnala "shrink rilevato, considera `--update-baseline`" senza bloccare.
+5. **Auto-discovery proibita**. Solo file presenti in `.large-files-allow.txt` possono avere marker `LARGE-FILE-ALLOW`. Marker su file non in lista → blocco. Aggiunte alla lista richiedono task utente esplicito.
+6. **Output sempre visibile**. Il messaggio d'errore include: percorso, righe attuali, limite, motivo (locked/default), companion path se LOCKED. Vietato sopprimere l'output (`>/dev/null`).
+
+### Comandi operativi
+```bash
+# Diagnostica locale (mostra offenders, marker-aware)
+npx tsx scripts/check-large-files.ts
+
+# Gate CI (uguale a workflow file-conflict-guard, pre-commit, post-merge)
+bash scripts/check-large-files-ratchet.sh
+
+# SOLO UTENTE — aggiornare la baseline dopo aver ridotto file legacy
+BIKERLINK_HUMAN_BASELINE_UPDATE=1 bash scripts/check-large-files-ratchet.sh --update-baseline
+```
+
+### Esempi di output errore
+```
+❌ Ratchet FAIL — 1 regressione/i:
+
+  server/routes/admin/example.ts
+    → nuovo file oltre il limite: 712 righe (max 600).
+      Splitta il file o, se è debito legacy autorizzato, attiva il marker corretto via task utente.
+```
+
+```
+❌ Ratchet FAIL — 1 regressione/i:
+
+  server/routes/admin/matching.ts
+    → LOCKED file: 1480 righe, limite dichiarato 1460 (drift +20 > 5).
+      Aggiungi nuove funzionalità in: server/routes/admin/matching-extra.ts
+```
+
+```
+❌ 1 file con marker LARGE-FILE-ALLOW non autorizzato:
+  server/routes/foo.ts  → marker LARGE-FILE-ALLOW presente ma file NON in .large-files-allow.txt
+Auto-discovery proibita. Aggiunte a .large-files-allow.txt richiedono task utente esplicito.
+```
+
+### File LOCKED priorità media
+_(Popolato dal task #2604. Lista vuota al momento.)_
+
+### File esclusi permanentemente (LARGE-FILE-ALLOW)
+_(Popolato dal task #2605. Lista vuota al momento — `.large-files-allow.txt` contiene solo header.)_
+
+---
+
 ## Protocollo Gestione Errori
 
 Quando il Build agent incontra un errore (compilazione, runtime, typecheck, test, API, crash) o un warning bloccante o un fallimento silenzioso (es. migrazione saltata senza eccezione), deve fermarsi e produrre obbligatoriamente una **scheda strutturata**:

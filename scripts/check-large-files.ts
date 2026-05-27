@@ -1,99 +1,128 @@
-import { readdirSync, readFileSync, statSync } from "fs";
-import { join, extname, relative } from "path";
+/**
+ * Standalone diagnostic: list TypeScript files exceeding 600 lines.
+ *
+ * This script is now MARKER-AWARE:
+ *   - `// LARGE-FILE-ALLOW: <motivo>` on line 1 → skipped IF path appears
+ *     in `.large-files-allow.txt`. Otherwise hard error.
+ *   - `// LARGE-FILE-LOCKED — limite: <N>` on line 1 → uses N as the limit;
+ *     drift ±5 is enforced (over → block, under → shrink hint).
+ *
+ * The CI gate lives in `scripts/check-large-files-ratchet.sh`. This file
+ * remains a useful local helper for "show me the offenders".
+ */
+import {
+  MAX_LINES,
+  LOCKED_DRIFT,
+  buildFileState,
+  loadAllowList,
+} from "./lib/large-files-core";
 
-const MAX_LINES = 600;
-const SCAN_EXTENSIONS = [".ts", ".tsx"];
-const EXCLUDED_DIRS = new Set([
-  "node_modules",
-  ".expo",
-  ".git",
-  "dist",
-  "server_dist",
-  "build",
-  "coverage",
-  ".turbo",
-]);
-const EXCLUDED_FILES = new Set([
-  "scripts/check-large-files.ts",
-]);
+const state = buildFileState();
+const allowList = loadAllowList();
 
-function countLines(filePath: string): number {
-  const content = readFileSync(filePath, "utf-8");
-  return content.split("\n").length;
+interface Violation {
+  file: string;
+  lines: number;
+  limit: number;
+  kind: "default" | "locked";
+  companion?: string;
 }
+const violations: Violation[] = [];
+const allowErrors: string[] = [];
+const lockedShrinkHints: string[] = [];
+const allowed: { file: string; lines: number; reason: string }[] = [];
+const lockedOk: { file: string; lines: number; limit: number; companion?: string }[] = [];
 
-function scanDir(dir: string, results: Array<{ file: string; lines: number }>): void {
-  let entries: string[];
-  try {
-    entries = readdirSync(dir);
-  } catch {
-    return;
-  }
-
-  for (const entry of entries) {
-    if (EXCLUDED_DIRS.has(entry)) continue;
-
-    const fullPath = join(dir, entry);
-    let stat;
-    try {
-      stat = statSync(fullPath);
-    } catch {
+for (const entry of state) {
+  if (entry.marker?.kind === "ALLOW") {
+    if (!allowList.has(entry.file)) {
+      allowErrors.push(
+        `  ${entry.file}  → marker LARGE-FILE-ALLOW presente ma file NON in .large-files-allow.txt`,
+      );
       continue;
     }
+    allowed.push({ file: entry.file, lines: entry.lines, reason: entry.marker.reason ?? "" });
+    continue;
+  }
 
-    if (stat.isDirectory()) {
-      scanDir(fullPath, results);
-    } else if (EXCLUDED_FILES.has(relative(process.cwd(), fullPath).replace(/\\/g, "/"))) {
-      continue;
-    } else if (SCAN_EXTENSIONS.includes(extname(entry))) {
-      const lines = countLines(fullPath);
-      if (lines > MAX_LINES) {
-        results.push({ file: relative(process.cwd(), fullPath), lines });
+  if (entry.marker?.kind === "LOCKED") {
+    const limit = entry.marker.lockedLimit ?? MAX_LINES;
+    const diff = entry.lines - limit;
+    if (diff > LOCKED_DRIFT) {
+      violations.push({
+        file: entry.file,
+        lines: entry.lines,
+        limit,
+        kind: "locked",
+        companion: entry.marker.companionPath,
+      });
+    } else {
+      lockedOk.push({
+        file: entry.file,
+        lines: entry.lines,
+        limit,
+        companion: entry.marker.companionPath,
+      });
+      if (limit - entry.lines > LOCKED_DRIFT) {
+        lockedShrinkHints.push(
+          `  ${entry.file}: ${entry.lines} righe, limite ${limit} (shrink di ${limit - entry.lines}; valuta --update-baseline)`,
+        );
       }
     }
+    continue;
+  }
+
+  if (entry.lines > MAX_LINES) {
+    violations.push({
+      file: entry.file,
+      lines: entry.lines,
+      limit: MAX_LINES,
+      kind: "default",
+    });
   }
 }
-
-const root = process.cwd();
-const violations: Array<{ file: string; lines: number }> = [];
-scanDir(root, violations);
 
 violations.sort((a, b) => b.lines - a.lines);
 
-if (violations.length === 0) {
-  console.log(`✅ All TypeScript files are under ${MAX_LINES} lines.`);
-  process.exit(0);
-} else {
-  console.error(`\n❌ Found ${violations.length} file(s) exceeding ${MAX_LINES} lines:\n`);
-  const maxLen = Math.max(...violations.map((v) => v.file.length));
-  for (const { file, lines } of violations) {
-    const excess = lines - MAX_LINES;
-    console.error(`  ${file.padEnd(maxLen + 2)} ${lines} lines  (+${excess} over limit)`);
-  }
-  console.error(`\nPlease split these files into focused modules before committing.\n`);
-
-  const proposalLines: string[] = [
-    "",
-    "=== PROPOSTA TASK ===",
-    `Titolo suggerito: Split file TypeScript — ${violations.length} file oltre i ${MAX_LINES} righe`,
-    "",
-    "File da splittare (Relevant files per il task):",
-  ];
-  for (const { file, lines } of violations) {
-    proposalLines.push(`  - ${file}  (${lines} righe, +${lines - MAX_LINES} oltre il limite)`);
-  }
-  proposalLines.push(
-    "",
-    "Nota per l'agente:",
-    `  Crea un task di split con questi file come "Relevant files".`,
-    `  Soglia: ${MAX_LINES} righe per file.`,
-    "  Obiettivo: spezzare ogni file in moduli focalizzati (es. un file per route,",
-    "  un file per tipo di helper, un barrel index.ts per i re-export).",
-    "  Aggiorna tutti gli import nei file che li usano dopo lo split.",
-    "=== FINE PROPOSTA ===",
-    "",
+if (allowErrors.length > 0) {
+  console.error(
+    `\n❌ ${allowErrors.length} file con marker LARGE-FILE-ALLOW non autorizzato:\n`,
   );
-
-  console.error(proposalLines.join("\n"));
-  process.exit(1);
+  for (const e of allowErrors) console.error(e);
+  console.error(
+    `\nAuto-discovery proibita. Aggiunte a .large-files-allow.txt richiedono task utente esplicito.\n`,
+  );
 }
+
+if (violations.length === 0 && allowErrors.length === 0) {
+  console.log(`✅ Nessun file oltre il limite (default ${MAX_LINES}, locked custom).`);
+  if (allowed.length > 0) {
+    console.log(`   (${allowed.length} file esclusi via LARGE-FILE-ALLOW, ${lockedOk.length} LOCKED entro limite)`);
+  }
+  if (lockedShrinkHints.length > 0) {
+    console.log(`\nℹ️  Shrink rilevato su file LOCKED:`);
+    for (const h of lockedShrinkHints) console.log(h);
+  }
+  process.exit(0);
+}
+
+if (violations.length > 0) {
+  console.error(`\n❌ Trovati ${violations.length} file oltre il limite:\n`);
+  const maxLen = Math.max(...violations.map((v) => v.file.length));
+  for (const v of violations) {
+    const excess = v.lines - v.limit;
+    const tag = v.kind === "locked" ? ` [LOCKED limite=${v.limit}]` : "";
+    const comp = v.companion ? `  → companion: ${v.companion}` : "";
+    console.error(
+      `  ${v.file.padEnd(maxLen + 2)} ${v.lines} righe  (+${excess} oltre ${v.limit})${tag}${comp}`,
+    );
+  }
+  console.error(`\nSplittare in moduli focalizzati prima di committare.\n`);
+}
+
+if (lockedShrinkHints.length > 0) {
+  console.log(`\nℹ️  Shrink rilevato su file LOCKED:`);
+  for (const h of lockedShrinkHints) console.log(h);
+}
+
+process.exit(violations.length > 0 || allowErrors.length > 0 ? 1 : 0);

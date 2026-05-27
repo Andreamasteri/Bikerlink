@@ -71,8 +71,19 @@ fi
 # detect-secrets-hook confronta i file staged con la baseline e
 # esce con codice non-zero se trova segreti non approvati
 if "$DETECT_SECRETS_HOOK" --baseline "$BASELINE" "${STAGED_FILES[@]}"; then
-  echo "✅ Nessun segreto rilevato — commit consentito."
-  exit 0
+  echo "✅ Nessun segreto rilevato."
+  # Gate "max 600 righe per file" — vedi replit.md "⛔ REGOLA FERREA".
+  echo ""
+  echo "🔍 Ratchet 600 righe per file..."
+  if bash scripts/check-large-files-ratchet.sh; then
+    echo "✅ Commit consentito."
+    exit 0
+  else
+    echo ""
+    echo "❌ COMMIT BLOCCATO — gate 600 righe fallito."
+    echo "   Vedi replit.md → \"⛔ REGOLA FERREA — Limite 600 righe per file\"."
+    exit 1
+  fi
 else
   echo ""
   echo "❌ COMMIT BLOCCATO — possibili segreti non approvati rilevati."

@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
+import { spawnSync } from "child_process";
 
 const ACTIVE_TASK_FILES = resolve(process.cwd(), ".local/active-task-files.txt");
 
@@ -62,7 +63,7 @@ async function main(): Promise<void> {
     console.log("       echo 'file1\\nfile2' | npx ts-node scripts/check-file-conflicts.ts");
     console.log("");
     console.log(`Active task registry: ${ACTIVE_TASK_FILES}`);
-    process.exit(0);
+    return;
   }
 
   const taskEntries = parseActiveTaskFiles();
@@ -75,7 +76,7 @@ async function main(): Promise<void> {
       "     server/routes/foo.ts\n" +
       "     app/screens/Bar.tsx\n"
     );
-    process.exit(0);
+    return;
   }
 
   const conflicts: Array<{ file: string; task: string }> = [];
@@ -90,7 +91,7 @@ async function main(): Promise<void> {
 
   if (conflicts.length === 0) {
     console.log("✅ Nessun conflitto trovato — i file in input non sono toccati da altri task attivi.");
-    process.exit(0);
+    return;
   }
 
   console.error(`\n⚠️  CONFLITTI RILEVATI: ${conflicts.length} file in comune con task attivi\n`);
@@ -116,7 +117,22 @@ async function main(): Promise<void> {
   process.exit(1);
 }
 
-main().catch((err) => {
-  console.error("Errore:", err);
-  process.exit(1);
-});
+function runLargeFilesRatchet(): number {
+  // Gate "max 600 righe per file" — chiamato anche da pre-commit e post-merge.
+  // Vedi replit.md → "⛔ REGOLA FERREA — Limite 600 righe per file".
+  const r = spawnSync("bash", ["scripts/check-large-files-ratchet.sh"], {
+    stdio: "inherit",
+  });
+  return r.status ?? 1;
+}
+
+main()
+  .then(() => {
+    const code = runLargeFilesRatchet();
+    process.exit(code);
+  })
+  .catch((err) => {
+    console.error("Errore:", err);
+    runLargeFilesRatchet();
+    process.exit(1);
+  });
