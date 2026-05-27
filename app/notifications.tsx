@@ -223,38 +223,72 @@ export default function NotificationsScreen() {
 
   const { data: notifications = [], isLoading } = useQuery<AppNotification[]>({
     queryKey: ["/api/notifications"],
+    refetchOnMount: "always",
+    staleTime: 0,
   });
 
   const { data: incomingRequests = [], isLoading: loadingRequests } = useQuery<IncomingMatchRequest[]>({
     queryKey: ["/api/friends/requests/incoming"],
+    refetchOnMount: "always",
+    staleTime: 0,
   });
 
   const markReadMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("PUT", `/api/notifications/${id}/read`, {}),
+    mutationFn: (id: string) => apiRequest("PUT", `/api/notifications/${id}/read`),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+      qc.invalidateQueries({ queryKey: ["/api/notifications"], refetchType: "all" });
     },
   });
 
   const deleteOneMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/notifications/${id}`, {}),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/notifications/${id}`),
+    onMutate: async (id: string) => {
+      await qc.cancelQueries({ queryKey: ["/api/notifications"] });
+      const previous = qc.getQueryData<AppNotification[]>(["/api/notifications"]);
+      qc.setQueryData<AppNotification[]>(["/api/notifications"], (old) =>
+        Array.isArray(old) ? old.filter((n) => n.id !== id) : old,
+      );
+      return { previous };
+    },
+    onError: (_e, _id, ctx) => {
+      if (ctx?.previous) qc.setQueryData(["/api/notifications"], ctx.previous);
+      Alert.alert("Errore", "Impossibile eliminare la notifica");
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["/api/notifications"], refetchType: "all" });
     },
   });
 
   const markAllRead = useCallback(async () => {
     const unread = notifications.filter((n) => !n.isRead);
     for (const n of unread) {
-      await apiRequest("PUT", `/api/notifications/${n.id}/read`, {});
+      try {
+        await apiRequest("PUT", `/api/notifications/${n.id}/read`);
+      } catch (e) {
+        console.error("[notifications] markRead failed:", e);
+      }
     }
-    qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    qc.invalidateQueries({ queryKey: ["/api/notifications"], refetchType: "all" });
   }, [notifications, qc]);
 
   const deleteAllMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", "/api/notifications/all", {}),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/notifications"] });
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/notifications/all");
+      return res.json().catch(() => ({ success: true }));
+    },
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: ["/api/notifications"] });
+      const previous = qc.getQueryData<AppNotification[]>(["/api/notifications"]);
+      qc.setQueryData<AppNotification[]>(["/api/notifications"], []);
+      return { previous };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(["/api/notifications"], ctx.previous);
+      console.error("[notifications] deleteAll failed:", e);
+      Alert.alert("Errore", (e as Error)?.message || "Impossibile eliminare le notifiche");
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["/api/notifications"], refetchType: "all" });
     },
   });
 

@@ -31,6 +31,7 @@ router.delete("/all", async (req: Request, res: Response) => {
       .where(eq(notifications.userId, userId))
       .returning({ id: notifications.id });
 
+    console.log(`[notifications] DELETE /all user=${userId} deleted=${deleted.length}`);
     return sendSuccess(res, { deleted: deleted.length });
   } catch (error) {
     console.error("Delete all notifications error:", error);
