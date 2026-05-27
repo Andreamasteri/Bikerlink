@@ -1,5 +1,15 @@
 import { Platform } from "react-native";
-import * as Device from "expo-device";
+
+// Safe lazy require: build 53 non ha il modulo nativo expo-device.
+// Import top-level crasherebbe l'intero bundle JS (schermata nera).
+// In build futuri con il modulo nativo, Device sarà popolato correttamente.
+let Device: { modelName?: string | null; manufacturer?: string | null } = {};
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+  Device = require("expo-device");
+} catch {
+  Device = {};
+}
 
 const ANDROID_MODEL_MAP: Record<string, string> = {
   "SM-S911B": "Samsung Galaxy S23",
