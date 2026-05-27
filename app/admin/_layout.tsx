@@ -64,6 +64,8 @@ export default function AdminLayout() {
       <Stack.Screen name="device-stats" options={{ title: "Dispositivi Utenti" }} />
       <Stack.Screen name="tags" options={{ title: "Sistema Tag" }} />
       <Stack.Screen name="text-aliases" options={{ title: "Alias Testo" }} />
+      <Stack.Screen name="ai-moderation-stats" options={{ title: "Co-Pilot AI — Stats" }} />
+      <Stack.Screen name="ai-moderation-settings" options={{ title: "Co-Pilot AI — Settings" }} />
     </Stack>
   );
 }

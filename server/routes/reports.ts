@@ -13,6 +13,7 @@ import { userReportSchema } from "@shared/validators";
 import { categoryToSeverity, type ReportCategory, type ReportContext } from "@shared/db";
 import { computeTrustScore, evaluateAutoActions, hookFeedbackLoop } from "../services/reportingService";
 import { sendModeratorReportPush } from "../push-notifications";
+import { enqueueTriage } from "../ai/moderation/queue";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 
@@ -125,6 +126,9 @@ router.post("/", reportsRateLimiter, async (req: Request, res: Response) => {
         }
       })
       .catch((err) => console.warn("[Reports] evaluateAutoActions failed:", err));
+
+    // Task #2532 — enqueue triage AI (best-effort, non-fatal).
+    try { enqueueTriage(report.id); } catch (err) { console.warn("[ai-triage] enqueue error:", err); }
 
     // Email amministrativa (best-effort)
     try {

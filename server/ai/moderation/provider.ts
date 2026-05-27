@@ -1,0 +1,177 @@
+// Task #2532 — Provider abstraction con fallback chain Anthropic → OpenAI → Google.
+// Tutti i consumer AI moderazione passano da qui. Restituisce un model handle
+// pronto per generateObject/streamText con metadata cost tracking.
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createOpenAI } from "@ai-sdk/openai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import type { LanguageModelV2 } from "@ai-sdk/provider";
+import { limiters } from "../../lib/throttle";
+import { storage } from "../../storage";
+import type { AiProviderHealth, AiProviderId } from "./types";
+
+export type ModelRole = "brain" | "router";
+
+interface ResolvedModel {
+  id: AiProviderId;
+  providerName: string;
+  modelId: string;
+  model: LanguageModelV2;
+  scheduler: <T>(fn: () => Promise<T>) => Promise<T>;
+}
+
+// Prezzi $ per 1k token (Maggio 2026, vedi _ai-stack-decision.md). Aggiornati a mano.
+const PRICING: Record<string, { in: number; out: number }> = {
+  "claude-sonnet-4-6": { in: 0.003, out: 0.015 },
+  "gpt-5.1": { in: 0.0025, out: 0.01 },
+  "gemini-2.5-pro": { in: 0.00125, out: 0.005 },
+  "gemini-2.5-flash-lite": { in: 0.0001, out: 0.0004 },
+};
+
+export function estimateCostUsd(modelId: string, tokensIn: number, tokensOut: number): number {
+  const p = PRICING[modelId] ?? { in: 0.001, out: 0.003 };
+  return (tokensIn / 1000) * p.in + (tokensOut / 1000) * p.out;
+}
+
+// Soft circuit-breaker per ogni provider: 60s di cooldown dopo errore non-rate-limit.
+const COOLDOWN_MS = 60_000;
+const health: Record<AiProviderId, AiProviderHealth & { cooldownUntil: number }> = {
+  anthropic: { id: "anthropic", available: true, cooldownUntil: 0 },
+  openai: { id: "openai", available: true, cooldownUntil: 0 },
+  google: { id: "google", available: true, cooldownUntil: 0 },
+};
+
+export function markProviderError(id: AiProviderId, err: unknown): void {
+  const msg = err instanceof Error ? err.message : String(err);
+  health[id].available = false;
+  health[id].lastError = msg.slice(0, 200);
+  health[id].lastErrorAt = new Date().toISOString();
+  health[id].cooldownUntil = Date.now() + COOLDOWN_MS;
+}
+
+export function markProviderOk(id: AiProviderId): void {
+  health[id].available = true;
+  health[id].cooldownUntil = 0;
+}
+
+export function getProviderHealth(): AiProviderHealth[] {
+  return (Object.values(health) as Array<AiProviderHealth & { cooldownUntil: number }>).map((h) => ({
+    id: h.id,
+    available: h.available && Date.now() >= h.cooldownUntil,
+    lastError: h.lastError,
+    lastErrorAt: h.lastErrorAt,
+  }));
+}
+
+function isAvailable(id: AiProviderId): boolean {
+  return Date.now() >= health[id].cooldownUntil;
+}
+
+function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): ResolvedModel | null {
+  if (!isAvailable(id)) return null;
+  try {
+    if (id === "anthropic") {
+      const key = process.env.ANTHROPIC_API_KEY;
+      if (!key) return null;
+      const modelId = forcedModelId ?? "claude-sonnet-4-6";
+      const client = createAnthropic({ apiKey: key });
+      return {
+        id, providerName: "anthropic", modelId,
+        model: client(modelId) as unknown as LanguageModelV2,
+        scheduler: <T>(fn: () => Promise<T>) => limiters.anthropic.schedule(fn),
+      };
+    }
+    if (id === "openai") {
+      const key = process.env.OPENAI_API_KEY;
+      if (!key) return null;
+      const modelId = forcedModelId ?? "gpt-5.1";
+      const client = createOpenAI({ apiKey: key });
+      return {
+        id, providerName: "openai", modelId,
+        model: client(modelId) as unknown as LanguageModelV2,
+        scheduler: <T>(fn: () => Promise<T>) => limiters.openai.schedule(fn),
+      };
+    }
+    if (id === "google") {
+      const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
+      if (!key) return null;
+      const modelId = forcedModelId ?? (role === "router" ? "gemini-2.5-flash-lite" : "gemini-2.5-pro");
+      const client = createGoogleGenerativeAI({ apiKey: key });
+      return {
+        id, providerName: "google", modelId,
+        model: client(modelId) as unknown as LanguageModelV2,
+        scheduler: <T>(fn: () => Promise<T>) => limiters.gemini.schedule(fn),
+      };
+    }
+  } catch (err) {
+    markProviderError(id, err);
+  }
+  return null;
+}
+
+// Ordine di preferenza: vedi _ai-stack-decision.md.
+const DEFAULT_BRAIN_CHAIN: AiProviderId[] = ["anthropic", "openai", "google"];
+const DEFAULT_ROUTER_CHAIN: AiProviderId[] = ["google", "openai", "anthropic"];
+
+export interface ResolveOpts {
+  role?: ModelRole;
+  preferredProvider?: AiProviderId | "auto";
+  forcedModelId?: string;
+}
+
+function buildChain(role: ModelRole, preferred?: AiProviderId | "auto"): AiProviderId[] {
+  const base = role === "router" ? DEFAULT_ROUTER_CHAIN : DEFAULT_BRAIN_CHAIN;
+  if (preferred && preferred !== "auto") {
+    return [preferred, ...base.filter((id) => id !== preferred)];
+  }
+  return base;
+}
+
+// Legge la preferenza salvata dall'admin (settings). Best-effort, fallback "auto".
+async function readPreferredProvider(): Promise<AiProviderId | "auto"> {
+  try {
+    const row = await storage.getAppSetting("ai_moderation_preferred_provider");
+    const v = (row?.value ?? "auto") as string;
+    if (v === "anthropic" || v === "openai" || v === "google") return v;
+  } catch {/* ignore */}
+  return "auto";
+}
+
+export function resolveModel(opts: ResolveOpts = {}): ResolvedModel {
+  const role: ModelRole = opts.role ?? "brain";
+  const chain = buildChain(role, opts.preferredProvider);
+  for (const id of chain) {
+    const m = tryBuild(id, role, opts.forcedModelId);
+    if (m) return m;
+  }
+  throw new Error("AI_PROVIDER_UNAVAILABLE: nessun provider AI configurato o disponibile");
+}
+
+// Per-request fallback: prova ogni provider della chain DENTRO la stessa richiesta.
+// Se uno fallisce, marca cooldown e prova il successivo. Solo l'ultimo errore propaga.
+export async function runWithFallback<T>(
+  opts: ResolveOpts,
+  fn: (m: ResolvedModel) => Promise<T>,
+): Promise<{ value: T; model: ResolvedModel }> {
+  const role: ModelRole = opts.role ?? "brain";
+  const preferred = opts.preferredProvider ?? (await readPreferredProvider());
+  const chain = buildChain(role, preferred);
+  let lastErr: unknown = null;
+  for (const id of chain) {
+    const m = tryBuild(id, role, opts.forcedModelId);
+    if (!m) continue;
+    try {
+      const value = await fn(m);
+      markProviderOk(m.id);
+      return { value, model: m };
+    } catch (err) {
+      markProviderError(m.id, err);
+      lastErr = err;
+      console.warn(`[ai-provider] ${m.providerName}/${m.modelId} fallito, provo fallback:`, (err as Error).message);
+    }
+  }
+  if (lastErr) throw lastErr;
+  throw new Error("AI_PROVIDER_UNAVAILABLE: nessun provider AI configurato o disponibile");
+}
+
+export { readPreferredProvider };
+export type { ResolvedModel };

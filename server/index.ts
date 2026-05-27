@@ -311,6 +311,19 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     }, FIVE_MIN_MS);
     console.log("[INIT] OTA auto-rollback worker scheduled every 5 min");
 
+    // Task #2532 — Co-Pilot AI moderazione: anomaly + digest scheduler.
+    try {
+      const { startAnomalyScheduler } = await import("./ai/moderation/anomalies");
+      startAnomalyScheduler();
+      const { startDigestScheduler } = await import("./ai/moderation/digest");
+      startDigestScheduler();
+      const { startUnbanScheduler } = await import("./ai/moderation/unban");
+      startUnbanScheduler();
+      console.log("[INIT] AI moderation schedulers (anomalies + digest + unban) started");
+    } catch (e) {
+      console.warn("[INIT] AI moderation schedulers failed (non-fatal):", e);
+    }
+
     // Motion simulator for fake users — fire-and-forget so it cannot hang boot
     import("./motion-simulator")
       .then(({ startMotionSimulator }) => startMotionSimulator())

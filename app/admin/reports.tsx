@@ -11,6 +11,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { t } from "@/lib/i18n";
 import { apiRequest, queryClient } from "@/lib/query-client";
+import AiAnalysisCard, { type AiAnalysis } from "@/components/admin/ai/AiAnalysisCard";
+import AiCopilotDrawer from "@/components/admin/ai/AiCopilotDrawer";
+import AiCostBadge from "@/components/admin/ai/AiCostBadge";
 
 interface Report {
   id: string;
@@ -28,6 +31,8 @@ interface Report {
   resolvedAt: string | null;
   createdAt: string;
   _reporterMasked?: boolean;
+  aiAnalysis?: AiAnalysis | null;
+  aiAnalyzedAt?: string | null;
 }
 
 type FilterStatus = "all" | "pending" | "resolved" | "dismissed";
@@ -48,6 +53,9 @@ export default function AdminReports() {
   const [status, setStatus] = useState<FilterStatus>("pending");
   const [severity, setSeverity] = useState<FilterSeverity>("all");
   const [category, setCategory] = useState<FilterCategory>("all");
+  // Task #2532 — Co-Pilot AI drawer state.
+  const [copilotReportId, setCopilotReportId] = useState<string | null>(null);
+  const [expandedAiId, setExpandedAiId] = useState<string | null>(null);
 
   const { data: reports = [], isLoading } = useQuery<Report[]>({
     queryKey: ["/api/admin/reports", { status, severity, category }],
@@ -118,11 +126,34 @@ export default function AdminReports() {
             <Text style={[styles.badgeText, { color: getStatusColor(item.status) }]}>{item.status}</Text>
           </View>
         </View>
-        {item.status === "pending" && (
-          <TouchableOpacity onPress={() => handleResolve(item)} testID={`resolve-${item.id}`}>
-            <MaterialIcons name="gavel" size={24} color={Colors.accent} />
+        <View style={{ alignItems: "center", gap: 12 }}>
+          {item.status === "pending" && (
+            <TouchableOpacity onPress={() => handleResolve(item)} testID={`resolve-${item.id}`}>
+              <MaterialIcons name="gavel" size={24} color={Colors.accent} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={() => setExpandedAiId(expandedAiId === item.id ? null : item.id)} testID={`ai-toggle-${item.id}`}>
+            <MaterialIcons name={item.aiAnalysis ? "smart-toy" : "auto-awesome"} size={22} color={item.aiAnalysis ? Colors.accent : Colors.textSecondary} />
           </TouchableOpacity>
-        )}
+        </View>
+      </View>
+    );
+  }
+
+  function renderItem({ item }: { item: Report }) {
+    return (
+      <View>
+        {renderReport({ item })}
+        {expandedAiId === item.id ? (
+          <AiAnalysisCard
+            reportId={item.id}
+            analysis={item.aiAnalysis ?? null}
+            analyzedAt={item.aiAnalyzedAt}
+            originalCategory={item.category ?? null}
+            onOpenCopilot={() => setCopilotReportId(item.id)}
+            onNavigateToReport={(rid) => setExpandedAiId(rid)}
+          />
+        ) : null}
       </View>
     );
   }
@@ -157,14 +188,26 @@ export default function AdminReports() {
         ))}
       </ScrollView>
 
+      <View style={{ paddingHorizontal: 16, paddingTop: 6, flexDirection: "row", justifyContent: "flex-end" }}>
+        <AiCostBadge />
+      </View>
+
       <FlatList
         data={reports}
         keyExtractor={(item) => item.id}
-        renderItem={renderReport}
+        renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: insets.bottom + 20, paddingHorizontal: 16, paddingTop: 8 }}
         ListEmptyComponent={
           isLoading ? <Text style={styles.emptyText}>Caricamento...</Text> : <Text style={styles.emptyText}>Nessuna segnalazione</Text>
         }
+      />
+
+      <AiCopilotDrawer
+        visible={!!copilotReportId}
+        onClose={() => setCopilotReportId(null)}
+        scope="report"
+        contextId={copilotReportId ?? undefined}
+        initialMessage={copilotReportId ? `Analizza il report ${copilotReportId} e proponi un'azione motivata.` : undefined}
       />
     </View>
   );

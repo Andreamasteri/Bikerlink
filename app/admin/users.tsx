@@ -14,6 +14,9 @@ import { UserDetailModal, UserStats, SessionsData, GeoZone } from "@/components/
 import { UserEditModal } from "@/components/admin/users/UserEditModal";
 import { ZoneMapModal } from "@/components/admin/users/ZoneMapModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import AiCopilotDrawer from "@/components/admin/ai/AiCopilotDrawer";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { TouchableOpacity } from "react-native";
 
 let MapView: React.ComponentType<Record<string, unknown>> | null = null;
 let MapMarker: React.ComponentType<Record<string, unknown>> | null = null;
@@ -45,6 +48,8 @@ export default function AdminUsers() {
   const [editPassword, setEditPassword] = useState("");
   const [searchText, setSearchText] = useState("");
   const [hideFake, setHideFake] = useState(true);
+  // Task #2532 — Co-Pilot AI scope=user: chat contestuale all'utente selezionato.
+  const [aiUserDrawer, setAiUserDrawer] = useState<{ visible: boolean; userId?: string }>({ visible: false });
 
   // Geo-insight effimero
   const [fzEnabled, setFzEnabled] = useState(false);
@@ -437,6 +442,24 @@ export default function AdminUsers() {
         />
       </ErrorBoundary>
 
+      {selectedUser ? (
+        <TouchableOpacity
+          style={styles.aiFab}
+          onPress={() => setAiUserDrawer({ visible: true, userId: selectedUser.id })}
+          accessibilityLabel="Apri Co-Pilot AI per questo utente"
+        >
+          <MaterialCommunityIcons name="robot-outline" size={22} color="#fff" />
+        </TouchableOpacity>
+      ) : null}
+
+      <AiCopilotDrawer
+        visible={aiUserDrawer.visible}
+        onClose={() => setAiUserDrawer({ visible: false })}
+        scope="user"
+        contextId={aiUserDrawer.userId}
+        initialMessage={aiUserDrawer.userId ? `Analizza l'utente ${aiUserDrawer.userId} (storico segnalazioni, trust, ban precedenti) e suggerisci azioni.` : undefined}
+      />
+
       <ErrorBoundary>
         <ZoneMapModal
           zone={fzMapZone}
@@ -453,4 +476,11 @@ export default function AdminUsers() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
+  aiFab: {
+    position: "absolute", right: 16, bottom: 24,
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: Colors.accent,
+    alignItems: "center", justifyContent: "center",
+    shadowColor: "#000", shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: { width: 0, height: 3 }, elevation: 4,
+  },
 });

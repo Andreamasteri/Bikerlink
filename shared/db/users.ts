@@ -35,6 +35,8 @@ export const users = pgTable("users", {
   coupleSexConfig: varchar("couple_sex_config", { length: 10 }),
   role: varchar("role", { length: 20 }).notNull().default("user"),
   status: varchar("status", { length: 20 }).notNull().default("active"),
+  // Task #2532 — scadenza ban temporanea (auto-unban quando NOW() > suspendedUntil).
+  suspendedUntil: timestamp("suspended_until"),
   birthYear: integer("birth_year"),
   region: varchar("region", { length: 100 }),
   avatarUrl: text("avatar_url"),

@@ -242,6 +242,7 @@ import dbAdminRouter from './admin/db';
 import translationsRouter from './admin/translations';
 import tagsRouter from './admin/tags';
 import textAliasesRouter from './admin/text-aliases';
+import aiModerationRouter from './admin/ai-moderation';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -333,5 +334,7 @@ router.use('/', _requireAdmin, miscRouter);
 router.use('/', _requireAdmin, matchingRouter);
 router.use('/', _requireAdmin, abRouter);
 router.use('/embeddings', _requireAdmin, embeddingsRouter);
+// Task #2532 — Co-Pilot AI Moderazione.
+router.use('/', _requireAdmin, aiModerationRouter);
 
 export default router;

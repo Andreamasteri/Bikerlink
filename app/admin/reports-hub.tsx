@@ -15,6 +15,8 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
+import AiCostBadge from "@/components/admin/ai/AiCostBadge";
+import AiCopilotDrawer from "@/components/admin/ai/AiCopilotDrawer";
 
 interface HubSummary {
   byStatus: Record<string, number>;
@@ -69,6 +71,7 @@ const QUICK_LINKS: Array<{ key: string; label: string; route: string; icon: keyo
 export default function ReportsHubScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [aiPatternOpen, setAiPatternOpen] = React.useState(false);
   const { data, isLoading, refetch, isFetching } = useQuery<HubSummary>({
     queryKey: ["/api/admin/reports/hub-summary"],
     queryFn: async () => {
@@ -102,6 +105,10 @@ export default function ReportsHubScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          <View style={{ marginBottom: 12, alignItems: "flex-end" }}>
+            <AiCostBadge />
+          </View>
 
           <View style={styles.kpiRow}>
             <View style={styles.kpiCard}>
@@ -170,7 +177,12 @@ export default function ReportsHubScreen() {
             })}
           </View>
 
-          <Text style={styles.sectionTitle}>Top 5 pattern (30g)</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <Text style={styles.sectionTitle}>Top 5 pattern (30g)</Text>
+            <TouchableOpacity onPress={() => setAiPatternOpen(true)} accessibilityLabel="Chiedi all'AI dei pattern">
+              <MaterialCommunityIcons name="robot-outline" size={20} color={Colors.accent} />
+            </TouchableOpacity>
+          </View>
           {(data?.topPatterns ?? []).length === 0 ? (
             <Text style={styles.empty}>Nessun pattern rilevato</Text>
           ) : (
@@ -210,6 +222,12 @@ export default function ReportsHubScreen() {
           )}
         </>
       )}
+      <AiCopilotDrawer
+        visible={aiPatternOpen}
+        onClose={() => setAiPatternOpen(false)}
+        scope="pattern"
+        initialMessage="Analizza i pattern di moderazione recenti: chi sono gli utenti più segnalati negli ultimi 30 giorni, ci sono cluster di categorie o segnalanti sospetti? Suggerisci priorità d'azione."
+      />
     </ScrollView>
   );
 }
