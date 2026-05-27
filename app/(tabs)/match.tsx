@@ -18,6 +18,7 @@ import { useT, useLocale } from "@/lib/language-context";
 
 import { MatchHeader } from "@/components/match/MatchHeader";
 import { GarageMatchCard, BikerBikerMatchCard, MatchCardFull, ProposalProfileMatchCard } from "@/components/match/MatchCard";
+import { RouteAffinityMatchCard } from "@/components/match/RouteAffinityMatchCard";
 import { TabBar, TabKey } from "@/components/match/TabBar";
 
 import { MatchEmptyState } from "@/components/match/tabs/MatchEmptyState";
@@ -128,6 +129,14 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
+  const { data: routeAffinityMatches, isLoading: routeAffinityLoading, refetch: routeAffinityRefetch, isRefetching: routeAffinityRefetching } = useQuery<any[]>({
+    queryKey: ["/api/proposals/route-affinity-matches"],
+    enabled: !!user,
+    refetchInterval: 60000,
+    refetchOnMount: true,
+  });
+
   const { data: lastfmStatus } = useQuery<{ connected: boolean; username?: string }>({
     queryKey: ["/api/music/lastfm/status"],
     enabled: !!user,
@@ -206,6 +215,29 @@ export default function MatchScreen() {
     mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/proposal-profile-matches/${matchId}/reject`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/proposal-profile-matches"] });
+    },
+  });
+
+  const acceptRouteAffinityMutation = useMutation({
+    mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/route-affinity-matches/${matchId}/accept`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
+      setPendingMatchId(null);
+    },
+    onError: () => setPendingMatchId(null),
+  });
+
+  const rejectRouteAffinityMutation = useMutation({
+    mutationFn: (matchId: string) => apiRequest("POST", `/api/proposals/route-affinity-matches/${matchId}/reject`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
+    },
+  });
+
+  const removeRouteAffinityMutation = useMutation({
+    mutationFn: (matchId: string) => apiRequest("DELETE", `/api/proposals/route-affinity-matches/${matchId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
     },
   });
 
@@ -310,7 +342,8 @@ export default function MatchScreen() {
     else if (activeTab === "music") musicRefetch();
     else if (activeTab === "accepted") acceptedRefetch();
     else if (activeTab === "propProfile") propProfileRefetch();
-  }, [activeTab, proposalRefetch, garageRefetch, bikerRefetch, blockedRefetch, musicRefetch, acceptedRefetch, propProfileRefetch]);
+    else if (activeTab === "route") routeAffinityRefetch();
+  }, [activeTab, proposalRefetch, garageRefetch, bikerRefetch, blockedRefetch, musicRefetch, acceptedRefetch, propProfileRefetch, routeAffinityRefetch]);
 
   const handleUnblock = useCallback((blockedUserId: string) => {
     Alert.alert(t("common.confirm"), t("match.confirmUnblock"), [
@@ -326,19 +359,21 @@ export default function MatchScreen() {
     if (activeTab === "blacklist") return blockedUsers || [];
     if (activeTab === "music") return musicMatches || [];
     if (activeTab === "propProfile") return propProfileMatches?.filter(m => m.status === "new") || [];
+    if (activeTab === "route") return routeAffinityMatches?.filter(m => m.status === "new") || [];
     if (activeTab === "accepted") {
       const g = (garageMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "garage" }));
       const b = (bikerMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "biker" }));
       const p = (proposalMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "proposal" }));
       const pp = (propProfileMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "propProfile" }));
+      const ra = (routeAffinityMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "routeAffinity" }));
       const acc = (acceptedMatches || []).map(m => ({ ...m, _matchType: "generic" }));
-      return [...g, ...b, ...p, ...pp, ...acc].sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+      return [...g, ...b, ...p, ...pp, ...ra, ...acc].sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
     }
     return [];
-  }, [activeTab, proposalMatches, garageMatches, bikerMatches, blockedUsers, musicMatches, acceptedMatches, propProfileMatches]);
+  }, [activeTab, proposalMatches, garageMatches, bikerMatches, blockedUsers, musicMatches, acceptedMatches, propProfileMatches, routeAffinityMatches]);
 
-  const isLoading = proposalLoading || garageLoading || bikerLoading || blockedLoading || musicLoading || acceptedLoading || propProfileLoading;
-  const isRefetching = proposalRefetching || garageRefetching || bikerRefetching || blockedRefetching || musicRefetching || acceptedRefetching || propProfileRefetching;
+  const isLoading = proposalLoading || garageLoading || bikerLoading || blockedLoading || musicLoading || acceptedLoading || propProfileLoading || routeAffinityLoading;
+  const isRefetching = proposalRefetching || garageRefetching || bikerRefetching || blockedRefetching || musicRefetching || acceptedRefetching || propProfileRefetching || routeAffinityRefetching;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- item shape varies by tab
   const renderItem = useCallback(({ item }: { item: any }) => {
@@ -425,6 +460,22 @@ export default function MatchScreen() {
           />
         );
       }
+      if (item._matchType === "routeAffinity") {
+        const otherId: string = item.otherUserId ?? (item.userAId === user?.id ? item.userBId : item.userAId);
+        return (
+          <RouteAffinityMatchCard
+            match={item}
+            currentUserId={user?.id || ""}
+            onAccept={() => {}}
+            onReject={() => {}}
+            onChatPress={() => startChatMutation.mutate(otherId)}
+            onRemove={() => removeRouteAffinityMutation.mutate(item.id)}
+            isPending={false}
+            t={t}
+            locale={locale}
+          />
+        );
+      }
       return (
         <MatchCardFull
           match={item}
@@ -434,6 +485,26 @@ export default function MatchScreen() {
           onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as never) : undefined}
           onRemove={() => confirmRemoveProposalMatch(item.id)}
           isPending={false}
+          t={t}
+          locale={locale}
+        />
+      );
+    }
+
+    if (activeTab === "route") {
+      const otherId: string = item.otherUserId ?? (item.userAId === user?.id ? item.userBId : item.userAId);
+      return (
+        <RouteAffinityMatchCard
+          match={item}
+          currentUserId={user?.id || ""}
+          onAccept={() => {
+            setPendingMatchId(item.id);
+            acceptRouteAffinityMutation.mutate(item.id);
+          }}
+          onReject={() => rejectRouteAffinityMutation.mutate(item.id)}
+          onChatPress={item.status === "accepted" ? () => startChatMutation.mutate(otherId) : undefined}
+          onRemove={item.status === "accepted" ? () => removeRouteAffinityMutation.mutate(item.id) : undefined}
+          isPending={pendingMatchId === item.id}
           t={t}
           locale={locale}
         />
@@ -504,7 +575,7 @@ export default function MatchScreen() {
         locale={locale}
       />
     );
-  }, [activeTab, user?.id, pendingMatchId, propProfilePendingId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, blockFromMatchMutation, acceptMutation, rejectMutation, acceptPropProfileMutation, rejectPropProfileMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, handleUnblock, router, t, locale]);
+  }, [activeTab, user?.id, pendingMatchId, propProfilePendingId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, blockFromMatchMutation, acceptMutation, rejectMutation, acceptPropProfileMutation, rejectPropProfileMutation, acceptRouteAffinityMutation, rejectRouteAffinityMutation, removeRouteAffinityMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, handleUnblock, router, t, locale]);
 
   const newGarageMatches = useMemo(() => garageMatches?.filter(m => m.status === "new") || [], [garageMatches]);
   const newBikerMatches = useMemo(() => bikerMatches?.filter(m => m.status === "new") || [], [bikerMatches]);
@@ -517,6 +588,7 @@ export default function MatchScreen() {
     { key: "music", label: t("match.tabMusic"), icon: "musical-notes", count: 0 },
     { key: "proposals", label: t("match.tabProposals"), icon: "flash", count: newProposalMatches.length },
     { key: "propProfile", label: t("match.tabPropProfile"), icon: "location", count: newPropProfileMatches.length },
+    { key: "route", label: t("match.tabRoute"), icon: "map", count: (routeAffinityMatches?.filter((m) => m.status === "new") || []).length },
     { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: 0 },
     { key: "blacklist", label: t("match.tabBlacklist"), icon: "ban", count: 0 },
   ];
@@ -528,6 +600,7 @@ export default function MatchScreen() {
     if (activeTab === "accepted") return "checkmark-circle-outline";
     if (activeTab === "blacklist") return "ban-outline";
     if (activeTab === "propProfile") return "location-outline";
+    if (activeTab === "route") return "map-outline";
     return "flash-outline";
   };
 
@@ -538,6 +611,7 @@ export default function MatchScreen() {
     if (activeTab === "accepted") return t("match.emptyAcceptedTitle");
     if (activeTab === "blacklist") return t("match.emptyBlacklistTitle");
     if (activeTab === "propProfile") return t("match.emptyPropProfileTitle");
+    if (activeTab === "route") return t("match.emptyRouteTitle");
     return t("match.emptyProposalsTitle");
   };
 
@@ -548,6 +622,7 @@ export default function MatchScreen() {
     if (activeTab === "accepted") return t("match.emptyAcceptedDesc");
     if (activeTab === "blacklist") return t("match.emptyBlacklistDesc");
     if (activeTab === "propProfile") return t("match.emptyPropProfileDesc");
+    if (activeTab === "route") return t("match.emptyRouteDesc");
     return t("match.emptyProposalsDesc");
   };
 

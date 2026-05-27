@@ -4,9 +4,9 @@ import {
   sosRequests,
   type SosRequest, type InsertSosRequest,
 } from "@shared/db";
-import { BikerMatchesStorage } from "./biker-matches";
+import { RouteAffinityMatchesStorage } from "./route-affinity-matches";
 
-export class SosStorage extends BikerMatchesStorage {
+export class SosStorage extends RouteAffinityMatchesStorage {
   async createSosRequest(data: InsertSosRequest): Promise<SosRequest> {
     const [req] = await db.insert(sosRequests).values(data).returning();
     return req;

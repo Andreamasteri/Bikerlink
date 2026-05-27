@@ -127,6 +127,13 @@ router.put("/:id/stop", async (req: Request, res: Response) => {
     updatePayload.gpsBlackoutCount = Math.max(0, Math.floor(Number(clientGpsBlackoutCount) || 0));
     updatePayload.gpsBlackoutSeconds = Math.max(0, Math.floor(Number(clientGpsBlackoutSeconds) || 0));
     const updated = await storage.updateRoute(id, updatePayload);
+    // Fire-and-forget: aggiorna fingerprint celle GPS (route_affinity matching)
+    try {
+      const { triggerFingerprintUpdate } = await import("../../matching/jobs/extract-route-cells");
+      triggerFingerprintUpdate(id);
+    } catch (err) {
+      console.warn("[tracking/stats] triggerFingerprintUpdate skipped:", err);
+    }
 
     const profile = await storage.getUserProfile(userId);
     if (profile) {

@@ -26,6 +26,7 @@ export const DEFAULT_PREFS = {
   bikerBikerAvgDuration: true,
   bikerBikerDayTime: true,
   bikerBikerEvents: true,
+  routeAffinity: true,
   directMatch: true,
   topMatchesOnly: false,
 };
@@ -62,6 +63,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         bikerBikerAvgDuration: row.bikerBikerAvgDuration,
         bikerBikerDayTime: row.bikerBikerDayTime,
         bikerBikerEvents: row.bikerBikerEvents,
+        routeAffinity: row.routeAffinity,
         directMatch: row.directMatch,
         topMatchesOnly: row.topMatchesOnly ?? false,
       },

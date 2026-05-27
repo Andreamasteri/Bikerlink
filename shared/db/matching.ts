@@ -6,6 +6,8 @@ import {
   integer,
   boolean,
   timestamp,
+  doublePrecision,
+  jsonb,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -150,12 +152,73 @@ export const matchPreferences = pgTable("match_preferences", {
   bikerBikerAvgDuration: boolean("biker_biker_avg_duration").notNull().default(true),
   bikerBikerDayTime: boolean("biker_biker_day_time").notNull().default(true),
   bikerBikerEvents: boolean("biker_biker_events").notNull().default(true),
+  routeAffinity: boolean("route_affinity").notNull().default(true),
   directMatch: boolean("direct_match").notNull().default(true),
   topMatchesOnly: boolean("top_matches_only").notNull().default(false),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("match_preferences_user_id_idx").on(table.userId),
 ]);
+
+export const userRouteFingerprints = pgTable("user_route_fingerprints", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .unique()
+    .references(() => users.id, { onDelete: "cascade" }),
+  cells: jsonb("cells").notNull().default(sql`'{}'::jsonb`),
+  cellCount: integer("cell_count").notNull().default(0),
+  centerLat: doublePrecision("center_lat"),
+  centerLon: doublePrecision("center_lon"),
+  lastRouteAt: timestamp("last_route_at"),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_route_fingerprints_user_id_idx").on(table.userId),
+  index("user_route_fingerprints_cell_count_idx").on(table.cellCount),
+]);
+
+export const geoCellLabels = pgTable("geo_cell_labels", {
+  geohash: varchar("geohash", { length: 12 }).primaryKey(),
+  label: varchar("label", { length: 200 }).notNull(),
+  centerLat: doublePrecision("center_lat"),
+  centerLon: doublePrecision("center_lon"),
+  visitCount: integer("visit_count").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const routeAffinityMatches = pgTable("route_affinity_matches", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userAId: varchar("user_a_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  userBId: varchar("user_b_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  commonCells: integer("common_cells").notNull(),
+  score: doublePrecision("score").notNull(),
+  topPlaces: jsonb("top_places").notNull().default(sql`'[]'::jsonb`),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("route_affinity_user_a_idx").on(table.userAId),
+  index("route_affinity_user_b_idx").on(table.userBId),
+  uniqueIndex("route_affinity_symmetric_idx").on(
+    sql`LEAST(${table.userAId}, ${table.userBId})`,
+    sql`GREATEST(${table.userAId}, ${table.userBId})`,
+  ),
+]);
+
+export type UserRouteFingerprint = typeof userRouteFingerprints.$inferSelect;
+export type InsertUserRouteFingerprint = typeof userRouteFingerprints.$inferInsert;
+export type GeoCellLabel = typeof geoCellLabels.$inferSelect;
+export type InsertGeoCellLabel = typeof geoCellLabels.$inferInsert;
+export type RouteAffinityMatch = typeof routeAffinityMatches.$inferSelect;
+export type InsertRouteAffinityMatch = typeof routeAffinityMatches.$inferInsert;
 
 export type ZavarrinaWishlist = typeof zavarrinaWishlists.$inferSelect;
 export type InsertZavarrinaWishlist = typeof zavarrinaWishlists.$inferInsert;

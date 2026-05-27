@@ -281,6 +281,11 @@ export interface IStorage {
   deleteBlockById(id: string): Promise<boolean>;
   deleteBikerBikerMatchesBetween(userId1: string, userId2: string): Promise<number>;
   cleanupAdminMatches(): Promise<{ bikerZavarrina: number; bikerBiker: number }>;
+  getRouteAffinityMatchesForUser(userId: string): Promise<import("@shared/db").RouteAffinityMatch[]>;
+  getRouteAffinityMatch(id: string): Promise<import("@shared/db").RouteAffinityMatch | undefined>;
+  updateRouteAffinityMatch(id: string, data: Partial<import("@shared/db").InsertRouteAffinityMatch>): Promise<import("@shared/db").RouteAffinityMatch | undefined>;
+  deleteRouteAffinityMatch(id: string): Promise<boolean>;
+  deleteRouteAffinityMatchesBetween(userId1: string, userId2: string): Promise<number>;
   createPlannedRoute(data: InsertPlannedRoute): Promise<PlannedRoute>;
   getPlannedRoute(id: string): Promise<PlannedRoute | undefined>;
   getPlannedRoutes(userId: string): Promise<PlannedRoute[]>;

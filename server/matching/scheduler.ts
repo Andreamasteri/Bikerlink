@@ -6,6 +6,8 @@ import { runMatching, runWishlistMatching } from "./run-matching";
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";
 import { runClubBrandMatching } from "./run-clubs";
 import { runMusicMatchBikerZavarrina, runGpsBasedMatching, runEventMatching, runBikerZavarrinaTypeStyleMatching } from "./run-extra";
+import { runExtractRouteCellsJob } from "./jobs/extract-route-cells";
+import { runRouteSimilarityMatching } from "./run-route-similarity";
 import { runDistanceMatching, runRouteTypeZoneMatching } from "./run-distance";
 import { runProposalToProfileMatching } from "./run-profile";
 import { runProposalZoneNotifications, runProposalMatchingForUser } from "./run-proposals";
@@ -271,6 +273,17 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           if (ppCount > 0) console.log(`[Matching] Found ${ppCount} new proposal-profile matches`);
         } catch (err) {
           console.error("[Matching] ProposalProfile matching error (non-blocking):", err);
+        }
+
+        try {
+          const fpResult = await runExtractRouteCellsJob();
+          if (fpResult.usersProcessed > 0) {
+            console.log(`[Matching] Route fingerprint aggiornata: ${fpResult.usersProcessed} utenti, ${fpResult.cellsTotal} celle`);
+          }
+          const raCount = await runRouteSimilarityMatching();
+          if (raCount > 0) console.log(`[Matching] Found ${raCount} new route-affinity matches`);
+        } catch (err) {
+          console.error("[Matching] RouteAffinity matching error (non-blocking):", err);
         }
       } else {
         console.log("[Matching] Auto matching disabilitato dall'admin, skip");

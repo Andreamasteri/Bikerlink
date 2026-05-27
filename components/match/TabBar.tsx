@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
-export type TabKey = "zavorrine" | "biker" | "proposals" | "propProfile" | "music" | "accepted" | "blacklist";
+export type TabKey = "zavorrine" | "biker" | "proposals" | "propProfile" | "music" | "route" | "accepted" | "blacklist";
 
 interface TabBarProps {
   activeTab: TabKey;
@@ -49,9 +49,10 @@ function TabItem({
 }
 
 export function TabBar({ activeTab, setActiveTab, tabs }: TabBarProps) {
+  const total = tabs.length;
   const row1 = tabs.slice(0, 3);
-  const row2 = tabs.slice(3, 5);
-  const row3 = tabs.slice(5, 7);
+  const row2 = tabs.slice(3, Math.min(5, total));
+  const row3 = tabs.slice(5, total);
 
   return (
     <View style={styles.container}>
