@@ -27,7 +27,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       >
         <Text style={styles.title}>BikerLink</Text>
         <Image
-          source={require("@/assets/images/helmet-logo.png")}
+          source={require("@/assets/images/helmet-logo-header.png")}
           style={styles.helmetLogo}
           resizeMode="contain"
         />
