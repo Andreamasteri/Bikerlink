@@ -284,16 +284,52 @@ async function checkPackages() {
     ...Object.keys(pkg.dependencies ?? {}),
     ...Object.keys(pkg.devDependencies ?? {}),
   ]);
+  // Falsi positivi #2581: i pacchetti elencati negli "overrides" (o "resolutions")
+  // possono non comparire come dependency diretta ma sono comunque versioni gestite.
+  const overrideNames = new Set<string>();
+  const collectOverrides = (obj: unknown) => {
+    if (!obj || typeof obj !== "object") return;
+    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+      overrideNames.add(k);
+      if (v && typeof v === "object") collectOverrides(v);
+    }
+  };
+  collectOverrides(pkg.overrides);
+  collectOverrides(pkg.resolutions);
+
   const tasksDir = path.join(ROOT, ".local", "tasks");
   const taskFiles = await listFiles(tasksDir, [".md"]).catch(() => []);
   const declared = new Map<string, string[]>(); // package -> task files
-  // Pattern: backtick-wrapped name followed by @^version, es. `pino@^10.3.1`
+  // Falsi positivi #2581: estrai SOLO dalle sezioni dichiarative ("## Versioni e
+  // compatibilità" oppure "## npm da installare"); le altre menzioni in changelog
+  // o note storiche non rappresentano una richiesta di installazione.
+  const ALLOWED_SECTIONS = /^##\s+(versioni\s+e\s+compatibilit[àa]|npm\s+da\s+installare)\b/i;
+  const SECTION_BOUNDARY = /^##\s+/;
   const re = /`([a-z0-9._-]+(?:\/[a-z0-9._-]+)?)@\^[\d.]+`/gi;
   for (const f of taskFiles) {
     const c = await readFileSafe(f);
     if (!c) continue;
+    // Estrai i blocchi sezione interessanti
+    const lines = c.split(/\r?\n/);
+    const buckets: string[] = [];
+    let active: string[] | null = null;
+    for (const ln of lines) {
+      if (SECTION_BOUNDARY.test(ln)) {
+        if (active) {
+          buckets.push(active.join("\n"));
+          active = null;
+        }
+        if (ALLOWED_SECTIONS.test(ln)) active = [];
+        continue;
+      }
+      if (active) active.push(ln);
+    }
+    if (active) buckets.push(active.join("\n"));
+    if (buckets.length === 0) continue;
+    const scanned = buckets.join("\n");
+    re.lastIndex = 0;
     let m: RegExpExecArray | null;
-    while ((m = re.exec(c)) !== null) {
+    while ((m = re.exec(scanned)) !== null) {
       const name = m[1];
       if (name.startsWith("@types/")) continue;
       if (!declared.has(name)) declared.set(name, []);
@@ -302,20 +338,25 @@ async function checkPackages() {
   }
   const gaps: Gap[] = [];
   for (const [name, sources] of declared.entries()) {
-    if (!installed.has(name)) {
-      gaps.push({
-        severity: "high",
-        check: "packages",
-        what: `Package '${name}' dichiarato nei task ma NON installato`,
-        where: sources.slice(0, 3).join(", ") + (sources.length > 3 ? ` (+${sources.length - 3})` : ""),
-        suggestion: `Installare con il packager tool oppure rimuovere riferimento dai task`,
-      });
-    }
+    if (installed.has(name)) continue;
+    if (overrideNames.has(name)) continue; // gestito da overrides/resolutions
+    gaps.push({
+      severity: "high",
+      check: "packages",
+      what: `Package '${name}' dichiarato nei task ma NON installato`,
+      where: sources.slice(0, 3).join(", ") + (sources.length > 3 ? ` (+${sources.length - 3})` : ""),
+      suggestion: `Installare con il packager tool oppure rimuovere riferimento dai task`,
+    });
   }
   return {
     status: gaps.length ? ("warn" as const) : ("ok" as const),
     gaps,
-    meta: { declaredCount: declared.size, installedCount: installed.size, taskFilesScanned: taskFiles.length },
+    meta: {
+      declaredCount: declared.size,
+      installedCount: installed.size,
+      overrideCount: overrideNames.size,
+      taskFilesScanned: taskFiles.length,
+    },
   };
 }
 
@@ -384,27 +425,168 @@ async function checkI18n() {
 async function checkAdminEndpoints() {
   const adminDir = path.join(ROOT, "server", "routes", "admin");
   const files = await listFiles(adminDir, [".ts"]).catch(() => []);
+  const fileSet = new Set(files);
+
+  // Falsi positivi #2581: la maggior parte dei sub-router admin è montata da
+  // `server/routes/admin.ts` (oppure `server/routes/admin/index.ts`) tramite
+  // `router.use(<path>, _requireAdmin, xRouter)`. Quei file ereditano la
+  // guardia dal parent e non devono essere segnalati. Segnaliamo HIGH solo i
+  // file route con mount diretto su `app` (senza middleware admin).
+  //
+  // Calcoliamo ricorsivamente la "chiusura protetta": partendo da admin.ts come
+  // radice protetta, ogni sub-router montato con `_requireAdmin` viene marcato
+  // protetto e visitato a sua volta per risolvere le sue mount.
+  type ParsedRouter = {
+    imports: Map<string, string>;
+    mounts: Array<{ symbol: string; hasGuard: boolean }>;
+    rootGuard: boolean;
+  };
+  const parseCache = new Map<string, ParsedRouter | null>();
+  const parseRouterFile = async (filePath: string): Promise<ParsedRouter | null> => {
+    if (parseCache.has(filePath)) return parseCache.get(filePath)!;
+    const src = await readFileSafe(filePath);
+    if (!src) {
+      parseCache.set(filePath, null);
+      return null;
+    }
+    const dir = path.dirname(filePath);
+    const imports = new Map<string, string>();
+    const importRe = /import\s+(\w+)\s+from\s+['"](\.[^'"]+)['"]/g;
+    let im: RegExpExecArray | null;
+    while ((im = importRe.exec(src)) !== null) {
+      const sym = im[1];
+      const rel = im[2];
+      const base = path.resolve(dir, rel);
+      for (const tp of [base + ".ts", path.join(base, "index.ts")]) {
+        if (fileSet.has(tp) || tp === path.join(ROOT, "server", "routes", "admin.ts")) {
+          imports.set(sym, tp);
+          break;
+        }
+        // Anche router non sotto admin/ possono essere referenziati ma non li
+        // tracciamo (es. mediaLibrary in server/routes/media-library.ts).
+      }
+    }
+    const rootGuard = /router\.use\(\s*_requireAdmin\s*\)/.test(src);
+    const mounts: Array<{ symbol: string; hasGuard: boolean }> = [];
+    // router.use('<path>', _requireAdmin, xRouter)  o  router.use('<path>', xRouter)
+    const mountRe = /router\.use\(\s*['"][^'"]*['"]\s*,\s*([^)]+)\)/g;
+    let mm: RegExpExecArray | null;
+    while ((mm = mountRe.exec(src)) !== null) {
+      const args = mm[1];
+      const hasGuard = /_requireAdmin|requireAdmin\b/.test(args);
+      for (const sym of args.split(",").map((s) => s.trim())) {
+        if (/^[A-Za-z_]\w*$/.test(sym)) mounts.push({ symbol: sym, hasGuard });
+      }
+    }
+    const parsed = { imports, mounts, rootGuard };
+    parseCache.set(filePath, parsed);
+    return parsed;
+  };
+
+  const protectedFiles = new Set<string>();
+  const adminTs = path.join(ROOT, "server", "routes", "admin.ts");
+  const adminIndex = path.join(ROOT, "server", "routes", "admin", "index.ts");
+  const queue: string[] = [];
+  for (const root of [adminTs, adminIndex]) {
+    if (await readFileSafe(root)) {
+      protectedFiles.add(root);
+      queue.push(root);
+    }
+  }
+  while (queue.length) {
+    const cur = queue.shift()!;
+    const parsed = await parseRouterFile(cur);
+    if (!parsed) continue;
+    for (const { symbol, hasGuard } of parsed.mounts) {
+      if (!hasGuard && !parsed.rootGuard) continue;
+      const target = parsed.imports.get(symbol);
+      if (!target) continue;
+      if (protectedFiles.has(target)) continue;
+      protectedFiles.add(target);
+      queue.push(target);
+    }
+  }
+
+  // Scan dei mount diretti su `app` per identificare file route esposti
+  // direttamente senza passare per il router admin.
+  const entrypoints = [
+    path.join(ROOT, "server", "routes.ts"),
+    path.join(ROOT, "server", "index.ts"),
+  ];
+  // file path -> { hasGuard: bool, mountPath: string }
+  const appMounts = new Map<string, { hasGuard: boolean; mountPath: string }>();
+  for (const ep of entrypoints) {
+    const src = await readFileSafe(ep);
+    if (!src) continue;
+    const dir = path.dirname(ep);
+    const imports = new Map<string, string>();
+    const importRe = /import\s+(?:(\w+)|\{\s*([^}]+)\s*\})\s+from\s+['"](\.[^'"]+)['"]/g;
+    let im: RegExpExecArray | null;
+    while ((im = importRe.exec(src)) !== null) {
+      const rel = im[3];
+      const base = path.resolve(dir, rel);
+      const resolved =
+        [base + ".ts", path.join(base, "index.ts")].find((p) => fileSet.has(p)) ?? null;
+      if (!resolved) continue;
+      if (im[1]) imports.set(im[1], resolved);
+      if (im[2]) {
+        for (const part of im[2].split(",").map((s) => s.trim())) {
+          const sym = part.split(/\s+as\s+/i).pop()!.trim();
+          if (sym) imports.set(sym, resolved);
+        }
+      }
+    }
+    const appRe = /app\.use\(\s*['"]([^'"]+)['"]\s*,\s*([^)]+)\)/g;
+    let am: RegExpExecArray | null;
+    while ((am = appRe.exec(src)) !== null) {
+      const mountPath = am[1];
+      const args = am[2];
+      const hasGuard = /_requireAdmin|requireAdmin\b/.test(args);
+      for (const sym of args.split(",").map((s) => s.trim())) {
+        const resolved = imports.get(sym);
+        if (!resolved) continue;
+        const prev = appMounts.get(resolved);
+        // Se almeno un mount ha la guard, consideriamo coperto.
+        if (!prev || (hasGuard && !prev.hasGuard)) {
+          appMounts.set(resolved, { hasGuard, mountPath });
+        }
+      }
+    }
+  }
+
   const gaps: Gap[] = [];
+  let checkedCount = 0;
   for (const f of files) {
     const c = await readFileSafe(f);
     if (!c) continue;
-    // Considera file route se importa Router o usa router.<method>
     if (!/Router\(|router\.(get|post|put|patch|delete)/i.test(c)) continue;
+    checkedCount++;
     const hasAdminGuard = /_requireAdmin|requireAdmin|isAdmin|adminMiddleware|adminOnly/i.test(c);
-    if (!hasAdminGuard) {
+    if (hasAdminGuard) continue;
+    if (protectedFiles.has(f)) continue; // protetto per ereditarietà dal parent
+    const direct = appMounts.get(f);
+    if (direct && !direct.hasGuard) {
       gaps.push({
         severity: "high",
         check: "admin-endpoints",
-        what: `Route admin senza middleware admin esplicito`,
+        what: `Route admin con mount diretto su 'app' (${direct.mountPath}) senza middleware admin`,
         where: path.relative(ROOT, f),
-        suggestion: "Aggiungere router.use(_requireAdmin) o equivalente in cima",
+        suggestion:
+          "Aggiungere _requireAdmin al mount in server/routes.ts oppure router.use(_requireAdmin) in cima al file",
       });
     }
+    // Negli altri casi (router montato da sub-router non protetto) non
+    // segnaliamo per evitare i falsi positivi descritti nel task #2581.
   }
   return {
     status: gaps.length ? ("warn" as const) : ("ok" as const),
     gaps,
-    meta: { adminRouteFiles: files.length },
+    meta: {
+      adminRouteFiles: files.length,
+      adminRouteFilesChecked: checkedCount,
+      protectedByParent: protectedFiles.size,
+      directAppMounts: appMounts.size,
+    },
   };
 }
 
