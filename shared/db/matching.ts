@@ -168,6 +168,8 @@ export const matchPreferences = pgTable("match_preferences", {
   // (tag-overlap + embedding similarity sui gusti musicali liberi).
   musicAffinity: boolean("music_affinity").notNull().default(true),
   bioAffinity: boolean("bio_affinity").notNull().default(true),
+  // Task #2528 — preferenza per ricevere inviti su giri pianificati compatibili.
+  plannedRouteInvite: boolean("planned_route_invite").notNull().default(true),
   directMatch: boolean("direct_match").notNull().default(true),
   topMatchesOnly: boolean("top_matches_only").notNull().default(false),
   weeklyRecap: boolean("weekly_recap").notNull().default(true),
@@ -296,6 +298,54 @@ export type GeoCellLabel = typeof geoCellLabels.$inferSelect;
 export type InsertGeoCellLabel = typeof geoCellLabels.$inferInsert;
 export type RouteAffinityMatch = typeof routeAffinityMatches.$inferSelect;
 export type InsertRouteAffinityMatch = typeof routeAffinityMatches.$inferInsert;
+
+/**
+ * Task #2528 — Curvy profile aggregato per utente.
+ * Media dei curvy-score delle rotte percorse, alimenta `curvy_affinity` in scoring.
+ */
+export const userCurvyProfile = pgTable("user_curvy_profile", {
+  userId: varchar("user_id", { length: 36 })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  avgCurvy: doublePrecision("avg_curvy").notNull().default(0),
+  sampleCount: integer("sample_count").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_curvy_profile_avg_idx").on(table.avgCurvy),
+]);
+
+export type UserCurvyProfile = typeof userCurvyProfile.$inferSelect;
+export type InsertUserCurvyProfile = typeof userCurvyProfile.$inferInsert;
+
+/**
+ * Task #2528 — Inviti a giri pianificati suggeriti dal matcher
+ * `run-planned-route-affinity.ts`. Unique su (route_id, suggested_user_id).
+ */
+export const plannedRouteInvites = pgTable("planned_route_invites", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  routeId: varchar("route_id", { length: 36 }).notNull(),
+  ownerId: varchar("owner_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  suggestedUserId: varchar("suggested_user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  score: doublePrecision("score").notNull(),
+  reasons: jsonb("reasons").notNull().default(sql`'{}'::jsonb`),
+  priority: varchar("priority", { length: 10 }).notNull().default("normal"),
+  status: varchar("status", { length: 20 }).notNull().default("suggested"),
+  notifiedAt: timestamp("notified_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("planned_route_invites_route_idx").on(table.routeId),
+  index("planned_route_invites_suggested_idx").on(table.suggestedUserId),
+  uniqueIndex("planned_route_invites_unique_idx").on(table.routeId, table.suggestedUserId),
+]);
+
+export type PlannedRouteInvite = typeof plannedRouteInvites.$inferSelect;
+export type InsertPlannedRouteInvite = typeof plannedRouteInvites.$inferInsert;
 
 /**
  * Task #2515 — Bio affinity matches (cosine similarity on user bio embeddings).

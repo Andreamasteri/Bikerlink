@@ -244,6 +244,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.url = "/matches/fresh";
     return (proposalRoutes as unknown as (req: Request, res: Response, next: NextFunction) => void)(req, res, next);
   });
+  // Task #2528 — shared planned routes per due utenti matchati
+  const { default: matchesSharedRoutes } = await import("./routes/matches-shared-routes");
+  app.use("/api/matches", matchesSharedRoutes);
   app.use("/api/chat", chatRoutes);
   app.use("/api/notifications", notificationRoutes);
   app.use("/api/reports", reportRoutes);

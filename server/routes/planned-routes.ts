@@ -3,6 +3,7 @@ import crudRouter from "./planned-routes/crud";
 import waypointsRouter from "./planned-routes/waypoints";
 import sharingRouter from "./planned-routes/sharing";
 import extrasRouter from "./planned-routes/extras";
+import matchingIntegrationRouter from "./planned-routes/matching-integration";
 
 const router = Router();
 
@@ -18,6 +19,9 @@ router.use("/", sharingRouter);
 
 // Elevation, multiday, style profile, hotels
 router.use("/", extrasRouter);
+
+// Task #2528 — integrazione matching ↔ planned routes
+router.use("/", matchingIntegrationRouter);
 
 // Export fallbackAiParse as it might be used elsewhere (though not in routes typically)
 export { fallbackAiParse } from "./planned-routes/utils";

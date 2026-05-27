@@ -21,7 +21,7 @@ function isMapboxAvailable(): boolean {
 
 router.get("/config", async (_req: Request, res: Response) => {
   try {
-    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting, osmSetting] =
+    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting, osmSetting, matchingIntegrationSetting] =
       await Promise.all([
         storage.getAppSetting("maps_rollout"),
         storage.getAppSetting("maps_renderer"),
@@ -29,6 +29,7 @@ router.get("/config", async (_req: Request, res: Response) => {
         storage.getAppSetting("maps_routing_engine"),
         storage.getAppSetting("maps_routing_profile"),
         storage.getAppSetting("osm_last_updated_at"),
+        storage.getAppSetting("matching_integration"),
       ]);
 
     const routing = (engineSetting?.value ?? DEFAULT_ENGINE) as RoutingEngineId;
@@ -77,6 +78,8 @@ router.get("/config", async (_req: Request, res: Response) => {
       available_tiles: AVAILABLE_TILES,
       available_engines: AVAILABLE_ENGINES,
       available_profiles: AVAILABLE_PROFILES,
+      // Task #2528 — toggle integrazione matching ↔ planned routes
+      matching_integration: matchingIntegrationSetting?.value !== "false",
     };
 
     if (mapbox_quota !== undefined) {
@@ -141,6 +144,28 @@ router.put("/routing", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[admin/maps/config] PUT routing error:", err);
     return sendError(res, 500, "Errore aggiornamento routing engine");
+  }
+});
+
+/**
+ * Task #2528 — Toggle integrazione matching ↔ planned routes.
+ * Disabilitabile in emergenza per stoppare job analisi + matcher invite.
+ */
+router.put("/matching-integration", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body as { enabled?: unknown };
+    if (typeof enabled !== "boolean") {
+      return sendError(res, 400, "enabled (boolean) obbligatorio");
+    }
+    await storage.upsertAppSetting("matching_integration", enabled ? "true" : "false");
+    try {
+      const mod = await import("../../../matching/jobs/analyze-planned-route");
+      mod.invalidateMatchingIntegrationCache();
+    } catch { /* ignore — modulo non disponibile */ }
+    return res.json({ ok: true, enabled });
+  } catch (err) {
+    console.error("[admin/maps/config] PUT matching-integration error:", err);
+    return sendError(res, 500, "Errore aggiornamento integrazione matching");
   }
 });
 

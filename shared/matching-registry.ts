@@ -276,6 +276,17 @@ export const MATCHING_REGISTRY: ReadonlyArray<MatchingTypeDef> = [
     defaultEnabled: true,
     addedBy: "#2521",
   },
+  {
+    id: 22,
+    key: "plannedRouteInvite",
+    label: "Planned Route Invite (#2528)",
+    category: "affinity",
+    table: null,
+    brandPattern: null,
+    prefColumn: "planned_route_invite",
+    defaultEnabled: true,
+    addedBy: "#2528",
+  },
 ];
 
 /**

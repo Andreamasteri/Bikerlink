@@ -3,6 +3,7 @@ import { Router, Request, Response } from "express";
 import { storage } from "../../storage";
 import { savePlannedRouteSchema, updatePlannedRouteBodySchema } from "@shared/validators";
 import { requireAuth } from "./utils";
+import { triggerAnalyzePlannedRoute } from "../../matching/jobs/analyze-planned-route";
 
 const router = Router();
 
@@ -36,6 +37,8 @@ router.post("/", async (req: Request, res: Response) => {
       altitudeMinM: body.altitudeMinM ?? null,
       altitudeMaxM: body.altitudeMaxM ?? null,
     });
+    // Task #2528 — analizza in background (geohash cells, curvy avg, tags).
+    triggerAnalyzePlannedRoute(route.id);
     return res.status(201).json(route);
   } catch (err) {
     console.error("[planned-routes] create error:", err);
@@ -93,6 +96,8 @@ router.patch("/:id", async (req: Request, res: Response) => {
     const parsedUpd = updatePlannedRouteBodySchema.safeParse(req.body);
     if (!parsedUpd.success) return sendError(res, 400, parsedUpd.error.issues[0].message);
     const updated = await storage.updatePlannedRoute(id, parsedUpd.data);
+    // Task #2528 — riprocessa se sono cambiate geometria o metadata
+    triggerAnalyzePlannedRoute(id);
     return res.json(updated);
   } catch (err) {
     console.error("[planned-routes] update error:", err);

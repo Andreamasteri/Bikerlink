@@ -10,6 +10,12 @@ import {
   jsonb,
   index,
 } from "drizzle-orm/pg-core";
+
+// Task #2528 — array text column helper (drizzle pgArray)
+import { customType } from "drizzle-orm/pg-core";
+const textArray = customType<{ data: string[]; driverData: string }>({
+  dataType() { return "text[]"; },
+});
 import { z } from "zod";
 import { users } from "./users";
 
@@ -37,11 +43,22 @@ export const plannedRoutes = pgTable("planned_routes", {
   elevationGainM: integer("elevation_gain_m"),
   altitudeMinM: integer("altitude_min_m"),
   altitudeMaxM: integer("altitude_max_m"),
+  // Task #2528 — colonne derivate per matching
+  geohashCells: jsonb("geohash_cells").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  curvyScoreAvg: doublePrecision("curvy_score_avg"),
+  estimatedDepartureWindow: jsonb("estimated_departure_window").$type<{
+    dow?: number;
+    hour?: number;
+    durationMin?: number;
+  } | null>(),
+  derivedTags: textArray("derived_tags").notNull().default(sql`ARRAY[]::text[]`),
+  analyzedAt: timestamp("analyzed_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("planned_routes_user_id_idx").on(table.userId),
   index("planned_routes_visibility_idx").on(table.visibility),
+  index("planned_routes_analyzed_at_idx").on(table.analyzedAt),
 ]);
 
 
