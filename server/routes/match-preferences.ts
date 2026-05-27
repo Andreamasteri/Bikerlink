@@ -29,6 +29,7 @@ export const DEFAULT_PREFS = {
   routeAffinity: true,
   directMatch: true,
   topMatchesOnly: false,
+  weeklyRecap: true,
 };
 
 router.get("/", requireAuth, async (req: Request, res: Response) => {
@@ -66,6 +67,7 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
         routeAffinity: row.routeAffinity,
         directMatch: row.directMatch,
         topMatchesOnly: row.topMatchesOnly ?? false,
+        weeklyRecap: row.weeklyRecap ?? true,
       },
     });
   } catch (error) {

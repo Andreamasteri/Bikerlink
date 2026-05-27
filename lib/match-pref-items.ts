@@ -19,6 +19,7 @@ export type MatchPrefsPayload = {
   routeAffinity: boolean;
   directMatch: boolean;
   topMatchesOnly: boolean;
+  weeklyRecap: boolean;
 };
 
 export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
@@ -42,6 +43,7 @@ export const DEFAULT_MATCH_PREFS: MatchPrefsPayload = {
   routeAffinity: true,
   directMatch: true,
   topMatchesOnly: false,
+  weeklyRecap: true,
 };
 
 export const MATCH_PREF_ITEMS: { key: keyof MatchPrefsPayload; label: string }[] = [

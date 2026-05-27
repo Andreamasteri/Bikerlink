@@ -38,6 +38,7 @@ import motoclubsRoutes from "./routes/motoclubs";
 import friendsRoutes from "./routes/friends";
 import { handleMusicMatch } from "./routes/music-match";
 import matchPreferencesRoutes from "./routes/match-preferences";
+import recapRoutes from "./routes/recap";
 import lastfmRoutes from "./routes/lastfm";
 import radioRoutes from "./routes/radio";
 import eventsRoutes from "./routes/events";
@@ -184,6 +185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.use("/api/match-preferences", matchPreferencesRoutes);
+  app.use("/api/recap", recapRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
   // Task #2503 — endpoint pubblici OTA (gating manifest + telemetria boot)

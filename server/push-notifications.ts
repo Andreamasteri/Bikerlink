@@ -378,6 +378,49 @@ export async function sendEventiPushNotifications(
   }
 }
 
+export async function sendWeeklyRecapPushNotifications(userIds: string[]): Promise<number> {
+  if (!userIds.length) return 0;
+  try {
+    // Riusa la preferenza "matches" come canale; weeklyRecap viene già filtrato
+    // a monte dal job (match_preferences.weekly_recap). Qui rispettiamo solo il
+    // master toggle pushNotificationsEnabled.
+    const rows = await db
+      .select({
+        id: users.id,
+        expoPushToken: users.expoPushToken,
+        pushEnabled: userProfiles.pushNotificationsEnabled,
+      })
+      .from(users)
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(inArray(users.id, userIds));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+
+    for (const row of rows) {
+      if (row.pushEnabled === false) continue;
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title: "La tua settimana su BikerLink",
+          body: "5 biker da non perdere — apri il recap",
+          sound: "default" as const,
+          data: { type: "weekly_recap" },
+          channelId: "matches",
+        });
+      }
+    }
+
+    if (messages.length === 0) return 0;
+    await sendExpoMessages(messages, userIdByToken);
+    return messages.length;
+  } catch (err) {
+    console.warn("[Push] sendWeeklyRecapPushNotifications error (non-fatal):", err);
+    return 0;
+  }
+}
+
 export async function sendOtaPendingApprovalPushToAdmins(version: string): Promise<void> {
   try {
     const adminRows = await db

@@ -10,6 +10,10 @@ try {
 }
 
 function navigateFromNotifData(data: { type?: string; unreadChat?: number } | undefined, router: ReturnType<typeof useRouter>) {
+  if (data?.type === "weekly_recap") {
+    router.push("/recap");
+    return;
+  }
   if (data?.type === "match") {
     router.push("/(tabs)/match");
     return;

@@ -164,10 +164,33 @@ export const matchPreferences = pgTable("match_preferences", {
   routeAffinity: boolean("route_affinity").notNull().default(true),
   directMatch: boolean("direct_match").notNull().default(true),
   topMatchesOnly: boolean("top_matches_only").notNull().default(false),
+  weeklyRecap: boolean("weekly_recap").notNull().default(true),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("match_preferences_user_id_idx").on(table.userId),
 ]);
+
+export const weeklyRecaps = pgTable("weekly_recaps", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  weekStart: timestamp("week_start").notNull(),
+  topMatches: jsonb("top_matches").notNull().default(sql`'[]'::jsonb`),
+  stats: jsonb("stats").notNull().default(sql`'{}'::jsonb`),
+  pushSentAt: timestamp("push_sent_at"),
+  openedAt: timestamp("opened_at"),
+  matchClickedAt: timestamp("match_clicked_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("weekly_recaps_user_idx").on(table.userId, table.weekStart),
+  uniqueIndex("weekly_recaps_user_week_idx").on(table.userId, table.weekStart),
+]);
+
+export type WeeklyRecap = typeof weeklyRecaps.$inferSelect;
+export type InsertWeeklyRecap = typeof weeklyRecaps.$inferInsert;
 
 export const userRouteFingerprints = pgTable("user_route_fingerprints", {
   id: varchar("id", { length: 36 })

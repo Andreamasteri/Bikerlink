@@ -7,6 +7,8 @@ import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-bik
 import { runClubBrandMatching } from "./run-clubs";
 import { runMusicMatchBikerZavarrina, runGpsBasedMatching, runEventMatching, runBikerZavarrinaTypeStyleMatching } from "./run-extra";
 import { runExtractRouteCellsJob } from "./jobs/extract-route-cells";
+import { runWeeklyRecapJob } from "./jobs/weekly-recap";
+import { Cron } from "croner";
 import { runRouteSimilarityMatching } from "./run-route-similarity";
 import { runDistanceMatching, runRouteTypeZoneMatching } from "./run-distance";
 import { runProposalToProfileMatching } from "./run-profile";
@@ -297,6 +299,7 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
 }
 
 const _engineTimers: ReturnType<typeof setInterval>[] = [];
+const _engineCrons: Cron[] = [];
 
 export function startMatchingEngine(): void {
   console.log("[Matching] Engine avviato — modalità on-demand (trigger da login utente)");
@@ -352,6 +355,33 @@ export function startMatchingEngine(): void {
   _engineTimers.push(setInterval(runArchiveStaleMatches, 24 * 60 * 60 * 1000));
   console.log("[Matching] Archiviazione giornaliera match 'new' stale avviata");
 
+  // Weekly recap: ogni lunedì alle 9:00 Europe/Rome (DST gestito da croner)
+  if (process.env.DISABLE_WEEKLY_RECAP_JOB !== "1") {
+    try {
+      const cron = new Cron(
+        "0 9 * * 1",
+        { timezone: "Europe/Rome", protect: true, name: "weekly-recap" },
+        async () => {
+          try {
+            console.log("[WeeklyRecap] Trigger schedulato (lun 09:00 Europe/Rome)");
+            await runWeeklyRecapJob();
+          } catch (err) {
+            console.error("[WeeklyRecap] Errore esecuzione schedulata:", err);
+          }
+        },
+      );
+      _engineCrons.push(cron);
+      const nextRun = cron.nextRun();
+      console.log(
+        `[Matching] Weekly recap schedulato — prossima esecuzione: ${nextRun?.toISOString() ?? "n/d"}`,
+      );
+    } catch (err) {
+      console.error("[Matching] Errore schedulazione weekly recap:", err);
+    }
+  } else {
+    console.log("[Matching] Weekly recap disabilitato (DISABLE_WEEKLY_RECAP_JOB=1)");
+  }
+
   _engineTimers.push(setInterval(async () => {
     try {
       const expired = await runCleanup();
@@ -399,5 +429,9 @@ export function stopMatchingEngine(): void {
     clearInterval(timer);
   }
   _engineTimers.length = 0;
+  for (const c of _engineCrons) {
+    try { c.stop(); } catch { /* ignore */ }
+  }
+  _engineCrons.length = 0;
   console.log("[Matching] Engine fermato");
 }

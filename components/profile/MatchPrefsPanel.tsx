@@ -90,6 +90,34 @@ export default function MatchPrefsPanel() {
               disabled={saveMatchPrefMutation.isPending}
             />
           </View>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingVertical: 10,
+              marginBottom: 6,
+              borderBottomWidth: 1,
+              borderBottomColor: Colors.border,
+              backgroundColor: "transparent",
+            }}
+          >
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.text }}>
+                Recap settimanale
+              </Text>
+              <Text style={{ fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 }}>
+                Ogni lunedì alle 9:00 ricevi una push con i tuoi 5 migliori match della settimana.
+              </Text>
+            </View>
+            <Switch
+              value={matchPrefs.weeklyRecap}
+              onValueChange={(val) => toggleMatchPref("weeklyRecap", val)}
+              trackColor={{ false: Colors.border, true: Colors.accent }}
+              thumbColor="#fff"
+              disabled={saveMatchPrefMutation.isPending}
+            />
+          </View>
           {MATCH_PREF_ITEMS.map((item) => (
             <View
               key={item.key}
