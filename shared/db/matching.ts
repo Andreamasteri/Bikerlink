@@ -369,3 +369,30 @@ export type InsertUserMatchProfile = typeof userMatchProfile.$inferInsert;
 
 export type FeatureWeights = Record<string, number>;
 export type FeatureStats = Record<string, { accepts: number; rejects: number; ignores: number; total: number; acceptRate: number }>;
+
+export const matchRules = pgTable("match_rules", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  searchTypeA: varchar("search_type_a", { length: 60 }).notNull(),
+  searchTypeB: varchar("search_type_b", { length: 60 }).notNull(),
+  compatible: boolean("compatible").notNull().default(true),
+  weight: doublePrecision("weight").notNull().default(1),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("match_rules_pair_unique_idx").on(table.searchTypeA, table.searchTypeB),
+]);
+
+export type MatchRuleRow = typeof matchRules.$inferSelect;
+export type InsertMatchRule = typeof matchRules.$inferInsert;
+
+export const updateMatchRuleSchema = z.object({
+  compatible: z.boolean().optional(),
+  weight: z.number().finite().min(0).max(100).optional(),
+  notes: z.string().max(500).optional().nullable(),
+}).refine((d) => d.compatible !== undefined || d.weight !== undefined || d.notes !== undefined, {
+  message: "Nessun campo da aggiornare",
+});
+export type UpdateMatchRuleInput = z.infer<typeof updateMatchRuleSchema>;

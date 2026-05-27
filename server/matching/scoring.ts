@@ -1,7 +1,10 @@
 import { haversineDistance } from "../geo";
 import { type Proposal } from "@shared/db";
 import { sql, type SQL } from "drizzle-orm";
-import { sameDay, timeRangesOverlap, MATCH_RULES } from "./filters";
+import { sameDay, timeRangesOverlap } from "./filters";
+import { areCompatibleByRule, getRuleWeight as _getRuleWeight } from "./rules-cache";
+
+export { _getRuleWeight as getRuleWeight };
 
 /**
  * Freshness/Decay configuration (task 2524).
@@ -109,11 +112,12 @@ export function resolveMatchPool(p1: ProposalWithAuthor, p2: ProposalWithAuthor)
     const types1 = getAllSearchTypes(p1);
     const types2 = getAllSearchTypes(p2);
     if (types1.length === 0 || types2.length === 0) return false;
-    return MATCH_RULES.some(
-      (r) =>
-        (types1.includes(r.searchType1) && types2.includes(r.searchType2)) ||
-        (types1.includes(r.searchType2) && types2.includes(r.searchType1))
-    );
+    for (const t1 of types1) {
+      for (const t2 of types2) {
+        if (areCompatibleByRule(t1, t2)) return true;
+      }
+    }
+    return false;
   }
 
   const targets1 = deriveTargetUserTypes(p1);

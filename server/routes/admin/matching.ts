@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { db, pool } from "../../db";
-import { gpsRejectionStats, bikerZavarrinaMatches, bikerBikerMatches, matchPreferences } from "@shared/db";
+import { gpsRejectionStats, bikerZavarrinaMatches, bikerBikerMatches, matchPreferences, matchRules, updateMatchRuleSchema } from "@shared/db";
 import { sendSuccess, sendError } from "../../lib/api-response";
-import { desc, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
+import { invalidateMatchRulesCache } from "../../matching/rules-cache";
 import { triggerMatchingRun, getLastMatchingCycleMeta } from "../../matching-engine";
 import { forceUnlockMatching, getMatchingLockState } from "../../matching/scheduler";
 import {
@@ -853,6 +854,41 @@ router.get("/weights-distribution", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("[admin] weights-distribution error:", error);
     return sendError(res, 500, "Errore lettura distribuzione pesi matching");
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Match Rules (Task #2511) — configurable compatibility matrix.
+// GET lists all pairs; PATCH updates a single rule and invalidates the cache.
+// ──────────────────────────────────────────────────────────────────────────
+router.get("/match-rules", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db.select().from(matchRules).orderBy(matchRules.searchTypeA, matchRules.searchTypeB);
+    return res.json({ rules: rows });
+  } catch (err) {
+    console.error("[admin] GET /match-rules error:", err);
+    return sendError(res, 500, "Errore lettura match rules");
+  }
+});
+
+router.patch("/match-rules/:id", async (req: Request, res: Response) => {
+  try {
+    const rawId = req.params.id;
+    const id: string | null = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? (rawId[0] ?? null) : null;
+    if (!id) return sendError(res, 400, "ID mancante");
+    const parsed = updateMatchRuleSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const updates: Record<string, unknown> = { updatedAt: new Date() };
+    if (parsed.data.compatible !== undefined) updates.compatible = parsed.data.compatible;
+    if (parsed.data.weight !== undefined) updates.weight = parsed.data.weight;
+    if (parsed.data.notes !== undefined) updates.notes = parsed.data.notes;
+    const [updated] = await db.update(matchRules).set(updates).where(eq(matchRules.id, id)).returning();
+    if (!updated) return sendError(res, 404, "Regola non trovata");
+    invalidateMatchRulesCache();
+    return res.json({ rule: updated });
+  } catch (err) {
+    console.error("[admin] PATCH /match-rules/:id error:", err);
+    return sendError(res, 500, "Errore aggiornamento regola");
   }
 });
 

@@ -189,6 +189,12 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   // ── Phase 5: Schedulers + maintenance jobs ────────────────────────────────
   bootLog(5, TOTAL, "Schedulers", "start");
   try {
+    try {
+      const { initMatchRulesCache } = await import("./matching/rules-cache");
+      await initMatchRulesCache();
+    } catch (err) {
+      console.warn("[INIT] match-rules cache init failed (non-fatal):", err);
+    }
     const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
     const runPlaylistSnapshot = async () => {
       try {

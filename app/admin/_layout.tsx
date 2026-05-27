@@ -46,6 +46,7 @@ export default function AdminLayout() {
       <Stack.Screen name="match-control" options={{ title: "Controllo Matching" }} />
       <Stack.Screen name="match-health" options={{ title: "Match Engine Health" }} />
       <Stack.Screen name="match-engine" options={{ title: "Motore Matching" }} />
+      <Stack.Screen name="match-rules" options={{ title: "Regole Matching" }} />
       <Stack.Screen name="ab" options={{ title: "A/B Esperimenti" }} />
       <Stack.Screen name="match-preferences-edit" options={{ title: "Preferenze Matching" }} />
       <Stack.Screen name="ota" options={{ title: "Controllo OTA" }} />
