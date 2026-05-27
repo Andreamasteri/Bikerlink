@@ -168,6 +168,8 @@ export const matchPreferences = pgTable("match_preferences", {
   // (tag-overlap + embedding similarity sui gusti musicali liberi).
   musicAffinity: boolean("music_affinity").notNull().default(true),
   bioAffinity: boolean("bio_affinity").notNull().default(true),
+  // Task #2580 — allinea match_preferences al registry (timeOverlap #2521).
+  timeOverlap: boolean("time_overlap").notNull().default(true),
   // Task #2528 — preferenza per ricevere inviti su giri pianificati compatibili.
   plannedRouteInvite: boolean("planned_route_invite").notNull().default(true),
   directMatch: boolean("direct_match").notNull().default(true),
