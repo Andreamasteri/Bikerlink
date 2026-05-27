@@ -21,19 +21,24 @@ export function LastfmLoginModal({
   onClose: () => void;
 }) {
   const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleConnect = async () => {
-    if (!username.trim()) return;
+    if (!username.trim() || !password) return;
     setIsLoading(true);
     setError(null);
     try {
-      const res = await apiRequest("POST", "/api/lastfm/connect", { username: username.trim() });
+      const res = await apiRequest("POST", "/api/lastfm/connect", {
+        username: username.trim(),
+        password,
+      });
       if (!res.ok) {
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.message || "Errore di connessione");
       }
+      setPassword("");
       onClose();
     } catch (err: unknown) {
       setError((err as Error).message);
@@ -67,12 +72,23 @@ export function LastfmLoginModal({
             autoCorrect={false}
           />
 
+          <TextInput
+            style={styles.input}
+            placeholder="Password Last.fm"
+            placeholderTextColor={Colors.textSecondary}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+
           {error && <Text style={styles.errorText}>{error}</Text>}
 
           <TouchableOpacity
-            style={[styles.button, !username.trim() && styles.buttonDisabled]}
+            style={[styles.button, (!username.trim() || !password) && styles.buttonDisabled]}
             onPress={handleConnect}
-            disabled={isLoading || !username.trim()}
+            disabled={isLoading || !username.trim() || !password}
           >
             {isLoading ? (
               <ActivityIndicator color="#fff" />
