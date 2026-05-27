@@ -133,12 +133,25 @@ export class UsersStorage {
   }
 
   async searchUsers(query: string): Promise<{ user: User; profile: UserProfile | null }[]> {
+    // Task #2518: fuzzy nickname search via pg_trgm (tolera typo + accenti).
+    // Mantiene il prefix-match ILIKE come fallback per copertura prefisso.
     const pattern = `${query}%`;
+    const normalized = query
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase();
     const results = await db
       .select({ user: users, profile: userProfiles })
       .from(users)
       .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
-      .where(and(eq(users.status, "active"), eq(users.ghostMode, false), sql`${users.nickname} ILIKE ${pattern}`, ...systemAccountConditions(users)))
+      .where(and(
+        eq(users.status, "active"),
+        eq(users.ghostMode, false),
+        sql`(${users.nickname} ILIKE ${pattern}
+             OR normalize_text(${users.nickname}) % ${normalized})`,
+        ...systemAccountConditions(users),
+      ))
+      .orderBy(sql`similarity(normalize_text(${users.nickname}), ${normalized}) DESC`)
       .limit(20);
     return results.map(r => ({ user: r.user, profile: maskHiddenLocation(r.profile) }));
   }

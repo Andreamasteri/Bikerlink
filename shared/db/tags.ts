@@ -6,6 +6,7 @@ import {
   timestamp,
   index,
   uniqueIndex,
+  real,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -83,3 +84,45 @@ export const TAG_CATEGORY_SLUGS = {
   STILE_GUIDA: "stile_guida",
   TIPO_MOTO: "tipo_moto",
 } as const;
+
+/**
+ * Text aliases (Task #2518) — mappa input normalizzato (lowercase + unaccent,
+ * vedi `normalize_text()` in migrations/0036_text_interpreter.sql) verso un
+ * target. Due modalità:
+ *  - target_id: FK opzionale a tags.id (categorie con tabella tags)
+ *  - target_value: stringa libera per categorie senza tabella (es. città,
+ *    marche moto).
+ * Le categorie supportate sono in TEXT_ALIAS_CATEGORIES.
+ */
+export const textAliases = pgTable("text_aliases", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  category: varchar("category", { length: 50 }).notNull(),
+  inputNormalized: varchar("input_normalized", { length: 200 }).notNull(),
+  targetId: varchar("target_id", { length: 36 }).references(() => tags.id, {
+    onDelete: "cascade",
+  }),
+  targetValue: varchar("target_value", { length: 200 }),
+  confidence: real("confidence").notNull().default(1.0),
+  source: varchar("source", { length: 20 }).notNull().default("seed"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("text_aliases_cat_input_uq").on(table.category, table.inputNormalized),
+  index("text_aliases_category_idx").on(table.category),
+  index("text_aliases_target_idx").on(table.targetId),
+]);
+
+export type TextAlias = typeof textAliases.$inferSelect;
+export type InsertTextAlias = typeof textAliases.$inferInsert;
+
+export const TEXT_ALIAS_CATEGORIES = [
+  "music_tag",
+  "riding_style_tag",
+  "moto_type_tag",
+  "bike_brand",
+  "bike_model",
+  "city",
+  "nickname",
+] as const;
+export type TextAliasCategory = (typeof TEXT_ALIAS_CATEGORIES)[number];

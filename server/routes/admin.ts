@@ -240,6 +240,7 @@ import telemetryAdminRouter from './admin/telemetry';
 import dbAdminRouter from './admin/db';
 import translationsRouter from './admin/translations';
 import tagsRouter from './admin/tags';
+import textAliasesRouter from './admin/text-aliases';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -313,6 +314,7 @@ router.patch('/privacy-rules', _requireAdmin, async (req: Request, res: Response
 
 router.use('/translations', _requireAdmin, translationsRouter);
 router.use('/tags', _requireAdmin, tagsRouter);
+router.use('/', _requireAdmin, textAliasesRouter);
 router.use('/users', _requireAdmin, usersRouter);
 router.use('/settings', settingsRouter);
 router.use('/advertisements', _requireAdmin, adsRouter);

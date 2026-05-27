@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import { users } from "@shared/db";
-import { ilike } from "drizzle-orm";
+import { ilike, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { TILE_PROVIDERS, DEFAULT_TILE_PROVIDER_ID, findTileProvider } from "../../lib/maps/tile-providers";
 import { getPublicTileInfo } from "../../lib/maps/tile-for-renderer";
@@ -299,11 +299,27 @@ export function registerClientSettingsRoutes(app: Express) {
     if (!req.session?.userId) return sendError(res, 401, "Non autenticato");
     try {
       const { q } = req.query as { q?: string };
-      if (!q || q.trim().length < 2) return res.json([]);
+      const query = (q ?? "").trim();
+      if (!query || query.length < 2) return res.json([]);
+      // Task #2518: fuzzy nickname search via pg_trgm (tolera typo + accenti)
+      // Fallback ilike per match parziali su substring.
+      const normalized = query
+        .normalize("NFD")
+        .replace(/\p{Diacritic}/gu, "")
+        .toLowerCase();
       const results = await db
-        .select({ id: users.id, nickname: users.nickname, userType: users.userType })
+        .select({
+          id: users.id,
+          nickname: users.nickname,
+          userType: users.userType,
+          score: sql<number>`similarity(normalize_text(${users.nickname}), ${normalized})`,
+        })
         .from(users)
-        .where(ilike(users.nickname, `%${q.trim()}%`))
+        .where(
+          sql`(normalize_text(${users.nickname}) % ${normalized}
+               OR ${users.nickname} ILIKE ${"%" + query + "%"})`,
+        )
+        .orderBy(sql`similarity(normalize_text(${users.nickname}), ${normalized}) DESC`)
         .limit(30);
       return res.json(results);
     } catch (err) {

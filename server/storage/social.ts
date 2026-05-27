@@ -9,9 +9,9 @@ import {
   type Report, type InsertReport,
   type ModeratorLog, type InsertModeratorLog,
 } from "@shared/db";
-import { TagsStorage } from "./tags";
+import { TextAliasesStorage } from "./text-aliases";
 
-export class SocialStorage extends TagsStorage {
+export class SocialStorage extends TextAliasesStorage {
   async getWorkshops(approved?: boolean): Promise<Workshop[]> {
     if (approved !== undefined) {
       return db.select().from(workshops).where(eq(workshops.isApproved, approved));

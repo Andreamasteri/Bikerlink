@@ -186,11 +186,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.use("/api/match-preferences", matchPreferencesRoutes);
-<<<<<<< HEAD
-  app.use("/api/recap", recapRoutes);
-=======
   app.use("/api/match-negative-preferences", matchNegativePreferencesRoutes);
->>>>>>> bd1e5af2 (Add intelligent negative filtering to improve user matching)
+  app.use("/api/recap", recapRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/users", userRoutes);
   // Task #2503 — endpoint pubblici OTA (gating manifest + telemetria boot)
@@ -269,6 +266,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn("[routes] Bull Board mount failed:", err instanceof Error ? err.message : err);
   }
 
+  const { default: textInterpreterRoutes } = await import("./routes/text-interpreter");
+  app.use("/api/text-interpreter", textInterpreterRoutes);
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
   app.use("/api/sos", sosRoutes);

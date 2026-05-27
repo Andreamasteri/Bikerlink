@@ -54,6 +54,7 @@ export default function AdminLayout() {
       <Stack.Screen name="maps" options={{ title: "Sistema Mappe" }} />
       <Stack.Screen name="device-stats" options={{ title: "Dispositivi Utenti" }} />
       <Stack.Screen name="tags" options={{ title: "Sistema Tag" }} />
+      <Stack.Screen name="text-aliases" options={{ title: "Alias Testo" }} />
     </Stack>
   );
 }

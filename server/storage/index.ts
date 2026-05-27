@@ -333,6 +333,10 @@ export interface IStorage {
   deleteTag(id: string): Promise<boolean>;
   getTagsForEntity(entityType: string, entityId: string): Promise<Array<import("@shared/db").Tag & { categorySlug: string; categoryLabel: string }>>;
   setTagsForEntity(entityType: string, entityId: string, tagIds: string[], options?: { categorySlug?: string }): Promise<import("@shared/db").EntityTag[]>;
+  // Text aliases (Task #2518)
+  listTextAliases(category?: string): Promise<Array<import("@shared/db").TextAlias & { tagLabel: string | null }>>;
+  createTextAlias(input: { category: string; input: string; targetId?: string | null; targetValue?: string | null; confidence?: number; source?: string }): Promise<import("@shared/db").TextAlias>;
+  deleteTextAlias(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage extends FakeUsersStorage implements IStorage {}

@@ -960,7 +960,6 @@ router.get("/weights-distribution", async (_req: Request, res: Response) => {
   }
 });
 
-<<<<<<< HEAD
 // ──────────────────────────────────────────────────────────────────────────
 // Match Rules (Task #2511) — configurable compatibility matrix.
 // GET lists all pairs; PATCH updates a single rule and invalidates the cache.

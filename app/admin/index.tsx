@@ -260,6 +260,7 @@ const adminGroups: AdminGroup[] = [
       { key: "invite-codes", label: "Codici Invito", icon: "gift", iconSet: "Ionicons", route: "/admin/invite-codes" },
       { key: "backup", label: "Backup automatici", icon: "cloud-upload", iconSet: "MaterialCommunityIcons", route: "/admin/backup" },
       { key: "tags", label: "Sistema Tag", icon: "tag-multiple", iconSet: "MaterialCommunityIcons", route: "/admin/tags", accentColor: "#9C27B0" },
+      { key: "text-aliases", label: "Alias Testo", icon: "spellcheck", iconSet: "MaterialCommunityIcons", route: "/admin/text-aliases", accentColor: "#FF9800" },
     ],
   },
   {

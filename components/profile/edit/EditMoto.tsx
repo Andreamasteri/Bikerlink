@@ -11,6 +11,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
+import { DidYouMean } from "@/components/text-interpreter/DidYouMean";
 
 interface EditMotoProps {
   isBikerOrCoppia: boolean;
@@ -103,6 +104,12 @@ export function EditMoto({
                 onChangeText={setMotoBrand}
                 placeholder="es. Ducati"
                 placeholderTextColor={Colors.textSecondary}
+                autoCapitalize="words"
+              />
+              <DidYouMean
+                value={motoBrand}
+                category="bike_brand"
+                onPick={setMotoBrand}
               />
             </View>
             <View style={[styles.field, { flex: 1 }]}>
@@ -113,6 +120,11 @@ export function EditMoto({
                 onChangeText={setMotoModel}
                 placeholder="es. Multistrada"
                 placeholderTextColor={Colors.textSecondary}
+              />
+              <DidYouMean
+                value={motoModel}
+                category="bike_model"
+                onPick={setMotoModel}
               />
             </View>
           </View>
@@ -330,6 +342,36 @@ const styles = StyleSheet.create({
   chipSelected: {
     backgroundColor: Colors.accent + "22",
     borderColor: Colors.accent,
+  },
+  didYouMeanRow: {
+    marginTop: 6,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 6,
+  },
+  didYouMeanLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  didYouMeanChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  didYouMeanChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+  },
+  didYouMeanChipText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.accent,
   },
   chipText: {
     fontSize: 13,
