@@ -4,7 +4,7 @@
 // arricchirli — qui restano cheap/medium per stabilità.
 import path from "path";
 import fs from "fs/promises";
-import type { AppIntegrityCheck, CheckResult, CheckContext } from "../types";
+import type { AppIntegrityCheck } from "../types";
 import { walkFiles, readSafe, countLines, relWithin } from "../fs-helpers";
 
 const TS_EXTS = [".ts", ".tsx"];
@@ -159,6 +159,23 @@ const largeFunctionsCheck: AppIntegrityCheck = {
   },
 };
 
+// ---------- Expensive checks (eseguiti solo con includeExpensive: true) ----------
+
+const EXPENSIVE_DIRS = ["server", "app", "lib", "hooks", "components", "shared"];
+const EXPENSIVE_TIMEOUT_MS = 180_000;
+
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let to: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, rej) => {
+    to = setTimeout(() => rej(new Error(`${label} timeout dopo ${ms}ms`)), ms);
+  });
+  try {
+    return await Promise.race([p, timeout]);
+  } finally {
+    if (to) clearTimeout(to);
+  }
+}
+
 const codeDuplicationCheck: AppIntegrityCheck = {
   id: "code/duplication",
   family: "code",
@@ -166,19 +183,201 @@ const codeDuplicationCheck: AppIntegrityCheck = {
   severity: "low",
   cost: "expensive",
   expensive: true,
-  description: "Detection duplicazioni con jscpd quando installato. Skip silenzioso se assente.",
-  async query() {
+  description: "Detection blocchi duplicati >50 token con jscpd su server/app/lib/hooks/components/shared.",
+  async query(ctx) {
     try {
-      // @ts-expect-error optional expensive dependency
       const mod: any = await import("jscpd").catch(() => null);
       if (!mod?.JSCPD) {
         return { ok: true, count: 0, sample: [], details: { skipped: "jscpd non installato" } };
       }
-      return { ok: true, count: 0, sample: [], details: { note: "jscpd disponibile ma scan run-once stub" } };
+      const targets = EXPENSIVE_DIRS
+        .map((d) => path.join(ctx.projectRoot, d))
+        .filter((p) => p);
+      const existing: string[] = [];
+      for (const t of targets) {
+        try { await fs.access(t); existing.push(t); } catch { /* skip */ }
+      }
+      if (!existing.length) return { ok: true, count: 0, sample: [] };
+
+      const jscpd = new mod.JSCPD({
+        path: existing,
+        mode: "mild",
+        minTokens: 50,
+        minLines: 5,
+        formatsExts: { typescript: ["ts", "tsx"] },
+        format: ["typescript"],
+        ignore: ["**/node_modules/**", "**/dist/**", "**/server_dist/**", "**/.expo/**", "**/build/**"],
+        reporters: [],
+        silent: true,
+        absolute: false,
+        gitignore: true,
+      });
+      const clones: any[] = await withTimeout(jscpd.detect(existing), EXPENSIVE_TIMEOUT_MS, "jscpd");
+      const list = Array.isArray(clones) ? clones : [];
+      const offenders = list.map((c) => {
+        const a = c?.duplicationA ?? {};
+        const b = c?.duplicationB ?? {};
+        const aPath = relWithin(ctx.projectRoot, a.sourceId ?? "");
+        const bPath = relWithin(ctx.projectRoot, b.sourceId ?? "");
+        return {
+          pk: `${aPath}↔${bPath}`,
+          data: {
+            a: { path: aPath, start: a.start?.line, end: a.end?.line },
+            b: { path: bPath, start: b.start?.line, end: b.end?.line },
+            lines: c?.lines ?? null,
+            tokens: c?.tokens ?? null,
+          },
+        };
+      });
+      return {
+        ok: offenders.length === 0,
+        count: offenders.length,
+        sample: sampleOf(offenders),
+        details: { tool: "jscpd", minTokens: 50, scanned: existing.length },
+      };
     } catch (e) {
       return { ok: true, count: 0, sample: [], details: { error: (e as Error).message } };
     }
   },
+  explainHint: "Estrai i blocchi duplicati in funzioni/utility condivise.",
+};
+
+const circularImportsCheck: AppIntegrityCheck = {
+  id: "code/circular-imports",
+  family: "code",
+  name: "Import circolari (madge)",
+  severity: "high",
+  cost: "expensive",
+  expensive: true,
+  description: "Cicli di import tra moduli TS/TSX. Rilevati con madge.",
+  async query(ctx) {
+    try {
+      // @ts-ignore optional expensive dependency, no type declarations
+      const mod: any = await import("madge").catch(() => null);
+      const madge = mod?.default ?? mod;
+      if (typeof madge !== "function") {
+        return { ok: true, count: 0, sample: [], details: { skipped: "madge non installato" } };
+      }
+      const targets: string[] = [];
+      for (const d of EXPENSIVE_DIRS) {
+        const abs = path.join(ctx.projectRoot, d);
+        try { await fs.access(abs); targets.push(abs); } catch { /* skip */ }
+      }
+      if (!targets.length) return { ok: true, count: 0, sample: [] };
+
+      const tsConfigPath = path.join(ctx.projectRoot, "tsconfig.json");
+      let tsConfig: string | undefined;
+      try { await fs.access(tsConfigPath); tsConfig = tsConfigPath; } catch { /* skip */ }
+
+      const res: any = await withTimeout(madge(targets, {
+        fileExtensions: ["ts", "tsx"],
+        excludeRegExp: [/node_modules/, /\.expo\//, /server_dist\//, /\bdist\b/, /\bbuild\b/],
+        tsConfig,
+        detectiveOptions: { ts: { skipTypeImports: true }, tsx: { skipTypeImports: true } },
+      }), EXPENSIVE_TIMEOUT_MS, "madge");
+      const cycles: string[][] = typeof res?.circular === "function" ? res.circular() : [];
+      const offenders = (cycles ?? []).map((cycle, idx) => ({
+        pk: cycle.join(" → "),
+        data: { cycle, length: cycle.length, index: idx },
+      }));
+      return {
+        ok: offenders.length === 0,
+        count: offenders.length,
+        sample: sampleOf(offenders),
+        details: { tool: "madge", scanned: targets.length },
+      };
+    } catch (e) {
+      return { ok: true, count: 0, sample: [], details: { error: (e as Error).message } };
+    }
+  },
+  explainHint: "Spezza il ciclo estraendo il tipo o l'utility condivisa in un terzo modulo.",
+};
+
+async function runProcess(
+  cmd: string,
+  args: string[],
+  cwd: string,
+  timeoutMs: number,
+): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  const { spawn } = await import("child_process");
+  return await new Promise((resolve, reject) => {
+    const child = spawn(cmd, args, { cwd, env: process.env });
+    let stdout = ""; let stderr = "";
+    const to = setTimeout(() => {
+      try { child.kill("SIGKILL"); } catch { /* noop */ }
+      reject(new Error(`${cmd} timeout dopo ${timeoutMs}ms`));
+    }, timeoutMs);
+    child.stdout.on("data", (b) => { stdout += b.toString(); });
+    child.stderr.on("data", (b) => { stderr += b.toString(); });
+    child.on("error", (e) => { clearTimeout(to); reject(e); });
+    child.on("close", (code) => { clearTimeout(to); resolve({ stdout, stderr, code }); });
+  });
+}
+
+const unusedExportsCheck: AppIntegrityCheck = {
+  id: "code/unused-exports",
+  family: "code",
+  name: "Export inutilizzati (knip)",
+  severity: "low",
+  cost: "expensive",
+  expensive: true,
+  description: "Identifica export, type-export, file e dipendenze non referenziate con knip.",
+  async query(ctx) {
+    const knipBin = path.join(ctx.projectRoot, "node_modules", ".bin", "knip");
+    try { await fs.access(knipBin); } catch {
+      return { ok: true, count: 0, sample: [], details: { skipped: "knip non installato" } };
+    }
+    try {
+      const { stdout, code } = await runProcess(
+        knipBin,
+        ["--reporter", "json", "--no-progress", "--no-exit-code"],
+        ctx.projectRoot,
+        EXPENSIVE_TIMEOUT_MS,
+      );
+      if (!stdout.trim()) {
+        return { ok: true, count: 0, sample: [], details: { tool: "knip", exit: code, note: "no stdout" } };
+      }
+      // knip JSON: { files: [...], issues: [ { file, exports: [...], types: [...], ...}, ... ] }
+      let parsed: any;
+      try { parsed = JSON.parse(stdout); } catch {
+        // knip può anteporre log non-json — prendi l'ultima riga JSON-like
+        const lastBrace = stdout.lastIndexOf("{");
+        parsed = lastBrace >= 0 ? JSON.parse(stdout.slice(lastBrace)) : null;
+      }
+      const offenders: { pk: string; data: Record<string, unknown> }[] = [];
+      const orphanFiles: string[] = Array.isArray(parsed?.files) ? parsed.files : [];
+      for (const f of orphanFiles) {
+        offenders.push({ pk: f, data: { path: f, kind: "unused-file" } });
+      }
+      const issues: any[] = Array.isArray(parsed?.issues) ? parsed.issues : [];
+      for (const it of issues) {
+        const filePath = it?.file ?? "(unknown)";
+        const exp = (it?.exports ?? []).map((e: any) => e?.name ?? e).filter(Boolean);
+        const types = (it?.types ?? []).map((e: any) => e?.name ?? e).filter(Boolean);
+        const enums = (it?.enumMembers ?? []).flatMap((e: any) => Object.values(e ?? {}));
+        const total = exp.length + types.length + enums.length;
+        if (total === 0) continue;
+        offenders.push({
+          pk: filePath,
+          data: {
+            path: filePath,
+            unusedExports: exp.slice(0, 10),
+            unusedTypes: types.slice(0, 10),
+            total,
+          },
+        });
+      }
+      return {
+        ok: offenders.length === 0,
+        count: offenders.length,
+        sample: sampleOf(offenders),
+        details: { tool: "knip", orphanFiles: orphanFiles.length, exitCode: code },
+      };
+    } catch (e) {
+      return { ok: true, count: 0, sample: [], details: { error: (e as Error).message } };
+    }
+  },
+  explainHint: "Rimuovi gli export/file non referenziati o esponili come API pubblica esplicita.",
 };
 
 const unusedImportsCheck: AppIntegrityCheck = {
@@ -236,5 +435,7 @@ const pack: AppIntegrityCheck[] = [
   largeFunctionsCheck,
   unusedImportsCheck,
   codeDuplicationCheck,
+  circularImportsCheck,
+  unusedExportsCheck,
 ];
 export default pack;

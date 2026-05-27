@@ -45,34 +45,92 @@ async function scanImportedPackages(root: string): Promise<Map<string, string[]>
   return out;
 }
 
+const DEPCHECK_TIMEOUT_MS = 180_000;
+const DEPCHECK_IGNORE = [
+  "patch-package", "@babel/core", "babel-plugin-react-compiler",
+  "drizzle-kit", "eslint", "eslint-config-expo", "tsx", "typescript",
+  "@expo/ngrok", "@types/*", "knip", "madge", "depcheck", "jscpd",
+];
+
 const depcheckUnused: AppIntegrityCheck = {
   id: "deps/unused-package",
   family: "deps",
-  name: "Pacchetto dichiarato ma mai importato",
+  name: "Pacchetto dichiarato ma mai importato (depcheck)",
   severity: "low",
-  cost: "medium",
-  description: "Pacchetto in package.json.dependencies senza alcuno `import`/`require` nel codice (heuristic).",
+  cost: "expensive",
+  expensive: true,
+  description: "Analisi statica con depcheck: pacchetti in dependencies/devDependencies senza alcun import nel codice.",
   async query(ctx) {
-    const pkg = await readPackageJson(ctx.projectRoot);
-    if (!pkg) return { ok: true, count: 0, sample: [] };
-    const used = await scanImportedPackages(ctx.projectRoot);
-    const usedNames = new Set(used.keys());
-    const orphans: { pk: string; data: Record<string, unknown> }[] = [];
-    // Esclude utility che servono ad altri tool (postinstall, build, type, ecc.)
-    const ALLOWED_IMPLICIT = new Set([
-      "patch-package", "@babel/core", "babel-plugin-react-compiler",
-      "drizzle-kit", "eslint", "eslint-config-expo", "tsx", "typescript",
-      "@expo/ngrok", "@types/react", "@types/express", "@types/supertest",
-      "@types/node", "@types/sharp",
-    ]);
-    for (const name of pkg.deps) {
-      if (ALLOWED_IMPLICIT.has(name)) continue;
-      // expo-* è importato spesso transitivamente; saltiamo dipendenze expo native
-      if (name.startsWith("@expo/") || name.startsWith("expo-")) continue;
-      if (!usedNames.has(name)) orphans.push({ pk: name, data: { package: name } });
+    try {
+      const mod: any = await import("depcheck").catch(() => null);
+      const depcheck = mod?.default ?? mod;
+      if (typeof depcheck !== "function") {
+        return { ok: true, count: 0, sample: [], details: { skipped: "depcheck non installato" } };
+      }
+      const pkg = await readPackageJson(ctx.projectRoot);
+      if (!pkg) return { ok: true, count: 0, sample: [] };
+
+      const options = {
+        ignoreBinPackage: false,
+        skipMissing: true,
+        ignorePatterns: [
+          "node_modules", "dist", "server_dist", ".expo", "build",
+          "android", "ios", ".git",
+        ],
+        ignoreMatches: DEPCHECK_IGNORE,
+        parsers: {
+          "**/*.ts": depcheck.parser.typescript,
+          "**/*.tsx": depcheck.parser.typescript,
+          "**/*.js": depcheck.parser.es6,
+          "**/*.jsx": depcheck.parser.jsx,
+        },
+        detectors: [
+          depcheck.detector.requireCallExpression,
+          depcheck.detector.importDeclaration,
+          depcheck.detector.exportDeclaration,
+          depcheck.detector.typescriptImportType,
+          depcheck.detector.typescriptImportEqualsDeclaration,
+        ],
+        specials: [
+          depcheck.special.eslint,
+          depcheck.special.babel,
+          depcheck.special.bin,
+        ],
+      };
+
+      const result: any = await new Promise((resolve, reject) => {
+        const to = setTimeout(() => reject(new Error(`depcheck timeout dopo ${DEPCHECK_TIMEOUT_MS}ms`)), DEPCHECK_TIMEOUT_MS);
+        depcheck(ctx.projectRoot, options)
+          .then((r: any) => { clearTimeout(to); resolve(r); })
+          .catch((e: any) => { clearTimeout(to); reject(e); });
+      });
+
+      const unusedDeps: string[] = result?.dependencies ?? [];
+      const unusedDev: string[] = result?.devDependencies ?? [];
+      const orphans: { pk: string; data: Record<string, unknown> }[] = [];
+      for (const name of unusedDeps) {
+        if (name.startsWith("@expo/") || name.startsWith("expo-") || name === "expo") continue;
+        orphans.push({ pk: name, data: { package: name, location: "dependencies" } });
+      }
+      for (const name of unusedDev) {
+        if (name.startsWith("@types/")) continue;
+        orphans.push({ pk: name, data: { package: name, location: "devDependencies" } });
+      }
+      return {
+        ok: orphans.length === 0,
+        count: orphans.length,
+        sample: orphans.slice(0, 20),
+        details: {
+          tool: "depcheck",
+          unusedDeps: unusedDeps.length,
+          unusedDevDeps: unusedDev.length,
+        },
+      };
+    } catch (e) {
+      return { ok: true, count: 0, sample: [], details: { error: (e as Error).message } };
     }
-    return { ok: orphans.length === 0, count: orphans.length, sample: orphans.slice(0, 20) };
   },
+  explainHint: "Rimuovi i pacchetti non utilizzati con `npm uninstall`. Verifica eventuali import dinamici esclusi.",
 };
 
 const depcheckMissing: AppIntegrityCheck = {
