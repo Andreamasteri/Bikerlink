@@ -1,0 +1,8 @@
+GET /api/auth/clear-session-cookie
+GET /api/chat/conversations/${id}/images
+GET /api/errors
+GET /api/friends/status
+GET /api/lastfm
+GET /api/ota/event
+GET /api/sprints/leaderboard/rank
+GET /api/users/me/photos

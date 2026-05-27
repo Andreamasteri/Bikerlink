@@ -155,13 +155,13 @@ export default function MatchScreen() {
   });
 
   const { data: lastfmStatus } = useQuery<{ connected: boolean; username?: string }>({
-    queryKey: ["/api/music/lastfm/status"],
+    queryKey: ["/api/lastfm/status"],
     enabled: !!user,
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- music match shape
   const { data: musicMatches, isLoading: musicLoading, refetch: musicRefetch, isRefetching: musicRefetching, error: musicError } = useQuery<any[]>({
-    queryKey: ["/api/music/matches"],
+    queryKey: ["/api/match/music"],
     enabled: !!user && activeTab === "music" && lastfmStatus?.connected === true,
     refetchInterval: 60000,
   });
@@ -259,7 +259,7 @@ export default function MatchScreen() {
   });
 
   const unblockMutation = useMutation({
-    mutationFn: (blockedUserId: string) => apiRequest("DELETE", `/api/users/blocked/${blockedUserId}`),
+    mutationFn: (blockedUserId: string) => apiRequest("DELETE", `/api/users/${blockedUserId}/block`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/blocked"] });
       Alert.alert(t("common.success"), t("match.userUnblocked"));
@@ -278,7 +278,7 @@ export default function MatchScreen() {
   });
 
   const blockFromMatchMutation = useMutation({
-    mutationFn: (targetUserId: string) => apiRequest("POST", "/api/users/block", { targetUserId }),
+    mutationFn: (targetUserId: string) => apiRequest("POST", `/api/users/${targetUserId}/block`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users/blocked"] });

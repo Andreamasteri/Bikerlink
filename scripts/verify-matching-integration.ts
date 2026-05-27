@@ -149,7 +149,7 @@ async function checkRegistryVsSchema() {
 // Check 2 — Registry vs match_preferences columns
 // ─────────────────────────────────────────────────────────────────────────
 async function checkRegistryVsPreferences() {
-  const { MATCHING_REGISTRY, getRegistryPrefColumns } = await import("../shared/matching-registry");
+  const { getRegistryPrefColumns } = await import("../shared/matching-registry");
   const { matchPreferences } = await import("../shared/db/matching");
   const schemaCols = new Set(
     Object.values(matchPreferences as unknown as Record<string, unknown>)

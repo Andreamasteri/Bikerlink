@@ -623,3 +623,39 @@ id = "uxtjE7i_B2gcJBGUHAru-"
 uri = "file://attached_assets/manualeMatching-rev0_1779889176543.pdf"
 type = "pdf"
 title = "Manuale Matching System – rev 0"
+
+[[outputs]]
+id = "NXzHbdd0QNDPicz4ENMbn"
+uri = "file://docs/sweep-404-2621.md"
+type = "text"
+title = "Report sweep 404 + pulizia warning (#2632)"
+
+[[outputs]]
+id = "CVTsp1wCBgm1lJ1DpSTEp"
+uri = "file://docs/sweep-2632-artifacts/sweep-results.txt"
+type = "text"
+title = "Sweep raw — tutti i 626 risultati (code/method/path)"
+
+[[outputs]]
+id = "9rCfYo0Ka1Fqd7J5GZ93F"
+uri = "file://docs/sweep-2632-artifacts/sweep-404.txt"
+type = "text"
+title = "Sweep — 8 404 residui (falsi positivi documentati)"
+
+[[outputs]]
+id = "eWr1RQpTb17itQoGl8f-i"
+uri = "file://docs/sweep-2632-artifacts/sweep-5xx.txt"
+type = "text"
+title = "Sweep — 5xx (auth/email preesistenti, fuori scope)"
+
+[[outputs]]
+id = "EojW7pMQh18cbz-Jr3Xtc"
+uri = "file://docs/sweep-2632-artifacts/sweep-union.txt"
+type = "text"
+title = "Sweep — union dei path testati"
+
+[[outputs]]
+id = "tSI0bcgbi3fIrI9M5ZjM-"
+uri = "file://docs/sweep-2632-artifacts/sweep-run.sh.log"
+type = "unspecified"
+title = "Script sweep riproducibile (.log per visibilità)"

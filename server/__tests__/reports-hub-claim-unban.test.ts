@@ -26,7 +26,7 @@ const { mockDbSelect } = vi.hoisted(() => ({
 }));
 
 vi.mock("../db", () => {
-  const chainable = () => {
+  const _chainable = () => {
     const obj: Record<string, unknown> = {};
     obj.from = vi.fn().mockReturnValue(obj);
     obj.where = vi.fn().mockReturnValue(obj);

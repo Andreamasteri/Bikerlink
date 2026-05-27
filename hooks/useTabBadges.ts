@@ -7,7 +7,7 @@ export function useTabBadges() {
   const prevUnreadRef = useRef<number>(0);
 
   const { data: unreadData } = useQuery<{ count: number }>({
-    queryKey: ["/api/chat/unread-total"],
+    queryKey: ["/api/chat/conversations/unread-total"],
     enabled: !!user,
     refetchInterval: 6000,
   });

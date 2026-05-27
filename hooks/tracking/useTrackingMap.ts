@@ -36,10 +36,12 @@ export function useTrackingMap() {
 
   const handleExportGpx = useCallback(async (id: string) => {
     try {
-      const res = await apiRequest("GET", `/api/routes/${id}/gpx`);
-      const data = await res.json() as { gpx: string };
+      const res = await apiRequest("GET", `/api/routes/${id}/export.gpx`);
+      // Endpoint server risponde con XML grezzo (Content-Type:
+      // application/gpx+xml), non JSON. Vedi server/routes/tracking/history.ts:185.
+      const gpxText = await res.text();
       const fileUri = `${FileSystem.cacheDirectory}ride_${id}.gpx`;
-      await FileSystem.writeAsStringAsync(fileUri, data.gpx ?? "");
+      await FileSystem.writeAsStringAsync(fileUri, gpxText);
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(fileUri);
       } else {

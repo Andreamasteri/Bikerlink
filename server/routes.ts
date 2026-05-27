@@ -47,6 +47,7 @@ import arcadeRoutes from "./routes/arcade";
 import errorsRoutes from "./routes/errors";
 import sprintsRoutes from "./routes/sprints";
 import roadHazardsRoutes from "./routes/road-hazards";
+import wipStubsRouter from "./routes/wip-stubs";
 import { publicMediaRouter, adminMediaRouter } from "./routes/media-library";
 import { db } from "./db";
 import { userFavorites } from "@shared/db";
@@ -289,6 +290,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const { default: plannedRoutesRoutes } = await import("./routes/planned-routes");
   app.use("/api/planned-routes", plannedRoutesRoutes);
+
+  // Task #2632 — Stub endpoints per chiamate client senza handler reale.
+  // Mounted ULTIMO sotto /api/ così non sovrascrive route esistenti più
+  // specifiche già registrate sopra. Vedi docs/sweep-404-2621.md sezione B.
+  app.use("/api", wipStubsRouter);
 
   app.get("/api/media/promo-video", async (_req: Request, res: Response) => {
     try {

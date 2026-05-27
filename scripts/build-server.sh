@@ -25,6 +25,15 @@ mkdir -p "$DIST_DIR"
 log_phase "Controllo apostrofi nelle inline <script>..."
 bash "$SCRIPT_DIR/check-script-apostrophes.sh"
 
+# ── SAFETY CHECK: scope dell'`eval()` ───────────────────────────────────────
+# Restringe lo scope dell'esbuild flag `--log-override:direct-eval=silent`
+# applicato sotto: il flag silenzia il warning a livello bundle, questo check
+# garantisce che il warning non si stia in realtà nascondendo per nuovo
+# codice non autorizzato. Solo server/ai/db-integrity/registry.ts può
+# usare eval() (vedi commento inline nel file).
+log_phase "Controllo scope direct-eval..."
+bash "$SCRIPT_DIR/check-direct-eval-scope.sh"
+
 compute_checksum() {
   find server/ shared/ -name '*.ts' -not -path '*/node_modules/*' 2>/dev/null \
     | sort | xargs sha256sum 2>/dev/null | sha256sum | awk '{print $1}'
@@ -53,6 +62,7 @@ npx esbuild server/index.ts \
   --outdir="$DIST_DIR" \
   --alias:@shared/db=./shared/db \
   --alias:@shared/privacy-policy-it=./shared/privacy-policy-it \
+  --log-override:direct-eval=silent \
   2>&1
 
 if [ $? -ne 0 ]; then

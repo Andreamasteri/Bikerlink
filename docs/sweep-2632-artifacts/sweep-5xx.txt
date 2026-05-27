@@ -1,0 +1,7 @@
+500 POST /api/ads/${ad.id}/click
+500 POST /api/ads/${campaignId}/click
+500 POST /api/auth/forgot-password
+500 POST /api/auth/resend-reset-code
+500 POST /api/auth/resend-verification
+500 POST /api/auth/reset-password
+500 POST /api/auth/verify-email

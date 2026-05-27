@@ -41,7 +41,11 @@ function safeCurrentDir(): string | null {
   const d = (globalThis as any).__dirname as string | undefined;
   if (d && typeof d === "string") return d;
   try {
-    // ESM path
+    // ESM path — `import.meta.url` only valid in ESM context, hidden behind
+    // eval() so the CJS bundle (esbuild --format=cjs) doesn't choke at parse
+    // time. The esbuild direct-eval warning is silenced via the build-server.sh
+    // `--log-override:direct-eval=silent` flag (intentional, semantically
+    // identical, runs only in the dev tsx/ESM path).
     const url = eval("import.meta.url") as string;
     return path.dirname(fileURLToPath(url));
   } catch {

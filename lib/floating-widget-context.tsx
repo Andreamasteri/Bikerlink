@@ -104,7 +104,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
   const isVisible = isLoggedIn && userEnabled && adminEnabled && !suppressed;
 
   const { data: unreadChatData } = useQuery<{ count: number }>({
-    queryKey: ["/api/chat/unread-total"],
+    queryKey: ["/api/chat/conversations/unread-total"],
     enabled: isVisible,
     refetchInterval: isVisible ? 15_000 : false,
   });
