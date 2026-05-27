@@ -196,6 +196,19 @@ export type InsertAiSuggestionLog = typeof aiSuggestionsLog.$inferInsert;
 export type AnomalyEvent = typeof anomalyEvents.$inferSelect;
 export type ModeratorDigest = typeof moderatorDigests.$inferSelect;
 
+// Task #2551 — stato letto/non letto del digest per moderatore.
+// PK composto (moderatorId, digestId) garantisce idempotenza del mark-read.
+export const digestReadState = pgTable("digest_read_state", {
+  moderatorId: varchar("moderator_id", { length: 36 }).notNull(),
+  digestId: varchar("digest_id", { length: 36 }).notNull(),
+  readAt: timestamp("read_at").notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("digest_read_state_mod_digest_idx").on(table.moderatorId, table.digestId),
+  index("digest_read_state_mod_idx").on(table.moderatorId),
+]);
+export type DigestReadState = typeof digestReadState.$inferSelect;
+export type InsertDigestReadState = typeof digestReadState.$inferInsert;
+
 // Task #2530 — soglie configurabili (biker/zavorrina) per notify/shadow_ban.
 export const moderationThresholds = pgTable("moderation_thresholds", {
   id: varchar("id", { length: 36 })

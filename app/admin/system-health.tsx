@@ -16,6 +16,7 @@ import { MetricsGrid } from "@/components/admin/system-health/MetricsGrid";
 import { ProposalsCard, type WatchdogLog } from "@/components/admin/system-health/ProposalsCard";
 import { WatchdogChat } from "@/components/admin/system-health/WatchdogChat";
 import { TrendsChart } from "@/components/admin/system-health/TrendsChart";
+import { useAdminWatchdogAlerts } from "@/hooks/useAdminWatchdogAlerts";
 
 interface Snapshot {
   status: "green" | "yellow" | "orange" | "red";
@@ -44,6 +45,10 @@ export default function SystemHealthScreen() {
     queryFn: async () => (await apiRequest("GET", "/api/admin/watchdog/snapshot")).json(),
     refetchInterval: 15_000,
   });
+
+  // Task #2555 — WS realtime: invalida lo snapshot non appena il watchdog
+  // ne pubblica uno nuovo, eliminando la finestra fino a 15s del polling.
+  useAdminWatchdogAlerts();
 
   const proposalsQ = useQuery<{ logs: WatchdogLog[] }>({
     queryKey: ["/api/admin/watchdog/logs", "proposal"],

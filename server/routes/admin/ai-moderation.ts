@@ -11,7 +11,7 @@ import { enqueueTriage, getQueueStats } from "../../ai/moderation/queue";
 import { getBudgetStatus, setBudgetLimit } from "../../ai/moderation/budget";
 import { getProviderHealth } from "../../ai/moderation/provider";
 import { runAnomalyScan } from "../../ai/moderation/anomalies";
-import { runDigestForAll, getLatestDigest } from "../../ai/moderation/digest";
+import { runDigestForAll, getLatestDigestWithReadState, markDigestRead, hasUnreadDigest } from "../../ai/moderation/digest";
 import { storage } from "../../storage";
 
 const router = Router();
@@ -270,10 +270,39 @@ router.get("/ai/digest/latest", async (req: Request, res: Response) => {
   const modId = req.session?.userId as string | undefined;
   if (!modId) return sendError(res, 401, "Sessione scaduta");
   try {
-    const d = await getLatestDigest(modId);
-    return res.json({ digest: d });
+    const d = await getLatestDigestWithReadState(modId);
+    if (!d) return res.json({ digest: null, digestId: null, read: false });
+    return res.json({ digest: d.payload, digestId: d.digestId, read: d.read });
   } catch {
     return sendError(res, 500, "Errore digest");
+  }
+});
+
+// Task #2551 — marca il digest come letto (idempotente).
+const markReadSchema = z.object({ digestId: z.string().min(1).max(36) });
+router.post("/ai/digest/mark-read", async (req: Request, res: Response) => {
+  const modId = req.session?.userId as string | undefined;
+  if (!modId) return sendError(res, 401, "Sessione scaduta");
+  const parsed = markReadSchema.safeParse(req.body);
+  if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+  try {
+    await markDigestRead(modId, parsed.data.digestId);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[ai/digest/mark-read] error:", err);
+    return sendError(res, 500, "Errore mark-read");
+  }
+});
+
+// Task #2551 — flag "non letto" per badge sull'hub report.
+router.get("/ai/digest/unread", async (req: Request, res: Response) => {
+  const modId = req.session?.userId as string | undefined;
+  if (!modId) return sendError(res, 401, "Sessione scaduta");
+  try {
+    const unread = await hasUnreadDigest(modId);
+    return res.json({ unread });
+  } catch {
+    return res.json({ unread: false });
   }
 });
 

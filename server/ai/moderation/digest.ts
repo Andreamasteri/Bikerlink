@@ -159,6 +159,49 @@ export async function getLatestDigest(modId: string): Promise<DigestPayload | nu
   return row ? (row.payload as DigestPayload) : null;
 }
 
+// Task #2551 — variante che include id+read-flag per consentire mark-read
+// e badge "non letto" sul pannello.
+export async function getLatestDigestWithReadState(modId: string): Promise<{
+  digestId: string;
+  payload: DigestPayload;
+  read: boolean;
+} | null> {
+  const [row] = await db.select().from(moderatorDigests)
+    .where(eq(moderatorDigests.moderatorId, modId))
+    .orderBy(desc(moderatorDigests.createdAt)).limit(1);
+  if (!row) return null;
+  const { digestReadState } = await import("@shared/db/social");
+  const { and: andOp } = await import("drizzle-orm");
+  const [rd] = await db.select({ digestId: digestReadState.digestId }).from(digestReadState)
+    .where(andOp(eq(digestReadState.moderatorId, modId), eq(digestReadState.digestId, row.id)))
+    .limit(1);
+  return { digestId: row.id, payload: row.payload as DigestPayload, read: !!rd };
+}
+
+// Task #2551 — segna come letto. Idempotente (upsert via onConflictDoNothing).
+export async function markDigestRead(modId: string, digestId: string): Promise<boolean> {
+  const { digestReadState } = await import("@shared/db/social");
+  await db.insert(digestReadState).values({
+    moderatorId: modId, digestId,
+  }).onConflictDoNothing();
+  return true;
+}
+
+// Task #2551 — flag rapido per badge "non letto" sull'hub: true se esiste
+// un digest piu' recente del read-state piu' recente del moderatore.
+export async function hasUnreadDigest(modId: string): Promise<boolean> {
+  const [latest] = await db.select({ id: moderatorDigests.id }).from(moderatorDigests)
+    .where(eq(moderatorDigests.moderatorId, modId))
+    .orderBy(desc(moderatorDigests.createdAt)).limit(1);
+  if (!latest) return false;
+  const { digestReadState } = await import("@shared/db/social");
+  const { and: andOp } = await import("drizzle-orm");
+  const [rd] = await db.select({ digestId: digestReadState.digestId }).from(digestReadState)
+    .where(andOp(eq(digestReadState.moderatorId, modId), eq(digestReadState.digestId, latest.id)))
+    .limit(1);
+  return !rd;
+}
+
 let cron: Cron | null = null;
 
 export function startDigestScheduler(): void {

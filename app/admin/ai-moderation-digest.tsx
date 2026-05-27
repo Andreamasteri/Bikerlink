@@ -40,7 +40,7 @@ export default function AiModerationDigestScreen() {
   const qc = useQueryClient();
   const router = useRouter();
 
-  const q = useQuery<{ digest: DigestPayload | null }>({
+  const q = useQuery<{ digest: DigestPayload | null; digestId: string | null; read: boolean }>({
     queryKey: ["/api/admin/ai/digest/latest"],
     queryFn: async () => (await apiRequest("GET", "/api/admin/ai/digest/latest")).json(),
     refetchInterval: 60_000,
@@ -48,11 +48,28 @@ export default function AiModerationDigestScreen() {
 
   const runNow = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/admin/ai/digest/run")).json(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/ai/digest/latest"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/ai/digest/latest"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/ai/digest/unread"] });
+    },
+    onError: (err: Error) => Alert.alert("Errore", err.message),
+  });
+
+  // Task #2551 — mark-as-read.
+  const markRead = useMutation({
+    mutationFn: async (digestId: string) => {
+      await apiRequest("POST", "/api/admin/ai/digest/mark-read", { digestId });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/admin/ai/digest/latest"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/ai/digest/unread"] });
+    },
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
   const d = q.data?.digest ?? null;
+  const digestId = q.data?.digestId ?? null;
+  const isRead = q.data?.read ?? false;
 
   return (
     <ScrollView
@@ -115,6 +132,30 @@ export default function AiModerationDigestScreen() {
             <Text style={styles.briefFooter}>
               Generato il {new Date(d.generatedAt).toLocaleString("it-IT")}
             </Text>
+            {digestId && (
+              <TouchableOpacity
+                style={[styles.markReadBtn, (isRead || markRead.isPending) && styles.markReadBtnDisabled]}
+                onPress={() => markRead.mutate(digestId)}
+                disabled={isRead || markRead.isPending}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: isRead }}
+              >
+                {markRead.isPending ? (
+                  <ActivityIndicator color={Colors.text} />
+                ) : (
+                  <>
+                    <MaterialCommunityIcons
+                      name={isRead ? "check-circle" : "email-open-outline"}
+                      size={16}
+                      color={isRead ? Colors.textSecondary : Colors.accent}
+                    />
+                    <Text style={[styles.markReadText, isRead && styles.markReadTextDone]}>
+                      {isRead ? "Già letto" : "Marca come letto"}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
 
           <Text style={styles.sectionTitle}>Casi prioritari ({d.topCases.length})</Text>
@@ -227,4 +268,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.accent + "33", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2,
   },
   assignedText: { color: Colors.accent, fontFamily: "Inter_600SemiBold", fontSize: 9 },
+  markReadBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    marginTop: 10, paddingVertical: 8, paddingHorizontal: 12,
+    borderRadius: 8, borderWidth: 1, borderColor: Colors.border,
+    backgroundColor: Colors.background,
+  },
+  markReadBtnDisabled: { opacity: 0.7 },
+  markReadText: { color: Colors.accent, fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  markReadTextDone: { color: Colors.textSecondary },
 });

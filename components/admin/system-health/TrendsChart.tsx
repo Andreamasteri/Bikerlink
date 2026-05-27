@@ -1,8 +1,9 @@
 // Task #2556 — Widget grafico trend score watchdog (ultime N snapshots).
 // SVG inline, niente librerie esterne. Mostra linea score 0-100 + zona
 // colorata per status (verde/giallo/arancione/rosso) basata sul valore.
-import React, { useMemo } from "react";
-import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
+// Include selettore finestra temporale 1h/6h/24h (default 6h).
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import Svg, { Path, Line, Circle, Text as SvgText } from "react-native-svg";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
@@ -20,6 +21,19 @@ interface Props {
   height?: number;
 }
 
+type WindowKey = "1h" | "6h" | "24h";
+const WINDOW_MS: Record<WindowKey, number> = {
+  "1h": 60 * 60 * 1000,
+  "6h": 6 * 60 * 60 * 1000,
+  "24h": 24 * 60 * 60 * 1000,
+};
+// Snapshot ogni 60s → limite generoso per coprire la finestra max scelta.
+const WINDOW_LIMIT: Record<WindowKey, number> = {
+  "1h": 70,
+  "6h": 380,
+  "24h": 200, // 24h con tick a 60s = 1440 — campioniamo i piu' recenti per evitare grafici troppo densi
+};
+
 const STATUS_COLORS = {
   green: "#22c55e",
   yellow: "#eab308",
@@ -27,30 +41,62 @@ const STATUS_COLORS = {
   red: "#ef4444",
 } as const;
 
-export function TrendsChart({ limit = 60, height = 180 }: Props) {
+export function TrendsChart({ limit, height = 180 }: Props) {
+  // Default 6h (#2556). Se il caller passa esplicitamente `limit`, vince comunque.
+  const [windowKey, setWindowKey] = useState<WindowKey>("6h");
+  const effectiveLimit = limit ?? WINDOW_LIMIT[windowKey];
+
   const q = useQuery<{ snapshots: SnapshotRow[] }>({
-    queryKey: ["/api/admin/watchdog/snapshots", limit],
-    queryFn: async () => (await apiRequest("GET", `/api/admin/watchdog/snapshots?limit=${limit}`)).json(),
+    queryKey: ["/api/admin/watchdog/snapshots", effectiveLimit],
+    queryFn: async () => (await apiRequest("GET", `/api/admin/watchdog/snapshots?limit=${effectiveLimit}`)).json(),
     refetchInterval: 30_000,
   });
 
   const rows = useMemo(() => {
     const raw = q.data?.snapshots ?? [];
-    // API ritorna desc per createdAt — invertiamo per asse X cronologico.
-    return [...raw].reverse();
-  }, [q.data]);
+    // API ritorna desc per createdAt — invertiamo per asse X cronologico,
+    // poi filtriamo per la finestra scelta.
+    const cutoff = Date.now() - WINDOW_MS[windowKey];
+    return [...raw]
+      .reverse()
+      .filter((r) => {
+        const t = Date.parse(r.createdAt);
+        return Number.isFinite(t) ? t >= cutoff : true;
+      });
+  }, [q.data, windowKey]);
+
+  const segmentedControl = (
+    <View style={styles.segmented}>
+      {(["1h", "6h", "24h"] as const).map((k) => {
+        const active = k === windowKey;
+        return (
+          <TouchableOpacity
+            key={k}
+            style={[styles.segmentedItem, active && styles.segmentedItemActive]}
+            onPress={() => setWindowKey(k)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+          >
+            <Text style={[styles.segmentedText, active && styles.segmentedTextActive]}>{k}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
 
   if (q.isLoading) {
     return (
       <View style={[styles.card, { height }]}>
+        {segmentedControl}
         <ActivityIndicator color={Colors.accent} />
       </View>
     );
   }
   if (q.error || rows.length < 2) {
     return (
-      <View style={[styles.card, { height: height / 2 }]}>
-        <Text style={styles.empty}>Dati insufficienti per il trend</Text>
+      <View style={[styles.card]}>
+        {segmentedControl}
+        <Text style={styles.empty}>Dati insufficienti per il trend ({windowKey})</Text>
       </View>
     );
   }
@@ -75,8 +121,9 @@ export function TrendsChart({ limit = 60, height = 180 }: Props) {
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>Trend health score</Text>
-        <Text style={styles.subtitle}>{rows.length} snapshot — ult. {last.score}/100</Text>
+        <Text style={styles.subtitle}>{rows.length} snapshot ({windowKey}) — ult. {last.score}/100</Text>
       </View>
+      {segmentedControl}
       <Svg width={width} height={height}>
         {[0, 25, 50, 75, 100].map((v) => (
           <React.Fragment key={`grid-${v}`}>
@@ -142,4 +189,22 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   legendItem: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 11 },
+  segmented: {
+    flexDirection: "row",
+    alignSelf: "stretch",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 8,
+    marginBottom: 8,
+    overflow: "hidden",
+  },
+  segmentedItem: {
+    flex: 1,
+    paddingVertical: 6,
+    alignItems: "center",
+    backgroundColor: "transparent",
+  },
+  segmentedItemActive: { backgroundColor: Colors.accent + "22" },
+  segmentedText: { color: Colors.textSecondary, fontFamily: "Inter_500Medium", fontSize: 12 },
+  segmentedTextActive: { color: Colors.accent, fontFamily: "Inter_700Bold" },
 });

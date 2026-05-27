@@ -83,6 +83,16 @@ export default function ReportsHubScreen() {
 
   const totalReports = Object.values(data?.byStatus ?? {}).reduce((a, b) => a + b, 0);
 
+  // Task #2551 — badge "digest non letto" in cima all'hub.
+  const unreadQ = useQuery<{ unread: boolean }>({
+    queryKey: ["/api/admin/ai/digest/unread"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/admin/ai/digest/unread");
+      return res.json();
+    },
+    refetchInterval: 60_000,
+  });
+
   return (
     <ScrollView
       style={styles.container}
@@ -93,6 +103,22 @@ export default function ReportsHubScreen() {
         <ActivityIndicator color={Colors.accent} style={{ marginTop: 40 }} />
       ) : (
         <>
+          {unreadQ.data?.unread && (
+            <TouchableOpacity
+              style={styles.unreadDigest}
+              onPress={() => router.push("/admin/ai-moderation-digest" as Href)}
+              accessibilityRole="button"
+              accessibilityLabel="Apri il digest AI non letto"
+            >
+              <MaterialCommunityIcons name="email-mark-as-unread" size={20} color="#fff" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.unreadDigestTitle}>Nuovo digest AI da leggere</Text>
+                <Text style={styles.unreadDigestSubtitle}>Brief mattutino e casi prioritari pronti.</Text>
+              </View>
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            </TouchableOpacity>
+          )}
+
           {data && data.criticalOpenOver1h > 0 && (
             <View style={styles.alertCritical}>
               <Ionicons name="warning" size={22} color="#fff" />
@@ -245,6 +271,17 @@ const styles = StyleSheet.create({
   },
   alertTitle: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 14 },
   alertSubtitle: { color: "#fff", fontFamily: "Inter_400Regular", fontSize: 12, opacity: 0.9 },
+  unreadDigest: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: "#6366F1",
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+  unreadDigestTitle: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 14 },
+  unreadDigestSubtitle: { color: "#fff", fontFamily: "Inter_400Regular", fontSize: 12, opacity: 0.9 },
   kpiRow: { flexDirection: "row", gap: 10, marginBottom: 20 },
   kpiCard: {
     flex: 1,

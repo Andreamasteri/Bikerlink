@@ -1,14 +1,15 @@
 // Task #2548 — Job notifier critical reports. Ogni 5 minuti scansiona i
 // report critical/high non assegnati e non risolti da > 15 min e invia un
 // push agli admin/moderatori online. Throttle: max 1 push per report ogni
-// 30 minuti.
+// N minuti (default 60, configurabile via CRITICAL_NOTIFIER_THROTTLE_MIN).
 import { Cron } from "croner";
 import { db } from "../db";
 import { reports, users } from "@shared/db";
 import { and, eq, inArray, isNull, lt, or } from "drizzle-orm";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
-const THROTTLE_MS = 30 * 60 * 1000;
+const THROTTLE_MIN = Math.max(1, Number(process.env.CRITICAL_NOTIFIER_THROTTLE_MIN) || 60);
+const THROTTLE_MS = THROTTLE_MIN * 60 * 1000;
 const STALE_MS = 15 * 60 * 1000;
 const lastPushed = new Map<string, number>();
 let cron: Cron | null = null;
@@ -91,7 +92,7 @@ export function startCriticalReportsNotifier(): void {
         console.warn("[critical-notifier] cron error:", err);
       }
     });
-    console.log("[critical-notifier] scheduler attivo (ogni 5 min, Europe/Rome)");
+    console.log(`[critical-notifier] scheduler attivo (ogni 5 min, Europe/Rome) throttle=${THROTTLE_MIN}min`);
   } catch (err) {
     console.warn("[critical-notifier] init error:", err);
   }
