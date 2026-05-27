@@ -77,8 +77,36 @@ router.post("/watchdog/proposals/:id/accept", async (req, res) => {
   if (!id) return sendError(res, 400, "id mancante");
   if (!adminId) return sendError(res, 401, "Sessione scaduta");
   await markProposalAccepted(id, adminId);
-  // Nota: l'esecuzione vera dell'azione resta MANUALE.
-  return res.json({ id, status: "accepted" });
+
+  // Task #2554 — dispatcher: se la proposta indica un'azione automatizzabile
+  // (releaseLockZombie / clearCacheDegraded / resetErrorWindow) la eseguiamo
+  // qui dopo l'accept. Per azioni non mappate o riskLevel="high" restiamo
+  // manual-only e ritorniamo dispatch=null.
+  let dispatch: { action: string; applied: boolean; summary: string } | null = null;
+  try {
+    const [row] = await db.select().from(aiWatchdogLog).where(eq(aiWatchdogLog.id, id)).limit(1);
+    const details = (row?.details ?? {}) as Record<string, unknown>;
+    const action = typeof details.action === "string" ? details.action : null;
+    const riskLevel = typeof details.riskLevel === "string" ? details.riskLevel : null;
+    if (action && riskLevel !== "high") {
+      const snap = getLatestSnapshot();
+      if (snap) {
+        const { AUTO_FIX_RULES } = await import("../../ai/watchdog/auto-fix");
+        const rule = AUTO_FIX_RULES.find((r) => r.id === action);
+        if (rule) {
+          const out = await rule.run(snap);
+          dispatch = {
+            action,
+            applied: out.applied,
+            summary: out.applied ? out.summary : out.reason,
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("[watchdog] dispatch error (non-fatal):", err);
+  }
+  return res.json({ id, status: "accepted", dispatch });
 });
 
 router.post("/watchdog/proposals/:id/reject", async (req, res) => {

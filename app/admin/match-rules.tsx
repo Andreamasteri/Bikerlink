@@ -8,6 +8,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  TouchableOpacity,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,6 +44,39 @@ export default function AdminMatchRulesScreen() {
       return res.json();
     },
   });
+
+  // Task #2540 — creazione regola.
+  const createMutation = useMutation({
+    mutationFn: async (payload: {
+      searchTypeA: string; searchTypeB: string; compatible: boolean; weight: number; notes: string | null;
+    }) => {
+      const res = await apiRequest("POST", "/api/admin/match-rules", payload);
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    onError: (err: Error) => Alert.alert("Errore", err.message || "Impossibile creare la regola"),
+  });
+
+  // Task #2540 — eliminazione regola con conferma.
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/match-rules/${id}`);
+      return res.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    onError: () => Alert.alert("Errore", "Impossibile eliminare la regola"),
+  });
+
+  function confirmDelete(rule: MatchRule) {
+    Alert.alert(
+      "Eliminare regola?",
+      `${rule.searchTypeA} ↔ ${rule.searchTypeB}`,
+      [
+        { text: "Annulla", style: "cancel" },
+        { text: "Elimina", style: "destructive", onPress: () => deleteMutation.mutate(rule.id) },
+      ],
+    );
+  }
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Pick<MatchRule, "compatible" | "weight" | "notes">> }) => {
@@ -102,6 +136,13 @@ export default function AdminMatchRulesScreen() {
         </Text>
       </View>
 
+      <Text style={styles.sectionTitle}>Nuova regola</Text>
+      <NewRuleForm
+        knownTypes={allTypes}
+        onCreate={(payload) => createMutation.mutate(payload)}
+        isSaving={createMutation.isPending}
+      />
+
       <Text style={styles.sectionTitle}>Regole ({rules.length})</Text>
 
       {rules.map((rule) => (
@@ -109,6 +150,7 @@ export default function AdminMatchRulesScreen() {
           key={rule.id}
           rule={rule}
           onChange={(updates) => updateMutation.mutate({ id: rule.id, updates })}
+          onDelete={() => confirmDelete(rule)}
           isSaving={updateMutation.isPending}
         />
       ))}
@@ -166,13 +208,91 @@ export default function AdminMatchRulesScreen() {
   );
 }
 
+function NewRuleForm({
+  knownTypes,
+  onCreate,
+  isSaving,
+}: {
+  knownTypes: string[];
+  onCreate: (payload: { searchTypeA: string; searchTypeB: string; compatible: boolean; weight: number; notes: string | null }) => void;
+  isSaving: boolean;
+}) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const [weightText, setWeightText] = useState("50");
+  const [compatible, setCompatible] = useState(true);
+  const [notes, setNotes] = useState("");
+
+  function submit() {
+    const aT = a.trim(); const bT = b.trim();
+    if (!aT || !bT) { Alert.alert("Mancante", "Inserisci entrambi i tipi"); return; }
+    const w = parseFloat(weightText.replace(",", "."));
+    if (!Number.isFinite(w) || w < 0 || w > 100) {
+      Alert.alert("Peso non valido", "Numero tra 0 e 100"); return;
+    }
+    onCreate({ searchTypeA: aT, searchTypeB: bT, compatible, weight: w, notes: notes.trim() || null });
+    setA(""); setB(""); setWeightText("50"); setNotes(""); setCompatible(true);
+  }
+
+  return (
+    <View style={styles.card}>
+      {knownTypes.length > 0 && (
+        <Text style={[styles.label, { fontSize: 11, marginBottom: 4, color: Colors.textSecondary }]}>
+          Tipi noti: {knownTypes.join(", ")}
+        </Text>
+      )}
+      <View style={styles.row}>
+        <Text style={styles.label}>Tipo A</Text>
+        <TextInput style={styles.input} value={a} onChangeText={setA} placeholder="es. biker" placeholderTextColor={Colors.textSecondary} autoCapitalize="none" />
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.label}>Tipo B</Text>
+        <TextInput style={styles.input} value={b} onChangeText={setB} placeholder="es. zavorrina" placeholderTextColor={Colors.textSecondary} autoCapitalize="none" />
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.label}>Compatibile</Text>
+        <Switch value={compatible} onValueChange={setCompatible} trackColor={{ false: Colors.border, true: "#22c55e" }} />
+      </View>
+      <View style={styles.row}>
+        <Text style={styles.label}>Peso</Text>
+        <TextInput style={styles.input} value={weightText} onChangeText={setWeightText} keyboardType="decimal-pad" />
+      </View>
+      <View style={styles.rowColumn}>
+        <Text style={styles.label}>Note</Text>
+        <TextInput
+          style={[styles.input, styles.notesInput]}
+          value={notes}
+          onChangeText={setNotes}
+          placeholder="Opzionale"
+          placeholderTextColor={Colors.textSecondary}
+          multiline
+        />
+      </View>
+      <TouchableOpacity
+        style={[styles.addBtn, isSaving && { opacity: 0.6 }]}
+        onPress={submit}
+        disabled={isSaving}
+      >
+        {isSaving ? <ActivityIndicator color="#fff" /> : (
+          <>
+            <MaterialCommunityIcons name="plus-circle" size={18} color="#fff" />
+            <Text style={styles.addBtnText}>Aggiungi regola</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function RuleCard({
   rule,
   onChange,
+  onDelete,
   isSaving,
 }: {
   rule: MatchRule;
   onChange: (updates: Partial<Pick<MatchRule, "compatible" | "weight" | "notes">>) => void;
+  onDelete: () => void;
   isSaving: boolean;
 }) {
   const [weightText, setWeightText] = useState(String(rule.weight));
@@ -203,7 +323,12 @@ function RuleCard({
         <Text style={styles.pairText}>
           {rule.searchTypeA} <Text style={styles.pairArrow}>↔</Text> {rule.searchTypeB}
         </Text>
-        {isSaving && <ActivityIndicator size="small" color={Colors.accent} />}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {isSaving && <ActivityIndicator size="small" color={Colors.accent} />}
+          <TouchableOpacity onPress={onDelete} hitSlop={8}>
+            <MaterialCommunityIcons name="trash-can-outline" size={20} color="#ef4444" />
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>Compatibile</Text>
@@ -335,4 +460,15 @@ const styles = StyleSheet.create({
   },
   matrixWeight: { color: Colors.text, fontFamily: "Inter_600SemiBold", fontSize: 12 },
   matrixEmpty: { color: Colors.textSecondary, fontFamily: "Inter_400Regular", fontSize: 12 },
+  addBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.accent,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  addBtnText: { color: "#fff", fontFamily: "Inter_600SemiBold", fontSize: 14 },
 });

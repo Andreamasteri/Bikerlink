@@ -15,6 +15,7 @@ import { ProblemsList, type Problem } from "@/components/admin/system-health/Pro
 import { MetricsGrid } from "@/components/admin/system-health/MetricsGrid";
 import { ProposalsCard, type WatchdogLog } from "@/components/admin/system-health/ProposalsCard";
 import { WatchdogChat } from "@/components/admin/system-health/WatchdogChat";
+import { TrendsChart } from "@/components/admin/system-health/TrendsChart";
 
 interface Snapshot {
   status: "green" | "yellow" | "orange" | "red";
@@ -176,6 +177,9 @@ export default function SystemHealthScreen() {
             onAccept={onAccept}
             onReject={onReject}
           />
+
+          <SectionTitle icon="chart-line">Trend score (ultime ore)</SectionTitle>
+          <TrendsChart />
 
           <SectionTitle icon="chat-processing-outline">Chat con il Watchdog</SectionTitle>
           <WatchdogChat />

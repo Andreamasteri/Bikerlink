@@ -46,6 +46,26 @@ export function attachAdminNotificationsWS(server: HttpServer): void {
   });
 
   console.log("[NotifWS] Admin notifications WS attached at /ws/admin/notifications");
+
+  // Task #2555 — wire watchdog broadcaster to this WS pool so admin snapshots
+  // arrivano in realtime sulla stessa connessione delle urgent-match.
+  (async () => {
+    try {
+      const { registerAdminWsBroadcast } = await import("../../ai/watchdog/alerts");
+      registerAdminWsBroadcast((msg) => {
+        if (!wss || clients.size === 0) return;
+        const payload = JSON.stringify({ ...msg, at: new Date().toISOString() });
+        for (const c of clients) {
+          try {
+            if (c.ws.readyState === WebSocket.OPEN) c.ws.send(payload);
+          } catch {/* noop */}
+        }
+      });
+      console.log("[NotifWS] Watchdog admin broadcast wired");
+    } catch (err) {
+      console.warn("[NotifWS] watchdog wire skipped:", (err as Error).message);
+    }
+  })();
 }
 
 export function broadcastAdminUrgent(payload: {

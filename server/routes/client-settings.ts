@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { storage } from "../storage";
 import { db } from "../db";
 import { users } from "@shared/db";
-import { ilike, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { TILE_PROVIDERS, DEFAULT_TILE_PROVIDER_ID, findTileProvider } from "../../lib/maps/tile-providers";
 import { getPublicTileInfo } from "../../lib/maps/tile-for-renderer";

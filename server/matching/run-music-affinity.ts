@@ -6,12 +6,11 @@ import {
   musicAffinityMatches,
   tagCategories,
   tags,
-  users,
   appSettings,
 } from "@shared/db";
 import { findSimilar } from "../embeddings";
 import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
-import { tagOverlap, getThresholdSync, loadMatchThresholds } from "./scoring";
+import { tagOverlap, loadMatchThresholds } from "./scoring";
 
 /**
  * Task #2516 — Matcher per affinità musicale combinata.

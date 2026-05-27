@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { db, pool } from "../../db";
-import { gpsRejectionStats, bikerZavarrinaMatches, bikerBikerMatches, matchPreferences, matchRules, updateMatchRuleSchema, appSettings } from "@shared/db";
+import { gpsRejectionStats, bikerZavarrinaMatches, bikerBikerMatches, matchPreferences, matchRules, updateMatchRuleSchema, insertMatchRuleSchema, appSettings } from "@shared/db";
 import {
   MATCHING_REGISTRY,
   getCountableMatchingTypes,
@@ -1117,6 +1117,49 @@ router.get("/match-rules", async (_req: Request, res: Response) => {
   } catch (err) {
     console.error("[admin] GET /match-rules error:", err);
     return sendError(res, 500, "Errore lettura match rules");
+  }
+});
+
+// POST /match-rules (Task #2540) — crea una nuova regola di compatibilità.
+router.post("/match-rules", async (req: Request, res: Response) => {
+  try {
+    const parsed = insertMatchRuleSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const { searchTypeA, searchTypeB, compatible, weight, notes } = parsed.data;
+    // Pair coerente: A <= B (ordine alfabetico) per evitare duplicati invertiti
+    const [a, b] = searchTypeA <= searchTypeB ? [searchTypeA, searchTypeB] : [searchTypeB, searchTypeA];
+    try {
+      const [row] = await db.insert(matchRules).values({
+        searchTypeA: a, searchTypeB: b, compatible, weight, notes: notes ?? null,
+      }).returning();
+      invalidateMatchRulesCache();
+      return res.json({ rule: row });
+    } catch (err) {
+      const msg = (err as Error).message ?? "";
+      if (msg.includes("unique") || msg.includes("duplicate")) {
+        return sendError(res, 409, "Regola già esistente per questa coppia");
+      }
+      throw err;
+    }
+  } catch (err) {
+    console.error("[admin] POST /match-rules error:", err);
+    return sendError(res, 500, "Errore creazione regola");
+  }
+});
+
+// DELETE /match-rules/:id (Task #2540) — rimuove una regola.
+router.delete("/match-rules/:id", async (req: Request, res: Response) => {
+  try {
+    const rawId = req.params.id;
+    const id: string | null = typeof rawId === "string" ? rawId : Array.isArray(rawId) ? (rawId[0] ?? null) : null;
+    if (!id) return sendError(res, 400, "ID mancante");
+    const [deleted] = await db.delete(matchRules).where(eq(matchRules.id, id)).returning();
+    if (!deleted) return sendError(res, 404, "Regola non trovata");
+    invalidateMatchRulesCache();
+    return res.json({ ok: true, id });
+  } catch (err) {
+    console.error("[admin] DELETE /match-rules/:id error:", err);
+    return sendError(res, 500, "Errore eliminazione regola");
   }
 });
 

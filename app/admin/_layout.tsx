@@ -66,6 +66,7 @@ export default function AdminLayout() {
       <Stack.Screen name="text-aliases" options={{ title: "Alias Testo" }} />
       <Stack.Screen name="ai-moderation-stats" options={{ title: "Co-Pilot AI — Stats" }} />
       <Stack.Screen name="ai-moderation-settings" options={{ title: "Co-Pilot AI — Settings" }} />
+      <Stack.Screen name="ai-moderation-digest" options={{ title: "Co-Pilot AI — Digest" }} />
       <Stack.Screen name="db-integrity" options={{ title: "AI DB Integrity" }} />
       <Stack.Screen name="db-integrity-quarantine" options={{ title: "DB Integrity — Quarantena" }} />
       <Stack.Screen name="app-integrity" options={{ title: "AI App Integrity" }} />

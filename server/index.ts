@@ -324,6 +324,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI moderation schedulers failed (non-fatal):", e);
     }
 
+    // Task #2548 — Critical reports notifier (ogni 5 min).
+    try {
+      const { startCriticalReportsNotifier } = await import("./jobs/critical-reports-notifier");
+      startCriticalReportsNotifier();
+      console.log("[INIT] Critical reports notifier started");
+    } catch (e) {
+      console.warn("[INIT] Critical reports notifier failed (non-fatal):", e);
+    }
+
     // Task #2533 — AI System Watchdog scheduler.
     try {
       const { startWatchdogScheduler } = await import("./ai/watchdog/scheduler");

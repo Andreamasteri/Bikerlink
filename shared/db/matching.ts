@@ -612,3 +612,12 @@ export const updateMatchRuleSchema = z.object({
   message: "Nessun campo da aggiornare",
 });
 export type UpdateMatchRuleInput = z.infer<typeof updateMatchRuleSchema>;
+
+export const insertMatchRuleSchema = z.object({
+  searchTypeA: z.string().min(1).max(60),
+  searchTypeB: z.string().min(1).max(60),
+  compatible: z.boolean().default(true),
+  weight: z.number().finite().min(0).max(100).default(1),
+  notes: z.string().max(500).optional().nullable(),
+});
+export type InsertMatchRuleInput = z.infer<typeof insertMatchRuleSchema>;

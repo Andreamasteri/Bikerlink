@@ -3,7 +3,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
 import { sql } from "drizzle-orm";
-import { moderatorLogs, motoClubs, motoClubRequests } from "@shared/db";
+import { motoClubs, motoClubRequests } from "@shared/db";
 import { workshopSchema, easterEggSchema, reportResolveSchema } from "@shared/validators";
 import { eq } from "drizzle-orm";
 import { massSeedFakeUsers, getMassSeedStatus } from "../../mass-seed";
