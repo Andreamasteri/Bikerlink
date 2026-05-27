@@ -53,6 +53,12 @@ export const proposals = pgTable("proposals", {
   index("proposals_user_id_idx").on(table.userId),
   index("proposals_status_idx").on(table.status),
   index("proposals_expires_at_idx").on(table.expiresAt),
+  index("proposals_scheduled_at_idx").on(table.scheduledAt),
+  index("proposals_search_type_idx").on(table.searchType),
+  index("proposals_club_id_idx").on(table.clubId),
+  index("proposals_status_scheduled_idx").on(table.status, table.scheduledAt),
+  index("proposals_departure_lat_idx").on(table.departureLatitude),
+  index("proposals_departure_lng_idx").on(table.departureLongitude),
 ]);
 
 export const proposalParticipants = pgTable("proposal_participants", {

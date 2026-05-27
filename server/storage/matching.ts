@@ -1,6 +1,7 @@
 import { eq, and, or, sql, desc, asc, inArray, notInArray, isNull, isNotNull, lt } from "drizzle-orm";
 import { db } from "../db";
 import { systemAccountConditions } from "../lib/system-account-filter";
+import { PROTECTED_NICKNAMES } from "../constants";
 import {
   zavarrinaWishlists, zavarrinaWishlistPhotos, zavarrinaWishlistMotos,
   bikerZavarrinaMatches, users, userMotorcycles,
@@ -124,6 +125,74 @@ export class MatchingStorage extends ContestStorage {
       .innerJoin(users, eq(users.id, userMotorcycles.userId))
       .where(condition);
     return results;
+  }
+
+  /**
+   * SQL JOIN that returns only compatible wishlist↔garage pairs (brand match
+   * OR motorcycleType match, case-insensitive). All user-side filters
+   * (isFake/status/role/userType) and optional country filter are applied in
+   * SQL so the JS engine only iterates plausible candidates.
+   */
+  async getCompatibleWishlistGaragePairs(countries?: string[]): Promise<Array<{
+    wishlistMoto: import("@shared/db").ZavarrinaWishlistMoto;
+    motorcycle: import("@shared/db").UserMotorcycle;
+    zavarrinaId: string;
+    bikerId: string;
+  }>> {
+    const countryFilter = countries && countries.length > 0
+      ? sql`AND wu.country = ANY(${countries}::text[]) AND mu.country = ANY(${countries}::text[])`
+      : sql``;
+
+    const rows = await db.execute<any>(sql`
+      SELECT
+        w.id AS w_id, w.wishlist_id AS w_wishlist_id, w.brand AS w_brand,
+        w.model AS w_model, w.motorcycle_type AS w_motorcycle_type,
+        w.riding_style AS w_riding_style, w.created_at AS w_created_at,
+        m.id AS m_id, m.user_id AS m_user_id, m.brand AS m_brand,
+        m.model AS m_model, m.motorcycle_type AS m_motorcycle_type,
+        m.riding_style AS m_riding_style, m.year AS m_year,
+        m.engine_size AS m_engine_size, m.is_primary AS m_is_primary,
+        m.created_at AS m_created_at,
+        wl.user_id AS zavarrina_id,
+        m.user_id AS biker_id
+      FROM zavorrina_wishlist_motos w
+      INNER JOIN zavorrina_wishlists wl ON wl.id = w.wishlist_id
+      INNER JOIN users wu ON wu.id = wl.user_id
+      INNER JOIN user_motorcycles m ON (
+        (w.brand IS NOT NULL AND w.brand <> '' AND m.brand IS NOT NULL AND m.brand <> ''
+          AND LOWER(w.brand) = LOWER(m.brand))
+        OR
+        (w.motorcycle_type IS NOT NULL AND w.motorcycle_type <> ''
+          AND m.motorcycle_type IS NOT NULL AND m.motorcycle_type <> ''
+          AND LOWER(w.motorcycle_type) = LOWER(m.motorcycle_type))
+      )
+      INNER JOIN users mu ON mu.id = m.user_id
+      WHERE wu.status = 'active' AND wu.is_fake = false AND wu.role <> 'admin'
+        AND wu.ghost_mode = false
+        AND wu.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
+        AND mu.status = 'active' AND mu.is_fake = false AND mu.role <> 'admin'
+        AND mu.ghost_mode = false
+        AND mu.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
+        AND (mu.user_type = 'biker' OR mu.user_type = 'coppia')
+        AND wl.user_id <> m.user_id
+        ${countryFilter}
+    `);
+
+    return (rows.rows as any[]).map((r) => ({
+      zavarrinaId: r.zavarrina_id as string,
+      bikerId: r.biker_id as string,
+      wishlistMoto: {
+        id: r.w_id, wishlistId: r.w_wishlist_id, brand: r.w_brand,
+        model: r.w_model, motorcycleType: r.w_motorcycle_type,
+        ridingStyle: r.w_riding_style, createdAt: r.w_created_at,
+      } as unknown as import("@shared/db").ZavarrinaWishlistMoto,
+      motorcycle: {
+        id: r.m_id, userId: r.m_user_id, brand: r.m_brand, model: r.m_model,
+        motorcycleType: r.m_motorcycle_type, ridingStyle: r.m_riding_style,
+        year: r.m_year, engineSize: r.m_engine_size,
+        isPrimary: r.m_is_primary, createdAt: r.m_created_at,
+      } as unknown as import("@shared/db").UserMotorcycle,
+    }));
   }
 
   async createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch | null> {

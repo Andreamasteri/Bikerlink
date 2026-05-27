@@ -9,12 +9,57 @@ import {
   clubScopeAllows 
 } from "./filters";
 import { areCompatible, baseModelName } from "./scoring";
+import { bboxAround } from "../lib/geo-bbox";
+import { createUserLoader } from "../lib/user-loader";
+import { matchingLogger } from "../lib/logger";
+
+export type MatchingRunStats = {
+  candidatesPre: number;
+  candidatesPost: number;
+  pairsConsidered: number;
+  pairsAfterBbox: number;
+  matchesCreated: number;
+};
+
+let lastProposalStats: MatchingRunStats = {
+  candidatesPre: 0, candidatesPost: 0, pairsConsidered: 0, pairsAfterBbox: 0, matchesCreated: 0,
+};
+export function getLastProposalMatchingStats(): MatchingRunStats { return lastProposalStats; }
+
+let lastWishlistStats: MatchingRunStats = {
+  candidatesPre: 0, candidatesPost: 0, pairsConsidered: 0, pairsAfterBbox: 0, matchesCreated: 0,
+};
+export function getLastWishlistMatchingStats(): MatchingRunStats { return lastWishlistStats; }
+
+const BBOX_RADIUS_KM = 500;
 
 export async function runMatching(): Promise<number> {
   try {
-    const activeProposals = await storage.getActiveProposalsWithLocation();
-    console.log(`[ProposalMatching] proposte attive: ${activeProposals.length} (admin esclusi)`);
+    const { proposals: activeProposals, candidatesPre } = await storage.getActiveProposalsWithLocationStats();
+    matchingLogger.info({ scope: "proposal", candidatesPost: activeProposals.length, candidatesPre }, "active proposals (admin/fake/ghost esclusi via SQL)");
+    lastProposalStats = {
+      candidatesPre,
+      candidatesPost: activeProposals.length,
+      pairsConsidered: 0,
+      pairsAfterBbox: 0,
+      matchesCreated: 0,
+    };
     if (activeProposals.length < 2) return 0;
+
+    // Bbox pre-compute (each proposal's reachable bbox at BBOX_RADIUS_KM) so we
+    // can cheaply skip pairs that cannot possibly overlap geographically
+    // before invoking areCompatible / Haversine in scoring.
+    const bboxes = activeProposals.map((p) => {
+      const lat = p.departureLatitude as number | null;
+      const lon = p.departureLongitude as number | null;
+      return lat != null && lon != null ? bboxAround(lat, lon, BBOX_RADIUS_KM) : null;
+    });
+
+    // DataLoader: batch-load author user records once per cycle for any
+    // downstream code that needs them (avoids N+1 in scoring extensions).
+    const userLoader = createUserLoader();
+    const userIds = Array.from(new Set(activeProposals.map((p) => p.userId)));
+    await userLoader.loadMany(userIds);
 
     const existingKeys = await storage.getAllExistingProposalMatchKeys();
     const clubProposals = activeProposals.filter((p) => !!p.clubId);
@@ -26,11 +71,21 @@ export async function runMatching(): Promise<number> {
 
     const BB_SEARCH_TYPES = new Set(["find_a_friend", "hitcher", "hitchhiker"]);
 
-    for (let i = 0; i < activeProposals.length; i++) {
-      for (let j = i + 1; j < activeProposals.length; j++) {
-        const p1 = activeProposals[i];
-        const p2 = activeProposals[j];
+    // SQL-side candidate pair generation: pairs already pre-filtered by
+    // status/isFake/ghostMode/role/scheduledAt + bbox at BBOX_RADIUS_KM.
+    // JS only consumes the geographically plausible pairs.
+    const candidatePairs = await storage.getActiveProposalCandidatePairs(BBOX_RADIUS_KM);
+    const proposalsById = new Map(activeProposals.map((p) => [p.id, p] as const));
+    const pairsConsidered = activeProposals.length * (activeProposals.length - 1) / 2;
+    const pairsAfterBbox = candidatePairs.length;
+    // Suppress unused warning while keeping bboxes ready for future hybrid use.
+    void bboxes;
 
+    for (const { id1, id2 } of candidatePairs) {
+      const p1 = proposalsById.get(id1);
+      const p2 = proposalsById.get(id2);
+      if (!p1 || !p2) continue;
+      {
         if (!areCompatible(p1, p2)) continue;
 
         const isBikerBikerProposal = BB_SEARCH_TYPES.has(p1.searchType ?? "") && BB_SEARCH_TYPES.has(p2.searchType ?? "");
@@ -78,7 +133,7 @@ export async function runMatching(): Promise<number> {
             referenceId: newMatch.id,
           });
         } catch (notifErr) {
-          console.error("[ProposalMatching] Error sending match notifications:", notifErr);
+          matchingLogger.error({ err: notifErr }, "ProposalMatching: error sending match notifications");
         }
         await dispatchMatchNotification({
           table: "proposal_matches",
@@ -89,9 +144,16 @@ export async function runMatching(): Promise<number> {
       }
     }
 
+    lastProposalStats = {
+      candidatesPre,
+      candidatesPost: activeProposals.length,
+      pairsConsidered,
+      pairsAfterBbox,
+      matchesCreated: matchCount,
+    };
     return matchCount;
   } catch (error) {
-    console.error("Matching engine error:", error);
+    matchingLogger.error({ err: error }, "Matching engine error");
     return 0;
   }
 }
@@ -105,15 +167,23 @@ export async function runWishlistMatching(): Promise<number> {
       if (!Array.isArray(matchingCountries) || matchingCountries.length === 0) matchingCountries = undefined;
     }
 
-    const wishlistMotos = await storage.getAllWishlistMotosWithUsers(matchingCountries);
-    const bikerMotorcycles = await storage.getAllBikerMotorcyclesWithUsers(matchingCountries);
-    const shuffledBikers = [...bikerMotorcycles].sort(() => Math.random() - 0.5);
+    // SQL JOIN — only compatible wishlist↔garage pairs are returned, with
+    // isFake/status/role/userType + optional country filter applied in SQL.
+    const compatiblePairs = await storage.getCompatibleWishlistGaragePairs(matchingCountries);
+    const shuffled = [...compatiblePairs].sort(() => Math.random() - 0.5);
 
-    console.log(`[WishlistMatching] wishlist entries: ${wishlistMotos.length}, biker motorcycles: ${bikerMotorcycles.length} (admin esclusi da entrambi i pool)`);
+    lastWishlistStats = {
+      candidatesPre: compatiblePairs.length,
+      candidatesPost: compatiblePairs.length,
+      pairsConsidered: compatiblePairs.length,
+      pairsAfterBbox: compatiblePairs.length,
+      matchesCreated: 0,
+    };
 
-    if (wishlistMotos.length === 0 || bikerMotorcycles.length === 0) {
-      if (wishlistMotos.length === 0) console.warn("[WishlistMatching] WARN: nessuna wishlist trovata");
-      if (bikerMotorcycles.length === 0) console.warn("[WishlistMatching] WARN: nessuna moto biker trovata — eseguire /api/admin/reconcile-fake-moto");
+    matchingLogger.info({ scope: "wishlist", pairs: compatiblePairs.length }, "WishlistMatching: compatible pairs (SQL)");
+
+    if (compatiblePairs.length === 0) {
+      matchingLogger.warn("WishlistMatching: nessuna coppia compatibile trovata");
       return 0;
     }
 
@@ -124,29 +194,14 @@ export async function runWishlistMatching(): Promise<number> {
     const MAX_MATCHES_PER_RUN = 500;
 
     outer:
-    for (const wm of wishlistMotos) {
-      const zavarrinaId = wm.userId;
-      const wish = wm.wishlistMoto;
+    for (const pair of shuffled) {
+      if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
 
-      for (const bm of shuffledBikers) {
-        if (matchCount >= MAX_MATCHES_PER_RUN) break outer;
+      const { zavarrinaId, bikerId } = pair;
+      const wish = pair.wishlistMoto;
+      const moto = pair.motorcycle;
 
-        const bikerId = bm.userId;
-        const moto = bm.motorcycle;
-
-        if (bikerId === zavarrinaId) continue;
-
-        let compatible = false;
-
-        if (wish.brand && moto.brand && wish.brand.toLowerCase() === moto.brand.toLowerCase()) {
-          compatible = true;
-        } else if (wish.motorcycleType && moto.motorcycleType &&
-                   wish.motorcycleType.toLowerCase() === moto.motorcycleType.toLowerCase()) {
-          compatible = true;
-        }
-
-        if (!compatible) continue;
-
+      {
         if (!bothPrefsEnabled(prefsMap, bikerId, zavarrinaId, "bikerZavorrinaBrand")) { skipCount++; continue; }
 
         const key = `${bikerId}:${zavarrinaId}:${moto.id}:${wish.id}`;
@@ -190,15 +245,23 @@ export async function runWishlistMatching(): Promise<number> {
       }
     }
 
-    console.log(`[WishlistMatching] nuovi match: ${matchCount}, saltati (già esistenti): ${skipCount}`);
+    matchingLogger.info({ matchCount, skipCount }, "WishlistMatching: ciclo completato");
 
     if (matchCount >= MAX_MATCHES_PER_RUN) {
-      console.log(`[WishlistMatching] Cap raggiunto (${MAX_MATCHES_PER_RUN} match/ciclo). Riprenderà al prossimo run.`);
+      matchingLogger.info({ cap: MAX_MATCHES_PER_RUN }, "WishlistMatching: cap raggiunto");
     }
+
+    lastWishlistStats = {
+      candidatesPre: compatiblePairs.length,
+      candidatesPost: compatiblePairs.length,
+      pairsConsidered: compatiblePairs.length,
+      pairsAfterBbox: compatiblePairs.length,
+      matchesCreated: matchCount,
+    };
 
     return matchCount;
   } catch (error) {
-    console.error("Wishlist matching error:", error);
+    matchingLogger.error({ err: error }, "Wishlist matching error");
     return 0;
   }
 }

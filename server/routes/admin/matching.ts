@@ -10,6 +10,8 @@ import {
   runUserTimeProfileJob,
   isTimeProfileJobRunning,
 } from "../../matching/time-profile";
+import { getAggregate, getRecentCycles } from "../../matching/perf-metrics";
+import { adminMatchingRateLimiter } from "../../lib/rate-limiters";
 import { storage } from "../../storage";
 import {
   captureSchemaSnapshot,
@@ -19,6 +21,9 @@ import {
 } from "../../scripts/snapshot-schema";
 
 const router = Router();
+
+// Apply rate limiter to ALL admin matching routes (Task #2509).
+router.use(adminMatchingRateLimiter);
 
 const MATCH_TYPES: Array<{
   id: number;
@@ -502,6 +507,26 @@ router.get("/matching/lock-state", async (_req: Request, res: Response) => {
     return res.json(getMatchingLockState());
   } catch (_error) {
     return sendError(res, 500, "Errore lettura lock state");
+  }
+});
+
+router.get("/matching/perf", async (req: Request, res: Response) => {
+  try {
+    const limitRaw = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : NaN;
+    const limit = Number.isFinite(limitRaw) ? Math.min(Math.max(limitRaw, 1), 50) : 20;
+    const aggregate = getAggregate();
+    const cycles = getRecentCycles(limit);
+    return sendSuccess(res, {
+      aggregate,
+      cycles,
+      lock: getMatchingLockState(),
+      memory: {
+        rssBytes: process.memoryUsage().rss,
+      },
+    });
+  } catch (error) {
+    console.error("[admin/matching/perf] error:", error);
+    return sendError(res, 500, "Errore lettura metriche matching");
   }
 });
 

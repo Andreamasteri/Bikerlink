@@ -1,6 +1,7 @@
 import { eq, and, or, sql, desc, lte, lt, inArray, isNull, isNotNull } from "drizzle-orm";
 import { db } from "../db";
 import { systemAccountConditions } from "../lib/system-account-filter";
+import { PROTECTED_NICKNAMES } from "../constants";
 import {
   proposals, proposalParticipants, proposalMatches, users,
   type Proposal, type InsertProposal,
@@ -56,12 +57,68 @@ export class ProposalsStorage extends ConversationsStorage {
       .innerJoin(users, eq(users.id, proposals.userId))
       .where(and(
         eq(proposals.status, "active"),
+        eq(users.status, "active"),
+        eq(users.isFake, false),
+        eq(users.ghostMode, false),
         sql`${proposals.departureLatitude} IS NOT NULL`,
         sql`${proposals.departureLongitude} IS NOT NULL`,
         sql`${proposals.searchType} IS NOT NULL`,
+        sql`(${proposals.scheduledAt} IS NULL OR ${proposals.scheduledAt} >= NOW())`,
         ...systemAccountConditions(users),
       ));
     return results.map(r => r.proposal);
+  }
+
+  /**
+   * SQL self-join returning candidate proposal-pair IDs that pass the
+   * cheap bbox prefilter at maxRadiusKm. This pushes the O(n²) pair
+   * generation into the database (using lat/lng indexes) so JS only
+   * iterates over geographically plausible pairs.
+   */
+  async getActiveProposalCandidatePairs(maxRadiusKm: number): Promise<Array<{ id1: string; id2: string }>> {
+    const deltaLat = maxRadiusKm / 111;
+    const rows = await db.execute<{ id1: string; id2: string }>(sql`
+      SELECT p1.id AS id1, p2.id AS id2
+      FROM proposals p1
+      INNER JOIN users u1 ON u1.id = p1.user_id
+      INNER JOIN proposals p2 ON p2.id > p1.id
+      INNER JOIN users u2 ON u2.id = p2.user_id
+      WHERE p1.status = 'active' AND p2.status = 'active'
+        AND u1.status = 'active' AND u2.status = 'active'
+        AND u1.is_fake = false AND u2.is_fake = false
+        AND u1.ghost_mode = false AND u2.ghost_mode = false
+        AND u1.role <> 'admin' AND u2.role <> 'admin'
+        AND u1.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
+        AND u2.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
+        AND p1.departure_latitude IS NOT NULL AND p1.departure_longitude IS NOT NULL
+        AND p2.departure_latitude IS NOT NULL AND p2.departure_longitude IS NOT NULL
+        AND p1.search_type IS NOT NULL AND p2.search_type IS NOT NULL
+        AND (p1.scheduled_at IS NULL OR p1.scheduled_at >= NOW())
+        AND (p2.scheduled_at IS NULL OR p2.scheduled_at >= NOW())
+        AND ABS(p1.departure_latitude - p2.departure_latitude) <= ${deltaLat}
+        AND ABS(p1.departure_longitude - p2.departure_longitude)
+              <= ${deltaLat} / GREATEST(COS(RADIANS(p1.departure_latitude)), 0.01)
+    `);
+    return (rows.rows as Array<{ id1: string; id2: string }>);
+  }
+
+  /**
+   * Same as getActiveProposalsWithLocation but also reports the unfiltered
+   * candidate count (proposals with status=active before user-side filters).
+   * Used by matching perf metrics to track candidatesPre vs candidatesPost.
+   */
+  async getActiveProposalsWithLocationStats(): Promise<{ proposals: Proposal[]; candidatesPre: number }> {
+    const preRows = await db
+      .select({ id: proposals.id })
+      .from(proposals)
+      .where(and(
+        eq(proposals.status, "active"),
+        sql`${proposals.departureLatitude} IS NOT NULL`,
+        sql`${proposals.departureLongitude} IS NOT NULL`,
+        sql`${proposals.searchType} IS NOT NULL`,
+      ));
+    const filtered = await this.getActiveProposalsWithLocation();
+    return { proposals: filtered, candidatesPre: preRows.length };
   }
 
   async getProposalMatches(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<ProposalMatch[]> {

@@ -71,6 +71,14 @@ export interface IStorage {
   upsertUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile>;
   getProposals(filters?: { status?: string }): Promise<Proposal[]>;
   getActiveProposalsWithLocation(): Promise<Proposal[]>;
+  getActiveProposalsWithLocationStats(): Promise<{ proposals: Proposal[]; candidatesPre: number }>;
+  getActiveProposalCandidatePairs(maxRadiusKm: number): Promise<Array<{ id1: string; id2: string }>>;
+  getCompatibleWishlistGaragePairs(countries?: string[]): Promise<Array<{
+    wishlistMoto: import("@shared/db").ZavarrinaWishlistMoto;
+    motorcycle: import("@shared/db").UserMotorcycle;
+    zavarrinaId: string;
+    bikerId: string;
+  }>>;
   getProposal(id: string): Promise<Proposal | undefined>;
   createProposal(proposal: InsertProposal): Promise<Proposal>;
   updateProposal(id: string, data: Partial<InsertProposal>): Promise<Proposal | undefined>;

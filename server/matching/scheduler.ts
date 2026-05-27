@@ -2,7 +2,7 @@ import { db } from "../db";
 import { storage } from "../storage";
 import { proposals, proposalZoneNotifications, proposalProfileMatches, type Proposal } from "@shared/db";
 import { eq, sql, lt } from "drizzle-orm";
-import { runMatching, runWishlistMatching } from "./run-matching";
+import { runMatching, runWishlistMatching, getLastProposalMatchingStats, getLastWishlistMatchingStats } from "./run-matching";
 import { runBikerBikerMatching, runBikerBikerTypeStyleMatching } from "./run-biker";
 import { runClubBrandMatching } from "./run-clubs";
 import { runMusicMatchBikerZavarrina, runGpsBasedMatching, runEventMatching, runBikerZavarrinaTypeStyleMatching } from "./run-extra";
@@ -13,6 +13,9 @@ import { runProposalToProfileMatching } from "./run-profile";
 import { runProposalZoneNotifications, runProposalMatchingForUser } from "./run-proposals";
 import { runMatchingForUser } from "./run-user";
 import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
+import { PhaseRecorder } from "./perf-metrics";
+import { schedulerLogger } from "../lib/logger";
+import { prettyMs, memoryRssPretty } from "../lib/format";
 
 const MATCH_DEBOUNCE_MS = 10_000;
 
@@ -187,93 +190,74 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
   lastMatchingStart = Date.now();
 
   (async () => {
-    const cycleStart = Date.now();
-    console.log("[Matching] Ciclo on-demand avviato");
+    const recorder = new PhaseRecorder("on-demand");
+    schedulerLogger.info({ event: "cycle_start", trigger: "on-demand" }, "Ciclo on-demand avviato");
+
+    let totalMatches = 0;
+    let garageMatches = 0;
+    let bikerBikerMatchCount = 0;
 
     try {
-      const expired = await runCleanup();
-      if (expired > 0) console.log(`[Matching] Scadute ${expired} proposte`);
+      const expired = await recorder.time("cleanup_expire", () => runCleanup());
+      if (expired > 0) schedulerLogger.info({ expired }, "Scadute proposte");
 
       try {
-        const deleted = await storage.deleteExpiredProposals();
-        if (deleted > 0) console.log(`[Matching] Eliminate ${deleted} proposte scadute`);
+        const deleted = await recorder.time("cleanup_delete_expired", () => storage.deleteExpiredProposals());
+        if (deleted > 0) schedulerLogger.info({ deleted }, "Eliminate proposte scadute");
       } catch (err) {
-        console.error("[Matching] Errore eliminazione proposte scadute:", err);
+        schedulerLogger.error({ err }, "Errore eliminazione proposte scadute");
       }
 
       const autoMatchSetting = await storage.getAppSetting("auto_matching_enabled");
       const autoMatchEnabled = autoMatchSetting?.value !== "false";
 
-      let garageMatches = 0;
-      let bikerBikerMatchCount = 0;
-
       if (autoMatchEnabled) {
-        const matches = await runMatching();
-        if (matches > 0) console.log(`[Matching] Found ${matches} new proposal matches`);
+        const matches = await recorder.time("proposal_matching", () => runMatching());
+        const propStats = getLastProposalMatchingStats();
+        recorder.updateLastPhase({
+          candidatesPre: propStats.candidatesPre,
+          candidatesPost: propStats.candidatesPost,
+          matchesCreated: propStats.matchesCreated,
+        });
+        totalMatches += matches;
+        if (matches > 0) schedulerLogger.info({ matches, ...propStats }, "new proposal matches");
 
-        garageMatches = await runWishlistMatching();
-        if (garageMatches > 0) console.log(`[Matching] Found ${garageMatches} new garage matches`);
+        garageMatches = await recorder.time("wishlist_matching", () => runWishlistMatching());
+        const wishStats = getLastWishlistMatchingStats();
+        recorder.updateLastPhase({
+          candidatesPre: wishStats.candidatesPre,
+          candidatesPost: wishStats.candidatesPost,
+          matchesCreated: wishStats.matchesCreated,
+        });
+        totalMatches += garageMatches;
+        if (garageMatches > 0) schedulerLogger.info({ garageMatches, ...wishStats }, "new garage matches");
 
-        bikerBikerMatchCount = await runBikerBikerMatching();
-        if (bikerBikerMatchCount > 0) console.log(`[Matching] Found ${bikerBikerMatchCount} new biker-biker matches`);
+        bikerBikerMatchCount = await recorder.time("biker_biker_matching", () => runBikerBikerMatching());
+        totalMatches += bikerBikerMatchCount;
+        if (bikerBikerMatchCount > 0) schedulerLogger.info({ bikerBikerMatchCount }, "new biker-biker matches");
 
-        try {
-          const typeStyleCount = await runBikerBikerTypeStyleMatching();
-          if (typeStyleCount > 0) console.log(`[Matching] Found ${typeStyleCount} new type-style matches`);
-        } catch (err) {
-          console.error("[Matching] TypeStyle matching error (non-blocking):", err);
-        }
+        const safePhases: Array<[string, () => Promise<number | void>]> = [
+          ["biker_biker_type_style", runBikerBikerTypeStyleMatching],
+          ["club_brand", runClubBrandMatching],
+          ["music_biker_zav", runMusicMatchBikerZavarrina],
+          ["gps_based", runGpsBasedMatching],
+          ["event_matching", runEventMatching],
+          ["biker_zav_type_style", runBikerZavarrinaTypeStyleMatching],
+          ["distance_matching", runDistanceMatching],
+          ["route_type_zone", runRouteTypeZoneMatching],
+          ["proposal_to_profile", runProposalToProfileMatching],
+        ];
 
-        try {
-          await runClubBrandMatching();
-        } catch (err) {
-          console.error("[Matching] ClubBrand matching error (non-blocking):", err);
-        }
-
-        try {
-          await runMusicMatchBikerZavarrina();
-        } catch (err) {
-          console.error("[Matching] MusicBikerZav matching error (non-blocking):", err);
-        }
-
-        try {
-          await runGpsBasedMatching();
-        } catch (err) {
-          console.error("[Matching] GpsBased matching error (non-blocking):", err);
-        }
-
-        try {
-          await runEventMatching();
-        } catch (err) {
-          console.error("[Matching] Event matching error (non-blocking):", err);
-        }
-
-        try {
-          const zavTypeStyleCount = await runBikerZavarrinaTypeStyleMatching();
-          if (zavTypeStyleCount > 0) console.log(`[Matching] Found ${zavTypeStyleCount} new zav type-style matches`);
-        } catch (err) {
-          console.error("[Matching] ZavTypeStyle matching error (non-blocking):", err);
-        }
-
-        try {
-          const distCount = await runDistanceMatching();
-          if (distCount > 0) console.log(`[Matching] Found ${distCount} new distance matches`);
-        } catch (err) {
-          console.error("[Matching] Distance matching error (non-blocking):", err);
-        }
-
-        try {
-          const zoneCount = await runRouteTypeZoneMatching();
-          if (zoneCount > 0) console.log(`[Matching] Found ${zoneCount} new route-zone matches`);
-        } catch (err) {
-          console.error("[Matching] RouteTypeZone matching error (non-blocking):", err);
-        }
-
-        try {
-          const ppCount = await runProposalToProfileMatching();
-          if (ppCount > 0) console.log(`[Matching] Found ${ppCount} new proposal-profile matches`);
-        } catch (err) {
-          console.error("[Matching] ProposalProfile matching error (non-blocking):", err);
+        for (const [name, fn] of safePhases) {
+          try {
+            const count = await recorder.time(name, async () => (await fn()) ?? 0);
+            if (typeof count === "number" && count > 0) {
+              totalMatches += count;
+              schedulerLogger.info({ phase: name, count }, "phase produced matches");
+            }
+          } catch (err) {
+            schedulerLogger.error({ err, phase: name }, "phase failed (non-blocking)");
+          }
         }
 
         try {
@@ -287,20 +271,24 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
           console.error("[Matching] RouteAffinity matching error (non-blocking):", err);
         }
       } else {
-        console.log("[Matching] Auto matching disabilitato dall'admin, skip");
+        schedulerLogger.info("Auto matching disabilitato dall'admin, skip");
       }
 
-      const cycleDuration = Date.now() - cycleStart;
+      const cycleMetric = recorder.finish(totalMatches);
       lastCycleMeta = {
-        completedAt: new Date().toISOString(),
-        durationMs: cycleDuration,
+        completedAt: cycleMetric.completedAt,
+        durationMs: cycleMetric.durationMs,
         zavarrinaMatchesNew: garageMatches,
         bikerBikerMatchesNew: bikerBikerMatchCount,
       };
 
-      console.log(`[Matching] Ciclo on-demand completato in ${(cycleDuration / 1000).toFixed(1)}s`);
+      schedulerLogger.info(
+        { duration: prettyMs(cycleMetric.durationMs), totalMatches, rss: memoryRssPretty() },
+        "Ciclo on-demand completato"
+      );
     } catch (err) {
-      console.error("[Matching] Errore nel ciclo on-demand:", err);
+      schedulerLogger.error({ err }, "Errore nel ciclo on-demand");
+      recorder.finish(totalMatches);
     } finally {
       isMatchingRunning = false;
     }

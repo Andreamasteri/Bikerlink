@@ -1,6 +1,7 @@
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import compression from "compression";
+import helmet from "helmet";
 import * as path from "path";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -126,14 +127,17 @@ export function setupMiddleware(app: express.Application) {
   // Compression
   app.use(compression());
 
-  // Security headers
-  app.use((_req, res, next) => {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("X-Frame-Options", "DENY");
-    res.setHeader("X-XSS-Protection", "1; mode=block");
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-    next();
-  });
+  // Security headers — helmet replaces the previous manual setHeader block.
+  // contentSecurityPolicy is disabled because we serve mixed assets/landing pages
+  // that would otherwise need a bespoke directive set; the existing X-Frame-Options,
+  // X-Content-Type-Options, Referrer-Policy, and HSTS protections remain in place
+  // and crossOriginEmbedderPolicy is off to keep Expo asset hosting working.
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  }));
 }
 
 export function setupStaticRoutes(app: express.Application) {

@@ -57,7 +57,14 @@ export const users = pgTable("users", {
   lastSeenMatchAt: timestamp("last_seen_match_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("users_status_idx").on(table.status),
+  index("users_is_fake_idx").on(table.isFake),
+  index("users_ghost_mode_idx").on(table.ghostMode),
+  index("users_country_idx").on(table.country),
+  index("users_user_type_idx").on(table.userType),
+  index("users_active_pool_idx").on(table.status, table.isFake, table.ghostMode),
+]);
 
 export const userPhotos = pgTable("user_photos", {
   id: varchar("id", { length: 36 })
@@ -95,6 +102,9 @@ export const userMotorcycles = pgTable("user_motorcycles", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("user_motorcycles_user_id_idx").on(table.userId),
+  index("user_motorcycles_brand_idx").on(table.brand),
+  index("user_motorcycles_brand_model_idx").on(table.brand, table.model),
+  index("user_motorcycles_type_idx").on(table.motorcycleType),
 ]);
 
 export const userProfiles = pgTable("user_profiles", {
@@ -157,6 +167,10 @@ export const userProfiles = pgTable("user_profiles", {
 }, (table) => [
   index("user_profiles_user_id_idx").on(table.userId),
   index("user_profiles_location_idx").on(table.latitude, table.longitude),
+  index("user_profiles_latitude_idx").on(table.latitude),
+  index("user_profiles_longitude_idx").on(table.longitude),
+  index("user_profiles_coords_updated_idx").on(table.coordinatesUpdatedAt),
+  index("user_profiles_is_available_idx").on(table.isAvailable),
 ]);
 
 export const userDevices = pgTable("user_devices", {

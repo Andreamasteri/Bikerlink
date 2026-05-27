@@ -10,7 +10,6 @@ import {
   jsonb,
   index,
   uniqueIndex,
-  jsonb,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { users, userMotorcycles } from "./users";
@@ -52,7 +51,12 @@ export const zavarrinaWishlistMotos = pgTable("zavorrina_wishlist_motos", {
   motorcycleType: varchar("motorcycle_type", { length: 50 }),
   ridingStyle: varchar("riding_style", { length: 50 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("wishlist_motos_wishlist_idx").on(table.wishlistId),
+  index("wishlist_motos_brand_idx").on(table.brand),
+  index("wishlist_motos_brand_model_idx").on(table.brand, table.model),
+  index("wishlist_motos_type_idx").on(table.motorcycleType),
+]);
 
 export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
   id: varchar("id", { length: 36 })

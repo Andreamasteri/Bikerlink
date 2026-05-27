@@ -4,6 +4,7 @@ import { z } from "zod";
 import { storage } from "../storage";
 import { sendEmail } from "../email";
 import { reportRateLimiter, getTrustedClientIp } from "../lib/abuse-rate-limit";
+import { reportsRateLimiter } from "../lib/rate-limiters";
 
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 
@@ -67,7 +68,7 @@ const createReportSchema = z.object({
   description: z.string().max(DESCRIPTION_MAX_LEN, `La descrizione non può superare ${DESCRIPTION_MAX_LEN} caratteri`).optional(),
 });
 
-router.post("/", async (req: Request, res: Response) => {
+router.post("/", reportsRateLimiter, async (req: Request, res: Response) => {
   try {
     const userId = requireUserId(req, res);
     if (!userId) return;
