@@ -28,6 +28,7 @@ import { BlacklistCard } from "@/components/match/tabs/BlacklistCard";
 import { MusicMatchCard } from "@/components/match/tabs/MusicMatchCard";
 import { MatchCardStack } from "@/components/match/tabs/MatchCardStack";
 import { MatchFiltersPanel } from "@/components/match/tabs/MatchFiltersPanel";
+import { NegativeSuggestionsCard } from "@/components/match/tabs/NegativeSuggestionsCard";
 
 export default function MatchScreen() {
   const router = useRouter();
@@ -667,6 +668,8 @@ export default function MatchScreen() {
       />
 
       <TabBar activeTab={activeTab} setActiveTab={setActiveTab} tabs={tabs} />
+
+      <NegativeSuggestionsCard />
 
       <BikerInfoBanner visible={activeTab === "biker"} />
 

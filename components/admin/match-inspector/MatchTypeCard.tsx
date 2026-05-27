@@ -30,6 +30,9 @@ interface MatchTypeCardProps {
   onToggle: () => void;
   formatDate: (iso: string) => string;
   statusColor: (status: string) => string;
+  // Task #2546 — passati a MatchListItem per abilitare "Spiega match"
+  currentUserId?: string;
+  currentNickname?: string;
 }
 
 export const MatchTypeCard: React.FC<MatchTypeCardProps> = ({
@@ -38,6 +41,8 @@ export const MatchTypeCard: React.FC<MatchTypeCardProps> = ({
   onToggle,
   formatDate,
   statusColor,
+  currentUserId,
+  currentNickname,
 }) => {
   const badgeColor = section.disabled
     ? Colors.textSecondary
@@ -88,6 +93,8 @@ export const MatchTypeCard: React.FC<MatchTypeCardProps> = ({
                 match={match}
                 formatDate={formatDate}
                 statusColor={statusColor}
+                currentUserId={currentUserId}
+                currentNickname={currentNickname}
               />
             ))
           )}

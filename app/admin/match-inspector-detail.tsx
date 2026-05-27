@@ -175,6 +175,8 @@ export default function MatchInspectorDetailScreen() {
           onToggle={() => toggleType(section.typeKey)}
           formatDate={formatDate}
           statusColor={statusColor}
+          currentUserId={userId}
+          currentNickname={user.nickname}
         />
       ))}
     </ScrollView>

@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, Image, StyleSheet } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import Colors from "@/constants/colors";
 
 interface MatchItem {
@@ -28,11 +29,47 @@ interface MatchListItemProps {
   match: MatchItem;
   formatDate: (iso: string) => string;
   statusColor: (status: string) => string;
+  // Task #2546 — quando presente, abilita navigazione al pannello explain
+  // pairwise (BioAffinityCard + breakdown). Senza queste props la riga resta
+  // un View statico (retro-compat).
+  currentUserId?: string;
+  currentNickname?: string;
 }
 
-export const MatchListItem: React.FC<MatchListItemProps> = ({ match, formatDate, statusColor }) => {
+export const MatchListItem: React.FC<MatchListItemProps> = ({
+  match,
+  formatDate,
+  statusColor,
+  currentUserId,
+  currentNickname,
+}) => {
+  const canExplain = !!currentUserId;
+  const onPress = () => {
+    if (!canExplain) return;
+    router.push({
+      pathname: "/admin/match-explain" as never,
+      params: {
+        userA: currentUserId!,
+        userB: match.matchedUserId,
+        nickA: currentNickname ?? "",
+        nickB: match.matchedNickname,
+      },
+    });
+  };
+  const Container: React.ComponentType<{ children: React.ReactNode }> = canExplain
+    ? ({ children }) => (
+        <TouchableOpacity
+          style={styles.matchRow}
+          onPress={onPress}
+          activeOpacity={0.7}
+          testID={`match-row-${match.id}`}
+        >
+          {children}
+        </TouchableOpacity>
+      )
+    : ({ children }) => <View style={styles.matchRow}>{children}</View>;
   return (
-    <View style={styles.matchRow}>
+    <Container>
       {match.matchedAvatarUrl ? (
         <Image source={{ uri: match.matchedAvatarUrl }} style={styles.matchAvatar} />
       ) : (
@@ -79,7 +116,10 @@ export const MatchListItem: React.FC<MatchListItemProps> = ({ match, formatDate,
         </View>
       </View>
       <View style={[styles.statusDot, { backgroundColor: statusColor(match.status) }]} />
-    </View>
+      {canExplain && (
+        <Ionicons name="chevron-forward" size={14} color={Colors.textSecondary} />
+      )}
+    </Container>
   );
 };
 

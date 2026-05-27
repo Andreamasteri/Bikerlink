@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 import { getApiUrl } from "@/lib/query-client";
+import { DidYouMean } from "@/components/text-interpreter/DidYouMean";
 
 interface EditBasicInfoProps {
   nickname: string;
@@ -59,6 +60,11 @@ export function EditBasicInfo({
             onChangeText={setNickname}
             placeholderTextColor={Colors.textSecondary}
             maxLength={50}
+          />
+          <DidYouMean
+            value={nickname}
+            category="nickname"
+            onPick={setNickname}
           />
         </View>
 
