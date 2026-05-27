@@ -9,7 +9,12 @@ import {
   doublePrecision,
   index,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
+
+const geographyPoint = customType<{ data: string; notNull: false; default: false }>({
+  dataType() { return "geography(Point, 4326)"; },
+});
 import { z } from "zod";
 import { users } from "./users";
 import { motoClubs } from "./motoclubs";
@@ -27,6 +32,8 @@ export const events = pgTable("events", {
   locationName: varchar("location_name", { length: 300 }),
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
+  // Task #2510: PostGIS generated.
+  geom: geographyPoint("geom"),
   eventDate: timestamp("event_date").notNull(),
   eventTime: varchar("event_time", { length: 5 }),
   isRecurring: boolean("is_recurring").notNull().default(false),

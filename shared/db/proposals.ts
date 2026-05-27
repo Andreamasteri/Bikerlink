@@ -10,8 +10,14 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
+
+// Task #2510: PostGIS geography(Point, 4326), colonne generated.
+const geographyPoint = customType<{ data: string; notNull: false; default: false }>({
+  dataType() { return "geography(Point, 4326)"; },
+});
 
 export const proposals = pgTable("proposals", {
   id: varchar("id", { length: 36 })
@@ -34,6 +40,9 @@ export const proposals = pgTable("proposals", {
   destinationAddress: text("destination_address"),
   destinationLatitude: doublePrecision("destination_latitude"),
   destinationLongitude: doublePrecision("destination_longitude"),
+  // Task #2510: colonne PostGIS generated, mantenute in sync dal DB.
+  departureGeom: geographyPoint("departure_geom"),
+  destinationGeom: geographyPoint("destination_geom"),
   scheduledAt: timestamp("scheduled_at"),
   departureTimeFrom: timestamp("departure_time_from"),
   departureTimeTo: timestamp("departure_time_to"),

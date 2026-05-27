@@ -503,6 +503,75 @@ router.post("/matching/force-unlock", async (_req: Request, res: Response) => {
   }
 });
 
+/**
+ * Task #2510 — Verifica indici geografici PostGIS.
+ * Esegue una query di prova "utenti entro 50 km da Milano" sull'indice GIST
+ * di `user_profiles.geom` e riporta tempo + numero risultati + EXPLAIN ANALYZE
+ * (abbreviato) per confermare l'uso dell'indice spaziale.
+ */
+router.get("/matching/geo-check", async (req: Request, res: Response) => {
+  try {
+    const lat = req.query.lat != null ? parseFloat(String(req.query.lat)) : 45.4642;  // Milano
+    const lon = req.query.lon != null ? parseFloat(String(req.query.lon)) : 9.1900;
+    const radiusKm = req.query.radiusKm != null ? parseFloat(String(req.query.radiusKm)) : 50;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(radiusKm) || radiusKm <= 0) {
+      return sendError(res, 400, "Parametri lat/lon/radiusKm non validi");
+    }
+    const radiusMeters = radiusKm * 1000;
+
+    const postgisVersionRes = await db.execute<{ version: string }>(
+      sql`SELECT PostGIS_Version() AS version`
+    );
+    const postgisVersion = postgisVersionRes.rows[0]?.version ?? null;
+
+    const start = Date.now();
+    const countRes = await db.execute<{ cnt: string }>(sql`
+      SELECT COUNT(*)::text AS cnt
+      FROM user_profiles
+      WHERE geom IS NOT NULL
+        AND ST_DWithin(
+          geom,
+          ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)::geography,
+          ${radiusMeters}
+        )
+    `);
+    const elapsedMs = Date.now() - start;
+    const matched = parseInt(countRes.rows[0]?.cnt ?? "0", 10);
+
+    const explainRes = await db.execute<{ "QUERY PLAN": string }>(sql`
+      EXPLAIN (ANALYZE, BUFFERS, FORMAT TEXT)
+      SELECT user_id FROM user_profiles
+      WHERE geom IS NOT NULL
+        AND ST_DWithin(
+          geom,
+          ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)::geography,
+          ${radiusMeters}
+        )
+    `);
+    const planLines = explainRes.rows.map((r) => r["QUERY PLAN"]);
+    const usesGistIndex = planLines.some((l) => /Index .*Scan.*user_profiles_geom_gist|Bitmap Index Scan on user_profiles_geom_gist/i.test(l));
+
+    const indexes = await db.execute<{ tablename: string; indexname: string }>(sql`
+      SELECT tablename, indexname FROM pg_indexes
+      WHERE indexname LIKE '%geom_gist%'
+      ORDER BY tablename, indexname
+    `);
+
+    return sendSuccess(res, {
+      postgisVersion,
+      query: { lat, lon, radiusKm },
+      matched,
+      elapsedMs,
+      usesGistIndex,
+      gistIndexes: indexes.rows,
+      explain: planLines,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return sendError(res, 500, `Errore geo-check PostGIS: ${message}`);
+  }
+});
+
 router.get("/matching/lock-state", async (_req: Request, res: Response) => {
   try {
     return res.json(getMatchingLockState());

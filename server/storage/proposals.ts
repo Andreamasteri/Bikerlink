@@ -70,13 +70,14 @@ export class ProposalsStorage extends ConversationsStorage {
   }
 
   /**
-   * SQL self-join returning candidate proposal-pair IDs that pass the
-   * cheap bbox prefilter at maxRadiusKm. This pushes the O(n²) pair
-   * generation into the database (using lat/lng indexes) so JS only
-   * iterates over geographically plausible pairs.
+   * SQL self-join returning candidate proposal-pair IDs entro maxRadiusKm.
+   * Task #2510: usa PostGIS `ST_DWithin` sull'indice GIST `departure_geom`
+   * (geography Point 4326), che è O(log n) per coppia anziché O(1) ma con
+   * il pre-filtro bbox in JS. Sostituisce il vecchio bbox-prefilter su
+   * `departure_latitude` / `departure_longitude` (delta deg + cos(lat)).
    */
   async getActiveProposalCandidatePairs(maxRadiusKm: number): Promise<Array<{ id1: string; id2: string }>> {
-    const deltaLat = maxRadiusKm / 111;
+    const radiusMeters = Math.max(0, maxRadiusKm) * 1000;
     const rows = await db.execute<{ id1: string; id2: string }>(sql`
       SELECT p1.id AS id1, p2.id AS id2
       FROM proposals p1
@@ -90,14 +91,12 @@ export class ProposalsStorage extends ConversationsStorage {
         AND u1.role <> 'admin' AND u2.role <> 'admin'
         AND u1.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
         AND u2.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
-        AND p1.departure_latitude IS NOT NULL AND p1.departure_longitude IS NOT NULL
-        AND p2.departure_latitude IS NOT NULL AND p2.departure_longitude IS NOT NULL
+        AND p1.departure_geom IS NOT NULL
+        AND p2.departure_geom IS NOT NULL
         AND p1.search_type IS NOT NULL AND p2.search_type IS NOT NULL
         AND (p1.scheduled_at IS NULL OR p1.scheduled_at >= NOW())
         AND (p2.scheduled_at IS NULL OR p2.scheduled_at >= NOW())
-        AND ABS(p1.departure_latitude - p2.departure_latitude) <= ${deltaLat}
-        AND ABS(p1.departure_longitude - p2.departure_longitude)
-              <= ${deltaLat} / GREATEST(COS(RADIANS(p1.departure_latitude)), 0.01)
+        AND ST_DWithin(p1.departure_geom, p2.departure_geom, ${radiusMeters})
     `);
     return (rows.rows as Array<{ id1: string; id2: string }>);
   }

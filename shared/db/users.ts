@@ -10,7 +10,16 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  customType,
 } from "drizzle-orm/pg-core";
+
+// Task #2510: tipo PostGIS `geography(Point, 4326)`. Drizzle non ha un tipo
+// nativo; usiamo customType che mappa la colonna come stringa WKT lato JS
+// (in pratica le query usano ST_DWithin / ST_MakePoint, non leggono il valore
+// raw). La colonna è GENERATED ALWAYS dal DB — non va mai impostata in INSERT.
+const geographyPoint = customType<{ data: string; notNull: false; default: false }>({
+  dataType() { return "geography(Point, 4326)"; },
+});
 import { z } from "zod";
 
 export const users = pgTable("users", {
@@ -163,6 +172,8 @@ export const userProfiles = pgTable("user_profiles", {
   mapFilters: jsonb("map_filters").$type<{ biker?: boolean; zavorrina?: boolean; clubs?: boolean; events?: boolean } | null>(),
   coordinatesUpdatedAt: timestamp("coordinates_updated_at"),
   adminOverrideUntil: timestamp("admin_override_until"),
+  // Task #2510: colonna PostGIS generata sempre da (longitude, latitude).
+  geom: geographyPoint("geom"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (table) => [
   index("user_profiles_user_id_idx").on(table.userId),

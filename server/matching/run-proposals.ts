@@ -1,8 +1,7 @@
 import { storage } from "../storage";
 import { db } from "../db";
-import { haversineDistance } from "../geo";
 import { proposalZoneNotifications, users, userProfiles, type Proposal } from "@shared/db";
-import { and, eq, isNotNull, gt } from "drizzle-orm";
+import { and, eq, isNotNull, gt, inArray, sql } from "drizzle-orm";
 import it from "../../lib/i18n/it";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
@@ -133,15 +132,17 @@ export async function runProposalZoneNotifications(proposal: Proposal): Promise<
       }
     }
 
-    const usersWithProfiles = await db
+    // Task #2510: PostGIS ST_DWithin sull'indice GIST `user_profiles.geom`
+    // sostituisce il loop Haversine in JS — il DB filtra in millisecondi
+    // anche con milioni di profili.
+    const radiusMeters = searchRadius * 1000;
+    const lon = proposal.departureLongitude!;
+    const lat = proposal.departureLatitude!;
+    const candidateRows = await db
       .select({
         userId: userProfiles.userId,
-        latitude: userProfiles.latitude,
-        longitude: userProfiles.longitude,
-        coordinatesUpdatedAt: userProfiles.coordinatesUpdatedAt,
         userType: users.userType,
         role: users.role,
-        status: users.status,
       })
       .from(userProfiles)
       .innerJoin(users, eq(userProfiles.userId, users.id))
@@ -151,22 +152,14 @@ export async function runProposalZoneNotifications(proposal: Proposal): Promise<
           isNotNull(userProfiles.longitude),
           gt(userProfiles.coordinatesUpdatedAt, sevenDaysAgo),
           eq(users.status, "active"),
+          sql`${userProfiles.geom} IS NOT NULL`,
+          sql`ST_DWithin(${userProfiles.geom}, ST_SetSRID(ST_MakePoint(${lon}, ${lat}), 4326)::geography, ${radiusMeters})`,
+          inArray(users.userType, targetUserTypes),
         )
       );
 
-    const candidateIds = usersWithProfiles
-      .filter((u) => {
-        if (u.userId === proposal.userId) return false;
-        if (u.role === "admin") return false;
-        if (!targetUserTypes.includes(u.userType || "")) return false;
-        const dist = haversineDistance(
-          proposal.departureLatitude!,
-          proposal.departureLongitude!,
-          u.latitude!,
-          u.longitude!
-        );
-        return dist <= searchRadius;
-      })
+    const candidateIds = candidateRows
+      .filter((u) => u.userId !== proposal.userId && u.role !== "admin")
       .map((u) => u.userId);
 
     if (candidateIds.length === 0) return;
