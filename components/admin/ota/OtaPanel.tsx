@@ -324,15 +324,15 @@ export default function OtaPanel() {
 
       <View style={[styles.directApplyRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <View style={styles.directApplyLeft}>
-          <Text style={[styles.directApplyLabel, { color: colors.text }]}>Applicazione Diretta</Text>
+          <Text style={[styles.directApplyLabel, { color: colors.text }]}>Approvazione admin</Text>
           {settingsLoading
             ? null
             : directApply
               ? <Text style={[styles.directApplyNote, { color: colors.success }]}>
-                  Attiva — le nuove OTA vengono promosse in production automaticamente
+                  Attiva — ricevi le OTA in stato pending su questo device per testarle prima dell'approvazione
                 </Text>
               : <Text style={[styles.directApplyNote, { color: colors.textSecondary }]}>
-                  Disattiva — le OTA richiedono approvazione manuale
+                  Disattiva — ricevi solo le OTA già approvate, come gli altri utenti
                 </Text>}
         </View>
         {settingsLoading

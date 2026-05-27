@@ -37,7 +37,9 @@ async function getDirectApplySetting(): Promise<boolean> {
     .from(appSettings)
     .where(eq(appSettings.key, "ota_direct_apply"))
     .limit(1);
-  return row?.value === "true";
+  // Default ON: gli admin ricevono le OTA pending per testarle prima dell'approvazione.
+  if (!row) return true;
+  return row.value === "true";
 }
 
 // Sincronizza il branch EAS `production` nel DB locale per tracking admin.
