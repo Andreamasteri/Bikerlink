@@ -761,4 +761,74 @@ router.post("/time-profile/run", async (_req: Request, res: Response) => {
   return sendSuccess(res, { started: true });
 });
 
+router.get("/weights-distribution", async (_req: Request, res: Response) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const fbRes = await client.query<{ feature_key: string; action: string; cnt: string }>(`
+        SELECT feature_key, action, COUNT(*) AS cnt
+        FROM match_feedback
+        GROUP BY feature_key, action
+      `);
+      const byFeature: Record<string, { accepts: number; rejects: number; ignores: number; total: number; acceptRate: number }> = {};
+      for (const row of fbRes.rows) {
+        const fk = row.feature_key;
+        if (!byFeature[fk]) byFeature[fk] = { accepts: 0, rejects: 0, ignores: 0, total: 0, acceptRate: 0 };
+        const n = parseInt(row.cnt, 10);
+        byFeature[fk].total += n;
+        if (row.action === "accept") byFeature[fk].accepts += n;
+        else if (row.action === "reject" || row.action === "block") byFeature[fk].rejects += n;
+        else if (row.action === "ignore") byFeature[fk].ignores += n;
+      }
+      for (const k of Object.keys(byFeature)) {
+        const v = byFeature[k];
+        const decisive = v.accepts + v.rejects;
+        v.acceptRate = decisive > 0 ? Math.round((v.accepts / decisive) * 1000) / 1000 : 0;
+      }
+
+      const profilesRes = await client.query<{
+        feedback_count: string;
+        weights: Record<string, number>;
+      }>(`
+        SELECT feedback_count, feature_weights AS weights FROM user_match_profile
+      `);
+      const totalProfiles = profilesRes.rows.length;
+      const profilesWithPersonalization = profilesRes.rows.filter(p => parseInt(p.feedback_count, 10) >= 10).length;
+
+      const weightAggregates: Record<string, { values: number[]; mean: number; min: number; max: number }> = {};
+      for (const row of profilesRes.rows) {
+        const w = row.weights || {};
+        for (const [fk, val] of Object.entries(w)) {
+          if (typeof val !== "number") continue;
+          if (!weightAggregates[fk]) weightAggregates[fk] = { values: [], mean: 0, min: val, max: val };
+          weightAggregates[fk].values.push(val);
+          if (val < weightAggregates[fk].min) weightAggregates[fk].min = val;
+          if (val > weightAggregates[fk].max) weightAggregates[fk].max = val;
+        }
+      }
+      for (const k of Object.keys(weightAggregates)) {
+        const vs = weightAggregates[k].values;
+        weightAggregates[k].mean = vs.length > 0
+          ? Math.round((vs.reduce((a, b) => a + b, 0) / vs.length) * 1000) / 1000
+          : 0;
+      }
+
+      return res.json({
+        totalProfiles,
+        profilesWithPersonalization,
+        coldStartThreshold: 10,
+        globalAcceptRates: byFeature,
+        personalWeightAggregates: Object.fromEntries(
+          Object.entries(weightAggregates).map(([k, v]) => [k, { mean: v.mean, min: v.min, max: v.max, sampleSize: v.values.length }]),
+        ),
+      });
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error("[admin] weights-distribution error:", error);
+    return sendError(res, 500, "Errore lettura distribuzione pesi matching");
+  }
+});
+
 export default router;

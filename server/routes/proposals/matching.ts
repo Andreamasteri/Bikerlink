@@ -10,6 +10,14 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 import { allLimited, matchEnrichmentSemaphore, SemaphoreQueueFullError } from "../../lib/concurrency";
 import { sendZoneMatchedPushNotifications } from "../../push-notifications";
 import { trackAbEvent } from "../../matching/ab";
+import {
+  recordMatchFeedbackFireAndForget,
+  featureKeyForBikerBucket,
+  featureKeyForKind,
+  explainMatchForUser,
+  getUserMatchProfile,
+  scoreMatchForUser,
+} from "../../matching/feedback";
 
 import { requireAuth } from "../../lib/auth-middleware";
 
@@ -205,7 +213,31 @@ router.get("/garage-matches", requireAuth, async (req: Request, res: Response) =
           }
         }
 
-        return res.json([...bestByUser.values()]);
+        const bestList = [...bestByUser.values()];
+
+        // Personalized re-ranking for garage matches.
+        try {
+          const profile = await getUserMatchProfile(userId);
+          const weights = (profile?.featureWeights as Record<string, number> | null) ?? null;
+          const feedbackCount = profile?.feedbackCount ?? 0;
+          const scored = bestList.map((m) => ({
+            m,
+            score: scoreMatchForUser({
+              weights,
+              feedbackCount,
+              featureKey: featureKeyForKind("garage"),
+              isSupermatch: !!m.isSupermatch,
+              recencyBoost: m.createdAt
+                ? Math.max(0, 1 - (Date.now() - new Date(m.createdAt).getTime()) / (7 * 24 * 60 * 60 * 1000))
+                : 0,
+            }),
+          }));
+          scored.sort((a, b) => b.score - a.score);
+          return res.json(scored.map((s) => ({ ...s.m, _personalScore: Math.round(s.score * 1000) / 1000 })));
+        } catch (rerankErr) {
+          console.warn("[garage-matches] personal rerank skipped:", rerankErr);
+          return res.json(bestList);
+        }
       } catch (error) {
         console.error("Get garage matches error:", error);
         return sendError(res, 500, "Errore interno del server");
@@ -238,6 +270,14 @@ router.post("/garage-matches/:id/accept", requireAuth, async (req: Request, res:
     }
     const updated = await storage.updateGarageMatch(matchId, { status: "accepted" });
     if (!updated) return sendError(res, 500, "Aggiornamento match fallito");
+    recordMatchFeedbackFireAndForget({
+      userId,
+      otherUserId: match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+      matchKind: "garage",
+      featureKey: featureKeyForKind("garage"),
+      action: "accept",
+      matchRefId: matchId,
+    });
     return res.json(updated);
   } catch (error) {
     console.error("Accept garage match error:", error instanceof Error ? error.message : error);
@@ -262,6 +302,14 @@ router.post("/garage-matches/:id/reject", requireAuth, async (req: Request, res:
     }
     const updated = await storage.updateGarageMatch(matchId, { status: "rejected" });
     if (!updated) return sendError(res, 500, "Aggiornamento match fallito");
+    recordMatchFeedbackFireAndForget({
+      userId,
+      otherUserId: match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+      matchKind: "garage",
+      featureKey: featureKeyForKind("garage"),
+      action: "reject",
+      matchRefId: matchId,
+    });
     return res.json(updated);
   } catch (error) {
     console.error("Reject garage match error:", error instanceof Error ? error.message : error);
@@ -353,6 +401,15 @@ router.post("/matches/:id/accept", requireAuth, async (req: Request, res: Respon
 
     const updated = await storage.updateProposalMatch(matchId, updateData);
 
+    recordMatchFeedbackFireAndForget({
+      userId,
+      otherUserId,
+      matchKind: "proposal",
+      featureKey: featureKeyForKind("proposal"),
+      action: "accept",
+      matchRefId: matchId,
+    });
+
     if (newAcceptedByUser1 && newAcceptedByUser2) {
       try {
         const proposalIds = [match.proposalId1, match.proposalId2].filter(Boolean) as string[];
@@ -411,6 +468,14 @@ router.post("/matches/:id/reject", requireAuth, async (req: Request, res: Respon
     }
 
     const updated = await storage.updateProposalMatch(matchId, { status: "rejected" });
+    recordMatchFeedbackFireAndForget({
+      userId,
+      otherUserId: match.userId1 === userId ? match.userId2 : match.userId1,
+      matchKind: "proposal",
+      featureKey: featureKeyForKind("proposal"),
+      action: "reject",
+      matchRefId: matchId,
+    });
     return res.json(updated);
   } catch (error) {
     console.error("Reject match error:", error);
@@ -502,7 +567,32 @@ router.get("/biker-matches", requireAuth, async (req: Request, res: Response) =>
           })
         );
 
-        return res.json(results.filter(Boolean));
+        const filtered = results.filter(Boolean) as NonNullable<(typeof results)[number]>[];
+
+        // Personalized re-ranking: apply per-user feature weights (cold start
+        // <10 feedback → neutral 1.0). Falls back silently on any error.
+        try {
+          const profile = await getUserMatchProfile(userId);
+          const weights = (profile?.featureWeights as Record<string, number> | null) ?? null;
+          const feedbackCount = profile?.feedbackCount ?? 0;
+          const scored = filtered.map((m) => ({
+            m,
+            score: scoreMatchForUser({
+              weights,
+              feedbackCount,
+              featureKey: featureKeyForBikerBucket(m.motorcycleBrand),
+              isSupermatch: !!m.isSupermatch,
+              recencyBoost: m.createdAt
+                ? Math.max(0, 1 - (Date.now() - new Date(m.createdAt).getTime()) / (7 * 24 * 60 * 60 * 1000))
+                : 0,
+            }),
+          }));
+          scored.sort((a, b) => b.score - a.score);
+          return res.json(scored.map((s) => ({ ...s.m, _personalScore: Math.round(s.score * 1000) / 1000 })));
+        } catch (rerankErr) {
+          console.warn("[biker-matches] personal rerank skipped:", rerankErr);
+          return res.json(filtered);
+        }
       } catch (error) {
         console.error("Get biker matches error:", error);
         return sendError(res, 500, "Errore interno del server");
@@ -530,6 +620,14 @@ router.post("/biker-matches/:id/accept", requireAuth, async (req: Request, res: 
     if (match.motorcycleBrand === "musica") {
       void trackAbEvent(userId, "bio_affinity_weight_v1", "match_accepted", { matchId });
     }
+    recordMatchFeedbackFireAndForget({
+      userId,
+      otherUserId: match.biker1Id === userId ? match.biker2Id : match.biker1Id,
+      matchKind: "biker",
+      featureKey: featureKeyForBikerBucket(match.motorcycleBrand),
+      action: "accept",
+      matchRefId: matchId,
+    });
     return res.json(updated);
   } catch (error) {
     console.error("Accept biker match error:", error);
@@ -549,6 +647,14 @@ router.post("/biker-matches/:id/reject", requireAuth, async (req: Request, res: 
     if (match.motorcycleBrand === "musica") {
       void trackAbEvent(userId, "bio_affinity_weight_v1", "match_rejected", { matchId });
     }
+    recordMatchFeedbackFireAndForget({
+      userId,
+      otherUserId: match.biker1Id === userId ? match.biker2Id : match.biker1Id,
+      matchKind: "biker",
+      featureKey: featureKeyForBikerBucket(match.motorcycleBrand),
+      action: "reject",
+      matchRefId: matchId,
+    });
     return res.json(updated);
   } catch (error) {
     console.error("Reject biker match error:", error);
@@ -650,6 +756,53 @@ router.delete("/route-affinity-matches/:id", requireAuth, async (req: Request, r
   }
 });
 
+router.get("/matches/:id/explain", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const matchId = req.params.id as string;
+    const kind = String(req.query.kind ?? "biker") as "biker" | "garage" | "proposal" | "propProfile";
+
+    let featureKey: string | null = null;
+    let isSupermatch = false;
+    let otherUserId: string | null = null;
+
+    if (kind === "biker") {
+      const m = await storage.getBikerBikerMatch(matchId);
+      if (!m) return sendError(res, 404, "Match non trovato");
+      if (m.biker1Id !== userId && m.biker2Id !== userId) return sendError(res, 403, "Non autorizzato");
+      featureKey = featureKeyForBikerBucket(m.motorcycleBrand);
+      isSupermatch = !!m.isSupermatch;
+      otherUserId = m.biker1Id === userId ? m.biker2Id : m.biker1Id;
+    } else if (kind === "garage") {
+      const m = await storage.getGarageMatch(matchId);
+      if (!m) return sendError(res, 404, "Match non trovato");
+      if (m.bikerId !== userId && m.zavarrinaId !== userId) return sendError(res, 403, "Non autorizzato");
+      featureKey = featureKeyForKind("garage");
+      otherUserId = m.bikerId === userId ? m.zavarrinaId : m.bikerId;
+    } else if (kind === "proposal") {
+      const m = await storage.getProposalMatch(matchId);
+      if (!m) return sendError(res, 404, "Match non trovato");
+      if (m.userId1 !== userId && m.userId2 !== userId) return sendError(res, 403, "Non autorizzato");
+      featureKey = featureKeyForKind("proposal");
+      otherUserId = m.userId1 === userId ? m.userId2 : m.userId1;
+    } else if (kind === "propProfile") {
+      const m = await storage.getProposalProfileMatch(matchId);
+      if (!m) return sendError(res, 404, "Match non trovato");
+      if (m.bikerId !== userId && m.zavarrinaId !== userId) return sendError(res, 403, "Non autorizzato");
+      featureKey = featureKeyForKind("propProfile");
+      otherUserId = m.bikerId === userId ? m.zavarrinaId : m.bikerId;
+    }
+
+    if (!featureKey) return sendError(res, 400, "Tipo match non valido");
+
+    const explanation = await explainMatchForUser({ userId, featureKey, isSupermatch });
+    return res.json({ ...explanation, otherUserId, kind });
+  } catch (error) {
+    console.error("Explain match error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
 router.post("/trigger-matching", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId as string;
@@ -703,6 +856,14 @@ router.post("/proposal-profile-matches/:id/accept", requireAuth, async (req: Req
     if (match.status !== "new") return sendError(res, 400, "Match già gestito");
 
     const updated = await storage.updateProposalProfileMatch(matchId, { status: "accepted" });
+    recordMatchFeedbackFireAndForget({
+      userId,
+      otherUserId: match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+      matchKind: "propProfile",
+      featureKey: featureKeyForKind("propProfile"),
+      action: "accept",
+      matchRefId: matchId,
+    });
     return res.json(updated);
   } catch (error) {
     console.error("Accept proposal-profile match error:", error);
@@ -721,6 +882,14 @@ router.post("/proposal-profile-matches/:id/reject", requireAuth, async (req: Req
     if (match.status !== "new") return sendError(res, 400, "Match già gestito");
 
     const updated = await storage.updateProposalProfileMatch(matchId, { status: "rejected" });
+    recordMatchFeedbackFireAndForget({
+      userId,
+      otherUserId: match.bikerId === userId ? match.zavarrinaId : match.bikerId,
+      matchKind: "propProfile",
+      featureKey: featureKeyForKind("propProfile"),
+      action: "reject",
+      matchRefId: matchId,
+    });
     return res.json(updated);
   } catch (error) {
     console.error("Reject proposal-profile match error:", error);

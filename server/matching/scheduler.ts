@@ -12,6 +12,7 @@ import { runDistanceMatching, runRouteTypeZoneMatching } from "./run-distance";
 import { runProposalToProfileMatching } from "./run-profile";
 import { runProposalZoneNotifications, runProposalMatchingForUser } from "./run-proposals";
 import { runMatchingForUser } from "./run-user";
+import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
 
 const MATCH_DEBOUNCE_MS = 10_000;
 
@@ -389,6 +390,20 @@ export function startMatchingEngine(): void {
     );
   }, 60 * 60 * 1000));
   console.log("[Matching] Cleanup orario proposte scadute avviato");
+
+  // Daily recompute of per-user match feedback profiles (24h interval).
+  // Runs once shortly after startup, then every 24 hours.
+  setTimeout(() => {
+    recomputeAllUserMatchProfiles().catch((err) =>
+      console.error("[ProfileRecompute] startup run failed:", err),
+    );
+  }, 5 * 60 * 1000);
+  _engineTimers.push(setInterval(() => {
+    recomputeAllUserMatchProfiles().catch((err) =>
+      console.error("[ProfileRecompute] daily run failed:", err),
+    );
+  }, 24 * 60 * 60 * 1000));
+  console.log("[Matching] Daily user-match-profile recompute scheduled");
 }
 
 export function stopMatchingEngine(): void {

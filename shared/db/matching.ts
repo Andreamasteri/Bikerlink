@@ -10,6 +10,7 @@ import {
   jsonb,
   index,
   uniqueIndex,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { users, userMotorcycles } from "./users";
@@ -301,3 +302,43 @@ export type UpdateWishlistMotoInput = z.infer<typeof updateWishlistMotoSchema>;
 
 export const matchPreferencesAdminUpdateSchema = z.record(z.string(), z.boolean()).and(z.object({}).passthrough());
 export type MatchPreferencesAdminUpdateInput = z.infer<typeof matchPreferencesAdminUpdateSchema>;
+
+export const matchFeedback = pgTable("match_feedback", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  otherUserId: varchar("other_user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  matchKind: varchar("match_kind", { length: 40 }).notNull(),
+  featureKey: varchar("feature_key", { length: 80 }).notNull(),
+  action: varchar("action", { length: 20 }).notNull(),
+  reasonTag: varchar("reason_tag", { length: 60 }),
+  matchRefId: varchar("match_ref_id", { length: 36 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("match_feedback_user_created_idx").on(table.userId, table.createdAt),
+  index("match_feedback_feature_idx").on(table.featureKey, table.action),
+  index("match_feedback_match_ref_idx").on(table.matchRefId),
+]);
+
+export const userMatchProfile = pgTable("user_match_profile", {
+  userId: varchar("user_id", { length: 36 })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  featureWeights: jsonb("feature_weights").notNull().default(sql`'{}'::jsonb`),
+  featureStats: jsonb("feature_stats").notNull().default(sql`'{}'::jsonb`),
+  feedbackCount: integer("feedback_count").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type MatchFeedback = typeof matchFeedback.$inferSelect;
+export type InsertMatchFeedback = typeof matchFeedback.$inferInsert;
+export type UserMatchProfile = typeof userMatchProfile.$inferSelect;
+export type InsertUserMatchProfile = typeof userMatchProfile.$inferInsert;
+
+export type FeatureWeights = Record<string, number>;
+export type FeatureStats = Record<string, { accepts: number; rejects: number; ignores: number; total: number; acceptRate: number }>;

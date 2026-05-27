@@ -13,6 +13,7 @@ import Colors from "@/constants/colors";
 import { useRouter } from "expo-router";
 import { DistanceBadge } from "./DistanceBadge";
 import { MatchActions } from "./MatchActions";
+import { WhyMatchButton } from "./WhyMatchButton";
 
 export function getSearchTypeIcon(searchType?: string | null): keyof typeof Ionicons.glyphMap {
   switch (searchType) {
@@ -512,6 +513,12 @@ export function GarageMatchCard({ match, currentUserId, onAccept, onReject, onCh
         t={t}
       />
 
+      {(isNew || isAccepted) && match.id && (
+        <View style={{ marginTop: 8 }}>
+          <WhyMatchButton matchId={match.id} kind="garage" t={t} />
+        </View>
+      )}
+
       {isNew && (
         <MatchActions
           onAccept={onAccept}
@@ -602,6 +609,12 @@ export function BikerBikerMatchCard({ match, currentUserId, onAccept, onReject, 
           <Ionicons name="chatbubble" size={18} color={Colors.background} />
           <Text style={sharedStyles.chatBtnText}>{t("match.sendMessage")}</Text>
         </TouchableOpacity>
+      )}
+
+      {(isNew || isAccepted) && match.id && (
+        <View style={{ marginTop: 8 }}>
+          <WhyMatchButton matchId={match.id} kind="biker" t={t} />
+        </View>
       )}
 
       {isNew && (
@@ -708,6 +721,12 @@ export function ProposalProfileMatchCard({ match, currentUserId, onAccept, onRej
           <Ionicons name="chatbubble" size={18} color={Colors.background} />
           <Text style={sharedStyles.chatBtnText}>{t("match.sendMessage")}</Text>
         </TouchableOpacity>
+      )}
+
+      {(isNew || isAccepted) && match.id && (
+        <View style={{ marginTop: 8 }}>
+          <WhyMatchButton matchId={match.id} kind="propProfile" t={t} />
+        </View>
       )}
 
       {isNew && (
@@ -850,6 +869,12 @@ export function MatchCardFull({ match, currentUserId, onAccept, onReject, onRemo
         <View style={sharedStyles.infoRow}>
           <Ionicons name="calendar" size={14} color={Colors.textSecondary} />
           <Text style={sharedStyles.infoText}>{scheduledDate}</Text>
+        </View>
+      )}
+
+      {(match.status === "pending" || isAccepted) && match.id && (
+        <View style={{ marginTop: 8 }}>
+          <WhyMatchButton matchId={match.id} kind="proposal" t={t} />
         </View>
       )}
 
