@@ -204,5 +204,9 @@ ROUTING_DISABLED = "0"
 EXPO_WEB_URL = "http://localhost:8081"
 
 [[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
 localPort = 8081
 externalPort = 8081
