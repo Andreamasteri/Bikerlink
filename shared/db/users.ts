@@ -9,6 +9,7 @@ import {
   doublePrecision,
   jsonb,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 
@@ -157,6 +158,26 @@ export const userProfiles = pgTable("user_profiles", {
   index("user_profiles_user_id_idx").on(table.userId),
   index("user_profiles_location_idx").on(table.latitude, table.longitude),
 ]);
+
+export const userDevices = pgTable("user_devices", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  model: varchar("model", { length: 100 }).notNull(),
+  platform: varchar("platform", { length: 16 }),
+  osVersion: varchar("os_version", { length: 50 }),
+  firstSeenAt: timestamp("first_seen_at").notNull().defaultNow(),
+  lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_devices_user_id_idx").on(table.userId),
+  uniqueIndex("user_devices_user_model_uq").on(table.userId, table.model),
+]);
+
+export type UserDevice = typeof userDevices.$inferSelect;
+export type InsertUserDevice = typeof userDevices.$inferInsert;
 
 export const motorcyclePhotos = pgTable("motorcycle_photos", {
   id: varchar("id", { length: 36 })

@@ -17,6 +17,7 @@ import { useMutation } from "@tanstack/react-query";
 import { getApiUrl } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
+import { collectDeviceInfo } from "@/lib/device-info";
 
 export default function FeatureRequestScreen() {
   const t = useT();
@@ -31,7 +32,7 @@ export default function FeatureRequestScreen() {
       const res = await globalThis.fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticketType: "feature", subject, message }),
+        body: JSON.stringify({ ticketType: "feature", subject, message, deviceInfo: collectDeviceInfo() }),
         credentials: "include",
       });
       if (!res.ok) {

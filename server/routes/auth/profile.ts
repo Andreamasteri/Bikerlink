@@ -2,6 +2,9 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { onlineTracker } from "../../online-tracker";
 import { sendSuccess, sendError } from "../../lib/api-response";
+import { db } from "../../db";
+import { userDevices } from "@shared/db";
+import { sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -35,7 +38,7 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
   try {
     const userId = req.session?.userId;
     if (!userId) return sendError(res, 401, "Non autenticato");
-    const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown; deviceModel?: unknown };
+    const body = (req.body ?? {}) as { appVersion?: unknown; platform?: unknown; deviceModel?: unknown; osVersion?: unknown };
     const semverRe = /^\d+\.\d+\.\d+$/;
     const platformAllowed = new Set(["android", "ios", "web"]);
     const lastAppVersion =
@@ -46,16 +49,43 @@ router.post("/heartbeat", async (req: Request, res: Response) => {
       typeof body.platform === "string" && platformAllowed.has(body.platform)
         ? body.platform
         : "unknown";
+    const deviceModel =
+      typeof body.deviceModel === "string" && body.deviceModel.trim().length > 0
+        ? body.deviceModel.trim().slice(0, 100)
+        : null;
+    const osVersion =
+      typeof body.osVersion === "string" && body.osVersion.trim().length > 0
+        ? body.osVersion.trim().slice(0, 50)
+        : null;
     const updatePayload: {
       lastLoginAt: Date;
       lastAppVersion: string;
       lastPlatform: string;
       lastDeviceModel?: string;
     } = { lastLoginAt: new Date(), lastAppVersion, lastPlatform };
-    if (typeof body.deviceModel === "string" && body.deviceModel.trim().length > 0) {
-      updatePayload.lastDeviceModel = body.deviceModel.trim().slice(0, 100);
+    if (deviceModel) {
+      updatePayload.lastDeviceModel = deviceModel;
     }
     await storage.updateUser(userId, updatePayload);
+    if (deviceModel) {
+      try {
+        await db.insert(userDevices).values({
+          userId,
+          model: deviceModel,
+          platform: lastPlatform !== "unknown" ? lastPlatform : null,
+          osVersion,
+        }).onConflictDoUpdate({
+          target: [userDevices.userId, userDevices.model],
+          set: {
+            lastSeenAt: new Date(),
+            platform: lastPlatform !== "unknown" ? lastPlatform : sql`${userDevices.platform}`,
+            osVersion: osVersion ?? sql`${userDevices.osVersion}`,
+          },
+        });
+      } catch (err) {
+        console.error("[heartbeat] user_devices upsert error:", err);
+      }
+    }
     onlineTracker.touch(userId);
     return sendSuccess(res);
   } catch {

@@ -20,6 +20,10 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
 
+import { formatDeviceInfo, type DeviceInfoPayload } from "@/lib/device-info";
+
+type DeviceInfo = Partial<DeviceInfoPayload>;
+
 interface FeedbackTicket {
   id: string;
   userId: string | null;
@@ -28,6 +32,7 @@ interface FeedbackTicket {
   message: string;
   status: string;
   internalNote: string | null;
+  deviceInfo: DeviceInfo | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -84,6 +89,7 @@ function TicketCard({ ticket, onOpen }: { ticket: FeedbackTicket; onOpen: (t: Fe
       </View>
       <Text style={styles.subject} numberOfLines={1}>{ticket.subject}</Text>
       <Text style={styles.message} numberOfLines={2}>{ticket.message}</Text>
+      <Text style={styles.note} numberOfLines={1}>📱 {formatDeviceInfo(ticket.deviceInfo)}</Text>
       {ticket.internalNote ? (
         <Text style={styles.note} numberOfLines={1}>📝 {ticket.internalNote}</Text>
       ) : null}
@@ -215,6 +221,9 @@ export default function ModeratorFeedback() {
               <View style={[styles.badge, { backgroundColor: Colors.accent + "18", marginBottom: 12, alignSelf: "flex-start" }]}>
                 <Text style={[styles.badgeText, { color: Colors.accent }]}>{selected?.ticketType}</Text>
               </View>
+
+              <Text style={styles.sectionLabel}>Dispositivo</Text>
+              <Text style={styles.ticketMessage}>{formatDeviceInfo(selected?.deviceInfo ?? null)}</Text>
 
               <Text style={styles.sectionLabel}>Messaggio</Text>
               <Text style={styles.ticketMessage}>{selected?.message}</Text>

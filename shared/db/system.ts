@@ -61,6 +61,12 @@ export const feedbackTickets = pgTable("feedback_tickets", {
   message: text("message").notNull(),
   status: varchar("status", { length: 20 }).notNull().default("open"),
   internalNote: text("internal_note"),
+  deviceInfo: jsonb("device_info").$type<{
+    model?: string | null;
+    platform?: string | null;
+    osVersion?: string | null;
+    appVersion?: string | null;
+  } | null>(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
@@ -165,9 +171,15 @@ export type AppCrashLog = typeof appCrashLogs.$inferSelect;
 export type InsertAppCrashLog = typeof appCrashLogs.$inferInsert;
 
 export const createFeedbackSchema = z.object({
-  ticketType: z.enum(["bug", "suggestion", "feedback", "other"]).optional().default("feedback"),
+  ticketType: z.enum(["bug", "suggestion", "feature", "feedback", "other"]).optional().default("feedback"),
   subject: z.string().min(1, "Oggetto obbligatorio").max(200, "L'oggetto non può superare 200 caratteri"),
   message: z.string().min(1, "Messaggio obbligatorio").max(4000, "Il messaggio non può superare 4000 caratteri"),
+  deviceInfo: z.object({
+    model: z.string().max(100).nullable().optional(),
+    platform: z.string().max(16).nullable().optional(),
+    osVersion: z.string().max(50).nullable().optional(),
+    appVersion: z.string().max(32).nullable().optional(),
+  }).nullable().optional(),
 });
 export type CreateFeedbackInput = z.infer<typeof createFeedbackSchema>;
 

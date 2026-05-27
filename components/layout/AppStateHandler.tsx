@@ -22,8 +22,10 @@ async function sendHeartbeat() {
     const appVersion = Constants.expoConfig?.version ?? "0.0.0";
     const platform = Platform.OS;
     const deviceModel = getDeviceModel();
+    const osVersion = Platform.Version != null ? String(Platform.Version) : null;
     const payload: Record<string, string> = { appVersion, platform };
     if (deviceModel) payload.deviceModel = deviceModel;
+    if (osVersion) payload.osVersion = osVersion;
     await apiRequest("POST", "/api/auth/heartbeat", payload);
   } catch {
     // no-op: ignore heartbeat failures

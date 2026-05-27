@@ -1,7 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { users, userLastfmSessions, userMusicTracks, proposals, conversationParticipants, messages, reports, moderatorLogs, adClicks, adCampaigns } from "@shared/db";
+import { users, userLastfmSessions, userMusicTracks, proposals, conversationParticipants, messages, reports, moderatorLogs, adClicks, adCampaigns, userDevices } from "@shared/db";
 import { userStatusSchema, userRoleSchema, userEmailAdminSchema, adminSetPasswordSchema, primalSchema } from "@shared/validators";
 import { eq, and, ne, sql, count } from "drizzle-orm";
 import bcrypt from "bcryptjs";
@@ -581,6 +581,16 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
         .orderBy(adClicks.createdAt),
     ]);
 
+    const devicesRows = await db.select({
+      model: userDevices.model,
+      platform: userDevices.platform,
+      osVersion: userDevices.osVersion,
+      firstSeenAt: userDevices.firstSeenAt,
+      lastSeenAt: userDevices.lastSeenAt,
+    }).from(userDevices)
+      .where(eq(userDevices.userId, id))
+      .orderBy(sql`${userDevices.lastSeenAt} DESC`);
+
     const moderatorNicknameMap: Record<string, string> = {};
     const moderatorIds = [...new Set(moderatorLogsRows.map((l) => l.moderatorId).filter(Boolean))] as string[];
     if (moderatorIds.length > 0) {
@@ -639,6 +649,13 @@ router.get("/:id/stats", async (req: Request, res: Response) => {
         action: l.action,
         createdAt: l.createdAt,
         moderatorNickname: l.moderatorId ? (moderatorNicknameMap[l.moderatorId] ?? l.moderatorId) : "Sistema",
+      })),
+      devices: devicesRows.map((d) => ({
+        model: d.model,
+        platform: d.platform,
+        osVersion: d.osVersion,
+        firstSeenAt: d.firstSeenAt,
+        lastSeenAt: d.lastSeenAt,
       })),
     });
   } catch (_error) {

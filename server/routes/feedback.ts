@@ -14,19 +14,35 @@ const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 const FEEDBACK_BODY_LIMIT = "16kb";
 const _FEEDBACK_SUBJECT_MAX_LEN = 200;
 const _FEEDBACK_MESSAGE_MAX_LEN = 4000;
-const _ALLOWED_TICKET_TYPES = new Set(["bug", "suggestion", "feedback", "other"]);
+const _ALLOWED_TICKET_TYPES = new Set(["bug", "suggestion", "feature", "feedback", "other"]);
 const feedbackJson = express.json({ limit: FEEDBACK_BODY_LIMIT });
 
 const TICKET_TYPE_LABELS: Record<string, string> = {
   bug: "Bug Report",
   suggestion: "Suggerimento",
+  feature: "Richiesta Funzione",
   feedback: "Feedback",
   other: "Altro",
 };
 
-function buildFeedbackEmailHtml(nickname: string, ticketType: string, subject: string, message: string): string {
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function formatDeviceInfo(deviceInfo?: { model?: string | null; platform?: string | null; osVersion?: string | null; appVersion?: string | null } | null): string {
+  if (!deviceInfo) return "—";
+  const parts: string[] = [];
+  if (deviceInfo.model) parts.push(deviceInfo.model);
+  const osPart = [deviceInfo.platform, deviceInfo.osVersion].filter(Boolean).join(" ");
+  if (osPart) parts.push(osPart);
+  if (deviceInfo.appVersion) parts.push(`v${deviceInfo.appVersion}`);
+  return parts.length > 0 ? parts.join(" · ") : "—";
+}
+
+function buildFeedbackEmailHtml(nickname: string, ticketType: string, subject: string, message: string, deviceInfo?: { model?: string | null; platform?: string | null; osVersion?: string | null; appVersion?: string | null } | null): string {
   const typeLabel = TICKET_TYPE_LABELS[ticketType] || ticketType;
   const typeBadgeColor = ticketType === "bug" ? "#e74c3c" : ticketType === "suggestion" ? "#2ecc71" : "#FF6B35";
+  const deviceText = escapeHtml(formatDeviceInfo(deviceInfo));
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 20px;">
       <div style="text-align: center; margin-bottom: 30px;">
@@ -39,6 +55,7 @@ function buildFeedbackEmailHtml(nickname: string, ticketType: string, subject: s
         </div>
         <h2 style="margin-top: 0; font-size: 20px; color: #FF6B35;">${subject}</h2>
         <p style="color: #aaa; font-size: 13px; margin-bottom: 4px;">Da: <strong style="color: #fff;">${nickname}</strong></p>
+        <p style="color: #aaa; font-size: 13px; margin-bottom: 4px;">Dispositivo: <span style="color: #fff;">${deviceText}</span></p>
         <div style="background: #16162a; border-radius: 8px; padding: 16px; margin-top: 16px;">
           <p style="color: #ccc; line-height: 1.6; margin: 0; white-space: pre-wrap;">${message}</p>
         </div>
@@ -78,23 +95,32 @@ router.post("/", feedbackJson, async (req: Request, res: Response) => {
     if (!parsed.success) {
       return sendError(res, 400, parsed.error.issues[0].message);
     }
-    const { ticketType, subject, message } = parsed.data;
+    const { ticketType, subject, message, deviceInfo } = parsed.data;
     const trimmedSubject = subject.trim();
     const trimmedMessage = message.trim();
     const safeTicketType = ticketType ?? "feedback";
+    const safeDeviceInfo = deviceInfo
+      ? {
+          model: deviceInfo.model ?? null,
+          platform: deviceInfo.platform ?? null,
+          osVersion: deviceInfo.osVersion ?? null,
+          appVersion: deviceInfo.appVersion ?? null,
+        }
+      : null;
 
     const ticket = await storage.createFeedbackTicket({
       userId: req.session.userId,
       ticketType: safeTicketType,
       subject: trimmedSubject,
       message: trimmedMessage,
+      deviceInfo: safeDeviceInfo,
     });
 
     try {
       const user = await storage.getUser(req.session.userId);
       const nickname = user?.nickname || "Utente sconosciuto";
       const emailSubject = `[BikerLink] ${TICKET_TYPE_LABELS[safeTicketType] || safeTicketType}: ${trimmedSubject}`;
-      const html = buildFeedbackEmailHtml(nickname, safeTicketType, trimmedSubject, trimmedMessage);
+      const html = buildFeedbackEmailHtml(nickname, safeTicketType, trimmedSubject, trimmedMessage, safeDeviceInfo);
       sendEmail(ADMIN_EMAIL, emailSubject, html).catch((err) =>
         console.error("[EMAIL] Errore invio notifica feedback:", err)
       );

@@ -1,9 +1,15 @@
 import { z } from "zod";
 
 export const createFeedbackSchema = z.object({
-  ticketType: z.enum(["bug", "suggestion", "feedback", "other"]).optional().default("feedback"),
+  ticketType: z.enum(["bug", "suggestion", "feature", "feedback", "other"]).optional().default("feedback"),
   subject: z.string().min(1, "Oggetto obbligatorio").max(200, "L'oggetto non può superare 200 caratteri"),
   message: z.string().min(1, "Messaggio obbligatorio").max(4000, "Il messaggio non può superare 4000 caratteri"),
+  deviceInfo: z.object({
+    model: z.string().max(100).nullable().optional(),
+    platform: z.string().max(16).nullable().optional(),
+    osVersion: z.string().max(50).nullable().optional(),
+    appVersion: z.string().max(32).nullable().optional(),
+  }).nullable().optional(),
 });
 export type CreateFeedbackInput = z.infer<typeof createFeedbackSchema>;
 

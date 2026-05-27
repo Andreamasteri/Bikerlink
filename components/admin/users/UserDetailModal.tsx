@@ -61,6 +61,7 @@ export interface UserStats {
   adClicks: { id: string; adTitle: string; clickedAt: string }[];
   motorcycles: { brand: string; model: string; year: number; displacement: number; motorcycleType: string; ridingStyle: string }[];
   moderatorLogs: { action: string; createdAt: string; moderatorNickname: string }[];
+  devices?: { model: string; platform: string | null; osVersion: string | null; firstSeenAt: string; lastSeenAt: string }[];
 }
 
 interface UserDetailModalProps {
@@ -268,6 +269,23 @@ export const UserDetailModal: React.FC<UserDetailModalProps> = ({
                 </>
               )}
             </View>
+
+            {(stats.devices?.length ?? 0) > 0 && (
+              <View style={statsStyles.section}>
+                <Text style={statsStyles.sectionTitle}>Dispositivi usati</Text>
+                {(stats.devices ?? []).map((d, i) => {
+                  const osPart = [d.platform, d.osVersion].filter(Boolean).join(" ");
+                  return (
+                    <View key={i} style={statsStyles.motoCard}>
+                      <Text style={statsStyles.motoTitle}>{d.model}</Text>
+                      <Text style={statsStyles.motoSub}>
+                        {osPart || "—"} · Ultimo: {formatDateIT(d.lastSeenAt)} · Primo: {formatDateIT(d.firstSeenAt)}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
 
             {(stats.motorcycles?.length ?? 0) > 0 && (
               <View style={statsStyles.section}>
