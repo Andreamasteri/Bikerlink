@@ -107,8 +107,20 @@ restart_backend() {
   BACKEND_LOCK_FILE="/tmp/start-backend.lock"
   if [ -f "$BACKEND_LOCK_FILE" ]; then
     LOCK_PID=$(cat "$BACKEND_LOCK_FILE" 2>/dev/null)
+    # PID vuoto o non numerico: start-backend.sh ha appena creato il lock
+    # ma non ha ancora scritto il PID. Trattare come lock attivo per evitare
+    # la race EADDRINUSE tra Start App e Watchdog.
+    if [ -z "$LOCK_PID" ] || ! [[ "$LOCK_PID" =~ ^[0-9]+$ ]]; then
+      log "Start-backend in avvio (lock con PID vuoto/non numerico: '$LOCK_PID') — skip restart"
+      return 0
+    fi
     if kill -0 "$LOCK_PID" 2>/dev/null; then
       log "Start-backend già in esecuzione (PID: $LOCK_PID), attendo che il backend si avvii..."
+      return 0
+    fi
+    # Verifica simmetrica: c'è già un processo start-backend.sh in giro?
+    if pgrep -f "bash .*scripts/start-backend.sh" >/dev/null 2>&1; then
+      log "Start-backend.sh rilevato attivo (pgrep) — skip restart"
       return 0
     fi
     rm -f "$BACKEND_LOCK_FILE"

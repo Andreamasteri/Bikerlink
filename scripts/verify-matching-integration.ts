@@ -124,7 +124,7 @@ async function checkRegistryVsSchema() {
   const { MATCHING_REGISTRY } = await import("../shared/matching-registry");
   const matchingSchema = await readFileSafe(path.join(ROOT, "shared/db/matching.ts")) ?? "";
   const expectedTables = new Set(
-    MATCHING_REGISTRY.map((t) => t.table).filter((t): t is string => !!t)
+    MATCHING_REGISTRY.map((t) => t.table).filter((t): t is NonNullable<typeof t> => !!t)
   );
   const gaps: Gap[] = [];
   for (const t of expectedTables) {
@@ -152,7 +152,7 @@ async function checkRegistryVsPreferences() {
   const { MATCHING_REGISTRY, getRegistryPrefColumns } = await import("../shared/matching-registry");
   const { matchPreferences } = await import("../shared/db/matching");
   const schemaCols = new Set(
-    Object.values(matchPreferences as Record<string, unknown>)
+    Object.values(matchPreferences as unknown as Record<string, unknown>)
       .map((v) => (v as { name?: string })?.name)
       .filter((n): n is string => typeof n === "string")
   );

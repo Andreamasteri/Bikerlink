@@ -43,8 +43,17 @@ trap cleanup EXIT
 
 if [ -f "$LOCK_FILE" ]; then
   LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null)
+  # Tratta un PID vuoto o non numerico come lock valido: un'altra istanza
+  # potrebbe aver appena creato il file ma non aver ancora scritto il proprio PID.
+  # NON rimuovere il lock in quel caso — altrimenti si genera la race EADDRINUSE.
+  if [ -z "$LOCK_PID" ] || ! [[ "$LOCK_PID" =~ ^[0-9]+$ ]]; then
+    echo "Lock file trovato con PID vuoto/non numerico ('$LOCK_PID') — un'altra istanza sta partendo. Uscita."
+    trap - EXIT
+    exit 0
+  fi
   if kill -0 "$LOCK_PID" 2>/dev/null; then
     echo "Un'altra istanza di start-backend.sh è già in esecuzione (PID: $LOCK_PID). Uscita."
+    trap - EXIT
     exit 0
   else
     echo "Lock file obsoleto trovato (PID $LOCK_PID morto), rimuovo."

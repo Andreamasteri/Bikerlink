@@ -18,11 +18,24 @@ LOCK_FILE="/tmp/start-metro.lock"
 # flock -n 9 fallisce immediatamente se il lock è già detenuto da un altro PID.
 exec 9>"$LOCK_FILE"
 if ! flock -n 9; then
-  LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || echo "?")
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup già in corso (PID: $LOCK_PID) — skip"
+  LOCK_PID=$(cat "$LOCK_FILE" 2>/dev/null || true)
+  # Se il PID è vuoto o non numerico, validiamo che il lock sia realmente
+  # detenuto da un processo vivo. flock ha già fallito sopra: il lock è
+  # detenuto da qualcuno, ma se il PID nel file è inutilizzabile lo segnaliamo.
+  if [ -z "$LOCK_PID" ] || ! [[ "$LOCK_PID" =~ ^[0-9]+$ ]]; then
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup già in corso (PID non ancora scritto nel lock) — skip"
+  elif ! kill -0 "$LOCK_PID" 2>/dev/null; then
+    # flock dice che il lock è attivo ma il PID scritto è morto: anomalia.
+    # Procediamo comunque a uscire per non duplicare l'avvio (flock è autorevole).
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup detenuto da flock ma PID $LOCK_PID risulta morto — skip per sicurezza"
+  else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Metro startup già in corso (PID: $LOCK_PID) — skip"
+  fi
   exit 0
 fi
 # Scrivi il PID corrente nel file (utile per diagnostica e watchdog)
+# Tronca prima di scrivere per evitare PID residui dal lock precedente.
+: >&9
 echo $$ >&9
 
 cleanup_lock() {
