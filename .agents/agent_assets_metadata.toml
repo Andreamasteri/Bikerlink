@@ -611,3 +611,9 @@ id = "i91MUnnmDi3aEI3cWJidB"
 uri = "file://exports/sistema-mappe-bikerlink.pdf"
 type = "pdf"
 title = "BikerLink — Sistema Mappe v2 (con Cesium, costi, LOC)"
+
+[[outputs]]
+id = "Wbp4kk8j-aLIWCorS0bVo"
+uri = "file://attached_assets/Turnistica_e_Maree_2026_compressed.pdf"
+type = "pdf"
+title = "Turnistica e Maree 2026 (compresso, 3.7 MB)"
