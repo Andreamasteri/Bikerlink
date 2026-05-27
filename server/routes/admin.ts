@@ -231,6 +231,7 @@ import analyticsRouter from './admin/analytics';
 import stregattiRouter from './admin/stregatti';
 import miscRouter from './admin/misc';
 import matchingRouter from './admin/matching';
+import abRouter from './admin/ab';
 import otaRouter from './admin/ota';
 import otaAssistantRouter from './admin/ota-assistant';
 import mapsAdminRouter from './admin/maps/index';
@@ -323,5 +324,6 @@ router.use('/', _requireAdmin, dbAdminRouter);
 router.use('/', _requireAdmin, telemetryAdminRouter);
 router.use('/', _requireAdmin, miscRouter);
 router.use('/', _requireAdmin, matchingRouter);
+router.use('/', _requireAdmin, abRouter);
 
 export default router;

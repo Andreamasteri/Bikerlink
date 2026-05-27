@@ -12,6 +12,14 @@ import {
 import { and, eq, isNotNull, gt } from "drizzle-orm";
 import { sendMatchPushNotifications } from "../push-notifications";
 import { loadMatchPreferencesMap, bothPrefsEnabled, prefEnabled } from "./filters";
+import { getVariantConfig, trackAbEvent } from "./ab";
+
+// A/B experiment key for music affinity threshold tuning. Variants:
+//   - control:     threshold = 0.65 (default)
+//   - newScoring:  threshold multiplied by `weight` in variant config
+// Used as the seed example for the A/B framework (Task #2525). The same pattern
+// can be extended to any matcher: read variant config, branch, then track events.
+const MUSIC_AFFINITY_EXPERIMENT = "bio_affinity_weight_v1";
 
 export async function runMusicMatchBikerZavarrina(): Promise<number> {
   try {
@@ -78,7 +86,12 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
 
         const shared = [...set2].filter(t => set1.has(t)).length;
         const smaller = Math.min(set1.size, set2.size);
-        if (smaller === 0 || shared / smaller < THRESHOLD) { skipCount++; continue; }
+        // A/B branching: variant config { weight: number } scales the base threshold.
+        // weight=1.0 -> control (0.65); weight=1.4 -> stricter (0.91).
+        const variantA = await getVariantConfig(uid1, MUSIC_AFFINITY_EXPERIMENT);
+        const weight = typeof variantA.config.weight === "number" ? variantA.config.weight : 1.0;
+        const threshold = Math.min(0.99, THRESHOLD * weight);
+        if (smaller === 0 || shared / smaller < threshold) { skipCount++; continue; }
 
         const idA = uid1 < uid2 ? uid1 : uid2;
         const idB = uid1 < uid2 ? uid2 : uid1;
@@ -93,6 +106,10 @@ export async function runMusicMatchBikerZavarrina(): Promise<number> {
         if (inserted) {
           matchCount++;
           sendMatchPushNotifications([idA, idB]);
+          if (brand === "musica") {
+            void trackAbEvent(idA, MUSIC_AFFINITY_EXPERIMENT, "match_created", { matchId: inserted.id, brand });
+            void trackAbEvent(idB, MUSIC_AFFINITY_EXPERIMENT, "match_created", { matchId: inserted.id, brand });
+          }
         } else skipCount++;
       }
     }

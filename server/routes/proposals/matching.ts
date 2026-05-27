@@ -9,6 +9,7 @@ import { runMatchingForUser, runProposalMatchingForUser } from "../../matching-e
 import { sendSuccess, sendError } from "../../lib/api-response";
 import { allLimited, matchEnrichmentSemaphore, SemaphoreQueueFullError } from "../../lib/concurrency";
 import { sendZoneMatchedPushNotifications } from "../../push-notifications";
+import { trackAbEvent } from "../../matching/ab";
 
 import { requireAuth } from "../../lib/auth-middleware";
 
@@ -513,6 +514,9 @@ router.post("/biker-matches/:id/accept", requireAuth, async (req: Request, res: 
     if (match.biker1Id !== userId && match.biker2Id !== userId) return sendError(res, 403, "Non autorizzato");
     if (match.status !== "new") return sendError(res, 400, "Match già gestito");
     const updated = await storage.updateBikerBikerMatch(matchId, { status: "accepted" });
+    if (match.motorcycleBrand === "musica") {
+      void trackAbEvent(userId, "bio_affinity_weight_v1", "match_accepted", { matchId });
+    }
     return res.json(updated);
   } catch (error) {
     console.error("Accept biker match error:", error);
@@ -529,6 +533,9 @@ router.post("/biker-matches/:id/reject", requireAuth, async (req: Request, res: 
     if (match.biker1Id !== userId && match.biker2Id !== userId) return sendError(res, 403, "Non autorizzato");
     if (match.status !== "new") return sendError(res, 400, "Match già gestito");
     const updated = await storage.updateBikerBikerMatch(matchId, { status: "rejected" });
+    if (match.motorcycleBrand === "musica") {
+      void trackAbEvent(userId, "bio_affinity_weight_v1", "match_rejected", { matchId });
+    }
     return res.json(updated);
   } catch (error) {
     console.error("Reject biker match error:", error);

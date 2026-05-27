@@ -246,6 +246,7 @@ const adminGroups: AdminGroup[] = [
       { key: "match-inspector", label: "Match Inspector", icon: "account-search", iconSet: "MaterialCommunityIcons", route: "/admin/match-inspector", accentColor: "#2196F3" },
       { key: "match-control", label: "Controllo Sistema", icon: "tune-variant", iconSet: "MaterialCommunityIcons", route: "/admin/match-control", accentColor: "#9C27B0" },
       { key: "match-health", label: "Match Health", icon: "heart-pulse", iconSet: "MaterialCommunityIcons", route: "/admin/match-health", accentColor: "#4CAF50" },
+      { key: "ab", label: "A/B Esperimenti", icon: "flask-outline", iconSet: "MaterialCommunityIcons", route: "/admin/ab", accentColor: "#E91E63" },
     ],
   },
   {

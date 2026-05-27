@@ -421,6 +421,59 @@ export const serverRestarts = pgTable("server_restarts", {
 export type ServerRestart = typeof serverRestarts.$inferSelect;
 export type InsertServerRestart = typeof serverRestarts.$inferInsert;
 
+export const abExperiments = pgTable("ab_experiments", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  key: varchar("key", { length: 100 }).notNull().unique(),
+  description: text("description"),
+  variants: jsonb("variants").$type<Array<{ name: string; weight: number; config?: Record<string, unknown> }>>().notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("running"),
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  endedAt: timestamp("ended_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("ab_experiments_status_idx").on(table.status),
+]);
+export type AbExperiment = typeof abExperiments.$inferSelect;
+export type InsertAbExperiment = typeof abExperiments.$inferInsert;
+
+export const abAssignments = pgTable("ab_assignments", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  experimentKey: varchar("experiment_key", { length: 100 }).notNull(),
+  userId: varchar("user_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  variant: varchar("variant", { length: 60 }).notNull(),
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+}, (table) => [
+  index("ab_assignments_exp_user_idx").on(table.experimentKey, table.userId),
+  index("ab_assignments_exp_variant_idx").on(table.experimentKey, table.variant),
+]);
+export type AbAssignment = typeof abAssignments.$inferSelect;
+export type InsertAbAssignment = typeof abAssignments.$inferInsert;
+
+export const abEvents = pgTable("ab_events", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  experimentKey: varchar("experiment_key", { length: 100 }).notNull(),
+  variant: varchar("variant", { length: 60 }).notNull(),
+  userId: varchar("user_id", { length: 36 })
+    .references(() => users.id, { onDelete: "set null" }),
+  eventName: varchar("event_name", { length: 60 }).notNull(),
+  payload: jsonb("payload"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("ab_events_exp_variant_event_idx").on(table.experimentKey, table.variant, table.eventName),
+  index("ab_events_created_at_idx").on(table.createdAt),
+]);
+export type AbEvent = typeof abEvents.$inferSelect;
+export type InsertAbEvent = typeof abEvents.$inferInsert;
+
 export const mapsQuota = pgTable("maps_quota", {
   providerId: varchar("provider_id", { length: 100 }).notNull(),
   yearMonth: varchar("year_month", { length: 7 }).notNull(),

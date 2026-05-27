@@ -85,6 +85,45 @@ Dopo la scheda, l'agente chiede: **"Hai preferenze su come risolvere, o procedo 
 
 **"Pubblica l'OTA"** significa SOLO pubblicare una OTA (Over-the-Air update). NON avviare mai una build EAS (APK/AAB) in risposta a questo comando. La build EAS è un'operazione separata e richiede autorizzazione esplicita come da sezione "APK Build — Regola Obbligatoria".
 
+## Framework A/B Testing Matching (Task #2525)
+
+Permette di testare varianti dell'algoritmo di matching su sottogruppi di utenti
+e misurare l'impatto su metriche reali (accept rate, chat aperte).
+
+### Tabelle
+- `ab_experiments` — `key`, `description`, `variants` (jsonb), `status` (`running|paused|ended`), `started_at`, `ended_at`.
+- `ab_assignments` — assegnazione sticky `(experimentKey, userId) -> variant`.
+- `ab_events` — eventi (`match_created`, `match_accepted`, `match_rejected`, `chat_opened`, …) con `experimentKey`+`variant`.
+
+### Come creare un nuovo esperimento
+1. Vai in **Admin → Matching → A/B Esperimenti**, clicca **Nuovo**.
+2. Inserisci `key` (snake_case), descrizione e varianti JSON, es.:
+   ```json
+   [
+     { "name": "control",  "weight": 0.5, "config": { "weight": 1.0 } },
+     { "name": "stricter", "weight": 0.5, "config": { "weight": 1.4 } }
+   ]
+   ```
+3. Nel matcher pertinente:
+   ```ts
+   import { getVariantConfig, trackAbEvent } from "@/server/matching/ab";
+   const { config } = await getVariantConfig(userId, "mio_experiment_v1");
+   const weight = typeof config.weight === "number" ? config.weight : 1.0;
+   // ...usa weight nell'algoritmo...
+   void trackAbEvent(userId, "mio_experiment_v1", "match_created", { matchId });
+   ```
+4. Aggancia `match_accepted`/`match_rejected` nelle route di azione del match.
+5. Il pannello calcola accept rate / chat rate per variante e un z-test su due
+   proporzioni (`simple-statistics`); p < 0.05 evidenziato in verde.
+
+L'assegnazione è deterministica: `sha1(userId + experimentKey) % totalWeight`,
+quindi lo stesso utente finisce sempre nella stessa variante per quell'esperimento.
+Quando l'esperimento è `paused`/`ended` o non esiste, `getVariant` restituisce
+`"control"` e il branching cade sui default — gli eventi non vengono registrati.
+
+Esperimento seed: `bio_affinity_weight_v1` (soglia music affinity, control vs newScoring),
+applicato in `server/matching/run-extra.ts`.
+
 ## Sistema OTA — Approvazione Admin (Task #2503)
 
 Il sistema OTA di BikerLink usa un **flusso fisso a singolo binario, senza toggle e senza modalità alternative**:
