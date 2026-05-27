@@ -7,30 +7,43 @@ import {
   type User, type UserProfile,
 } from "@shared/db";
 import { PlannedRoutesStorage } from "./planned-routes";
+import { cachedCandidatesForZone } from "../cache/zone-cache";
 
 export class MapStorage extends PlannedRoutesStorage {
   async getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
-    const conditions: SQL<unknown>[] = [
-      eq(users.status, "active"),
-      eq(users.isFake, false),
-      ...systemAccountConditions(users),
-      sql`${userProfiles.latitude} IS NOT NULL`,
-      sql`${userProfiles.longitude} IS NOT NULL`,
-    ];
-    if (countries && countries.length > 0) {
-      conditions.push(or(inArray(users.country, countries), sql`${users.country} IS NULL`)!);
-    }
-    const results = await db
-      .select({
-        user: users,
-        profile: userProfiles,
-        distance: sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance"),
-      })
-      .from(userProfiles)
-      .innerJoin(users, eq(users.id, userProfiles.userId))
-      .where(and(...conditions))
-      .orderBy(sql`distance`);
-    return results;
+    // Task #2517 — wrap with zone cache (60s TTL, 0.05° grid). The cache is a
+    // no-op when REDIS_URL isn't set; otherwise nearby callers within the same
+    // grid cell skip the DB hit entirely.
+    const variant = countries && countries.length > 0 ? `c:${[...countries].sort().join(",")}` : "all";
+    return await cachedCandidatesForZone<{ user: User; profile: UserProfile; distance: number }>(
+      lat,
+      lng,
+      radiusKm,
+      async () => {
+        const conditions: SQL<unknown>[] = [
+          eq(users.status, "active"),
+          eq(users.isFake, false),
+          ...systemAccountConditions(users),
+          sql`${userProfiles.latitude} IS NOT NULL`,
+          sql`${userProfiles.longitude} IS NOT NULL`,
+        ];
+        if (countries && countries.length > 0) {
+          conditions.push(or(inArray(users.country, countries), sql`${users.country} IS NULL`)!);
+        }
+        const results = await db
+          .select({
+            user: users,
+            profile: userProfiles,
+            distance: sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance"),
+          })
+          .from(userProfiles)
+          .innerJoin(users, eq(users.id, userProfiles.userId))
+          .where(and(...conditions))
+          .orderBy(sql`distance`);
+        return results;
+      },
+      { variant },
+    );
   }
 
   async countActiveUsers(since: Date): Promise<number> {

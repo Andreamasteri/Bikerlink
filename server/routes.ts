@@ -254,6 +254,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/invitations", invitationRoutes);
   app.use("/api/routes", trackingRoutes);
   app.use(customRoutesRouter);
+  // Task #2517 — Bull Board UI for inspecting BullMQ queues. Mounted BEFORE
+  // the JSON-only admin router so its HTML/static assets are served correctly.
+  try {
+    const { buildBullBoardRouter } = await import("./cache/bull-board");
+    const bullBoardRouter = await buildBullBoardRouter();
+    app.use("/api/admin/queues", _requireAdmin, bullBoardRouter);
+  } catch (err) {
+    console.warn("[routes] Bull Board mount failed:", err instanceof Error ? err.message : err);
+  }
+
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
   app.use("/api/sos", sosRoutes);

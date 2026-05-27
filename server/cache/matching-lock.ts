@@ -1,0 +1,207 @@
+import Redlock, { type Lock } from "redlock";
+import { getRawRedis, isRedisAvailable } from "./redis";
+
+/**
+ * Distributed matching lock (Task #2517).
+ *
+ * Replaces the in-process `isMatchingRunning` boolean with a Redlock-backed
+ * distributed lock so multiple backend instances can't run overlapping cycles.
+ * Falls back transparently to an in-memory lock when Redis is unavailable —
+ * single-instance deployments keep working unchanged.
+ */
+
+const LOCK_KEY = "bl:lock:matching";
+const LOCK_OWNER_KEY = "bl:lock:matching:owner";
+const LOCK_TTL_MS = 5 * 60 * 1000; // 5 minutes — covers a long cycle, auto-expires if instance dies.
+
+type Holder = {
+  owner: string;
+  acquiredAt: number;
+  expiresAt: number;
+  source: "redis" | "memory";
+};
+
+const HISTORY_MAX = 10;
+const history: Array<{ event: "acquired" | "released" | "expired" | "rejected"; at: string; owner: string; source: string; reason?: string }> = [];
+
+let memoryLockHeld = false;
+let memoryLockHolder: Holder | null = null;
+let lastHolder: Holder | null = null;
+
+let redlock: Redlock | null = null;
+
+function pushHistory(entry: { event: "acquired" | "released" | "expired" | "rejected"; owner: string; source: string; reason?: string }) {
+  history.push({ at: new Date().toISOString(), ...entry });
+  if (history.length > HISTORY_MAX) history.shift();
+}
+
+function getRedlock(): Redlock | null {
+  if (redlock) return redlock;
+  const client = getRawRedis();
+  if (!client) return null;
+  try {
+    redlock = new Redlock([client], {
+      driftFactor: 0.01,
+      retryCount: 0, // No retry: caller decides what to do when busy.
+      retryDelay: 200,
+      retryJitter: 100,
+      automaticExtensionThreshold: 500,
+    });
+    redlock.on("error", (err: unknown) => {
+      console.warn("[matching-lock] redlock error:", err instanceof Error ? err.message : err);
+    });
+    return redlock;
+  } catch (err) {
+    console.warn("[matching-lock] failed to init redlock:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export type LockResult<T> =
+  | { acquired: true; result: T; source: "redis" | "memory" }
+  | { acquired: false; reason: string };
+
+export async function withMatchingLock<T>(
+  owner: string,
+  fn: () => Promise<T>,
+): Promise<LockResult<T>> {
+  const useRedis = isRedisAvailable();
+  const rl = useRedis ? getRedlock() : null;
+
+  if (rl) {
+    let lock: Lock;
+    try {
+      lock = await rl.acquire([LOCK_KEY], LOCK_TTL_MS);
+    } catch (_err) {
+      pushHistory({ event: "rejected", owner, source: "redis", reason: "already_held" });
+      return { acquired: false, reason: "already_running" };
+    }
+    const holder: Holder = {
+      owner,
+      acquiredAt: Date.now(),
+      expiresAt: Date.now() + LOCK_TTL_MS,
+      source: "redis",
+    };
+    memoryLockHolder = holder;
+    lastHolder = holder;
+    // Persist holder metadata in Redis so other instances can read it via
+    // getMatchingLockStatus(). Mirrors lock TTL so it auto-expires.
+    const rawClient = getRawRedis();
+    if (rawClient) {
+      try {
+        await rawClient.set(
+          LOCK_OWNER_KEY,
+          JSON.stringify({ owner, acquiredAt: holder.acquiredAt, expiresAt: holder.expiresAt, pid: process.pid }),
+          "PX",
+          LOCK_TTL_MS,
+        );
+      } catch { /* best-effort */ }
+    }
+    pushHistory({ event: "acquired", owner, source: "redis" });
+    try {
+      const result = await fn();
+      return { acquired: true, result, source: "redis" };
+    } finally {
+      try {
+        await lock.release();
+        pushHistory({ event: "released", owner, source: "redis" });
+      } catch (err: unknown) {
+        pushHistory({ event: "expired", owner, source: "redis", reason: err instanceof Error ? err.message : String(err) });
+      }
+      memoryLockHolder = null;
+      if (rawClient) {
+        rawClient.del(LOCK_OWNER_KEY).catch(() => { /* ignore */ });
+      }
+    }
+  }
+
+  // In-memory fallback (single-instance mode).
+  if (memoryLockHeld) {
+    pushHistory({ event: "rejected", owner, source: "memory", reason: "already_held" });
+    return { acquired: false, reason: "already_running" };
+  }
+  memoryLockHeld = true;
+  const holder: Holder = {
+    owner,
+    acquiredAt: Date.now(),
+    expiresAt: Date.now() + LOCK_TTL_MS,
+    source: "memory",
+  };
+  memoryLockHolder = holder;
+  lastHolder = holder;
+  pushHistory({ event: "acquired", owner, source: "memory" });
+  if (!useRedis) {
+    console.warn("[matching-lock] Redis not available — using in-memory lock fallback");
+  }
+  try {
+    const result = await fn();
+    return { acquired: true, result, source: "memory" };
+  } finally {
+    memoryLockHeld = false;
+    memoryLockHolder = null;
+    pushHistory({ event: "released", owner, source: "memory" });
+  }
+}
+
+export function forceUnlockMatchingLock(): { wasHeld: boolean; holder: Holder | null } {
+  const wasHeld = memoryLockHeld || !!memoryLockHolder;
+  const holder = memoryLockHolder;
+  memoryLockHeld = false;
+  memoryLockHolder = null;
+  pushHistory({ event: "released", owner: holder?.owner ?? "force", source: holder?.source ?? "memory", reason: "force_unlock" });
+  // Best-effort Redis release.
+  const r = getRawRedis();
+  if (r) {
+    r.del(LOCK_KEY).catch(() => { /* ignore */ });
+    r.del(LOCK_OWNER_KEY).catch(() => { /* ignore */ });
+  }
+  return { wasHeld, holder };
+}
+
+export async function getMatchingLockStatus() {
+  const r = getRawRedis();
+  let redisLock: { exists: boolean; ttlSeconds: number | null; remoteHolder: unknown } = { exists: false, ttlSeconds: null, remoteHolder: null };
+  if (r) {
+    try {
+      const ttl = await r.pttl(LOCK_KEY);
+      let remoteHolder: unknown = null;
+      try {
+        const raw = await r.get(LOCK_OWNER_KEY);
+        if (raw) remoteHolder = JSON.parse(raw);
+      } catch { /* ignore */ }
+      redisLock = {
+        exists: ttl > 0,
+        ttlSeconds: ttl > 0 ? Math.ceil(ttl / 1000) : null,
+        remoteHolder,
+      };
+    } catch {
+      /* ignore */
+    }
+  }
+  const currentHolder = memoryLockHolder;
+  return {
+    active: !!currentHolder || redisLock.exists,
+    holder: currentHolder
+      ? {
+          owner: currentHolder.owner,
+          source: currentHolder.source,
+          acquiredAt: new Date(currentHolder.acquiredAt).toISOString(),
+          expiresAt: new Date(currentHolder.expiresAt).toISOString(),
+          elapsedMs: Date.now() - currentHolder.acquiredAt,
+        }
+      : null,
+    lastHolder: lastHolder
+      ? {
+          owner: lastHolder.owner,
+          source: lastHolder.source,
+          acquiredAt: new Date(lastHolder.acquiredAt).toISOString(),
+        }
+      : null,
+    redis: {
+      available: isRedisAvailable(),
+      lockKey: LOCK_KEY,
+      ...redisLock,
+    },
+    history: [...history],
+  };
+}

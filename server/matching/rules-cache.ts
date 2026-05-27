@@ -1,6 +1,11 @@
 import { db } from "../db";
 import { matchRules, type MatchRuleRow } from "@shared/db";
 import { matchingLogger } from "../lib/logger";
+import { cacheDel, cacheGet, cacheSet } from "../cache/cache";
+
+const RULES_CACHE_NS = "match-rules";
+const RULES_CACHE_KEY = "all";
+const RULES_CACHE_TTL_S = 300;
 
 type CacheEntry = { compatible: boolean; weight: number };
 
@@ -36,17 +41,33 @@ function symmetricKeys(a: string, b: string): [string, string] {
   return [key(a, b), key(b, a)];
 }
 
+type SerialisedRule = { a: string; b: string; compatible: boolean; weight: number };
+
 async function loadFromDb(): Promise<void> {
+  // First try Redis-mirrored cache so multi-instance deployments share warm state.
+  const cached = await cacheGet<SerialisedRule[]>(RULES_CACHE_NS, RULES_CACHE_KEY);
+  if (cached && Array.isArray(cached)) {
+    const m = new Map<string, CacheEntry>();
+    for (const r of cached) {
+      m.set(key(r.a, r.b), { compatible: r.compatible, weight: r.weight });
+    }
+    cache = m;
+    matchingLogger.info({ rules: m.size, source: "redis" }, "match-rules cache loaded");
+    return;
+  }
   const rows = await db.select().from(matchRules);
   const map = new Map<string, CacheEntry>();
+  const serialised: SerialisedRule[] = [];
   for (const row of rows) {
     map.set(key(row.searchTypeA, row.searchTypeB), {
       compatible: row.compatible,
       weight: row.weight,
     });
+    serialised.push({ a: row.searchTypeA, b: row.searchTypeB, compatible: row.compatible, weight: row.weight });
   }
   cache = map;
-  matchingLogger.info({ rules: map.size }, "match-rules cache loaded");
+  void cacheSet(RULES_CACHE_NS, RULES_CACHE_KEY, serialised, RULES_CACHE_TTL_S);
+  matchingLogger.info({ rules: map.size, source: "db" }, "match-rules cache loaded");
 }
 
 export async function initMatchRulesCache(): Promise<void> {
@@ -57,6 +78,8 @@ export async function initMatchRulesCache(): Promise<void> {
 
 export function invalidateMatchRulesCache(): void {
   cache = null;
+  // Also clear any Redis-backed mirror so other instances refetch.
+  void cacheDel(RULES_CACHE_NS, RULES_CACHE_KEY);
 }
 
 function ensureCacheSync(): Map<string, CacheEntry> {

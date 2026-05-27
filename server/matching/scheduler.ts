@@ -18,6 +18,7 @@ import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
 import { PhaseRecorder } from "./perf-metrics";
 import { schedulerLogger } from "../lib/logger";
 import { prettyMs, memoryRssPretty } from "../lib/format";
+import { withMatchingLock, forceUnlockMatchingLock, getMatchingLockStatus } from "../cache/matching-lock";
 
 const MATCH_DEBOUNCE_MS = 10_000;
 
@@ -149,7 +150,7 @@ export function triggerMatchingForUser(userId: string): void {
   })();
 }
 
-let isMatchingRunning = false;
+let cycleInFlight = false;
 let lastMatchingStart: number | null = null;
 let lastCycleMeta: {
   completedAt: string;
@@ -162,36 +163,46 @@ export function getLastMatchingCycleMeta() {
   return lastCycleMeta;
 }
 
+/**
+ * Lightweight legacy shape (for /admin/matching/lock-state). Use
+ * getMatchingLockStatus() (re-exported) for the full Redis-aware view.
+ */
 export function getMatchingLockState() {
   return {
-    isRunning: isMatchingRunning,
+    isRunning: cycleInFlight,
     lastStartAt: lastMatchingStart,
     lastStartIso: lastMatchingStart ? new Date(lastMatchingStart).toISOString() : null,
     elapsedMs: lastMatchingStart ? Date.now() - lastMatchingStart : null,
   };
 }
 
+export { getMatchingLockStatus };
+
 export function forceUnlockMatching(): { wasRunning: boolean; lastStartAt: number | null } {
-  const wasRunning = isMatchingRunning;
+  const wasRunning = cycleInFlight;
   const lastStartAt = lastMatchingStart;
-  isMatchingRunning = false;
+  cycleInFlight = false;
   lastMatchingStart = null;
+  forceUnlockMatchingLock();
   console.warn(`[Matching] forceUnlockMatching invocato — wasRunning=${wasRunning}, lastStartAt=${lastStartAt}`);
   return { wasRunning, lastStartAt };
 }
 
 export function triggerMatchingRun(): { started: boolean; reason?: string } {
-  if (isMatchingRunning) {
+  if (cycleInFlight) {
     return { started: false, reason: "already_running" };
   }
   if (lastMatchingStart && Date.now() - lastMatchingStart < MATCH_DEBOUNCE_MS) {
     const ago = Math.floor((Date.now() - lastMatchingStart) / 1000);
     return { started: false, reason: `debounced — last run ${ago}s ago` };
   }
-  isMatchingRunning = true;
+  cycleInFlight = true;
   lastMatchingStart = Date.now();
+  const owner = `${process.pid}@${new Date().toISOString()}`;
 
   (async () => {
+    try {
+    const lockOutcome = await withMatchingLock(owner, async () => {
     const recorder = new PhaseRecorder("on-demand");
     schedulerLogger.info({ event: "cycle_start", trigger: "on-demand" }, "Ciclo on-demand avviato");
 
@@ -291,8 +302,16 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
     } catch (err) {
       schedulerLogger.error({ err }, "Errore nel ciclo on-demand");
       recorder.finish(totalMatches);
+    }
+    });
+    if (!lockOutcome.acquired) {
+      schedulerLogger.warn({ reason: lockOutcome.reason }, "Ciclo skippato — lock già attivo");
+    }
+    } catch (err) {
+      schedulerLogger.error({ err }, "Errore non gestito attorno a withMatchingLock");
     } finally {
-      isMatchingRunning = false;
+      // Guaranteed reset even if withMatchingLock / runtime throws unexpectedly.
+      cycleInFlight = false;
     }
   })();
   return { started: true };

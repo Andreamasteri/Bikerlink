@@ -1,0 +1,76 @@
+import Bottleneck from "bottleneck";
+
+/**
+ * Centralised rate limiters for outbound provider calls (Task #2517).
+ *
+ * All call sites that hit an external AI / mapping provider should route
+ * through the matching limiter so per-provider quotas are honoured globally,
+ * independent of how many call sites or queues are firing.
+ *
+ * Usage:
+ *   import { limiters } from "@/server/lib/throttle";
+ *   const result = await limiters.openai.schedule(() => callOpenAi(...));
+ */
+
+const isTest = process.env.NODE_ENV === "test";
+
+function make(opts: Bottleneck.ConstructorOptions): Bottleneck {
+  return new Bottleneck(
+    isTest
+      ? { maxConcurrent: 100, minTime: 0 }
+      : opts,
+  );
+}
+
+export const limiters = {
+  // OpenAI: shared embeddings + chat. Conservative defaults — raise per-key.
+  openai: make({
+    maxConcurrent: 5,
+    minTime: 50, // ~20 req/s ceiling
+    reservoir: 500,
+    reservoirRefreshAmount: 500,
+    reservoirRefreshInterval: 60 * 1000,
+  }),
+  gemini: make({
+    maxConcurrent: 5,
+    minTime: 100,
+    reservoir: 60,
+    reservoirRefreshAmount: 60,
+    reservoirRefreshInterval: 60 * 1000,
+  }),
+  anthropic: make({
+    maxConcurrent: 5,
+    minTime: 100,
+    reservoir: 50,
+    reservoirRefreshAmount: 50,
+    reservoirRefreshInterval: 60 * 1000,
+  }),
+  mapbox: make({
+    maxConcurrent: 10,
+    minTime: 50,
+    reservoir: 600,
+    reservoirRefreshAmount: 600,
+    reservoirRefreshInterval: 60 * 1000,
+  }),
+  tomtom: make({
+    maxConcurrent: 5,
+    minTime: 200,
+    reservoir: 5,
+    reservoirRefreshAmount: 5,
+    reservoirRefreshInterval: 1000,
+  }),
+} as const;
+
+export type LimiterName = keyof typeof limiters;
+
+export function getLimiter(name: LimiterName): Bottleneck {
+  return limiters[name];
+}
+
+export function getLimiterStats(): Record<string, ReturnType<Bottleneck["counts"]>> {
+  const out: Record<string, ReturnType<Bottleneck["counts"]>> = {};
+  for (const [name, lim] of Object.entries(limiters)) {
+    out[name] = lim.counts();
+  }
+  return out;
+}

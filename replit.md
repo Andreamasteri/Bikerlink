@@ -85,6 +85,36 @@ Dopo la scheda, l'agente chiede: **"Hai preferenze su come risolvere, o procedo 
 
 **"Pubblica l'OTA"** significa SOLO pubblicare una OTA (Over-the-Air update). NON avviare mai una build EAS (APK/AAB) in risposta a questo comando. La build EAS è un'operazione separata e richiede autorizzazione esplicita come da sezione "APK Build — Regola Obbligatoria".
 
+## Redis — Lock Distribuito + Cache + Code BullMQ (Task #2517)
+
+Il matching engine usa un **lock distribuito Redis** (Redlock) per evitare cicli sovrapposti tra istanze multiple, una **cache Redis breve** (TTL 60–120s) per tag e candidati per zona, e **code BullMQ** persistenti per i job pesanti. Tutto è **opzionale**: se `REDIS_URL` non è configurato, il backend ricade automaticamente su lock in-memory + cache assente (modalità single-instance) con un warning nei log.
+
+### Configurazione
+- Secret `REDIS_URL` (Replit Secrets). Formato: `redis://user:pass@host:port` oppure `rediss://...` per TLS. Richiede Redis ≥ 7.0 (necessario per `SET NX EX` atomico e stream BullMQ).
+- Senza la secret: `getRedis()` ritorna `null`, `withMatchingLock` usa fallback in-memory, BullMQ è disattivato, Bull Board risponde 503.
+
+### Moduli chiave
+- `server/cache/redis.ts` — client `ioredis` singleton con `retryStrategy` esponenziale, riconnessione automatica, `isAvailable()` flag. Tutti gli accessi a Redis passano da qui.
+- `server/cache/matching-lock.ts` — `withMatchingLock(owner, fn)` basato su `redlock@5.0.0-beta.2` (TTL 5 min). Espone `getMatchingLockStatus()` con holder, scadenza, ultimi 10 acquire/release e stato Redis.
+- `server/cache/cache.ts` — wrapper JSON `cacheGet/cacheSet/cacheDel/cacheGetOrSet` con metriche hit/miss per namespace.
+- `server/cache/zone-cache.ts` — `cachedCandidatesForZone(lat, lon, radiusKm, loader)` con grid snap 0.05° + TTL 60s per le query di prossimità ricorrenti.
+- `server/cache/queues.ts` — code BullMQ: `embeddings`, `recap`, `route-fingerprint`, `pattern-detect`. Lazy-init.
+- `server/cache/bull-board.ts` — dashboard `@bull-board/express` montata su `/api/admin/queues` (protetta da `_requireAdmin`).
+- `server/lib/throttle.ts` — limiter Bottleneck centralizzati per `openai`, `gemini`, `anthropic`, `mapbox`, `tomtom`.
+
+### Endpoint admin
+- `GET /api/admin/matching/lock-status` — stato lock distribuito + holder + history.
+- `GET /api/admin/matching/perf` — ora include `cache` (hit/miss/error per namespace), `redis` (status), `limiters` (Bottleneck counts), `queues` (lista).
+- `GET /api/admin/queues/*` — Bull Board UI.
+
+### Cache attive
+- `tags-for-entity` (TTL 120s) — invalidata da `setTagsForEntity` (`server/storage/tags.ts`).
+- `zone-candidates` (TTL 60s) — invalidabile con `invalidateZoneCache()`.
+- `match-rules` — la cache in-process è preservata; `invalidateMatchRulesCache()` ora cancella anche la chiave Redis (`bl:match-rules:all`) per consistenza multi-istanza.
+
+### Refactor scheduler
+`triggerMatchingRun()` in `server/matching/scheduler.ts` ora avvolge il ciclo in `withMatchingLock`. Se un'altra istanza tiene il lock, il ciclo viene saltato con log `Ciclo skippato — lock già attivo`. `forceUnlockMatching()` rilascia sia il lock in-memory che la chiave Redis.
+
 ## Framework A/B Testing Matching (Task #2525)
 
 Permette di testare varianti dell'algoritmo di matching su sottogruppi di utenti

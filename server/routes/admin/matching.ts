@@ -5,7 +5,11 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 import { desc, eq, sql } from "drizzle-orm";
 import { invalidateMatchRulesCache } from "../../matching/rules-cache";
 import { triggerMatchingRun, getLastMatchingCycleMeta } from "../../matching-engine";
-import { forceUnlockMatching, getMatchingLockState } from "../../matching/scheduler";
+import { forceUnlockMatching, getMatchingLockState, getMatchingLockStatus } from "../../matching/scheduler";
+import { getRedisStatus } from "../../cache/redis";
+import { snapshotCacheMetrics } from "../../cache/cache-metrics";
+import { getLimiterStats } from "../../lib/throttle";
+import { getQueueNames } from "../../cache/queues";
 import {
   getTimeProfileLabelDistribution,
   runUserTimeProfileJob,
@@ -580,6 +584,21 @@ router.get("/matching/lock-state", async (_req: Request, res: Response) => {
   }
 });
 
+// Task #2517 — distributed lock status (Redis-aware).
+router.get("/matching/lock-status", async (_req: Request, res: Response) => {
+  try {
+    const status = await getMatchingLockStatus();
+    return sendSuccess(res, {
+      ...status,
+      legacyLocal: getMatchingLockState(),
+      redis: { ...status.redis, ...getRedisStatus() },
+    });
+  } catch (error) {
+    console.error("[admin/matching/lock-status] error:", error);
+    return sendError(res, 500, "Errore lettura lock status distribuito");
+  }
+});
+
 router.get("/matching/perf", async (req: Request, res: Response) => {
   try {
     const limitRaw = typeof req.query.limit === "string" ? parseInt(req.query.limit, 10) : NaN;
@@ -593,6 +612,10 @@ router.get("/matching/perf", async (req: Request, res: Response) => {
       memory: {
         rssBytes: process.memoryUsage().rss,
       },
+      cache: snapshotCacheMetrics(),
+      redis: getRedisStatus(),
+      limiters: getLimiterStats(),
+      queues: getQueueNames(),
     });
   } catch (error) {
     console.error("[admin/matching/perf] error:", error);

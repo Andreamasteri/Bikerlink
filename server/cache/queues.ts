@@ -1,0 +1,68 @@
+import { Queue, type ConnectionOptions } from "bullmq";
+import { getRawRedis, isRedisAvailable } from "./redis";
+
+/**
+ * BullMQ persistent queues (Task #2517).
+ *
+ * Lazily instantiated — only when REDIS_URL is configured. Consumers that need
+ * to enqueue jobs should `getQueue(name)` and fall back to direct execution if
+ * it returns null. This module deliberately does NOT register workers — those
+ * are added by the individual job owners (#2515/#2516/#2520/#2523/#2526).
+ */
+
+export type QueueName = "embeddings" | "recap" | "route-fingerprint" | "pattern-detect";
+
+const ALL_QUEUES: QueueName[] = ["embeddings", "recap", "route-fingerprint", "pattern-detect"];
+
+const queues = new Map<QueueName, Queue>();
+
+function getConnection(): ConnectionOptions | null {
+  const client = getRawRedis();
+  if (!client) return null;
+  // BullMQ accepts a shared ioredis instance via `connection`.
+  return client as unknown as ConnectionOptions;
+}
+
+export function getQueue(name: QueueName): Queue | null {
+  if (!isRedisAvailable()) return null;
+  const existing = queues.get(name);
+  if (existing) return existing;
+  const connection = getConnection();
+  if (!connection) return null;
+  try {
+    const q = new Queue(name, {
+      connection,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5_000 },
+        removeOnComplete: { age: 24 * 3600, count: 1000 },
+        removeOnFail: { age: 7 * 24 * 3600 },
+      },
+    });
+    queues.set(name, q);
+    return q;
+  } catch (err) {
+    console.warn(`[queues] failed to init queue ${name}:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export function getAllQueues(): Queue[] {
+  const out: Queue[] = [];
+  for (const name of ALL_QUEUES) {
+    const q = getQueue(name);
+    if (q) out.push(q);
+  }
+  return out;
+}
+
+export function getQueueNames(): QueueName[] {
+  return [...ALL_QUEUES];
+}
+
+export async function closeQueues(): Promise<void> {
+  for (const q of queues.values()) {
+    try { await q.close(); } catch { /* ignore */ }
+  }
+  queues.clear();
+}

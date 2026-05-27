@@ -10,6 +10,14 @@ import {
   type InsertTag,
 } from "@shared/db";
 import { TrackingStorage } from "./tracking";
+import { cacheGet, cacheSet, cacheDel } from "../cache/cache";
+
+const TAGS_CACHE_NS = "tags-for-entity";
+const TAGS_CACHE_TTL_S = 120;
+
+function tagsCacheKey(entityType: string, entityId: string): string {
+  return `${entityType}:${entityId}`;
+}
 
 /**
  * Tag system storage (Task #2512).
@@ -81,6 +89,12 @@ export class TagsStorage extends TrackingStorage {
     entityType: string,
     entityId: string,
   ): Promise<Array<Tag & { categorySlug: string; categoryLabel: string }>> {
+    const cacheKey = tagsCacheKey(entityType, entityId);
+    const cached = await cacheGet<Array<Tag & { categorySlug: string; categoryLabel: string }>>(
+      TAGS_CACHE_NS,
+      cacheKey,
+    );
+    if (cached) return cached;
     const rows = await db
       .select({ tag: tags, category: tagCategories })
       .from(entityTags)
@@ -93,11 +107,14 @@ export class TagsStorage extends TrackingStorage {
         ),
       )
       .orderBy(asc(tagCategories.label), asc(tags.label));
-    return rows.map((r) => ({
+    const result = rows.map((r) => ({
       ...r.tag,
       categorySlug: r.category.slug,
       categoryLabel: r.category.label,
     }));
+    // Populate Redis cache (no-op when REDIS_URL unset).
+    void cacheSet(TAGS_CACHE_NS, cacheKey, result, TAGS_CACHE_TTL_S);
+    return result;
   }
 
   /**
@@ -137,6 +154,9 @@ export class TagsStorage extends TrackingStorage {
         }
       }
     }
+
+    // Invalidate Redis cache after mutation completes.
+    void cacheDel(TAGS_CACHE_NS, tagsCacheKey(entityType, entityId));
 
     return await db.transaction(async (tx) => {
       if (options?.categorySlug) {
