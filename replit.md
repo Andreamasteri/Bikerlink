@@ -30,6 +30,46 @@ Validation command `eslint` (comando: `bash scripts/eslint-hooks-check.sh`) è r
 
 ---
 
+## ⛔ REGOLA FERREA — File LOCKED priorità media (Task "Lock dimensione file priorità media")
+
+Otto file TS/TSX nella fascia 600–950 righe sono **congelati alla dimensione attuale** tramite header `LARGE-FILE-LOCKED` in cima al file. Sono grossi ma coesi: splittarli ora introdurrebbe rischio senza beneficio. Per evitarne la crescita, ogni file dichiara un **companion path** dedicato dove va il codice nuovo.
+
+### Tabella file LOCKED
+
+| File | Limite locked | Companion path |
+|---|---:|---|
+| `server/motion-simulator.ts` | 936 | `server/motion-simulator-extra.ts` |
+| `components/admin/ota/OtaPanel.tsx` | 767 | `components/admin/ota/OtaPanelExtra.tsx` |
+| `server/routes/admin/users.ts` | 728 | `server/routes/admin/users-extra.ts` |
+| `app/admin/stregatti.tsx` | 726 | `app/admin/stregatti-extra.tsx` |
+| `app/(tabs)/match.tsx` | 719 | `app/(tabs)/match-extra.tsx` |
+| `server/routes/client-settings.ts` | 669 | `server/routes/client-settings-extra.ts` |
+| `app/proposals/create.tsx` | 658 | `app/proposals/create-extra.tsx` |
+| `shared/db/matching.ts` | 630 | `shared/db/matching-extra.ts` |
+
+### Regola d'uso (non negoziabile)
+
+**Quando aggiungi codice a uno di questi file, mettilo nel companion path indicato nell'header. Non crescere il file esistente.**
+
+Quando il gate ratchet (Task #2584) è attivo e blocca un file LOCKED cresciuto, il messaggio d'errore è del tipo:
+
+```
+❌ server/motion-simulator.ts cresciuto a 937 righe (limite locked: 936).
+   Sposta il codice nuovo in: server/motion-simulator-extra.ts
+```
+
+### Regole anti-bypass (vincolanti per ogni task futuro)
+
+1. **Mai alzare il numero `<N>` dell'header LOCKED.** La baseline `<N>` può solo restare uguale o calare. Il ratchet rifiuta un `<N>` aumentato.
+2. **Mai rimuovere l'header LOCKED.** Rimuoverlo riapplica il default 600 → il file scatta sopra soglia → blocco. Equivale a chiedere lo split, va fatto solo con task esplicito utente.
+3. **Quando aggiungi codice a un file LOCKED, va nel companion path indicato nell'header.** Non in un altro file, non "appena 3 righe nel file esistente perché è più comodo".
+4. **Il companion file, quando creato, eredita il limite default 600.** Non può nascere già LOCKED a una dimensione alta — deve crescere naturalmente.
+5. **Vietato creare companion "fake"** (file vuoto con `export {}` per silenziare warning). Il companion nasce solo quando ha contenuto reale da ospitare.
+6. **Vietato cambiare il path companion suggerito** senza task esplicito utente. Il path è una convenzione vincolante.
+7. **Vietato spostare gli 8 file LOCKED in `.large-files-allow.txt`** per silenziarli definitivamente. ALLOW è riservato a categorie strutturali (i18n, dataset, asset, test); i file LOCKED sono debito tecnico temporaneo.
+
+---
+
 ## Anti-pattern dell'agente — leggere prima di lavorare
 
 1. **Gerarchia delle fonti di verità per le dipendenze native**: per dichiarare che una libreria nativa Android non è nell'APK, NON basta verificare `package.json` o gli `import` nel codice JS. Le dipendenze transitive di Expo (es. `expo-camera` tira ML Kit Barcode, `expo-notifications` tira Firebase Cloud Messaging) finiscono nell'APK senza apparire in `package.json`. La sola fonte di verità è il `.apk` compilato (o il gradle dependency tree).

@@ -1,3 +1,8 @@
+// LARGE-FILE-LOCKED — limite: 936 righe (attuali: 936)
+// Aggiungi nuove funzionalità in: server/motion-simulator-extra.ts
+// Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
+//         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
+
 /**
  * motion-simulator.ts
  * GPS motion simulator for fake users (Stregatti).

@@ -1,3 +1,8 @@
+// LARGE-FILE-LOCKED — limite: 767 righe (attuali: 767)
+// Aggiungi nuove funzionalità in: components/admin/ota/OtaPanelExtra.tsx
+// Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
+//         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
+
 import React, { useState, useCallback } from "react";
 import {
   View,

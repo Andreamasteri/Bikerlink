@@ -1,3 +1,8 @@
+// LARGE-FILE-LOCKED — limite: 728 righe (attuali: 728)
+// Aggiungi nuove funzionalità in: server/routes/admin/users-extra.ts
+// Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
+//         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
+
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";

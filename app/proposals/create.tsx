@@ -1,3 +1,8 @@
+// LARGE-FILE-LOCKED — limite: 658 righe (attuali: 658)
+// Aggiungi nuove funzionalità in: app/proposals/create-extra.tsx
+// Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
+//         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
+
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,

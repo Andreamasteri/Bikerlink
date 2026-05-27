@@ -1,3 +1,8 @@
+// LARGE-FILE-LOCKED — limite: 630 righe (attuali: 630)
+// Aggiungi nuove funzionalità in: shared/db/matching-extra.ts
+// Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
+//         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
+
 import { sql } from "drizzle-orm";
 import {
   pgTable,
