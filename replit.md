@@ -131,6 +131,40 @@ Filtri esclusivi opzionali che pre-filtrano i candidati prima dello scoring (es.
 - `server/routes/admin/matching.ts` — endpoint `GET /api/admin/matching/negative-pref-patterns` per stats community
 - `app/admin/negative-pref-patterns.tsx` — UI admin
 
+## Embeddings — pgvector + OpenAI (Task #2514)
+
+Infrastruttura riusabile per embeddings semantici (matching musicale, bio libere, ecc.).
+
+### Modello scelto
+**Default**: OpenAI `text-embedding-3-small` (1536 dim) via `@ai-sdk/openai` + `ai` (`embed`/`embedMany`).
+- **Motivazione**: zero nuove dipendenze pesanti (SDK già usato per OTA assistant + traduzioni), qualità multilingua eccellente, costo trascurabile (~$0.02 / 1M token). Backfill stimato 5000 utenti × bio media (~50 token) ≈ **$0.005 totali**. Rate limit tier 1 OpenAI = 3000 req/min, ampiamente sufficiente con `embedMany`.
+- **Piano B documentato** (non implementato): locale `@huggingface/transformers` v4.x con `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (384 dim) per dev offline. Switch richiede cambiare `EMBEDDING_MODEL_ID` in `server/embeddings/client.ts` + nuova colonna `embedding vector(384)` (migrazione separata). NON `@xenova/transformers` (deprecato).
+
+### Stack
+- **DB**: PostgreSQL `pgvector` 0.8.0 (HNSW stabili + halfvec). Verificato con `SELECT extversion FROM pg_extension WHERE extname='vector'`.
+- **Tabella**: `embeddings` — colonne `entity_type`, `entity_id`, `field` (es. `bio`, `music_taste`), `embedding vector(1536)`, `model`, `source_hash` (sha256 input per cache idempotente), `created_at`, `updated_at`. Unique index `(entity_type, entity_id, field)`. Indice **HNSW** su `embedding vector_cosine_ops`.
+- **Schema Drizzle**: `shared/db/embeddings.ts` (usa il helper `vector` nativo di `drizzle-orm/pg-core`, non quello di `pgvector/drizzle-orm` che in v0.2.1 non è esposto via subpath exports).
+- **Migrazione**: `migrations/0036_embeddings.sql` (idempotente).
+
+### Helper server (`server/embeddings/`)
+- `generateEmbedding(text): Promise<number[]>` — vettore singolo, timeout 15s, retry esponenziale 3x su 429/5xx (`p-retry`).
+- `generateEmbeddings(texts[]): Promise<number[][]>` — batch via `embedMany`.
+- `upsertEmbedding(entityType, entityId, field, text)` — cache su `source_hash`: se l'hash combacia con la riga esistente, **nessuna chiamata API**, ritorna `cached: true`.
+- `findSimilar(entityType, field, vec, limit=5, minSimilarity=0)` — usa l'operatore `<=>` (cosine distance) + HNSW, ritorna `similarity = 1 - distance` ordinato decrescente.
+
+### Endpoint admin di test
+`POST /api/admin/embeddings/test` — body `{ text, entityType?, field? }` → ritorna `{ model, dimensions, generationMs, searchMs, preview, similar }`. Se `entityType`+`field` sono passati, esegue anche la ricerca top-5. Tabella vuota → `similar: []` (smoke test ok). Protetto da `_requireAdmin`.
+
+### Secret
+`OPENAI_API_KEY` (già presente nei Secrets, riusata da `server/routes/admin/ota-assistant.ts` e `server/routes/admin/translations.ts`). **MAI hardcoded**.
+
+### Pacchetti npm aggiunti (Task #2514)
+- `pgvector@^0.2.1` (in package.json per usi futuri / formattazione utility; helper drizzle non esposto in subpath exports → si usa `vector` nativo di drizzle-orm)
+- `@huggingface/transformers@^4.2.0` (piano B / fallback offline, non usato di default — vedi sopra)
+- `p-retry@^6.2.0` (Node 20 compatible; v8 richiede Node ≥22 e la repo è pinnata `nodejs-20`)
+- `p-limit@^7.3.0` (per backfill batch nei task successivi)
+- Bump `drizzle-kit` `^0.31.4` → `^0.31.10` (pieno supporto colonne `vector`)
+
 ## Framework A/B Testing Matching (Task #2525)
 
 Permette di testare varianti dell'algoritmo di matching su sottogruppi di utenti
@@ -201,7 +235,6 @@ BikerLink utilizes a modern full-stack architecture.
 - Interactive maps are implemented esclusivamente con Leaflet in WebView (componenti `Leaflet*Map.tsx`). Solo native (Android/iOS): la piattaforma web è stata rimossa completamente (Task #1150).
 - **⚠️ ARCHITETTURA MAPPE — Due sistemi distinti e separati**:
   - **Mappe utente (visualizzazione)**: Leaflet in WebView (componenti `Leaflet*Map.tsx`), tile server OSM o equivalente. Usato per mostrare a schermo utenti, percorsi, easter egg, workshop Syneco e qualunque overlay visivo.
-<<<<<<< HEAD
   - **GraphHopper (routing)**: server di routing dedicato, usato **esclusivamente** per il calcolo dei percorsi moto (curvy roads, waypoint, ottimizzazione tracciato). Non viene mai usato per la visualizzazione diretta. Self-hosted su `https://routing.bikerlink.app`. Variabili d'ambiente: `GRAPHHOPPER_URL` (URL base server), `GRAPHHOPPER_TOKEN` (header X-GH-Token), `ROUTING_DISABLED=0` (abilita routing; default disabilitato). Tile server self-hosted: `TILES_URL=https://tiles.bikerlink.app` (letto da `lib/map-tiles.ts` via `SELF_HOSTED_TILES_URL`/`isTilesSelfHosted`; su client Expo usare `EXPO_PUBLIC_TILES_URL`). Endpoint test admin: `GET /api/admin/maps/test-routing` (in `server/routes/admin/maps/test-handler.ts`) — esegue percorso Milano→Como sull'engine configurato e ritorna `graphhopper_url` mascherato, `latency_ms`, `source`, `is_self_hosted`, `distanceKm`, `durationMinutes`.
   - **Valhalla (routing secondario)**: secondo routing engine self-hosted (Task #2360), affiancato a GraphHopper. Client: `server/routing/valhalla-client.ts`. Request builder: `server/routing/valhalla/request-builder.ts`. Response mapper: `server/routing/valhalla/response-mapper.ts`. Polyline converter: `server/routing/valhalla/polyline-convert.ts`. Selector: `server/routing/router-selector.ts`. Attivabile dall'admin tramite pannello Admin → Mappe → Routing Engine. Gated: visibile solo a utenti con `mapTester=true` quando rollout=tester, oppure a tutti quando rollout=all. Fallback automatico a GraphHopper su 5xx/timeout (header `X-Routing-Fallback: graphhopper`). Profilo motorcycle: `use_highways:0.3, use_trails:0.0, use_ferry:0.5`. Setup infrastruttura Docker in `infra/valhalla/README.md`. Variabili d'ambiente: `VALHALLA_URL`, `VALHALLA_API_KEY`.
   - **Mapbox Directions (cloud emergency, Routing #3)**: terzo engine (Task #2361) — failover cloud per emergenze quando entrambi i self-hosted sono down. Client: `server/routing/mapbox-directions-client.ts`. Request builder: `server/routing/mapbox/request-builder.ts`. Response mapper: `server/routing/mapbox/response-mapper.ts`. Quota guard: `server/routing/mapbox/quota-guard.ts`. Integrato nel selector `server/routing/router-selector.ts`. Profilo `driving` (Mapbox non ha motorcycle nativo; exclude motorway+ferry per approssimare moto-friendly). Gate quota: contatore `mapbox_request_count_month` in `app_settings`; soglia warning `mapbox_quota_warning_threshold` (default 80k); reset automatico il 1° del mese (cron in `server/index.ts`). Quota esaurita (≥100k): fallback preventivo a GraphHopper senza chiamare Mapbox. Errori 4xx/5xx/timeout: fallback automatico con header `X-Routing-Fallback: graphhopper`. Il payload `GET /api/admin/maps/config` include `mapbox_quota: { used, limit, percent, warning_threshold, resets_at }` quando Mapbox è attivo. Variabile d'ambiente: `MAPBOX_ACCESS_TOKEN` (token secret `sk.*`, da aggiungere nei Secrets quando si sottoscrive Mapbox). **REMINDER UTENTE**: aggiungere `MAPBOX_ACCESS_TOKEN` nei Secrets Replit quando si attiva l'abbonamento Mapbox (free tier: 100k req/mese, richiede carta di credito per verifica).
