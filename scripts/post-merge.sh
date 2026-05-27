@@ -2,6 +2,26 @@
 set -e
 
 echo "Running post-merge setup..."
+
+# ── SYNC node_modules POST-MERGE (Task #2573) ────────────────
+# I task agent vivono in ambienti isolati: node_modules NON è
+# sincronizzato dai merge. Solo package.json + package-lock.json
+# vengono committati. Senza questo step, il server crasha con
+# "Cannot find module 'X'" per ogni pacchetto installato in un
+# task ma assente nel node_modules dell'app principale.
+if [ -f "package-lock.json" ]; then
+  echo "→ Sincronizzazione node_modules (npm install dal lockfile)..."
+  if npm install --no-audit --no-fund 2>&1; then
+    echo "✅ node_modules sincronizzato."
+  else
+    NPM_EXIT=$?
+    echo "❌ npm install fallito (exit ${NPM_EXIT}) — abort post-merge per evitare stato incoerente."
+    exit "${NPM_EXIT}"
+  fi
+else
+  echo "⚠️  package-lock.json mancante — sync node_modules saltato."
+fi
+
 npm run db:push --force 2>&1 || true
 
 echo "Invalidating server_dist to force TypeScript recompile on next start..."

@@ -38,6 +38,19 @@ Validation command `eslint` (comando: `bash scripts/eslint-hooks-check.sh`) è r
 
 3. **"Fatto" ≠ "credo di aver fatto"**: per task di rimozione/pulizia, "fatto" significa che esiste una prova oggettiva nell'output finale (binario, log, response API). Se la prova non c'è, dichiarare esplicitamente "applicato ma non verificato sul binario" — non "fatto".
 
+## Sincronizzazione node_modules dopo merge (Task #2573)
+
+**Root cause documentato**: i task agent lavorano in ambienti isolati con il proprio `node_modules`. Quando un task viene mergeato nell'app principale, il merge committa **solo** `package.json` + `package-lock.json` — `node_modules` NON viene sincronizzato. Risultato storico: dopo merge di task che installano nuove deps (es. #2541→#2561, che ha aggiunto pino/helmet/bullmq/ioredis/sentry/etc.), il server crasha in loop con `Cannot find module 'X'` per ogni pacchetto dichiarato ma non presente in `node_modules`.
+
+**Soluzione (permanente)**: `scripts/post-merge.sh` esegue `npm install --no-audit --no-fund` dal `package-lock.json` come **primo step** dopo il merge, prima di qualunque altro check (db:push, typecheck, ecc.). Questo garantisce che `node_modules` rifletta sempre `package.json` corrente.
+
+**Regola per chi scrive task**: chi installa nuovi pacchetti in un task deve:
+1. Usare il packager tool (`installLanguagePackages`) — MAI `npm install` diretto via bash (è bloccato per design)
+2. Assicurarsi che `package.json` + `package-lock.json` siano committati nel merge
+3. Non preoccuparsi del sync `node_modules`: lo fa automaticamente `post-merge.sh`
+
+**Verifica rapida post-merge**: se il workflow `Start App` crasha con `Cannot find module '...'`, controllare che `scripts/post-merge.sh` contenga `npm install` e che sia stato eseguito (log del merge nella console Replit).
+
 ## Image Assets — Varianti Responsive
 
 Ogni immagine WebP in `assets/images/` deve avere una variante `*-sm.webp` al 50% di larghezza, usata dai `srcset` del sito web (`server/site/pages.ts`).

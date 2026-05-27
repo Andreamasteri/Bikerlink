@@ -22,7 +22,6 @@ export async function explainViolation(input: ExplainInput): Promise<ExplainOk |
 
   let model: any = null; let modelName = "";
   if (process.env.ANTHROPIC_API_KEY) {
-    // @ts-expect-error optional dependency, may not be installed
     const anth: any = await import("@ai-sdk/anthropic").catch(() => null);
     if (anth?.anthropic) { model = anth.anthropic("claude-sonnet-4-20250514"); modelName = "claude-sonnet-4"; }
   }

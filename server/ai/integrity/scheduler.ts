@@ -24,7 +24,6 @@ export function stopAppIntegrityScheduler(): void {
 }
 
 async function bootCron() {
-  // @ts-expect-error croner is an optional dependency; falls back to setInterval if missing
   const cronMod: any = await import("croner").catch(() => null);
   const runCheap = async () => {
     lastRunAt = new Date();

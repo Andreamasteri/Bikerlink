@@ -1,7 +1,7 @@
 // Task #2537 — Runner: esegue tutti i check (o famiglia singola), persiste run + violazioni.
 import { db } from "../../db";
 import { integrityRuns, integrityViolations } from "@shared/db";
-import { desc, eq, isNull, inArray, and, notInArray } from "drizzle-orm";
+import { desc, eq, inArray, and, notInArray } from "drizzle-orm";
 import type { AppIntegrityCheck, Family, RunSummary, Severity } from "./types";
 import { ALL_FAMILIES } from "./types";
 import { loadAllChecks, loadFamilyChecks } from "./registry";
