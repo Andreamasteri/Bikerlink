@@ -1,6 +1,6 @@
 // Task #2698 — Pannello admin "AI Assistant Utenti". Tabs Android/iOS,
 // configurazione master + modes + actions + proactive rules + telemetria.
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Switch, Pressable, ActivityIndicator, Alert } from "react-native";
 import { Stack } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
