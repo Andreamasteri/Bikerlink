@@ -24,10 +24,17 @@ const MIGRATIONS_HASH_CACHE = path.resolve(process.cwd(), "server_dist", ".migra
  * migration in this batch is the source of truth.
  *   42703 — undefined_column  (CREATE INDEX/CONSTRAINT on dropped column)
  *   42P01 — undefined_table   (operation on dropped table)
+ *
+ * "Object does not exist" — the object was already removed by a migration
+ * that was previously applied manually, so the DROP is a no-op:
+ *   42704 — undefined_object  (DROP CONSTRAINT / DROP TYPE / DROP INDEX on a
+ *                              missing object — e.g. a FK constraint that was
+ *                              renamed or dropped by an earlier manual apply)
  */
 const SKIPPABLE_ERROR_CODES = new Set([
   "42P07", "42701", "42710", "42P16",
   "42703", "42P01",
+  "42704",
 ]);
 
 function isSkippableError(err: unknown): boolean {
