@@ -1,16 +1,65 @@
 /**
  * custom-routes2.ts — Successore di custom-routes.ts
  *
- * Questo file è il "file companion" di server/routes/custom-routes.ts (562 righe).
- * Quando custom-routes.ts si avvicina o supera la soglia delle 600 righe (attualmente 562),
- * i nuovi blocchi di route e helper vanno aggiunti qui invece che nel file originale.
- *
- * Convenzioni:
- * - Importare Router da express e registrare il router con app.use() in server/index.ts
- * - Mantenere la stessa struttura: helper functions in cima, poi router.get/post/put/delete
- * - NON spostare il codice esistente da custom-routes.ts qui senza task dedicato
- *
- * Stato attuale: VUOTO — pronto a ricevere nuove route.
+ * Nuovo codice relativo al dominio custom-routes va aggiunto qui.
+ * NON spostare il codice esistente da custom-routes.ts senza task dedicato.
  */
 
-export {};
+import { Router } from "express";
+import { storage } from "../storage";
+
+const router = Router();
+
+// ─── POST /api/custom-routes/:id/duplicate ────────────────────────────────────
+// Duplica un percorso (e i suoi waypoint) assegnando la copia all'utente
+// autenticato. Restituisce il nuovo percorso con i waypoint duplicati.
+router.post("/api/custom-routes/:id/duplicate", async (req, res) => {
+  try {
+    const userId = req.session.userId;
+    if (!userId) return res.status(401).json({ error: "Non autenticato" });
+
+    const { id } = req.params;
+    const original = await storage.getCustomRoute(id);
+    if (!original) return res.status(404).json({ error: "Percorso non trovato" });
+
+    const isOwner = original.userId === userId;
+    const isPublic =
+      original.visibility === "public" ||
+      (original.visibility !== "private" && original.isPublic);
+
+    if (!isOwner && !isPublic) {
+      return res.status(403).json({ error: "Accesso non consentito" });
+    }
+
+    const copy = await storage.createCustomRoute({
+      userId,
+      title: `${original.title} (copia)`,
+      description: original.description ?? undefined,
+      totalDistanceKm: original.totalDistanceKm ?? 0,
+      isPublic: false,
+      visibility: "private",
+    });
+
+    const waypoints = await storage.getCustomRouteWaypoints(original.id);
+    const copiedWaypoints = await Promise.all(
+      waypoints.map((wp) =>
+        storage.createCustomRouteWaypoint({
+          routeId: copy.id,
+          orderIndex: wp.orderIndex,
+          name: wp.name,
+          description: wp.description ?? undefined,
+          latitude: wp.latitude,
+          longitude: wp.longitude,
+          waypointType: wp.waypointType,
+        })
+      )
+    );
+
+    return res.status(201).json({ route: copy, waypoints: copiedWaypoints });
+  } catch (err: unknown) {
+    console.error("[custom-routes2 duplicate] error:", err);
+    return res.status(500).json({ error: "Errore durante la duplicazione del percorso" });
+  }
+});
+
+export default router;

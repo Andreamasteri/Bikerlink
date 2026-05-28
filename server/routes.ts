@@ -32,6 +32,7 @@ import easterEggRoutes from "./routes/easter-eggs";
 import adminRoutes from "./routes/admin";
 import moderatorRoutes from "./routes/moderator";
 import customRoutesRouter from "./routes/custom-routes";
+import customRoutes2Router from "./routes/custom-routes2";
 import sosRoutes from "./routes/sos";
 import telemetryRoutes from "./routes/telemetry";
 import telemetryMapsRoutes from "./routes/telemetry-maps";
@@ -264,6 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/invitations", invitationRoutes);
   app.use("/api/routes", trackingRoutes);
   app.use(customRoutesRouter);
+  app.use(customRoutes2Router);
   // Task #2517 — Bull Board UI for inspecting BullMQ queues. Mounted BEFORE
   // the JSON-only admin router so its HTML/static assets are served correctly.
   try {
