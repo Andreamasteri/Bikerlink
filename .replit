@@ -61,6 +61,10 @@ args = "typecheck-client"
 task = "workflow.run"
 args = "OTA Publish"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "planned-routes-size"
+
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
@@ -162,6 +166,17 @@ args = "bash scripts/publish-ota-full.sh"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "planned-routes-size"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/check-planned-routes-size.ts"
+
+[workflows.workflow.metadata]
+isValidation = true
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
