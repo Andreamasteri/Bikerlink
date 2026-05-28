@@ -13,7 +13,6 @@ DELETE FROM users WHERE email LIKE '%@bikerlink.test';
 DELETE FROM ota_watchdog_reports;
 DELETE FROM ota_assistant_runs;
 DELETE FROM ota_boot_events;
-DELETE FROM ota_events;
 DELETE FROM ota_releases;
 
 -- Step 3: rimuovi utenti dev non presenti in prod (user1@bikerlink.it)
