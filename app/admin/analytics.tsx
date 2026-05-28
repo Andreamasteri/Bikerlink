@@ -143,6 +143,17 @@ export default function AdminAnalytics() {
     queryKey: ["/api/admin/analytics"],
   });
 
+  const onboardingTagsQuery = useQuery<{
+    shown: number;
+    saved: number;
+    skipped: number;
+    conversionRate: number;
+    skipRate: number;
+    avgTagCount: number;
+  }>({
+    queryKey: ["/api/admin/analytics/onboarding-tags"],
+  });
+
   const usersQuery = useQuery<UserItem[]>({
     queryKey: ["/api/admin/analytics/users-list"],
     enabled: activeModal === "users",
@@ -298,6 +309,46 @@ export default function AdminAnalytics() {
             ))}
           </View>
 
+          <View style={styles.onboardingBlock}>
+            <Text style={styles.onboardingTitle}>Onboarding — Step Tag</Text>
+            {onboardingTagsQuery.isLoading ? (
+              <Text style={styles.loadingText}>Caricamento...</Text>
+            ) : (
+              <View style={styles.onboardingRows}>
+                <View style={styles.onboardingRow}>
+                  <Text style={styles.onboardingLabel}>Visualizzazioni step</Text>
+                  <Text style={styles.onboardingValue}>{onboardingTagsQuery.data?.shown ?? 0}</Text>
+                </View>
+                <View style={styles.onboardingRow}>
+                  <Text style={styles.onboardingLabel}>Salvataggi</Text>
+                  <Text style={styles.onboardingValue}>{onboardingTagsQuery.data?.saved ?? 0}</Text>
+                </View>
+                <View style={styles.onboardingRow}>
+                  <Text style={styles.onboardingLabel}>Skip</Text>
+                  <Text style={styles.onboardingValue}>{onboardingTagsQuery.data?.skipped ?? 0}</Text>
+                </View>
+                <View style={styles.onboardingRow}>
+                  <Text style={styles.onboardingLabel}>Conversion rate</Text>
+                  <Text style={[styles.onboardingValue, { color: Colors.success }]}>
+                    {(onboardingTagsQuery.data?.conversionRate ?? 0).toFixed(1)}%
+                  </Text>
+                </View>
+                <View style={styles.onboardingRow}>
+                  <Text style={styles.onboardingLabel}>Skip rate</Text>
+                  <Text style={styles.onboardingValue}>
+                    {(onboardingTagsQuery.data?.skipRate ?? 0).toFixed(1)}%
+                  </Text>
+                </View>
+                <View style={styles.onboardingRow}>
+                  <Text style={styles.onboardingLabel}>Tag medi per salvataggio</Text>
+                  <Text style={styles.onboardingValue}>
+                    {(onboardingTagsQuery.data?.avgTagCount ?? 0).toFixed(1)}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+
           <AnalyticsExport onExport={handleExportCSV} />
         </>
       )}
@@ -361,4 +412,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
   modalTitle: { fontFamily: "Inter_700Bold", fontSize: 18, color: Colors.text },
+  onboardingBlock: {
+    marginTop: 20,
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  onboardingTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.text,
+    marginBottom: 12,
+  },
+  onboardingRows: { gap: 8 },
+  onboardingRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  onboardingLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+  },
+  onboardingValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: Colors.text,
+  },
 });

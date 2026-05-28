@@ -46,6 +46,7 @@ import radioRoutes from "./routes/radio";
 import eventsRoutes from "./routes/events";
 import arcadeRoutes from "./routes/arcade";
 import errorsRoutes from "./routes/errors";
+import analyticsEventsRoutes from "./routes/analytics-events";
 import sprintsRoutes from "./routes/sprints";
 import roadHazardsRoutes from "./routes/road-hazards";
 import wipStubsRouter from "./routes/wip-stubs";
@@ -286,6 +287,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/events", eventsRoutes);
   app.use("/api/arcade", arcadeRoutes);
   app.use("/api/errors", errorsRoutes);
+  app.use("/api/analytics", analyticsEventsRoutes);
   app.use("/api/sprints", sprintsRoutes);
   app.use("/api/road-hazards", roadHazardsRoutes);
   app.use("/api/media", publicMediaRouter);

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import Colors from "@/constants/colors";
 import { apiRequest, authFetchHeaders, getApiUrl, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { PENDING_ONBOARDING_TAGS_KEY } from "@/constants/onboarding";
+import { trackEvent } from "@/lib/analytics";
 
 interface TagCategory {
   id: string;
@@ -45,6 +46,13 @@ export default function OnboardingTagsStep({ onDone }: Props) {
   const { isAuthenticated } = useAuth();
   const [selected, setSelected] = useState<Record<string, Set<string>>>({});
   const [submitting, setSubmitting] = useState(false);
+  const shownTrackedRef = useRef(false);
+
+  useEffect(() => {
+    if (shownTrackedRef.current) return;
+    shownTrackedRef.current = true;
+    trackEvent("onboarding_tags_shown");
+  }, []);
 
   const categoriesQuery = useQuery<TagCategory[]>({
     queryKey: ["/api/tags/categories"],
@@ -113,6 +121,21 @@ export default function OnboardingTagsStep({ onDone }: Props) {
         }
 
         const hasSelections = Object.keys(payload).length > 0;
+        const totalCount = Object.values(payload).reduce((acc, ids) => acc + ids.length, 0);
+        const categoriesList = Object.keys(payload);
+
+        if (skipped) {
+          trackEvent("onboarding_tags_skipped", {
+            hadSelections: hasSelections,
+            count: totalCount,
+          });
+        }
+        if (hasSelections) {
+          trackEvent("onboarding_tags_saved", {
+            count: totalCount,
+            categories: categoriesList,
+          });
+        }
 
         if (hasSelections) {
           if (isAuthenticated) {

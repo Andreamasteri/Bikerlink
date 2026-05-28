@@ -2,8 +2,8 @@ import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { users } from "@shared/db";
-import { sql } from "drizzle-orm";
+import { users, abEvents } from "@shared/db";
+import { sql, and, eq } from "drizzle-orm";
 
 const router = Router();
 
@@ -196,6 +196,63 @@ router.get("/site-visits", async (req: Request, res: Response) => {
   } catch (_error) {
     console.error("Admin site-visits list error:", _error);
     return sendError(res, 500, "Errore lettura visite sito");
+  }
+});
+
+router.get("/onboarding-tags", async (_req: Request, res: Response) => {
+  try {
+    const rows = await db
+      .select({
+        eventName: abEvents.eventName,
+        n: sql<number>`count(*)::int`,
+      })
+      .from(abEvents)
+      .where(
+        and(
+          eq(abEvents.experimentKey, "analytics"),
+          sql`${abEvents.eventName} IN ('onboarding_tags_shown','onboarding_tags_saved','onboarding_tags_skipped')`
+        )
+      )
+      .groupBy(abEvents.eventName);
+
+    const counts: Record<string, number> = {
+      onboarding_tags_shown: 0,
+      onboarding_tags_saved: 0,
+      onboarding_tags_skipped: 0,
+    };
+    for (const r of rows) counts[r.eventName] = r.n;
+
+    const shown = counts.onboarding_tags_shown;
+    const saved = counts.onboarding_tags_saved;
+    const skipped = counts.onboarding_tags_skipped;
+
+    const avgRow = await db.execute(sql`
+      SELECT
+        COALESCE(AVG((payload->>'count')::int), 0)::float AS avg_count
+      FROM ab_events
+      WHERE experiment_key = 'analytics'
+        AND event_name = 'onboarding_tags_saved'
+        AND payload IS NOT NULL
+        AND payload->>'count' ~ '^[0-9]+$'
+    `);
+    const avgTagCount = Math.round(
+      ((avgRow.rows[0] as { avg_count: number } | undefined)?.avg_count ?? 0) * 10
+    ) / 10;
+
+    const conversionRate = shown > 0 ? Math.round((saved / shown) * 1000) / 10 : 0;
+    const skipRate = shown > 0 ? Math.round((skipped / shown) * 1000) / 10 : 0;
+
+    return res.json({
+      shown,
+      saved,
+      skipped,
+      conversionRate,
+      skipRate,
+      avgTagCount,
+    });
+  } catch (err) {
+    console.error("Admin onboarding-tags analytics error:", err);
+    return sendError(res, 500, "Errore lettura analytics onboarding tags");
   }
 });
 
