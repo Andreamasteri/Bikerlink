@@ -61,7 +61,7 @@ export default function MessageList({ messages, streamState, loading, scrollToMe
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={styles.list}
       data={data}
-      inverted
+      inverted={data.length > 0 || !!liveAssistant}
       keyExtractor={(m) => m.id}
       renderItem={({ item }) => <MessageItem message={item} />}
       ListHeaderComponent={
@@ -108,7 +108,7 @@ export default function MessageList({ messages, streamState, loading, scrollToMe
 
 const styles = StyleSheet.create({
   list: { padding: 12, flexGrow: 1 },
-  empty: { padding: 32, alignItems: "center", transform: [{ scaleY: -1 }] },
+  empty: { padding: 32, alignItems: "center" },
   emptyTitle: { fontFamily: "Inter_700Bold", fontSize: 16, marginBottom: 6 },
   emptySub: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 18, textAlign: "center" },
   routerLive: {
