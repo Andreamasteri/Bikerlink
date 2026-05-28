@@ -23,3 +23,4 @@ export * from "./watchdog";
 export * from "./db-integrity";
 export * from "./integrity";
 export * from "./ai-console";
+export * from "./ai-coordinator";

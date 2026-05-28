@@ -247,6 +247,7 @@ import aiWatchdogRouter from './admin/ai-watchdog';
 import dbIntegrityRouter from './admin/db-integrity';
 import appIntegrityRouter from './admin/app-integrity';
 import aiConsoleRouter from './admin/ai-console';
+import aiCoordinatorRouter from './admin/ai-coordinator';
 import metricsRouter from './admin/metrics';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
@@ -347,6 +348,8 @@ router.use('/', _requireAdmin, aiWatchdogRouter);
 router.use('/', _requireAdmin, dbIntegrityRouter);
 router.use('/', _requireAdmin, appIntegrityRouter);
 router.use('/', aiConsoleRouter);
+// Task #2649 — Layer AI Coordinato (auth interno: requireConsoleRole).
+router.use('/', aiCoordinatorRouter);
 router.use('/', _requireAdmin, metricsRouter);
 
 export default router;

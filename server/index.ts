@@ -342,6 +342,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI Watchdog scheduler failed (non-fatal):", e);
     }
 
+    // Task #2649 — AI Coordinator retention cleanup (04:30 nightly).
+    try {
+      const { startCoordinatorCleanupScheduler } = await import("./ai/coordinator/cleanup");
+      startCoordinatorCleanupScheduler();
+      console.log("[INIT] AI Coordinator cleanup scheduler started");
+    } catch (e) {
+      console.warn("[INIT] AI Coordinator cleanup scheduler failed (non-fatal):", e);
+    }
+
     // Task #2536 — AI DB Integrity scheduler + worker BullMQ.
     try {
       const { startDbIntegrityScheduler } = await import("./ai/db-integrity/scheduler");

@@ -1,0 +1,53 @@
+# Task #2649 — Policy Engine seed rules per il Layer AI Coordinato.
+# Schema: vedi `server/ai/coordinator/types.ts` → PolicyRuleSchema.
+# Hot-reload: POST /api/admin/ai/policies/reload (admin/superadmin only).
+version: 1
+rules:
+  - id: notify-critical-events
+    name: Notify admin su qualsiasi evento critico
+    priority: 100
+    when:
+      severityGte: critical
+    then:
+      action: NOTIFY
+      message: "Evento AI critico rilevato — verificare console"
+
+  - id: watchdog-wins-killswitch
+    name: Il watchdog vince i conflitti di tipo kill_switch
+    priority: 90
+    conflictType: kill_switch
+    when:
+      aiName: watchdog
+    then:
+      action: ALLOW
+      message: "Watchdog ha priorità sul kill switch"
+
+  - id: ota-blocks-on-active-incident
+    name: OTA bloccato se conflitto con incidente integrity attivo
+    priority: 80
+    conflictType: ota_vs_integrity
+    when:
+      aiName: integrity
+    then:
+      action: BLOCK
+      message: "Rollout OTA bloccato: incidente integrity attivo"
+
+  - id: delay-bulk-moderation-during-incident
+    name: Ritarda azioni di moderazione bulk durante un incidente
+    priority: 70
+    conflictType: moderation_vs_incident
+    when:
+      aiName: moderation
+      eventType: bulk_action
+    then:
+      action: DELAY
+      message: "Azione bulk ritardata: incidente in corso"
+
+  - id: default-conflict-block
+    name: Default — blocca i conflitti irrisolti in attesa di admin
+    priority: 1
+    conflictType: "*"
+    when: {}
+    then:
+      action: BLOCK
+      message: "Conflitto irrisolto: in attesa di decisione admin"
