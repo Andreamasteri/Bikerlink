@@ -13,10 +13,17 @@ import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
+import { apiRequest } from "@/lib/query-client";
 import { useAiActionQueue } from "@/hooks/admin/ai-console/useAiActionQueue";
 import { useAiAlertsState } from "@/hooks/admin/ai-console/useAiAlerts";
 import { useAiPinned } from "@/hooks/admin/ai-console/useAiPinned";
+
+interface AiHubCardData {
+  state: "ok" | "warn" | "frozen";
+  budgetPct: number;
+}
 
 interface AiHubCard {
   key: string;
@@ -35,6 +42,26 @@ export default function AiHubScreen() {
   const actions = useAiActionQueue();
   const alerts = useAiAlertsState();
   const pinned = useAiPinned();
+
+  const budgetCard = useQuery<AiHubCardData>({
+    queryKey: ["/api/admin/ai/hub-card"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/ai/hub-card")).json(),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+
+  const budgetState = budgetCard.data?.state;
+  const budgetPct = budgetCard.data?.budgetPct ?? 0;
+  const showBudgetBanner = budgetState === "warn" || budgetState === "frozen";
+  const budgetBannerColor = budgetState === "frozen" ? Colors.error : Colors.warning;
+  const budgetBannerIcon: keyof typeof MaterialCommunityIcons.glyphMap =
+    budgetState === "frozen" ? "alert-octagon" : "alert";
+  const budgetBannerTitle = budgetState === "frozen"
+    ? "Budget AI mensile esaurito"
+    : `Budget AI mensile al ${Math.round(budgetPct * 100)}%`;
+  const budgetBannerSubtitle = budgetState === "frozen"
+    ? "Le AI sono in pausa fino al reset. Tocca per vedere i dettagli."
+    : "Sopra la soglia dell'80%. Tocca per vedere i dettagli.";
 
   const pendingActions = actions.data?.total ?? 0;
   const unreadAlerts = alerts.unread ?? 0;
@@ -126,6 +153,34 @@ export default function AiHubScreen() {
       <Text style={styles.subtitle}>
         Tutti gli strumenti AI in un unico posto.
       </Text>
+      {showBudgetBanner ? (
+        <TouchableOpacity
+          style={[
+            styles.budgetBanner,
+            { borderColor: budgetBannerColor, backgroundColor: budgetBannerColor + "1A" },
+          ]}
+          onPress={() => router.push("/admin/ai-moderation-stats" as Href)}
+          activeOpacity={0.8}
+          testID="ai-hub-budget-banner"
+        >
+          <MaterialCommunityIcons
+            name={budgetBannerIcon}
+            size={22}
+            color={budgetBannerColor}
+          />
+          <View style={styles.budgetBannerTextWrap}>
+            <Text style={[styles.budgetBannerTitle, { color: budgetBannerColor }]}>
+              {budgetBannerTitle}
+            </Text>
+            <Text style={styles.budgetBannerSubtitle}>{budgetBannerSubtitle}</Text>
+          </View>
+          <MaterialCommunityIcons
+            name="chevron-right"
+            size={22}
+            color={budgetBannerColor}
+          />
+        </TouchableOpacity>
+      ) : null}
       <View style={styles.grid}>
         {cards.map((card) => (
           <TouchableOpacity
@@ -158,6 +213,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginBottom: 16,
+  },
+  budgetBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  budgetBannerTextWrap: { flex: 1 },
+  budgetBannerTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  budgetBannerSubtitle: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
   },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
   card: {
