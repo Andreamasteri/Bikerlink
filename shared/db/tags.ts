@@ -87,7 +87,7 @@ export const TAG_CATEGORY_SLUGS = {
 
 /**
  * Text aliases (Task #2518) — mappa input normalizzato (lowercase + unaccent,
- * vedi `normalize_text()` in migrations/0036_text_interpreter.sql) verso un
+ * vedi `normalize_text()` in migrations/0042_text_interpreter.sql) verso un
  * target. Due modalità:
  *  - target_id: FK opzionale a tags.id (categorie con tabella tags)
  *  - target_value: stringa libera per categorie senza tabella (es. città,

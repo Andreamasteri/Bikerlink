@@ -10,7 +10,7 @@
  *  5. ranking client-side     — fast-fuzzy come tie-breaker per i top N
  *
  * Le ricerche fuzzy usano gli indici GIN trigram creati in migration 0036
- * (vedi migrations/0036_text_interpreter.sql).
+ * (vedi migrations/0042_text_interpreter.sql).
  */
 import { sql, eq, and, desc, ilike } from "drizzle-orm";
 import { Searcher } from "fast-fuzzy";

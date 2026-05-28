@@ -10,7 +10,7 @@ const RULES_CACHE_TTL_S = 300;
 type CacheEntry = { compatible: boolean; weight: number };
 
 /**
- * Default rules — mirror the seed in migrations/0036_match_rules.sql.
+ * Default rules — mirror the seed in migrations/0040_match_rules.sql.
  * Used as a fallback when the DB cache is not yet initialized (e.g. in unit
  * tests or before Phase 5). The DB is the source of truth at runtime.
  */

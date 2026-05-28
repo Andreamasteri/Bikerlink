@@ -411,7 +411,7 @@ Infrastruttura riusabile per embeddings semantici (matching musicale, bio libere
 - **DB**: PostgreSQL `pgvector` 0.8.0 (HNSW stabili + halfvec). Verificato con `SELECT extversion FROM pg_extension WHERE extname='vector'`.
 - **Tabella**: `embeddings` — colonne `entity_type`, `entity_id`, `field` (es. `bio`, `music_taste`), `embedding vector(1536)`, `model`, `source_hash` (sha256 input per cache idempotente), `created_at`, `updated_at`. Unique index `(entity_type, entity_id, field)`. Indice **HNSW** su `embedding vector_cosine_ops`.
 - **Schema Drizzle**: `shared/db/embeddings.ts` (usa il helper `vector` nativo di `drizzle-orm/pg-core`, non quello di `pgvector/drizzle-orm` che in v0.2.1 non è esposto via subpath exports).
-- **Migrazione**: `migrations/0036_embeddings.sql` (idempotente).
+- **Migrazione**: `migrations/0039_embeddings.sql` (idempotente).
 
 ### Helper server (`server/embeddings/`)
 - `generateEmbedding(text): Promise<number[]>` — vettore singolo, timeout 15s, retry esponenziale 3x su 429/5xx (`p-retry`).
@@ -740,7 +740,7 @@ Confronta colonne fisiche `match_preferences` (schema drizzle) vs `MATCHING_REGI
 
 Sistema di segnalazione utenti categorizzato con moderazione asimmetrica per ruolo, hook al feedback-loop matching, trust score reporter e shadow-ban automatico.
 
-### Schema DB (`migrations/0039_reports_extension.sql`)
+### Schema DB (`migrations/0047_reports_extension.sql`)
 
 Estende `reports` con: `category` (8 valori), `context` (match|chat|profile|post_meetup|other), `context_id`, `reported_user_role`, `severity` (low|medium|high|critical), `affected_feedback_loop`, `reporter_trust_score` (snapshot al momento del report). Indici su category/severity/reported_user_id/reporter_id.
 
