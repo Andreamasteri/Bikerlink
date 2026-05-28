@@ -44,8 +44,8 @@ rules:
       message: "Azione bulk ritardata: incidente in corso"
 
   # Task #2654 — Regole (b) integrazione AI nel bus
-  - id: ota_watchdog_alert_block
-    name: OTA bloccato se watchdog ha alert critical recente
+  - id: R001
+    name: ota_watchdog_alert_block — OTA bloccato se watchdog ha alert critical recente
     priority: 80
     conflictType: ota_watchdog_alert
     when:
@@ -56,8 +56,8 @@ rules:
       action: BLOCK
       message: "Publish OTA bloccato: watchdog alert critical negli ultimi 60s"
 
-  - id: ota_integrity_drift_block
-    name: OTA bloccato se app-integrity ha violation_detected critical recente
+  - id: R002
+    name: ota_integrity_drift_block — OTA bloccato se app-integrity ha violation_detected critical recente
     priority: 75
     conflictType: ota_integrity_drift
     when:
@@ -68,8 +68,8 @@ rules:
       action: BLOCK
       message: "Publish OTA bloccato: app-integrity violation critical negli ultimi 5 minuti"
 
-  - id: db_integrity_critical_notify
-    name: Notifica admin su violation_detected critical DB Integrity
+  - id: R003
+    name: db_integrity_critical_notify — Notifica admin su violation_detected critical DB Integrity
     priority: 70
     when:
       aiName: db-integrity

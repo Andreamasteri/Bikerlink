@@ -2,6 +2,9 @@
 // Verifica: ogni adapter emette eventi/decisioni e fallisce gracefully se il
 // Coordinator è giù. Esegui con: npx tsx scripts/smoke-coordinator-integration.ts
 import { getCoordinator } from "../server/ai/coordinator";
+import { db } from "../server/db";
+import { aiConflicts, aiEvents } from "@shared/db";
+import { desc, eq } from "drizzle-orm";
 import { recordOtaDecision, shouldDelayForCoordinator } from "../server/ai/coordinator/integrations/ota";
 import { emitModerationSuggestion } from "../server/ai/coordinator/integrations/moderation";
 import { emitWatchdogAlert, emitWatchdogStatusChange, emitWatchdogKillSwitch } from "../server/ai/coordinator/integrations/watchdog";
@@ -88,6 +91,67 @@ async function main() {
     console.log(`  ${smoke.length} eventi smoke trovati nelle ultime 1h`);
     if (smoke.length === 0) failures.push("nessun evento smoke trovato in query");
   } catch (e) { fail("verify query", e); }
+
+  console.log("\n[scenario A] watchdog alert critical → R001 BLOCK persistito in ai_conflicts");
+  try {
+    const c = getCoordinator();
+    const corr = `smoke-A-${Date.now().toString(36)}`;
+    // Emetti un watchdog alert critical recente
+    const wd = await c.emit({
+      aiName: "watchdog", eventType: "alert",
+      payload: { problemId: "smoke.r001", title: "smoke r001" },
+      severity: "critical", correlationId: corr,
+    });
+    // Emetti un evento OTA sintetico
+    const ota = await c.emit({
+      aiName: "ota-orchestrator", eventType: "publish_attempt",
+      payload: { action: "publish" }, severity: "warn", correlationId: corr,
+    });
+    const decision = await c.evaluateConflict({
+      eventIdA: ota.id, eventIdB: wd.id, conflictType: "ota_watchdog_alert",
+    });
+    if (decision.action !== "BLOCK") throw new Error(`atteso BLOCK, ricevuto ${decision.action}`);
+    if (decision.policyRuleId !== "R001") throw new Error(`atteso policyRuleId=R001, ricevuto ${decision.policyRuleId}`);
+    if (decision.resolvedBy !== "policy") throw new Error(`atteso resolvedBy=policy, ricevuto ${decision.resolvedBy}`);
+    // Verifica persistenza in ai_conflicts
+    const [persisted] = await db.select().from(aiConflicts).where(eq(aiConflicts.id, decision.conflictId)).limit(1);
+    if (!persisted) throw new Error("conflict non persistito in ai_conflicts");
+    if (persisted.resolvedBy !== "policy" || persisted.policyRuleId !== "R001") {
+      throw new Error(`conflict persistito con dati errati: resolvedBy=${persisted.resolvedBy} policyRuleId=${persisted.policyRuleId}`);
+    }
+    pass("R001 BLOCK + ai_conflicts persistito con resolvedBy=policy, policyRuleId=R001");
+  } catch (e) { fail("scenario A R001 conflict", e); }
+
+  console.log("\n[scenario B] app-integrity violation critical → R002 BLOCK persistito");
+  try {
+    const c = getCoordinator();
+    const corr = `smoke-B-${Date.now().toString(36)}`;
+    const ai = await c.emit({
+      aiName: "app-integrity", eventType: "violation_detected",
+      payload: { checkId: "smoke.r002" }, severity: "critical", correlationId: corr,
+    });
+    const ota = await c.emit({
+      aiName: "ota-orchestrator", eventType: "publish_attempt",
+      payload: { action: "publish" }, severity: "warn", correlationId: corr,
+    });
+    const decision = await c.evaluateConflict({
+      eventIdA: ota.id, eventIdB: ai.id, conflictType: "ota_integrity_drift",
+    });
+    if (decision.action !== "BLOCK" || decision.policyRuleId !== "R002") {
+      throw new Error(`atteso action=BLOCK policyRuleId=R002, ricevuto ${decision.action}/${decision.policyRuleId}`);
+    }
+    pass("R002 BLOCK con policyRuleId=R002");
+  } catch (e) { fail("scenario B R002 conflict", e); }
+
+  console.log("\n[per-AI presence] verify che ogni AI abbia almeno 1 evento recente");
+  try {
+    const c = getCoordinator();
+    for (const ai of ["watchdog", "moderation", "db-integrity", "app-integrity", "console", "ota-orchestrator"]) {
+      const r = await c.query({ aiName: ai, sinceHours: 1, limit: 1 });
+      if (r.rows.length === 0) fail(`per-AI ${ai}`, new Error(`nessun evento recente per ${ai}`));
+      else pass(`per-AI ${ai} presente`);
+    }
+  } catch (e) { fail("per-AI presence", e); }
 
   console.log("\n[fallback] graceful quando Coordinator emit lancia eccezione");
   try {

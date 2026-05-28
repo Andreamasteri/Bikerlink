@@ -108,6 +108,15 @@ router.post("/ai/apply/ban", async (req: Request, res: Response) => {
         .set({ acceptedByAdminId: modId, acceptedAt: new Date() })
         .where(eq(aiSuggestionsLog.id, suggestionLogId));
     }
+    // Task #2654 — emit Coordinator (graceful)
+    try {
+      const { emitConsoleOverride } = await import("../../ai/coordinator/integrations/console");
+      await emitConsoleOverride({
+        adminId: modId, target: `user:${userId}`,
+        rationale: `apply_ban days=${durationDays} reason=${reason.slice(0, 200)}`,
+        correlationId: suggestionLogId ? `sugg-${suggestionLogId.slice(0, 12)}` : undefined,
+      });
+    } catch (e) { console.warn("[ai/apply/ban] emit coordinator:", (e as Error).message); }
     return res.json({ ok: true });
   } catch (err) {
     console.error("[ai/apply/ban] error:", err);
@@ -133,6 +142,15 @@ router.post("/ai/apply/dismiss", async (req: Request, res: Response) => {
         .set({ acceptedByAdminId: modId, acceptedAt: new Date() })
         .where(eq(aiSuggestionsLog.id, suggestionLogId));
     }
+    // Task #2654 — emit Coordinator (graceful)
+    try {
+      const { emitConsoleOverride } = await import("../../ai/coordinator/integrations/console");
+      await emitConsoleOverride({
+        adminId: modId, target: `report:${reportId}`,
+        rationale: `apply_dismiss reason=${reason.slice(0, 200)}`,
+        correlationId: suggestionLogId ? `sugg-${suggestionLogId.slice(0, 12)}` : undefined,
+      });
+    } catch (e) { console.warn("[ai/apply/dismiss] emit coordinator:", (e as Error).message); }
     return res.json({ ok: true });
   } catch (err) {
     console.error("[ai/apply/dismiss] error:", err);
@@ -153,6 +171,15 @@ router.post("/ai/reject", async (req: Request, res: Response) => {
       rejectedAt: new Date(),
       rejectReason: parsed.data.reason ?? null,
     }).where(eq(aiSuggestionsLog.id, parsed.data.suggestionLogId));
+    // Task #2654 — emit Coordinator (graceful)
+    try {
+      const { emitConsoleOverride } = await import("../../ai/coordinator/integrations/console");
+      await emitConsoleOverride({
+        adminId: modId, target: `suggestion:${parsed.data.suggestionLogId}`,
+        rationale: `reject_suggestion reason=${(parsed.data.reason ?? "").slice(0, 200)}`,
+        correlationId: `sugg-${parsed.data.suggestionLogId.slice(0, 12)}`,
+      });
+    } catch (e) { console.warn("[ai/reject] emit coordinator:", (e as Error).message); }
     return res.json({ ok: true });
   } catch (err) {
     console.error("[ai/reject] error:", err);

@@ -1,47 +1,84 @@
-// Task #2654 — Regression test OTA Orchestrator dopo l'integrazione Coordinator.
-// Verifica che le funzioni execMutatingTool/spawnPublishJob siano ancora invocabili
-// senza Coordinator (graceful fallback) e che la firma execMutatingTool non sia rotta.
+// Task #2654 — Regression OTA Orchestrator: parità UP vs DOWN Coordinator.
+// Requisito: l'OTA orchestrator deve produrre lo STESSO outcome (success/error)
+// quando il Coordinator è UP vs DOWN, eccetto nei casi in cui R001 (watchdog
+// alert critical) o R002 (app-integrity violation critical) hanno deciso BLOCK.
 // Esegui con: npx tsx scripts/regression-ota-orchestrator.ts
 import { execMutatingTool } from "../server/routes/admin/ota-assistant/helpers";
+import { getCoordinator } from "../server/ai/coordinator";
+
+interface Scenario {
+  name: string;
+  tool: string;
+  args: Record<string, unknown>;
+  expectOk: boolean;
+  errorIncludes?: string;
+}
+
+const SCENARIOS: Scenario[] = [
+  { name: "publishOta senza message", tool: "publishOta", args: {}, expectOk: false, errorIncludes: "message obbligatorio" },
+  { name: "tool sconosciuto", tool: "doesNotExist", args: {}, expectOk: false, errorIncludes: "Tool sconosciuto" },
+  { name: "approveRelease senza id", tool: "approveRelease", args: {}, expectOk: false, errorIncludes: "obbligatorio" },
+  { name: "approveRelease id inesistente", tool: "approveRelease", args: { releaseId: "00000000-0000-0000-0000-000000000000" }, expectOk: false, errorIncludes: "release" },
+  { name: "rejectRelease senza id", tool: "rejectRelease", args: {}, expectOk: false, errorIncludes: "obbligatorio" },
+  { name: "rollbackToGroup senza id", tool: "rollbackToGroup", args: {}, expectOk: false, errorIncludes: "obbligatorio" },
+  { name: "forceUpdateDevice senza args", tool: "forceUpdateDevice", args: {}, expectOk: false, errorIncludes: "obbligatori" },
+];
+
+type Outcome = { ok: boolean; errorPrefix: string | null };
+
+function outcome(r: { ok: boolean; error?: string }): Outcome {
+  return { ok: r.ok, errorPrefix: (r.error ?? "").slice(0, 60) || null };
+}
+
+async function runScenario(s: Scenario, runId: string): Promise<Outcome> {
+  const r = await execMutatingTool(s.tool, s.args, "regression-admin", runId);
+  return outcome(r);
+}
 
 async function main() {
   const failures: string[] = [];
   const pass = (n: string) => console.log(`  ✅ ${n}`);
-  const fail = (n: string, e: unknown) => { failures.push(n); console.error(`  ❌ ${n}:`, (e as Error).message); };
+  const fail = (n: string, msg: string) => { failures.push(`${n}: ${msg}`); console.error(`  ❌ ${n}: ${msg}`); };
 
-  console.log("\n[1/4] execMutatingTool publishOta senza message → errore atteso");
+  console.log("\n── FASE A: Coordinator UP — baseline ──");
+  const upResults = new Map<string, Outcome>();
+  for (const s of SCENARIOS) {
+    const o = await runScenario(s, `regress-up-${s.tool}`);
+    upResults.set(s.name, o);
+    if (o.ok !== s.expectOk) fail(s.name, `UP: ok=${o.ok}, atteso ${s.expectOk}`);
+    else if (!s.expectOk && s.errorIncludes && !(o.errorPrefix ?? "").toLowerCase().includes(s.errorIncludes.toLowerCase()))
+      fail(s.name, `UP: errorPrefix="${o.errorPrefix}" non contiene "${s.errorIncludes}"`);
+    else pass(`UP ${s.name}`);
+  }
+
+  console.log("\n── FASE B: Coordinator DOWN — parità outcome ──");
+  const c = getCoordinator();
+  const origEmit = c.emit.bind(c);
+  const origQuery = c.query.bind(c);
+  const origRecord = c.recordDecision.bind(c);
+  const origEval = c.evaluateConflict.bind(c);
+  (c as unknown as { emit: typeof origEmit }).emit = async () => { throw new Error("simulated coordinator down"); };
+  (c as unknown as { query: typeof origQuery }).query = async () => { throw new Error("simulated coordinator down"); };
+  (c as unknown as { recordDecision: typeof origRecord }).recordDecision = async () => { throw new Error("simulated coordinator down"); };
+  (c as unknown as { evaluateConflict: typeof origEval }).evaluateConflict = async () => { throw new Error("simulated coordinator down"); };
+
   try {
-    const r = await execMutatingTool("publishOta", {}, "smoke-admin", "smoke-run-id-1");
-    if (r.ok) fail("publishOta vuoto", new Error("doveva fallire"));
-    else if (!String(r.error ?? "").includes("message obbligatorio")) fail("publishOta vuoto", new Error(`error inatteso: ${r.error}`));
-    else pass("rifiuta publishOta senza message");
-  } catch (e) { fail("publishOta vuoto", e); }
+    for (const s of SCENARIOS) {
+      const o = await runScenario(s, `regress-down-${s.tool}`);
+      const up = upResults.get(s.name)!;
+      // Requisito: parità ok/ok, parità prefisso errore (deve essere lo stesso messaggio applicativo, NON "Coordinator down")
+      if (o.ok !== up.ok) fail(s.name, `DOWN: ok=${o.ok}, UP era ${up.ok} (regression!)`);
+      else if (o.errorPrefix !== up.errorPrefix) fail(s.name, `DOWN: errorPrefix divergente UP="${up.errorPrefix}" DOWN="${o.errorPrefix}"`);
+      else pass(`DOWN parità ${s.name}`);
+    }
+  } finally {
+    (c as unknown as { emit: typeof origEmit }).emit = origEmit;
+    (c as unknown as { query: typeof origQuery }).query = origQuery;
+    (c as unknown as { recordDecision: typeof origRecord }).recordDecision = origRecord;
+    (c as unknown as { evaluateConflict: typeof origEval }).evaluateConflict = origEval;
+  }
 
-  console.log("\n[2/4] execMutatingTool tool sconosciuto");
-  try {
-    const r = await execMutatingTool("doesNotExist" as never, {}, "smoke-admin", "smoke-run-id-2");
-    if (r.ok) fail("tool sconosciuto", new Error("doveva fallire"));
-    else if (!String(r.error ?? "").includes("Tool sconosciuto")) fail("tool sconosciuto", new Error(`error inatteso: ${r.error}`));
-    else pass("rifiuta tool sconosciuto");
-  } catch (e) { fail("tool sconosciuto", e); }
-
-  console.log("\n[3/4] execMutatingTool approveRelease su id inesistente");
-  try {
-    const r = await execMutatingTool("approveRelease", { releaseId: "00000000-0000-0000-0000-000000000000" }, "smoke-admin", "smoke-run-id-3");
-    if (r.ok) fail("approve fake id", new Error("doveva fallire"));
-    else if (!String(r.error ?? "").toLowerCase().includes("release")) fail("approve fake id", new Error(`error inatteso: ${r.error}`));
-    else pass("approve su id inesistente fallisce coerentemente");
-  } catch (e) { fail("approve fake id", e); }
-
-  console.log("\n[4/4] execMutatingTool approveRelease senza releaseId");
-  try {
-    const r = await execMutatingTool("approveRelease", {}, "smoke-admin", "smoke-run-id-4");
-    if (r.ok) fail("approve no id", new Error("doveva fallire"));
-    else if (!String(r.error ?? "").toLowerCase().includes("obbligatorio")) fail("approve no id", new Error(`error inatteso: ${r.error}`));
-    else pass("approve senza releaseId fallisce coerentemente");
-  } catch (e) { fail("approve no id", e); }
-
-  console.log(`\n${failures.length === 0 ? "✅ REGRESSION OK" : `❌ FALLITO: ${failures.join(", ")}`}\n`);
+  console.log(`\n${failures.length === 0 ? "✅ REGRESSION OK (parità UP/DOWN su " + SCENARIOS.length + " scenari)" : `❌ FALLITO: ${failures.join("; ")}`}\n`);
   process.exit(failures.length === 0 ? 0 : 1);
 }
 

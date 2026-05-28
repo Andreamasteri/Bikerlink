@@ -94,7 +94,7 @@ router.post("/ai/console/message", async (req: Request, res: Response) => {
     // Memoria + Router
     const memory = await loadMemory(conversationId);
     const sysCtx = buildSystemContext(memory);
-    const routeRes = await routeMessage({ message, conversationContext: memory?.summary });
+    const routeRes = await routeMessage({ message, conversationContext: memory?.summary, adminId: userId });
     send("router", { scopes: routeRes.decision.scopes, reasoning: routeRes.decision.reasoning, cached: routeRes.cached });
     await db.insert(aiMessages).values({
       conversationId, role: "router", content: routeRes.decision.reasoning,
@@ -256,6 +256,16 @@ router.post("/ai/console/conversations/:id/pin/:messageId", async (req: Request,
     conversationId: id, messageId, adminUserId: userId,
     title: parsed.data.title ?? null, note: parsed.data.note ?? null,
   }).returning();
+  // Task #2654 — emit Coordinator (graceful)
+  try {
+    const { emitConsolePin } = await import("../../ai/coordinator/integrations/console");
+    await emitConsolePin({
+      adminId: userId,
+      pinId: pin.id,
+      contentPreview: (msg.content ?? "").slice(0, 200),
+      correlationId: `pin-${pin.id.slice(0, 12)}`,
+    });
+  } catch (e) { console.warn("[ai-console/pin] emit coordinator:", (e as Error).message); }
   res.json({ pin });
 });
 
