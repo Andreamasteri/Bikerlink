@@ -6,9 +6,7 @@ import {
   varchar,
   text,
   timestamp,
-  integer,
   jsonb,
-  numeric,
   index,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
@@ -30,26 +28,8 @@ export const aiConversations = pgTable("ai_conversations", {
   index("ai_conversations_archived_idx").on(t.archivedAt),
 ]);
 
-export const aiMessages = pgTable("ai_messages", {
-  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
-  conversationId: varchar("conversation_id", { length: 36 }).notNull(),
-  role: varchar("role", { length: 16 }).notNull(), // user|assistant|tool|system|router
-  content: text("content").notNull().default(""),
-  scopes: jsonb("scopes"),     // string[] selezionati dal router per il turno
-  toolCalls: jsonb("tool_calls"), // [{name, args, result, durationMs}]
-  entities: jsonb("entities"), // estratte da memory.ts su quel messaggio
-  model: varchar("model", { length: 80 }),
-  provider: varchar("provider", { length: 30 }),
-  tokensIn: integer("tokens_in").notNull().default(0),
-  tokensOut: integer("tokens_out").notNull().default(0),
-  costUsd: numeric("cost_usd", { precision: 12, scale: 6 }).notNull().default("0"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (t) => [
-  index("ai_messages_conv_idx").on(t.conversationId),
-  index("ai_messages_created_idx").on(t.createdAt),
-  // GIN trigram per full-text search su content (creato lato pg_trgm).
-  index("ai_messages_content_trgm_idx").using("gin", sql`${t.content} gin_trgm_ops`),
-]);
+// aiMessages — spostato in shared/db/ai-console-messages.ts (Task #2682).
+export { aiMessages } from "./ai-console-messages";
 
 export const aiPinnedInsights = pgTable("ai_pinned_insights", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -66,7 +46,6 @@ export const aiPinnedInsights = pgTable("ai_pinned_insights", {
 
 export type AiConversation = typeof aiConversations.$inferSelect;
 export type InsertAiConversation = typeof aiConversations.$inferInsert;
-export type AiMessage = typeof aiMessages.$inferSelect;
-export type InsertAiMessage = typeof aiMessages.$inferInsert;
+export type { AiMessage, InsertAiMessage } from "./ai-console-messages";
 export type AiPinnedInsight = typeof aiPinnedInsights.$inferSelect;
 export type InsertAiPinnedInsight = typeof aiPinnedInsights.$inferInsert;

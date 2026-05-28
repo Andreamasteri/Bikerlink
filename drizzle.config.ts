@@ -46,27 +46,9 @@ export default defineConfig({
     // four tables from drizzle-kit management stops the noise; the indexes already
     // exist in the DB and are preserved unchanged. Any future DDL changes for these
     // tables must go through a numbered SQL migration in migrations/.
-    "!biker_biker_matches",
-    "!match_negative_preferences",
-    "!pending_auto_suggestions",
-    "!ai_messages",
-    // Task #2682 — Tabelle definite in shared/db/*.ts ma MANCANTI sia in dev DB
-    // sia in migrations/*.sql. I sottosistemi che le usano (ai/*, db-integrity/*,
-    // weekly recaps/*) sono wirati con try/catch non-fatal in server/index.ts,
-    // quindi il boot non fallisce. Escluderle qui evita che drizzle-kit push
-    // tenti di crearle in dev (e collida con il prompt rename ambiguo).
-    // Follow-up: creare migration SQL dedicata per ciascuna prima di abilitare
-    // i relativi sottosistemi in produzione.
-    "!db_integrity_runs",
-    "!db_integrity_violations",
-    "!db_integrity_quarantine",
-    "!ai_conversations",
-    "!ai_pinned_insights",
-    "!ai_watchdog_log",
-    "!system_health_snapshot",
-    "!system_signals",
-    "!user_time_profile",
-    "!weekly_recaps",
-    "!weekly_system_reports",
+    // Task #2682 — biker_biker_matches, match_negative_preferences,
+    // pending_auto_suggestions, ai_messages NON sono in tablesFilter perché
+    // sono state spostate fuori da drizzle-schema.ts (vedi
+    // shared/db/matching-drizzle-excluded.ts e shared/db/ai-console-messages.ts).
   ],
 });

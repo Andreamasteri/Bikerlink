@@ -5,8 +5,9 @@ Ultimo aggiornamento: 28/05/2026 — Task #2682.
 
 ## Sintesi
 
-✅ **Deploy sbloccato.** Tutti i controlli pre-deploy passano. L'utente può
-premere **Publish** dalla UI Replit.
+✅ **Deploy sbloccato.** Tutti i controlli pre-deploy passano. `drizzle-kit push`
+gira non-interattivo e termina con `[✓] Changes applied`. L'utente può premere
+**Publish** dalla UI Replit.
 
 ## Risultati Step 0-7
 
@@ -17,10 +18,11 @@ premere **Publish** dalla UI Replit.
 | Build history (ultimi 3) | 1 success, 2 failed | Ultimo fail 28/05 11:51 — promote step (Nix layer), non codice |
 | Machine size deploy | `cr-2-4` | 2 vCPU, 4 GB — adeguata per server con WebSocket + BullMQ |
 | Env vars dev vs prod | OK | Nessuna mancanza critica (vedi sotto) |
-| Drizzle-kit push | ⚠ TTY error noto | Reso non-fatale in `deploy-build.sh` |
+| `drizzle-kit push --force` | ✅ Pulito | `[✓] Changes applied`, no TTY prompt |
 | Smoke test | ✅ 22/25 PASS, 0 FAIL, 3 SKIP | SKIP attesi: invite (no code), maps 404 #2673, proposals 404 routing bug |
 | Typecheck server | ✅ Finished | 0 errori |
 | Typecheck client | ✅ Finished | 0 errori |
+| ESLint | ✅ 0 errori | 7 warning pre-esistenti su `any` in scripts/smoke |
 | `UIBackgroundModes` | ✅ Deduplicato | Da `["location","audio","location","audio"]` a `["location","audio"]` |
 | Android permissions | ✅ Deduplicato | 32 entry duplicate → 16 uniche |
 | Run command prod | ✅ OK | `PORT=8081 node server_dist/index.js` — server bind `0.0.0.0:${PORT}` (server/index.ts:143-146) |
@@ -28,8 +30,8 @@ premere **Publish** dalla UI Replit.
 
 ### Step 1 — Fix `app.json`
 
-Applicato (vedi commit). UIBackgroundModes e android.permissions deduplicati,
-nessun rischio reject in App Store review per Expo Launch.
+Applicato. `UIBackgroundModes` e `android.permissions` deduplicati. Nessun rischio
+di reject in App Store review per Expo Launch.
 
 ### Step 2 — Env vars
 
@@ -52,18 +54,19 @@ critica per il boot del server in prod**.
 
 ### Step 4 — Dry-run `deploy-build.sh`
 
-Reso `drizzle-kit push` non-fatale (vedi sezione "Limitazioni note" sotto).
-Output dry-run locale:
-
 ```
 === [1/2] Sync database schema ===
-⚠ drizzle-kit push fallito (TTY/conflict noto) — proseguo: schema applicato a runtime da runMigrations().
+[✓] Pulling schema from database...
+[✓] Changes applied
+  Schema sync completato.
 === [2/2] Build server TypeScript ===
 server_dist/index.js  2.9mb
-⚡ Done in 466ms
+⚡ Done in 490ms
 === Deploy build completato ===
-exit=0
+EXIT=0
 ```
+
+Lo step `drizzle-kit push` è **fail-fast**: se fallisce, il deploy si ferma.
 
 ### Step 5 — Machine size
 
@@ -76,36 +79,59 @@ Replit) per test su dispositivo fisico.
 
 ### Step 7 — Questo documento.
 
-## Limitazioni note (NON bloccanti per il deploy)
+## Root cause TTY prompt — risolto
 
-### 14 tabelle nello schema TS non hanno migration SQL
+Cause originale del fallimento `drizzle-kit push` in CI/deploy:
 
-Definite in `shared/db/*.ts` ma assenti sia in DB dev sia in `migrations/*.sql`:
+1. **`shared/db/drizzle-schema.ts` non importava `./matching-extra`**
+   (split di matching.ts fatto in task precedente). drizzle vedeva
+   `match_rules` / `match_thresholds` come *missing* (presenti nel DB, assenti
+   nello schema TS visto) → `promptNamedWithSchemasConflict` richiedeva TTY per
+   chiedere se renominare le 15 tabelle nuove sulle 2 missing.
+   **Fix**: aggiunto `export * from "./matching-extra";` a `drizzle-schema.ts`.
 
-```
-ai_conversations, ai_pinned_insights, ai_watchdog_log,
-db_integrity_runs, db_integrity_violations, db_integrity_quarantine,
-system_health_snapshot, system_signals,
-user_time_profile,
-weekly_recaps, weekly_system_reports,
-match_negative_preferences, pending_auto_suggestions, ai_messages
-```
+2. **UNIQUE constraints legacy `_key` vs canonico `_unique`** —
+   `ab_experiments_key_key`, `newsletter_subscribers_email_key`,
+   `user_route_fingerprints_user_id_key` erano nominate col default Postgres
+   pre-drizzle. drizzle generava un drop+add con prompt "do you want to
+   truncate?" (TTY).
+   **Fix**: migration `migrations/0047_rename_unique_constraints_to_drizzle_naming.sql`
+   rinomina i constraint al naming drizzle. Idempotente.
 
-I consumer (`server/ai/*`, `server/ai/db-integrity/*`, `server/matching/notifications/*`)
-sono wirati con `try { ... } catch { (non-fatal) }` in `server/index.ts:315-396` → il boot
-non fallisce, le funzionalità relative restano disattivate finché le tabelle non vengono
-create.
+3. **UNIQUE constraint mancante in DB**: `ota_releases.eas_update_id` aveva il
+   `.unique()` nello schema TS ma non in DB → stesso prompt truncate.
+   **Fix**: migration `migrations/0046_ota_releases_eas_update_id_unique.sql`.
+   Verificato: 25/25 valori distinti, 0 null, safe.
 
-**Esclusioni in `drizzle.config.ts`** (`tablesFilter`) impediscono che drizzle-kit
-proponga rename ambigui. Restano comunque conflitti residui (probabilmente su
-indexes/constraint di altre tabelle) che mantengono `drizzle-kit push` in errore
-TTY — non bloccante poiché lo step è ora non-fatale in `deploy-build.sh`.
+4. **Tabelle problematiche con FK names lunghi e indexes GIN/trgm/sql-expr**
+   (`biker_biker_matches`, `match_negative_preferences`,
+   `pending_auto_suggestions`, `ai_messages`) — drizzle-kit le re-introspect
+   imperfettamente generando diff spurious + errori `relation already exists`.
+   **Fix**: spostate in `shared/db/matching-drizzle-excluded.ts` e
+   `shared/db/ai-console-messages.ts`. Importate da `shared/db/index.ts`
+   (runtime) ma NON da `shared/db/drizzle-schema.ts` (entry-point drizzle-kit).
+   Re-export verso `@shared/db` mantiene backward compatibility.
 
-**Follow-up consigliato**: creare migration SQL dedicate (`migrations/0046_*.sql`,
-`0047_*.sql`, ...) per ciascuna tabella mancante, una alla volta, con review
-dello schema. Vedi task follow-up.
+## File modificati (task #2682)
 
-### Bug noti già tracciati (non legati al deploy)
+- `app.json` — dedup `UIBackgroundModes` + `android.permissions`
+- `shared/db/drizzle-schema.ts` — aggiunto import di `matching-extra`
+- `shared/db/matching.ts` — `bikerBikerMatches`, `matchNegativePreferences`,
+  `pendingAutoSuggestions` re-export da `matching-drizzle-excluded`
+- `shared/db/ai-console.ts` — `aiMessages` re-export da `ai-console-messages`;
+  dedup imports inutili (`integer`, `numeric`)
+- `shared/db/matching-drizzle-excluded.ts` — **nuovo**, 3 tabelle escluse
+- `shared/db/ai-console-messages.ts` — **nuovo**, `aiMessages` escluso
+- `shared/db/index.ts` — import dei 2 nuovi file per runtime
+- `drizzle.config.ts` — rimosse le esclusioni precedenti (non più necessarie:
+  le tabelle non sono più viste da drizzle-schema)
+- `migrations/0046_ota_releases_eas_update_id_unique.sql` — **nuovo**
+- `migrations/0047_rename_unique_constraints_to_drizzle_naming.sql` — **nuovo**
+- `scripts/deploy-build.sh` — `drizzle-kit push` torna **fail-fast** (no più
+  best-effort)
+- `docs/deploy-status.md` — questo file
+
+## Bug noti già tracciati (NON legati al deploy)
 
 - `/api/maps/provider/status` → 404 (task #2673)
 - `/api/proposals/biker-matches` → 404 per crud routing eat-all (annotato in smoke)

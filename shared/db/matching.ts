@@ -107,36 +107,9 @@ export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
   }).onDelete("cascade"),
 ]);
 
-export const bikerBikerMatches = pgTable("biker_biker_matches", {
-  id: varchar("id", { length: 36 })
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  biker1Id: varchar("biker1_id", { length: 36 })
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  biker2Id: varchar("biker2_id", { length: 36 })
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  motorcycleBrand: varchar("motorcycle_brand", { length: 100 }).notNull(),
-  status: varchar("status", { length: 20 }).notNull().default("new"),
-  isSupermatch: boolean("is_supermatch").notNull().default(false),
-  pairType: varchar("pair_type", { length: 10 }).notNull().default("bb"),
-  scoreBreakdown: jsonb("score_breakdown").notNull().default(sql`'{}'::jsonb`),
-  notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
-  notifiedAt: timestamp("notified_at"),
-  archivedAt: timestamp("archived_at"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (table) => [
-  index("biker_biker_biker1_idx").on(table.biker1Id),
-  index("biker_biker_biker2_idx").on(table.biker2Id),
-  index("biker_biker_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
-  index("bb_matches_archived_at_idx").on(table.archivedAt),
-  uniqueIndex("biker_biker_symmetric_idx").on(
-    sql`LEAST(${table.biker1Id}, ${table.biker2Id})`,
-    sql`GREATEST(${table.biker1Id}, ${table.biker2Id})`,
-    table.motorcycleBrand,
-  ),
-]);
+// bikerBikerMatches — spostata in shared/db/matching-drizzle-excluded.ts (Task #2682).
+// Re-export per backward compatibility verso `@shared/db`.
+export { bikerBikerMatches } from "./matching-drizzle-excluded";
 
 export const directMatchRequests = pgTable("direct_match_requests", {
   id: varchar("id", { length: 36 })
@@ -406,8 +379,8 @@ export type ZavarrinaWishlistMoto = typeof zavarrinaWishlistMotos.$inferSelect;
 export type InsertZavarrinaWishlistMoto = typeof zavarrinaWishlistMotos.$inferInsert;
 export type BikerZavarrinaMatch = typeof bikerZavarrinaMatches.$inferSelect;
 export type InsertBikerZavarrinaMatch = typeof bikerZavarrinaMatches.$inferInsert;
-export type BikerBikerMatch = typeof bikerBikerMatches.$inferSelect;
-export type InsertBikerBikerMatch = typeof bikerBikerMatches.$inferInsert;
+// BikerBikerMatch / InsertBikerBikerMatch — re-export da matching-drizzle-excluded.
+export type { BikerBikerMatch, InsertBikerBikerMatch } from "./matching-drizzle-excluded";
 export type DirectMatchRequest = typeof directMatchRequests.$inferSelect;
 export type InsertDirectMatchRequest = typeof directMatchRequests.$inferInsert;
 export const dailyPushCounts = pgTable("daily_push_counts", {
@@ -513,44 +486,16 @@ export type InsertMatchFeedback = typeof matchFeedback.$inferInsert;
 export type UserMatchProfile = typeof userMatchProfile.$inferSelect;
 export type InsertUserMatchProfile = typeof userMatchProfile.$inferInsert;
 
-export const matchNegativePreferences = pgTable("match_negative_preferences", {
-  id: varchar("id", { length: 36 })
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 36 })
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  kind: varchar("kind", { length: 40 }).notNull(),
-  value: jsonb("value").notNull(),
-  source: varchar("source", { length: 20 }).notNull().default("manual"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (table) => [
-  index("match_neg_prefs_user_idx").on(table.userId),
-  uniqueIndex("match_neg_prefs_unique_idx").on(table.userId, table.kind, sql`(value::text)`),
-]);
-
-export const pendingAutoSuggestions = pgTable("pending_auto_suggestions", {
-  id: varchar("id", { length: 36 })
-    .primaryKey()
-    .default(sql`gen_random_uuid()`),
-  userId: varchar("user_id", { length: 36 })
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  kind: varchar("kind", { length: 40 }).notNull(),
-  value: jsonb("value").notNull(),
-  rejectCount: integer("reject_count").notNull().default(0),
-  status: varchar("status", { length: 20 }).notNull().default("pending"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  resolvedAt: timestamp("resolved_at"),
-}, (table) => [
-  index("pending_auto_suggestions_user_idx").on(table.userId, table.status),
-  uniqueIndex("pending_auto_suggestions_unique_idx").on(table.userId, table.kind, sql`(value::text)`),
-]);
-
-export type MatchNegativePreference = typeof matchNegativePreferences.$inferSelect;
-export type InsertMatchNegativePreference = typeof matchNegativePreferences.$inferInsert;
-export type PendingAutoSuggestion = typeof pendingAutoSuggestions.$inferSelect;
-export type InsertPendingAutoSuggestion = typeof pendingAutoSuggestions.$inferInsert;
+// matchNegativePreferences + pendingAutoSuggestions — spostate in
+// shared/db/matching-drizzle-excluded.ts (Task #2682). Re-export per backward
+// compatibility.
+export { matchNegativePreferences, pendingAutoSuggestions } from "./matching-drizzle-excluded";
+export type {
+  MatchNegativePreference,
+  InsertMatchNegativePreference,
+  PendingAutoSuggestion,
+  InsertPendingAutoSuggestion,
+} from "./matching-drizzle-excluded";
 
 export const NEGATIVE_PREF_KINDS = [
   "bike_type",
