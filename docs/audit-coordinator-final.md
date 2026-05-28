@@ -165,3 +165,42 @@ I 6 adapter sono presenti in `server/ai/coordinator/integrations/`: `app-integri
 ---
 
 **Bundle COMPLETO ✅.**
+
+---
+
+## Allineamento schema DB prod (Task #2677)
+
+**Contesto:** lo step `drizzle-kit push` è stato rimosso da `scripts/deploy-build.sh`
+(commit `144814d3`) per sbloccare la pubblicazione (rename conflict integrity_* vs
+db_integrity_* richiede TTY). Finché il conflitto di rename non viene risolto e
+lo step ripristinato, **ogni modifica schema applicata in dev va replicata
+manualmente in prod**.
+
+**Pattern operativo:**
+
+1. Scrivere uno script SQL idempotente in `scripts/db/` (es.
+   `sync-prod-watchdog-schema.sql`): `CREATE TABLE IF NOT EXISTS`,
+   `CREATE INDEX IF NOT EXISTS`, `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`,
+   tutto avvolto in `BEGIN; ... COMMIT;`. Niente `DROP`, niente assunzioni
+   sullo stato preesistente.
+2. Dry-run su dev (deve completare senza errori; con dev già allineato è
+   un no-op grazie al pattern `IF NOT EXISTS`).
+3. **Applicazione in prod:** per policy Replit (database skill), l'agente
+   NON può eseguire DDL contro il DB di produzione (`environment: "production"`
+   è read-only). Il canale ufficiale è la Publish flow di Replit che
+   introspetta dev↔prod e applica il diff. In caso di rename conflict come
+   quello attuale, l'utente deve risolverlo dalla UI Publish (oppure
+   eseguire manualmente lo script SQL contro `DATABASE_URL` di prod tramite
+   `psql` fuori dall'agente).
+4. Verifica post-apply: query read-only su prod
+   (`SELECT to_regclass('public.system_signals')` ecc., e
+   `information_schema.columns` per `time_overlap`/`weekly_recap`) +
+   controllo log di deployment per assenza errori `42P01` / `42703`.
+
+**Script attualmente in repo:** `scripts/db/sync-prod-watchdog-schema.sql`
+copre le 7 tabelle (system_signals, system_health_snapshot, ai_watchdog_log,
+weekly_system_reports, db_integrity_runs, db_integrity_violations,
+db_integrity_quarantine) + le 2 colonne `match_preferences.time_overlap` /
+`match_preferences.weekly_recap`. Validato idempotente su dev il 2026-05-28
+(task #2677).
+
