@@ -240,9 +240,32 @@ async function autoVerifyEmail(email: string): Promise<{ ok: boolean; note: stri
   }
 }
 
+async function cleanupOrphanSmokeUsers(): Promise<void> {
+  if (!process.env.DATABASE_URL) return;
+  const { Client } = await import("pg");
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
+  try {
+    await client.connect();
+    await client.query(
+      "DELETE FROM email_verification_tokens WHERE user_id IN (SELECT id FROM users WHERE email ILIKE 'smoke+%@bikerlink.test')"
+    );
+    const r = await client.query(
+      "DELETE FROM users WHERE email ILIKE 'smoke+%@bikerlink.test' OR nickname LIKE 'smoke%'"
+    );
+    if (r.rowCount && r.rowCount > 0) {
+      console.log(`[smoke] cleanup orfani: rimossi ${r.rowCount} utenti smoke residui`);
+    }
+  } catch (e) {
+    console.warn(`[smoke] cleanup orfani fallita (non bloccante): ${(e as Error).message}`);
+  } finally {
+    await client.end().catch(() => {});
+  }
+}
+
 async function main(): Promise<number> {
   console.log(`\n[smoke] BASE_URL=${BASE_URL}`);
   console.log(`[smoke] email=${EMAIL}\n`);
+  await cleanupOrphanSmokeUsers();
   console.log("flag id     area         check                                status   time");
   console.log("-".repeat(96));
 
