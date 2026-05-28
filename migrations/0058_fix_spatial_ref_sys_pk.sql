@@ -1,4 +1,17 @@
 -- Task #2731 — Migration no-op (svuotata).
+-- Task #2762 — Commento di guardia aggiornato con i tre livelli di difesa.
+--
+-- ╔══════════════════════════════════════════════════════════════════════════╗
+-- ║  ATTENZIONE: questo file è INTENTIONALLY VUOTO.                        ║
+-- ║  Non aggiungere MAI statement SQL che referenzino:                     ║
+-- ║    • spatial_ref_sys                                                   ║
+-- ║    • geography_columns                                                 ║
+-- ║    • geometry_columns                                                  ║
+-- ║  Sono tabelle/view di sistema PostGIS di proprietà del ruolo           ║
+-- ║  `postgres`, non dell'utente applicativo. Qualunque DDL su di esse     ║
+-- ║  fa fallire il deploy in produzione con:                               ║
+-- ║    ERROR: must be owner of table spatial_ref_sys                       ║
+-- ╚══════════════════════════════════════════════════════════════════════════╝
 --
 -- Contesto: il deploy in produzione falliva con
 --   ALTER TABLE "spatial_ref_sys" ADD PRIMARY KEY ("srid");
@@ -12,11 +25,36 @@
 -- l'esecuzione (validation failure) appena trova `ALTER TABLE spatial_ref_sys`,
 -- senza mai arrivare a eseguire il blocco EXCEPTION.
 --
--- Soluzione: svuotare completamente la migration lasciando solo questo
--- commento (nessuno statement SQL eseguibile). Il file resta numerato 0058 così
+-- Soluzione: svuotare completamente la migration lasciando solo commenti
+-- (nessuno statement SQL eseguibile). Il file resta numerato 0058 così
 -- drizzle-kit lo considera già applicato e non rigenera l'ALTER TABLE.
 --
--- NON reintrodurre alcuno statement che referenzi spatial_ref_sys,
--- geography_columns o geometry_columns in questa o in future migration:
--- la gestione di questi oggetti PostGIS è demandata interamente a
--- `tablesFilter` in drizzle.config.ts e al wrapper scripts/db-push-safe.sh.
+-- ═══════════════════════════════════════════════════════════════════════════
+-- TRE LIVELLI DI DIFESA (Task #2762) — stato attuale
+-- ═══════════════════════════════════════════════════════════════════════════
+--
+-- Livello 1 — extensionsFilters: ["postgis"] in drizzle.config.ts
+--   Opzione ufficiale drizzle-kit ≥ 0.30. Esclude completamente le tabelle
+--   PostGIS durante l'introspection: drizzle-kit non genera MAI statement
+--   DDL su spatial_ref_sys, geography_columns, geometry_columns.
+--   Questo risolve la causa radice (drizzle-kit ≥ 0.30 ignora il blacklist
+--   tablesFilter con più di un'esclusione PostGIS).
+--
+-- Livello 2 — tablesFilter (blacklist non-PostGIS) in drizzle.config.ts
+--   Esclude le tabelle di app non gestite da drizzle-kit (session,
+--   integrity_*, schema_migrations, tabelle con expression-index flickering).
+--   NON contiene più voci PostGIS (gestite dal livello 1).
+--
+-- Livello 3 — scripts/db-push-safe.sh (package.json → db:push)
+--   Wrapper shell con due controlli:
+--   a) Pre-flight: scansiona migrations/*.sql per statement SQL eseguibili
+--      che referenzino oggetti PostGIS; esce con errore se li trova.
+--   b) Runtime strict: se drizzle-kit fallisce e l'output contiene qualsiasi
+--      riferimento a spatial_ref_sys/geography_columns/geometry_columns,
+--      hard fail con messaggio diagnostico (non benign pass-through).
+--      Con extensionsFilters attivo, questi oggetti non dovrebbero MAI
+--      apparire — se appaiono significa che il livello 1 ha fallito.
+--
+-- Se future migration devono gestire oggetti PostGIS, usare SEMPRE uno
+-- statement che verifichi preventivamente la ownership o delegare l'operazione
+-- a un utente con i privilegi adeguati (fuori dal pipeline di deploy).

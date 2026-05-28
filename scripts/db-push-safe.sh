@@ -1,47 +1,39 @@
 #!/bin/bash
 # Task #2700 — Wrapper "fail-safe" attorno a `drizzle-kit push --force`.
+# Task #2762 — Comportamento aggiornato a strict-fail per oggetti PostGIS.
 #
-# Problema: in produzione il deploy fallisce con
-#   ERROR: must be owner of table spatial_ref_sys
-# perché drizzle-kit, nonostante `tablesFilter`, in alcune versioni emette
-# `ALTER TABLE spatial_ref_sys ADD PRIMARY KEY` (oggetto PostGIS di proprietà
-# del ruolo `postgres`, non dell'utente applicativo).
+# ARCHITETTURA DEI TRE LIVELLI DI DIFESA (Task #2762):
+#   Livello 1: extensionsFilters: ["postgis"] in drizzle.config.ts
+#              → drizzle-kit non genera MAI DDL su oggetti PostGIS
+#   Livello 2: tablesFilter (non-PostGIS blacklist) in drizzle.config.ts
+#              → esclude tabelle di app non gestite da drizzle-kit
+#   Livello 3: questo script (db-push-safe.sh)
+#              → pre-flight check su migration files + strict-fail runtime
 #
-# Comportamento di questo wrapper:
-# 1. Esegue `drizzle-kit push --force` catturando stdout+stderr.
-# 2. Se l'esecuzione termina con `exit 0` → success, esce 0.
-# 3. Se fallisce ED l'output contiene SOLO l'errore di ownership su uno dei
-#    tre oggetti PostGIS noti (spatial_ref_sys, geography_columns,
-#    geometry_columns), riprova fino a MAX_ITER volte. Tutti gli statement
-#    validi vengono applicati nel frattempo (drizzle ricalcola il diff a ogni
-#    push). Quando non resta nient'altro da applicare a parte lo statement
-#    PostGIS, esce 0 con un warning loggato (lo statement è benigno: il PK è
-#    già presente perché creato da PostGIS al CREATE EXTENSION).
-# 4. Se l'output contiene qualunque altro errore non PostGIS, esce con il
-#    codice originale (fail-fast, nessun masking).
-#
-# Idempotenza: la seconda esecuzione consecutiva è no-op se la prima è andata
-# a buon fine. Verificato in `docs/deploy-status.md`.
+# Comportamento di questo wrapper (post-Task #2762):
+# 1. Pre-flight: scansiona migrations/*.sql per statement PostGIS eseguibili.
+#    Se trovati, esce con errore PRIMA di toccare il database.
+# 2. Esegue `drizzle-kit push --force` catturando stdout+stderr.
+# 3. Se esce 0 → success.
+# 4. Se l'output contiene qualsiasi riferimento a oggetti PostGIS noti
+#    (spatial_ref_sys, geography_columns, geometry_columns) → HARD FAIL.
+#    Con extensionsFilters attivo, questi oggetti NON dovrebbero MAI apparire
+#    nell'output. Se appaiono significa che il livello 1 ha fallito e il
+#    deploy non deve proseguire.
+# 5. Qualsiasi altro errore → fail-fast con il codice originale.
 
 set -uo pipefail
 
-# Task #2731 — Pre-flight guard.
-# Layer di sicurezza aggiuntivo: prima di toccare il pipeline, scansiona i file
-# di migration in migrations/*.sql alla ricerca di statement SQL ESEGUIBILI che
-# referenzino oggetti di sistema PostGIS (spatial_ref_sys, geography_columns,
-# geometry_columns). I commenti (righe che iniziano con `--`) vengono ignorati,
-# così la documentazione e le migration no-op restano consentite.
-# Se trova uno statement eseguibile, esce con errore descrittivo PRIMA che la
-# migration raggiunga il pipeline di deploy di Replit.
 POSTGIS_OBJECTS_PATTERN='spatial_ref_sys|geography_columns|geometry_columns'
 MIGRATIONS_DIR="$(dirname "$0")/../migrations"
 
+# ─── PRE-FLIGHT: scansione migration files ──────────────────────────────────
 if [ -d "$MIGRATIONS_DIR" ]; then
   echo "[db-push-safe] Pre-flight: scansione migration per statement PostGIS eseguibili…"
   offending=""
   for f in "$MIGRATIONS_DIR"/*.sql; do
     [ -e "$f" ] || continue
-    # Rimuove righe vuote e commenti (`--`), poi cerca i pattern PostGIS.
+    # Rimuove commenti (--) poi cerca i pattern PostGIS nel codice eseguibile.
     if sed -e 's/--.*$//' "$f" | grep -nEi "$POSTGIS_OBJECTS_PATTERN" >/dev/null 2>&1; then
       hits=$(sed -e 's/--.*$//' "$f" | grep -nEi "$POSTGIS_OBJECTS_PATTERN")
       offending="${offending}\n  ${f}:\n${hits}\n"
@@ -52,69 +44,49 @@ if [ -d "$MIGRATIONS_DIR" ]; then
     echo "[db-push-safe] ERRORE pre-flight: trovati statement SQL eseguibili che referenziano oggetti PostGIS di sistema." >&2
     echo "Questi oggetti (spatial_ref_sys/geography_columns/geometry_columns) sono di proprietà del ruolo 'postgres'" >&2
     echo "e qualunque ALTER/DDL su di essi fa fallire il deploy in produzione con 'must be owner of table'." >&2
-    echo "Rimuovi lo statement (lascia solo commenti) o gestisci l'oggetto via tablesFilter in drizzle.config.ts." >&2
+    echo "Rimuovi lo statement (lascia solo commenti) — la gestione di questi oggetti è demandata a" >&2
+    echo "extensionsFilters: [\"postgis\"] in drizzle.config.ts (livello 1 di difesa)." >&2
     echo -e "Occorrenze:$offending" >&2
     exit 1
   fi
   echo "[db-push-safe] Pre-flight OK: nessuno statement PostGIS eseguibile nelle migration."
 fi
 
-MAX_ITER=4
-POSTGIS_ERR_PATTERN='must be owner of (table|view|relation|sequence) (spatial_ref_sys|geography_columns|geometry_columns)'
-OTHER_ERR_PATTERN='(error:|ERROR:|FATAL:|Error:)'
+# ─── RUNTIME: drizzle-kit push ──────────────────────────────────────────────
+echo "[db-push-safe] Esecuzione: drizzle-kit push --force"
 
-iter=0
-last_postgis_only=0
+tmp_out=$(mktemp)
+set +e
+npx drizzle-kit push --force >"$tmp_out" 2>&1
+rc=$?
+set -e
 
-while [ $iter -lt $MAX_ITER ]; do
-  iter=$((iter + 1))
-  echo "[db-push-safe] Iterazione $iter/$MAX_ITER — drizzle-kit push --force"
+cat "$tmp_out"
 
-  tmp_out=$(mktemp)
-  set +e
-  npx drizzle-kit push --force >"$tmp_out" 2>&1
-  rc=$?
-  set -e
-
-  cat "$tmp_out"
-
-  if [ $rc -eq 0 ]; then
-    rm -f "$tmp_out"
-    echo "[db-push-safe] OK (iterazione $iter)."
-    exit 0
-  fi
-
-  # L'output contiene un errore PostGIS noto?
-  if grep -qE "$POSTGIS_ERR_PATTERN" "$tmp_out"; then
-    # Controlla se ci sono altri errori non-PostGIS, riga per riga.
-    other=$(grep -E "$OTHER_ERR_PATTERN" "$tmp_out" | grep -vE "$POSTGIS_ERR_PATTERN" || true)
-    if [ -n "$other" ]; then
-      echo "[db-push-safe] ERRORE non-PostGIS rilevato — aborting:" >&2
-      echo "$other" >&2
-      rm -f "$tmp_out"
-      exit $rc
-    fi
-
-    # Solo errori PostGIS. Se l'iterazione precedente era già "solo PostGIS",
-    # vuol dire che drizzle continua a generare lo stesso ALTER e non c'è
-    # altro da fare → trattiamolo come benigno e usciamo 0.
-    if [ $last_postgis_only -eq 1 ]; then
-      echo "[db-push-safe] WARN: errore ownership PostGIS persistente — treating as benign (PK già creato da CREATE EXTENSION postgis)." >&2
-      rm -f "$tmp_out"
-      exit 0
-    fi
-    last_postgis_only=1
-    echo "[db-push-safe] Solo errore PostGIS rilevato — retry per applicare eventuali statement residui."
-    rm -f "$tmp_out"
-    continue
-  fi
-
-  echo "[db-push-safe] ERRORE non-PostGIS — aborting (exit $rc)." >&2
+if [ $rc -eq 0 ]; then
   rm -f "$tmp_out"
-  exit $rc
-done
+  echo "[db-push-safe] OK."
+  exit 0
+fi
 
-# Ultima iterazione completata: se siamo qui significa che siamo usciti dal
-# loop dopo MAX_ITER iterazioni con solo errori PostGIS — benigno.
-echo "[db-push-safe] Raggiunte $MAX_ITER iterazioni con solo errori PostGIS — treating as benign." >&2
-exit 0
+# ─── STRICT FAIL su oggetti PostGIS ─────────────────────────────────────────
+# Con extensionsFilters: ["postgis"] attivo (livello 1), drizzle-kit NON dovrebbe
+# generare alcun DDL su spatial_ref_sys/geography_columns/geometry_columns.
+# Se questi oggetti appaiono nell'output in seguito a un errore, significa che
+# il livello 1 ha fallito: si tratta di un errore reale, non benigno.
+if grep -qEi "$POSTGIS_OBJECTS_PATTERN" "$tmp_out"; then
+  echo "[db-push-safe] ERRORE CRITICO: drizzle-kit ha generato DDL su oggetti PostGIS di sistema." >&2
+  echo "Questo NON dovrebbe accadere perché extensionsFilters: [\"postgis\"] è configurato in drizzle.config.ts." >&2
+  echo "Azione richiesta:" >&2
+  echo "  1. Verifica che extensionsFilters: [\"postgis\"] sia presente in drizzle.config.ts" >&2
+  echo "  2. Verifica la versione di drizzle-kit (deve essere ≥ 0.30)" >&2
+  echo "  3. Controlla che nessuna migration abbia statement PostGIS eseguibili" >&2
+  echo "Il deploy è stato bloccato per evitare 'must be owner of table spatial_ref_sys' in produzione." >&2
+  rm -f "$tmp_out"
+  exit 1
+fi
+
+# ─── Qualsiasi altro errore: fail-fast ──────────────────────────────────────
+echo "[db-push-safe] ERRORE drizzle-kit (exit $rc) — aborting." >&2
+rm -f "$tmp_out"
+exit $rc

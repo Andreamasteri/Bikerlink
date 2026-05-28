@@ -14,8 +14,20 @@ export default defineConfig({
   dbCredentials: {
     url: process.env.DATABASE_URL,
   },
-  // Task #2678 — tablesFilter keeps drizzle-kit's "missingItems" list empty so
-  // promptNamedWithSchemasConflict (which requires a TTY) is never triggered.
+  // Task #2762 — LIVELLO 1 di difesa PostGIS.
+  // extensionsFilters è l'opzione ufficiale drizzle-kit ≥ 0.30 per escludere
+  // completamente le tabelle PostGIS (spatial_ref_sys, geography_columns,
+  // geometry_columns) durante l'introspection. Con questo flag abilitato,
+  // drizzle-kit non genera MAI statement DDL su quegli oggetti, risolvendo
+  // la causa radice del bug ricorrente:
+  //   ALTER TABLE "spatial_ref_sys" ADD PRIMARY KEY ("srid");
+  //   must be owner of table spatial_ref_sys
+  // Nota: drizzle-kit ≥ 0.30 ignora il tablesFilter-blacklist quando ci sono
+  // più di un'esclusione PostGIS — extensionsFilters risolve questa limitazione.
+  extensionsFilters: ["postgis"],
+  // Task #2678 — tablesFilter (LIVELLO 2 di difesa) keeps drizzle-kit's
+  // "missingItems" list empty so promptNamedWithSchemasConflict (which requires
+  // a TTY) is never triggered.
   //
   // Background: promptNamedWithSchemasConflict fires for every "to-create" table
   // whenever ANY "DB-only" (to-delete) table exists, regardless of structural
@@ -27,32 +39,17 @@ export default defineConfig({
   //                         DB and excluded from drizzle-schema.ts to prevent the
   //                         integrity_* → db_integrity_* rename conflict
   // !schema_migrations    — external migration tracking table, not in TS schema
-  // !spatial_ref_sys      — PostGIS system table (owned by `postgres`, not the
-  //                         app user → `ALTER TABLE` su questa fallisce in prod
-  //                         con "must be owner of table spatial_ref_sys" e
-  //                         blocca il publish). Task #2700.
-  // !geography_columns    — PostGIS view, idem
-  // !geometry_columns     — PostGIS view, idem
   //
-  // Task #2700 — i pattern sono duplicati anche schema-qualified
-  // (`!public.spatial_ref_sys`) perché alcune versioni di drizzle-kit
-  // applicano il filtro solo dopo aver costruito il diff schema-qualified,
-  // lasciando passare uno statement `ALTER TABLE spatial_ref_sys ADD
-  // PRIMARY KEY` che fa fallire il deploy. Defense-in-depth: anche
-  // `scripts/db-push-safe.sh` intercetta eventuali errori di ownership
-  // residui sui tre oggetti PostGIS.
+  // NOTE (Task #2762): PostGIS objects (spatial_ref_sys, geography_columns,
+  // geometry_columns) are intentionally NOT listed here anymore. They are fully
+  // handled by extensionsFilters above (level 1). The level 3 runtime guard is
+  // scripts/db-push-safe.sh, wired via package.json → db:push.
   tablesFilter: [
     "!session",
     "!integrity_runs",
     "!integrity_violations",
     "!integrity_quarantine",
     "!schema_migrations",
-    "!spatial_ref_sys",
-    "!geography_columns",
-    "!geometry_columns",
-    "!public.spatial_ref_sys",
-    "!public.geography_columns",
-    "!public.geometry_columns",
     // Task #2680 — Expression-index flickering fix.
     // drizzle-kit cannot compare expression indexes (LEAST/GREATEST, ::text cast, GIN
     // trgm) and always generates DROP+CREATE for them on every push. The GIN index and
