@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   Alert,
   Linking,
   ActivityIndicator,
@@ -15,7 +14,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import * as Speech from "expo-speech";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { useOfflineTiles } from "@/hooks/useOfflineTiles";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
@@ -26,96 +24,25 @@ import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
 import { NavigationMap } from "@/components/navigate/NavigationMap";
 import { NavigationInstruction } from "@/components/navigate/NavigationInstruction";
 import { NavigationFinished } from "@/components/navigate/NavigationFinished";
+import type { NavigationStep, PlannedRoute } from "./[id].types";
+import {
+  saveRouteToCache,
+  loadRouteFromCache,
+  activeStepIndex,
+  signToIcon,
+  formatDistance,
+  formatDuration,
+} from "./[id].helpers";
+import { makeStyles } from "./[id].styles";
 
-// ─── Route cache helpers ───────────────────────────────────────────────────────
-
-const ROUTE_CACHE_PREFIX = "route_cache_";
-
-async function saveRouteToCache(route: PlannedRoute): Promise<void> {
-  try {
-    await AsyncStorage.setItem(
-      `${ROUTE_CACHE_PREFIX}${route.id}`,
-      JSON.stringify(route)
-    );
-  } catch {
-    // no-op: route caching is best-effort
-  }
-}
-
-async function loadRouteFromCache(id: string): Promise<PlannedRoute | null> {
-  try {
-    const raw = await AsyncStorage.getItem(`${ROUTE_CACHE_PREFIX}${id}`);
-    if (!raw) return null;
-    return JSON.parse(raw) as PlannedRoute;
-  } catch {
-    // no-op: cache retrieval is best-effort
-    return null;
-  }
-}
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface NavigationStep {
-  sign: number;
-  text: string;
-  distance: number;
-  time: number;
-  interval: [number, number];
-  streetName?: string;
-}
-
-interface PlannedRoute {
-  id: string;
-  title: string;
-  distanceKm: number;
-  durationMinutes: number;
-  waypoints: Array<{ lat: number; lng: number; name?: string }>;
-  polyline?: string | null;
-  navigationSteps?: NavigationStep[] | null;
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function activeStepIndex(polylineIdx: number, steps: NavigationStep[]): number {
-  for (let i = steps.length - 1; i >= 0; i--) {
-    if (polylineIdx >= steps[i].interval[0]) return i;
-  }
-  return 0;
-}
-
-function signToIcon(sign: number): keyof typeof Ionicons.glyphMap {
-  switch (sign) {
-    case -3: return "return-down-back-outline";
-    case -2: return "arrow-back-outline";
-    case -1: return "arrow-back-circle-outline";
-    case 0: return "arrow-up-outline";
-    case 1: return "arrow-forward-circle-outline";
-    case 2: return "arrow-forward-outline";
-    case 3: return "return-down-forward-outline";
-    case 4: return "flag-outline";
-    case 6: return "refresh-outline";
-    default: return "navigate-outline";
-  }
-}
-
-function formatDistance(m: number): string {
-  if (m >= 1000) return `${(m / 1000).toFixed(1)} km`;
-  return `${Math.round(m)} m`;
-}
-
-function formatDuration(mins: number): string {
-  const h = Math.floor(mins / 60);
-  const m = mins % 60;
-  if (h === 0) return `${m} min`;
-  return m > 0 ? `${h}h ${m}min` : `${h}h`;
-}
-
-// ─── Main Screen ──────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const ANNOUNCE_DISTANCE_FAR = 200;
 const ANNOUNCE_DISTANCE_NEAR = 50;
 const REROUTE_DISTANCE_M = 200;
 const REROUTE_DELAY_MS = 5000;
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function NavigateScreen() {
   const colors = useColors();
@@ -429,7 +356,7 @@ export default function NavigateScreen() {
     router.back();
   };
 
-  const s = styles(colors);
+  const s = makeStyles(colors);
 
   // Build map URI — rebuilt whenever polylinePoints or offline tile status change
   const mapUri = React.useMemo(() => {
@@ -589,52 +516,3 @@ export default function NavigateScreen() {
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const styles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  progressBg: { height: 4, backgroundColor: colors.border },
-  progressFill: { height: 4, backgroundColor: colors.accent, borderRadius: 2 },
-  offlineBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#c0392b",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  offlineBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#fff" },
-  downloadBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(0,0,0,0.72)",
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-  },
-  downloadBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#fff", flex: 1 },
-  downloadProgressWrap: { flex: 1, gap: 4 },
-  downloadProgressBg: { height: 3, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: 2, overflow: "hidden" },
-  downloadProgressFill: { height: 3, backgroundColor: colors.accent, borderRadius: 2 },
-  staleBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    backgroundColor: "#e67e22",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  staleBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#fff" },
-  offlineAvailableBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(34,197,94,0.15)",
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-  },
-  offlineAvailableBannerText: { fontFamily: "Inter_500Medium", fontSize: 12, color: "#22c55e", flex: 1 },
-});
