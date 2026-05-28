@@ -60,8 +60,7 @@ if (/bikerlink\.(app|com|it)$/i.test(new URL(BASE_URL).hostname) && !ALLOW_PROD)
 const results: CheckResult[] = [];
 let cookieJar = "";
 let stopReason: string | null = null;
-// Stato condiviso con runWithCleanup(): permette al cleanup nel finally di
-// agire SOLO se questo run ha effettivamente registrato un utente smoke.
+// Stato condiviso con runWithCleanup(): agisce SOLO se questo run ha registrato un utente smoke.
 let registeredThisRun = false;
 let createdUserId: string | null = null;
 
@@ -593,9 +592,7 @@ async function runWithCleanup(): Promise<void> {
       console.log(`[smoke] cleanup ${EMAIL}: FAIL — ${e?.message ?? String(e)}`);
     }
   }
-  if (fatal) {
-    console.error("[smoke] errore fatale:", (fatal as any)?.message ?? fatal);
-  }
+  if (fatal) console.error("[smoke] errore fatale:", (fatal as any)?.message ?? fatal);
   process.exit(exitCode);
 }
 

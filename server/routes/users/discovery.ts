@@ -475,12 +475,8 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     const requesterId = req.session.userId!;
     const lat = parseFloat(req.query.lat as string);
     const lng = parseFloat(req.query.lng as string);
-    // Task #2697 — supportare il caso "raggio mondiale":
-    //   - radius assente            → world (nessun filtro distanza)
-    //   - radius=0 | "world" | "all"→ world
-    //   - radius numerico > 0       → raggio in km (comportamento storico)
-    // Il default storico era 50km; lo manteniamo solo quando il client passa
-    // esplicitamente un valore non parsabile (preserva retro-compatibilità).
+    // Task #2697: radius assente/"world"/"all"/0 → world (nessun filtro distanza);
+    // numerico > 0 → raggio km; non parsabile → default 50km (retro-compatibilità).
     const rawRadius = req.query.radius;
     let radius: number;
     if (rawRadius === undefined || rawRadius === null || rawRadius === "") {
@@ -492,21 +488,17 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
       radius = Number.isFinite(parsed) ? parsed : 50;
     }
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
-
     if (isNaN(lat) || isNaN(lng)) {
       return sendError(res, 400, "Parametri lat e lng richiesti");
     }
-
     const [offlineRandomSetting, mapFilterSetting] = await Promise.all([
       storage.getAppSetting("offline_position_randomize_default"),
       storage.getAppSetting("map_visibility_filter"),
     ]);
     const globalOfflineRandomize = offlineRandomSetting?.value !== "false";
     const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
-
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
     const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
-
     const fifteenMinutesAgoNearby = new Date(Date.now() - 15 * 60 * 1000);
     const results = nearbyUsers
       .filter((item) => !blockedIds.has(item.user.id))
@@ -565,7 +557,6 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
     ]);
     const blockedSet = new Set(blockedIds);
     const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
-
     const onlineIdSet = mapVisibilityFilter !== "all" ? new Set(onlineTracker.getOnlineUserIds()) : null;
     const availableIdSet = mapVisibilityFilter === "available_only"
       ? new Set([...onlineTracker.getAvailableBikerIds(), ...onlineTracker.getAvailableZavorrinaIds()])
@@ -605,5 +596,4 @@ router.get("/search", requireAuth, async (req: Request, res: Response) => {
     return sendError(res, 500, "Errore interno del server");
   }
 });
-
 export default router;
