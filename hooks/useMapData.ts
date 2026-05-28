@@ -45,14 +45,19 @@ export function useMapData({
   const router = useRouter();
   const baseUrl = getApiUrl();
 
+  // Task #2697 — la mappa usa la selezione area (modal Paesi/continente/mondo)
+  // come unico filtro spaziale, non un raggio "vicino a me". Inviamo quindi
+  // sempre `radius=world` così il backend non taglia gli utenti fuori dai 50km.
+  const radiusParam = "world";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nearbyUsersQuery = useQuery<any[]>({
-    queryKey: ["/api/users/nearby", location?.latitude, location?.longitude, countriesQueryParam],
+    queryKey: ["/api/users/nearby", location?.latitude, location?.longitude, countriesQueryParam, radiusParam],
     queryFn: async () => {
       if (!location) return [];
       const url = new URL("/api/users/nearby", baseUrl);
       url.searchParams.set("lat", String(location.latitude));
       url.searchParams.set("lng", String(location.longitude));
+      url.searchParams.set("radius", radiusParam);
       if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
       const res = await apiRequest("GET", url.pathname + url.search);
       return res.json();

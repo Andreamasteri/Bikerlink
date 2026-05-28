@@ -11,14 +11,17 @@ import { cachedCandidatesForZone } from "../cache/zone-cache";
 
 export class MapStorage extends PlannedRoutesStorage {
   async getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>> {
-    // Task #2517 — wrap with zone cache (60s TTL, 0.05° grid). The cache is a
-    // no-op when REDIS_URL isn't set; otherwise nearby callers within the same
-    // grid cell skip the DB hit entirely.
-    const variant = countries && countries.length > 0 ? `c:${[...countries].sort().join(",")}` : "all";
+    // Task #2517 — wrap with zone cache (60s TTL, 0.05° grid).
+    // Task #2697 — radiusKm <= 0 means "world" (no Haversine radius filter):
+    // ritorna tutti gli utenti dell'area (eventualmente filtrata per country),
+    // ordinati per distanza dal viewer per coerenza UI.
+    const isWorld = !(radiusKm > 0);
+    const countriesPart = countries && countries.length > 0 ? `c:${[...countries].sort().join(",")}` : "all";
+    const variant = `${countriesPart}|r:${isWorld ? "world" : Math.round(radiusKm)}`;
     return await cachedCandidatesForZone<{ user: User; profile: UserProfile; distance: number }>(
       lat,
       lng,
-      radiusKm,
+      isWorld ? 0 : radiusKm,
       async () => {
         const conditions: SQL<unknown>[] = [
           eq(users.status, "active"),
@@ -30,11 +33,15 @@ export class MapStorage extends PlannedRoutesStorage {
         if (countries && countries.length > 0) {
           conditions.push(or(inArray(users.country, countries), sql`${users.country} IS NULL`)!);
         }
+        const distanceExpr = sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance");
+        if (!isWorld) {
+          conditions.push(sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude})))) <= ${radiusKm}`);
+        }
         const results = await db
           .select({
             user: users,
             profile: userProfiles,
-            distance: sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance"),
+            distance: distanceExpr,
           })
           .from(userProfiles)
           .innerJoin(users, eq(users.id, userProfiles.userId))

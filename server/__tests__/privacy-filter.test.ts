@@ -424,6 +424,65 @@ describe("GET /api/users/nearby — map_visibility_filter", () => {
     const res = await request(app).get("/api/users/nearby");
     expect(res.status).toBe(400);
   });
+
+  // Task #2697 — raggio mondiale: senza radius (o radius=world/0) il backend
+  // non deve tagliare gli utenti fuori dai 50km storici.
+  it("world radius — returns users >50km away when radius is omitted", async () => {
+    vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
+    });
+    vi.mocked(storage.getNearbyUsers).mockImplementation(async (_lat, _lng, radiusKm) => {
+      // Lo storage mock verifica che il router passi radius=0 (world) in assenza
+      // di parametro: se passasse 50 questo test fallirebbe.
+      expect(radiusKm).toBe(0);
+      return [
+        { ...makeNearbyRow("far-user", { lastLoginAt: recentLoginAt }), distance: 9500 } as unknown as StorageNearbyRow,
+        { ...makeNearbyRow("near-user", { lastLoginAt: recentLoginAt }), distance: 12 } as unknown as StorageNearbyRow,
+      ];
+    });
+
+    const res = await request(app).get("/api/users/nearby?lat=45&lng=9");
+
+    expect(res.status).toBe(200);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
+    expect(ids).toContain("far-user");
+    expect(ids).toContain("near-user");
+  });
+
+  it("world radius — explicit radius=world is treated as world", async () => {
+    vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
+    });
+    vi.mocked(storage.getNearbyUsers).mockImplementation(async (_lat, _lng, radiusKm) => {
+      expect(radiusKm).toBe(0);
+      return [{ ...makeNearbyRow("very-far", { lastLoginAt: recentLoginAt }), distance: 14000 } as unknown as StorageNearbyRow];
+    });
+
+    const res = await request(app).get("/api/users/nearby?lat=45&lng=9&radius=world");
+
+    expect(res.status).toBe(200);
+    const ids = res.body.map((u: Record<string, unknown>) => u.id);
+    expect(ids).toContain("very-far");
+  });
+
+  it("explicit numeric radius is forwarded to storage", async () => {
+    vi.mocked(storage.getAppSetting).mockImplementation(async (key: string) => {
+      if (key === "offline_position_randomize_default") return { key, value: "false" } as unknown as StorageSetting;
+      if (key === "map_visibility_filter") return filterSetting("all") as unknown as StorageSetting;
+      return undefined;
+    });
+    vi.mocked(storage.getNearbyUsers).mockImplementation(async (_lat, _lng, radiusKm) => {
+      expect(radiusKm).toBe(25);
+      return [];
+    });
+
+    const res = await request(app).get("/api/users/nearby?lat=45&lng=9&radius=25");
+    expect(res.status).toBe(200);
+  });
 });
 
 // ---------------------------------------------------------------------------

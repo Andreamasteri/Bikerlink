@@ -475,7 +475,22 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     const requesterId = req.session.userId!;
     const lat = parseFloat(req.query.lat as string);
     const lng = parseFloat(req.query.lng as string);
-    const radius = parseFloat(req.query.radius as string) || 50;
+    // Task #2697 — supportare il caso "raggio mondiale":
+    //   - radius assente            → world (nessun filtro distanza)
+    //   - radius=0 | "world" | "all"→ world
+    //   - radius numerico > 0       → raggio in km (comportamento storico)
+    // Il default storico era 50km; lo manteniamo solo quando il client passa
+    // esplicitamente un valore non parsabile (preserva retro-compatibilità).
+    const rawRadius = req.query.radius;
+    let radius: number;
+    if (rawRadius === undefined || rawRadius === null || rawRadius === "") {
+      radius = 0;
+    } else if (typeof rawRadius === "string" && (rawRadius === "world" || rawRadius === "all")) {
+      radius = 0;
+    } else {
+      const parsed = parseFloat(rawRadius as string);
+      radius = Number.isFinite(parsed) ? parsed : 50;
+    }
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
 
     if (isNaN(lat) || isNaN(lng)) {
