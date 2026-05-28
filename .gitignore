@@ -75,3 +75,6 @@ server/data/schema-snapshot.json
 
 # Screenshot e asset incollati dalla chat — non devono essere tracciati
 attached_assets/
+
+# Runtime upload assets (transient, not tracked)
+uploads/ads/
