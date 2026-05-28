@@ -1,11 +1,23 @@
 // Task #2641 — FAB flottante AI Console: tap=drawer, long-press=console intera.
+// Task #2692 — FAB trascinabile con persistenza posizione (AsyncStorage) e clamp ai bordi.
 // Haptics conditional; reanimated per fade/scale.
-import React, { useState } from "react";
-import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Platform,
+  PanResponder,
+  useWindowDimensions,
+  GestureResponderEvent,
+  PanResponderGestureState,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useColors } from "@/hooks/useColors";
 import { useAiActionQueue } from "@/hooks/admin/ai-console/useAiActionQueue";
 import { useAiAlertsState, useAiAlertsSubscriber } from "@/hooks/admin/ai-console/useAiAlerts";
@@ -23,10 +35,16 @@ function triggerHaptic(style: "light" | "medium" = "light") {
   } catch { /* skip */ }
 }
 
+const FAB_SIZE = 56;
+const EDGE_MARGIN = 8;
+const DRAG_THRESHOLD = 5;
+const STORAGE_KEY = "admin:ai-fab:pos";
+
 export default function FabWidget() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { width: winW, height: winH } = useWindowDimensions();
   const [drawerOpen, setDrawerOpen] = useState(false);
   useAiAlertsSubscriber({ enabled: true });
   const alerts = useAiAlertsState();
@@ -40,18 +58,99 @@ export default function FabWidget() {
   const hasExplain = !!explain;
 
   const bottomInset = Math.max(insets.bottom, Platform.OS === "web" ? 34 : 12);
+  const topInset = Math.max(insets.top, Platform.OS === "web" ? 67 : 0);
+
+  const clamp = (x: number, y: number) => {
+    const minX = EDGE_MARGIN + insets.left;
+    const maxX = winW - FAB_SIZE - EDGE_MARGIN - insets.right;
+    const minY = EDGE_MARGIN + topInset;
+    const maxY = winH - FAB_SIZE - EDGE_MARGIN - bottomInset;
+    return {
+      x: Math.min(Math.max(x, minX), Math.max(minX, maxX)),
+      y: Math.min(Math.max(y, minY), Math.max(minY, maxY)),
+    };
+  };
+
+  const defaultPos = () => ({
+    x: winW - FAB_SIZE - 16 - insets.right,
+    y: winH - FAB_SIZE - 16 - bottomInset,
+  });
+
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => defaultPos());
+  const [loaded, setLoaded] = useState(false);
+  const posRef = useRef(pos);
+  posRef.current = pos;
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const didDragRef = useRef(false);
+
+  // Load persisted position
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed?.x === "number" && typeof parsed?.y === "number") {
+            setPos(clamp(parsed.x, parsed.y));
+          }
+        }
+      } catch { /* skip */ }
+      setLoaded(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-clamp on window resize / inset change
+  useEffect(() => {
+    if (!loaded) return;
+    setPos((prev) => clamp(prev.x, prev.y));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [winW, winH, insets.top, insets.bottom, insets.left, insets.right, loaded]);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_e: GestureResponderEvent, g: PanResponderGestureState) =>
+        Math.abs(g.dx) > DRAG_THRESHOLD || Math.abs(g.dy) > DRAG_THRESHOLD,
+      onPanResponderGrant: () => {
+        dragStartRef.current = { x: posRef.current.x, y: posRef.current.y };
+        didDragRef.current = false;
+      },
+      onPanResponderMove: (_e, g) => {
+        const start = dragStartRef.current;
+        if (!start) return;
+        didDragRef.current = true;
+        const next = clamp(start.x + g.dx, start.y + g.dy);
+        setPos(next);
+      },
+      onPanResponderRelease: () => {
+        dragStartRef.current = null;
+        if (didDragRef.current) {
+          const final = posRef.current;
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(final)).catch(() => { /* skip */ });
+        }
+        didDragRef.current = false;
+      },
+      onPanResponderTerminate: () => {
+        dragStartRef.current = null;
+        didDragRef.current = false;
+      },
+    }),
+  ).current;
 
   return (
     <>
       <Animated.View
         pointerEvents="box-none"
-        style={[styles.wrap, { bottom: bottomInset + 16, right: 16 }, animStyle]}
+        style={[styles.wrap, { left: pos.x, top: pos.y }, animStyle]}
+        {...panResponder.panHandlers}
       >
         <Pressable
           // Task #2645 — quando c'è un explain pendente, il tap apre direttamente
           // la Console (che consumerà il pending e auto-invierà il seed). Altrimenti
           // tap = drawer rapido, long-press = console intera (comportamento storico).
           onPress={() => {
+            if (didDragRef.current) { didDragRef.current = false; return; }
             triggerHaptic("light");
             if (hasExplain) {
               router.push("/admin/ai-console" as never);
@@ -60,6 +159,7 @@ export default function FabWidget() {
             }
           }}
           onLongPress={() => {
+            if (didDragRef.current) return;
             triggerHaptic("medium");
             router.push("/admin/ai-console" as never);
           }}
@@ -89,9 +189,9 @@ export default function FabWidget() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: "absolute", zIndex: 999 },
+  wrap: { position: "absolute", zIndex: 999, width: FAB_SIZE, height: FAB_SIZE },
   btn: {
-    width: 56, height: 56, borderRadius: 28,
+    width: FAB_SIZE, height: FAB_SIZE, borderRadius: FAB_SIZE / 2,
     alignItems: "center", justifyContent: "center",
     shadowOpacity: 0.35, shadowOffset: { width: 0, height: 4 }, shadowRadius: 8, elevation: 6,
   },
