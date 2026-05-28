@@ -125,6 +125,20 @@ Motivi:
 - Nessun tool Replit interattivo richiesto.
 ```
 
+## Regola task — blocco "Esecuzione Agente"
+
+**Ogni plan file in `.local/tasks/*.md` deve avere come PRIMA sezione (subito dopo il titolo `#`) il blocco `## ⚙️ Esecuzione Agente`** che dichiara a monte modello agente e necessità di smoke test. Fonte di verità: skill `.agents/skills/task-execution-mode/SKILL.md` (auto-carica su trigger "crea task", "nuovo task", "pianifica", "project task", ecc.).
+
+Formato compatto:
+```markdown
+## ⚙️ Esecuzione Agente
+- Modello: Light | Economy | Power
+- App Testing: ON | OFF
+- Motivo: <una frase che giustifica entrambe le scelte>
+```
+
+Semantica sintetica: **Light** = modifica isolata in 1 file, niente logica · **Economy** = feature contenuta 1–3 file · **Power** = refactor multi-file, debug infrastruttura, ragionamento. **App Testing ON** se il task tocca anche solo un elemento di `auto-smoke-on-ui-change` (UI interattiva, navigazione, modali, publish OTA, admin panel); **OFF** se puro backend, script, doc, seed, stile puro senza handler. In dubbio: ON. Complementare a `auto-smoke-on-ui-change` (questa skill dichiara a monte, quella esegue a valle).
+
 ## Sincronizzazione node_modules dopo merge (Task #2573)
 
 **Root cause documentato**: i task agent lavorano in ambienti isolati con il proprio `node_modules`. Quando un task viene mergeato nell'app principale, il merge committa **solo** `package.json` + `package-lock.json` — `node_modules` NON viene sincronizzato. Risultato storico: dopo merge di task che installano nuove deps (es. #2541→#2561, che ha aggiunto pino/helmet/bullmq/ioredis/sentry/etc.), il server crasha in loop con `Cannot find module 'X'` per ogni pacchetto dichiarato ma non presente in `node_modules`.
