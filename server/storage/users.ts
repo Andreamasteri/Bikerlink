@@ -4,12 +4,14 @@ import { systemAccountConditions } from "../lib/system-account-filter";
 import { enqueueMusicTasteEmbedding } from "../embeddings/music-text";
 import {
   users, userPhotos, userMotorcycles, userProfiles, motorcyclePhotos,
+  entityTags,
   type User, type InsertUser,
   type UserPhoto, type InsertUserPhoto,
   type UserMotorcycle, type InsertUserMotorcycle,
   type UserProfile, type InsertUserProfile,
   type MotorcyclePhoto, type InsertMotorcyclePhoto,
 } from "@shared/db";
+import { cacheDel } from "../cache/cache";
 
 function maskHiddenLocation(profile: UserProfile | null | undefined): UserProfile {
   if (!profile) return profile as unknown as UserProfile;
@@ -124,7 +126,24 @@ export class UsersStorage {
   }
 
   async deleteUserMotorcycle(id: string): Promise<void> {
-    await db.delete(userMotorcycles).where(eq(userMotorcycles.id, id));
+    // Task #2718 — pulisce le righe orfane in `entity_tags` per la moto
+    // eliminata. L'associazione tag↔moto è polimorfica (entityType +
+    // entityId), quindi non c'è ON DELETE CASCADE a livello DB: la pulizia
+    // è responsabilità applicativa. Eseguita in transazione per evitare
+    // stati intermedi dove la moto è cancellata ma i tag restano.
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(entityTags)
+        .where(
+          and(
+            eq(entityTags.entityType, "motorcycle"),
+            eq(entityTags.entityId, id),
+          ),
+        );
+      await tx.delete(userMotorcycles).where(eq(userMotorcycles.id, id));
+    });
+    // Invalida la cache `tags-for-entity` (vedi server/storage/tags.ts).
+    void cacheDel("tags-for-entity", `motorcycle:${id}`);
   }
 
   async getUserMotorcycle(id: string): Promise<UserMotorcycle | undefined> {
