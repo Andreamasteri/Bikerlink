@@ -342,7 +342,6 @@ function renderGroupHeaderIcon(group: AdminGroup) {
   }
 }
 
-
 export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
