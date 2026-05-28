@@ -351,6 +351,25 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI Coordinator cleanup scheduler failed (non-fatal):", e);
     }
 
+    // Task #2654 — AI Coordinator wire (b): 5 AI + OTA orchestrator nel bus.
+    try {
+      const { wireOtaToCoordinator } = await import("./ai/coordinator/integrations/ota");
+      const { wireModerationToCoordinator } = await import("./ai/coordinator/integrations/moderation");
+      const { wireWatchdogToCoordinator } = await import("./ai/coordinator/integrations/watchdog");
+      const { wireDbIntegrityToCoordinator } = await import("./ai/coordinator/integrations/db-integrity");
+      const { wireAppIntegrityToCoordinator } = await import("./ai/coordinator/integrations/app-integrity");
+      const { wireConsoleToCoordinator } = await import("./ai/coordinator/integrations/console");
+      wireOtaToCoordinator();
+      wireModerationToCoordinator();
+      wireWatchdogToCoordinator();
+      wireDbIntegrityToCoordinator();
+      wireAppIntegrityToCoordinator();
+      wireConsoleToCoordinator();
+      console.log("[INIT] AI Coordinator integrations wired (6 sottosistemi)");
+    } catch (e) {
+      console.warn("[INIT] AI Coordinator integrations wire failed (non-fatal):", e);
+    }
+
     // Task #2536 — AI DB Integrity scheduler + worker BullMQ.
     try {
       const { startDbIntegrityScheduler } = await import("./ai/db-integrity/scheduler");

@@ -2,6 +2,7 @@
 // Quando disabilitato: nessun ciclo aggregator, niente auto-fix, niente proposal, niente alert,
 // niente chat AI, niente report settimanale. Endpoint admin per leggere/toggle.
 import { storage } from "../../storage";
+import { emitWatchdogKillSwitch } from "../coordinator/integrations/watchdog";
 
 const SETTING_KEY = "ai_watchdog_enabled";
 let cachedAt = 0;
@@ -22,7 +23,7 @@ export async function isWatchdogEnabled(): Promise<boolean> {
   return cached;
 }
 
-export async function setWatchdogEnabled(enabled: boolean): Promise<void> {
+export async function setWatchdogEnabled(enabled: boolean, triggeredBy?: string, reason?: string): Promise<void> {
   try {
     await storage.upsertAppSetting(SETTING_KEY, enabled ? "true" : "false");
   } catch (err) {
@@ -30,6 +31,8 @@ export async function setWatchdogEnabled(enabled: boolean): Promise<void> {
   }
   cached = enabled;
   cachedAt = Date.now();
+  // Task #2654 — Notifica Coordinator (graceful)
+  await emitWatchdogKillSwitch({ enabled, triggeredBy, reason });
 }
 
 export function invalidateCache(): void {

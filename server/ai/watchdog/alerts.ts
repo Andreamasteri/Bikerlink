@@ -5,6 +5,7 @@ import { users } from "@shared/db";
 import { eq } from "drizzle-orm";
 import type { HealthSnapshot } from "./types";
 import { writeWatchdogLog } from "./log";
+import { emitWatchdogAlert, emitWatchdogStatusChange } from "../coordinator/integrations/watchdog";
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const ALERT_TTL_MS = 10 * 60 * 1000;
@@ -45,6 +46,14 @@ async function pushAdmins(title: string, body: string, data: Record<string, unkn
 export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: number }> {
   // Snapshot-level (status change → red/orange)
   let sentCount = 0;
+  // Task #2654 — Emit al Coordinator (graceful, non blocca)
+  if (snap.status === "red" || snap.status === "orange") {
+    await emitWatchdogStatusChange({
+      status: snap.status,
+      score: snap.score,
+      topProblem: snap.problems[0]?.title ?? null,
+    });
+  }
   if ((snap.status === "red" || snap.status === "orange") && shouldSend(`status.${snap.status}`)) {
     const icon = snap.status === "red" ? "🔴" : "🟠";
     const top = snap.problems[0]?.title ?? "Problema sistema";
@@ -64,6 +73,8 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
   // Problem-level (critical singoli)
   for (const p of snap.problems) {
     if (p.severity !== "critical") continue;
+    // Task #2654 — emit ogni problem critical anche se throttled (lo throttle è solo per push)
+    await emitWatchdogAlert({ problem: p, score: snap.score, status: snap.status });
     if (!shouldSend(`problem.${p.id}`)) continue;
     const n = await pushAdmins(
       `🚨 ${p.title}`,

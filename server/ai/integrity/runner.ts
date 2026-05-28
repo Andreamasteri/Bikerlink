@@ -6,6 +6,7 @@ import type { AppIntegrityCheck, Family, RunSummary, Severity } from "./types";
 import { ALL_FAMILIES } from "./types";
 import { loadAllChecks, loadFamilyChecks } from "./registry";
 import { executeCheck, executeAutofix, hashViolation } from "./framework";
+import { emitAppViolation, emitAppAutofix } from "../coordinator/integrations/app-integrity";
 
 const _SEV_RANK: Record<Severity, number> = { low: 1, medium: 2, high: 3, critical: 4 };
 
@@ -64,7 +65,14 @@ export async function runIntegrityScan(opts: RunOptions = {}): Promise<RunSummar
       const r = await executeAutofix(check, { dryRun: !!opts.dryRun, projectRoot });
       didFix = !!r.applied; autoFixSummary = r.summary;
       if (didFix) autoFixed++;
+      // Task #2654 — emit autofix al Coordinator (graceful)
+      await emitAppAutofix({ runId: runRow.id, checkId: check.id, applied: didFix, affected: r.affected ?? 0, summary: r.summary ?? "" });
     }
+    // Task #2654 — emit violation al Coordinator (graceful)
+    await emitAppViolation({
+      runId: runRow.id, checkId: check.id, checkName: check.name,
+      family: check.family, count: result.count, severity: check.severity,
+    });
 
     await db.insert(integrityViolations).values({
       runId: runRow.id,

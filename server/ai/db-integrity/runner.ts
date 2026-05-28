@@ -11,6 +11,7 @@ import { loadAllChecks } from "./registry";
 import { executeCheck, hashViolation } from "./framework";
 import { runSafeAutofixes } from "./autofix";
 import type { Category, IntegrityCheck, RunSummary, Severity } from "./types";
+import { emitDbViolation, emitDbAutofix } from "../coordinator/integrations/db-integrity";
 
 const ADVISORY_LOCK_KEY = 0x4242_4242; // costante: solo lo scan db-integrity la usa.
 
@@ -147,6 +148,11 @@ async function runScanInternal(opts: RunOptions): Promise<RunSummary> {
     byCategory[c.category] = (byCategory[c.category] ?? 0) + 1;
     violatingChecks.push(c);
     if (c.severity === "critical") criticals.push({ checkId: c.id, name: c.name, count: exec.result.count });
+    // Task #2654 — emit al Coordinator (graceful)
+    await emitDbViolation({
+      runId, checkId: c.id, checkName: c.name, category: c.category,
+      count: exec.result.count, severity: c.severity,
+    });
     const hash = hashViolation(c.id, exec.result);
     try {
       await db.insert(dbIntegrityViolations).values({
@@ -171,6 +177,8 @@ async function runScanInternal(opts: RunOptions): Promise<RunSummary> {
   const fixes = await runSafeAutofixes(violatingChecks, ctx);
   let autoFixed = 0;
   for (const [checkId, fix] of fixes.entries()) {
+    // Task #2654 — emit autofix (sia applied che rejected)
+    await emitDbAutofix({ runId, checkId, applied: !!fix.applied, affected: fix.affected ?? 0, summary: fix.summary ?? "" });
     if (!fix.applied) continue;
     autoFixed++;
     try {

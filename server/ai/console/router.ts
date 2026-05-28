@@ -8,6 +8,7 @@ import { z } from "zod";
 import { runWithFallback, estimateCostUsd } from "../moderation/provider";
 import { getRedis } from "../../cache/redis";
 import { SCOPES } from "./tools";
+import { emitConsoleQuery } from "../coordinator/integrations/console";
 
 const CACHE_TTL_S = 60;
 
@@ -34,6 +35,7 @@ REGOLE:
 export interface RouteOpts {
   message: string;
   conversationContext?: string; // summary della conversazione (memoria)
+  adminId?: string;
 }
 
 function hashKey(message: string, ctx?: string): string {
@@ -54,6 +56,13 @@ export async function routeMessage(opts: RouteOpts): Promise<{
       const cached = await redis.get(key);
       if (cached) {
         const parsed = RouterDecisionSchema.parse(JSON.parse(cached));
+        // Task #2654 — emit al Coordinator (graceful)
+        await emitConsoleQuery({
+          adminId: opts.adminId ?? "unknown",
+          scopes: parsed.scopes,
+          queryPreview: opts.message,
+          cached: true,
+        });
         return { decision: parsed, cached: true, costUsd: 0, model: "cache", provider: "cache" };
       }
     } catch { /* swallow */ }
@@ -90,6 +99,13 @@ export async function routeMessage(opts: RouteOpts): Promise<{
     if (redis) {
       redis.set(key, JSON.stringify(decision), "EX", CACHE_TTL_S).catch(() => {});
     }
+    // Task #2654 — emit al Coordinator (graceful)
+    await emitConsoleQuery({
+      adminId: opts.adminId ?? "unknown",
+      scopes: decision.scopes,
+      queryPreview: opts.message,
+      cached: false,
+    });
     return { decision, cached: false, costUsd, model: modelId, provider: providerName };
   } catch (err) {
     // Fallback determinato: scegli tutto per non bloccare l'utente.

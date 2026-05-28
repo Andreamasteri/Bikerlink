@@ -11,6 +11,7 @@ import { db } from "../../../db";
 import { otaReleases, otaBootEvents, otaAssistantRuns, otaWatchdogReports, users } from "@shared/db";
 import { eq, desc, and, inArray, or, like } from "drizzle-orm";
 import { syncProductionUpdates } from "../ota";
+import { shouldDelayForCoordinator, recordOtaDecision } from "../../../ai/coordinator/integrations/ota";
 
 const execFileAsync = promisify(execFile);
 
@@ -442,16 +443,43 @@ export async function execMutatingTool(
   adminId: string,
   runId: string,
 ): Promise<{ ok: boolean; result?: unknown; error?: string; logPath?: string; async?: boolean }> {
+  const correlationId = `ota-${runId.slice(0, 12)}`;
+  const startedAt = Date.now();
   try {
     if (toolName === "publishOta") {
       const message = String(args.message ?? "").trim();
       if (!message) return { ok: false, error: "message obbligatorio" };
+      // Task #2654 — Coordinator pre-check (graceful: errori NON bloccano)
+      const delay = await shouldDelayForCoordinator({ action: "publish", correlationId, payload: { adminId, message } });
+      if (delay.delay) {
+        await recordOtaDecision({
+          decisionType: "DELAY",
+          input: { adminId, message },
+          output: { reason: delay.reason, conflictId: delay.conflictId ?? null, policyRuleId: delay.policyRuleId ?? null },
+          rationale: delay.reason,
+          tookMs: Date.now() - startedAt,
+          correlationId,
+          severity: "warn",
+        });
+        return { ok: false, error: `Publish OTA bloccato dal Coordinator: ${delay.reason}` };
+      }
       const job = spawnPublishJob(runId, message);
+      await recordOtaDecision({
+        decisionType: "PUBLISH_OTA",
+        input: { adminId, message },
+        output: { jobRunId: job.runId, logPath: job.logPath },
+        tookMs: Date.now() - startedAt,
+        correlationId,
+      });
       // Async: lo status del run resterà 'running' fino al completamento del job.
       return { ok: true, result: { runId: job.runId, status: "running" }, logPath: job.logPath, async: true };
     }
     if (toolName === "syncEas") {
       await syncProductionUpdates();
+      await recordOtaDecision({
+        decisionType: "SYNC_EAS", input: { adminId }, output: { synced: true },
+        tookMs: Date.now() - startedAt, correlationId,
+      });
       return { ok: true, result: { synced: true } };
     }
     if (toolName === "approveRelease") {
@@ -464,6 +492,10 @@ export async function execMutatingTool(
         .returning();
       if (!updated) return { ok: false, error: "Release non trovata o non in stato pending" };
       console.log(`[ota-assistant][AUDIT] APPROVE ${id} by ${adminId}`);
+      await recordOtaDecision({
+        decisionType: "APPROVE_RELEASE", input: { adminId, releaseId: id }, output: { status: "approved" },
+        tookMs: Date.now() - startedAt, correlationId,
+      });
       return { ok: true, result: updated };
     }
     if (toolName === "rejectRelease") {
@@ -476,19 +508,33 @@ export async function execMutatingTool(
         .returning();
       if (!updated) return { ok: false, error: "Release non trovata o non in stato pending" };
       console.log(`[ota-assistant][AUDIT] REJECT ${id} by ${adminId}`);
+      await recordOtaDecision({
+        decisionType: "REJECT_RELEASE", input: { adminId, releaseId: id }, output: { status: "rejected" },
+        tookMs: Date.now() - startedAt, correlationId, severity: "warn",
+      });
       return { ok: true, result: updated };
     }
     if (toolName === "rollbackToGroup") {
       const id = String(args.releaseId ?? "");
       if (!id) return { ok: false, error: "releaseId obbligatorio" };
       const out = await execRollbackToGroup(id, adminId);
+      await recordOtaDecision({
+        decisionType: "ROLLBACK", input: { adminId, releaseId: id }, output: out.ok ? (out.result ?? {}) as Record<string, unknown> : { error: out.error },
+        tookMs: Date.now() - startedAt, correlationId, severity: out.ok ? "warn" : "critical",
+      });
       return out;
     }
     if (toolName === "forceUpdateDevice") {
       const userId = String(args.userId ?? "");
       const releaseId = String(args.releaseId ?? "");
       if (!userId || !releaseId) return { ok: false, error: "userId e releaseId obbligatori" };
-      return await execForceUpdateDevice({ userId, releaseId });
+      const out = await execForceUpdateDevice({ userId, releaseId });
+      await recordOtaDecision({
+        decisionType: "FORCE_UPDATE", input: { adminId, userId, releaseId },
+        output: out.ok ? (out.result ?? {}) as Record<string, unknown> : { error: out.error },
+        tookMs: Date.now() - startedAt, correlationId, severity: "warn",
+      });
+      return out;
     }
     return { ok: false, error: `Tool sconosciuto: ${toolName}` };
   } catch (err) {

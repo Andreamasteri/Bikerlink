@@ -10,6 +10,7 @@ import { redactPII } from "./redact";
 import { triageOutputSchema, type TriageOutput, type AiCallMeta } from "./types";
 import { withBudget } from "./budget";
 import { logAiCall } from "./log";
+import { emitModerationSuggestion } from "../coordinator/integrations/moderation";
 
 const SYSTEM_PROMPT = `Sei un moderatore AI esperto della community motociclistica BikerLink.
 Analizza la segnalazione e restituisci SOLO l'oggetto JSON richiesto dallo schema.
@@ -178,6 +179,14 @@ export async function runTriage(input: TriageInput): Promise<TriageOutput | null
         response: JSON.stringify(result.object).slice(0, 4000),
         suggestion: result.object, meta,
       });
+      // Task #2654 — emit al Coordinator (graceful)
+      await emitModerationSuggestion({
+        reportId: input.reportId,
+        reportedUserId: ctx.report.reportedUserId,
+        reporterId: ctx.report.reporterId,
+        suggestion: result.object,
+        modelId: m.modelId,
+      });
       return result.object;
     } catch (err) {
       console.warn(`[ai-triage] tutti i provider falliti:`, (err as Error).message);
@@ -200,6 +209,13 @@ export async function runTriage(input: TriageInput): Promise<TriageOutput | null
         scope: "triage", reportId: input.reportId,
         prompt: "[rule-based fallback]", response: JSON.stringify(rb).slice(0, 4000),
         suggestion: rb, meta,
+      });
+      await emitModerationSuggestion({
+        reportId: input.reportId,
+        reportedUserId: ctxForFallback.report.reportedUserId,
+        reporterId: ctxForFallback.report.reporterId,
+        suggestion: rb,
+        modelId: "rule-based",
       });
       return rb;
     }
