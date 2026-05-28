@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
 import { DidYouMean } from "@/components/text-interpreter/DidYouMean";
+import { EditTags } from "@/components/profile/edit/EditTags";
 
 interface EditMotoProps {
   isBikerOrCoppia: boolean;
@@ -64,6 +65,7 @@ export function EditMoto({
   isPending,
 }: EditMotoProps) {
   const t = useT();
+  const [expandedTagsMotoId, setExpandedTagsMotoId] = useState<string | null>(null);
 
   if (!isBikerOrCoppia) return null;
 
@@ -73,23 +75,56 @@ export function EditMoto({
 
       {motorcycles.length > 0 && (
         <View style={styles.motoList}>
-          {motorcycles.map((moto) => (
-            <View key={moto.id} style={styles.motoCard}>
-              <MaterialCommunityIcons
-                name="motorbike"
-                size={20}
-                color={Colors.accent}
-              />
-              <View style={styles.motoCardInfo}>
-                <Text style={styles.motoCardTitle}>
-                  {moto.brand} {moto.model}
-                </Text>
-                {moto.year && (
-                  <Text style={styles.motoCardSub}>{moto.year}</Text>
+          {motorcycles.map((moto) => {
+            const tagsOpen = expandedTagsMotoId === moto.id;
+            return (
+              <View key={moto.id} style={styles.motoCardWrap}>
+                <View style={styles.motoCard}>
+                  <MaterialCommunityIcons
+                    name="motorbike"
+                    size={20}
+                    color={Colors.accent}
+                  />
+                  <View style={styles.motoCardInfo}>
+                    <Text style={styles.motoCardTitle}>
+                      {moto.brand} {moto.model}
+                    </Text>
+                    {moto.year && (
+                      <Text style={styles.motoCardSub}>{moto.year}</Text>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    testID={`moto-tags-toggle-${moto.id}`}
+                    style={styles.tagsToggleBtn}
+                    onPress={() =>
+                      setExpandedTagsMotoId(tagsOpen ? null : moto.id)
+                    }
+                  >
+                    <Ionicons
+                      name="pricetag-outline"
+                      size={16}
+                      color={Colors.accent}
+                    />
+                    <Text style={styles.tagsToggleText}>Tag</Text>
+                    <Ionicons
+                      name={tagsOpen ? "chevron-up" : "chevron-down"}
+                      size={14}
+                      color={Colors.accent}
+                    />
+                  </TouchableOpacity>
+                </View>
+                {tagsOpen && (
+                  <View style={styles.tagsPanel}>
+                    <EditTags
+                      entityType="motorcycle"
+                      entityId={moto.id}
+                      compact
+                    />
+                  </View>
                 )}
               </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
       )}
 
@@ -279,6 +314,32 @@ const styles = StyleSheet.create({
   motoList: {
     gap: 8,
     marginBottom: 12,
+  },
+  motoCardWrap: {
+    gap: 8,
+  },
+  tagsToggleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    backgroundColor: Colors.background,
+  },
+  tagsToggleText: {
+    fontSize: 12,
+    color: Colors.accent,
+    fontWeight: "600" as const,
+  },
+  tagsPanel: {
+    backgroundColor: Colors.surfaceLight,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   motoCard: {
     flexDirection: "row",

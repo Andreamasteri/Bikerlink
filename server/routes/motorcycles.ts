@@ -201,6 +201,66 @@ router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /api/motorcycles/:id/tags
+ * Restituisce i tag associati alla moto (entityType="motorcycle"),
+ * raggruppati per categoria. Usato dalla UI garage per pre-selezionare
+ * i tag scelti in precedenza per quella specifica moto.
+ */
+router.get("/:id/tags", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const motoId = req.params.id as string;
+    const moto = await storage.getUserMotorcycle(motoId);
+    if (!moto || moto.userId !== userId) {
+      return sendError(res, 404, "Moto non trovata");
+    }
+    const tags = await storage.getTagsForEntity("motorcycle", motoId);
+    return res.json({ tags });
+  } catch (error) {
+    console.error("Get motorcycle tags error:", error);
+    return sendError(res, 500, "Errore lettura tag moto");
+  }
+});
+
+/**
+ * PUT /api/motorcycles/:id/tags
+ * Body: { categorySlug: string, tagIds: string[] }
+ * Sostituisce in modo atomico i tag della moto per la categoria indicata.
+ * Tag di altre categorie restano invariati.
+ */
+router.put("/:id/tags", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const motoId = req.params.id as string;
+    const moto = await storage.getUserMotorcycle(motoId);
+    if (!moto || moto.userId !== userId) {
+      return sendError(res, 404, "Moto non trovata");
+    }
+    const body = req.body as { categorySlug?: unknown; tagIds?: unknown };
+    const categorySlug = typeof body?.categorySlug === "string" ? body.categorySlug : "";
+    const tagIds = Array.isArray(body?.tagIds)
+      ? body.tagIds.filter((v): v is string => typeof v === "string")
+      : null;
+    if (!categorySlug) {
+      return sendError(res, 400, "categorySlug mancante");
+    }
+    if (tagIds === null) {
+      return sendError(res, 400, "tagIds deve essere un array di stringhe");
+    }
+    await storage.setTagsForEntity("motorcycle", motoId, tagIds, { categorySlug });
+    const tags = await storage.getTagsForEntity("motorcycle", motoId);
+    return res.json({ tags });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/Tag inesistenti|non appartenenti|Categoria non trovata/i.test(msg)) {
+      return sendError(res, 400, msg);
+    }
+    console.error("Set motorcycle tags error:", error);
+    return sendError(res, 500, "Errore aggiornamento tag moto");
+  }
+});
+
 router.get("/:id/photos", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;

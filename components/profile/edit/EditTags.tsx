@@ -25,20 +25,52 @@ interface TagItem {
   label: string;
 }
 
-interface UserTag extends TagItem {
+interface EntityTag extends TagItem {
   categorySlug: string;
   categoryLabel: string;
 }
 
 const CATEGORY_ORDER = ["musica", "stile_guida", "tipo_moto"] as const;
 
-export function EditTags() {
+interface EditTagsProps {
+  /**
+   * Tipo di entità a cui assegnare i tag. Default "user" (retro-compatibile).
+   */
+  entityType?: "user" | "motorcycle";
+  /**
+   * Id dell'entità. Richiesto per entityType="motorcycle";
+   * ignorato per entityType="user" (usa l'utente corrente).
+   */
+  entityId?: string;
+  /**
+   * Override opzionali per UI compatta (es. dentro card moto).
+   */
+  title?: string;
+  helper?: string | null;
+  compact?: boolean;
+}
+
+export function EditTags({
+  entityType = "user",
+  entityId,
+  title,
+  helper,
+  compact = false,
+}: EditTagsProps) {
+  const tagsEndpoint =
+    entityType === "motorcycle"
+      ? `/api/motorcycles/${entityId}/tags`
+      : "/api/users/me/tags";
+
+  const enabled = entityType === "user" || !!entityId;
+
   const categoriesQuery = useQuery<TagCategory[]>({
     queryKey: ["/api/tags/categories"],
   });
 
-  const userTagsQuery = useQuery<{ tags: UserTag[] }>({
-    queryKey: ["/api/users/me/tags"],
+  const entityTagsQuery = useQuery<{ tags: EntityTag[] }>({
+    queryKey: [tagsEndpoint],
+    enabled,
   });
 
   const orderedCategories = useMemo(() => {
@@ -75,20 +107,20 @@ export function EditTags() {
 
   const selectedByCategory = useMemo(() => {
     const map = new Map<string, Set<string>>();
-    for (const t of userTagsQuery.data?.tags ?? []) {
+    for (const t of entityTagsQuery.data?.tags ?? []) {
       if (!map.has(t.categorySlug)) map.set(t.categorySlug, new Set());
       map.get(t.categorySlug)!.add(t.id);
     }
     return map;
-  }, [userTagsQuery.data]);
+  }, [entityTagsQuery.data]);
 
   const updateTagsMutation = useMutation({
     mutationFn: async (vars: { categorySlug: string; tagIds: string[] }) => {
-      const res = await apiRequest("PUT", "/api/users/me/tags", vars);
+      const res = await apiRequest("PUT", tagsEndpoint, vars);
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me/tags"] });
+      queryClient.invalidateQueries({ queryKey: [tagsEndpoint] });
     },
   });
 
@@ -100,20 +132,28 @@ export function EditTags() {
     updateTagsMutation.mutate({ categorySlug, tagIds: Array.from(next) });
   };
 
-  const isLoading = categoriesQuery.isLoading || userTagsQuery.isLoading;
+  const isLoading =
+    categoriesQuery.isLoading || (enabled && entityTagsQuery.isLoading);
+
+  const resolvedTitle =
+    title ?? (entityType === "motorcycle" ? "Tag di questa moto" : "I tuoi tag");
+  const resolvedHelper =
+    helper === null
+      ? null
+      : helper ??
+        (entityType === "motorcycle"
+          ? "Seleziona i tag che descrivono questa moto."
+          : "Seleziona i tag che ti rappresentano: ci aiutano a trovarti compagni di viaggio compatibili.");
 
   return (
-    <View style={styles.fieldGroup}>
+    <View style={[styles.fieldGroup, compact && styles.fieldGroupCompact]}>
       <View style={styles.headerRow}>
-        <Text style={styles.groupTitle}>I tuoi tag</Text>
+        <Text style={styles.groupTitle}>{resolvedTitle}</Text>
         {updateTagsMutation.isPending && (
           <ActivityIndicator size="small" color={Colors.accent} />
         )}
       </View>
-      <Text style={styles.helper}>
-        Seleziona i tag che ti rappresentano: ci aiutano a trovarti compagni di
-        viaggio compatibili.
-      </Text>
+      {resolvedHelper && <Text style={styles.helper}>{resolvedHelper}</Text>}
 
       {isLoading ? (
         <View style={styles.loadingBox}>
@@ -127,23 +167,23 @@ export function EditTags() {
             data?: { tags: TagItem[] };
             isLoading: boolean;
           };
-          const tags = query?.data?.tags ?? [];
+          const catTags = query?.data?.tags ?? [];
           const selected = selectedByCategory.get(cat.slug) ?? new Set<string>();
           return (
             <View key={cat.id} style={styles.categoryBlock}>
               <Text style={styles.categoryLabel}>{cat.label}</Text>
               {query?.isLoading ? (
                 <ActivityIndicator color={Colors.accent} />
-              ) : tags.length === 0 ? (
+              ) : catTags.length === 0 ? (
                 <Text style={styles.empty}>Nessun tag in questa categoria.</Text>
               ) : (
                 <View style={styles.chipsRow}>
-                  {tags.map((tag) => {
+                  {catTags.map((tag) => {
                     const isOn = selected.has(tag.id);
                     return (
                       <TouchableOpacity
                         key={tag.id}
-                        testID={`tag-chip-${tag.slug}`}
+                        testID={`tag-chip-${entityType}-${tag.slug}`}
                         style={[styles.chip, isOn && styles.chipActive]}
                         onPress={() => toggleTag(cat.slug, tag.id)}
                         disabled={updateTagsMutation.isPending}
@@ -185,6 +225,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderWidth: 1,
     borderColor: Colors.border,
+  },
+  fieldGroupCompact: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
+    padding: 0,
+    marginBottom: 0,
   },
   headerRow: {
     flexDirection: "row",
