@@ -1,0 +1,239 @@
+// Task #2698 — Drawer chat AI Assistant utente. Inverted FlatList per messaggi
+// reali, NORMALE View per empty state. Streaming via expo/fetch.
+import React, { useCallback, useRef, useState } from "react";
+import {
+  Modal,
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import { useColors } from "@/hooks/useColors";
+import { useT, useLanguage } from "@/lib/language-context";
+import { apiRequest } from "@/lib/query-client";
+import { streamAssistantMessage } from "@/lib/ai-assistant/sse-client";
+import { currentAssistantPlatform } from "@/hooks/useAssistantConfig";
+import { executeClientAction } from "@/lib/ai-assistant/client-actions";
+import AssistantActionConfirmSheet from "./AssistantActionConfirmSheet";
+import type { AssistantChatMessage, AssistantProposedAction } from "@/lib/ai-assistant/types";
+
+interface Props {
+  visible: boolean;
+  onClose: () => void;
+}
+
+function genId(): string {
+  return Date.now().toString() + Math.random().toString(36).slice(2, 8);
+}
+
+export default function AssistantChatSheet({ visible, onClose }: Props) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const t = useT();
+  const router = useRouter();
+  const { setLanguage } = useLanguage();
+  const [messages, setMessages] = useState<AssistantChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [streaming, setStreaming] = useState(false);
+  const [pendingAction, setPendingAction] = useState<AssistantProposedAction | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const send = useCallback(async () => {
+    const text = input.trim();
+    if (!text || streaming) return;
+    const userMsg: AssistantChatMessage = { id: genId(), role: "user", content: text, createdAt: Date.now() };
+    const asstId = genId();
+    const asstMsg: AssistantChatMessage = { id: asstId, role: "assistant", content: "", createdAt: Date.now() };
+    setMessages((prev) => [...prev, userMsg, asstMsg]);
+    setInput("");
+    setStreaming(true);
+    const platform = (Platform.OS === "web" ? "web" : currentAssistantPlatform()) as "android" | "ios" | "web";
+    const history = messages
+      .filter((m) => m.content)
+      .slice(-8)
+      .map((m) => ({ role: m.role, content: m.content }));
+    const abort = new AbortController();
+    abortRef.current = abort;
+    const collectedActions: AssistantProposedAction[] = [];
+    try {
+      await streamAssistantMessage({
+        message: text,
+        platform,
+        history,
+        signal: abort.signal,
+        onEvent: (ev) => {
+          if (ev.event === "delta") {
+            const d = (ev.data as { text?: string }).text ?? "";
+            setMessages((prev) => prev.map((m) => m.id === asstId ? { ...m, content: m.content + d } : m));
+          } else if (ev.event === "action") {
+            const a = ev.data as AssistantProposedAction;
+            collectedActions.push(a);
+          } else if (ev.event === "done") {
+            const d = ev.data as { text?: string };
+            setMessages((prev) => prev.map((m) =>
+              m.id === asstId
+                ? { ...m, content: d.text ?? m.content, actions: collectedActions.length ? collectedActions : undefined }
+                : m,
+            ));
+          } else if (ev.event === "error") {
+            const d = ev.data as { message?: string };
+            setMessages((prev) => prev.map((m) =>
+              m.id === asstId ? { ...m, content: `⚠️ ${d.message ?? "errore"}` } : m,
+            ));
+          }
+        },
+      });
+    } catch (e) {
+      setMessages((prev) => prev.map((m) =>
+        m.id === asstId ? { ...m, content: `⚠️ ${(e as Error).message}` } : m,
+      ));
+    } finally {
+      setStreaming(false);
+      abortRef.current = null;
+    }
+  }, [input, messages, streaming]);
+
+  const confirmAction = useCallback(async () => {
+    if (!pendingAction) return;
+    const platform = (Platform.OS === "web" ? "web" : currentAssistantPlatform()) as "android" | "ios" | "web";
+    try {
+      await apiRequest("POST", `/api/ai/assistant/action/${encodeURIComponent(pendingAction.actionId)}`, {
+        confirmed: true,
+        params: pendingAction.params,
+        platform,
+      });
+      await executeClientAction(pendingAction.actionId, pendingAction.params as Record<string, unknown>, {
+        router,
+        setLanguage: (l) => setLanguage(l as never),
+      });
+    } catch (e) {
+      console.warn("[assistant action]", (e as Error).message);
+    } finally {
+      setPendingAction(null);
+    }
+  }, [pendingAction, router, setLanguage]);
+
+  const data = React.useMemo(() => [...messages].reverse(), [messages]);
+  const hasMessages = messages.length > 0;
+
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+        <View style={[styles.header, { borderBottomColor: colors.border }]}>
+          <Ionicons name="sparkles" size={20} color={colors.primary} />
+          <Text style={[styles.title, { color: colors.text }]}>{t("aiAssistant.title") || "AI Assistant"}</Text>
+          <Pressable testID="assistant-chat-close" onPress={onClose} hitSlop={12}>
+            <Ionicons name="close" size={24} color={colors.text} />
+          </Pressable>
+        </View>
+
+        {hasMessages ? (
+          <FlatList
+            data={data}
+            inverted
+            keyExtractor={(m) => m.id}
+            contentContainerStyle={{ padding: 12 }}
+            keyboardShouldPersistTaps="handled"
+            renderItem={({ item }) => (
+              <View style={[
+                styles.bubble,
+                item.role === "user"
+                  ? { backgroundColor: colors.primary, alignSelf: "flex-end" }
+                  : { backgroundColor: colors.surface, alignSelf: "flex-start" },
+              ]}>
+                <Text style={{ color: item.role === "user" ? "#fff" : colors.text }}>
+                  {item.content || (streaming && item.role === "assistant" ? "…" : "")}
+                </Text>
+                {item.actions?.map((a, i) => (
+                  <Pressable
+                    key={i}
+                    testID={`assistant-action-${a.actionId}`}
+                    onPress={() => setPendingAction(a)}
+                    style={[styles.actionChip, { borderColor: colors.primary }]}
+                  >
+                    <Ionicons name="flash-outline" size={14} color={colors.primary} />
+                    <Text style={{ color: colors.primary, fontWeight: "600" }}>
+                      {t(a.confirmKey) || a.actionId}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          />
+        ) : (
+          <View style={styles.empty}>
+            <Ionicons name="chatbubbles-outline" size={48} color={colors.textMuted ?? colors.textSecondary} />
+            <Text style={[styles.emptyText, { color: colors.textMuted ?? colors.textSecondary }]}>
+              {t("aiAssistant.emptyHint") || "Chiedi qualcosa su BikerLink: funzioni, impostazioni, percorsi…"}
+            </Text>
+          </View>
+        )}
+
+        <View style={[styles.inputRow, { borderTopColor: colors.border, paddingBottom: insets.bottom + 8 }]}>
+          <TextInput
+            testID="assistant-chat-input"
+            value={input}
+            onChangeText={setInput}
+            placeholder={t("aiAssistant.inputPlaceholder") || "Scrivi un messaggio…"}
+            placeholderTextColor={colors.textMuted ?? colors.textSecondary}
+            style={[styles.input, { color: colors.text, backgroundColor: colors.surface }]}
+            editable={!streaming}
+            multiline
+            maxLength={2000}
+          />
+          <Pressable
+            testID="assistant-chat-send"
+            disabled={!input.trim() || streaming}
+            onPress={send}
+            style={[styles.sendBtn, { backgroundColor: colors.primary, opacity: !input.trim() || streaming ? 0.5 : 1 }]}
+          >
+            {streaming ? <ActivityIndicator color="#fff" /> : <Ionicons name="send" size={18} color="#fff" />}
+          </Pressable>
+        </View>
+
+        <AssistantActionConfirmSheet
+          visible={!!pendingAction}
+          actionId={pendingAction?.actionId ?? null}
+          confirmKey={pendingAction?.confirmKey ?? null}
+          onCancel={() => setPendingAction(null)}
+          onConfirm={confirmAction}
+        />
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    padding: 14, borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  title: { flex: 1, fontSize: 17, fontWeight: "600" },
+  bubble: { maxWidth: "85%", borderRadius: 14, padding: 10, marginBottom: 8, gap: 8 },
+  actionChip: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14, borderWidth: 1,
+    alignSelf: "flex-start", backgroundColor: "rgba(255,255,255,0.6)",
+  },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, padding: 24 },
+  emptyText: { textAlign: "center", fontSize: 14, lineHeight: 20 },
+  inputRow: {
+    flexDirection: "row", gap: 8, padding: 8,
+    borderTopWidth: StyleSheet.hairlineWidth, alignItems: "flex-end",
+  },
+  input: {
+    flex: 1, minHeight: 40, maxHeight: 120, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 18, fontSize: 15,
+  },
+  sendBtn: {
+    width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center",
+  },
+});

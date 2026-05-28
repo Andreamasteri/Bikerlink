@@ -29,6 +29,7 @@ import { EditBasicInfo } from "@/components/profile/edit/EditBasicInfo";
 import { EditMoto } from "@/components/profile/edit/EditMoto";
 import { EditLocation } from "@/components/profile/edit/EditLocation";
 import { EditPreferences } from "@/components/profile/edit/EditPreferences";
+import { EditAssistantPrefs } from "@/components/profile/edit/EditAssistantPrefs";
 
 interface ProfileData {
   id: string;
@@ -415,6 +416,8 @@ export default function EditProfileScreen() {
           handleDeleteAccount={handleDeleteAccount}
           setShowRevokeConsentModal={setShowRevokeConsentModal}
         />
+
+        <EditAssistantPrefs />
 
         <View style={{ height: 40 }} />
       </ScrollView>

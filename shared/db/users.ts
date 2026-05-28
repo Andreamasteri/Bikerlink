@@ -72,6 +72,13 @@ export const users = pgTable("users", {
   expoPushToken: text("expo_push_token"),
   // Task #2645 — preferenze admin (onboarding console, hint dismissed, ecc.)
   adminPrefs: jsonb("admin_prefs").$type<Record<string, unknown>>().default({}),
+  // Task #2698 — preferenze AI Assistant per utenti normali (opt-out per-user)
+  assistantPrefs: jsonb("assistant_prefs").$type<{
+    disabled?: boolean;
+    proactiveDisabled?: boolean;
+    onboardingDisabled?: boolean;
+    updatedAt?: string;
+  }>().default({}),
   firstLoginAt: timestamp("first_login_at"),
   firstLoginLat: doublePrecision("first_login_lat"),
   firstLoginLng: doublePrecision("first_login_lng"),

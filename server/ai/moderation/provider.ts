@@ -25,6 +25,8 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "gpt-5.1": { in: 0.0025, out: 0.01 },
   "gemini-2.5-pro": { in: 0.00125, out: 0.005 },
   "gemini-2.5-flash-lite": { in: 0.0001, out: 0.0004 },
+  // Task #2698 — modello leggero per AI Assistant utente
+  "gpt-4o-mini": { in: 0.00015, out: 0.0006 },
 };
 
 export function estimateCostUsd(modelId: string, tokensIn: number, tokensOut: number): number {

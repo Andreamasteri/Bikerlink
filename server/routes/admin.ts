@@ -266,6 +266,8 @@ import aiConsoleRouter from './admin/ai-console';
 import aiCoordinatorRouter from './admin/ai-coordinator';
 import aiCoordinatorGovernanceRouter from './admin/ai-coordinator-governance';
 import metricsRouter from './admin/metrics';
+// Task #2698 — AI Assistant per utenti normali (admin config/telemetria).
+import aiAssistantAdminRouter from './admin/ai-assistant';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -369,5 +371,7 @@ router.use('/', aiConsoleRouter);
 router.use('/', aiCoordinatorRouter);
 router.use('/', aiCoordinatorGovernanceRouter);
 router.use('/', _requireAdmin, metricsRouter);
+// Task #2698 — config + telemetria AI Assistant utente (admin only).
+router.use('/', _requireAdmin, aiAssistantAdminRouter);
 
 export default router;

@@ -35,6 +35,9 @@ import { RootProviders } from "@/components/RootProviders";
 import { AppStateHandler } from "@/components/layout/AppStateHandler";
 import { BackgroundNotificationHandler } from "@/components/layout/BackgroundNotificationHandler";
 import { PushTokenRegistrar } from "@/components/layout/PushTokenRegistrar";
+// Task #2698 — AI Assistant utente.
+import AssistantFab from "@/components/user/ai-assistant/AssistantFab";
+import AssistantOnboardingTour from "@/components/user/ai-assistant/AssistantOnboardingTour";
 import { useOtaStagingBanner } from "@/hooks/useOtaStagingBanner";
 SplashScreen.preventAutoHideAsync();
 
@@ -287,6 +290,9 @@ export default function RootLayout() {
           </View>
           <MatchPopupAlert />
           <UpdateNudgeWrapper />
+          {/* Task #2698 — AI Assistant utente (FAB + onboarding tour). */}
+          <AssistantFab />
+          <AssistantOnboardingTour />
         </MapReadyGate>
       </StartupGate>
       <FloatingWidget />

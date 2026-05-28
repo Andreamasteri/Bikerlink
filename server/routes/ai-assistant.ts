@@ -1,0 +1,286 @@
+// Task #2698 — Endpoint AI Assistant utente (NON admin). Sessione richiesta.
+// - GET  /api/ai/assistant/config?platform=ios|android — config piattaforma
+// - POST /api/ai/assistant/message — SSE streaming risposta dell'agente
+// - POST /api/ai/assistant/action/:id — esegue azione whitelisted (validazione)
+// - GET  /api/users/me/assistant-prefs — prefs utente
+// - PATCH /api/users/me/assistant-prefs — aggiorna prefs utente
+import { Router, type Request, type Response } from "express";
+import { z } from "zod";
+import rateLimit from "express-rate-limit";
+import { eq } from "drizzle-orm";
+import { db } from "../db";
+import { storage } from "../storage";
+import { sendError } from "../lib/api-response";
+import { users as usersTable } from "@shared/db";
+import {
+  loadAssistantConfig,
+  resolveClientPlatform,
+  type AssistantPlatform,
+} from "../ai/assistant/config";
+import { runAssistantAgent, extractActions } from "../ai/assistant/agent";
+import {
+  ASSISTANT_ACTIONS,
+  isWhitelistedAction,
+  validateActionParams,
+  type AssistantActionId,
+} from "../ai/assistant/actions";
+import { ASSISTANT_KNOWLEDGE, type KnowledgeEntry } from "../ai/assistant/knowledge";
+import { logAssistantEvent } from "../ai/assistant/telemetry";
+
+const router = Router();
+
+// ── Auth: qualsiasi utente loggato (incluso admin/moderator) ──────────────
+async function requireUser(req: Request, res: Response, next: () => void): Promise<void> {
+  const userId = (req.session as { userId?: string })?.userId;
+  if (!userId) { sendError(res, 401, "Non autenticato"); return; }
+  try {
+    const user = await storage.getUser(userId);
+    if (!user) { sendError(res, 401, "Sessione non valida"); return; }
+    (req as Request & { sessionUser?: typeof user }).sessionUser = user;
+    next();
+  } catch (e) {
+    console.error("[ai-assistant/auth]", e);
+    sendError(res, 500, "Errore autenticazione");
+  }
+}
+
+// ── Rate limits ───────────────────────────────────────────────────────────
+const messageLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String((req.session as { userId?: string })?.userId ?? req.ip),
+  message: { message: "Troppi messaggi all'AI Assistant — riprova tra un po'." },
+});
+
+const actionLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => String((req.session as { userId?: string })?.userId ?? req.ip),
+  message: { message: "Troppe azioni all'AI Assistant — riprova tra un po'." },
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function parsePlatform(raw: unknown): AssistantPlatform {
+  return resolveClientPlatform(typeof raw === "string" ? raw : undefined);
+}
+
+async function loadCustomFaqs(_keys: string[]): Promise<KnowledgeEntry[]> {
+  // Le chiavi i18n editabili runtime sono tradotte client-side; per il prompt
+  // server-side qui non risolvo (per evitare dipendenze su un i18n server).
+  // Le FAQ statiche di seed in ASSISTANT_KNOWLEDGE coprono il caso base.
+  return [];
+}
+
+// ── GET /config ───────────────────────────────────────────────────────────
+router.get("/ai/assistant/config", requireUser, async (req: Request, res: Response) => {
+  try {
+    const platform = parsePlatform(req.query.platform);
+    const config = await loadAssistantConfig(platform);
+    res.json({ platform, config, knowledge: ASSISTANT_KNOWLEDGE });
+  } catch (e) {
+    console.error("[ai-assistant/config]", e);
+    sendError(res, 500, "Errore lettura config");
+  }
+});
+
+// ── POST /message — SSE streaming ─────────────────────────────────────────
+const MessageBody = z.object({
+  message: z.string().min(1).max(2000),
+  platform: z.enum(["android", "ios", "web"]).optional(),
+  history: z.array(z.object({
+    role: z.enum(["user", "assistant"]),
+    content: z.string().min(1).max(4000),
+  })).max(10).optional(),
+});
+
+router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Request, res: Response) => {
+  const parsed = MessageBody.safeParse(req.body);
+  if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
+  const user = (req as Request & { sessionUser?: { id: string; role?: string | null; assistantPrefs?: { disabled?: boolean } | null } }).sessionUser!;
+
+  if (user.assistantPrefs?.disabled) {
+    sendError(res, 403, "Assistente disattivato dalle tue preferenze");
+    return;
+  }
+
+  const rawPlatform = parsed.data.platform ?? "android";
+  const platformForConfig = parsePlatform(rawPlatform);
+  const config = await loadAssistantConfig(platformForConfig);
+  if (!config.enabled) {
+    sendError(res, 403, "Assistente disattivato dall'amministratore");
+    return;
+  }
+
+  const allowedActions = Object.entries(config.actions)
+    .filter(([, on]) => on)
+    .map(([id]) => id);
+  const customFaqs = await loadCustomFaqs(config.customFaqKeys);
+
+  // SSE
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+  const send = (event: string, data: unknown) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+  };
+  const abort = new AbortController();
+  req.on("close", () => abort.abort());
+
+  await logAssistantEvent({
+    eventType: "message_sent",
+    platform: rawPlatform,
+    userRole: user.role ?? null,
+    userId: user.id,
+    payload: { messageLen: parsed.data.message.length },
+  });
+
+  try {
+    const result = await runAssistantAgent({
+      message: parsed.data.message,
+      platform: rawPlatform as "android" | "ios" | "web",
+      allowedActions,
+      customFaqs,
+      history: parsed.data.history ?? [],
+      signal: abort.signal,
+      onTextDelta: (delta) => send("delta", { text: delta }),
+    });
+
+    const { cleanText, actions } = extractActions(result.text);
+    // Filtra azioni: devono essere whitelisted globalmente E abilitate dall'admin.
+    const safeActions = actions.filter((a) =>
+      isWhitelistedAction(a.actionId) && allowedActions.includes(a.actionId),
+    );
+    for (const a of safeActions) {
+      const def = ASSISTANT_ACTIONS[a.actionId as AssistantActionId];
+      send("action", {
+        actionId: a.actionId,
+        params: a.params,
+        confirmKey: def.confirmKey,
+      });
+      await logAssistantEvent({
+        eventType: "action_proposed",
+        platform: rawPlatform,
+        userRole: user.role ?? null,
+        userId: user.id,
+        payload: { actionId: a.actionId },
+      });
+    }
+    send("done", {
+      text: cleanText,
+      provider: result.provider,
+      model: result.model,
+      costUsd: result.costUsd,
+      degraded: result.degraded,
+      actionsCount: safeActions.length,
+    });
+    res.end();
+  } catch (err) {
+    console.error("[ai-assistant/message]", err);
+    try { send("error", { code: 500, message: (err as Error).message }); } catch { /* */ }
+    res.end();
+  }
+});
+
+// ── POST /action/:id — valida + logga (esecuzione client-side) ────────────
+const ActionBody = z.object({
+  params: z.unknown().optional(),
+  confirmed: z.literal(true),
+  platform: z.enum(["android", "ios", "web"]).optional(),
+});
+
+router.post("/ai/assistant/action/:id", requireUser, actionLimiter, async (req: Request, res: Response) => {
+  const id = String(req.params.id ?? "");
+  if (!isWhitelistedAction(id)) { sendError(res, 400, "Azione non in whitelist"); return; }
+  const parsed = ActionBody.safeParse(req.body ?? {});
+  if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
+
+  const user = (req as Request & { sessionUser?: { id: string; role?: string | null } }).sessionUser!;
+  const rawPlatform = parsed.data.platform ?? "android";
+  const platformForConfig = parsePlatform(rawPlatform);
+  const config = await loadAssistantConfig(platformForConfig);
+  if (!config.enabled) { sendError(res, 403, "Assistente disattivato"); return; }
+  if (!config.actions[id as AssistantActionId]) {
+    sendError(res, 403, "Azione disabilitata dall'admin per questa piattaforma");
+    return;
+  }
+
+  const v = validateActionParams(id, parsed.data.params);
+  if (!v.ok) { sendError(res, 400, v.error); return; }
+
+  await logAssistantEvent({
+    eventType: "action_executed",
+    platform: rawPlatform,
+    userRole: user.role ?? null,
+    userId: user.id,
+    payload: { actionId: id, params: v.params },
+  });
+
+  res.json({ ok: true, actionId: id, params: v.params });
+});
+
+// ── User prefs ────────────────────────────────────────────────────────────
+router.get("/users/me/assistant-prefs", requireUser, async (req: Request, res: Response) => {
+  const userId = (req.session as { userId?: string }).userId as string;
+  const [row] = await db.select({ assistantPrefs: usersTable.assistantPrefs })
+    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  res.json({ prefs: row?.assistantPrefs ?? {} });
+});
+
+const PrefsPatch = z.object({
+  disabled: z.boolean().optional(),
+  proactiveDisabled: z.boolean().optional(),
+  onboardingDisabled: z.boolean().optional(),
+});
+
+router.patch("/users/me/assistant-prefs", requireUser, async (req: Request, res: Response) => {
+  const userId = (req.session as { userId?: string }).userId as string;
+  const parsed = PrefsPatch.safeParse(req.body ?? {});
+  if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
+  const [row] = await db.select({ assistantPrefs: usersTable.assistantPrefs })
+    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  const current = (row?.assistantPrefs ?? {}) as Record<string, unknown>;
+  const next = { ...current, ...parsed.data, updatedAt: new Date().toISOString() };
+  await db.update(usersTable).set({ assistantPrefs: next, updatedAt: new Date() })
+    .where(eq(usersTable.id, userId));
+  const user = (req as Request & { sessionUser?: { role?: string | null } }).sessionUser;
+  await logAssistantEvent({
+    eventType: "opt_out_changed",
+    platform: typeof req.body?.platform === "string" ? req.body.platform : "unknown",
+    userRole: user?.role ?? null,
+    userId,
+    payload: parsed.data,
+  });
+  res.json({ prefs: next });
+});
+
+// ── Client telemetry beacon (tip_shown/dismissed, onboarding, ecc.) ──────
+const ClientTelemetryBody = z.object({
+  eventType: z.enum([
+    "tip_shown", "tip_dismissed", "tip_disabled_permanent",
+    "onboarding_started", "onboarding_completed", "conversation_started",
+  ]),
+  platform: z.string().min(1).max(16),
+  payload: z.record(z.string(), z.unknown()).optional(),
+});
+
+router.post("/ai/assistant/telemetry", requireUser, async (req: Request, res: Response) => {
+  const parsed = ClientTelemetryBody.safeParse(req.body ?? {});
+  if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
+  const user = (req as Request & { sessionUser?: { id: string; role?: string | null } }).sessionUser!;
+  await logAssistantEvent({
+    eventType: parsed.data.eventType,
+    platform: parsed.data.platform,
+    userRole: user.role ?? null,
+    userId: user.id,
+    payload: parsed.data.payload ?? {},
+  });
+  res.json({ ok: true });
+});
+
+export default router;

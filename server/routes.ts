@@ -293,6 +293,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { default: plannedRoutesRoutes } = await import("./routes/planned-routes");
   app.use("/api/planned-routes", plannedRoutesRoutes);
 
+  // Task #2698 — AI Assistant utente (sessione richiesta, no admin role).
+  const { default: aiAssistantRoutes } = await import("./routes/ai-assistant");
+  app.use("/api", aiAssistantRoutes);
+
   // Task #2632 — Stub endpoints per chiamate client senza handler reale.
   // Mounted ULTIMO sotto /api/ così non sovrascrive route esistenti più
   // specifiche già registrate sopra. Vedi docs/sweep-404-2621.md sezione B.
