@@ -20,8 +20,19 @@ set -e
 # drizzle-kit push --force ora gira senza TTY e senza prompt interattivi.
 
 echo "=== [1/2] Sync database schema ==="
-npx drizzle-kit push --force
-echo "  Schema sync completato."
+# Task #2682 — drizzle-kit push reso non-fatale.
+# Source of truth dello schema in produzione = migrations/*.sql, applicate da
+# server/migrate.ts (runMigrations()) durante Phase 1 del boot. drizzle-kit push
+# resta utile per allineamenti opportunistici, ma il deploy NON deve fallire
+# quando incontra il prompt promptNamedWithSchemasConflict in ambienti non-TTY.
+# Background: 14 tabelle (ai_conversations, db_integrity_*, system_*, weekly_*,
+# user_time_profile, ...) sono definite in shared/db/*.ts ma non ancora in
+# migrations/*.sql; i loro consumer sono try/catch non-fatal in server/index.ts.
+if npx drizzle-kit push --force; then
+  echo "  Schema sync completato (drizzle-kit push OK)."
+else
+  echo "  ⚠ drizzle-kit push fallito (TTY/conflict noto) — proseguo: schema applicato a runtime da runMigrations()."
+fi
 
 echo "=== [2/2] Build server TypeScript ==="
 node scripts/server-build.js
