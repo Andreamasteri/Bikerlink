@@ -39,5 +39,16 @@ export default defineConfig({
     "!spatial_ref_sys",
     "!geography_columns",
     "!geometry_columns",
+    // Task #2680 — Expression-index flickering fix.
+    // drizzle-kit cannot compare expression indexes (LEAST/GREATEST, ::text cast, GIN
+    // trgm) and always generates DROP+CREATE for them on every push. The GIN index and
+    // the long-FK-triggered internal names also cause spurious diffs. Excluding these
+    // four tables from drizzle-kit management stops the noise; the indexes already
+    // exist in the DB and are preserved unchanged. Any future DDL changes for these
+    // tables must go through a numbered SQL migration in migrations/.
+    "!biker_biker_matches",
+    "!match_negative_preferences",
+    "!pending_auto_suggestions",
+    "!ai_messages",
   ],
 });
