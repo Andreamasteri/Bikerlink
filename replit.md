@@ -82,23 +82,28 @@ Quando il gate ratchet (Task #2584) è attivo e blocca un file LOCKED cresciuto,
 
 **Regola obbligatoria per ogni nuovo project task**: il plan file in `.local/tasks/<slug>.md` deve includere in fondo una sezione **`## Modalità di esecuzione consigliata`** con:
 
-1. **Scelta esplicita**: `Main agent` oppure `Task agent isolato`.
+1. **Scelta esplicita**: `Main agent` oppure `Background (task agent isolato)`.
 2. **Motivi**: 2-5 bullet che giustifichino la scelta in base ai criteri qui sotto.
+
+**Terminologia:**
+- **Main agent** = eseguito nella chat corrente, in foreground, con accesso a tutti i tool Replit (`viewEnvVars`, `listDeploymentBuilds`, `suggestDeploy`, `screenshot`, database prod, ecc.) e possibilità di interazione con l'utente a metà task.
+- **Background (task agent isolato)** = eseguito in un ambiente separato e isolato, senza accesso ai tool Replit interattivi, senza DB di produzione, senza `suggestDeploy`. Il codice prodotto viene mergeato nel main al termine.
 
 **Criteri di scelta:**
 
 | Caso | Modalità consigliata |
 |------|----------------------|
 | Tocca DB di **produzione**, secret, deploy, OTA publish, o richiede conferma utente interattiva | **Main agent** |
+| Richiede tool Replit interattivi (`listDeploymentBuilds`, `viewEnvVars`, `suggestDeploy`, `screenshot`) | **Main agent** |
 | Richiede di osservare log/runtime dell'ambiente principale **subito dopo** la modifica | **Main agent** |
 | Modifiche piccole (<200 righe, 1-2 file), debug puntuale, hotfix | **Main agent** |
-| Feature isolata, multi-file (>5), niente dipendenze da prod o da log live | **Task agent isolato** |
-| Refactor ampi con boundary chiari, scritti per essere mergiati indipendentemente | **Task agent isolato** |
-| Più task indipendenti che possono girare in parallelo | **Task agent isolato** (uno per task) |
+| Feature isolata, multi-file (>5), niente dipendenze da prod o da log live | **Background** |
+| Refactor ampi con boundary chiari, scritti per essere mergiati indipendentemente | **Background** |
+| Più task indipendenti che possono girare in parallelo | **Background** (uno per task) |
 
-**Razionale**: l'utente sceglie chi esegue il task (main agent o task agent isolato) dopo che il task è proposto. Senza il suggerimento il rischio è scegliere il canale sbagliato — es. mandare in task agent isolato un fix che richiede l'apply su DB prod (impossibile da fare nella bolla) o tenere sul main agent un refactor lungo che bloccherebbe la chat per ore.
+**Razionale**: l'utente sceglie chi esegue il task (main agent o background) dopo che il task è proposto. Senza il suggerimento il rischio è scegliere il canale sbagliato — es. mandare in background un fix che richiede l'apply su DB prod (impossibile nella bolla isolata) o tenere sul main agent un refactor lungo che bloccherebbe la chat per ore.
 
-**Esempio minimo:**
+**Esempio minimo — main agent:**
 ```markdown
 ## Modalità di esecuzione consigliata
 **Main agent**.
@@ -107,6 +112,17 @@ Motivi:
 - Tocca il DB di produzione (write via database skill con environment="production"), richiede conferma utente.
 - Volume ridotto (1 script SQL + 1 nota docs).
 - Necessita osservazione log deployment post-apply.
+```
+
+**Esempio minimo — background:**
+```markdown
+## Modalità di esecuzione consigliata
+**Background (task agent isolato)**.
+
+Motivi:
+- Feature puramente frontend, 8 file nuovi, nessuna dipendenza da prod o log live.
+- Può girare in parallelo ad altri task senza interferire.
+- Nessun tool Replit interattivo richiesto.
 ```
 
 ## Sincronizzazione node_modules dopo merge (Task #2573)
