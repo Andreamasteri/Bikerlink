@@ -245,24 +245,29 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           <ActivityIndicator size="small" color={Colors.accent} />
         </View>
       )}
-      <MapFilterBar
-        filterBiker={filterBiker} filterZavorrina={filterZavorrina}
-        filterClubs={filterClubs} filterEvents={filterEvents}
-        showEventPins={showEventPins} topOffset={filterBarTopOffset}
-        onToggleFilterBiker={onToggleFilterBiker} onToggleFilterZavorrina={onToggleFilterZavorrina}
-        onToggleFilterClubs={onToggleFilterClubs} onToggleFilterEvents={onToggleFilterEvents}
-      />
+      {filterBarTopOffset != null && (
+        <MapFilterBar
+          filterBiker={filterBiker} filterZavorrina={filterZavorrina}
+          filterClubs={filterClubs} filterEvents={filterEvents}
+          showEventPins={showEventPins} topOffset={filterBarTopOffset}
+          onToggleFilterBiker={onToggleFilterBiker} onToggleFilterZavorrina={onToggleFilterZavorrina}
+          onToggleFilterClubs={onToggleFilterClubs} onToggleFilterEvents={onToggleFilterEvents}
+        />
+      )}
       <MapControls
         isAvailable={isAvailable} ghostMode={ghostMode}
         onCenterOnUser={centerOnUser}
         availabilityBottomOffset={filterBarTopOffset != null ? 100 : undefined}
         locationButtonBottomOffset={filterBarTopOffset != null ? 205 : undefined}
+        compact={filterBarTopOffset == null}
+        hideAvailability={filterBarTopOffset == null}
       />
       {mapReady && (
         <MapStyleToggle
           currentStyleId={styleId}
           onSelectStyle={setStyle}
           bottomOffset={filterBarTopOffset != null ? 160 : undefined}
+          compact={filterBarTopOffset == null}
         />
       )}
       {mapReady && filterBarTopOffset != null && (

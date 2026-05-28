@@ -35,7 +35,7 @@ export const HomeMapSection: React.FC<HomeMapSectionProps> = ({ onCardLayout }) 
 
 const styles = StyleSheet.create({
   mapPlaceholder: {
-    height: 220,
+    height: 253,
     marginHorizontal: 16,
     marginBottom: 16,
     borderRadius: 20,

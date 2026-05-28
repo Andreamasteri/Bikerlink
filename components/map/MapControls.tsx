@@ -10,6 +10,8 @@ interface MapControlsProps {
   onCenterOnUser: () => void;
   availabilityBottomOffset?: number;
   locationButtonBottomOffset?: number;
+  compact?: boolean;
+  hideAvailability?: boolean;
 }
 
 export function MapControls({
@@ -18,13 +20,17 @@ export function MapControls({
   onCenterOnUser,
   availabilityBottomOffset,
   locationButtonBottomOffset,
+  compact,
+  hideAvailability,
 }: MapControlsProps) {
   return (
     <>
       <View
         style={[
           styles.controlsContainer,
-          locationButtonBottomOffset != null && { bottom: locationButtonBottomOffset },
+          compact
+            ? { top: 12, bottom: undefined as unknown as number }
+            : locationButtonBottomOffset != null && { bottom: locationButtonBottomOffset },
         ]}
       >
         <TouchableOpacity style={styles.locationButton} onPress={onCenterOnUser} activeOpacity={0.7}>
@@ -32,7 +38,7 @@ export function MapControls({
         </TouchableOpacity>
       </View>
 
-      <View
+      {!hideAvailability && <View
         style={[
           styles.availabilityContainer,
           availabilityBottomOffset != null && { bottom: availabilityBottomOffset },
@@ -52,7 +58,7 @@ export function MapControls({
             </Text>
           </View>
         </View>
-      </View>
+      </View>}
     </>
   );
 }
