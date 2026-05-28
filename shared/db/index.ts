@@ -22,3 +22,4 @@ export * from "./embeddings";
 export * from "./watchdog";
 export * from "./db-integrity";
 export * from "./integrity";
+export * from "./ai-console";

@@ -246,6 +246,7 @@ import aiModerationRouter from './admin/ai-moderation';
 import aiWatchdogRouter from './admin/ai-watchdog';
 import dbIntegrityRouter from './admin/db-integrity';
 import appIntegrityRouter from './admin/app-integrity';
+import aiConsoleRouter from './admin/ai-console';
 import metricsRouter from './admin/metrics';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
@@ -345,6 +346,7 @@ router.use('/', _requireAdmin, aiWatchdogRouter);
 // Task #2536 — AI Database Integrity.
 router.use('/', _requireAdmin, dbIntegrityRouter);
 router.use('/', _requireAdmin, appIntegrityRouter);
+router.use('/', aiConsoleRouter);
 router.use('/', _requireAdmin, metricsRouter);
 
 export default router;
