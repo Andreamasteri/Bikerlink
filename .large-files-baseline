@@ -40,3 +40,4 @@ LEGACY server/routes/proposals/matching.ts 1098
 LEGACY shared/db/matching.ts 631
 LOCKED server/routes/planned-routes/extras.ts 450
 LOCKED server/routes/planned-routes/sharing.ts 450
+LOCKED server/routes/planned-routes/waypoints.ts 550

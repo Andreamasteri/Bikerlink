@@ -1,3 +1,5 @@
+// LARGE-FILE-LOCKED — limite: 550
+// Aggiungi nuove funzionalità in: server/routes/planned-routes/waypoints.next.ts
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { requireAuth, computeBikerScoreFromPoints } from "./utils";
