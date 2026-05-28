@@ -171,12 +171,12 @@ outputType = "console"
 name = "planned-routes-size"
 author = "agent"
 
+[workflows.workflow.metadata]
+isValidation = true
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "npx tsx scripts/check-planned-routes-size.ts"
-
-[workflows.workflow.metadata]
-isValidation = true
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"
