@@ -12,8 +12,10 @@ import {
   customType,
 } from "drizzle-orm/pg-core";
 
+// Task #2678: dataType()="geography" corrisponde a udt_name nel DB; generatedAlwaysAs
+// rispecchia GENERATED ALWAYS, evitando ALTER SET DATA TYPE / DROP EXPRESSION.
 const geographyPoint = customType<{ data: string; notNull: false; default: false }>({
-  dataType() { return "geography(Point, 4326)"; },
+  dataType() { return "geography"; },
 });
 import { z } from "zod";
 import { users } from "./users";
@@ -33,7 +35,10 @@ export const events = pgTable("events", {
   latitude: doublePrecision("latitude"),
   longitude: doublePrecision("longitude"),
   // Task #2510: PostGIS generated.
-  geom: geographyPoint("geom"),
+  // Task #2678: generatedAlwaysAs rispecchia GENERATED ALWAYS del DB.
+  geom: geographyPoint("geom").generatedAlwaysAs(
+    sql`CASE WHEN ((longitude IS NOT NULL) AND (latitude IS NOT NULL)) THEN (st_setsrid(st_makepoint(longitude, latitude), 4326))::geography ELSE NULL::geography END`,
+  ),
   eventDate: timestamp("event_date").notNull(),
   eventTime: varchar("event_time", { length: 5 }),
   isRecurring: boolean("is_recurring").notNull().default(false),

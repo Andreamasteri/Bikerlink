@@ -15,8 +15,10 @@ import {
 import { users } from "./users";
 
 // Task #2510: PostGIS geography(Point, 4326), colonne generated.
+// Task #2678: dataType()="geography" corrisponde a udt_name nel DB; generatedAlwaysAs
+// rispecchia GENERATED ALWAYS, evitando ALTER SET DATA TYPE / DROP EXPRESSION.
 const geographyPoint = customType<{ data: string; notNull: false; default: false }>({
-  dataType() { return "geography(Point, 4326)"; },
+  dataType() { return "geography"; },
 });
 
 export const proposals = pgTable("proposals", {
@@ -41,8 +43,13 @@ export const proposals = pgTable("proposals", {
   destinationLatitude: doublePrecision("destination_latitude"),
   destinationLongitude: doublePrecision("destination_longitude"),
   // Task #2510: colonne PostGIS generated, mantenute in sync dal DB.
-  departureGeom: geographyPoint("departure_geom"),
-  destinationGeom: geographyPoint("destination_geom"),
+  // Task #2678: generatedAlwaysAs rispecchia GENERATED ALWAYS del DB.
+  departureGeom: geographyPoint("departure_geom").generatedAlwaysAs(
+    sql`CASE WHEN ((departure_longitude IS NOT NULL) AND (departure_latitude IS NOT NULL)) THEN (st_setsrid(st_makepoint(departure_longitude, departure_latitude), 4326))::geography ELSE NULL::geography END`,
+  ),
+  destinationGeom: geographyPoint("destination_geom").generatedAlwaysAs(
+    sql`CASE WHEN ((destination_longitude IS NOT NULL) AND (destination_latitude IS NOT NULL)) THEN (st_setsrid(st_makepoint(destination_longitude, destination_latitude), 4326))::geography ELSE NULL::geography END`,
+  ),
   scheduledAt: timestamp("scheduled_at"),
   departureTimeFrom: timestamp("departure_time_from"),
   departureTimeTo: timestamp("departure_time_to"),
