@@ -17,6 +17,7 @@ import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
 import AiCostBadge from "@/components/admin/ai/AiCostBadge";
 import AiCopilotDrawer from "@/components/admin/ai/AiCopilotDrawer";
+import { useAiExplain } from "@/hooks/admin/ai-console/useAiExplain";
 
 interface HubSummary {
   byStatus: Record<string, number>;
@@ -214,18 +215,14 @@ export default function ReportsHubScreen() {
             <Text style={styles.empty}>Nessun pattern rilevato</Text>
           ) : (
             (data?.topPatterns ?? []).map((p, i) => (
-              <TouchableOpacity
+              <PatternRow
                 key={p.reportedUserId}
-                style={styles.patternRow}
-                onPress={() => router.push("/admin/reports-patterns" as Href)}
-              >
-                <Text style={styles.patternRank}>#{i + 1}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.patternId}>{p.reportedUserId.slice(0, 8)}…</Text>
-                  <Text style={styles.patternMeta}>{p.count} segnalazioni · peso {p.weight.toFixed(2)}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
-              </TouchableOpacity>
+                rank={i + 1}
+                userId={p.reportedUserId}
+                count={p.count}
+                weight={p.weight}
+                onOpen={() => router.push("/admin/reports-patterns" as Href)}
+              />
             ))
           )}
 
@@ -258,6 +255,37 @@ export default function ReportsHubScreen() {
     </ScrollView>
   );
 }
+
+// Task #2645 — pattern row con bottone "Spiegami questo" verso AI Console.
+function PatternRow({
+  rank, userId, count, weight, onOpen,
+}: { rank: number; userId: string; count: number; weight: number; onOpen: () => void }) {
+  const explain = useAiExplain({ type: "user", id: userId, label: `Utente ${userId.slice(0, 8)} (${count} segnalazioni)` });
+  return (
+    <TouchableOpacity style={styles.patternRow} onPress={onOpen}>
+      <Text style={styles.patternRank}>#{rank}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.patternId}>{userId.slice(0, 8)}…</Text>
+        <Text style={styles.patternMeta}>{count} segnalazioni · peso {weight.toFixed(2)}</Text>
+      </View>
+      <TouchableOpacity
+        onPress={(e) => { e.stopPropagation?.(); explain.trigger(); }}
+        style={patternStyles.explainBtn}
+        accessibilityLabel="Spiegami in AI Console"
+        testID={`explain-pattern-${userId}`}
+      >
+        <MaterialCommunityIcons name="robot-happy-outline" size={14} color={Colors.accent} />
+      </TouchableOpacity>
+      <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+    </TouchableOpacity>
+  );
+}
+
+const patternStyles = StyleSheet.create({
+  explainBtn: {
+    padding: 6, borderRadius: 12, borderWidth: 1, borderColor: Colors.accent, marginRight: 6,
+  },
+});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },

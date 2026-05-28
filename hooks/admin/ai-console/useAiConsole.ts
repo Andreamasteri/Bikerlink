@@ -57,20 +57,24 @@ export function useAiConsole(conversationId: string | null, onConversationCreate
   }, []);
 
   const send = useCallback(
-    async (message: string) => {
+    // Task #2645 — opzione `conversationIdOverride`: usata dall'explain flow per
+    // forzare l'invio nella conversazione appena creata, evitando la closure
+    // stale su `conversationId`.
+    async (message: string, opts?: { conversationIdOverride?: string | null }) => {
       const trimmed = message.trim();
       if (!trimmed || state.streaming) return;
       setState({ ...INITIAL_STATE, streaming: true });
       const ac = new AbortController();
       abortRef.current = ac;
-      let convId = conversationId;
+      const targetConvId = opts?.conversationIdOverride ?? conversationId;
+      let convId = targetConvId;
       try {
         const url = new URL("/api/admin/ai/console/message", getApiUrl()).toString();
         const resp = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authFetchHeaders() },
           credentials: "include",
-          body: JSON.stringify({ conversationId: conversationId ?? undefined, message: trimmed }),
+          body: JSON.stringify({ conversationId: targetConvId ?? undefined, message: trimmed }),
           signal: ac.signal,
         });
         if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);

@@ -105,6 +105,71 @@ Il comando è idempotente: salta i file `-sm.webp` già presenti. Non richiede d
 
 ---
 
+## AI Console Unificata (Task #2637 + #2641 + #2645)
+
+Dashboard admin `/admin/ai-console` che consolida le precedenti AI Copilot drawer in
+un'unica console 3 colonne (desktop) / 3 tab (mobile):
+
+- **Sidebar**: lista conversazioni + SearchBar full-text (Postgres ILIKE) su
+  contenuti messaggi. Risultato click → naviga a `?conversationId=…&messageId=…`
+  con auto-scroll alla riga.
+- **Chat**: stream incrementale (SSE) via `useAiConsole`; messaggi possono essere
+  **pinnati** come insight condivisi (knowledge base).
+- **Contesto**: pannello laterale con `BudgetIndicator` (endpoint reale
+  `GET /api/admin/ai/console/budget` con fallback `null`), `ContextPanel`
+  (scope detection da messaggi), `ActionQueuePanel`.
+
+### Routing API (mount `/api/admin/ai/console/*`)
+
+- `GET /conversations`, `POST /conversations`, `DELETE /conversations/:id`
+- `GET /conversations/:id/messages`, `POST /conversations/:id/stream` (SSE)
+- `GET /search?q=…` → `{ results: [{ conversationId, convTitle, messageId, snippet, createdAt }] }`
+- `GET /pinned` → knowledge base condivisa `{ pinned: [{ id, title, body, scope, pinnedBy, createdAt, conversationId, messageId }] }`
+- `POST /pinned`, `DELETE /pinned/:id`
+- `GET /budget` → status budget reale (giornaliero/mensile, modelli)
+- `GET /admin-prefs`, `PATCH /admin-prefs` → preferenze per-admin (jsonb su `users.adminPrefs`)
+
+### Notifiche realtime (WS)
+
+`useAiAlertsSubscriber()` (in `app/admin/ai-console.tsx`) si sottoscrive a
+`/ws/admin/notifications` e:
+
+- Quando WS connesso → polling `useAiActionQueue` rallenta a **5 min** (safety net,
+  i refresh sono guidati da `invalidateQueries` dal subscriber).
+- Quando WS down → fallback polling **60s** automatico (sostituisce il vecchio 30s).
+- Alla prima notifica critica viene creato (o riusato per giornata) un
+  auto-thread `Alerts — YYYY-MM-DD` con il payload dell'evento preloadato
+  come messaggio `system`.
+- Bumpa il counter unread su `urgent_match` / `watchdog_snapshot` rosso/arancio
+  → badge sul `FabWidget`.
+
+### "Spiegami questo" — integrazione cross-screen
+
+Hook `useAiExplain({ type, id, label })` espone `trigger()` che:
+
+1. Imposta un pending in-memory (`setExplainPending`).
+2. Naviga a `/admin/ai-console`.
+3. Console al mount consuma il pending (`consumeExplainPending`) e auto-invia
+   il seed corrispondente (`defaultSeed()` per type: report/user/violation/
+   snapshot/route/match).
+
+Reference integrations attive:
+
+- `app/admin/reports-hub.tsx` → bottone explain su ogni riga "top pattern".
+- `app/admin/db-integrity.tsx` → bottone "Spiega in console" su ogni violazione.
+
+### Onboarding 3-step
+
+`components/admin/ai-console/OnboardingTour.tsx` mostrato al primo accesso,
+persistito su `users.adminPrefs.aiConsoleOnboarded = true` (migrazione SQL
+`migrations/0045_admin_prefs.sql`).
+
+### Smoke E2E
+
+`npx tsx scripts/smoke-ai-console-e2e.ts` esegue 7 scenari end-to-end:
+admin-prefs GET/PATCH, conversations CRUD, stream SSE, search, pin/unpin
+knowledge base, budget, search→deep-link conv+messageId.
+
 ## Overview
 BikerLink is a React Native (Expo SDK 55) mobile application designed to connect motorcyclists ("biker") and passengers ("zavorrine") across Italy, with a vision to expand Pan-European. The application aims to foster a community for motorcycle enthusiasts, enabling them to find riding partners, organize group rides, and share experiences. The tagline, "U'll never ride alone," encapsulates its core mission. Sponsored by Syneco Lubrificanti, BikerLink also integrates advertising and services relevant to its user base, such as Syneco workshops. The project seeks to create a dynamic platform for the motorcycle community, offering interactive maps, social features, and essential tools for riders.
 

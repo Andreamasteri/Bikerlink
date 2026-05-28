@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { apiRequest } from "@/lib/query-client";
 import Colors from "@/constants/colors";
+import { useAiExplain } from "@/hooks/admin/ai-console/useAiExplain";
 
 type Severity = "low" | "medium" | "high" | "critical";
 type Health = "green" | "yellow" | "orange" | "red";
@@ -190,6 +191,7 @@ export default function DbIntegrityScreen() {
                 <View style={styles.row}>
                   <View style={[styles.sevDot, { backgroundColor: SEV_COLOR[v.severity] }]} />
                   <Text style={styles.violationTitle}>{v.checkName}</Text>
+                  <ExplainInConsoleBtn id={v.id} label={v.checkName} />
                 </View>
                 <Text style={styles.violationMeta}>{v.category} · {v.count} righe · {v.status}</Text>
               </TouchableOpacity>
@@ -285,4 +287,26 @@ const styles = StyleSheet.create({
   checkMeta: { color: Colors.textSecondary, fontSize: 11, marginTop: 2 },
   aiLabel: { color: Colors.textSecondary, fontSize: 11, marginTop: 4, textTransform: "uppercase" },
   aiText: { color: Colors.text, fontSize: 13 },
+  explainBtn: {
+    marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 4,
+    paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.accent,
+  },
+  explainBtnText: { color: Colors.accent, fontFamily: "Inter_500Medium", fontSize: 10 },
 });
+
+// Task #2645 — bottone "Spiegami questo" che apre la AI Console con seed contesto.
+function ExplainInConsoleBtn({ id, label }: { id: string; label: string }) {
+  const explain = useAiExplain({ type: "violation", id, label });
+  return (
+    <TouchableOpacity
+      onPress={explain.trigger}
+      style={styles.explainBtn}
+      accessibilityLabel="Spiegami in AI Console"
+      testID="explain-in-console"
+    >
+      <MaterialCommunityIcons name="robot-happy-outline" size={12} color={Colors.accent} />
+      <Text style={styles.explainBtnText}>Spiega in console</Text>
+    </TouchableOpacity>
+  );
+}

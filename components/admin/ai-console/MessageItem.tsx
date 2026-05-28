@@ -7,6 +7,7 @@ import { useRouter } from "expo-router";
 import { useColors } from "@/hooks/useColors";
 import ScopeBadges from "./ScopeBadges";
 import type { AiMessageRow } from "@/hooks/admin/ai-console/useAiConversation";
+import { usePinMessage } from "@/hooks/admin/ai-console/useAiPinned";
 
 interface Props {
   message: AiMessageRow;
@@ -19,11 +20,25 @@ export default function MessageItem({ message }: Props) {
   const colors = useColors();
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const pinMut = usePinMessage();
 
   const isUser = message.role === "user";
   const isRouter = message.role === "router";
   const isAssistant = message.role === "assistant";
   const isTool = message.role === "tool";
+
+  const canPin = isAssistant && message.id && message.id !== "__live__" && message.conversationId && message.conversationId !== "live";
+  const onPin = () => {
+    if (!canPin || pinned || pinMut.isPending) return;
+    // Task #2645 — preserva sia title (snippet) sia note (contenuto integrale)
+    // così l'insight nella knowledge base resta utile senza ulteriore editing.
+    const title = (message.content || "").slice(0, 80).trim() || "Insight AI";
+    pinMut.mutate(
+      { conversationId: message.conversationId, messageId: message.id, title, note: message.content ?? "" },
+      { onSuccess: () => setPinned(true) },
+    );
+  };
 
   const segments = useMemo(() => parseEntities(message.content), [message.content]);
 
@@ -117,6 +132,24 @@ export default function MessageItem({ message }: Props) {
             </Text>
           ) : null}
 
+          {canPin ? (
+            <TouchableOpacity
+              onPress={onPin}
+              style={styles.pinBtn}
+              accessibilityLabel={pinned ? "Pinnato" : "Pinna insight"}
+              testID="ai-pin-message"
+            >
+              <Ionicons
+                name={pinned ? "bookmark" : "bookmark-outline"}
+                size={14}
+                color={pinned ? colors.accent : colors.textSecondary}
+              />
+              <Text style={[styles.pinTxt, { color: pinned ? colors.accent : colors.textSecondary }]}>
+                {pinned ? "Pinnato" : pinMut.isPending ? "…" : "Pinna"}
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+
           {isTool ? (
             <Text style={[styles.cost, { color: colors.textSecondary }]}>tool result</Text>
           ) : null}
@@ -163,6 +196,8 @@ const styles = StyleSheet.create({
   toolName: { fontFamily: "Inter_600SemiBold", fontSize: 11, marginBottom: 4 },
   toolJson: { fontFamily: "Inter_400Regular", fontSize: 10, lineHeight: 14 },
   cost: { fontFamily: "Inter_400Regular", fontSize: 10, marginTop: 6, opacity: 0.8 },
+  pinBtn: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 6, alignSelf: "flex-start" },
+  pinTxt: { fontFamily: "Inter_500Medium", fontSize: 10 },
   routerCard: { borderRadius: 8, borderWidth: 1, padding: 8, marginVertical: 4, alignSelf: "stretch" },
   routerHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4, flexWrap: "wrap" },
   routerLabel: { fontFamily: "Inter_700Bold", fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5 },

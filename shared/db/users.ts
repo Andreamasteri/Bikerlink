@@ -66,6 +66,8 @@ export const users = pgTable("users", {
   lastPlatform: varchar("last_platform", { length: 16 }),
   lastDeviceModel: varchar("last_device_model", { length: 100 }),
   expoPushToken: text("expo_push_token"),
+  // Task #2645 — preferenze admin (onboarding console, hint dismissed, ecc.)
+  adminPrefs: jsonb("admin_prefs").$type<Record<string, unknown>>().default({}),
   firstLoginAt: timestamp("first_login_at"),
   firstLoginLat: doublePrecision("first_login_lat"),
   firstLoginLng: doublePrecision("first_login_lng"),

@@ -8,6 +8,8 @@ import { useRouter } from "expo-router";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { useColors } from "@/hooks/useColors";
 import { useAiActionQueue } from "@/hooks/admin/ai-console/useAiActionQueue";
+import { useAiAlertsState, useAiAlertsSubscriber } from "@/hooks/admin/ai-console/useAiAlerts";
+import { useExplainPending } from "@/hooks/admin/ai-console/useAiExplain";
 import FabDrawer from "./FabDrawer";
 
 import * as Haptics from "expo-haptics";
@@ -26,12 +28,16 @@ export default function FabWidget() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const { data: queue } = useAiActionQueue({ refetchMs: 30_000 });
+  useAiAlertsSubscriber({ enabled: true });
+  const alerts = useAiAlertsState();
+  const explain = useExplainPending();
+  const { data: queue } = useAiActionQueue();
 
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const total = queue?.items?.length ?? 0;
+  const total = (queue?.items?.length ?? 0) + alerts.unread;
+  const hasExplain = !!explain;
 
   const bottomInset = Math.max(insets.bottom, Platform.OS === "web" ? 34 : 12);
 
@@ -42,7 +48,17 @@ export default function FabWidget() {
         style={[styles.wrap, { bottom: bottomInset + 16, right: 16 }, animStyle]}
       >
         <Pressable
-          onPress={() => { triggerHaptic("light"); setDrawerOpen(true); }}
+          // Task #2645 — quando c'è un explain pendente, il tap apre direttamente
+          // la Console (che consumerà il pending e auto-invierà il seed). Altrimenti
+          // tap = drawer rapido, long-press = console intera (comportamento storico).
+          onPress={() => {
+            triggerHaptic("light");
+            if (hasExplain) {
+              router.push("/admin/ai-console" as never);
+            } else {
+              setDrawerOpen(true);
+            }
+          }}
           onLongPress={() => {
             triggerHaptic("medium");
             router.push("/admin/ai-console" as never);
@@ -57,11 +73,13 @@ export default function FabWidget() {
             { backgroundColor: colors.accent, shadowColor: colors.accent },
           ]}
         >
-          <Ionicons name="sparkles" size={24} color="#fff" />
+          <Ionicons name={hasExplain ? "help-circle" : "sparkles"} size={24} color="#fff" />
           {total > 0 ? (
             <View style={[styles.badge, { backgroundColor: colors.error, borderColor: colors.background }]}>
               <Text style={styles.badgeText}>{total > 99 ? "99+" : total}</Text>
             </View>
+          ) : hasExplain ? (
+            <View style={[styles.dot, { backgroundColor: colors.warning ?? "#FFB300", borderColor: colors.background }]} />
           ) : null}
         </Pressable>
       </Animated.View>
@@ -83,4 +101,5 @@ const styles = StyleSheet.create({
     alignItems: "center", justifyContent: "center", borderWidth: 2,
   },
   badgeText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 10 },
+  dot: { position: "absolute", top: -2, right: -2, width: 12, height: 12, borderRadius: 6, borderWidth: 2 },
 });

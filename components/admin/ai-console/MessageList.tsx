@@ -1,5 +1,6 @@
 // Task #2641 — Inverted FlatList per chat AI Console (no scrollToEnd).
-import React, { useMemo } from "react";
+// Task #2645 — supporto scrollToMessageId (per arrivo da search/notifica).
+import React, { useEffect, useMemo, useRef } from "react";
 import { FlatList, View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import MessageItem from "./MessageItem";
@@ -11,13 +12,28 @@ interface Props {
   messages: AiMessageRow[];
   streamState: AiStreamState;
   loading?: boolean;
+  scrollToMessageId?: string | null;
 }
 
-export default function MessageList({ messages, streamState, loading }: Props) {
+export default function MessageList({ messages, streamState, loading, scrollToMessageId }: Props) {
   const colors = useColors();
+  const listRef = useRef<FlatList<AiMessageRow>>(null);
 
   // Inverted: dati con il messaggio più recente in cima.
   const data = useMemo(() => [...messages].reverse(), [messages]);
+
+  // Scroll a messaggio specifico (arrivo da search o notifica).
+  useEffect(() => {
+    if (!scrollToMessageId) return;
+    const idx = data.findIndex((m) => m.id === scrollToMessageId);
+    if (idx < 0) return;
+    const t = setTimeout(() => {
+      try {
+        listRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.3 });
+      } catch { /* ignore */ }
+    }, 150);
+    return () => clearTimeout(t);
+  }, [scrollToMessageId, data]);
 
   const liveAssistant: AiMessageRow | null =
     streamState.streaming || streamState.text
@@ -40,6 +56,8 @@ export default function MessageList({ messages, streamState, loading }: Props) {
 
   return (
     <FlatList
+      ref={listRef}
+      onScrollToIndexFailed={() => { /* lista non ancora layoutata, retry implicito */ }}
       style={{ flex: 1, backgroundColor: colors.background }}
       contentContainerStyle={styles.list}
       data={data}

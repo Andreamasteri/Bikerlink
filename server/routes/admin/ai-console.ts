@@ -50,7 +50,7 @@ const MessageBody = z.object({
   message: z.string().min(1).max(8000),
 });
 
-router.post("/console/message", async (req: Request, res: Response) => {
+router.post("/ai/console/message", async (req: Request, res: Response) => {
   const parsed = MessageBody.safeParse(req.body);
   if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
   const userId = (req.session as { userId?: string }).userId as string;
@@ -170,7 +170,47 @@ async function trackBudget(costUsd: number): Promise<void> {
 }
 
 // ── GET /console/conversations ────────────────────────────────────────────
-router.get("/console/conversations", async (req: Request, res: Response) => {
+// Task #2645 — POST /ai/console/conversations: crea (o riusa per title esatto)
+// una conversazione, con possibilità di preload di un messaggio iniziale
+// (es. system-context per "Spiegami questo" o auto-thread Alerts).
+const CreateConvBody = z.object({
+  title: z.string().min(1).max(200),
+  reuseByTitle: z.boolean().optional(),
+  preload: z
+    .object({
+      role: z.enum(["system", "assistant", "user"]).default("system"),
+      content: z.string().min(1).max(8000),
+    })
+    .optional(),
+});
+router.post("/ai/console/conversations", async (req: Request, res: Response) => {
+  const userId = (req.session as { userId?: string }).userId as string;
+  const parsed = CreateConvBody.safeParse(req.body ?? {});
+  if (!parsed.success) { sendError(res, 400, parsed.error.issues[0].message); return; }
+  const { title, reuseByTitle, preload } = parsed.data;
+
+  let convId: string | null = null;
+  if (reuseByTitle) {
+    const [existing] = await db.select({ id: aiConversations.id }).from(aiConversations)
+      .where(and(eq(aiConversations.adminUserId, userId), eq(aiConversations.title, title)))
+      .orderBy(desc(aiConversations.createdAt)).limit(1);
+    if (existing) convId = existing.id;
+  }
+  if (!convId) {
+    const [row] = await db.insert(aiConversations).values({
+      adminUserId: userId, title,
+    }).returning({ id: aiConversations.id });
+    convId = row.id;
+  }
+  if (preload) {
+    await db.insert(aiMessages).values({
+      conversationId: convId, role: preload.role, content: preload.content,
+    });
+  }
+  res.json({ conversation: { id: convId, title } });
+});
+
+router.get("/ai/console/conversations", async (req: Request, res: Response) => {
   const userId = (req.session as { userId?: string }).userId as string;
   const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "30"), 10) || 30));
   const offset = Math.max(0, parseInt(String(req.query.offset ?? "0"), 10) || 0);
@@ -184,7 +224,7 @@ router.get("/console/conversations", async (req: Request, res: Response) => {
 });
 
 // ── GET /console/conversations/:id/messages ───────────────────────────────
-router.get("/console/conversations/:id/messages", async (req: Request, res: Response) => {
+router.get("/ai/console/conversations/:id/messages", async (req: Request, res: Response) => {
   const userId = (req.session as { userId?: string }).userId as string;
   const id = String(req.params.id);
   const [conv] = await db.select().from(aiConversations)
@@ -198,7 +238,7 @@ router.get("/console/conversations/:id/messages", async (req: Request, res: Resp
 
 // ── POST /console/conversations/:id/pin/:messageId ────────────────────────
 const PinBody = z.object({ title: z.string().max(200).optional(), note: z.string().max(2000).optional() });
-router.post("/console/conversations/:id/pin/:messageId", async (req: Request, res: Response) => {
+router.post("/ai/console/conversations/:id/pin/:messageId", async (req: Request, res: Response) => {
   const userId = (req.session as { userId?: string }).userId as string;
   const id = String(req.params.id);
   const messageId = String(req.params.messageId);
@@ -219,16 +259,56 @@ router.post("/console/conversations/:id/pin/:messageId", async (req: Request, re
   res.json({ pin });
 });
 
-router.get("/console/pinned", async (req: Request, res: Response) => {
-  const userId = (req.session as { userId?: string }).userId as string;
-  const rows = await db.select().from(aiPinnedInsights)
-    .where(eq(aiPinnedInsights.adminUserId, userId))
-    .orderBy(desc(aiPinnedInsights.createdAt)).limit(100);
-  res.json({ pins: rows });
+// Task #2645 — knowledge base condivisa: niente filtro per pinnedBy.
+// Body fallback al contenuto del messaggio sorgente quando note è vuoto/nullo,
+// così il pin "tap-only" da chat resta utile come knowledge card.
+router.get("/ai/console/pinned", async (req: Request, res: Response) => {
+  const limit = Math.min(500, Math.max(1, parseInt(String(req.query.limit ?? "200"), 10) || 200));
+  const rows = await db.select({
+    id: aiPinnedInsights.id,
+    conversationId: aiPinnedInsights.conversationId,
+    messageId: aiPinnedInsights.messageId,
+    title: aiPinnedInsights.title,
+    note: aiPinnedInsights.note,
+    adminUserId: aiPinnedInsights.adminUserId,
+    createdAt: aiPinnedInsights.createdAt,
+    scopesHint: aiConversations.scopesHint,
+    msgContent: aiMessages.content,
+  }).from(aiPinnedInsights)
+    .leftJoin(aiConversations, eq(aiConversations.id, aiPinnedInsights.conversationId))
+    .leftJoin(aiMessages, eq(aiMessages.id, aiPinnedInsights.messageId))
+    .orderBy(desc(aiPinnedInsights.createdAt)).limit(limit);
+  const pinned = rows.map((r) => {
+    const scopesArr = Array.isArray(r.scopesHint) ? (r.scopesHint as string[]) : null;
+    const noteStr = r.note && String(r.note).trim().length > 0 ? String(r.note) : null;
+    const msgStr = r.msgContent && String(r.msgContent).trim().length > 0 ? String(r.msgContent) : null;
+    return {
+      id: r.id,
+      conversationId: r.conversationId,
+      messageId: r.messageId,
+      title: r.title ?? (msgStr ? msgStr.slice(0, 80) : "Insight"),
+      body: noteStr ?? msgStr ?? "",
+      scope: scopesArr && scopesArr.length ? String(scopesArr[0]) : null,
+      pinnedBy: r.adminUserId,
+      pinnedByNickname: null,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : String(r.createdAt),
+    };
+  });
+  res.json({ pinned });
+});
+
+// Task #2645 — unpin (cancellazione hard, qualsiasi admin può rimuovere).
+router.delete("/ai/console/pinned/:id", async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const [del] = await db.delete(aiPinnedInsights)
+    .where(eq(aiPinnedInsights.id, id))
+    .returning({ id: aiPinnedInsights.id });
+  if (!del) { sendError(res, 404, "Insight non trovato"); return; }
+  res.json({ unpinned: true });
 });
 
 // ── DELETE /console/conversations/:id — soft delete ───────────────────────
-router.delete("/console/conversations/:id", async (req: Request, res: Response) => {
+router.delete("/ai/console/conversations/:id", async (req: Request, res: Response) => {
   const userId = (req.session as { userId?: string }).userId as string;
   const id = String(req.params.id);
   const [updated] = await db.update(aiConversations).set({ archivedAt: new Date() })
@@ -324,7 +404,7 @@ function countBy<T extends Record<string, unknown>>(arr: T[], key: keyof T): Rec
 }
 
 // ── GET /console/search?q=... — full-text su aiMessages.content ───────────
-router.get("/console/search", async (req: Request, res: Response) => {
+router.get("/ai/console/search", async (req: Request, res: Response) => {
   const userId = (req.session as { userId?: string }).userId as string;
   const q = String(req.query.q ?? "").trim();
   if (q.length < 2) { sendError(res, 400, "q troppo corto (min 2 caratteri)"); return; }
@@ -360,7 +440,7 @@ function snippet(content: string, q: string): string {
 }
 
 // ── GET /console/scopes — elenco scope ────────────────────────────────────
-router.get("/console/scopes", (_req: Request, res: Response) => {
+router.get("/ai/console/scopes", (_req: Request, res: Response) => {
   res.json({ scopes: SCOPES });
 });
 
@@ -368,3 +448,44 @@ router.get("/console/scopes", (_req: Request, res: Response) => {
 void lte;
 
 export default router;
+
+// ────────────────────────────────────────────────────────────────────────────
+// Task #2645 — Endpoint aggiuntivi: budget reale + admin prefs.
+// ────────────────────────────────────────────────────────────────────────────
+import { getBudgetStatus } from "../../ai/moderation/budget";
+import { users as usersTable } from "@shared/db";
+
+router.get("/ai/console/budget", async (_req: Request, res: Response) => {
+  try {
+    const status = await getBudgetStatus();
+    res.json(status);
+  } catch (e) {
+    console.error("[ai-console/budget]", e);
+    sendError(res, 500, "Errore lettura budget");
+  }
+});
+
+router.get("/ai/console/admin-prefs", async (req: Request, res: Response) => {
+  const userId = (req.session as { userId?: string }).userId as string;
+  const [row] = await db.select({ adminPrefs: usersTable.adminPrefs })
+    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  const prefs = (row?.adminPrefs ?? {}) as Record<string, unknown>;
+  res.json({ prefs });
+});
+
+const PrefsPatch = z.object({}).catchall(z.unknown());
+router.patch("/ai/console/admin-prefs", async (req: Request, res: Response) => {
+  const userId = (req.session as { userId?: string }).userId as string;
+  const parsed = PrefsPatch.safeParse(req.body ?? {});
+  if (!parsed.success) { sendError(res, 400, "Body invalido"); return; }
+  const [row] = await db.select({ adminPrefs: usersTable.adminPrefs })
+    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
+  const current = (row?.adminPrefs ?? {}) as Record<string, unknown>;
+  const next = { ...current, ...parsed.data };
+  await db.update(usersTable).set({ adminPrefs: next, updatedAt: new Date() })
+    .where(eq(usersTable.id, userId));
+  res.json({ prefs: next });
+});
+
+// Suppress unused-import warning for `or` (used elsewhere when feature-flagged).
+void or;
