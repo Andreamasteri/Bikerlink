@@ -244,6 +244,125 @@ async function main() {
     return "graceful + recovery ok";
   });
 
+  // ── G) Task #2660 — conflict → admin override (coordinator-level, no HTTP) ──
+  await step("G. conflict creato + admin override → resolvedBy='admin' + ai_decisions", async () => {
+    // Due eventi in conflitto su tipo univoco per evitare match policy noti
+    // e mantenere il test deterministico anche senza SESSION_COOKIE.
+    const a = await c.emit({
+      aiName: "moderation", eventType: "review_request",
+      payload: { userId: "u-g1", contentId: "p-g1" },
+      severity: "warn", correlationId: `${corrTag}-G`,
+    });
+    const b = await c.emit({
+      aiName: "watchdog", eventType: "review_request",
+      payload: { userId: "u-g1", reason: "spam_burst" },
+      severity: "info", correlationId: `${corrTag}-G`,
+    });
+    assert(a.id && b.id, "emit G falliti");
+    const conflictType = `e2e_admin_override_${Date.now()}`;
+    const res = await c.evaluateConflict({
+      eventIdA: a.id, eventIdB: b.id, conflictType,
+    });
+    // Verifica creazione record ai_conflicts.
+    const [created] = await db.select().from(aiConflicts).where(eq(aiConflicts.id, res.conflictId)).limit(1);
+    assert(created, "ai_conflicts row non creata");
+    assert(created.eventIdA === a.id && created.eventIdB === b.id, "eventIdA/B errati nel record");
+    assert(created.conflictType === conflictType, `conflictType=${created.conflictType}`);
+
+    // Esegue lo stesso flusso dell'endpoint /override direttamente sul
+    // coordinator + DB, in modo che il test giri sempre (no cookie richiesto).
+    const corrOverride = `override-${res.conflictId.slice(0, 12)}`;
+    const decisionId = await c.recordDecision({
+      aiName: "admin",
+      decisionType: "conflict_override",
+      input: { conflictId: res.conflictId, eventIdA: a.id, eventIdB: b.id, conflictType },
+      output: { decision: "useEventA" },
+      rationale: "E2E #2660 — override admin (coordinator-level)",
+      tookMs: 0,
+      correlationId: corrOverride,
+    });
+    assert(decisionId, "recordDecision non ha restituito id");
+    await db.update(aiConflicts).set({
+      resolvedBy: "admin",
+      resolutionRationale: "[admin:e2e] useEventA — E2E #2660",
+      resolvedAt: new Date(),
+    }).where(eq(aiConflicts.id, res.conflictId));
+
+    const [updated] = await db.select().from(aiConflicts).where(eq(aiConflicts.id, res.conflictId)).limit(1);
+    assert(updated?.resolvedBy === "admin", `resolvedBy=${updated?.resolvedBy} (atteso 'admin')`);
+    assert(updated?.resolvedAt, "resolvedAt non valorizzato dopo override");
+
+    // Verifica record ai_decisions presente con aiName='admin' + correlationId override.
+    const decRows = await db.select().from(aiDecisions)
+      .where(and(eq(aiDecisions.aiName, "admin"), eq(aiDecisions.correlationId, corrOverride)));
+    assert(decRows.length >= 1, "ai_decisions row override non creata");
+    assert(decRows[0].decisionType === "conflict_override", `decisionType=${decRows[0].decisionType}`);
+    return `conflict=${res.conflictId.slice(0, 8)} decision=${decisionId.slice(0, 8)}`;
+  });
+
+  // ── H) Task #2660 — kill-switch bypass per aiName='admin' sotto pause("*") ──
+  await step("H. pause('*') → admin emit + override comunque registrati (bypass)", async () => {
+    await pauseAi("*", 60, "e2e-2660-bypass");
+    try {
+      // Sanity: emit non-admin deve essere soppresso.
+      const blocked = await c.emit({
+        aiName: "moderation", eventType: "ping",
+        payload: {}, severity: "info", correlationId: `${corrTag}-H0`,
+      });
+      assert(blocked.id === "", `kill-switch non sopprime non-admin (id=${blocked.id})`);
+
+      // Setup conflitto (gli eventi A/B *prima* della pausa per non essere soppressi).
+      await resumeAi("*");
+      const a = await c.emit({
+        aiName: "moderation", eventType: "review_request",
+        payload: { userId: "u-h1" }, severity: "warn", correlationId: `${corrTag}-H`,
+      });
+      const b = await c.emit({
+        aiName: "watchdog", eventType: "review_request",
+        payload: { userId: "u-h1" }, severity: "info", correlationId: `${corrTag}-H`,
+      });
+      assert(a.id && b.id, "emit setup H falliti");
+      const conflictType = `e2e_admin_bypass_${Date.now()}`;
+      const res = await c.evaluateConflict({ eventIdA: a.id, eventIdB: b.id, conflictType });
+
+      // Ora rimette in pausa il layer e simula l'override admin.
+      await pauseAi("*", 60, "e2e-2660-bypass-2");
+      assert(await isAiPaused("admin"), "isAiPaused('admin') deve riportare true sotto pause('*')");
+
+      const corrOverride = `override-${res.conflictId.slice(0, 12)}`;
+      // recordDecision bypassa kill switch by design (è solo DB insert).
+      const decisionId = await c.recordDecision({
+        aiName: "admin",
+        decisionType: "conflict_override",
+        input: { conflictId: res.conflictId, eventIdA: a.id, eventIdB: b.id, conflictType },
+        output: { decision: "useEventB" },
+        rationale: "E2E #2660 — override admin sotto kill-switch layer",
+        tookMs: 0,
+        correlationId: corrOverride,
+      });
+      assert(decisionId, "recordDecision admin sotto pause(*) fallita");
+
+      // emit admin DEVE bypassare il kill switch (coordinator: aiName !== 'admin' check).
+      const adminEvt = await c.emit({
+        aiName: "admin", eventType: "override",
+        payload: { conflictId: res.conflictId, decision: "useEventB", decisionId },
+        severity: "warn", correlationId: corrOverride,
+      });
+      assert(adminEvt.id !== "", "emit admin soppresso da kill-switch (bypass rotto)");
+
+      // Verifica DB: evento admin persistito + decisione admin presente.
+      const [evRow] = await db.select().from(aiEvents).where(eq(aiEvents.id, adminEvt.id)).limit(1);
+      assert(evRow?.aiName === "admin" && evRow.eventType === "override", "ai_events admin non persistito correttamente");
+      const decRows = await db.select().from(aiDecisions)
+        .where(and(eq(aiDecisions.aiName, "admin"), eq(aiDecisions.correlationId, corrOverride)));
+      assert(decRows.length >= 1, "ai_decisions admin non registrata sotto kill-switch");
+
+      return `admin emit/decision registrati sotto pause(*) conflict=${res.conflictId.slice(0, 8)}`;
+    } finally {
+      await resumeAi("*");
+    }
+  });
+
   const failed = results.filter((r) => !r.ok);
   const skipped = results.filter((r) => r.skipped).length;
   console.log(`\n=== ${results.length - failed.length - skipped}/${results.length} passed, ${skipped} skipped, ${failed.length} failed ===`);
