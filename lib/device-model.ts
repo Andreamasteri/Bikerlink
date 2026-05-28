@@ -3,6 +3,12 @@ import { Platform } from "react-native";
 // Safe lazy require: build 53 non ha il modulo nativo expo-device.
 // Import top-level crasherebbe l'intero bundle JS (schermata nera).
 // In build futuri con il modulo nativo, Device sarà popolato correttamente.
+//
+// NOTA COMPATIBILITÀ APK: la stringa arricchita con codice modello grezzo
+// (es. "Samsung Galaxy S24 Ultra (SM-S928B)") appare solo per utenti che
+// eseguono una APK ≥ versione corrente, dove expo-device è disponibile
+// nativamente. Le build vecchie (53.x) continueranno a riportare
+// deviceModel: null e a mostrare solo la piattaforma nella card admin.
 let Device: { modelName?: string | null; manufacturer?: string | null } = {};
 try {
    
@@ -97,8 +103,19 @@ export function getDeviceModel(): string | null {
   if (Platform.OS === "android") {
     if (modelName) {
       const mapped = ANDROID_MODEL_MAP[modelName];
-      if (mapped) return mapped;
+      if (mapped) {
+        // Mappato: aggiungi anche il codice grezzo tra parentesi.
+        // Evita duplicazione se per qualche motivo mapped == modelName.
+        if (mapped === modelName) return mapped;
+        return `${mapped} (${modelName})`;
+      }
       if (manufacturer) {
+        // Evita duplicazione se manufacturer è già contenuto in modelName
+        // (es. modelName="Samsung SM-S928B", manufacturer="Samsung").
+        const manuLower = manufacturer.toLowerCase();
+        if (modelName.toLowerCase().startsWith(manuLower)) {
+          return modelName;
+        }
         return `${manufacturer} ${modelName}`;
       }
       return modelName;

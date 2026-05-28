@@ -110,7 +110,7 @@ export const UserCard: React.FC<UserCardProps> = ({
           );
         })()}
         {(item.lastDeviceModel || item.lastPlatform) && (
-          <Text style={styles.deviceModel} numberOfLines={1}>
+          <Text style={styles.deviceModel} numberOfLines={2}>
             {[item.lastPlatform, item.lastDeviceModel].filter(Boolean).join(" · ")}
           </Text>
         )}
