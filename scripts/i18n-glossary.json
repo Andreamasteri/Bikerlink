@@ -1,0 +1,19 @@
+{
+  "_description": "Moto-specific glossary for BikerLink i18n auto-translation. Italian source term → preferred translation per target language. The translator MUST follow these mappings when present.",
+  "BikerLink": { "en": "BikerLink", "es": "BikerLink", "fr": "BikerLink", "de": "BikerLink", "el": "BikerLink", "tr": "BikerLink" },
+  "biker": { "en": "biker", "es": "biker", "fr": "biker", "de": "Biker", "el": "biker", "tr": "biker" },
+  "Biker": { "en": "Biker", "es": "Biker", "fr": "Biker", "de": "Biker", "el": "Biker", "tr": "Biker" },
+  "zavorrina": { "en": "pillion", "es": "pasajera", "fr": "passagère", "de": "Sozia", "el": "συνεπιβάτιδα", "tr": "zavorrina" },
+  "Zavorrina": { "en": "Pillion", "es": "Pasajera", "fr": "Passagère", "de": "Sozia", "el": "Συνεπιβάτιδα", "tr": "Zavorrina" },
+  "motoclub": { "en": "motorcycle club", "es": "club de moteros", "fr": "moto club", "de": "Motorradclub", "el": "λέσχη μοτοσικλέτας", "tr": "motoklüp" },
+  "Syneco": { "en": "Syneco", "es": "Syneco", "fr": "Syneco", "de": "Syneco", "el": "Syneco", "tr": "Syneco" },
+  "piega": { "en": "lean angle", "es": "ángulo de inclinación", "fr": "angle d'inclinaison", "de": "Schräglage", "el": "γωνία κλίσης", "tr": "yatış açısı" },
+  "tornante": { "en": "hairpin", "es": "curva cerrada", "fr": "épingle", "de": "Spitzkehre", "el": "φουρκέτα", "tr": "U dönüşü" },
+  "passo": { "en": "mountain pass", "es": "puerto de montaña", "fr": "col", "de": "Pass", "el": "ορεινό πέρασμα", "tr": "dağ geçidi" },
+  "raduno": { "en": "rally", "es": "concentración", "fr": "rassemblement", "de": "Treffen", "el": "συγκέντρωση", "tr": "buluşma" },
+  "giro": { "en": "ride", "es": "ruta", "fr": "balade", "de": "Tour", "el": "βόλτα", "tr": "tur" },
+  "casco": { "en": "helmet", "es": "casco", "fr": "casque", "de": "Helm", "el": "κράνος", "tr": "kask" },
+  "garage": { "en": "garage", "es": "garaje", "fr": "garage", "de": "Garage", "el": "γκαράζ", "tr": "garaj" },
+  "wishlist": { "en": "wishlist", "es": "wishlist", "fr": "wishlist", "de": "Wunschliste", "el": "wishlist", "tr": "istek listesi" },
+  "match": { "en": "match", "es": "match", "fr": "match", "de": "Match", "el": "match", "tr": "eşleşme" }
+}
