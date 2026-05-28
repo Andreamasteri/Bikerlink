@@ -67,7 +67,6 @@ export async function runBioAffinityMatching(): Promise<number> {
       WHERE e.entity_type = 'user'
         AND e.field = 'bio'
         AND u.is_fake = false
-        AND COALESCE(u.deleted_at IS NOT NULL, false) = false
     `);
     const rows = (rowsRes.rows ?? rowsRes) as BioRow[];
     if (rows.length < 2) {
