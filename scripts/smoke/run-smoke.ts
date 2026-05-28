@@ -60,6 +60,10 @@ if (/bikerlink\.(app|com|it)$/i.test(new URL(BASE_URL).hostname) && !ALLOW_PROD)
 const results: CheckResult[] = [];
 let cookieJar = "";
 let stopReason: string | null = null;
+// Stato condiviso con runWithCleanup(): permette al cleanup nel finally di
+// agire SOLO se questo run ha effettivamente registrato un utente smoke.
+let registeredThisRun = false;
+let createdUserId: string | null = null;
 
 function captureCookies(res: Response): void {
   const anyHeaders = res.headers as unknown as { getSetCookie?: () => string[] };
@@ -157,6 +161,66 @@ async function run(
   return result;
 }
 
+const SMOKE_EMAIL_PATTERN = /^smoke\+[^@]+@bikerlink\.test$/i;
+const FORCE_CLEANUP = process.env.SMOKE_FORCE_CLEANUP === "1";
+
+async function cleanupSmokeUser(
+  email: string,
+  createdUserId: string | null,
+  registeredThisRun: boolean,
+): Promise<{ ok: boolean; note: string }> {
+  if (!DATABASE_URL) return { ok: true, note: "DATABASE_URL non disponibile — skip" };
+  // Safety guard #1: niente cleanup se questo run non ha registrato un utente
+  // (a meno di override esplicito SMOKE_FORCE_CLEANUP=1). Evita di cancellare
+  // account preesistenti se SMOKE_EMAIL viene riusato manualmente o se il
+  // register è fallito perché l'utente esisteva già.
+  if (!registeredThisRun && !FORCE_CLEANUP) {
+    return { ok: true, note: "skip: register non riuscito in questo run (usa SMOKE_FORCE_CLEANUP=1 per forzare)" };
+  }
+  // Safety guard #2: l'email deve corrispondere al pattern smoke. Evita
+  // distruzione accidentale se SMOKE_EMAIL è stato sovrascritto con un valore
+  // arbitrario.
+  if (!SMOKE_EMAIL_PATTERN.test(email)) {
+    return { ok: true, note: `skip: email '${email}' non corrisponde al pattern smoke+*@bikerlink.test` };
+  }
+  let pg: any;
+  try { pg = await import("pg"); } catch { return { ok: false, note: "pacchetto pg non disponibile" }; }
+  const client = new pg.Client({ connectionString: DATABASE_URL });
+  try {
+    await client.connect();
+    // Preferenza: id catturato al register; fallback: lookup per email (sempre
+    // ristretto al pattern smoke dal guard sopra).
+    let userId = createdUserId;
+    if (!userId) {
+      const u = await client.query(
+        "SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND email ILIKE 'smoke+%@bikerlink.test' LIMIT 1",
+        [email],
+      );
+      if (u.rowCount === 0) return { ok: true, note: "nessun utente smoke da rimuovere" };
+      userId = u.rows[0].id;
+    }
+    // Doppio check: verifichiamo che l'id abbia davvero un'email smoke prima
+    // di cancellare (difesa in profondità nel caso createdUserId provenga da
+    // una fonte non fidata).
+    const verify = await client.query(
+      "SELECT email FROM users WHERE id = $1 AND email ILIKE 'smoke+%@bikerlink.test' LIMIT 1",
+      [userId],
+    );
+    if (verify.rowCount === 0) {
+      return { ok: false, note: `skip: userId=${userId} non corrisponde a un account smoke` };
+    }
+    // Token di verifica email non hanno FK CASCADE garantita: rimuoviamo esplicitamente.
+    try { await client.query("DELETE FROM email_verification_tokens WHERE user_id = $1", [userId]); } catch { /* tabella opzionale */ }
+    // Tutte le altre dipendenze hanno ON DELETE CASCADE (vedi shared/db/*.ts).
+    const del = await client.query("DELETE FROM users WHERE id = $1", [userId]);
+    return { ok: true, note: `userId=${userId} deleted=${del.rowCount}` };
+  } catch (e: any) {
+    return { ok: false, note: `pg error: ${e?.message ?? String(e)}` };
+  } finally {
+    try { await client.end(); } catch { /* ignore */ }
+  }
+}
+
 async function autoVerifyEmail(email: string): Promise<{ ok: boolean; note: string }> {
   if (!DATABASE_URL) return { ok: false, note: "DATABASE_URL non disponibile" };
   let pg: any;
@@ -177,7 +241,7 @@ async function autoVerifyEmail(email: string): Promise<{ ok: boolean; note: stri
   }
 }
 
-async function main(): Promise<void> {
+async function main(): Promise<number> {
   console.log(`\n[smoke] BASE_URL=${BASE_URL}`);
   console.log(`[smoke] email=${EMAIL}\n`);
   console.log("flag id     area         check                                status   time");
@@ -217,6 +281,14 @@ async function main(): Promise<void> {
       ...(INVITE_CODE ? { invitationCode: INVITE_CODE } : {}),
     });
     registered = r.status >= 200 && r.status < 300;
+    if (registered) {
+      registeredThisRun = true;
+      // Cattura l'id dell'utente appena creato per il cleanup targettato in
+      // finally. Best-effort: se la response non lo espone, il fallback in
+      // cleanupSmokeUser farà lookup per email ristretta al pattern smoke.
+      const id = r.json?.user?.id ?? r.json?.userId ?? r.json?.id;
+      if (typeof id === "string" && id.length > 0) createdUserId = id;
+    }
     return { ok: registered, status: r.status, note: registered ? undefined : (r.json?.message ?? r.text?.slice(0, 120)) };
   });
 
@@ -498,10 +570,33 @@ async function main(): Promise<void> {
     console.log("\n[smoke-json]" + JSON.stringify({ baseUrl: BASE_URL, results, stopReason }));
   }
 
-  process.exit(blockerFail.length > 0 ? 1 : 0);
+  return blockerFail.length > 0 ? 1 : 0;
 }
 
-main().catch((e) => {
-  console.error("[smoke] errore fatale:", e?.message ?? e);
-  process.exit(2);
-});
+async function runWithCleanup(): Promise<void> {
+  let exitCode = 0;
+  let fatal: unknown = null;
+  try {
+    exitCode = await main();
+  } catch (e) {
+    fatal = e;
+    exitCode = 2;
+  } finally {
+    // Cleanup best-effort dell'utente smoke creato in questo run.
+    // Gira SEMPRE (anche su fast-fail BLOCKER o eccezione fatale), perché
+    // main() ora ritorna l'exit code invece di chiamare process.exit().
+    // Non altera l'exit code del report: un delete fallito viene solo loggato.
+    try {
+      const c = await cleanupSmokeUser(EMAIL, createdUserId, registeredThisRun);
+      console.log(`[smoke] cleanup ${EMAIL}: ${c.ok ? "OK" : "FAIL"} — ${c.note}`);
+    } catch (e: any) {
+      console.log(`[smoke] cleanup ${EMAIL}: FAIL — ${e?.message ?? String(e)}`);
+    }
+  }
+  if (fatal) {
+    console.error("[smoke] errore fatale:", (fatal as any)?.message ?? fatal);
+  }
+  process.exit(exitCode);
+}
+
+runWithCleanup();

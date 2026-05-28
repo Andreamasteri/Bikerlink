@@ -61,10 +61,6 @@ args = "typecheck-client"
 task = "workflow.run"
 args = "OTA Publish"
 
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Smoke Test"
-
 [[workflows.workflow]]
 name = "Start App"
 author = "agent"
