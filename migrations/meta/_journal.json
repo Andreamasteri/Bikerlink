@@ -145,7 +145,273 @@
     {
       "idx": 20,
       "version": "7",
-      "when": 1748995300000,
+      "when": 1749081600000,
+      "tag": "0020_drop_ota_residuals",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1749168000000,
+      "tag": "0021_crash_logs_dedup_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1749254400000,
+      "tag": "0022_create_ota_releases",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1749340800000,
+      "tag": "0023_ota_group_id",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1749427200000,
+      "tag": "0024_users_map_tester",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1749513600000,
+      "tag": "0025_drop_map_tester",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1749600000000,
+      "tag": "0026_maps_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1749686400000,
+      "tag": "0027_active_tile_provider",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1749772800000,
+      "tag": "0028_maps_quota",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1749859200000,
+      "tag": "0029_translation_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1749945600000,
+      "tag": "0030_last_device_model",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1750032000000,
+      "tag": "0031_ota_approval_redesign",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1750118400000,
+      "tag": "0031_user_devices_and_feedback_device_info",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1750204800000,
+      "tag": "0032_ota_assistant_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1750291200000,
+      "tag": "0033_ota_watchdog_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1750377600000,
+      "tag": "0034_ab_experiments",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1750464000000,
+      "tag": "0034_match_archive_freshness",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1750550400000,
+      "tag": "0034_notification_priority_and_deliveries",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1750636800000,
+      "tag": "0035_route_affinity",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1750723200000,
+      "tag": "0036_embeddings",
+      "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1750809600000,
+      "tag": "0036_match_rules",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1750896000000,
+      "tag": "0036_postgis",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1750982400000,
+      "tag": "0036_text_interpreter",
+      "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1751068800000,
+      "tag": "0037_match_thresholds_and_score_breakdown",
+      "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1751155200000,
+      "tag": "0038_bio_affinity",
+      "breakpoints": true
+    },
+    {
+      "idx": 45,
+      "version": "7",
+      "when": 1751241600000,
+      "tag": "0038_music_affinity_embeddings",
+      "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1751328000000,
+      "tag": "0039_planned_route_integration",
+      "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1751414400000,
+      "tag": "0039_reports_extension",
+      "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1751500800000,
+      "tag": "0040_reports_admin_hub",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1751587200000,
+      "tag": "0041_ai_moderation",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1751673600000,
+      "tag": "0042_integrity_app",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1751760000000,
+      "tag": "0043_integrity_auto_resolved",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1751846400000,
+      "tag": "0044_digest_read_state",
+      "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1751932800000,
+      "tag": "0045_admin_prefs",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1752019200000,
+      "tag": "0046_ota_releases_eas_update_id_unique",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1752105600000,
+      "tag": "0047_rename_unique_constraints_to_drizzle_naming",
+      "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1752192000000,
+      "tag": "0048_maps_telemetry_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1752278400000,
+      "tag": "0049_ai_assistant",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1752364800000,
       "tag": "0050_fix_spatial_ref_sys_pk",
       "breakpoints": true
     }
