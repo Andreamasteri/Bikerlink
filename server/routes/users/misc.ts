@@ -157,4 +157,54 @@ router.get("/:id/time-profile", requireAuth, async (req: Request, res: Response)
   }
 });
 
+/**
+ * GET /api/users/me/tags
+ * Restituisce i tag associati all'utente corrente (entityType="user"),
+ * raggruppati per categoria. Usato dalla schermata profilo per pre-selezionare
+ * i tag scelti in precedenza.
+ */
+router.get("/me/tags", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const tags = await storage.getTagsForEntity("user", userId);
+    return res.json({ tags });
+  } catch (error) {
+    console.error("Get user tags error:", error);
+    return sendError(res, 500, "Errore lettura tag utente");
+  }
+});
+
+/**
+ * PUT /api/users/me/tags
+ * Body: { categorySlug: string, tagIds: string[] }
+ * Sostituisce in modo atomico i tag dell'utente per la categoria indicata.
+ * Tag di altre categorie restano invariati.
+ */
+router.put("/me/tags", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const body = req.body as { categorySlug?: unknown; tagIds?: unknown };
+    const categorySlug = typeof body?.categorySlug === "string" ? body.categorySlug : "";
+    const tagIds = Array.isArray(body?.tagIds)
+      ? body.tagIds.filter((v): v is string => typeof v === "string")
+      : null;
+    if (!categorySlug) {
+      return sendError(res, 400, "categorySlug mancante");
+    }
+    if (tagIds === null) {
+      return sendError(res, 400, "tagIds deve essere un array di stringhe");
+    }
+    await storage.setTagsForEntity("user", userId, tagIds, { categorySlug });
+    const tags = await storage.getTagsForEntity("user", userId);
+    return res.json({ tags });
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    if (/Tag inesistenti|non appartenenti|Categoria non trovata/i.test(msg)) {
+      return sendError(res, 400, msg);
+    }
+    console.error("Set user tags error:", error);
+    return sendError(res, 500, "Errore aggiornamento tag utente");
+  }
+});
+
 export default router;

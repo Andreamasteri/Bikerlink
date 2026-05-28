@@ -30,6 +30,7 @@ import { EditMoto } from "@/components/profile/edit/EditMoto";
 import { EditLocation } from "@/components/profile/edit/EditLocation";
 import { EditPreferences } from "@/components/profile/edit/EditPreferences";
 import { EditAssistantPrefs } from "@/components/profile/edit/EditAssistantPrefs";
+import { EditTags } from "@/components/profile/edit/EditTags";
 
 interface ProfileData {
   id: string;
@@ -416,6 +417,8 @@ export default function EditProfileScreen() {
           handleDeleteAccount={handleDeleteAccount}
           setShowRevokeConsentModal={setShowRevokeConsentModal}
         />
+
+        <EditTags />
 
         <EditAssistantPrefs />
 
