@@ -65,7 +65,9 @@ export function AdToolbar({
   onRefresh, 
   onDeleteAll, 
   isDeletingAll, 
-  onOpenSettings 
+  onOpenSettings,
+  onSelfCheck,
+  isSelfChecking,
 }: { 
   campaignCount: number; 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- cache stats from API
@@ -77,11 +79,28 @@ export function AdToolbar({
   onDeleteAll: () => void; 
   isDeletingAll: boolean; 
   onOpenSettings: () => void; 
+  onSelfCheck?: () => void;
+  isSelfChecking?: boolean;
 }) {
   return (
     <View style={styles.toolbar}>
       <AdStats count={campaignCount} cacheStats={cacheStats} />
       <View style={styles.toolbarActions}>
+        {onSelfCheck && (
+          <TouchableOpacity
+            onPress={onSelfCheck}
+            disabled={!!isSelfChecking}
+            style={styles.toolbarBtn}
+            testID="btn-self-check-ai"
+            accessibilityLabel="Verifica con AI"
+          >
+            {isSelfChecking ? (
+              <ActivityIndicator size="small" color={Colors.accent} />
+            ) : (
+              <MaterialCommunityIcons name="robot-outline" size={22} color={Colors.accent} />
+            )}
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           onPress={onRestartAll}
           disabled={isRestartingAll || activeCampaignCount === 0}

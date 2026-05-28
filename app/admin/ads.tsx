@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -7,12 +7,39 @@ import {
   TouchableOpacity,
   Modal,
   Platform,
+  ScrollView,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native";
-import { MaterialIcons } from "@expo/vector-icons";
+import { MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { queryClient } from "@/lib/query-client";
+import { queryClient, apiRequest } from "@/lib/query-client";
+
+interface SelfCheckEntry { name: string; status: "ok" | "warn" | "error"; durationMs: number; message?: string }
+interface SelfCheckResult {
+  overall: "ok" | "degraded" | "broken";
+  checks: SelfCheckEntry[];
+  summary: string;
+  suggestedFix: string | null;
+  generatedAt: string;
+  durationMs: number;
+  triggeredBy: "manual" | "scheduler" | "startup";
+  aiBrief?: string;
+  aiMeta?: { provider: string; model: string };
+}
+
+function overallColor(overall: SelfCheckResult["overall"]): string {
+  if (overall === "ok") return Colors.success;
+  if (overall === "degraded") return Colors.warning;
+  return Colors.error;
+}
+
+function overallLabel(overall: SelfCheckResult["overall"]): string {
+  if (overall === "ok") return "OK";
+  if (overall === "degraded") return "DEGRADED";
+  return "BROKEN";
+}
 
 import { AdForm } from "@/components/admin/ads/AdForm";
 import { AdGroupList } from "@/components/admin/ads/AdGroupList";
@@ -96,6 +123,58 @@ function AdminAdsInner() {
 
   const currentTab = TABS.find((t) => t.key === activeTab)!;
 
+  const [selfCheckResult, setSelfCheckResult] = useState<SelfCheckResult | null>(null);
+  const [showSelfCheckModal, setShowSelfCheckModal] = useState(false);
+  const [lastFetched, setLastFetched] = useState(false);
+  const selfCheckMutation = useMutation<SelfCheckResult>({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/advertisements/self-check", { withAi: true });
+      return (await res.json()) as SelfCheckResult;
+    },
+    onSuccess: (data) => {
+      setSelfCheckResult(data);
+      setShowSelfCheckModal(true);
+    },
+    onError: (err: Error) => {
+      setSelfCheckResult({
+        overall: "broken",
+        checks: [{ name: "richiesta", status: "error", durationMs: 0, message: err?.message ?? "errore di rete" }],
+        summary: `Impossibile contattare il self-check: ${err?.message ?? "errore di rete"}.`,
+        suggestedFix: "Verifica che il backend sia attivo e raggiungibile.",
+        generatedAt: new Date().toISOString(),
+        durationMs: 0,
+        triggeredBy: "manual",
+      });
+      setShowSelfCheckModal(true);
+    },
+  });
+
+  // Task #2694 — quando si apre il modal, mostra subito l'ultimo report del
+  // watchdog (se presente) senza forzare un rerun. L'utente può poi cliccare
+  // "Riesegui" per un check immediato.
+  const openSelfCheckModal = async () => {
+    setShowSelfCheckModal(true);
+    setLastFetched(true);
+    try {
+      const res = await apiRequest("GET", "/api/admin/advertisements/self-check/last");
+      const data = (await res.json()) as { result: SelfCheckResult | null };
+      if (data.result) setSelfCheckResult(data.result);
+    } catch {/* best-effort */}
+  };
+  useEffect(() => {
+    // Pre-warm: prova a leggere lo storage al mount, senza aprire il modal.
+    if (lastFetched) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await apiRequest("GET", "/api/admin/advertisements/self-check/last");
+        const data = (await res.json()) as { result: SelfCheckResult | null };
+        if (!cancelled && data.result) setSelfCheckResult(data.result);
+      } catch {/* ignore */}
+    })();
+    return () => { cancelled = true; };
+  }, [lastFetched]);
+
   return (
     <View style={styles.container}>
       <AdTabs tabs={TABS} activeTab={activeTab} onTabPress={setActiveTab} />
@@ -135,7 +214,88 @@ function AdminAdsInner() {
         onDeleteAll={handleDeleteAll}
         isDeletingAll={bulkDeleteMutation.isPending}
         onOpenSettings={openRotationSettings}
+        onSelfCheck={() => { void openSelfCheckModal(); }}
+        isSelfChecking={selfCheckMutation.isPending}
       />
+
+      <Modal
+        visible={showSelfCheckModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setShowSelfCheckModal(false)}
+      >
+        <View style={styles.scModalBackdrop}>
+          <View style={styles.scModalCard}>
+            <View style={styles.scModalHeader}>
+              <MaterialCommunityIcons
+                name="robot-outline"
+                size={20}
+                color={selfCheckResult ? overallColor(selfCheckResult.overall) : Colors.textSecondary}
+              />
+              <Text style={styles.scModalTitle}>Verifica con AI — Campagne</Text>
+              <TouchableOpacity onPress={() => setShowSelfCheckModal(false)}>
+                <MaterialIcons name="close" size={22} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.scModalBody}>
+              {selfCheckResult ? (
+                <>
+                  <Text style={styles.scStatusLine}>
+                    Esito: <Text style={{ fontFamily: "Inter_700Bold", color: overallColor(selfCheckResult.overall) }}>{overallLabel(selfCheckResult.overall)}</Text>
+                    {" "}({selfCheckResult.durationMs}ms · trigger={selfCheckResult.triggeredBy})
+                  </Text>
+                  <Text style={styles.scSummary}>{selfCheckResult.summary}</Text>
+                  {selfCheckResult.suggestedFix ? (
+                    <View style={styles.scFixBox}>
+                      <Text style={styles.scFixLabel}>Suggerimento:</Text>
+                      <Text style={styles.scFixText}>{selfCheckResult.suggestedFix}</Text>
+                    </View>
+                  ) : null}
+                  {selfCheckResult.aiBrief ? (
+                    <View style={styles.scAiBriefBox}>
+                      <Text style={styles.scAiBriefLabel}>Report AI{selfCheckResult.aiMeta ? ` · ${selfCheckResult.aiMeta.provider}` : ""}</Text>
+                      <Text style={styles.scAiBriefText}>{selfCheckResult.aiBrief}</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.scNoAi}>Report AI non disponibile (provider non configurato).</Text>
+                  )}
+                  <Text style={styles.scStepsLabel}>Passi ({selfCheckResult.checks.length}):</Text>
+                  {selfCheckResult.checks.map((s, idx) => (
+                    <View key={idx} style={styles.scStepRow}>
+                      <MaterialIcons
+                        name={s.status === "ok" ? "check-circle" : s.status === "warn" ? "warning" : "error"}
+                        size={16}
+                        color={s.status === "ok" ? Colors.success : s.status === "warn" ? Colors.warning : Colors.error}
+                      />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.scStepName}>{s.name} <Text style={styles.scStepDur}>({s.durationMs}ms)</Text></Text>
+                        {s.message ? <Text style={styles.scStepMsg}>{s.message}</Text> : null}
+                      </View>
+                    </View>
+                  ))}
+                </>
+              ) : (
+                <Text style={styles.scNoAi}>Nessun risultato.</Text>
+              )}
+            </ScrollView>
+            <View style={styles.scModalFooter}>
+              <TouchableOpacity
+                onPress={() => selfCheckMutation.mutate()}
+                disabled={selfCheckMutation.isPending}
+                style={[styles.scFooterBtn, { backgroundColor: Colors.accent }]}
+              >
+                <Text style={styles.scFooterBtnText}>{selfCheckMutation.isPending ? "Verifica..." : "Riesegui"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowSelfCheckModal(false)}
+                style={[styles.scFooterBtn, { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }]}
+              >
+                <Text style={[styles.scFooterBtnText, { color: Colors.text }]}>Chiudi</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <AdGroupList
         listItems={listItems}
@@ -287,6 +447,74 @@ export default function AdminAds() {
 }
 
 const styles = StyleSheet.create({
+  scModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+  },
+  scModalCard: {
+    width: "100%",
+    maxWidth: 520,
+    maxHeight: "85%",
+    backgroundColor: Colors.background,
+    borderRadius: 14,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  scModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  scModalTitle: {
+    flex: 1,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: Colors.text,
+  },
+  scModalBody: { paddingHorizontal: 14, paddingVertical: 12 },
+  scStatusLine: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, marginBottom: 8 },
+  scSummary: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.text, marginBottom: 10, lineHeight: 18 },
+  scFixBox: { backgroundColor: Colors.surface, borderLeftWidth: 3, borderLeftColor: Colors.warning, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 6, marginBottom: 10 },
+  scFixLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.warning, marginBottom: 4, textTransform: "uppercase" },
+  scFixText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.text, lineHeight: 18 },
+  scAiBriefBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.accent,
+  },
+  scAiBriefLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11, color: Colors.textSecondary, marginBottom: 4, textTransform: "uppercase" },
+  scAiBriefText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.text, lineHeight: 18 },
+  scNoAi: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, fontStyle: "italic", marginBottom: 12 },
+  scStepsLabel: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textSecondary, marginBottom: 6, marginTop: 4, textTransform: "uppercase" },
+  scStepRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 6 },
+  scStepName: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text },
+  scStepDur: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
+  scStepMsg: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.error, marginTop: 2 },
+  scModalFooter: {
+    flexDirection: "row",
+    gap: 8,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  scFooterBtn: {
+    flex: 1,
+    paddingVertical: 11,
+    borderRadius: 10,
+    alignItems: "center",
+  },
+  scFooterBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
   container: { flex: 1, backgroundColor: Colors.background },
   errorBanner: {
     flexDirection: "row",

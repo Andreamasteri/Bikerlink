@@ -342,6 +342,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI Watchdog scheduler failed (non-fatal):", e);
     }
 
+    // Task #2694 — Campagne pubblicitarie self-check scheduler (ogni 6h).
+    try {
+      const { startCampaignsSelfCheckScheduler } = await import("./ai/watchdog/campaigns-self-check");
+      startCampaignsSelfCheckScheduler();
+      console.log("[INIT] Campagne self-check scheduler started");
+    } catch (e) {
+      console.warn("[INIT] Campagne self-check scheduler failed (non-fatal):", e);
+    }
+
     // Task #2649 — AI Coordinator retention cleanup (04:30 nightly).
     try {
       const { startCoordinatorCleanupScheduler } = await import("./ai/coordinator/cleanup");

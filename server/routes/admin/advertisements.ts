@@ -7,7 +7,7 @@ import { eq, inArray } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { uploadBuffer } from "../../objectStorage";
+import { uploadBuffer, deleteObject } from "../../objectStorage";
 import { cacheAdImage } from "../ads";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import crypto from "crypto";
@@ -28,6 +28,18 @@ function paramStr(v: string | string[] | undefined): string | null {
   return typeof v === "string" ? v : null;
 }
 
+// Task #2694 — best-effort audit log: il watchdog interno chiama queste route
+// con un pseudo-userId ("__watchdog__") che non esiste in DB, e l'insert con
+// FK violation farebbe 500. Per le chiamate reali admin l'errore resta loggato.
+async function safeModLog(entry: Parameters<typeof storage.createModeratorLog>[0]): Promise<void> {
+  try {
+    if (!entry.moderatorId || entry.moderatorId === "__watchdog__") return;
+    await storage.createModeratorLog(entry);
+  } catch (err) {
+    console.warn("[ads/mod-log] insert failed (non-fatal):", err);
+  }
+}
+
 async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string, mimetype: string): Promise<string> {
   const filename = `ad-${Date.now()}-${originalname}`;
   const objectPath = `public/ads/${filename}`;
@@ -35,8 +47,34 @@ async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string
   return `/api/ads/images/${filename}`;
 }
 
-async function deleteAdImageIfUnreferenced(_filename: string, _excludeIds: string[]): Promise<void> {
-  // Logic from admin.ts would go here
+async function deleteAdImageIfUnreferenced(filename: string, excludeIds: string[]): Promise<void> {
+  try {
+    // Check DB: any campaign (excluding the ones being deleted/updated) still
+    // referencing this filename? If yes, keep both the object and the local cache.
+    const all = await storage.getAllCampaigns();
+    const referenced = all.some((c) => {
+      if (excludeIds.includes(c.id)) return false;
+      if (!c.imageUrl) return false;
+      const m = c.imageUrl.match(/\/api\/ads\/images\/([^?#]+)/);
+      return m?.[1] === filename;
+    });
+    if (referenced) return;
+    // Remove local cache (uploads/ads/<file>)
+    try {
+      const localPath = path.join(adsDir, filename);
+      if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
+    } catch (e) {
+      console.warn(`[ads/cleanup] local unlink failed for ${filename}:`, e);
+    }
+    // Remove object storage copy
+    try {
+      await deleteObject(`public/ads/${filename}`);
+    } catch (e) {
+      console.warn(`[ads/cleanup] object delete failed for ${filename}:`, e);
+    }
+  } catch (e) {
+    console.warn(`[ads/cleanup] non-fatal error for ${filename}:`, e);
+  }
 }
 
 router.get("/", async (_req: Request, res: Response) => {
@@ -54,48 +92,84 @@ router.post("/bulk", adUpload.array("images", 10), async (req: Request, res: Res
     const parsedAb = adsBulkSchema.safeParse(req.body);
     if (!parsedAb.success) return sendError(res, 400, parsedAb.error.issues[0].message);
     const adBulkData = parsedAb.data as Record<string, string | undefined>;
-    const { name, sponsor, linkUrl, targetUserType, rotationDuration, rotationMode, sortOrder, startDate, endDate, placement } = adBulkData;
+    const {
+      baseName, sponsor, linkUrl, targetUserType,
+      displayDuration, rotationDuration, rotationMode,
+      sortOrder, startDate, endDate, placement,
+      groupId: providedGroupId, startIndex, totalImages,
+    } = adBulkData;
 
     const files = (req.files as Express.Multer.File[]) || [];
-    const groupId = crypto.randomUUID();
     const campaigns = [];
+    const failedFiles: string[] = [];
+    const groupId = (providedGroupId && providedGroupId.trim()) || crypto.randomUUID();
+    const base = (baseName ?? "").trim();
+    if (!base) return sendError(res, 400, "baseName obbligatorio");
+    const startIdx = startIndex ? parseInt(startIndex) : 0;
+    const total = totalImages ? parseInt(totalImages) : files.length;
+    const duration = (displayDuration ?? rotationDuration) ? parseInt(String(displayDuration ?? rotationDuration)) : 10;
+    const normalizedTarget = normalizeTargetUserType(targetUserType);
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const imageUrl = await uploadAdImageToObjectStorage(file.buffer, file.originalname, file.mimetype);
-      const campaign = await storage.createAdCampaign({
-        name: files.length === 1 ? (name ?? "").trim() : `${(name ?? "").trim()} #${i + 1}`,
-        sponsor: sponsor || "Syneco Lubrificanti",
-        imageUrl,
-        linkUrl: linkUrl || null,
-        displayMode: "banner",
-        targetUserType: targetUserType || "biker",
-        rotationDuration: rotationDuration ? parseInt(rotationDuration) : 10,
-        rotationMode: rotationMode || "sequential",
-        sortOrder: (sortOrder ? parseInt(sortOrder) : 0) + i,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate: endDate ? new Date(endDate) : null,
-        placement: placement || "all",
-        groupId,
-      });
-      campaigns.push(campaign);
-      cacheAdImage(campaign.imageUrl).catch(() => {});
+      const globalIndex = startIdx + i;
+      try {
+        const imageUrl = await uploadAdImageToObjectStorage(file.buffer, file.originalname, file.mimetype);
+        const campaign = await storage.createAdCampaign({
+          name: total === 1 ? base : `${base} #${globalIndex + 1}`,
+          sponsor: sponsor || "Syneco Lubrificanti",
+          imageUrl,
+          linkUrl: linkUrl || null,
+          displayMode: "banner",
+          targetUserType: normalizedTarget,
+          rotationDuration: duration,
+          rotationMode: rotationMode || "sequential",
+          sortOrder: (sortOrder ? parseInt(sortOrder) : 0) + globalIndex,
+          startDate: startDate ? new Date(startDate) : null,
+          endDate: endDate ? new Date(endDate) : null,
+          placement: placement || "all",
+          groupId,
+        });
+        campaigns.push(campaign);
+        cacheAdImage(campaign.imageUrl).catch(() => {});
+      } catch (e) {
+        console.warn(`[ads/bulk] file ${file.originalname} failed:`, e);
+        failedFiles.push(file.originalname);
+      }
     }
 
-    await storage.createModeratorLog({
+    await safeModLog({
       moderatorId: req.session.userId!,
       action: "bulk_create_advertisements",
       targetType: "campaign",
       targetId: groupId,
-      details: `Create ${campaigns.length} campagne in blocco: ${name}`,
+      details: `Create ${campaigns.length} campagne in blocco: ${base}`,
     });
 
-    return res.status(201).json(campaigns);
+    return res.status(201).json({
+      created: campaigns.length,
+      failed: failedFiles.length,
+      campaigns: campaigns.map((c) => ({ id: c.id, name: c.name, imageUrl: c.imageUrl, isActive: c.isActive })),
+      failedFiles,
+    });
   } catch (error) {
     console.error("Admin bulk advertisement error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
+
+/**
+ * Normalize the UI's `targetUserType` ↔ storage contract.
+ * UI uses `"tutti"` for the catch-all tab; `getActiveAdsByUserType` filters on
+ * `eq(targetUserType, "tutti")`. The strict enum in shared/db/ads.ts uses
+ * `"all"` — accept it for backward compat but persist `"tutti"`.
+ */
+function normalizeTargetUserType(input?: string | null): string {
+  const v = (input ?? "").trim();
+  if (!v) return "biker";
+  if (v === "all" || v === "tutti") return "tutti";
+  return v;
+}
 
 router.post("/", adUpload.single("image"), async (req: Request, res: Response) => {
   try {
@@ -111,6 +185,10 @@ router.post("/", adUpload.single("image"), async (req: Request, res: Response) =
       }
       imageUrl = req.body.imageUrl;
     }
+    // Optional groupId from body: allinea il single-create al bulk (che assegna
+     // sempre un groupId) e permette al self-check di esercitare /group/:groupId.
+    const groupIdFromBody = typeof req.body.groupId === "string" && req.body.groupId.trim().length > 0
+      ? req.body.groupId.trim() : undefined;
     const campaign = await storage.createAdCampaign({
       name,
       sponsor: sponsor || "Syneco Lubrificanti",
@@ -118,15 +196,16 @@ router.post("/", adUpload.single("image"), async (req: Request, res: Response) =
       linkUrl: linkUrl || null,
       displayMode: "banner",
       description: description || null,
-      targetUserType: targetUserType || "biker",
+      targetUserType: normalizeTargetUserType(targetUserType),
       rotationDuration: rotationDuration ? parseInt(String(rotationDuration)) : 10,
       rotationMode: rotationMode || "sequential",
       sortOrder: sortOrder ? parseInt(String(sortOrder)) : 0,
+      ...(groupIdFromBody ? { groupId: groupIdFromBody } : {}),
       startDate: startDate ? new Date(startDate) : null,
       endDate: endDate ? new Date(endDate) : null,
       placement: placement || "all",
     });
-    await storage.createModeratorLog({
+    await safeModLog({
       moderatorId: req.session.userId!,
       action: "create_advertisement",
       targetType: "campaign",
@@ -153,8 +232,11 @@ router.put("/:id", adUpload.single("image"), async (req: Request, res: Response)
     if (adBody.sponsor !== undefined) updates.sponsor = adBody.sponsor;
     if (adBody.linkUrl !== undefined) updates.linkUrl = adBody.linkUrl;
     if (adBody.description !== undefined) updates.description = adBody.description;
-    if (adBody.isActive !== undefined) updates.isActive = adBody.isActive === true || adBody.isActive === "true";
-    if (adBody.targetUserType !== undefined) updates.targetUserType = adBody.targetUserType;
+    if (adBody.isActive !== undefined) {
+      const v = adBody.isActive;
+      updates.isActive = v === true || v === "true";
+    }
+    if (adBody.targetUserType !== undefined) updates.targetUserType = normalizeTargetUserType(adBody.targetUserType);
     if (adBody.rotationDuration !== undefined) updates.rotationDuration = parseInt(String(adBody.rotationDuration));
     if (adBody.rotationMode !== undefined) updates.rotationMode = adBody.rotationMode;
     if (adBody.sortOrder !== undefined) updates.sortOrder = parseInt(String(adBody.sortOrder));
@@ -181,7 +263,7 @@ router.put("/:id", adUpload.single("image"), async (req: Request, res: Response)
     if (!campaign) {
       return sendError(res, 404, "Campagna non trovata");
     }
-    await storage.createModeratorLog({
+    await safeModLog({
       moderatorId: req.session.userId!,
       action: "update_advertisement",
       targetType: "campaign",
@@ -225,7 +307,7 @@ router.delete("/bulk-delete", async (req: Request, res: Response) => {
         }
       }
     }
-    await storage.createModeratorLog({
+    await safeModLog({
       moderatorId: req.session.userId!,
       action: "bulk_delete_advertisements",
       targetType: "campaign",
@@ -245,8 +327,11 @@ router.put("/group/:groupId", async (req: Request, res: Response) => {
     const parsedGu = adsGroupUpdateSchema.safeParse(req.body);
     if (!parsedGu.success) return sendError(res, 400, parsedGu.error.issues[0].message);
     const { name, linkUrl, isActive } = parsedGu.data;
-    if (!name?.trim()) {
-      return sendError(res, 400, "Nome base obbligatorio");
+    const hasName = typeof name === "string" && name.trim().length > 0;
+    const hasLink = linkUrl !== undefined;
+    const hasActive = typeof isActive === "boolean";
+    if (!hasName && !hasLink && !hasActive) {
+      return sendError(res, 400, "Almeno un campo (name, linkUrl, isActive) è obbligatorio");
     }
     const existing = await db.select().from(adCampaignsTable).where(eq(adCampaignsTable.groupId, groupId));
     if (existing.length === 0) {
@@ -259,22 +344,33 @@ router.put("/group/:groupId", async (req: Request, res: Response) => {
     });
     const updated = [];
     for (let i = 0; i < sorted.length; i++) {
-      const newName = sorted.length === 1 ? name.trim() : `${name.trim()} #${i + 1}`;
-      const updatePayload: Record<string, unknown> = { name: newName, linkUrl: linkUrl?.trim() || null };
-      if (typeof isActive === "boolean") updatePayload.isActive = isActive;
+      const updatePayload: Record<string, unknown> = {};
+      if (hasName) {
+        const trimmed = name!.trim();
+        updatePayload.name = sorted.length === 1 ? trimmed : `${trimmed} #${i + 1}`;
+      }
+      if (hasLink) updatePayload.linkUrl = linkUrl?.trim() || null;
+      if (hasActive) updatePayload.isActive = isActive;
+      if (Object.keys(updatePayload).length === 0) {
+        updated.push(sorted[i]);
+        continue;
+      }
       const [upd] = await db.update(adCampaignsTable)
         .set(updatePayload)
         .where(eq(adCampaignsTable.id, sorted[i].id))
         .returning();
       updated.push(upd);
     }
-    const activeLabel = typeof isActive === "boolean" ? `, isActive=${isActive}` : "";
-    await storage.createModeratorLog({
+    const parts: string[] = [];
+    if (hasName) parts.push(`name=${name!.trim()}`);
+    if (hasActive) parts.push(`isActive=${isActive}`);
+    if (hasLink) parts.push(`linkUrl=${linkUrl ?? "null"}`);
+    await safeModLog({
       moderatorId: req.session.userId!,
       action: "update_advertisement_group",
       targetType: "campaign",
       targetId: groupId,
-      details: `Gruppo aggiornato: ${name.trim()} (${updated.length} campagne${activeLabel})`,
+      details: `Gruppo aggiornato (${updated.length} campagne): ${parts.join(", ")}`,
     });
     return res.json(updated);
   } catch (error) {
@@ -298,7 +394,7 @@ router.delete("/:id", async (req: Request, res: Response) => {
         }
       }
     }
-    await storage.createModeratorLog({
+    await safeModLog({
       moderatorId: req.session.userId!,
       action: "delete_advertisement",
       targetType: "campaign",
@@ -308,6 +404,35 @@ router.delete("/:id", async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Admin delete advertisement error:", error);
     return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+// Task #2694 — Self-check del flusso campagne (probe + AI report).
+router.post("/self-check", async (req: Request, res: Response) => {
+  try {
+    const { runCampaignsSelfCheck } = await import("../../ai/watchdog/campaigns-self-check");
+    const withAi = req.body?.withAi !== false;
+    const result = await runCampaignsSelfCheck({ triggeredBy: "manual", withAi });
+    await safeModLog({
+      moderatorId: req.session.userId!,
+      action: "campaigns_self_check",
+      targetType: "system",
+      targetId: "campaigns",
+      details: `Self-check: ${result.overall} (${result.checks.length} passi, ${result.durationMs}ms)`,
+    });
+    return res.json(result);
+  } catch (error) {
+    console.error("Self-check campagne error:", error);
+    return sendError(res, 500, (error as Error)?.message ?? "Errore self-check");
+  }
+});
+
+router.get("/self-check/last", async (_req: Request, res: Response) => {
+  try {
+    const { getLastSelfCheck } = await import("../../ai/watchdog/campaigns-self-check");
+    return res.json({ result: getLastSelfCheck() });
+  } catch (error) {
+    return sendError(res, 500, (error as Error)?.message ?? "Errore lettura self-check");
   }
 });
 

@@ -149,6 +149,22 @@ function _requireAdmin(req: Request, res: Response, next: Function) {
   const path = req.originalUrl || req.url;
   // Ultimi 6 char del sessionId per la diagnostica (no PII, no leak completo).
   const sid = req.sessionID ? `…${req.sessionID.slice(-6)}` : "none";
+  // Task #2694 — bypass per il self-check watchdog interno (solo loopback +
+  // token in-memory generato a runtime). Necessario per probare l'API reale
+  // senza una sessione admin live.
+  try {
+    const mod = require("../ai/watchdog/internal-token") as typeof import("../ai/watchdog/internal-token");
+    const hdr = req.headers[mod.getInternalProbeHeaderName()];
+    const tokenHeader = Array.isArray(hdr) ? hdr[0] : hdr;
+    if (tokenHeader && tokenHeader === mod.getInternalProbeToken() && mod.isLoopback(req.ip)) {
+      (req as Request & { currentUser?: unknown }).currentUser = {
+        id: "__watchdog__", role: "admin", status: "active",
+      };
+      // Niente DB lookup: il middleware globale di gating non si applica al
+      // pseudo-utente, e nessuna scrittura attribuita a un user reale.
+      return next();
+    }
+  } catch {/* token module non disponibile: ignora bypass */}
   if (!req.session.userId) {
     console.warn(`[admin-auth] 401 reason=no-session path=${path} sid=${sid}`);
     return sendError(res, 401, "Sessione scaduta. Effettua di nuovo l'accesso.");
