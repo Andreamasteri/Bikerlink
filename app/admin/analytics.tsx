@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Modal } from "react-native";
+import { View, Text, ScrollView, TouchableOpacity, Alert, Linking, Modal } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { MaterialIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
