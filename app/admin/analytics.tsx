@@ -150,6 +150,21 @@ export default function AdminAnalytics() {
     conversionRate: number;
     skipRate: number;
     avgTagCount: number;
+    funnel?: {
+      started: number;
+      carouselCompleted: number;
+      carouselCompletedFinish: number;
+      carouselCompletedSkip: number;
+      tagsShown: number;
+      tagsSaved: number;
+      tagsSkipped: number;
+      dropOff: {
+        startedToCarousel: number;
+        carouselToTagsShown: number;
+        tagsShownToSaved: number;
+        startedToSaved: number;
+      };
+    };
   }>({
     queryKey: ["/api/admin/analytics/onboarding-tags"],
   });
@@ -310,6 +325,67 @@ export default function AdminAnalytics() {
           </View>
 
           <View style={styles.onboardingBlock}>
+            <Text style={styles.onboardingTitle}>Onboarding — Funnel completo</Text>
+            {onboardingTagsQuery.isLoading ? (
+              <Text style={styles.loadingText}>Caricamento...</Text>
+            ) : (
+              (() => {
+                const f = onboardingTagsQuery.data?.funnel;
+                const started = f?.started ?? 0;
+                const carouselCompleted = f?.carouselCompleted ?? 0;
+                const tagsShown = f?.tagsShown ?? 0;
+                const tagsSaved = f?.tagsSaved ?? 0;
+                const finishN = f?.carouselCompletedFinish ?? 0;
+                const skipN = f?.carouselCompletedSkip ?? 0;
+                const d = f?.dropOff;
+                return (
+                  <View style={styles.onboardingRows}>
+                    <View style={styles.onboardingRow}>
+                      <Text style={styles.onboardingLabel}>1. Onboarding avviato</Text>
+                      <Text style={styles.onboardingValue}>{started}</Text>
+                    </View>
+                    <View style={styles.onboardingRow}>
+                      <Text style={styles.onboardingLabel}>↓ → 2. Carousel completato</Text>
+                      <Text style={styles.onboardingValue}>
+                        {carouselCompleted}{" "}
+                        <Text style={styles.funnelPct}>({(d?.startedToCarousel ?? 0).toFixed(1)}%)</Text>
+                      </Text>
+                    </View>
+                    <View style={[styles.onboardingRow, styles.onboardingSubRow]}>
+                      <Text style={styles.onboardingSubLabel}>   • Finiti (Continua)</Text>
+                      <Text style={styles.onboardingSubValue}>{finishN}</Text>
+                    </View>
+                    <View style={[styles.onboardingRow, styles.onboardingSubRow]}>
+                      <Text style={styles.onboardingSubLabel}>   • Skip</Text>
+                      <Text style={styles.onboardingSubValue}>{skipN}</Text>
+                    </View>
+                    <View style={styles.onboardingRow}>
+                      <Text style={styles.onboardingLabel}>↓ → 3. Tag mostrati</Text>
+                      <Text style={styles.onboardingValue}>
+                        {tagsShown}{" "}
+                        <Text style={styles.funnelPct}>({(d?.carouselToTagsShown ?? 0).toFixed(1)}%)</Text>
+                      </Text>
+                    </View>
+                    <View style={styles.onboardingRow}>
+                      <Text style={styles.onboardingLabel}>↓ → 4. Tag salvati</Text>
+                      <Text style={[styles.onboardingValue, { color: Colors.success }]}>
+                        {tagsSaved}{" "}
+                        <Text style={styles.funnelPct}>({(d?.tagsShownToSaved ?? 0).toFixed(1)}%)</Text>
+                      </Text>
+                    </View>
+                    <View style={styles.onboardingRow}>
+                      <Text style={styles.onboardingLabel}>Conversione totale (start → saved)</Text>
+                      <Text style={[styles.onboardingValue, { color: Colors.accent }]}>
+                        {(d?.startedToSaved ?? 0).toFixed(1)}%
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })()
+            )}
+          </View>
+
+          <View style={styles.onboardingBlock}>
             <Text style={styles.onboardingTitle}>Onboarding — Step Tag</Text>
             {onboardingTagsQuery.isLoading ? (
               <Text style={styles.loadingText}>Caricamento...</Text>
@@ -444,5 +520,24 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 14,
     color: Colors.text,
+  },
+  onboardingSubRow: {
+    borderBottomWidth: 0,
+    paddingVertical: 2,
+  },
+  onboardingSubLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  onboardingSubValue: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  funnelPct: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
 });

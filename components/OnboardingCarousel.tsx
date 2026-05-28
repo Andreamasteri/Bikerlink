@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
+import { trackEvent } from "@/lib/analytics";
 
 const ONBOARDING_BASE = `${getApiUrl()}/api/assets/onboarding/`;
 
@@ -250,6 +251,10 @@ export default function OnboardingCarousel({ onComplete, onSkip }: Props) {
   const [activeIndex, setActiveIndex] = useState(0);
   const total = ONBOARDING_SLIDES.length;
 
+  useEffect(() => {
+    trackEvent("onboarding_started", { totalSlides: total });
+  }, [total]);
+
   const topPad = insets.top;
   const bottomPad = insets.bottom;
 
@@ -262,11 +267,25 @@ export default function OnboardingCarousel({ onComplete, onSkip }: Props) {
 
   const handleNext = useCallback(() => {
     if (isLast) {
+      trackEvent("onboarding_carousel_completed", {
+        action: "complete",
+        reachedIndex: activeIndex,
+        totalSlides: total,
+      });
       onComplete();
     } else {
       scrollToIndex(activeIndex + 1);
     }
-  }, [isLast, activeIndex, onComplete, scrollToIndex]);
+  }, [isLast, activeIndex, total, onComplete, scrollToIndex]);
+
+  const handleSkip = useCallback(() => {
+    trackEvent("onboarding_carousel_completed", {
+      action: "skip",
+      reachedIndex: activeIndex,
+      totalSlides: total,
+    });
+    onSkip();
+  }, [activeIndex, total, onSkip]);
 
   const handleBack = useCallback(() => {
     if (!isFirst) {
@@ -341,7 +360,7 @@ export default function OnboardingCarousel({ onComplete, onSkip }: Props) {
           </Text>
         </View>
 
-        <Pressable style={styles.headerBtn} onPress={onSkip} hitSlop={12}>
+        <Pressable style={styles.headerBtn} onPress={handleSkip} hitSlop={12}>
           <Text style={styles.skipText}>Salta</Text>
         </Pressable>
       </View>

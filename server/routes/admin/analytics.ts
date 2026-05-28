@@ -210,21 +210,47 @@ router.get("/onboarding-tags", async (_req: Request, res: Response) => {
       .where(
         and(
           eq(abEvents.experimentKey, "analytics"),
-          sql`${abEvents.eventName} IN ('onboarding_tags_shown','onboarding_tags_saved','onboarding_tags_skipped')`
+          sql`${abEvents.eventName} IN (
+            'onboarding_started',
+            'onboarding_carousel_completed',
+            'onboarding_tags_shown',
+            'onboarding_tags_saved',
+            'onboarding_tags_skipped'
+          )`
         )
       )
       .groupBy(abEvents.eventName);
 
     const counts: Record<string, number> = {
+      onboarding_started: 0,
+      onboarding_carousel_completed: 0,
       onboarding_tags_shown: 0,
       onboarding_tags_saved: 0,
       onboarding_tags_skipped: 0,
     };
     for (const r of rows) counts[r.eventName] = r.n;
 
+    const started = counts.onboarding_started;
+    const carouselCompleted = counts.onboarding_carousel_completed;
     const shown = counts.onboarding_tags_shown;
     const saved = counts.onboarding_tags_saved;
     const skipped = counts.onboarding_tags_skipped;
+
+    const carouselActionRows = await db.execute(sql`
+      SELECT
+        COALESCE(payload->>'action', 'unknown') AS action,
+        COUNT(*)::int AS n
+      FROM ab_events
+      WHERE experiment_key = 'analytics'
+        AND event_name = 'onboarding_carousel_completed'
+      GROUP BY 1
+    `);
+    let carouselCompletedFinish = 0;
+    let carouselCompletedSkip = 0;
+    for (const row of carouselActionRows.rows as Array<{ action: string; n: number }>) {
+      if (row.action === "complete") carouselCompletedFinish = row.n;
+      else if (row.action === "skip") carouselCompletedSkip = row.n;
+    }
 
     const avgRow = await db.execute(sql`
       SELECT
@@ -239,8 +265,11 @@ router.get("/onboarding-tags", async (_req: Request, res: Response) => {
       ((avgRow.rows[0] as { avg_count: number } | undefined)?.avg_count ?? 0) * 10
     ) / 10;
 
-    const conversionRate = shown > 0 ? Math.round((saved / shown) * 1000) / 10 : 0;
-    const skipRate = shown > 0 ? Math.round((skipped / shown) * 1000) / 10 : 0;
+    const pct = (num: number, den: number) =>
+      den > 0 ? Math.round((num / den) * 1000) / 10 : 0;
+
+    const conversionRate = pct(saved, shown);
+    const skipRate = pct(skipped, shown);
 
     return res.json({
       shown,
@@ -249,6 +278,21 @@ router.get("/onboarding-tags", async (_req: Request, res: Response) => {
       conversionRate,
       skipRate,
       avgTagCount,
+      funnel: {
+        started,
+        carouselCompleted,
+        carouselCompletedFinish,
+        carouselCompletedSkip,
+        tagsShown: shown,
+        tagsSaved: saved,
+        tagsSkipped: skipped,
+        dropOff: {
+          startedToCarousel: pct(carouselCompleted, started),
+          carouselToTagsShown: pct(shown, carouselCompleted),
+          tagsShownToSaved: conversionRate,
+          startedToSaved: pct(saved, started),
+        },
+      },
     });
   } catch (err) {
     console.error("Admin onboarding-tags analytics error:", err);
