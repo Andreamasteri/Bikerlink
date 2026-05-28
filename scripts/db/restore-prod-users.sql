@@ -9,10 +9,17 @@
 DELETE FROM users WHERE is_fake = true AND email NOT LIKE '%@bikerlink.internal';
 DELETE FROM users WHERE email LIKE '%@bikerlink.test';
 
--- Step 2: rimuovi utenti dev non presenti in prod (user1@bikerlink.it)
+-- Step 2: azzera tutte le tabelle OTA (i record dev non devono stare in prod)
+DELETE FROM ota_watchdog_reports;
+DELETE FROM ota_assistant_runs;
+DELETE FROM ota_boot_events;
+DELETE FROM ota_events;
+DELETE FROM ota_releases;
+
+-- Step 3: rimuovi utenti dev non presenti in prod (user1@bikerlink.it)
 DELETE FROM users WHERE id = '5b6d4efa-ed3f-4384-b3b7-90213979a770';
 
--- Step 3: ripristina utenti reali di produzione
+-- Step 4: ripristina utenti reali di produzione
 INSERT INTO users (
   id, nickname, email, phone, password, user_type, sex, couple_sex_config, role, status,
   birth_year, region, avatar_url, eula_accepted, invitation_code, last_login_at,
