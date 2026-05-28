@@ -59,11 +59,11 @@ args = "typecheck-client"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "file-conflict-guard"
+args = "OTA Publish"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "OTA Publish"
+args = "Smoke Test"
 
 [[workflows.workflow]]
 name = "Start App"
@@ -157,23 +157,23 @@ task = "shell.exec"
 args = "bash scripts/typecheck-client.sh"
 
 [[workflows.workflow]]
-name = "file-conflict-guard"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsx scripts/check-file-conflicts.ts"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
 name = "OTA Publish"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "bash scripts/publish-ota-full.sh"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow]]
+name = "Smoke Test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npx tsx scripts/smoke/run-smoke.ts"
 
 [workflows.workflow.metadata]
 outputType = "console"
