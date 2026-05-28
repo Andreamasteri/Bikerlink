@@ -66,6 +66,23 @@ export function attachAdminNotificationsWS(server: HttpServer): void {
       console.warn("[NotifWS] watchdog wire skipped:", (err as Error).message);
     }
   })();
+
+  // Task #2657 — Bridge Coordinator → admin WS per tab "AI Layer".
+  (async () => {
+    try {
+      const { registerAiBroadcaster } = await import("../../ai/coordinator/ws-bridge");
+      registerAiBroadcaster((msg) => {
+        if (!wss || clients.size === 0) return;
+        const payload = JSON.stringify({ ...msg, at: new Date().toISOString() });
+        for (const c of clients) {
+          try { if (c.ws.readyState === WebSocket.OPEN) c.ws.send(payload); } catch { /* noop */ }
+        }
+      });
+      console.log("[NotifWS] AI Coordinator broadcast wired");
+    } catch (err) {
+      console.warn("[NotifWS] coordinator wire skipped:", (err as Error).message);
+    }
+  })();
 }
 
 export function broadcastAdminUrgent(payload: {

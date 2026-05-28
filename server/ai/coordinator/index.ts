@@ -54,6 +54,16 @@ export class AiCoordinator {
 
   async emit(input: AiEventInput): Promise<{ id: string; policy: ReturnType<typeof policyEvaluateEvent> }> {
     const parsed = AiEventInputSchema.parse(input);
+    // Task #2657 — coordinator-disabled resilience: caller non blocca mai.
+    if (process.env.COORDINATOR_DISABLED === "1") {
+      return { id: "", policy: { matched: false, ruleId: null, action: "ALLOW", message: "", rationale: "coordinator-disabled" } };
+    }
+    // Task #2657 — kill switch: emit ignorato se AI o layer in pausa.
+    // Bypass per `admin`: governance/audit deve sempre essere registrato e
+    // propagato via WS anche quando l'intero layer è in pausa.
+    if (parsed.aiName !== "admin" && await isAiPaused(parsed.aiName)) {
+      return { id: "", policy: { matched: false, ruleId: null, action: "ALLOW", message: "", rationale: "paused" } };
+    }
     const [row] = await db.insert(aiEvents).values({
       aiName: parsed.aiName,
       eventType: parsed.eventType,
@@ -232,6 +242,21 @@ export class AiCoordinator {
       resolvedAt: evalResult.matched ? new Date() : null,
     }).returning({ id: aiConflicts.id });
 
+    // Task #2657 — push conflict to admin WS bridge per realtime UI (<2s).
+    for (const fn of conflictListeners) {
+      try {
+        fn({
+          conflictId: row.id,
+          eventIdA: opts.eventIdA,
+          eventIdB: opts.eventIdB,
+          conflictType: opts.conflictType,
+          resolvedBy,
+          policyRuleId: evalResult.ruleId,
+          createdAt: new Date().toISOString(),
+        });
+      } catch { /* noop */ }
+    }
+
     return {
       conflictId: row.id,
       resolvedBy,
@@ -250,6 +275,8 @@ export class AiCoordinator {
       criticals: number;
       conflictsOpen: number;
       lastActivityAt: string | null;
+      lastEventType: string | null;
+      healthScore: number;
     }>;
     totals: { events: number; decisions: number; criticals: number; conflictsOpen: number };
     sinceHours: number;
@@ -276,20 +303,36 @@ export class AiCoordinator {
       total: sql<number>`count(*)::int`,
     }).from(aiConflicts).where(sql`${aiConflicts.resolvedAt} IS NULL`);
 
+    // Last event TYPE per AI nella finestra (Postgres DISTINCT ON via raw SQL).
+    const lastTypeRows = (await db.execute<{ ai_name: string; event_type: string }>(sql`
+      SELECT DISTINCT ON (ai_name) ai_name, event_type
+      FROM ai_events
+      WHERE created_at >= ${since}
+      ORDER BY ai_name, created_at DESC
+    `)).rows as Array<{ ai_name: string; event_type: string }>;
+
     const names = new Set<string>([...eventsRows.map((r) => r.aiName), ...decisionsRows.map((r) => r.aiName)]);
     const perAi = Array.from(names).map((name) => {
       const ev = eventsRows.find((r) => r.aiName === name);
       const dc = decisionsRows.find((r) => r.aiName === name);
+      const lt = lastTypeRows.find((r) => r.ai_name === name);
       const lastEv = ev?.lastAt ? new Date(ev.lastAt as unknown as string).getTime() : 0;
       const lastDc = dc?.lastAt ? new Date(dc.lastAt as unknown as string).getTime() : 0;
       const last = Math.max(lastEv, lastDc);
+      const criticals = ev?.criticals ?? 0;
+      // Health score 0-100: 100=ottimo, decresce con critici (-15) e silenzio (>1h −10).
+      const ageH = last > 0 ? (Date.now() - last) / 3_600_000 : sinceHours;
+      const silencePenalty = ageH > 1 ? Math.min(30, Math.round(ageH * 5)) : 0;
+      const healthScore = Math.max(0, Math.min(100, 100 - criticals * 15 - silencePenalty));
       return {
         aiName: name,
         events: ev?.total ?? 0,
         decisions: dc?.total ?? 0,
-        criticals: ev?.criticals ?? 0,
+        criticals,
         conflictsOpen: 0, // breakdown per-AI fuori scope #2649
         lastActivityAt: last > 0 ? new Date(last).toISOString() : null,
+        lastEventType: lt?.event_type ?? null,
+        healthScore,
       };
     }).sort((a, b) => b.events - a.events);
 
@@ -380,4 +423,97 @@ let singleton: AiCoordinator | null = null;
 export function getCoordinator(): AiCoordinator {
   if (!singleton) singleton = new AiCoordinator();
   return singleton;
+}
+
+// Task #2657 — Conflict listener bus per realtime UI (admin WS bridge).
+export interface ConflictBroadcast {
+  conflictId: string;
+  eventIdA: string;
+  eventIdB: string;
+  conflictType: string;
+  resolvedBy: string;
+  policyRuleId: string | null;
+  createdAt: string;
+}
+type ConflictCallback = (c: ConflictBroadcast) => void;
+const conflictListeners: Set<ConflictCallback> = new Set();
+export function onConflictCreated(cb: ConflictCallback): () => void {
+  conflictListeners.add(cb);
+  return () => conflictListeners.delete(cb);
+}
+
+// Task #2657 — Pause / kill switch helpers. Stato in Redis con TTL; se Redis
+// non disponibile fallback in-memory (process-local). Tutte le funzioni
+// graceful: errori non propagano.
+const PAUSE_KEY = (ai: string) => `ai:paused:${ai}`;
+const localPaused = new Map<string, number>(); // aiName → expiresAt(ms), 0 = forever
+
+export async function isAiPaused(aiName: string): Promise<boolean> {
+  try {
+    const redis = getRedis();
+    if (redis) {
+      const [a, all] = await Promise.all([redis.get(PAUSE_KEY(aiName)), redis.get(PAUSE_KEY("*"))]);
+      return Boolean(a) || Boolean(all);
+    }
+  } catch { /* fallthrough */ }
+  const now = Date.now();
+  for (const k of [aiName, "*"]) {
+    const exp = localPaused.get(k);
+    if (exp === undefined) continue;
+    if (exp === 0 || exp > now) return true;
+    localPaused.delete(k);
+  }
+  return false;
+}
+
+export async function pauseAi(aiName: string, ttlSeconds: number, reason: string): Promise<void> {
+  const ttl = Math.max(1, Math.min(86400, Math.floor(ttlSeconds || 3600)));
+  try {
+    const redis = getRedis();
+    if (redis) {
+      await redis.set(PAUSE_KEY(aiName), JSON.stringify({ reason, at: new Date().toISOString() }), "EX", ttl);
+      return;
+    }
+  } catch { /* fallthrough */ }
+  localPaused.set(aiName, Date.now() + ttl * 1000);
+}
+
+export async function resumeAi(aiName: string): Promise<void> {
+  try {
+    const redis = getRedis();
+    if (redis) { await redis.del(PAUSE_KEY(aiName)); return; }
+  } catch { /* fallthrough */ }
+  localPaused.delete(aiName);
+}
+
+export async function listPaused(): Promise<Array<{ aiName: string; reason?: string; at?: string; ttl?: number }>> {
+  const out: Array<{ aiName: string; reason?: string; at?: string; ttl?: number }> = [];
+  try {
+    const redis = getRedis();
+    if (redis) {
+      // SCAN non-bloccante (cursore) invece di KEYS, sicuro a scale di
+      // migliaia di chiavi nel keyspace.
+      const keys: string[] = [];
+      let cursor = "0";
+      do {
+        const [next, batch] = await redis.scan(cursor, "MATCH", "ai:paused:*", "COUNT", 100);
+        cursor = next;
+        if (batch.length) keys.push(...batch);
+      } while (cursor !== "0");
+      for (const k of keys) {
+        const aiName = k.replace(/^ai:paused:/, "");
+        const [val, ttl] = await Promise.all([redis.get(k), redis.ttl(k)]);
+        let meta: { reason?: string; at?: string } = {};
+        try { meta = val ? JSON.parse(val) : {}; } catch { /* ignore */ }
+        out.push({ aiName, reason: meta.reason, at: meta.at, ttl: ttl > 0 ? ttl : undefined });
+      }
+      return out;
+    }
+  } catch { /* fallthrough */ }
+  const now = Date.now();
+  for (const [k, exp] of localPaused.entries()) {
+    if (exp !== 0 && exp <= now) { localPaused.delete(k); continue; }
+    out.push({ aiName: k, ttl: exp === 0 ? undefined : Math.floor((exp - now) / 1000) });
+  }
+  return out;
 }

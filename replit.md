@@ -105,6 +105,36 @@ Il comando è idempotente: salta i file `-sm.webp` già presenti. Non richiede d
 
 ---
 
+## Layer AI Coordinato — Tab + Governance (Task #2657)
+
+UI admin `/admin/ai-layer` (Expo Router) per il Layer AI Coordinato (#2649)
+sopra le 6 AI integrate (#2654): `moderation`, `watchdog`, `ota-orchestrator`,
+`db-integrity`, `app-integrity`, `console`.
+
+- **Dashboard**: grid 6 card **fissa** (mostrata anche con 0 attività), con
+  badge eventi/critici/conflitti, Pause/Resume per-AI e Kill Switch Layer.
+- **Conflicts**: lista conflitti aperti + Override admin (audita decisione in
+  `ai_decisions` con `aiName='admin'` + chiude `ai_conflicts`).
+- **Policies**: editor YAML con `validate` (dry-run) e `salva & reload`
+  (backup `.bak-<ts>` automatico).
+- **Health**: latenze, heartbeat, ratio decisions/events, % override admin.
+- **Audit**: filtri (ai/type/severity/kind) + export `csv` / `ndjson` / `json`
+  via `/api/admin/ai/audit?format=…`.
+- **Timeline**: stream WS push (`ai_event`, `ai_conflict_new`) con
+  auto-invalidazione cache React Query (<2s end-to-end).
+
+Governance backend: `server/routes/admin/ai-coordinator-governance.ts`
+(pause/resume/paused/conflicts/override/policies). Auth: admin/superadmin via
+sessione (`storage.getUser(session.userId)`).
+
+Kill switch: `Coordinator.emit()` controlla `isAiPaused(aiName)` prima di
+persistere; in pausa restituisce `id=""` (Redis con TTL, fallback in-memory).
+
+E2E: `ADMIN_USER_ID=… SESSION_COOKIE='connect.sid=…' npx tsx scripts/e2e-ai-coordinator.ts`
+(scenari A-G, vedi `docs/ai-layer.md`).
+
+Schema eventi WS + esempi payload per ogni AI + checklist adapter: `docs/ai-layer.md`.
+
 ## AI Console Unificata (Task #2637 + #2641 + #2645)
 
 Dashboard admin `/admin/ai-console` che consolida le precedenti AI Copilot drawer in
