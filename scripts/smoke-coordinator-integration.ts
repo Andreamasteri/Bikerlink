@@ -3,8 +3,8 @@
 // Coordinator è giù. Esegui con: npx tsx scripts/smoke-coordinator-integration.ts
 import { getCoordinator } from "../server/ai/coordinator";
 import { db } from "../server/db";
-import { aiConflicts, aiEvents } from "@shared/db";
-import { desc, eq } from "drizzle-orm";
+import { aiConflicts } from "@shared/db";
+import { eq } from "drizzle-orm";
 import { recordOtaDecision, shouldDelayForCoordinator } from "../server/ai/coordinator/integrations/ota";
 import { emitModerationSuggestion } from "../server/ai/coordinator/integrations/moderation";
 import { emitWatchdogAlert, emitWatchdogStatusChange, emitWatchdogKillSwitch } from "../server/ai/coordinator/integrations/watchdog";
