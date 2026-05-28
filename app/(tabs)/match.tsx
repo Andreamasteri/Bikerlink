@@ -1,12 +1,6 @@
-// LARGE-FILE-LOCKED — limite: 719 righe (attuali: 719)
-// Aggiungi nuove funzionalità in: app/(tabs)/match-extra.tsx
-// Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
-//         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
-
 import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
-  StyleSheet,
   Alert,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -14,7 +8,6 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Colors from "@/constants/colors";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
 import { queryClient, apiRequest, ServerBusyError } from "@/lib/query-client";
@@ -22,18 +15,16 @@ import { useAuth } from "@/lib/auth-context";
 import { useT, useLocale } from "@/lib/language-context";
 
 import { MatchHeader } from "@/components/match/MatchHeader";
-import { GarageMatchCard, BikerBikerMatchCard, MatchCardFull, ProposalProfileMatchCard } from "@/components/match/MatchCard";
-import { RouteAffinityMatchCard } from "@/components/match/RouteAffinityMatchCard";
 import { TabBar, TabKey } from "@/components/match/TabBar";
 
 import { MatchEmptyState } from "@/components/match/tabs/MatchEmptyState";
 import { BikerInfoBanner } from "@/components/match/tabs/BikerInfoBanner";
 import { MusicCriteriaChip } from "@/components/match/tabs/MusicCriteriaChip";
-import { BlacklistCard } from "@/components/match/tabs/BlacklistCard";
-import { MusicMatchCard } from "@/components/match/tabs/MusicMatchCard";
 import { MatchCardStack } from "@/components/match/tabs/MatchCardStack";
 import { MatchFiltersPanel } from "@/components/match/tabs/MatchFiltersPanel";
 import { NegativeSuggestionsCard } from "@/components/match/tabs/NegativeSuggestionsCard";
+import { useRenderItem } from "@/components/match/useRenderItem";
+import { styles } from "./match.styles";
 
 export default function MatchScreen() {
   const router = useRouter();
@@ -392,207 +383,34 @@ export default function MatchScreen() {
   const isLoading = proposalLoading || garageLoading || bikerLoading || blockedLoading || musicLoading || acceptedLoading || propProfileLoading || routeAffinityLoading;
   const isRefetching = proposalRefetching || garageRefetching || bikerRefetching || blockedRefetching || musicRefetching || acceptedRefetching || propProfileRefetching || routeAffinityRefetching;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- item shape varies by tab
-  const renderItem = useCallback(({ item }: { item: any }) => {
-    if (activeTab === "blacklist") {
-      return (
-        <BlacklistCard item={item} onUnblock={handleUnblock} />
-      );
-    }
-
-    if (activeTab === "music") {
-      return (
-        <MusicMatchCard item={item} onSendMessage={(userId) => startChatMutation.mutate(userId)} />
-      );
-    }
-
-    if (activeTab === "propProfile") {
-      const isBiker = item.bikerId === user?.id;
-      const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
-      return (
-        <ProposalProfileMatchCard
-          match={{ ...item, isFresh: freshIds.has(item.id) }}
-          currentUserId={user?.id || ""}
-          onAccept={() => {
-            setPropProfilePendingId(item.id);
-            acceptPropProfileMutation.mutate(item.id);
-          }}
-          onReject={() => rejectPropProfileMutation.mutate(item.id)}
-          onChatPress={item.status === "accepted" ? () => startChatMutation.mutate(otherUserId) : undefined}
-          isPending={propProfilePendingId === item.id}
-          t={t}
-          locale={locale}
-        />
-      );
-    }
-
-    if (activeTab === "accepted") {
-      if (item._matchType === "biker") {
-        const isBiker1 = item.biker1Id === user?.id;
-        const otherUserId = isBiker1 ? item.biker2Id : item.biker1Id;
-        return (
-          <BikerBikerMatchCard
-            match={{ ...item, isFresh: freshIds.has(item.id) }}
-            currentUserId={user?.id || ""}
-            onAccept={() => {}}
-            onReject={() => {}}
-            onBlock={() => {}}
-            onChatPress={() => startChatMutation.mutate(otherUserId)}
-            onRemove={() => confirmRemoveBikerMatch(item.id)}
-            isPending={false}
-            t={t}
-            locale={locale}
-          />
-        );
-      }
-      if (item._matchType === "garage") {
-        const isBiker = item.bikerId === user?.id;
-        const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
-        return (
-          <GarageMatchCard
-            match={{ ...item, isFresh: freshIds.has(item.id) }}
-            currentUserId={user?.id || ""}
-            onAccept={() => {}}
-            onReject={() => {}}
-            onChatPress={() => startChatMutation.mutate(otherUserId)}
-            onRemove={() => confirmRemoveGarageMatch(item.id)}
-            isPending={false}
-            t={t}
-            locale={locale}
-          />
-        );
-      }
-      if (item._matchType === "propProfile") {
-        const otherUserId = item.bikerId === user?.id ? item.zavarrinaId : item.bikerId;
-        return (
-          <ProposalProfileMatchCard
-            match={{ ...item, isFresh: freshIds.has(item.id) }}
-            currentUserId={user?.id || ""}
-            onAccept={() => {}}
-            onReject={() => {}}
-            onChatPress={() => startChatMutation.mutate(otherUserId)}
-            isPending={false}
-            t={t}
-            locale={locale}
-          />
-        );
-      }
-      if (item._matchType === "routeAffinity") {
-        const otherId: string = item.otherUserId ?? (item.userAId === user?.id ? item.userBId : item.userAId);
-        return (
-          <RouteAffinityMatchCard
-            match={item}
-            currentUserId={user?.id || ""}
-            onAccept={() => {}}
-            onReject={() => {}}
-            onChatPress={() => startChatMutation.mutate(otherId)}
-            onRemove={() => removeRouteAffinityMutation.mutate(item.id)}
-            isPending={false}
-            t={t}
-            locale={locale}
-          />
-        );
-      }
-      return (
-        <MatchCardFull
-          match={{ ...item, isFresh: freshIds.has(item.id) }}
-          currentUserId={user?.id || ""}
-          onAccept={() => {}}
-          onReject={() => {}}
-          onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as never) : undefined}
-          onRemove={() => confirmRemoveProposalMatch(item.id)}
-          isPending={false}
-          t={t}
-          locale={locale}
-        />
-      );
-    }
-
-    if (activeTab === "route") {
-      const otherId: string = item.otherUserId ?? (item.userAId === user?.id ? item.userBId : item.userAId);
-      return (
-        <RouteAffinityMatchCard
-          match={item}
-          currentUserId={user?.id || ""}
-          onAccept={() => {
-            setPendingMatchId(item.id);
-            acceptRouteAffinityMutation.mutate(item.id);
-          }}
-          onReject={() => rejectRouteAffinityMutation.mutate(item.id)}
-          onChatPress={item.status === "accepted" ? () => startChatMutation.mutate(otherId) : undefined}
-          onRemove={item.status === "accepted" ? () => removeRouteAffinityMutation.mutate(item.id) : undefined}
-          isPending={pendingMatchId === item.id}
-          t={t}
-          locale={locale}
-        />
-      );
-    }
-
-    if (activeTab === "biker") {
-      const isBiker1 = item.biker1Id === user?.id;
-      const otherUserId = isBiker1 ? item.biker2Id : item.biker1Id;
-      return (
-        <BikerBikerMatchCard
-          match={{ ...item, isFresh: freshIds.has(item.id) }}
-          currentUserId={user?.id || ""}
-          onAccept={() => {
-            setPendingMatchId(item.id);
-            acceptBikerMutation.mutate(item.id);
-          }}
-          onReject={() => rejectBikerMutation.mutate(item.id)}
-          onBlock={() => {
-            const nickname = (item.biker1Id === user?.id ? item.biker2Nickname : item.biker1Nickname) || t("match.thisUser");
-            const msg = t("match.blockUserConfirmMsg").replace("{nickname}", nickname);
-            Alert.alert(t("match.blockUserConfirmTitle"), msg, [
-              { text: t("common.cancel"), style: "cancel" },
-              { text: t("match.blockUser"), style: "destructive", onPress: () => blockFromMatchMutation.mutate(otherUserId) },
-            ]);
-          }}
-          onChatPress={item.status === "accepted" ? () => startChatMutation.mutate(otherUserId) : undefined}
-          onRemove={item.status === "accepted" ? () => confirmRemoveBikerMatch(item.id) : undefined}
-          isPending={pendingMatchId === item.id}
-          t={t}
-          locale={locale}
-        />
-      );
-    }
-    if (activeTab === "zavorrine") {
-      const isBiker = item.bikerId === user?.id;
-      const otherUserId = isBiker ? item.zavarrinaId : item.bikerId;
-      return (
-        <GarageMatchCard
-          match={{ ...item, isFresh: freshIds.has(item.id) }}
-          currentUserId={user?.id || ""}
-          onAccept={() => {
-            setPendingMatchId(item.id);
-            acceptGarageMutation.mutate(item.id);
-          }}
-          onReject={() => rejectGarageMutation.mutate(item.id)}
-          onChatPress={item.status === "accepted" ? () => startChatMutation.mutate(otherUserId) : undefined}
-          onRemove={item.status === "accepted" ? () => confirmRemoveGarageMatch(item.id) : undefined}
-          isPending={pendingMatchId === item.id}
-          t={t}
-          locale={locale}
-        />
-      );
-    }
-    return (
-      <MatchCardFull
-        match={{ ...item, isFresh: freshIds.has(item.id) }}
-        currentUserId={user?.id || ""}
-        onAccept={() => {
-          setPendingMatchId(item.id);
-          acceptMutation.mutate(item.id);
-        }}
-        onReject={() => rejectMutation.mutate(item.id)}
-        onChatPress={item.conversationId ? () => router.push(`/chat/${item.conversationId}` as never) : undefined}
-        onRemove={item.status === "accepted" ? () => confirmRemoveProposalMatch(item.id) : undefined}
-        isPending={pendingMatchId === item.id}
-        t={t}
-        locale={locale}
-      />
-    );
-  }, [activeTab, user?.id, pendingMatchId, propProfilePendingId, acceptGarageMutation, rejectGarageMutation, acceptBikerMutation, rejectBikerMutation, blockFromMatchMutation, acceptMutation, rejectMutation, acceptPropProfileMutation, rejectPropProfileMutation, acceptRouteAffinityMutation, rejectRouteAffinityMutation, removeRouteAffinityMutation, startChatMutation, confirmRemoveGarageMatch, confirmRemoveBikerMatch, confirmRemoveProposalMatch, handleUnblock, router, t, locale, freshIds]);
+  const renderItem = useRenderItem({
+    activeTab,
+    userId: user?.id,
+    pendingMatchId,
+    setPendingMatchId,
+    propProfilePendingId,
+    setPropProfilePendingId,
+    freshIds,
+    acceptMutation,
+    rejectMutation,
+    acceptGarageMutation,
+    rejectGarageMutation,
+    acceptBikerMutation,
+    rejectBikerMutation,
+    blockFromMatchMutation,
+    acceptPropProfileMutation,
+    rejectPropProfileMutation,
+    acceptRouteAffinityMutation,
+    rejectRouteAffinityMutation,
+    removeRouteAffinityMutation,
+    startChatMutation,
+    confirmRemoveGarageMatch,
+    confirmRemoveBikerMatch,
+    confirmRemoveProposalMatch,
+    handleUnblock,
+    t,
+    locale,
+  });
 
   const newGarageMatches = useMemo(() => garageMatches?.filter(m => m.status === "new") || [], [garageMatches]);
   const newBikerMatches = useMemo(() => bikerMatches?.filter(m => m.status === "new") || [], [bikerMatches]);
@@ -655,7 +473,7 @@ export default function MatchScreen() {
       <InlineMiniPlayer />
       <MatchHeader title={t("match.title")} />
 
-      <MatchFiltersPanel 
+      <MatchFiltersPanel
         distanceMode={distanceMode}
         setDistanceMode={(mode) => {
           const wasKm = distanceMode === "km" && mode === "all";
@@ -678,7 +496,7 @@ export default function MatchScreen() {
 
       <BikerInfoBanner visible={activeTab === "biker"} />
 
-      <MusicCriteriaChip 
+      <MusicCriteriaChip
         visible={activeTab === "music" && lastfmStatus?.connected === true}
         musicCriteria={musicCriteria}
         musicMinSongs={musicMinSongs}
@@ -687,13 +505,13 @@ export default function MatchScreen() {
       />
 
       {activeTab === "music" && lastfmStatus?.connected !== true ? (
-        <MatchEmptyState 
+        <MatchEmptyState
           icon="musical-notes-outline"
           title={t("match.emptyMusicTitle")}
           description={t("match.emptyMusicDesc")}
         />
       ) : (
-        <MatchCardStack 
+        <MatchCardStack
           currentList={currentList}
           renderItem={renderItem}
           isRefetching={isRefetching}
@@ -709,11 +527,3 @@ export default function MatchScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-});
-
