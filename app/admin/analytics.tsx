@@ -155,6 +155,8 @@ export default function AdminAnalytics() {
       carouselCompleted: number;
       carouselCompletedFinish: number;
       carouselCompletedSkip: number;
+      skipBySlide?: { index: number; count: number }[];
+      topSkipSlides?: { index: number; count: number; pct: number }[];
       tagsShown: number;
       tagsSaved: number;
       tagsSkipped: number;
@@ -386,6 +388,70 @@ export default function AdminAnalytics() {
           </View>
 
           <View style={styles.onboardingBlock}>
+            <Text style={styles.onboardingTitle}>Onboarding — Abbandono Carousel per Slide</Text>
+            {onboardingTagsQuery.isLoading ? (
+              <Text style={styles.loadingText}>Caricamento...</Text>
+            ) : (
+              (() => {
+                const skipBySlide = onboardingTagsQuery.data?.funnel?.skipBySlide ?? [];
+                const topSkipSlides = onboardingTagsQuery.data?.funnel?.topSkipSlides ?? [];
+                const totalSkips = skipBySlide.reduce((s, x) => s + x.count, 0);
+                if (totalSkips === 0) {
+                  return (
+                    <Text style={styles.loadingText}>
+                      Nessun abbandono registrato.
+                    </Text>
+                  );
+                }
+                const maxCount = Math.max(...skipBySlide.map((s) => s.count), 1);
+                return (
+                  <View style={styles.onboardingRows}>
+                    <Text style={styles.skipHint}>
+                      Top 5 slide con più abbandoni ({totalSkips} skip totali)
+                    </Text>
+                    {topSkipSlides.map((s) => (
+                      <View key={`top-${s.index}`} style={styles.skipRow}>
+                        <Text style={styles.skipLabel}>Slide {s.index + 1}</Text>
+                        <View style={styles.skipBarTrack}>
+                          <View
+                            style={[
+                              styles.skipBarFill,
+                              { width: `${(s.count / maxCount) * 100}%` },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.skipValue}>
+                          {s.count} <Text style={styles.funnelPct}>({s.pct.toFixed(1)}%)</Text>
+                        </Text>
+                      </View>
+                    ))}
+                    <Text style={[styles.skipHint, { marginTop: 8 }]}>
+                      Distribuzione completa
+                    </Text>
+                    {skipBySlide.map((s) => (
+                      <View key={`all-${s.index}`} style={styles.skipRow}>
+                        <Text style={styles.skipLabel}>Slide {s.index + 1}</Text>
+                        <View style={styles.skipBarTrack}>
+                          <View
+                            style={[
+                              styles.skipBarFill,
+                              {
+                                width: `${(s.count / maxCount) * 100}%`,
+                                backgroundColor: Colors.textSecondary,
+                              },
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.skipValue}>{s.count}</Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()
+            )}
+          </View>
+
+          <View style={styles.onboardingBlock}>
             <Text style={styles.onboardingTitle}>Onboarding — Step Tag</Text>
             {onboardingTagsQuery.isLoading ? (
               <Text style={styles.loadingText}>Caricamento...</Text>
@@ -534,6 +600,43 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 12,
     color: Colors.textSecondary,
+  },
+  skipHint: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 4,
+  },
+  skipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+    gap: 8,
+  },
+  skipLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.text,
+    width: 64,
+  },
+  skipBarTrack: {
+    flex: 1,
+    height: 8,
+    backgroundColor: Colors.border,
+    borderRadius: 4,
+    overflow: "hidden",
+  },
+  skipBarFill: {
+    height: "100%",
+    backgroundColor: Colors.accent,
+    borderRadius: 4,
+  },
+  skipValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    color: Colors.text,
+    minWidth: 70,
+    textAlign: "right",
   },
   funnelPct: {
     fontFamily: "Inter_500Medium",

@@ -252,6 +252,33 @@ router.get("/onboarding-tags", async (_req: Request, res: Response) => {
       else if (row.action === "skip") carouselCompletedSkip = row.n;
     }
 
+    const skipBySlideRows = await db.execute(sql`
+      SELECT
+        (payload->>'reachedIndex')::int AS idx,
+        COUNT(*)::int AS n
+      FROM ab_events
+      WHERE experiment_key = 'analytics'
+        AND event_name = 'onboarding_carousel_completed'
+        AND payload->>'action' = 'skip'
+        AND payload->>'reachedIndex' ~ '^[0-9]+$'
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `);
+    const skipBySlide: { index: number; count: number }[] = (
+      skipBySlideRows.rows as Array<{ idx: number; n: number }>
+    ).map((r) => ({ index: r.idx, count: r.n }));
+    const totalSkipsWithIndex = skipBySlide.reduce((sum, s) => sum + s.count, 0);
+    const topSkipSlides = [...skipBySlide]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+      .map((s) => ({
+        index: s.index,
+        count: s.count,
+        pct: totalSkipsWithIndex > 0
+          ? Math.round((s.count / totalSkipsWithIndex) * 1000) / 10
+          : 0,
+      }));
+
     const avgRow = await db.execute(sql`
       SELECT
         COALESCE(AVG((payload->>'count')::int), 0)::float AS avg_count
@@ -283,6 +310,8 @@ router.get("/onboarding-tags", async (_req: Request, res: Response) => {
         carouselCompleted,
         carouselCompletedFinish,
         carouselCompletedSkip,
+        skipBySlide,
+        topSkipSlides,
         tagsShown: shown,
         tagsSaved: saved,
         tagsSkipped: skipped,
