@@ -5,7 +5,8 @@
 -- ============================================================
 
 -- Step 1: rimuovi utenti fake importati da dev
-DELETE FROM users WHERE is_fake = true;
+-- (eccezione: BikerLink_Official è marcato is_fake=true ma è un account di sistema)
+DELETE FROM users WHERE is_fake = true AND email NOT LIKE '%@bikerlink.internal';
 DELETE FROM users WHERE email LIKE '%@bikerlink.test';
 
 -- Step 2: rimuovi utenti dev non presenti in prod (user1@bikerlink.it)
