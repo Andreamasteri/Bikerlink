@@ -10,6 +10,7 @@ export * from "./social";
 export * from "./ads";
 export * from "./system";
 export * from "./matching";
+export * from "./matching-extra";
 export * from "./sos";
 export * from "./motoclubs";
 export * from "./music";
