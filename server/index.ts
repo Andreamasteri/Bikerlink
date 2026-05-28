@@ -5,6 +5,7 @@ import { initState } from "./init-state";
 import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount, seedGooglePlayReviewerAccount, ensureBikerLinkOfficialOnBoot } from "./auto-seed";
 import { seedTranslationKeys } from "./routes/admin/translations";
+import { seedTagsAtStartup } from "./seed-tags-runtime";
 import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 import { initUptimeTracking, startMetroMonitor, stopMetroMonitor } from "./uptime";
@@ -186,6 +187,9 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     await withPhaseTimeout("seedGooglePlayReviewerAccount", seedGooglePlayReviewerAccount());
     await withPhaseTimeout("ensureBikerLinkOfficialOnBoot", ensureBikerLinkOfficialOnBoot());
     await withPhaseTimeout("seedTranslationKeys", seedTranslationKeys());
+    // Task #2713 — Idempotent tag seed: garantisce che categorie + tag canonici
+    // siano sempre presenti in qualsiasi nuovo deployment / DB reset.
+    await withPhaseTimeout("seedTagsAtStartup", seedTagsAtStartup());
     startMatchingEngine();
     try {
       const { startNotificationJobs } = await import("./matching/notifications/digest-job");
