@@ -19,14 +19,9 @@
  *   SMOKE_TIMEOUT_MS  Timeout per singola richiesta (default 10000)
  *   SMOKE_ALLOW_PROD  '1' per consentire BASE_URL di produzione
  *   SMOKE_JSON        '1' per dump finale dei risultati in JSON
- *
- * Vincoli:
- *  - Solo `fetch` nativo Node, `pg` (già dipendenza del server) per auto-verify.
- *  - Non invia SOS reali (solo GET di stato — endpoint dry-run non disponibile,
- *    vedi follow-up nel docs/smoke-test.md).
- *  - Idempotente: l'utente smoke è dedicato per run.
+ * Vincoli: fetch nativo + pg, no SOS reali, idempotente.
  */
-
+import { cleanupOrphanSmokeUsers } from "./cleanup-orphans-runtime.js";
 type Severity = "BLOCKER" | "MAJOR" | "MINOR";
 type Outcome = "PASS" | "FAIL" | "SKIP";
 
@@ -237,28 +232,6 @@ async function autoVerifyEmail(email: string): Promise<{ ok: boolean; note: stri
     return { ok: false, note: `pg error: ${e?.message ?? String(e)}` };
   } finally {
     try { await client.end(); } catch { /* ignore */ }
-  }
-}
-
-async function cleanupOrphanSmokeUsers(): Promise<void> {
-  if (!process.env.DATABASE_URL) return;
-  const { Client } = await import("pg");
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
-  try {
-    await client.connect();
-    await client.query(
-      "DELETE FROM email_verification_tokens WHERE user_id IN (SELECT id FROM users WHERE email ILIKE 'smoke+%@bikerlink.test')"
-    );
-    const r = await client.query(
-      "DELETE FROM users WHERE email ILIKE 'smoke+%@bikerlink.test' OR nickname LIKE 'smoke%'"
-    );
-    if (r.rowCount && r.rowCount > 0) {
-      console.log(`[smoke] cleanup orfani: rimossi ${r.rowCount} utenti smoke residui`);
-    }
-  } catch (e) {
-    console.warn(`[smoke] cleanup orfani fallita (non bloccante): ${(e as Error).message}`);
-  } finally {
-    await client.end().catch(() => {});
   }
 }
 
