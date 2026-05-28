@@ -25,6 +25,40 @@
 
 set -uo pipefail
 
+# Task #2731 — Pre-flight guard.
+# Layer di sicurezza aggiuntivo: prima di toccare il pipeline, scansiona i file
+# di migration in migrations/*.sql alla ricerca di statement SQL ESEGUIBILI che
+# referenzino oggetti di sistema PostGIS (spatial_ref_sys, geography_columns,
+# geometry_columns). I commenti (righe che iniziano con `--`) vengono ignorati,
+# così la documentazione e le migration no-op restano consentite.
+# Se trova uno statement eseguibile, esce con errore descrittivo PRIMA che la
+# migration raggiunga il pipeline di deploy di Replit.
+POSTGIS_OBJECTS_PATTERN='spatial_ref_sys|geography_columns|geometry_columns'
+MIGRATIONS_DIR="$(dirname "$0")/../migrations"
+
+if [ -d "$MIGRATIONS_DIR" ]; then
+  echo "[db-push-safe] Pre-flight: scansione migration per statement PostGIS eseguibili…"
+  offending=""
+  for f in "$MIGRATIONS_DIR"/*.sql; do
+    [ -e "$f" ] || continue
+    # Rimuove righe vuote e commenti (`--`), poi cerca i pattern PostGIS.
+    if sed -e 's/--.*$//' "$f" | grep -nEi "$POSTGIS_OBJECTS_PATTERN" >/dev/null 2>&1; then
+      hits=$(sed -e 's/--.*$//' "$f" | grep -nEi "$POSTGIS_OBJECTS_PATTERN")
+      offending="${offending}\n  ${f}:\n${hits}\n"
+    fi
+  done
+
+  if [ -n "$offending" ]; then
+    echo "[db-push-safe] ERRORE pre-flight: trovati statement SQL eseguibili che referenziano oggetti PostGIS di sistema." >&2
+    echo "Questi oggetti (spatial_ref_sys/geography_columns/geometry_columns) sono di proprietà del ruolo 'postgres'" >&2
+    echo "e qualunque ALTER/DDL su di essi fa fallire il deploy in produzione con 'must be owner of table'." >&2
+    echo "Rimuovi lo statement (lascia solo commenti) o gestisci l'oggetto via tablesFilter in drizzle.config.ts." >&2
+    echo -e "Occorrenze:$offending" >&2
+    exit 1
+  fi
+  echo "[db-push-safe] Pre-flight OK: nessuno statement PostGIS eseguibile nelle migration."
+fi
+
 MAX_ITER=4
 POSTGIS_ERR_PATTERN='must be owner of (table|view|relation|sequence) (spatial_ref_sys|geography_columns|geometry_columns)'
 OTHER_ERR_PATTERN='(error:|ERROR:|FATAL:|Error:)'

@@ -1,25 +1,22 @@
--- Task #2702 — Fix deploy: spatial_ref_sys migration sicura.
--- Replit's deploy pipeline genera `ALTER TABLE spatial_ref_sys ADD PRIMARY KEY (srid)`
--- confrontando dev e prod. Questa istruzione fallisce in produzione perché spatial_ref_sys
--- è una tabella di sistema PostGIS, di proprietà del ruolo `postgres`.
--- Aggiungendo questa migration numerata, drizzle-kit la marca come "già applicata"
--- e smette di rigenerarla ad ogni deploy.
+-- Task #2731 — Migration no-op (svuotata).
 --
--- Idempotenza:
---   • Pre-check via pg_constraint: se il PK esiste già, ALTER TABLE non viene eseguito.
---   • EXCEPTION WHEN insufficient_privilege: gestisce il caso prod dove l'utente
---     applicativo non è owner della tabella (PostGIS system table).
-
-DO $$ BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM   pg_constraint c
-    JOIN   pg_class      t ON t.oid = c.conrelid
-    WHERE  t.relname = 'spatial_ref_sys'
-    AND    c.contype = 'p'
-  ) THEN
-    ALTER TABLE spatial_ref_sys ADD PRIMARY KEY (srid);
-  END IF;
-EXCEPTION
-  WHEN insufficient_privilege THEN NULL;
-END $$;
+-- Contesto: il deploy in produzione falliva con
+--   ALTER TABLE "spatial_ref_sys" ADD PRIMARY KEY ("srid");
+--   must be owner of table spatial_ref_sys
+-- perché `spatial_ref_sys` è una tabella di sistema PostGIS di proprietà del
+-- ruolo `postgres`, non dell'utente applicativo.
+--
+-- La versione precedente di questa migration (Task #2702) provava a gestire il
+-- caso con un DO block + EXCEPTION WHEN insufficient_privilege. Tuttavia il
+-- pipeline di deploy di Replit analizza il TESTO SQL della migration e blocca
+-- l'esecuzione (validation failure) appena trova `ALTER TABLE spatial_ref_sys`,
+-- senza mai arrivare a eseguire il blocco EXCEPTION.
+--
+-- Soluzione: svuotare completamente la migration lasciando solo questo
+-- commento (nessuno statement SQL eseguibile). Il file resta numerato 0058 così
+-- drizzle-kit lo considera già applicato e non rigenera l'ALTER TABLE.
+--
+-- NON reintrodurre alcuno statement che referenzi spatial_ref_sys,
+-- geography_columns o geometry_columns in questa o in future migration:
+-- la gestione di questi oggetti PostGIS è demandata interamente a
+-- `tablesFilter` in drizzle.config.ts e al wrapper scripts/db-push-safe.sh.
