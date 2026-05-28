@@ -290,6 +290,29 @@ I prefer detailed explanations and iterative development. Ask before making majo
 - `// LARGE-FILE-LOCKED — limite: <N>` → limite specifico `<N>`. **Seconda riga obbligatoria**: `// Aggiungi nuove funzionalità in: <companion-path>`.
 - Sintassi commento per estensioni non-JS: `#` per `.sh`/`.sql`/`.py`/`.yml`; `<!-- ... -->` per `.html`.
 
+### Convenzioni file — pattern successore
+
+**Regola operativa** per ogni agente che aggiunge codice nuovo:
+
+1. **Nessun file sorgente supera le 600 righe.** Vale per `.ts`, `.tsx`, `.js`, `.jsx` e qualsiasi altro file sorgente del progetto.
+2. **Quando un file si avvicina alle 600 righe**, le nuove feature non vanno in quel file: vanno in un file successore con il suffisso `-extra` (pattern già in uso nel progetto):
+   - `server/routes/foo.ts` → nuove funzioni in `server/routes/foo-extra.ts`
+   - `components/FooPanel.tsx` → nuove funzioni in `components/FooPanelExtra.tsx`
+   - `shared/db/bar.ts` → nuove funzioni in `shared/db/bar-extra.ts`
+3. **Il file originale rimane congelato sotto i 600**: nessuna nuova riga di logica. Solo bugfix strettamente localizzati sono tollerati.
+4. **Il successore riceve tutto il codice nuovo.** Quando anche il successore si avvicina alle 600 righe, si crea il successore del successore (`foo-extra.ts` → `foo-extra-2.ts`), e così via.
+5. **Il companion viene creato solo quando ha contenuto reale** — non file vuoti con `export {}` per silenziare warning.
+
+Esempio concreto già presente nel progetto:
+
+| File principale | Companion path |
+|---|---|
+| `server/motion-simulator.ts` | `server/motion-simulator-extra.ts` |
+| `server/routes/admin/users.ts` | `server/routes/admin/users-extra.ts` |
+| `shared/db/matching.ts` | `shared/db/matching-extra.ts` |
+
+Il CI gate (`scripts/check-large-files-ratchet.sh`) blocca qualsiasi file che superi i 600 senza marker autorizzato. Se il gate fallisce, sposta il codice nel companion — non alzare la baseline.
+
 ### Le 6 REGOLE FERREE — non negoziabili (task agent, code reviewer, main agent)
 1. **Il gate va eseguito nei 3 punti elencati sopra**, ognuno con `exit 1` su fallimento. Non disabilitarli.
 2. **`--update-baseline` è riservato all'operatore umano (utente)**. Vietato a qualsiasi agente. Se invocato senza `BIKERLINK_HUMAN_BASELINE_UPDATE=1`, lo script rifiuta con: "❌ Solo l'utente può aggiornare la baseline. Se il file si è ridotto, chiedi all'utente di eseguire `BIKERLINK_HUMAN_BASELINE_UPDATE=1 bash scripts/check-large-files-ratchet.sh --update-baseline`."
