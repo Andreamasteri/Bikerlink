@@ -1,3 +1,5 @@
+// LARGE-FILE-LOCKED — limite: 450
+// Aggiungi nuove funzionalità in: server/routes/planned-routes/extras.next.ts
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { storage } from "../../storage";
