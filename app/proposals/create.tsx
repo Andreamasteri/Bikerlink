@@ -1,13 +1,7 @@
-// LARGE-FILE-LOCKED — limite: 658 righe (attuali: 658)
-// Aggiungi nuove funzionalità in: app/proposals/create-extra.tsx
-// Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
-//         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
-
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TextInput,
   TouchableOpacity,
   Alert,
@@ -24,6 +18,15 @@ import { apiRequest, queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
 import MapPickerContent from "@/components/MapPickerModal";
+
+import { styles } from "./create.styles";
+import {
+  formatDateInput,
+  formatTimeInput,
+  autoCompleteTime,
+  formatDateDDMMYYYY,
+  parseDateAndTime,
+} from "./create.helpers";
 
 // Sub-components
 import { ProposalTypeSelector } from "@/components/proposals/create/ProposalTypeSelector";
@@ -50,46 +53,6 @@ const TARGET_USER_TYPE_OPTIONS = [
   { key: "hitchhiker", labelKey: "proposal.targetHitchhiker", icon: "thumb-up", color: Colors.success },
   { key: "hotcher", labelKey: "proposal.targetHotcher", icon: "account-arrow-right", color: Colors.accent },
 ];
-
-function formatDateInput(val: string): string {
-  const nums = val.replace(/\D/g, "");
-  if (nums.length <= 2) return nums;
-  if (nums.length <= 4) return nums.slice(0, 2) + "/" + nums.slice(2);
-  return nums.slice(0, 2) + "/" + nums.slice(2, 4) + "/" + nums.slice(4, 8);
-}
-
-function formatTimeInput(val: string): string {
-  const nums = val.replace(/\D/g, "");
-  if (nums.length <= 2) return nums;
-  return nums.slice(0, 2) + ":" + nums.slice(2, 4);
-}
-
-function autoCompleteTime(val: string): string {
-  const trimmed = val.trim();
-  if (!trimmed || trimmed.includes(":")) return trimmed;
-  const nums = trimmed.replace(/\D/g, "");
-  if (nums.length === 0) return "";
-  const h = parseInt(nums.slice(0, 2), 10);
-  if (isNaN(h) || h > 23) return trimmed;
-  return String(h).padStart(2, "0") + ":00";
-}
-
-function formatDateDDMMYYYY(d: Date): string {
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = String(d.getFullYear());
-  return `${dd}/${mm}/${yyyy}`;
-}
-
-function parseDateAndTime(dateStr: string, timeStr: string): Date | null {
-  const parts = dateStr.split("/");
-  if (parts.length !== 3) return null;
-  const [dd, mm, yyyy] = parts;
-  const timeParts = timeStr.split(":");
-  if (timeParts.length !== 2) return null;
-  const d = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd), parseInt(timeParts[0]), parseInt(timeParts[1]));
-  return isNaN(d.getTime()) ? null : d;
-}
 
 export default function CreateProposalScreen() {
   const router = useRouter();
@@ -600,59 +563,3 @@ export default function CreateProposalScreen() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  content: { padding: 20, paddingBottom: 60 },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: Colors.text,
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  input: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
-    color: Colors.text,
-    fontSize: 15,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  typeGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 10,
-    marginBottom: 8,
-  },
-  typeCard: {
-    flex: 1,
-    minWidth: 80,
-    alignItems: "center",
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
-    gap: 6,
-  },
-  typeCardLabel: {
-    fontSize: 12,
-    fontWeight: "600" as const,
-    color: Colors.textSecondary,
-    textAlign: "center" as const,
-  },
-  submitButton: {
-    backgroundColor: Colors.accent,
-    borderRadius: 14,
-    paddingVertical: 16,
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 24,
-  },
-  submitButtonDisabled: { opacity: 0.5 },
-  submitText: { color: "#000", fontSize: 16, fontWeight: "700" as const },
-});
