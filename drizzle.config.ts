@@ -22,8 +22,11 @@ export default defineConfig({
   // la causa radice del bug ricorrente:
   //   ALTER TABLE "spatial_ref_sys" ADD PRIMARY KEY ("srid");
   //   must be owner of table spatial_ref_sys
-  // Nota: drizzle-kit ≥ 0.30 ignora il tablesFilter-blacklist quando ci sono
-  // più di un'esclusione PostGIS — extensionsFilters risolve questa limitazione.
+  // Task #2778 — NOTA: extensionsFilters non è affidabile al 100% in
+  // drizzle-kit 0.31.x (regressione osservata in produzione). Per questo
+  // motivo coesiste con le voci esplicite nel tablesFilter qui sotto (livello 2).
+  // I due approcci si completano a vicenda: extensionsFilters è il filtro
+  // ufficiale; tablesFilter è la difesa esplicita di fallback.
   extensionsFilters: ["postgis"],
   // Task #2678 — tablesFilter (LIVELLO 2 di difesa) keeps drizzle-kit's
   // "missingItems" list empty so promptNamedWithSchemasConflict (which requires
@@ -40,16 +43,23 @@ export default defineConfig({
   //                         integrity_* → db_integrity_* rename conflict
   // !schema_migrations    — external migration tracking table, not in TS schema
   //
-  // NOTE (Task #2762): PostGIS objects (spatial_ref_sys, geography_columns,
-  // geometry_columns) are intentionally NOT listed here anymore. They are fully
-  // handled by extensionsFilters above (level 1). The level 3 runtime guard is
-  // scripts/db-push-safe.sh, wired via package.json → db:push.
+  // Task #2778 — PostGIS objects (spatial_ref_sys, geography_columns,
+  // geometry_columns) sono aggiunti ANCHE qui come difesa esplicita parallela.
+  // extensionsFilters (livello 1) dovrebbe già escluderli, ma in drizzle-kit
+  // 0.31.x si sono osservate regressioni in cui il filtro non veniva applicato.
+  // Le due opzioni coesistono intenzionalmente: livello 1 (extensionsFilters)
+  // + livello 2 (tablesFilter) + livello 3 (db-push-safe.sh).
   tablesFilter: [
     "!session",
     "!integrity_runs",
     "!integrity_violations",
     "!integrity_quarantine",
     "!schema_migrations",
+    // Task #2778 — PostGIS system objects: espliciti come fallback per
+    // il caso in cui extensionsFilters fallisca in drizzle-kit 0.31.x.
+    "!spatial_ref_sys",
+    "!geography_columns",
+    "!geometry_columns",
     // Task #2680 — Expression-index flickering fix.
     // drizzle-kit cannot compare expression indexes (LEAST/GREATEST, ::text cast, GIN
     // trgm) and always generates DROP+CREATE for them on every push. The GIN index and

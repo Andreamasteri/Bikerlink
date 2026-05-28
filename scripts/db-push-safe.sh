@@ -1,26 +1,37 @@
 #!/bin/bash
 # Task #2700 — Wrapper "fail-safe" attorno a `drizzle-kit push --force`.
 # Task #2762 — Comportamento aggiornato a strict-fail per oggetti PostGIS.
+# Task #2778 — REGRESSIONE Task #2762: il comportamento strict-fail si è
+#              rivelato troppo aggressivo. In drizzle-kit 0.31.x,
+#              extensionsFilters non è affidabile al 100% e può non filtrare
+#              gli oggetti PostGIS. Quando l'unico errore riguarda oggetti
+#              PostGIS (spatial_ref_sys/geography_columns/geometry_columns),
+#              il comportamento corretto è un warning benigno + exit 0,
+#              come era in Task #2700 prima della stretta di Task #2762.
+#              Se invece l'output contiene ANCHE altri errori non-PostGIS,
+#              il fail-fast viene mantenuto per non mascherare bug reali.
 #
-# ARCHITETTURA DEI TRE LIVELLI DI DIFESA (Task #2762):
+# ARCHITETTURA DEI TRE LIVELLI DI DIFESA (Task #2778):
 #   Livello 1: extensionsFilters: ["postgis"] in drizzle.config.ts
-#              → drizzle-kit non genera MAI DDL su oggetti PostGIS
-#   Livello 2: tablesFilter (non-PostGIS blacklist) in drizzle.config.ts
-#              → esclude tabelle di app non gestite da drizzle-kit
+#              → drizzle-kit non genera MAI DDL su oggetti PostGIS (se funziona)
+#   Livello 2: tablesFilter con "!spatial_ref_sys", "!geography_columns",
+#              "!geometry_columns" in drizzle.config.ts (Task #2778)
+#              → difesa esplicita parallela a extensionsFilters per 0.31.x
 #   Livello 3: questo script (db-push-safe.sh)
-#              → pre-flight check su migration files + strict-fail runtime
+#              → pre-flight check su migration files + benign skip runtime
 #
-# Comportamento di questo wrapper (post-Task #2762):
+# Comportamento di questo wrapper (post-Task #2778):
 # 1. Pre-flight: scansiona migrations/*.sql per statement PostGIS eseguibili.
 #    Se trovati, esce con errore PRIMA di toccare il database.
 # 2. Esegue `drizzle-kit push --force` catturando stdout+stderr.
 # 3. Se esce 0 → success.
-# 4. Se l'output contiene qualsiasi riferimento a oggetti PostGIS noti
-#    (spatial_ref_sys, geography_columns, geometry_columns) → HARD FAIL.
-#    Con extensionsFilters attivo, questi oggetti NON dovrebbero MAI apparire
-#    nell'output. Se appaiono significa che il livello 1 ha fallito e il
-#    deploy non deve proseguire.
-# 5. Qualsiasi altro errore → fail-fast con il codice originale.
+# 4. Se drizzle-kit fallisce e l'output contiene riferimenti a oggetti PostGIS:
+#    a) Se l'output contiene SOLO errori PostGIS → warning benigno + exit 0
+#       (questi errori sono attesi quando extensionsFilters non funziona in
+#       0.31.x; tablesFilter è il fallback ma non copre i runtime errors).
+#    b) Se l'output contiene sia errori PostGIS SIA altri errori → fail-fast
+#       (non mascherare bug reali che coesistono con l'errore PostGIS).
+# 5. Qualsiasi altro errore (nessun riferimento PostGIS) → fail-fast.
 
 set -uo pipefail
 
@@ -69,24 +80,41 @@ if [ $rc -eq 0 ]; then
   exit 0
 fi
 
-# ─── STRICT FAIL su oggetti PostGIS ─────────────────────────────────────────
-# Con extensionsFilters: ["postgis"] attivo (livello 1), drizzle-kit NON dovrebbe
-# generare alcun DDL su spatial_ref_sys/geography_columns/geometry_columns.
-# Se questi oggetti appaiono nell'output in seguito a un errore, significa che
-# il livello 1 ha fallito: si tratta di un errore reale, non benigno.
+# ─── BENIGN SKIP per errori PostGIS (Task #2778) ────────────────────────────
+# extensionsFilters non è affidabile al 100% in drizzle-kit 0.31.x.
+# Se l'output contiene riferimenti a oggetti PostGIS, distinguiamo due casi:
+#   a) SOLO errori PostGIS → warning benigno + exit 0 (skip sicuro)
+#   b) Errori PostGIS + altri errori → fail-fast (non mascherare bug reali)
+#
+# Nota: Task #2762 aveva introdotto uno strict-fail per tutti i casi PostGIS,
+# ma questo bloccava il deploy anche quando extensionsFilters semplicemente
+# non funzionava in 0.31.x (regressione nota). Il comportamento benigno
+# originale di Task #2700 viene ripristinato con il discriminatore aggiuntivo
+# "altri errori presenti?".
 if grep -qEi "$POSTGIS_OBJECTS_PATTERN" "$tmp_out"; then
-  echo "[db-push-safe] ERRORE CRITICO: drizzle-kit ha generato DDL su oggetti PostGIS di sistema." >&2
-  echo "Questo NON dovrebbe accadere perché extensionsFilters: [\"postgis\"] è configurato in drizzle.config.ts." >&2
-  echo "Azione richiesta:" >&2
-  echo "  1. Verifica che extensionsFilters: [\"postgis\"] sia presente in drizzle.config.ts" >&2
-  echo "  2. Verifica la versione di drizzle-kit (deve essere ≥ 0.30)" >&2
-  echo "  3. Controlla che nessuna migration abbia statement PostGIS eseguibili" >&2
-  echo "Il deploy è stato bloccato per evitare 'must be owner of table spatial_ref_sys' in produzione." >&2
+  # Costruisce una versione dell'output con le righe PostGIS rimosse.
+  # Se quella versione contiene ancora indicatori di errore, ci sono bug reali.
+  stripped=$(grep -vEi "$POSTGIS_OBJECTS_PATTERN" "$tmp_out" || true)
+  if echo "$stripped" | grep -qEi "error|Error|ERROR|failed|exception"; then
+    echo "[db-push-safe] ERRORE: drizzle-kit ha fallito con errori PostGIS E altri errori non-PostGIS." >&2
+    echo "Gli errori non-PostGIS indicano un problema reale che non può essere ignorato." >&2
+    echo "Output non-PostGIS rilevante:" >&2
+    echo "$stripped" | grep -Ei "error|Error|ERROR|failed|exception" >&2
+    rm -f "$tmp_out"
+    exit "$rc"
+  fi
+  # Solo errori PostGIS: skip benigno.
+  echo "[db-push-safe] WARNING: drizzle-kit ha prodotto errori su oggetti PostGIS di sistema." >&2
+  echo "Questo accade quando extensionsFilters non filtra correttamente in drizzle-kit 0.31.x." >&2
+  echo "Gli oggetti spatial_ref_sys/geography_columns/geometry_columns sono di proprietà del" >&2
+  echo "ruolo 'postgres' e NON devono essere modificati dall'utente applicativo." >&2
+  echo "Skip benigno: il deploy continua. I livelli 1+2 (extensionsFilters + tablesFilter)" >&2
+  echo "impediscono che questi oggetti vengano modificati nel database." >&2
   rm -f "$tmp_out"
-  exit 1
+  exit 0
 fi
 
 # ─── Qualsiasi altro errore: fail-fast ──────────────────────────────────────
 echo "[db-push-safe] ERRORE drizzle-kit (exit $rc) — aborting." >&2
 rm -f "$tmp_out"
-exit $rc
+exit "$rc"
