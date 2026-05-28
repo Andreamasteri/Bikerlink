@@ -12,6 +12,8 @@ const SERVER_DIRS = ["server"];
 const ALL_CODE_DIRS = ["server", "app", "lib", "hooks", "components", "shared", "scripts"];
 
 const MAX_FILE_LINES = 300;
+const NEAR_LIMIT_WARN = 590;
+const HARD_LIMIT = 600;
 const MAX_FN_LINES = 80;
 const SAMPLE = 10;
 
@@ -436,8 +438,44 @@ const unusedImportsCheck: AppIntegrityCheck = {
   },
 };
 
+const nearLimitFilesCheck: AppIntegrityCheck = {
+  id: "code/near-limit-files",
+  family: "code",
+  name: "File TS vicini al limite 600 righe",
+  severity: "high",
+  cost: "cheap",
+  description: `Identifica file TypeScript con ≥${NEAR_LIMIT_WARN} righe, vicini al limite duro di ${HARD_LIMIT} righe. File ≥${HARD_LIMIT} righe sono oltre il limite e vanno splittati immediatamente.`,
+  async query(ctx) {
+    const files = await walkFiles(ctx.projectRoot, { extensions: TS_EXTS, includeDirs: ALL_CODE_DIRS });
+    const warn: { pk: string; data: Record<string, unknown> }[] = [];
+    const over: { pk: string; data: Record<string, unknown> }[] = [];
+    for (const f of files) {
+      const txt = await readSafe(f.absPath);
+      if (!txt) continue;
+      const lines = countLines(txt);
+      if (lines >= HARD_LIMIT) {
+        over.push({ pk: f.relPath, data: { path: f.relPath, lines, status: "OLTRE LIMITE — split urgente" } });
+      } else if (lines >= NEAR_LIMIT_WARN) {
+        warn.push({ pk: f.relPath, data: { path: f.relPath, lines, status: "vicino al limite — pianifica split" } });
+      }
+    }
+    over.sort((a, b) => (b.data.lines as number) - (a.data.lines as number));
+    warn.sort((a, b) => (b.data.lines as number) - (a.data.lines as number));
+    const all = [...over, ...warn];
+    const details: Record<string, unknown> = {
+      overLimit: over.length,
+      nearLimit: warn.length,
+      hardLimit: HARD_LIMIT,
+      warnThreshold: NEAR_LIMIT_WARN,
+    };
+    return { ok: all.length === 0, count: all.length, sample: sampleOf(all, 20), details };
+  },
+  explainHint: `File con ≥${NEAR_LIMIT_WARN} righe: elenca i file da splittare, suggerisci come dividerli per responsabilità (es. estrarre componenti, hook, utility o route separate).`,
+};
+
 const pack: AppIntegrityCheck[] = [
   largeFilesCheck,
+  nearLimitFilesCheck,
   anyExplicitCheck,
   consoleResidualCheck,
   todoWithoutIssueCheck,
