@@ -1,10 +1,14 @@
-import React, { useCallback } from "react";
-import { StatusBar } from "react-native";
+import React, { useCallback, useState } from "react";
+import { StatusBar, View, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import OnboardingCarousel from "@/components/OnboardingCarousel";
+import OnboardingTagsStep from "@/components/onboarding/OnboardingTagsStep";
+import Colors from "@/constants/colors";
 
 import { ONBOARDING_STORAGE_KEY } from "@/constants/onboarding";
+
+type Stage = "carousel" | "tags";
 
 async function markOnboardingComplete() {
   try {
@@ -16,21 +20,43 @@ async function markOnboardingComplete() {
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const [stage, setStage] = useState<Stage>("carousel");
 
-  const handleComplete = useCallback(async () => {
+  const finishOnboarding = useCallback(async () => {
     await markOnboardingComplete();
     router.replace("/welcome");
   }, [router]);
 
-  const handleSkip = useCallback(async () => {
-    await markOnboardingComplete();
-    router.replace("/welcome");
-  }, [router]);
+  const handleCarouselComplete = useCallback(() => {
+    setStage("tags");
+  }, []);
+
+  const handleCarouselSkip = useCallback(() => {
+    setStage("tags");
+  }, []);
 
   return (
-    <>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      <OnboardingCarousel onComplete={handleComplete} onSkip={handleSkip} />
-    </>
+    <View style={styles.root}>
+      <StatusBar
+        barStyle="light-content"
+        translucent
+        backgroundColor="transparent"
+      />
+      {stage === "carousel" ? (
+        <OnboardingCarousel
+          onComplete={handleCarouselComplete}
+          onSkip={handleCarouselSkip}
+        />
+      ) : (
+        <OnboardingTagsStep onDone={finishOnboarding} />
+      )}
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+});

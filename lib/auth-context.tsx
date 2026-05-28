@@ -13,10 +13,55 @@ import {
   authFetchHeaders
 } from "@/lib/query-client";
 import type { User } from "@shared/db";
+import { PENDING_ONBOARDING_TAGS_KEY } from "@/constants/onboarding";
 
 type SafeUser = Omit<User, "password">;
 
 const HAD_SESSION_KEY = "@bikerlink/had_session";
+
+/**
+ * After successful login/register, drain any tag selections the user picked
+ * during pre-auth onboarding (see app/onboarding.tsx → OnboardingTagsStep).
+ * Best-effort: failures are silent so they never block the auth flow.
+ */
+async function drainPendingOnboardingTags(): Promise<void> {
+  let raw: string | null = null;
+  try {
+    raw = await AsyncStorage.getItem(PENDING_ONBOARDING_TAGS_KEY);
+  } catch {
+    return;
+  }
+  if (!raw) return;
+
+  let payload: Record<string, string[]> | null = null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed === "object") {
+      payload = parsed as Record<string, string[]>;
+    }
+  } catch {
+    payload = null;
+  }
+
+  // Always clear the key so we don't keep retrying on every login.
+  try {
+    await AsyncStorage.removeItem(PENDING_ONBOARDING_TAGS_KEY);
+  } catch {
+    // no-op
+  }
+
+  if (!payload) return;
+
+  for (const [categorySlug, tagIds] of Object.entries(payload)) {
+    if (!Array.isArray(tagIds) || tagIds.length === 0) continue;
+    try {
+      await apiRequest("PUT", "/api/users/me/tags", { categorySlug, tagIds });
+    } catch {
+      // best-effort: skip categories that fail
+    }
+  }
+  queryClient.invalidateQueries({ queryKey: ["/api/users/me/tags"] });
+}
 
 // Retry delays: 2s, 5s, 10s
 const RETRY_DELAYS = [2000, 5000, 10000];
@@ -59,6 +104,9 @@ function useLoginMutation() {
           const key = query.queryKey[0] as string;
           return key !== "/api/auth/me";
         }
+      });
+      drainPendingOnboardingTags().catch(() => {
+        // no-op: best-effort
       });
       (async () => {
         try {
@@ -137,6 +185,9 @@ function useRegisterMutation() {
         const { sessionToken: _t, ...user } = res;
         queryClient.setQueryData(["/api/auth/me"], user);
         AsyncStorage.setItem(HAD_SESSION_KEY, "true").catch(() => {});
+        drainPendingOnboardingTags().catch(() => {
+          // no-op: best-effort
+        });
       }
       // Clear the freshly-issued connect.sid cookie from the Android native jar
       if (Platform.OS === "android") {

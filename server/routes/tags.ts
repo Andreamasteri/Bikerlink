@@ -1,6 +1,5 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../storage";
-import { requireAuth } from "../lib/auth-middleware";
 import { sendError } from "../lib/api-response";
 
 const router = Router();
@@ -10,10 +9,11 @@ const router = Router();
  * GET /api/tags?category=<slug>    → tag di una categoria
  * GET /api/tags                    → tutti i tag con categoria
  *
- * Endpoint pubblici (autenticati) per la UI utente. La gestione (create/delete)
- * resta in /api/admin/tags.
+ * Endpoint di lettura pubblici (reference data, nessun dato sensibile):
+ * accessibili anche in onboarding pre-auth per permettere la scelta dei tag
+ * prima della registrazione. La gestione (create/delete) resta in /api/admin/tags.
  */
-router.get("/categories", requireAuth, async (_req: Request, res: Response) => {
+router.get("/categories", async (_req: Request, res: Response) => {
   try {
     const cats = await storage.listTagCategories();
     return res.json(cats);
@@ -23,7 +23,7 @@ router.get("/categories", requireAuth, async (_req: Request, res: Response) => {
   }
 });
 
-router.get("/", requireAuth, async (req: Request, res: Response) => {
+router.get("/", async (req: Request, res: Response) => {
   try {
     const category = typeof req.query.category === "string" ? req.query.category : undefined;
     if (category) {
