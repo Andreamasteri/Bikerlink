@@ -57,6 +57,7 @@ import { eq, and } from "drizzle-orm";
 import { onlineTracker } from "./online-tracker";
 import { registerClientSettingsRoutes } from "./routes/client-settings";
 import { registerMoreRoutes } from "./routes/more-routes";
+import { registerMoreRoutes2 } from "./routes/more-routes-2";
 
 async function _requireAdmin(req: Request, res: Response, next: NextFunction) {
   const session = req.session as { userId?: string };
@@ -534,6 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerClientSettingsRoutes(app);
 
   registerMoreRoutes(app);
+  registerMoreRoutes2(app);
 
   const httpServer = createServer(app);
 
