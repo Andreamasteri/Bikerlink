@@ -79,6 +79,8 @@ export default function AdminLayout() {
         <Stack.Screen name="app-integrity" options={{ title: "AI App Integrity" }} />
         <Stack.Screen name="ai-console" options={{ title: "AI Console" }} />
         <Stack.Screen name="ai-pinned" options={{ title: "AI — Insight Pinnati" }} />
+        <Stack.Screen name="ai-layer" options={{ title: "AI Layer" }} />
+        <Stack.Screen name="ai-hub" options={{ title: "Hub AI" }} />
       </Stack>
       {showFab ? <FabWidget /> : null}
     </View>

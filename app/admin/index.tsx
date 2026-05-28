@@ -274,6 +274,7 @@ const adminGroups: AdminGroup[] = [
     headerIcon: "settings",
     headerIconSet: "MaterialIcons",
     items: [
+      { key: "ai-hub", label: "Hub AI", icon: "robot-outline", iconSet: "MaterialCommunityIcons", route: "/admin/ai-hub", accentColor: "#FF6600" },
       { key: "system-health", label: "AI System Watchdog", icon: "shield-check", iconSet: "MaterialCommunityIcons", route: "/admin/system-health", accentColor: "#22c55e" },
       { key: "settings", label: "Impostazioni", icon: "settings", iconSet: "MaterialIcons", route: "/admin/settings" },
       { key: "privacy", label: "Gestione Privacy", icon: "shield-lock", iconSet: "MaterialCommunityIcons", route: "/admin/privacy", accentColor: "#4CAF50" },
