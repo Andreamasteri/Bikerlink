@@ -29,7 +29,9 @@ export const aiConversations = pgTable("ai_conversations", {
 ]);
 
 // aiMessages — spostato in shared/db/ai-console-messages.ts (Task #2682).
-export { aiMessages } from "./ai-console-messages";
+// NOTA: nessun re-export qui. Il consumer accede via `@shared/db` (index.ts
+// importa direttamente ai-console-messages.ts). Re-exportare qui
+// ri-includerebbe la tabella nel grafo di drizzle-schema.ts.
 
 export const aiPinnedInsights = pgTable("ai_pinned_insights", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
@@ -46,6 +48,7 @@ export const aiPinnedInsights = pgTable("ai_pinned_insights", {
 
 export type AiConversation = typeof aiConversations.$inferSelect;
 export type InsertAiConversation = typeof aiConversations.$inferInsert;
-export type { AiMessage, InsertAiMessage } from "./ai-console-messages";
+// AiMessage / InsertAiMessage — accessibili via `@shared/db` direttamente da
+// ai-console-messages.ts. Niente re-export qui.
 export type AiPinnedInsight = typeof aiPinnedInsights.$inferSelect;
 export type InsertAiPinnedInsight = typeof aiPinnedInsights.$inferInsert;

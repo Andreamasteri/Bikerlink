@@ -108,8 +108,10 @@ export const bikerZavarrinaMatches = pgTable("biker_zavorrina_matches", {
 ]);
 
 // bikerBikerMatches — spostata in shared/db/matching-drizzle-excluded.ts (Task #2682).
-// Re-export per backward compatibility verso `@shared/db`.
-export { bikerBikerMatches } from "./matching-drizzle-excluded";
+// NOTA: nessun re-export qui. Il consumer accede via `@shared/db` (index.ts
+// importa direttamente matching-drizzle-excluded.ts). Re-exportare qui
+// ri-includerebbe la tabella nel grafo di drizzle-schema.ts → cancella
+// l'esclusione e riporta i conflitti TTY.
 
 export const directMatchRequests = pgTable("direct_match_requests", {
   id: varchar("id", { length: 36 })
@@ -379,8 +381,8 @@ export type ZavarrinaWishlistMoto = typeof zavarrinaWishlistMotos.$inferSelect;
 export type InsertZavarrinaWishlistMoto = typeof zavarrinaWishlistMotos.$inferInsert;
 export type BikerZavarrinaMatch = typeof bikerZavarrinaMatches.$inferSelect;
 export type InsertBikerZavarrinaMatch = typeof bikerZavarrinaMatches.$inferInsert;
-// BikerBikerMatch / InsertBikerBikerMatch — re-export da matching-drizzle-excluded.
-export type { BikerBikerMatch, InsertBikerBikerMatch } from "./matching-drizzle-excluded";
+// BikerBikerMatch / InsertBikerBikerMatch — solo nei moduli che li definiscono
+// (shared/db/matching-drizzle-excluded.ts), accessibili via `@shared/db`.
 export type DirectMatchRequest = typeof directMatchRequests.$inferSelect;
 export type InsertDirectMatchRequest = typeof directMatchRequests.$inferInsert;
 export const dailyPushCounts = pgTable("daily_push_counts", {
@@ -487,15 +489,8 @@ export type UserMatchProfile = typeof userMatchProfile.$inferSelect;
 export type InsertUserMatchProfile = typeof userMatchProfile.$inferInsert;
 
 // matchNegativePreferences + pendingAutoSuggestions — spostate in
-// shared/db/matching-drizzle-excluded.ts (Task #2682). Re-export per backward
-// compatibility.
-export { matchNegativePreferences, pendingAutoSuggestions } from "./matching-drizzle-excluded";
-export type {
-  MatchNegativePreference,
-  InsertMatchNegativePreference,
-  PendingAutoSuggestion,
-  InsertPendingAutoSuggestion,
-} from "./matching-drizzle-excluded";
+// shared/db/matching-drizzle-excluded.ts (Task #2682). Nessun re-export qui:
+// vedi NOTA sopra su bikerBikerMatches.
 
 export const NEGATIVE_PREF_KINDS = [
   "bike_type",

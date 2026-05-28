@@ -46,9 +46,15 @@ export default defineConfig({
     // four tables from drizzle-kit management stops the noise; the indexes already
     // exist in the DB and are preserved unchanged. Any future DDL changes for these
     // tables must go through a numbered SQL migration in migrations/.
-    // Task #2682 — biker_biker_matches, match_negative_preferences,
-    // pending_auto_suggestions, ai_messages NON sono in tablesFilter perché
-    // sono state spostate fuori da drizzle-schema.ts (vedi
-    // shared/db/matching-drizzle-excluded.ts e shared/db/ai-console-messages.ts).
+    // Task #2682 — defense-in-depth: queste 4 tabelle sono già escluse dal
+    // grafo di drizzle-schema.ts (spostate in matching-drizzle-excluded.ts e
+    // ai-console-messages.ts, non re-exportate dai moduli inclusi). Le
+    // riaggiungiamo a tablesFilter come ulteriore safeguard: se un futuro
+    // refactor reintroducesse un re-export accidentale, tablesFilter
+    // continuerebbe comunque a impedirne la gestione da parte di drizzle-kit.
+    "!biker_biker_matches",
+    "!match_negative_preferences",
+    "!pending_auto_suggestions",
+    "!ai_messages",
   ],
 });
