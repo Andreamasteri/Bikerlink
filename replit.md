@@ -78,6 +78,37 @@ Quando il gate ratchet (Task #2584) è attivo e blocca un file LOCKED cresciuto,
 
 3. **"Fatto" ≠ "credo di aver fatto"**: per task di rimozione/pulizia, "fatto" significa che esiste una prova oggettiva nell'output finale (binario, log, response API). Se la prova non c'è, dichiarare esplicitamente "applicato ma non verificato sul binario" — non "fatto".
 
+## Convenzione plan file dei task — sezione "Modalità di esecuzione consigliata"
+
+**Regola obbligatoria per ogni nuovo project task**: il plan file in `.local/tasks/<slug>.md` deve includere in fondo una sezione **`## Modalità di esecuzione consigliata`** con:
+
+1. **Scelta esplicita**: `Main agent` oppure `Task agent isolato`.
+2. **Motivi**: 2-5 bullet che giustifichino la scelta in base ai criteri qui sotto.
+
+**Criteri di scelta:**
+
+| Caso | Modalità consigliata |
+|------|----------------------|
+| Tocca DB di **produzione**, secret, deploy, OTA publish, o richiede conferma utente interattiva | **Main agent** |
+| Richiede di osservare log/runtime dell'ambiente principale **subito dopo** la modifica | **Main agent** |
+| Modifiche piccole (<200 righe, 1-2 file), debug puntuale, hotfix | **Main agent** |
+| Feature isolata, multi-file (>5), niente dipendenze da prod o da log live | **Task agent isolato** |
+| Refactor ampi con boundary chiari, scritti per essere mergiati indipendentemente | **Task agent isolato** |
+| Più task indipendenti che possono girare in parallelo | **Task agent isolato** (uno per task) |
+
+**Razionale**: l'utente sceglie chi esegue il task (main agent o task agent isolato) dopo che il task è proposto. Senza il suggerimento il rischio è scegliere il canale sbagliato — es. mandare in task agent isolato un fix che richiede l'apply su DB prod (impossibile da fare nella bolla) o tenere sul main agent un refactor lungo che bloccherebbe la chat per ore.
+
+**Esempio minimo:**
+```markdown
+## Modalità di esecuzione consigliata
+**Main agent**.
+
+Motivi:
+- Tocca il DB di produzione (write via database skill con environment="production"), richiede conferma utente.
+- Volume ridotto (1 script SQL + 1 nota docs).
+- Necessita osservazione log deployment post-apply.
+```
+
 ## Sincronizzazione node_modules dopo merge (Task #2573)
 
 **Root cause documentato**: i task agent lavorano in ambienti isolati con il proprio `node_modules`. Quando un task viene mergeato nell'app principale, il merge committa **solo** `package.json` + `package-lock.json` — `node_modules` NON viene sincronizzato. Risultato storico: dopo merge di task che installano nuove deps (es. #2541→#2561, che ha aggiunto pino/helmet/bullmq/ioredis/sentry/etc.), il server crasha in loop con `Cannot find module 'X'` per ogni pacchetto dichiarato ma non presente in `node_modules`.
