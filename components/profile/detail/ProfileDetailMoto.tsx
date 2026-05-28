@@ -3,6 +3,13 @@ import { View, Text, StyleSheet } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
+interface ProfileMotoTag {
+  id: string;
+  slug?: string;
+  label: string;
+  categorySlug?: string;
+  categoryLabel?: string;
+}
 interface ProfileMoto {
   id: string;
   brand?: string | null;
@@ -12,6 +19,7 @@ interface ProfileMoto {
   ridingStyle?: string | null;
   isForSale?: boolean;
   saleDescription?: string | null;
+  tags?: ProfileMotoTag[];
 }
 interface ProfileDetailMotoProps {
   profile: { motorcycles?: ProfileMoto[] };
@@ -41,6 +49,15 @@ export const ProfileDetailMoto: React.FC<ProfileDetailMotoProps> = ({ profile, m
             {marketplaceEnabled && m.isForSale && !!m.saleDescription && (
               <Text style={[styles.motoDetail, { fontStyle: "italic", marginTop: 4 }]}>{m.saleDescription}</Text>
             )}
+            {!!m.tags && m.tags.length > 0 && (
+              <View style={styles.tagsRow}>
+                {m.tags.map((t) => (
+                  <View key={t.id} style={styles.tagChip}>
+                    <Text style={styles.tagChipText}>{t.label}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         </View>
       ))}
@@ -67,4 +84,12 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   saleBadgeText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: "#FF9800" },
+  tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 6 },
+  tagChip: {
+    backgroundColor: Colors.accent + "20",
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  tagChipText: { fontSize: 12, fontFamily: "Inter_500Medium", color: Colors.accent },
 });

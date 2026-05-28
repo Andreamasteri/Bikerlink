@@ -80,7 +80,22 @@ router.get("/:id/public", requireAuth, async (req: Request, res: Response) => {
     const { password: _, ...safeUser } = user;
     const profile = await storage.getUserProfile(userId);
     const photos = (await storage.getUserPhotos(userId)).filter((p) => p.isApproved);
-    const motorcycles = await storage.getUserMotorcycles(userId);
+    const baseMotorcycles = await storage.getUserMotorcycles(userId);
+    const motorcycles = await Promise.all(
+      baseMotorcycles.map(async (m) => {
+        const motoTags = await storage.getTagsForEntity("motorcycle", m.id);
+        return {
+          ...m,
+          tags: motoTags.map((t) => ({
+            id: t.id,
+            slug: t.slug,
+            label: t.label,
+            categorySlug: t.categorySlug,
+            categoryLabel: t.categoryLabel,
+          })),
+        };
+      }),
+    );
 
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     const isOnline = !user.ghostMode && user.lastLoginAt != null && new Date(user.lastLoginAt) >= fifteenMinutesAgo;
