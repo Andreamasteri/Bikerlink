@@ -1,5 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import React, { useMemo, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
@@ -187,15 +187,42 @@ function renderGroupHeaderIcon(group: AdminGroup) {
   }
 }
 
+function normalize(text: string): string {
+  return text
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
 export default function AdminDashboard() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [search, setSearch] = useState("");
 
   function handleItemPress(item: AdminItem) {
     if (item.route) {
       router.push(item.route as Href);
     }
   }
+
+  const normalizedSearch = normalize(search);
+  const filteredGroups = useMemo(() => {
+    if (!normalizedSearch) return adminGroups;
+    return adminGroups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) =>
+          normalize(item.label).includes(normalizedSearch)
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [normalizedSearch]);
+
+  const isSearching = normalizedSearch.length > 0;
+  const hasInput = search.length > 0;
+  const isEmpty = isSearching && filteredGroups.length === 0;
 
   return (
     <ScrollView
@@ -204,13 +231,49 @@ export default function AdminDashboard() {
         styles.content,
         { paddingBottom: insets.bottom + 20, paddingTop: 0 },
       ]}
+      keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.subtitle}>Gestisci tutti gli aspetti dell'app</Text>
 
-      <TelemetryCard />
-      <GraphHopperCard />
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={18} color={Colors.textSecondary} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Cerca funzione…"
+          placeholderTextColor={Colors.textSecondary}
+          autoCorrect={false}
+          autoCapitalize="none"
+          returnKeyType="search"
+          testID="admin-search-input"
+        />
+        {hasInput && (
+          <TouchableOpacity
+            onPress={() => setSearch("")}
+            style={styles.clearButton}
+            testID="admin-search-clear"
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="close-circle" size={20} color={Colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
 
-      {adminGroups.map((group) => (
+      {!isSearching && (
+        <>
+          <TelemetryCard />
+          <GraphHopperCard />
+        </>
+      )}
+
+      {isEmpty && (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyStateText}>Nessuna funzione trovata</Text>
+        </View>
+      )}
+
+      {filteredGroups.map((group) => (
         <React.Fragment key={group.title}>
           <View style={styles.groupContainer}>
             <View style={styles.groupHeader}>
@@ -257,6 +320,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginBottom: 20,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    paddingHorizontal: 12,
+    marginBottom: 20,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.text,
+    paddingVertical: 12,
+  },
+  clearButton: {
+    marginLeft: 8,
+  },
+  emptyState: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  emptyStateText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.textSecondary,
   },
   groupContainer: {
     marginBottom: 24,
