@@ -20,12 +20,14 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../server/db";
 import { aiConflicts, aiDecisions, aiEvents } from "../shared/db";
 import { getCoordinator, pauseAi, resumeAi, isAiPaused } from "../server/ai/coordinator";
+import { createAdminSession, destroyAdminSession } from "./lib/admin-session";
 
 const BASE = (process.argv.find((a) => a.startsWith("--base="))?.slice(7))
   ?? process.env.E2E_BASE
   ?? "http://localhost:5000";
 const ADMIN_ID = process.env.ADMIN_USER_ID;
-const SESSION_COOKIE = process.env.SESSION_COOKIE;
+let SESSION_COOKIE: string | undefined = process.env.SESSION_COOKIE;
+let autoDerivedSid: string | undefined;
 if (!ADMIN_ID) {
   console.error("ADMIN_USER_ID env richiesto (uuid admin/superadmin).");
   process.exit(2);
@@ -64,6 +66,12 @@ function assert(cond: unknown, msg: string): asserts cond {
 }
 
 async function main() {
+  if (!SESSION_COOKIE && process.env.SESSION_SECRET) {
+    const s = await createAdminSession(ADMIN_ID!, { ttlSeconds: 600 });
+    SESSION_COOKIE = s.cookieHeader;
+    autoDerivedSid = s.sid;
+    console.log(`[setup] SESSION_COOKIE auto-derivato da ADMIN_USER_ID (sid=${s.sid.slice(0, 8)})`);
+  }
   const c = getCoordinator();
   const corrTag = `e2e-${Date.now().toString(36)}`;
 
@@ -366,8 +374,13 @@ async function main() {
   const failed = results.filter((r) => !r.ok);
   const skipped = results.filter((r) => r.skipped).length;
   console.log(`\n=== ${results.length - failed.length - skipped}/${results.length} passed, ${skipped} skipped, ${failed.length} failed ===`);
+  if (autoDerivedSid) await destroyAdminSession(autoDerivedSid).catch(() => {});
   if (failed.length) process.exit(1);
   process.exit(0);
 }
 
-main().catch((err) => { console.error("FATAL", err); process.exit(2); });
+main().catch(async (err) => {
+  console.error("FATAL", err);
+  if (autoDerivedSid) await destroyAdminSession(autoDerivedSid).catch(() => {});
+  process.exit(2);
+});

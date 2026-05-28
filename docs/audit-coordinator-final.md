@@ -133,17 +133,18 @@ FASE B: Coordinator DOWN — parità outcome (7/7 ✅)
 
 1. **Cold start watchdog flow al primo boot del workflow Start App**: il watchdog rileva `BACKEND_DOWN` e `METRO CRASH` nei primi secondi prima che il polling healthcheck rilevi i servizi up. Comportamento atteso (cooldown 60s/90s), recovery automatico entro 10s. Nessuna azione necessaria.
 2. **Tabella `ai_events` colonna timestamp**: la colonna è `created_at` (non `ts`). Documentare per evitare query a vuoto da operatori che ricordano il nome `ts`.
-3. **E2E scenario D**: skip-by-design senza `SESSION_COOKIE`. Per attivarlo manualmente in CI: settare la env con un cookie admin valido. G+H restano la copertura sempre-on del contratto.
+3. **E2E scenario D**: ~~skip-by-design senza `SESSION_COOKIE`~~ **RISOLTO** — ora `scripts/e2e-ai-coordinator.ts` auto-deriva la session admin via `scripts/lib/admin-session.ts` (insert in `session` + firma `cookie-signature` con `SESSION_SECRET`). Run senza `SESSION_COOKIE` → 8/8 PASS incluso D (override admin con `resolvedBy='admin'`). Cleanup automatico del sid in finally.
 
 ---
 
-## Follow-up proposti
+## Follow-up risolti contestualmente
 
-| Ref | Severità | Descrizione | Razionale |
-|-----|----------|-------------|-----------|
-| #FU-1 | low | Smoke automatico rotte utente critiche (login + feed match + proposte + chat + OTA check) in `scripts/smoke-user-routes.ts` | Oggi rotte utente non hanno smoke automatico post-deploy; coperte solo da pingiter /api/health |
-| #FU-2 | low | Long-run stability script (30 min) `scripts/stability-long-run.sh` con RSS sampling | Audit time-window stability mancante per release confidence |
-| #2662 | already-proposed | Allinea schema database dev/prod per dashboard watchdog | Auto-generato da agent-inbox durante l'audit |
+| Ref | Stato | Descrizione | File |
+|-----|-------|-------------|------|
+| #FU-1 | ✅ DONE | Smoke automatico rotte utente critiche (10 probe: health, version, ota/manifest, auth/me, garage/biker/proposal matches, chat conversations, notifications, proposals). Run: 10/10 PASS. | `scripts/smoke-user-routes.ts` |
+| #FU-2 | ✅ DONE | Long-run stability sampler con health-check + RSS sampling, `DURATION_SEC` e `SAMPLE_INTERVAL_SEC` configurabili, warning su crescita RSS >20% vs baseline. Burn-in 60s validato: 4/4 health 200. | `scripts/stability-long-run.sh` |
+| D (E2E) | ✅ DONE | Auto-derivazione `SESSION_COOKIE` da `ADMIN_USER_ID` + `SESSION_SECRET`. Scenario D non più skip. | `scripts/lib/admin-session.ts`, `scripts/e2e-ai-coordinator.ts` |
+| #2662 | proposed | Allinea schema database dev/prod per dashboard watchdog | Auto-generato da agent-inbox |
 
 Nessun issue critical o high rilevato. Bundle Layer AI Coordinato (a/b/c + e2e #2660) è **stabile, coerente e pronto per produzione**.
 
