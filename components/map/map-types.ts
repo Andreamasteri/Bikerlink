@@ -83,6 +83,8 @@ export interface InteractiveMapProps {
   onToggleFilterClubs?: () => void;
   filterEvents?: boolean;
   onToggleFilterEvents?: () => void;
+  motoTags?: string[];
+  onChangeMotoTags?: (next: string[]) => void;
   onClubPress?: (club: ClubMapPin) => void;
   onProposeClubLocation?: (club: ClubMapPin) => void;
   initialCenterOverride?: { latitude: number; longitude: number } | null;

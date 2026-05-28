@@ -488,6 +488,13 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
       radius = Number.isFinite(parsed) ? parsed : 50;
     }
     const countriesParam = req.query.countries ? (req.query.countries as string).split(",").filter(Boolean) : undefined;
+    // Task #2721 — filtro opzionale per tag della moto sulla mappa.
+    // Accetta `motoTags=<id1>,<id2>` (id dei tag, qualunque categoria,
+    // tipicamente `tipo_moto`/`stile_guida`). Semantica OR: include utenti
+    // con almeno una moto associata a uno dei tag richiesti.
+    const motoTagsParam = req.query.motoTags
+      ? (req.query.motoTags as string).split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined;
     if (isNaN(lat) || isNaN(lng)) {
       return sendError(res, 400, "Parametri lat e lng richiesti");
     }
@@ -498,7 +505,7 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     const globalOfflineRandomize = offlineRandomSetting?.value !== "false";
     const mapVisibilityFilter = (mapFilterSetting?.value as "all" | "online_only" | "available_only") || "all";
     const blockedIds = new Set(await storage.getBlockedUserIds(requesterId));
-    const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam);
+    const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam, motoTagsParam);
     const fifteenMinutesAgoNearby = new Date(Date.now() - 15 * 60 * 1000);
     const results = nearbyUsers
       .filter((item) => !blockedIds.has(item.user.id))

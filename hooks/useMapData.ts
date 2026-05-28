@@ -13,6 +13,7 @@ type Props = {
   mapReady: boolean;
   countriesLoaded: boolean;
   countriesQueryParam: string;
+  motoTags?: string[];
   showOnlineList: boolean;
   showBikerList: boolean;
   showZavorrinaList: boolean;
@@ -31,6 +32,7 @@ export function useMapData({
   mapReady,
   countriesLoaded,
   countriesQueryParam,
+  motoTags,
   showOnlineList,
   showBikerList,
   showZavorrinaList,
@@ -49,9 +51,13 @@ export function useMapData({
   // come unico filtro spaziale, non un raggio "vicino a me". Inviamo quindi
   // sempre `radius=world` così il backend non taglia gli utenti fuori dai 50km.
   const radiusParam = "world";
+  // Task #2721 — chiave normalizzata (ordinata + dedup) per cache stabile.
+  const motoTagsKey = (motoTags && motoTags.length > 0)
+    ? Array.from(new Set(motoTags)).sort().join(",")
+    : "";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nearbyUsersQuery = useQuery<any[]>({
-    queryKey: ["/api/users/nearby", location?.latitude, location?.longitude, countriesQueryParam, radiusParam],
+    queryKey: ["/api/users/nearby", location?.latitude, location?.longitude, countriesQueryParam, radiusParam, motoTagsKey],
     queryFn: async () => {
       if (!location) return [];
       const url = new URL("/api/users/nearby", baseUrl);
@@ -59,6 +65,7 @@ export function useMapData({
       url.searchParams.set("lng", String(location.longitude));
       url.searchParams.set("radius", radiusParam);
       if (countriesQueryParam) url.searchParams.set("countries", countriesQueryParam);
+      if (motoTagsKey) url.searchParams.set("motoTags", motoTagsKey);
       const res = await apiRequest("GET", url.pathname + url.search);
       return res.json();
     },

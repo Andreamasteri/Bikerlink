@@ -46,6 +46,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   showEventPins = true, clubPins = [],
   filterClubs = true, onToggleFilterClubs,
   filterEvents = true, onToggleFilterEvents,
+  motoTags, onChangeMotoTags,
   onClubPress, initialCenterOverride,
   onRegionChangeComplete, gpsFollowupEnabled = false,
   showHazardReportButton = false,
@@ -252,6 +253,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           showEventPins={showEventPins} topOffset={filterBarTopOffset}
           onToggleFilterBiker={onToggleFilterBiker} onToggleFilterZavorrina={onToggleFilterZavorrina}
           onToggleFilterClubs={onToggleFilterClubs} onToggleFilterEvents={onToggleFilterEvents}
+          motoTags={motoTags} onChangeMotoTags={onChangeMotoTags}
         />
       )}
       <MapControls

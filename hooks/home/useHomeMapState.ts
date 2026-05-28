@@ -112,10 +112,12 @@ export function useHomeMapState() {
     filterZavorrina,
     filterClubs,
     filterEvents,
+    motoTags,
     toggleFilterBiker,
     toggleFilterZavorrina,
     toggleFilterClubs,
     toggleFilterEvents,
+    setMotoTags,
   } = useMapFilters({ user, isAuthenticated });
 
   const typedUser = user as UserWithProfileCoords | null | undefined;
@@ -138,6 +140,7 @@ export function useHomeMapState() {
     mapReady,
     countriesLoaded,
     countriesQueryParam,
+    motoTags,
     showOnlineList,
     showBikerList,
     showZavorrinaList,
@@ -517,10 +520,12 @@ export function useHomeMapState() {
     filterZavorrina,
     filterClubs,
     filterEvents,
+    motoTags,
     toggleFilterBiker,
     toggleFilterZavorrina,
     toggleFilterClubs,
     toggleFilterEvents,
+    setMotoTags,
     location,
     locationLoading,
     setLocation,

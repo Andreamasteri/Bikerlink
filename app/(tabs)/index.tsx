@@ -88,10 +88,12 @@ export default function MapScreen() {
     filterZavorrina,
     filterClubs,
     filterEvents,
+    motoTags,
     toggleFilterBiker,
     toggleFilterZavorrina,
     toggleFilterClubs,
     toggleFilterEvents,
+    setMotoTags,
     locationLoading,
     mapData,
     saveCountries,
@@ -328,6 +330,8 @@ export default function MapScreen() {
             onToggleFilterZavorrina={toggleFilterZavorrina}
             onToggleFilterClubs={toggleFilterClubs}
             onToggleFilterEvents={toggleFilterEvents}
+            motoTags={motoTags}
+            onChangeMotoTags={setMotoTags}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- MapUser index signature mismatch between map-types and useHomeMapState
             onUserPress={(u) => { handleUserPress(u as any); }}
             // eslint-disable-next-line @typescript-eslint/no-explicit-any -- EasterEgg vs MapEasterEgg index signature mismatch
