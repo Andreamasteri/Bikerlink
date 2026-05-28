@@ -10,6 +10,7 @@ import { collectDb } from "./collectors/db-collector";
 import { collectRedis } from "./collectors/redis-collector";
 import { collectLatency } from "./collectors/latency-collector";
 import { collectErrors } from "./collectors/error-collector";
+import { collectMaps } from "./collectors/maps-collector";
 import { recordSignals } from "./signals";
 import type { HealthSnapshot, Problem, Severity, Signal } from "./types";
 import { collectDbIntegrity } from "../db-integrity/collector";
@@ -81,6 +82,45 @@ function deriveProblems(signals: Signal[]): Problem[] {
       title = `${s.value} crash client nell'ultima ora`;
     } else if (s.metric === "collector.error") {
       title = `Errore collector ${s.source}`;
+    } else if (s.metric === "client.webview_crash_5min") {
+      title = `Crash mappa WebView: ${s.value} negli ultimi 5 min`;
+      suggestion = "Verifica renderer più colpito e log lato client.";
+    } else if (s.metric === "client.tile_load_error_5min") {
+      title = `Errori caricamento tile: ${s.value}/5min`;
+      suggestion = "Possibile provider tile down o problema rete.";
+    } else if (s.metric === "client.map_init_failed_5min") {
+      title = `Init mappa fallita: ${s.value}/5min`;
+      suggestion = "Bundle WebView corrotto o stile MapLibre invalido.";
+    } else if (s.metric === "client.gps_lost_5min") {
+      title = `GPS perso su ${s.value} dispositivi (5 min)`;
+    } else if (s.metric === "client.render_avg_ms") {
+      title = `Render mappa lento: ${s.value}ms (media)`;
+    } else if (s.metric === "client.routing_failed_5min") {
+      title = `Routing fallito ${s.value} volte (5 min)`;
+    } else if (s.metric === "routing.fallback_rate") {
+      const pct = Math.round(Number(s.value) * 100);
+      title = `Routing fallback rate ${pct}%`;
+      suggestion = "Engine primario in difficoltà — controlla GraphHopper/Valhalla.";
+    } else if (s.metric.startsWith("routing.engine_down.")) {
+      const engine = s.metric.split(".")[2];
+      title = `Routing engine ${engine} down da ${s.value} min`;
+      suggestion = `Verifica salute ${engine} e quota. Fallback su GraphHopper attivo.`;
+    } else if (s.metric === "quota.mapbox" || s.metric === "quota.tomtom") {
+      const provider = s.metric.split(".")[1];
+      title = `Quota ${provider} al ${s.value}%`;
+      suggestion = "Considera passare a engine self-hosted per il resto del mese.";
+    } else if (s.metric.startsWith("health.tile.")) {
+      const tile = s.metric.split(".")[2];
+      title = `Tile provider ${tile} non raggiungibile`;
+      suggestion = "Verifica disponibilità CDN tile e fallback configurato.";
+    } else if (s.metric.startsWith("health.engine.")) {
+      const engine = s.metric.split(".")[2];
+      title = `Routing engine ${engine} health-check KO`;
+      suggestion = `Pinga manualmente ${engine}, verifica DNS/firewall.`;
+    } else if (s.metric === "matching.last_run_h") {
+      title = `Map-matching: ultimo run ${s.value}h fa`;
+    } else if (s.metric === "matching.pending") {
+      title = `Map-matching pending: ${s.value} rides`;
     }
     problems.push({
       id, severity: s.severity, source: s.source, title, suggestion,
@@ -114,7 +154,7 @@ export async function runAggregatorCycle(): Promise<HealthSnapshot> {
   const collectors = await Promise.allSettled([
     collectBullMq(), collectScheduler(), collectDb(),
     collectRedis(), collectLatency(), collectErrors(),
-    collectDbIntegritySignals(),
+    collectDbIntegritySignals(), collectMaps(),
   ]);
   const signals: Signal[] = [];
   for (const r of collectors) {

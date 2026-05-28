@@ -1,5 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from "react-native";
+import { router } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -105,6 +107,12 @@ export default function AdminMapsPage() {
         </Text>
       </View>
 
+      <TouchableOpacity style={styles.healthLink} onPress={() => router.push("/admin/system-health")}>
+        <MaterialCommunityIcons name="heart-pulse" size={18} color={Colors.accent} />
+        <Text style={styles.healthLinkText}>Apri Maps Health (System Watchdog)</Text>
+        <MaterialCommunityIcons name="chevron-right" size={18} color={Colors.textSecondary} />
+      </TouchableOpacity>
+
       <RolloutCard
         rollout={data.rollout}
         isPending={rolloutMutation.isPending}
@@ -173,6 +181,12 @@ const styles = StyleSheet.create({
     borderColor: Colors.accent + "30",
   },
   warningText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
+  healthLink: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    backgroundColor: Colors.surface,
+    borderRadius: 10, padding: 12, marginBottom: 12,
+  },
+  healthLinkText: { flex: 1, color: Colors.text, fontSize: 14, fontFamily: "Inter_600SemiBold" },
   osmBox: {
     backgroundColor: Colors.surface,
     borderRadius: 8,

@@ -16,6 +16,7 @@ import { MetricsGrid } from "@/components/admin/system-health/MetricsGrid";
 import { ProposalsCard, type WatchdogLog } from "@/components/admin/system-health/ProposalsCard";
 import { WatchdogChat } from "@/components/admin/system-health/WatchdogChat";
 import { TrendsChart } from "@/components/admin/system-health/TrendsChart";
+import { MapsHealthCard } from "@/components/admin/system-health/MapsHealthCard";
 import { useAdminWatchdogAlerts } from "@/hooks/useAdminWatchdogAlerts";
 
 interface Snapshot {
@@ -174,6 +175,9 @@ export default function SystemHealthScreen() {
 
           <SectionTitle icon="chart-box-outline">Metriche</SectionTitle>
           <MetricsGrid metrics={snap.metrics} />
+
+          <SectionTitle icon="map-marker-radius">Maps Health</SectionTitle>
+          <MapsHealthCard />
 
           <SectionTitle icon="robot-outline">Proposte AI in attesa</SectionTitle>
           <ProposalsCard

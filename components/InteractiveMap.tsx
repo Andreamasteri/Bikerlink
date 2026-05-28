@@ -19,6 +19,7 @@ import { useMapStateSync } from "@/hooks/useMapStateSync";
 import { createMapMessageHandler } from "@/components/map/createMapMessageHandler";
 import { HazardDetailSheet } from "@/components/map/HazardDetailSheet";
 import { HazardReportSheet } from "@/components/map/HazardReportSheet";
+import { useMapTelemetry } from "@/hooks/useMapTelemetry";
 import { HAZARD_ICONS } from "@shared/db/road-hazards";
 import type {
   MapUser, MapWorkshop, MapEasterEgg, MapSosRequest,
@@ -71,6 +72,22 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
   const effectiveTileUrl = activePreset.tileUrl;
   const effectiveTileMaxZoom = activePreset.maxZoom;
   useEffect(() => { sendStartupBeacon("interactive_map_mount"); }, []);
+
+  // Task #2686 — Maps watchdog telemetry
+  const tlm = useMapTelemetry("InteractiveMap", "leaflet");
+  const mapInitStartRef = useRef<number>(Date.now());
+  useEffect(() => {
+    mapInitStartRef.current = Date.now();
+    tlm.emit("map_init");
+    return () => { tlm.emit("map_destroy"); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (mapReady) {
+      tlm.emit("map_ready", { durationMs: Date.now() - mapInitStartRef.current });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady]);
 
   const today = new Date().toISOString().substring(0, 10);
   const { data: eventPinsRaw } = useQuery<EventMapPin[]>({

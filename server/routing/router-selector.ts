@@ -6,6 +6,7 @@ import { calculateRoute as mapboxCalculateRoute } from "./mapbox-directions-clie
 import { calculateRoute as tomtomCalculateRoute } from "./tomtom-routing-client";
 import { checkQuota } from "./mapbox/quota-guard";
 import { checkQuota as checkTomTomQuota } from "./tomtom/quota-guard";
+import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } from "./routing-metrics";
 
 interface RouterSelectorOptions {
   rollout: MapsRollout;
@@ -69,6 +70,7 @@ async function routeViaValhallaWithFallback(
     if (res && !res.headersSent) {
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
+    recordRoutingFallback("valhalla", "graphhopper");
     return routeViaGraphHopper(req);
   }
 }
@@ -103,6 +105,7 @@ async function routeViaMapboxWithFallback(
     if (res && !res.headersSent) {
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
+    recordRoutingFallback("mapbox", "graphhopper");
     return routeViaGraphHopper(req);
   }
 }
@@ -152,6 +155,7 @@ async function routeViaTomTomWithFallback(
     if (res && !res.headersSent) {
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
+    recordRoutingFallback("tomtom", "graphhopper");
     return routeViaGraphHopper(req);
   }
 }
@@ -167,23 +171,36 @@ export async function getActiveRouter(
   opts: RouterSelectorOptions,
   res?: Response
 ): Promise<RouteResult> {
+  const wrapMetrics = async (
+    engine: "graphhopper" | "valhalla" | "mapbox" | "tomtom",
+    fn: () => Promise<RouteResult>,
+  ): Promise<RouteResult> => {
+    try {
+      const out = await fn();
+      // Se la richiesta è stata servita tramite fallback (header impostato dalle
+      // funzioni routeViaXxxWithFallback), `recordRoutingFallback` per l'engine
+      // originale è già stato registrato — qui contiamo il successo per
+      // l'engine di destinazione (GraphHopper) e NON per quello originale.
+      const fallbackTo = res?.getHeader("X-Routing-Fallback");
+      if (typeof fallbackTo === "string" && fallbackTo.length > 0) {
+        recordRoutingSuccess(fallbackTo as "graphhopper" | "valhalla" | "mapbox" | "tomtom");
+      } else {
+        recordRoutingSuccess(engine);
+      }
+      return out;
+    } catch (err) {
+      recordRoutingFailure(engine);
+      throw err;
+    }
+  };
+
   if (!isNewEngineEnabled(opts)) {
-    return routeViaGraphHopper(req);
+    return wrapMetrics("graphhopper", () => routeViaGraphHopper(req));
   }
-
-  if (opts.engine === "valhalla") {
-    return routeViaValhallaWithFallback(req, res);
-  }
-
-  if (opts.engine === "mapbox-directions") {
-    return routeViaMapboxWithFallback(req, res);
-  }
-
-  if (opts.engine === "tomtom") {
-    return routeViaTomTomWithFallback(req, res);
-  }
-
-  return routeViaGraphHopper(req);
+  if (opts.engine === "valhalla") return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, res));
+  if (opts.engine === "mapbox-directions") return wrapMetrics("mapbox", () => routeViaMapboxWithFallback(req, res));
+  if (opts.engine === "tomtom") return wrapMetrics("tomtom", () => routeViaTomTomWithFallback(req, res));
+  return wrapMetrics("graphhopper", () => routeViaGraphHopper(req));
 }
 
 export async function resolveActiveEngine(opts: RouterSelectorOptions): Promise<RoutingEngineId> {

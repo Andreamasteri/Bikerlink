@@ -13,6 +13,7 @@ import { MapZoomSlider } from "@/components/map/MapZoomSlider";
 import { MapNorthCompass } from "@/components/map/MapNorthCompass";
 import Colors from "@/constants/colors";
 import type { RouteMapProps } from "@/lib/maps/types";
+import { useMapTelemetry } from "@/hooks/useMapTelemetry";
 
 export default function MapLibreRouteMap({
   waypoints, height, typeColors: _typeColors, showMarkers: _showMarkers = true, trackPoints,
@@ -24,6 +25,12 @@ export default function MapLibreRouteMap({
   const webViewRef = useRef<WebView>(null);
   const onFatalErrorRef = useRef(onFatalError);
   onFatalErrorRef.current = onFatalError;
+  const tlm = useMapTelemetry("MapLibreRouteMap", "maplibre");
+  useEffect(() => {
+    tlm.emit("map_init");
+    return () => { tlm.emit("map_destroy"); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [viewState, setViewState] = useState({
     zoom: 10, minZoom: 0, maxZoom: 22, bearing: 0, lat: 45.5, lng: 10.5,
   });
@@ -41,11 +48,11 @@ export default function MapLibreRouteMap({
     setSkeletonVisible(true);
   }, [mapHtml, fadeAnim]);
 
-  const handleLoadEnd = () => {
+  const handleLoadEnd = useCallback(() => {
     Animated.timing(fadeAnim, {
       toValue: 1, duration: 300, useNativeDriver: true,
     }).start(() => setSkeletonVisible(false));
-  };
+  }, [fadeAnim]);
 
   const inject = useCallback((js: string) => {
     webViewRef.current?.injectJavaScript(js + ";true;");
@@ -64,13 +71,20 @@ export default function MapLibreRouteMap({
         lng: msg.lng ?? 0,
       });
     } else if (msg.type === "error") {
+      tlm.emit("style_load_error", { errorMessage: String((msg as { error?: string }).error ?? "maplibre error") });
       onFatalErrorRef.current?.();
     }
-  }, []);
+  }, [tlm]);
 
   const handleWebViewError = useCallback(() => {
+    tlm.emit("webview_crash");
     onFatalErrorRef.current?.();
-  }, []);
+  }, [tlm]);
+
+  const handleLoadEndTlm = useCallback(() => {
+    handleLoadEnd();
+    tlm.emit("map_ready");
+  }, [tlm, handleLoadEnd]);
 
   const handleZoomChange = useCallback((z: number) => {
     setViewState((prev) => ({ ...prev, zoom: z }));
@@ -101,7 +115,7 @@ export default function MapLibreRouteMap({
           overScrollMode="never"
           cacheEnabled={false}
           startInLoadingState={false}
-          onLoadEnd={handleLoadEnd}
+          onLoadEnd={handleLoadEndTlm}
           onError={handleWebViewError}
         />
       </Animated.View>

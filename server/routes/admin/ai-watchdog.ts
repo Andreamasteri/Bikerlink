@@ -13,6 +13,15 @@ import { runAutoFix } from "../../ai/watchdog/auto-fix";
 import { runProposer } from "../../ai/watchdog/proposer";
 import { markProposalAccepted, markProposalRejected } from "../../ai/watchdog/log";
 import { runWeeklyReport } from "../../ai/watchdog/weekly-report";
+import {
+  type MapsKillSwitchKey,
+  getAllMapsFlags, setMapsFlag,
+} from "../../ai/watchdog/maps-kill-switch";
+
+const MAPS_FLAGS: readonly MapsKillSwitchKey[] = ["telemetry", "collector", "llm", "alerts"] as const;
+import { getMapsTelemetryBuckets, aggregateMapsTelemetry, getMapsSummaryTelemetry } from "../../ai/watchdog/maps-telemetry-store";
+import { getLastHealthCheckResults, runMapsHealthChecks } from "../../ai/watchdog/maps-health-checks";
+import { getRoutingCounters } from "../../routing/routing-metrics";
 
 const router = Router();
 
@@ -170,6 +179,53 @@ router.post("/watchdog/chat", async (req: Request, res: Response) => {
     res.write(`event: error\ndata: ${JSON.stringify({ code, message })}\n\n`);
     res.end();
   }
+});
+
+// === Task #2686 — Maps watchdog admin endpoints ===
+
+router.get("/watchdog/maps/flags", async (_req, res) => {
+  const flags = await getAllMapsFlags();
+  return res.json({ flags });
+});
+
+router.post("/watchdog/maps/flags", async (req, res) => {
+  const schema = z.object({
+    flag: z.enum(MAPS_FLAGS as unknown as [MapsKillSwitchKey, ...MapsKillSwitchKey[]]),
+    enabled: z.boolean(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+  await setMapsFlag(parsed.data.flag, parsed.data.enabled);
+  return res.json({ flag: parsed.data.flag, enabled: parsed.data.enabled });
+});
+
+router.get("/watchdog/maps/buckets", async (req, res) => {
+  const minutes = Math.min(1440, Math.max(15, Number(req.query.minutes ?? 60)));
+  const hours = Math.max(1, Math.ceil(minutes / 60));
+  const buckets = await getMapsTelemetryBuckets(hours);
+  return res.json({ minutes, buckets });
+});
+
+router.get("/watchdog/maps/summary", async (_req, res) => {
+  const [telemetry, agg, healthResults, routing, flags] = await Promise.all([
+    getMapsSummaryTelemetry(5 * 60_000),
+    aggregateMapsTelemetry(5 * 60_000),
+    Promise.resolve(getLastHealthCheckResults()),
+    Promise.resolve(getRoutingCounters(5 * 60_000)),
+    getAllMapsFlags(),
+  ]);
+  return res.json({
+    telemetry,
+    aggregate: agg,
+    health: healthResults ?? { at: Date.now(), results: [] },
+    routing,
+    flags,
+  });
+});
+
+router.post("/watchdog/maps/health/run", async (_req, res) => {
+  const results = await runMapsHealthChecks(true);
+  return res.json({ results });
 });
 
 export default router;

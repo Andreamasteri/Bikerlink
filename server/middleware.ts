@@ -75,6 +75,7 @@ export function setupMiddleware(app: express.Application) {
     "/api/admin/client-error",
     "/api/feedback",
     "/api/errors",
+    "/api/telemetry/maps",
   ]);
 
   app.use((req, res, next) => {

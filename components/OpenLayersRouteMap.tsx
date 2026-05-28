@@ -10,6 +10,7 @@ import { buildOLRouteHtml } from "@/lib/openlayers/secondary-builders";
 import { parseMessage } from "@/lib/openlayers/bridge-events";
 import Colors from "@/constants/colors";
 import type { RouteMapProps } from "@/lib/maps/types";
+import { useMapTelemetry } from "@/hooks/useMapTelemetry";
 
 export default function OpenLayersRouteMap({
   waypoints, height, typeColors: _typeColors, showMarkers: _showMarkers = true, trackPoints,
@@ -19,6 +20,12 @@ export default function OpenLayersRouteMap({
   const tileConfig = getTileConfig(mapsEnabled ? resolvedProvider : "carto_dark");
   const onFatalErrorRef = useRef(onFatalError);
   onFatalErrorRef.current = onFatalError;
+  const tlm = useMapTelemetry("OpenLayersRouteMap", "openlayers");
+  useEffect(() => {
+    tlm.emit("map_init");
+    return () => { tlm.emit("map_destroy"); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const mapHtml = useMemo(
     () => buildOLRouteHtml(tileConfig.urlTemplate, waypoints, trackPoints, Colors.accent),
@@ -35,14 +42,21 @@ export default function OpenLayersRouteMap({
 
   const handleLoadEnd = () => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true }).start(() => setSkeletonVisible(false));
+    tlm.emit("map_ready");
   };
 
   const handleMessage = useCallback((event: WebViewMessageEvent) => {
     const msg = parseMessage(event.nativeEvent.data);
-    if (msg?.type === "error") onFatalErrorRef.current?.();
-  }, []);
+    if (msg?.type === "error") {
+      tlm.emit("style_load_error");
+      onFatalErrorRef.current?.();
+    }
+  }, [tlm]);
 
-  const handleWebViewError = useCallback(() => { onFatalErrorRef.current?.(); }, []);
+  const handleWebViewError = useCallback(() => {
+    tlm.emit("webview_crash");
+    onFatalErrorRef.current?.();
+  }, [tlm]);
 
   const containerStyle = height != null ? [styles.wrapper, { height }] : styles.fill;
 

@@ -7,6 +7,8 @@ import { dispatchAlerts } from "./alerts";
 import { cleanupOldSignals } from "./signals";
 import { isWatchdogEnabled } from "./kill-switch";
 import { startWeeklyReportScheduler } from "./weekly-report";
+import { cleanupMapsTelemetry } from "./maps-telemetry-store";
+import { runMapsHealthChecks } from "./maps-health-checks";
 
 const TICK_MS = 60_000;
 const CLEANUP_MS = 60 * 60_000;
@@ -52,6 +54,12 @@ export function startWatchdogScheduler(): void {
     cleanupOldSignals().then((n) => {
       if (n > 0) console.log(`[watchdog/scheduler] cleanup signals: ${n} righe rimosse`);
     }).catch(() => {});
+    // Task #2686 — cleanup telemetria mappe (retention 7gg)
+    cleanupMapsTelemetry().then((n) => {
+      if (n > 0) console.log(`[watchdog/scheduler] cleanup maps telemetry: ${n} righe rimosse`);
+    }).catch(() => {});
+    // Task #2686 — refresh health-checks tile/engine periodicamente
+    runMapsHealthChecks(true).catch(() => {});
   }, CLEANUP_MS);
   cleanupTimer.unref?.();
   startWeeklyReportScheduler();

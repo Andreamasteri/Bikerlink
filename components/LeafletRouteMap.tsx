@@ -9,6 +9,7 @@ import { buildLeafletRouteMapHtml } from "@/lib/leaflet-route-map-html";
 import type { RouteWaypoint } from "@/lib/leaflet-route-map-html";
 import { MapZoomSlider } from "@/components/map/MapZoomSlider";
 import Colors from "@/constants/colors";
+import { useMapTelemetry } from "@/hooks/useMapTelemetry";
 
 interface LeafletRouteMapProps {
   waypoints: RouteWaypoint[];
@@ -24,6 +25,14 @@ export default function LeafletRouteMap({ waypoints, height, typeColors, showMar
   const tileMaxZoom = mapsEnabled ? activeTileMaxZoom : 19;
 
   const webViewRef = useRef<WebView>(null);
+  const tlm = useMapTelemetry("LeafletRouteMap", "leaflet");
+  const initStartRef = useRef<number>(Date.now());
+  useEffect(() => {
+    initStartRef.current = Date.now();
+    tlm.emit("map_init");
+    return () => { tlm.emit("map_destroy"); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const mapHtml = useMemo(
     () => buildLeafletRouteMapHtml(
       tileUrl, tileMaxZoom,

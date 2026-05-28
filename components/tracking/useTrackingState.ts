@@ -15,6 +15,7 @@ import { apiRequest, getQueryFn } from "@/lib/query-client";
 import { haversineKm } from "@/lib/geo";
 import { setTrackingActive, setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
 import { logGpsError } from "@/lib/gps-logger";
+import { emitMapsTelemetry } from "@/hooks/useMapTelemetry";
 import {
   loadBatteryDrainStats,
   appendBatteryDrainSample,
@@ -163,6 +164,7 @@ export function useTrackingState() {
 
   const handsOffDismissedForRideRef = useRef(false);
   const totalGpsPointsRef = useRef(0);
+  const lastLowAccuracyTelemetryRef = useRef(0);
   const [isTabFocused] = useState(true);
   const isTabFocusedRef = useRef(isTabFocused);
 
@@ -315,6 +317,12 @@ export function useTrackingState() {
     const smoothedSpeed = gps.emaSpeedRef.current * 0.7 + speedKmh * 0.3;
     gps.emaSpeedRef.current = smoothedSpeed; gps.setCurrentSpeed(smoothedSpeed); gps.setGpsAccuracy(accuracy); gps.setCurrentCoord({ latitude, longitude });
     totalGpsPointsRef.current += 1; if (bg.bgTrackingActiveRef.current) bg.bgPointsCountRef.current += 1;
+    // Task #2686 — telemetria GPS: segnala accuracy degradata (>30m) per il watchdog mappe.
+    // Throttle a 60s per evitare spam (un fix di location può arrivare ogni secondo).
+    if (accuracy != null && accuracy > 30 && now - lastLowAccuracyTelemetryRef.current > 60_000) {
+      lastLowAccuracyTelemetryRef.current = now;
+      emitMapsTelemetry({ event: "gps_low_accuracy", component: "useTrackingState", details: { accuracyM: accuracy } });
+    }
     if (smoothedSpeed < IDLE_THRESHOLD_KMH) {
       if (!stats.isIdleRef.current) { stats.isIdleRef.current = true; stats.idleStartRef.current = now; }
     } else if (stats.isIdleRef.current) {

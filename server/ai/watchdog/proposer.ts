@@ -10,6 +10,7 @@ import { proposalSchema, type HealthSnapshot, type Proposal } from "./types";
 import { z } from "zod";
 import type { AiCallMeta } from "../moderation/types";
 import { isWatchdogEnabled } from "./kill-switch";
+import { isMapsFlagEnabled } from "./maps-kill-switch";
 
 const SYSTEM = `Sei l'AI proposer del watchdog BikerLink. Analizza i problemi e proponi 1-3 azioni di rimedio.
 REGOLE:
@@ -17,7 +18,15 @@ REGOLE:
 - Sii conservativo: preferisci "manual_only" se incerto.
 - Indica chiaramente il riskLevel.
 - riskLevel "high" SOLO se l'azione tocca dati o riavvia componenti core.
-- Rispondi in italiano, max 800 caratteri per reasoning.`;
+- Rispondi in italiano, max 800 caratteri per reasoning.
+
+PROBLEMI MAPPE (source="maps"):
+- Per "routing.engine_down.*" o "health.engine.*": proporre switch a engine fallback (GraphHopper) via "manual_only", citando engine specifico.
+- Per "quota.mapbox" o "quota.tomtom" >= 80%: proporre rollout temporaneo verso GraphHopper self-hosted.
+- Per "client.webview_crash_5min" alto: proporre disable rendering avanzato (es. forzare LeafletRouteMap base) come hotfix.
+- Per "client.tile_load_error_5min" alto: proporre switch provider tile fallback.
+- Per "client.gps_lost_5min" alto: proporre verifica permission flow / suggerire push educational agli utenti.
+- Per "matching.last_run_h" > 24h: proporre run manuale map-matching job.`;
 
 const proposalsSchema = z.object({
   proposals: z.array(proposalSchema).min(0).max(3),
@@ -30,7 +39,10 @@ export interface ProposerResult {
 
 export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult | null> {
   if (!(await isWatchdogEnabled())) return null;
-  const hiSev = snap.problems.filter((p) => p.severity === "high" || p.severity === "critical");
+  const mapsLlmEnabled = await isMapsFlagEnabled("llm");
+  const hiSev = snap.problems
+    .filter((p) => p.severity === "high" || p.severity === "critical")
+    .filter((p) => mapsLlmEnabled || p.source !== "maps");
   if (hiSev.length === 0) return null;
 
   const prompt = [

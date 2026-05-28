@@ -34,6 +34,7 @@ import moderatorRoutes from "./routes/moderator";
 import customRoutesRouter from "./routes/custom-routes";
 import sosRoutes from "./routes/sos";
 import telemetryRoutes from "./routes/telemetry";
+import telemetryMapsRoutes from "./routes/telemetry-maps";
 import motoclubsRoutes from "./routes/motoclubs";
 import friendsRoutes from "./routes/friends";
 import { handleMusicMatch } from "./routes/music-match";
@@ -276,6 +277,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/moderator", moderatorRoutes);
   app.use("/api/sos", sosRoutes);
   app.use("/api/telemetry", telemetryRoutes);
+  app.use("/api/telemetry", telemetryMapsRoutes);
   app.use("/api/motoclubs", motoclubsRoutes);
   app.use("/api/friends", friendsRoutes);
   app.use("/api/lastfm", lastfmRoutes);

@@ -6,6 +6,10 @@ import { eq } from "drizzle-orm";
 import type { HealthSnapshot } from "./types";
 import { writeWatchdogLog } from "./log";
 import { emitWatchdogAlert, emitWatchdogStatusChange } from "../coordinator/integrations/watchdog";
+import { isMapsFlagEnabled } from "./maps-kill-switch";
+import { logger } from "../../lib/logger";
+
+const mapsLog = logger.child({ scope: "maps-watchdog", layer: "alerts" });
 
 const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 const ALERT_TTL_MS = 10 * 60 * 1000;
@@ -75,11 +79,19 @@ export async function dispatchAlerts(snap: HealthSnapshot): Promise<{ sent: numb
     if (p.severity !== "critical") continue;
     // Task #2654 — emit ogni problem critical anche se throttled (lo throttle è solo per push)
     await emitWatchdogAlert({ problem: p, score: snap.score, status: snap.status });
+    // Task #2686 — kill-switch dedicato per push mappe.
+    if (p.source === "maps") {
+      const mapsAlertsOn = await isMapsFlagEnabled("alerts");
+      if (!mapsAlertsOn) {
+        mapsLog.info({ problemId: p.id }, "push maps soppressa da kill-switch");
+        continue;
+      }
+    }
     if (!shouldSend(`problem.${p.id}`)) continue;
     const n = await pushAdmins(
       `🚨 ${p.title}`,
       p.suggestion ?? "Verifica system-health admin.",
-      { type: "watchdog_problem", problemId: p.id, severity: p.severity },
+      { type: "watchdog_problem", problemId: p.id, severity: p.severity, source: p.source },
     );
     sentCount += n;
     await writeWatchdogLog({

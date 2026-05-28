@@ -81,3 +81,34 @@ export const weeklySystemReports = pgTable("weekly_system_reports", {
 ]);
 export type WeeklySystemReport = typeof weeklySystemReports.$inferSelect;
 export type InsertWeeklySystemReport = typeof weeklySystemReports.$inferInsert;
+
+// Task #2686 — Eventi telemetria client mappe. Inviati dai device tramite
+// hook `useMapTelemetry`. Aggregati in finestre di 5 min dal maps-collector
+// per produrre Signal[] nel watchdog. Retention 7 giorni (allineato a signals).
+export const mapsTelemetryEvents = pgTable("maps_telemetry_events", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id", { length: 36 }),
+  // Tipo evento: tile_load_error | webview_crash | render_slow | gps_lost |
+  //              gps_degraded | routing_failed | map_init_failed |
+  //              map_ready | tile_load_ok
+  event: varchar("event", { length: 40 }).notNull(),
+  // Renderer: leaflet | maplibre | openlayers | maplibre-full-3d
+  renderer: varchar("renderer", { length: 30 }),
+  // Componente origine: InteractiveMap | LeafletRouteMap | MapLibreRouteMap |
+  //                      OpenLayersRouteMap | useGpsTracking | ...
+  component: varchar("component", { length: 60 }),
+  // Routing engine se evento routing_failed: graphhopper | valhalla | mapbox | tomtom
+  engine: varchar("engine", { length: 30 }),
+  durationMs: integer("duration_ms"),
+  errorMessage: varchar("error_message", { length: 500 }),
+  platform: varchar("platform", { length: 20 }), // ios | android | web
+  appVersion: varchar("app_version", { length: 30 }),
+  details: jsonb("details"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  index("maps_telemetry_event_created_idx").on(t.event, t.createdAt),
+  index("maps_telemetry_renderer_created_idx").on(t.renderer, t.createdAt),
+  index("maps_telemetry_created_idx").on(t.createdAt),
+]);
+export type MapsTelemetryEvent = typeof mapsTelemetryEvents.$inferSelect;
+export type InsertMapsTelemetryEvent = typeof mapsTelemetryEvents.$inferInsert;

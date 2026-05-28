@@ -1,4 +1,5 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { emitMapsTelemetry } from "@/hooks/useMapTelemetry";
 
 export interface GpsPoint {
   latitude: number;
@@ -33,6 +34,30 @@ export function useGpsTracking() {
   const gpsBlackoutSecondsRef = useRef(0);
   const gpsBlackoutStartRef = useRef<number | null>(null);
   const emaSpeedRef = useRef<number>(0);
+
+  // Task #2686 — telemetria GPS: emette gps_acquire/gps_lost SOLO sulle transizioni
+  // di stato e throttla gps_low_accuracy a 60s per evitare spam di rete.
+  const lastGpsStateRef = useRef<boolean | null>(null);
+  const lastLowAccuracyEmitRef = useRef<number>(0);
+  useEffect(() => {
+    if (lastGpsStateRef.current === gpsLost) return;
+    lastGpsStateRef.current = gpsLost;
+    emitMapsTelemetry({
+      event: gpsLost ? "gps_lost" : "gps_acquire",
+      component: "useGpsTracking",
+    });
+  }, [gpsLost]);
+  useEffect(() => {
+    if (gpsAccuracy == null || gpsAccuracy <= 50) return;
+    const now = Date.now();
+    if (now - lastLowAccuracyEmitRef.current < 60_000) return;
+    lastLowAccuracyEmitRef.current = now;
+    emitMapsTelemetry({
+      event: "gps_low_accuracy",
+      component: "useGpsTracking",
+      details: { accuracy: gpsAccuracy },
+    });
+  }, [gpsAccuracy]);
 
   return {
     currentSpeed,
