@@ -66,6 +66,7 @@ const QUICK_LINKS: Array<{ key: string; label: string; route: string; icon: keyo
   { key: "bans", label: "Ban Attivi", route: "/admin/active-bans", icon: "account-cancel-outline", color: "#FF3B30" },
   { key: "logs", label: "Log Moderatori", route: "/admin/moderator-logs", icon: "shield-account-outline", color: "#6366F1" },
   { key: "thresh", label: "Soglie & Policy", route: "/admin/reports-thresholds", icon: "tune-variant", color: "#22C55E" },
+  { key: "ai-console", label: "AI Console", route: "/admin/ai-console", icon: "robot-outline", color: "#FF6600" },
 ];
 
 export default function ReportsHubScreen() {

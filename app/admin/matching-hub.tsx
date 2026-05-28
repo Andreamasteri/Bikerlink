@@ -58,6 +58,7 @@ const QUICK_LINKS: QuickLink[] = [
   { key: "telemetry", label: "Telemetria", icon: "chart-line", iconSet: "MaterialCommunityIcons", route: "/admin/matching-telemetry", color: "#22C55E" },
   { key: "ab", label: "A/B", icon: "flask-outline", iconSet: "MaterialCommunityIcons", route: "/admin/ab", color: "#E91E63" },
   { key: "negative", label: "Pref. Negative", icon: "minus-circle-outline", iconSet: "MaterialCommunityIcons", route: "/admin/negative-pref-patterns", color: "#F44336" },
+  { key: "ai-console", label: "AI Console", icon: "robot-outline", iconSet: "MaterialCommunityIcons", route: "/admin/ai-console", color: "#FF6600" },
 ];
 
 function formatDate(iso: string | null) {
