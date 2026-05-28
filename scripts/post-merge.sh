@@ -154,4 +154,18 @@ if [ "$RATCHET_EXIT" -ne 0 ]; then
   exit "$RATCHET_EXIT"
 fi
 
+# ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
+echo "════════════════════════════════════════"
+echo "  Cleanup utenti smoke residui"
+echo "════════════════════════════════════════"
+CLEANUP_EXIT=0
+npx tsx scripts/smoke/cleanup-orphans.ts 2>&1 || CLEANUP_EXIT=$?
+if [ "$CLEANUP_EXIT" -ne 0 ]; then
+  echo "⚠️  cleanup-orphans.ts ha restituito exit ${CLEANUP_EXIT} — verificare manualmente."
+else
+  echo "✅ Cleanup smoke completato."
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 exit 0
