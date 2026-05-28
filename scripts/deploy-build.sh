@@ -25,7 +25,19 @@ echo "=== [1/2] Sync database schema ==="
 # match_thresholds). Senza questo import, drizzle-kit vedeva quelle tabelle come
 # to-delete vs 15 to-create → promptNamedWithSchemasConflict richiedeva TTY.
 # Ora to-delete=0 → no prompt, push gira non-interattivo. Step torna fatale.
-npx drizzle-kit push --force
+#
+# Task #2700 — sostituito `npx drizzle-kit push --force` con il wrapper
+# `scripts/db-push-safe.sh`. In prod drizzle-kit, nonostante il tablesFilter,
+# emette un `ALTER TABLE spatial_ref_sys ADD PRIMARY KEY` (oggetto PostGIS
+# di proprietà di `postgres`) che fallisce con "must be owner of table
+# spatial_ref_sys" bloccando il deploy. Il wrapper:
+#  - swallowa SOLO gli errori di ownership sui 3 oggetti PostGIS noti
+#    (spatial_ref_sys, geography_columns, geometry_columns);
+#  - fa fail-fast su qualunque altro errore (nessun masking di bug reali);
+#  - rimane idempotente (seconda esecuzione = no-op).
+# NON reintrodurre `npx drizzle-kit push --force` diretto: vedi task #2700
+# e drizzle.config.ts (commento su `!public.spatial_ref_sys`).
+bash scripts/db-push-safe.sh
 echo "  Schema sync completato."
 
 echo "=== [2/2] Build server TypeScript ==="

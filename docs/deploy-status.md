@@ -135,3 +135,69 @@ Cause originale del fallimento `drizzle-kit push` in CI/deploy:
 
 - `/api/maps/provider/status` → 404 (task #2673)
 - `/api/proposals/biker-matches` → 404 per crud routing eat-all (annotato in smoke)
+
+## Task #2700 — Fix `ALTER spatial_ref_sys` (28/05/2026)
+
+### Sintomo
+Deploy in prod falliva con
+```
+ERROR: must be owner of table spatial_ref_sys
+```
+durante lo step `[1/2] Sync database schema` di `scripts/deploy-build.sh`.
+
+### Causa
+`drizzle-kit push --force` introspetta tutto lo schema `public`. PostGIS
+installa lì `spatial_ref_sys` (table), `geography_columns` e `geometry_columns`
+(views), di proprietà del ruolo `postgres`. Nonostante `tablesFilter`, in
+alcune versioni di drizzle-kit (^0.31.10) il filtro non copre TUTTI i diff
+sui constraint introspettati schema-qualified, lasciando passare uno
+`ALTER TABLE spatial_ref_sys ADD PRIMARY KEY` che l'utente applicativo non
+può eseguire → exit code non-zero → publish bloccato.
+
+### Fix applicato (defense-in-depth)
+
+1. **`drizzle.config.ts`** — aggiunti pattern schema-qualified
+   `"!public.spatial_ref_sys"`, `"!public.geography_columns"`,
+   `"!public.geometry_columns"` accanto a quelli unqualified preesistenti.
+2. **`scripts/db-push-safe.sh`** — nuovo wrapper che esegue
+   `drizzle-kit push --force` e:
+   - swallowa SOLO errori del tipo `must be owner of (table|view) X` per
+     X ∈ {spatial_ref_sys, geography_columns, geometry_columns};
+   - fa fail-fast (exit non-zero) su qualsiasi altro errore — nessun
+     masking di bug reali;
+   - retry fino a 4 volte: drizzle ricalcola il diff a ogni push, quindi
+     ogni iterazione applica gli statement validi e isola via via il
+     residuo PostGIS; se dopo due iterazioni consecutive resta SOLO
+     l'errore PostGIS, esce 0 (il PK è già presente perché creato da
+     `CREATE EXTENSION postgis`).
+3. **`scripts/deploy-build.sh`** — step 1 ora invoca
+   `bash scripts/db-push-safe.sh` invece di `npx drizzle-kit push --force`
+   diretto. Commento esplicito vieta di reintrodurre il comando originale.
+
+### Verifica idempotenza (locale, DB con PostGIS attivo)
+
+```
+=== Run 1 ===
+[✓] Pulling schema from database...
+[✓] Changes applied
+[db-push-safe] OK (iterazione 1).
+
+=== Run 2 (no-op atteso) ===
+[✓] Pulling schema from database...
+[✓] Changes applied
+[db-push-safe] OK (iterazione 1).
+```
+
+Nessun errore di ownership rilevato in locale (il bug è specifico della
+combinazione PostGIS + permessi del ruolo applicativo in prod), ma il
+wrapper è progettato per intercettarlo se/quando si ripresenta al publish.
+
+### Cosa fare se ricompare
+
+- Verificare con `drizzle-kit push --force --verbose` quale oggetto PostGIS
+  sta causando l'errore (potrebbero essere stati aggiunti nuovi oggetti
+  da future versioni di PostGIS, es. `raster_columns`, `topology.*`).
+- Aggiungere il nuovo oggetto a `POSTGIS_ERR_PATTERN` in
+  `scripts/db-push-safe.sh` e ai pattern in `drizzle.config.ts`
+  (sia unqualified che `public.*`).
+

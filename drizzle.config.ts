@@ -27,9 +27,20 @@ export default defineConfig({
   //                         DB and excluded from drizzle-schema.ts to prevent the
   //                         integrity_* → db_integrity_* rename conflict
   // !schema_migrations    — external migration tracking table, not in TS schema
-  // !spatial_ref_sys      — PostGIS system table, not in TS schema
-  // !geography_columns    — PostGIS view, not in TS schema
-  // !geometry_columns     — PostGIS view, not in TS schema
+  // !spatial_ref_sys      — PostGIS system table (owned by `postgres`, not the
+  //                         app user → `ALTER TABLE` su questa fallisce in prod
+  //                         con "must be owner of table spatial_ref_sys" e
+  //                         blocca il publish). Task #2700.
+  // !geography_columns    — PostGIS view, idem
+  // !geometry_columns     — PostGIS view, idem
+  //
+  // Task #2700 — i pattern sono duplicati anche schema-qualified
+  // (`!public.spatial_ref_sys`) perché alcune versioni di drizzle-kit
+  // applicano il filtro solo dopo aver costruito il diff schema-qualified,
+  // lasciando passare uno statement `ALTER TABLE spatial_ref_sys ADD
+  // PRIMARY KEY` che fa fallire il deploy. Defense-in-depth: anche
+  // `scripts/db-push-safe.sh` intercetta eventuali errori di ownership
+  // residui sui tre oggetti PostGIS.
   tablesFilter: [
     "!session",
     "!integrity_runs",
@@ -39,6 +50,9 @@ export default defineConfig({
     "!spatial_ref_sys",
     "!geography_columns",
     "!geometry_columns",
+    "!public.spatial_ref_sys",
+    "!public.geography_columns",
+    "!public.geometry_columns",
     // Task #2680 — Expression-index flickering fix.
     // drizzle-kit cannot compare expression indexes (LEAST/GREATEST, ::text cast, GIN
     // trgm) and always generates DROP+CREATE for them on every push. The GIN index and
