@@ -9,6 +9,7 @@ import { uploadBuffer } from "./objectStorage";
 import { db } from "./db";
 import { appSettings } from "@shared/db";
 import { eq } from "drizzle-orm";
+import { uploadBackupToGDrive } from "./google-drive-backup";
 
 const execAsync = promisify(exec);
 
@@ -187,6 +188,11 @@ export async function backupDatabase(): Promise<{ path: string; name: string; si
     await saveLastBackup("db", meta);
 
     console.log(`[backup-service] DB backup su Object Storage: ${objectPath} (${buf.length} bytes)`);
+
+    uploadBackupToGDrive(buf, fileName, "application/gzip").catch((err) => {
+      console.warn("[backup-service] GDrive upload DB fallito (non bloccante):", err);
+    });
+
     return { path: objectPath, name: fileName, size: buf.length };
   } finally {
     isBackingUp = false;
@@ -229,6 +235,11 @@ export async function backupMedia(): Promise<{ path: string; name: string; size:
     await saveLastBackup("media", meta);
 
     console.log(`[backup-service] Media backup su Object Storage: ${objectPath} (${zipBuffer.length} bytes)`);
+
+    uploadBackupToGDrive(zipBuffer, fileName, "application/zip").catch((err) => {
+      console.warn("[backup-service] GDrive upload media fallito (non bloccante):", err);
+    });
+
     return { path: objectPath, name: fileName, size: zipBuffer.length };
   } finally {
     isBackingUp = false;
