@@ -5,12 +5,14 @@ import {
   type User,
 } from "@shared/db";
 import { SosStorage } from "./sos";
+import { systemAccountConditions } from "../lib/system-account-filter";
+import { PROTECTED_NICKNAMES } from "../constants";
 
 export class FakeUsersStorage extends SosStorage {
   async getFakeUserStats(limit = 50, offset = 0, type = "tutti"): Promise<{ users: unknown[]; total: number; hasMore: boolean; stats: { total: number; biker: number; zavorrina: number; coppia: number } }> {
-    const baseCondition = and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`);
+    const baseCondition = and(eq(users.isFake, true), ...systemAccountConditions(users));
     const typeCondition = type !== "tutti"
-      ? and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`, eq(users.userType, type))
+      ? and(eq(users.isFake, true), ...systemAccountConditions(users), eq(users.userType, type))
       : baseCondition;
 
     const [[{ total }], [statsRow], fakeUsers] = await Promise.all([
@@ -49,11 +51,11 @@ export class FakeUsersStorage extends SosStorage {
   }
 
   async getFakeUsers(): Promise<User[]> {
-    return db.select().from(users).where(and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`)).orderBy(desc(users.createdAt));
+    return db.select().from(users).where(and(eq(users.isFake, true), ...systemAccountConditions(users))).orderBy(desc(users.createdAt));
   }
 
   async deleteFakeUser(id: string): Promise<void> {
-    const fakeCondition = and(eq(users.id, id), eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`);
+    const fakeCondition = and(eq(users.id, id), eq(users.isFake, true), ...systemAccountConditions(users));
     const [fakeUser] = await db.select({ id: users.id }).from(users).where(fakeCondition).limit(1);
     if (!fakeUser) return;
     await db.transaction(async (tx) => {
@@ -63,17 +65,17 @@ export class FakeUsersStorage extends SosStorage {
   }
 
   async deleteAllFakeUsers(): Promise<number> {
-    const condition = and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`);
+    const condition = and(eq(users.isFake, true), ...systemAccountConditions(users));
     const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(condition);
     console.log(`[Admin] deleteAllFakeUsers: trovati ${count} utenti fake da eliminare`);
     if (count === 0) return 0;
     await db.transaction(async (tx) => {
-      await tx.execute(sql`DELETE FROM user_motorcycles WHERE user_id IN (SELECT id FROM users WHERE is_fake = true AND nickname != 'BikerLink_Official')`);
+      await tx.execute(sql`DELETE FROM user_motorcycles WHERE user_id IN (SELECT id FROM users WHERE is_fake = true)`);
       console.log(`[Admin] deleteAllFakeUsers: eliminate moto associate agli utenti fake`);
       await tx.delete(users).where(condition);
       console.log(`[Admin] deleteAllFakeUsers: eliminati ${count} utenti fake`);
       await tx.execute(sql`DELETE FROM conversations WHERE id IN (SELECT c.id FROM conversations c LEFT JOIN conversation_participants cp ON cp.conversation_id = c.id WHERE c.conversation_type != 'motoclub' GROUP BY c.id HAVING count(cp.id) = 0)`);
-      const officialUser = await tx.select({ id: users.id }).from(users).where(sql`${users.nickname} = 'BikerLink_Official'`).limit(1);
+      const officialUser = await tx.select({ id: users.id }).from(users).where(inArray(users.nickname, PROTECTED_NICKNAMES)).limit(1);
       if (officialUser.length > 0) {
         await tx.execute(sql`DELETE FROM conversations WHERE id IN (SELECT c.id FROM conversations c INNER JOIN conversation_participants cp ON cp.conversation_id = c.id WHERE c.conversation_type != 'motoclub' GROUP BY c.id HAVING count(cp.id) = 1 AND max(cp.user_id) = ${officialUser[0].id})`);
       }

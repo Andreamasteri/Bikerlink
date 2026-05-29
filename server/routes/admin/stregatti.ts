@@ -8,6 +8,7 @@ import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { setMotionEnabled, getMotionStatus, getPositions, getBoundingBox, setBoundingBox, getUserSpeedMap, removeUserFromSimulator, clearSimulatorUsers, addUserToSimulator } from "../../motion-simulator";
+import { systemAccountConditions } from "../../lib/system-account-filter";
 
 const router = Router();
 
@@ -82,7 +83,6 @@ router.delete("/", async (_req: Request, res: Response) => {
     const realUsersMismarked = await db.execute(sql`
       SELECT COUNT(*) AS cnt FROM users
       WHERE is_fake = true
-        AND nickname != 'BikerLink_Official'
         AND role NOT IN ('admin', 'moderator')
         AND email NOT LIKE '%@fakeuser.bikerlink.it'
         AND (invitation_code IS NULL OR invitation_code NOT LIKE 'mass_seed%')
@@ -93,7 +93,7 @@ router.delete("/", async (_req: Request, res: Response) => {
       console.error(`[stregatti-delete] BLOCKED: ${mismarkedCount} real user(s) incorrectly marked as isFake=true would be deleted. Run /api/admin/users/fix-isfake first.`);
       return sendError(res, 409, `Impossibile eliminare: ${mismarkedCount} utenti reali risultano erroneamente marcati come fake. Esegui prima il fix "is_fake" (/api/admin/users/fix-isfake) e riprova.`);
     }
-    const deleteCondition = and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`);
+    const deleteCondition = and(eq(users.isFake, true), ...systemAccountConditions(users));
     const countResult = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(deleteCondition);
     const deleted = countResult[0]?.count ?? 0;
     await db.delete(users).where(deleteCondition);

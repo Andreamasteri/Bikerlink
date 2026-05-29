@@ -28,7 +28,7 @@ export async function ensureBikerLinkOfficialOnBoot(): Promise<void> {
       userType: "biker",
       sex: "M",
       role: "user",
-      isFake: true,
+      isFake: false,
       region: "Lombardia",
       birthYear: 2000,
       emailVerified: false,

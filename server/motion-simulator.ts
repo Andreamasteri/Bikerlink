@@ -26,6 +26,7 @@ import { db } from "./db";
 import { users, userProfiles } from "@shared/db";
 import { eq, and, sql, inArray } from "drizzle-orm";
 import { storage } from "./storage";
+import { systemAccountConditions } from "./lib/system-account-filter";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -428,7 +429,7 @@ async function loadFakeUsers(): Promise<void> {
     .where(
       and(
         eq(users.isFake, true),
-        sql`${users.nickname} != 'BikerLink_Official'`,
+        ...systemAccountConditions(users),
       ),
     );
 
@@ -854,7 +855,7 @@ export async function reloadSimulatorUsers(): Promise<void> {
     .where(
       and(
         eq(users.isFake, true),
-        sql`${users.nickname} != 'BikerLink_Official'`,
+        ...systemAccountConditions(users),
       ),
     );
 
