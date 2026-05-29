@@ -1,20 +1,10 @@
-// LARGE-FILE-LOCKED — limite: 726 righe (attuali: 726)
+// LARGE-FILE-LOCKED — limite: 726 righe (attuali: 720)
 // Aggiungi nuove funzionalità in: app/admin/stregatti-extra.tsx
 // Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
 //         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
 
 import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Modal,
-  ActivityIndicator,
-  Alert
-} from "react-native";
-import { KeyboardAvoidingView } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Modal, ActivityIndicator, Alert, KeyboardAvoidingView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
