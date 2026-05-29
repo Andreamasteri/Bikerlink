@@ -1,6 +1,6 @@
 /**
  * build-snapshots.js
- * Incrementally builds drizzle-kit snapshot files for migrations/meta/
+ * Incrementally builds schema snapshot files for migrations/meta/
  * by parsing each SQL migration file and applying schema changes to the
  * previous snapshot state.
  *

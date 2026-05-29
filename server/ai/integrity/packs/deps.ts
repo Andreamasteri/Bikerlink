@@ -48,7 +48,7 @@ async function scanImportedPackages(root: string): Promise<Map<string, string[]>
 const DEPCHECK_TIMEOUT_MS = 180_000;
 const DEPCHECK_IGNORE = [
   "patch-package", "@babel/core", "babel-plugin-react-compiler",
-  "drizzle-kit", "eslint", "eslint-config-expo", "tsx", "typescript",
+  "eslint", "eslint-config-expo", "tsx", "typescript",
   "@expo/ngrok", "@types/*", "knip", "madge", "depcheck", "jscpd",
 ];
 

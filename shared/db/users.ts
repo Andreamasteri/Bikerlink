@@ -17,10 +17,9 @@ import {
 // nativo; usiamo customType che mappa la colonna come stringa WKT lato JS
 // (in pratica le query usano ST_DWithin / ST_MakePoint, non leggono il valore
 // raw). La colonna è GENERATED ALWAYS dal DB — non va mai impostata in INSERT.
-// Task #2678: dataType() restituisce "geography" (senza parametri) per
-// corrispondere a udt_name che drizzle-kit legge dal DB. generatedAlwaysAs
-// rispecchia l'espressione GENERATED ALWAYS definita in PG, evitando che
-// drizzle-kit generi un ALTER SET DATA TYPE / DROP EXPRESSION distruttivo.
+// dataType() restituisce "geography" (senza parametri) per corrispondere a
+// udt_name restituito da PostgreSQL. generatedAlwaysAs rispecchia l'espressione
+// GENERATED ALWAYS definita in PG, preservando la colonna nei diff ORM.
 const geographyPoint = customType<{ data: string; notNull: false; default: false }>({
   dataType() { return "geography"; },
 });
@@ -199,7 +198,7 @@ export const userProfiles = pgTable("user_profiles", {
   // della categoria "musica" per costruire l'embedding `music_taste`.
   musicTasteText: text("music_taste_text"),
   // Task #2510: colonna PostGIS generata sempre da (longitude, latitude).
-  // Task #2678: generatedAlwaysAs rispecchia GENERATED ALWAYS del DB.
+  // generatedAlwaysAs rispecchia GENERATED ALWAYS del DB.
   geom: geographyPoint("geom").generatedAlwaysAs(
     sql`CASE WHEN ((longitude IS NOT NULL) AND (latitude IS NOT NULL)) THEN (st_setsrid(st_makepoint(longitude, latitude), 4326))::geography ELSE NULL::geography END`,
   ),

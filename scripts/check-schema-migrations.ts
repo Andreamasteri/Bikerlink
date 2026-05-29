@@ -165,7 +165,7 @@ async function checkDbColumnsInformational(
     const missingFromDb = schemaCols.filter((c) => !dbCols.has(c));
     if (missingFromDb.length > 0) {
       console.warn(
-        `  ⚠  DB INFO: tabella "${tableName}" — colonne mancanti dal DB dev (eseguire db:push):`
+        `  ⚠  DB INFO: tabella "${tableName}" — colonne mancanti dal DB dev (applicare una migration SQL numerata):`
       );
       for (const col of missingFromDb) {
         console.warn(`       • ${col}`);

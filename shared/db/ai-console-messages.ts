@@ -1,11 +1,10 @@
-// Task #2682 — `ai_messages` ESCLUSO dallo schema visto da drizzle-kit.
+// Task #2682 — `ai_messages` gestita esclusivamente via migration SQL numerata.
 //
-// Perché: la tabella usa un indice GIN trigram (`gin_trgm_ops`) che drizzle-kit
-// non sa generare correttamente con push (rigenera spurious diff e prompt TTY).
+// Perché: la tabella usa un indice GIN trigram (`gin_trgm_ops`) che non può
+// essere gestito automaticamente dallo schema ORM (genera diff spurie).
 // Source of truth = migrations/*.sql.
 //
-// Questo file è importato da shared/db/index.ts (runtime) ma NON da
-// shared/db/drizzle-schema.ts.
+// Questo file è importato da shared/db/index.ts (runtime).
 
 import { pgTable, varchar, text, integer, jsonb, numeric, timestamp, index } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";

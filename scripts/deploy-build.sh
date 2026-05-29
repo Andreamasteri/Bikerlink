@@ -9,16 +9,9 @@ set -e
 # referenzia più static-build, e la cartella confondeva il classifier autoscale di
 # Replit.
 #
-# Task #2678 – #2700 — in passato era presente uno step "drizzle-kit push --force"
-# (prima diretto, poi wrappato in db-push-safe.sh) per sincronizzare lo schema PROD.
-# Rimosso definitivamente: il sistema di migrazione in server/migrate.ts copre
-# già tutto (legge migrations/0001-NNN.sql, traccia in schema_migrations, gira a
-# ogni boot). drizzle-kit push era ridondante E causa del bug ricorrente
-#   ALTER TABLE "spatial_ref_sys" ADD PRIMARY KEY ("srid");
-#   must be owner of table spatial_ref_sys
-# perché introspettava il DB live trovando le tabelle PostGIS.
+# Task #2678 – #2800 — la sincronizzazione schema avviene tramite server/migrate.ts
+# (legge migrations/0001-NNN.sql, traccia in schema_migrations, gira a ogni boot).
 # Regola: ogni cambio schema → file .sql numerato in migrations/ → commit.
-# Non reintrodurre drizzle-kit push nel deploy.
 
 # Task #2800-fix — Pulizia asset non necessari prima del push del Repl layer.
 # attached_assets/ contiene screenshot del workspace Replit (usati dall'agente

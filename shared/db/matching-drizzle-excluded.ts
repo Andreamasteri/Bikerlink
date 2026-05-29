@@ -1,13 +1,11 @@
-// Task #2682 — Tabelle ESCLUSE dallo schema visto da drizzle-kit.
+// Task #2682 — Tabelle gestite esclusivamente via migration SQL numerata.
 //
-// Perché: queste 3 tabelle esistono già in dev/prod DB con FK names lunghi che
-// drizzle-kit rinominerebbe a ogni push (spurious diff). bikerBikerMatches usa
-// un uniqueIndex su LEAST/GREATEST che drizzle introspect non sempre rispecchia
-// correttamente. Manteniamo l'unica fonte di verità nelle migration SQL.
+// Perché: queste 3 tabelle hanno FK names lunghi (troncati da PG) e indici su
+// espressioni LEAST/GREATEST che genererebbero diff spurie se gestiti via ORM.
+// Source of truth = migrations/*.sql.
 //
-// Questo file è importato da shared/db/index.ts (runtime), ma NON da
-// shared/db/drizzle-schema.ts (entry-point di drizzle-kit). Eventuali ALTER
-// schema future devono passare per una numbered SQL migration in migrations/.
+// Questo file è importato da shared/db/index.ts (runtime).
+// Eventuali ALTER schema future devono passare per una numbered SQL migration in migrations/.
 
 import { sql } from "drizzle-orm";
 import {

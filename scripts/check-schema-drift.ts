@@ -256,7 +256,7 @@ async function main() {
   console.log(`\n══════════════════════════════════════════════`);
   if (driftFound) {
     console.log(
-      "  RESULT: DRIFT FOUND — run `npm run db:push` to sync the database",
+      "  RESULT: DRIFT FOUND — apply a numbered SQL migration in migrations/ to sync the database",
     );
     console.log("══════════════════════════════════════════════");
     process.exit(1);
