@@ -3,9 +3,11 @@
 -- ============================================================================
 -- Task #2801 — "Backup totale, napalm DB e redeploy"
 --
--- ⚠️  FILE INERTE / DRAFT — NON è in migrations/, quindi NON viene eseguito né
---     al restart di DEV né al deploy. Per ATTIVARLO vedi .local/napalm/README.md
---     (va copiato in migrations/0064_napalm_wipe_all_users.sql SOLO al "go" finale).
+-- ⚠️  ARMATA E APPLICATA — questo file È in migrations/, quindi:
+--       - DEV : già applicato (vedi schema_migrations).
+--       - PROD: verrà eseguito AUTOMATICAMENTE al prossimo deploy riuscito.
+--     Per DISARMARLA (lasciare il prod intatto) va rimossa da migrations/.
+--     Storico/rollback: vedi .local/napalm/README.md e il backup DEV .dump.
 --
 -- ⚠️  IRREVERSIBILE. Eseguire SOLO dopo aver verificato il backup:
 --       - DEV : .local/backups/dev_<TS>.dump            (pg_dump -Fc, ripristinabile)
