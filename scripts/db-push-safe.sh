@@ -79,13 +79,16 @@ npx drizzle-kit push --force >"$tmp_out" 2>&1
 rc=$?
 set -e
 
-cat "$tmp_out"
-
 if [ $rc -eq 0 ]; then
+  cat "$tmp_out"
   rm -f "$tmp_out"
   echo "[db-push-safe] OK."
   exit 0
 fi
+
+# rc != 0: stampiamo l'output SOLO dopo aver capito se è un errore benigno PostGIS
+# (non prima — altrimenti il testo dell'errore PostGIS appare nei log del deploy
+# anche quando usciamo con exit 0, fuorviando Replit e l'utente).
 
 # ─── BENIGN SKIP per errori PostGIS (Task #2778) ────────────────────────────
 # extensionsFilters non è affidabile al 100% in drizzle-kit 0.31.x.
