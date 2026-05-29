@@ -10,6 +10,13 @@
 #              come era in Task #2700 prima della stretta di Task #2762.
 #              Se invece l'output contiene ANCHE altri errori non-PostGIS,
 #              il fail-fast viene mantenuto per non mascherare bug reali.
+# BUG FIX (2026-05-29) — Il grep -v sul POSTGIS_OBJECTS_PATTERN rimuoveva
+#              solo le righe con il nome della tabella PostGIS, ma lasciava
+#              "Failed to run database migration statement" (la riga precedente)
+#              nel testo stripped. Il successivo grep "failed" la trovava e
+#              scattava il fail-fast anche quando l'unico errore era PostGIS.
+#              Fix: usa perl per rimuovere l'intero blocco di 3 righe
+#              "Failed...\nDDL_postgis\nowner_error" prima di cercare errori.
 #
 # ARCHITETTURA DEI TRE LIVELLI DI DIFESA (Task #2778):
 #   Livello 1: extensionsFilters: ["postgis"] in drizzle.config.ts
@@ -92,9 +99,16 @@ fi
 # originale di Task #2700 viene ripristinato con il discriminatore aggiuntivo
 # "altri errori presenti?".
 if grep -qEi "$POSTGIS_OBJECTS_PATTERN" "$tmp_out"; then
-  # Costruisce una versione dell'output con le righe PostGIS rimosse.
-  # Se quella versione contiene ancora indicatori di errore, ci sono bug reali.
-  stripped=$(grep -vEi "$POSTGIS_OBJECTS_PATTERN" "$tmp_out" || true)
+  # Rimuove l'intero blocco di 3 righe dell'errore PostGIS usando perl.
+  # drizzle-kit emette errori nel formato:
+  #   Failed to run database migration statement     ← riga 1: nessun nome PostGIS
+  #   ALTER TABLE "spatial_ref_sys" ADD PRIMARY KEY; ← riga 2: contiene nome PostGIS
+  #   must be owner of table spatial_ref_sys         ← riga 3: conseguenza PostGIS
+  # grep -v rimuoveva solo righe 2 e 3, lasciando riga 1 "Failed..." che
+  # scattava erroneamente il fail-fast. perl rimuove l'intero blocco.
+  stripped=$(perl -0777 -pe \
+    's/[^\n]*\n[^\n]*(spatial_ref_sys|geography_columns|geometry_columns)[^\n]*\n[^\n]*(\n|$)//gi' \
+    "$tmp_out" 2>/dev/null || grep -vEi "$POSTGIS_OBJECTS_PATTERN" "$tmp_out" || true)
   if echo "$stripped" | grep -qEi "error|Error|ERROR|failed|exception"; then
     echo "[db-push-safe] ERRORE: drizzle-kit ha fallito con errori PostGIS E altri errori non-PostGIS." >&2
     echo "Gli errori non-PostGIS indicano un problema reale che non può essere ignorato." >&2
