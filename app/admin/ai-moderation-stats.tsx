@@ -14,7 +14,7 @@ import Colors from "@/constants/colors";
 interface Stats {
   budget: { month: string; totalCostUsd: number; limitUsd: number; pct: number; state: "ok" | "warn" | "frozen" };
   queue: { pending: number; running: boolean; processed: number; failed: number; oldestEnqueuedMsAgo: number; lastError: { at: string; message: string } | null };
-  providers: Array<{ id: string; available: boolean; lastError?: string; lastErrorAt?: string }>;
+  providers: Array<{ id: string; available: boolean; lastError?: string; lastErrorAt?: string; cooldownRemainingMs?: number; isQuotaError?: boolean }>;
   analyzed24h: number;
   byScope: Array<{ scope: string; n: number; cost: number; accepted: number }>;
   byModel: Array<{ model: string | null; n: number; cost: number }>;
@@ -66,10 +66,15 @@ export default function AiModerationStatsScreen() {
             <Text style={styles.cardTitle}>Provider AI</Text>
             {data.providers.map((p) => (
               <View key={p.id} style={styles.providerRow}>
-                <View style={[styles.dot, { backgroundColor: p.available ? Colors.success : Colors.error }]} />
+                <View style={[styles.dot, { backgroundColor: p.available ? Colors.success : (p.isQuotaError ? Colors.warning : Colors.error) }]} />
                 <Text style={styles.providerName}>{p.id}</Text>
-                <Text style={styles.providerStatus}>{p.available ? "online" : "cooldown"}</Text>
-                {p.lastError ? <Text style={styles.providerError} numberOfLines={1}>{p.lastError}</Text> : null}
+                <View style={styles.providerStatusCol}>
+                  <Text style={[styles.providerStatus, !p.available && p.isQuotaError && styles.providerStatusQuota]}>
+                    {p.available ? "online" : p.isQuotaError ? "quota lockout" : "error"}
+                    {!p.available && p.cooldownRemainingMs ? ` — ${formatCooldown(p.cooldownRemainingMs)}` : ""}
+                  </Text>
+                  {!p.available && p.lastError ? <Text style={styles.providerError} numberOfLines={1}>{p.lastError}</Text> : null}
+                </View>
               </View>
             ))}
           </View>
@@ -139,6 +144,16 @@ export default function AiModerationStatsScreen() {
   );
 }
 
+function formatCooldown(ms: number): string {
+  const totalSec = Math.ceil(ms / 1000);
+  if (totalSec < 60) return `${totalSec}s rimanenti`;
+  const totalMin = Math.round(ms / 60_000);
+  if (totalMin < 60) return `${totalMin}m rimanenti`;
+  const hours = Math.floor(totalMin / 60);
+  const minutes = totalMin % 60;
+  return minutes > 0 ? `${hours}h ${minutes}m rimanenti` : `${hours}h rimanenti`;
+}
+
 function Kpi({ label, value, color }: { label: string; value: number; color?: string }) {
   return (
     <View style={styles.kpi}>
@@ -160,11 +175,13 @@ const styles = StyleSheet.create({
   barFill: { height: "100%", borderRadius: 4 },
   linkBtn: { marginTop: 8, alignSelf: "flex-start" },
   linkBtnText: { color: Colors.accent, fontFamily: "Inter_600SemiBold", fontSize: 12 },
-  providerRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 6 },
-  dot: { width: 10, height: 10, borderRadius: 5 },
+  providerRow: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingVertical: 6 },
+  dot: { width: 10, height: 10, borderRadius: 5, marginTop: 3 },
   providerName: { color: Colors.text, fontFamily: "Inter_600SemiBold", fontSize: 13, minWidth: 80 },
-  providerStatus: { color: Colors.textSecondary, fontSize: 12 },
-  providerError: { color: Colors.error, fontSize: 11, flex: 1, fontFamily: "Inter_400Regular" },
+  providerStatusCol: { flex: 1 },
+  providerStatus: { color: Colors.textSecondary, fontSize: 12, fontFamily: "Inter_400Regular" },
+  providerStatusQuota: { color: Colors.warning, fontFamily: "Inter_600SemiBold" },
+  providerError: { color: Colors.error, fontSize: 11, fontFamily: "Inter_400Regular", marginTop: 2 },
   kpiRow: { flexDirection: "row", justifyContent: "space-between", gap: 8 },
   kpi: { flex: 1, alignItems: "center", padding: 8, backgroundColor: Colors.surfaceLight, borderRadius: 8 },
   kpiValue: { color: Colors.text, fontFamily: "Inter_700Bold", fontSize: 18 },

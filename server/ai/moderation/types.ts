@@ -41,4 +41,6 @@ export interface AiProviderHealth {
   available: boolean;
   lastError?: string;
   lastErrorAt?: string;
+  cooldownRemainingMs?: number;
+  isQuotaError?: boolean;
 }

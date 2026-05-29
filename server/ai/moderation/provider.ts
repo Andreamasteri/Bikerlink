@@ -46,33 +46,42 @@ function isQuotaError(msg: string): boolean {
   return QUOTA_ERROR_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
 }
 
-const health: Record<AiProviderId, AiProviderHealth & { cooldownUntil: number }> = {
-  anthropic: { id: "anthropic", available: true, cooldownUntil: 0 },
-  openai: { id: "openai", available: true, cooldownUntil: 0 },
-  google: { id: "google", available: true, cooldownUntil: 0 },
+const health: Record<AiProviderId, AiProviderHealth & { cooldownUntil: number; quotaError: boolean }> = {
+  anthropic: { id: "anthropic", available: true, cooldownUntil: 0, quotaError: false },
+  openai: { id: "openai", available: true, cooldownUntil: 0, quotaError: false },
+  google: { id: "google", available: true, cooldownUntil: 0, quotaError: false },
 };
 
 export function markProviderError(id: AiProviderId, err: unknown): void {
   const msg = err instanceof Error ? err.message : String(err);
+  const quota = isQuotaError(msg);
   health[id].available = false;
   health[id].lastError = msg.slice(0, 200);
   health[id].lastErrorAt = new Date().toISOString();
+  health[id].quotaError = quota;
   // Errori di quota: cooldown lungo (6 ore) per non intasare i log con retry inutili.
-  health[id].cooldownUntil = Date.now() + (isQuotaError(msg) ? QUOTA_COOLDOWN_MS : COOLDOWN_MS);
+  health[id].cooldownUntil = Date.now() + (quota ? QUOTA_COOLDOWN_MS : COOLDOWN_MS);
 }
 
 export function markProviderOk(id: AiProviderId): void {
   health[id].available = true;
   health[id].cooldownUntil = 0;
+  health[id].quotaError = false;
 }
 
 export function getProviderHealth(): AiProviderHealth[] {
-  return (Object.values(health) as Array<AiProviderHealth & { cooldownUntil: number }>).map((h) => ({
-    id: h.id,
-    available: h.available && Date.now() >= h.cooldownUntil,
-    lastError: h.lastError,
-    lastErrorAt: h.lastErrorAt,
-  }));
+  const now = Date.now();
+  return (Object.values(health) as Array<AiProviderHealth & { cooldownUntil: number; quotaError: boolean }>).map((h) => {
+    const effectivelyAvailable = h.available && now >= h.cooldownUntil;
+    const remainingMs = !effectivelyAvailable && h.cooldownUntil > now ? h.cooldownUntil - now : 0;
+    return {
+      id: h.id,
+      available: effectivelyAvailable,
+      lastError: h.lastError,
+      lastErrorAt: h.lastErrorAt,
+      ...(remainingMs > 0 ? { cooldownRemainingMs: remainingMs, isQuotaError: h.quotaError } : {}),
+    };
+  });
 }
 
 function isAvailable(id: AiProviderId): boolean {
