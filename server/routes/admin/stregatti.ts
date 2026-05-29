@@ -3,7 +3,7 @@ import { storage } from "../../storage";
 import { db } from "../../db";
 import { users } from "@shared/db";
 import { stregattaSchema } from "@shared/validators";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../lib/api-response";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
@@ -82,6 +82,7 @@ router.delete("/", async (_req: Request, res: Response) => {
     const realUsersMismarked = await db.execute(sql`
       SELECT COUNT(*) AS cnt FROM users
       WHERE is_fake = true
+        AND nickname != 'BikerLink_Official'
         AND role NOT IN ('admin', 'moderator')
         AND email NOT LIKE '%@fakeuser.bikerlink.it'
         AND (invitation_code IS NULL OR invitation_code NOT LIKE 'mass_seed%')
@@ -90,16 +91,17 @@ router.delete("/", async (_req: Request, res: Response) => {
     const mismarkedCount = parseInt((realUsersMismarked.rows[0] as CntRow)?.cnt ?? "0", 10);
     if (mismarkedCount > 0) {
       console.error(`[stregatti-delete] BLOCKED: ${mismarkedCount} real user(s) incorrectly marked as isFake=true would be deleted. Run /api/admin/users/fix-isfake first.`);
-      return sendError(res, 409, `Impossibile eliminare: ${mismarkedCount} utenti reali risultano erroneamente marcati come fake. Esegui prima /api/admin/users/fix-isfake.`);
+      return sendError(res, 409, `Impossibile eliminare: ${mismarkedCount} utenti reali risultano erroneamente marcati come fake. Esegui prima il fix "is_fake" (/api/admin/users/fix-isfake) e riprova.`);
     }
-    const countResult = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(eq(users.isFake, true));
+    const deleteCondition = and(eq(users.isFake, true), sql`${users.nickname} != 'BikerLink_Official'`);
+    const countResult = await db.select({ count: sql<number>`count(*)::int` }).from(users).where(deleteCondition);
     const deleted = countResult[0]?.count ?? 0;
-    await db.delete(users).where(eq(users.isFake, true));
+    await db.delete(users).where(deleteCondition);
     clearSimulatorUsers();
     return sendSuccess(res, { deleted });
   } catch (_error) {
     console.error("Admin delete all stregatti error:", _error);
-    return sendError(res, 500, "Errore eliminazione globale");
+    return sendError(res, 500, "Errore eliminazione globale: vincolo dati o errore interno");
   }
 });
 

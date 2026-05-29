@@ -205,10 +205,14 @@ export default function FakeUsersAdmin() {
   });
 
   const deleteAllMutation = useMutation({
-    mutationFn: () => apiRequest("DELETE", "/api/admin/stregatti"),
-    onSuccess: () => {
+    mutationFn: () => apiRequest("DELETE", "/api/admin/stregatti").then(r => r.json() as Promise<{ deleted: number }>),
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stregatti"] });
       queryClient.invalidateQueries({ queryKey: ["/api/settings/fake-users-enabled"] });
+      Alert.alert("Eliminazione completata", `${data?.deleted ?? 0} stregatti eliminati (insieme ai loro match).`);
+    },
+    onError: (error: Error) => {
+      Alert.alert("Errore eliminazione", error?.message || "Impossibile eliminare gli stregatti. Riprova.");
     }
   });
 
