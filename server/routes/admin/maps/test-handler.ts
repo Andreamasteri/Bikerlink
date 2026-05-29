@@ -13,8 +13,10 @@ import type { RouteRequest } from "../../../routing/graphhopper-adapter";
 import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
 import {
   GH_BASE_URL, isSelfHosted, ROUTING_DISABLED, getServerInfo,
+  getRoutingHealthSnapshot,
   type GHServerInfo,
 } from "../../../graphhopper-client";
+import { getInfo as getValhallaInfo } from "../../../routing/valhalla-client";
 import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-tiles";
 
 const router = Router();
@@ -30,6 +32,74 @@ function maskUrl(url: string): string {
     return url.slice(0, 40);
   }
 }
+
+/**
+ * GET /api/admin/maps/routing-health
+ * Stato di salute del server di routing self-hosted (PC di casa) + Valhalla.
+ * Non esegue routing reale: legge lo snapshot in-memory aggiornato a ogni
+ * chiamata + un probe diretto /health (GraphHopper) e /status (Valhalla).
+ */
+router.get("/routing-health", async (_req: Request, res: Response) => {
+  const [ghInfo, valhallaInfo, engineSetting] = await Promise.all([
+    getServerInfo().catch((): GHServerInfo => ({ status: "error" })),
+    getValhallaInfo().catch((): GHServerInfo => ({ status: "error" })),
+    storage.getAppSetting("maps_routing_engine"),
+  ]);
+
+  const activeEngine = (engineSetting?.value ?? "graphhopper") as RoutingEngineId;
+  const snap = getRoutingHealthSnapshot();
+  const ghOk = ghInfo.status !== "error" && ghInfo.status !== "disabled";
+  const ghDown = snap.selfHosted && !ghOk;
+  // Valhalla è self-hosted: "down" se configurato (status != unconfigured) ma non ok.
+  const valhallaOk = valhallaInfo.status === "ok";
+  const valhallaConfigured = valhallaInfo.status !== "unconfigured";
+  const valhallaDown = valhallaConfigured && !valhallaOk;
+
+  // L'engine attivo determina se l'app è realmente degradata.
+  const activeEngineDown =
+    activeEngine === "valhalla" ? valhallaDown : ghDown;
+
+  let message: string;
+  if (ROUTING_DISABLED) {
+    message = "Routing disabilitato via kill-switch.";
+  } else if (activeEngine === "valhalla" && valhallaDown) {
+    message = "Valhalla (server di casa) OFFLINE — fallback automatico a GraphHopper.";
+  } else if (ghDown) {
+    message = snap.cloudFallbackAvailable
+      ? "Server di casa OFFLINE — routing servito dalla Cloud API (profilo car)."
+      : "Server di casa OFFLINE — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
+  } else {
+    message = "Server di routing operativo.";
+  }
+
+  return res.json({
+    self_hosted: snap.selfHosted,
+    active_engine: activeEngine,
+    graphhopper: {
+      url: maskUrl(GH_BASE_URL),
+      status: ghInfo.status,
+      ok: ghOk,
+      down: ghDown,
+      latency_ms: snap.latencyMs,
+      last_check_at: snap.lastCheckAt,
+      consecutive_failures: snap.consecutiveFailures,
+      error: snap.error,
+      version: ghInfo.version,
+    },
+    valhalla: {
+      status: valhallaInfo.status,
+      ok: valhallaOk,
+      down: valhallaDown,
+      version: valhallaInfo.version,
+    },
+    cloud_fallback_available: snap.cloudFallbackAvailable,
+    cloud_fallback_active: snap.cloudFallbackActive,
+    routing_disabled: ROUTING_DISABLED,
+    // Riepilogo per banner admin — riflette l'engine attivo
+    degraded: activeEngineDown,
+    message,
+  });
+});
 
 router.get("/test-routing", async (req: Request, res: Response) => {
   if (ROUTING_DISABLED) {
