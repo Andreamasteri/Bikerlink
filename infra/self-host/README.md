@@ -177,5 +177,6 @@ docker compose down -v      # ATTENZIONE: cancella anche i volumi (dati persi)
 | `docker-compose.yml` | Definizione dei 5 servizi e dei volumi persistenti. |
 | `graphhopper/config.yml` | Config GraphHopper (profilo moto curvy, PBF unificato). |
 | `.env.local.template` | Template variabili app con URL locali precompilati. |
+| `expose/` | Guida + config (Cloudflare Tunnel o Nginx+TLS) per esporre GraphHopper e Valhalla all'app cloud in modo sicuro. |
 | `.env` | (generato) credenziali dei container — non committare. |
 | `.env.local` | (generato) variabili per l'app BikerLink — non committare. |

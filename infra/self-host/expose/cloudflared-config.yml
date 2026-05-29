@@ -1,0 +1,60 @@
+# =============================================================================
+# Cloudflare Tunnel (cloudflared) — esposizione sicura dei servizi self-host
+#
+# Alternativa a Nginx+certbot quando il PC di casa NON ha IP pubblico statico
+# o porte 80/443 raggiungibili (es. dietro CG-NAT del provider). Cloudflare
+# crea un tunnel uscente: nessuna porta in entrata da aprire sul router.
+#
+# Il TLS è terminato da Cloudflare sull'edge; il tunnel cifra il traffico fino
+# al PC. L'AUTENTICAZIONE applicativa resta a carico dei servizi tramite i
+# token che l'app invia (X-GH-Token / X-Valhalla-Key), quindi anche con il
+# tunnel pubblico solo chi ha il token può chiamare le API.
+#
+# POSTGRES e REDIS NON vanno messi nel tunnel come hostname HTTP pubblici.
+# Per accesso remoto al DB usa `cloudflared access` (TCP) o una VPN.
+#
+# ── Setup (una tantum, sul PC di casa) ───────────────────────────────────────
+#   1. Installa cloudflared:
+#        curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
+#        sudo dpkg -i cloudflared.deb
+#   2. Autentica e crea il tunnel:
+#        cloudflared tunnel login
+#        cloudflared tunnel create bikerlink
+#      -> annota il Tunnel UUID e il percorso del file credenziali JSON.
+#   3. Crea i record DNS verso il tunnel:
+#        cloudflared tunnel route dns bikerlink gh.bikerlink.app
+#        cloudflared tunnel route dns bikerlink valhalla.bikerlink.app
+#   4. Copia questo file in /etc/cloudflared/config.yml, sostituisci i segnaposto
+#      e installa come servizio:
+#        sudo cloudflared service install
+#        sudo systemctl enable --now cloudflared
+#
+# Segnaposto da sostituire:
+#   __TUNNEL_UUID__   UUID restituito da `cloudflared tunnel create`
+#   __BASE_DOMAIN__   es: bikerlink.app
+# =============================================================================
+
+tunnel: __TUNNEL_UUID__
+credentials-file: /etc/cloudflared/__TUNNEL_UUID__.json
+
+# Origini interne raggiunte dal tunnel. L'ordine conta: la prima regola che
+# combacia con l'hostname vince. L'ultima (service: http_status:404) è il
+# catch-all obbligatorio.
+ingress:
+  # GraphHopper -> localhost:8989
+  - hostname: gh.__BASE_DOMAIN__
+    service: http://localhost:8989
+    originRequest:
+      connectTimeout: 5s
+      # GraphHopper risponde su /health senza token
+      noHappyEyeballs: true
+
+  # Valhalla -> localhost:8002
+  - hostname: valhalla.__BASE_DOMAIN__
+    service: http://localhost:8002
+    originRequest:
+      connectTimeout: 5s
+      noHappyEyeballs: true
+
+  # Catch-all obbligatorio
+  - service: http_status:404
