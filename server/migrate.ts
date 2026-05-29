@@ -55,7 +55,7 @@ const POSTGIS_SYSTEM_TABLES = ["spatial_ref_sys", "geography_columns", "geometry
  * Any 42501 on an application-owned table is still a real bug and must
  * propagate normally.
  */
-function isPostgisOwnerError(err: unknown): boolean {
+export function isPostgisOwnerError(err: unknown): boolean {
   const code = (err as { code?: string })?.code;
   if (code !== "42501") return false;
   const message = err instanceof Error ? err.message : String(err);
@@ -151,7 +151,7 @@ function writeCachedHash(hash: string): void {
  *  3. Partially-applied (e.g. missing new columns)   → old objects skip,
  *                                                       new objects created
  */
-async function applyMigration(
+export async function applyMigration(
   client: import("pg").PoolClient,
   filename: string,
   statements: string[]
