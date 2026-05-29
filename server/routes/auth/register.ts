@@ -103,6 +103,20 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
 
     data.email = data.email.trim().toLowerCase();
 
+    // BLOCCO ACCOUNT SMOKE — impedisce la creazione di account di test "smoke"
+    // (es. smoke+<ts>@bikerlink.test / nickname smoke<ts>) che possono restare
+    // "in limbo" e sporcare il DB. Vale per qualsiasi chiamante.
+    const SMOKE_EMAIL_RE = /^smoke\+[^@]+@bikerlink\.test$/i;
+    const SMOKE_NICKNAME_RE = /^smoke\d{6,}$/i;
+    if (
+      SMOKE_EMAIL_RE.test(data.email) ||
+      data.email.endsWith("@bikerlink.test") ||
+      SMOKE_NICKNAME_RE.test(data.nickname.trim())
+    ) {
+      console.warn(`[REGISTER] Bloccata creazione account smoke: email=${data.email} nickname=${data.nickname}`);
+      return sendError(res, 403, "Registrazione non consentita");
+    }
+
     const existingEmail = await storage.getUserByEmail(data.email);
     if (existingEmail) {
       return sendError(res, 409, "Email già registrata");
