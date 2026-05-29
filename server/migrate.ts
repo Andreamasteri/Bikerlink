@@ -191,6 +191,16 @@ export async function runMigrations(): Promise<void> {
 
   const client = await pool.connect();
   try {
+    // Raise statement_timeout for this connection only (session-scoped).
+    // Migration 0062 deletes ~5 000 fake users with CASCADE across 84+ child
+    // tables; without indexes that can take minutes. The FK indexes in 0062
+    // make it index-driven, but we still give 5 minutes of headroom for any
+    // future DML-intensive migration.
+    // IMPORTANT: we RESET this before client.release() (see finally block)
+    // so that the physical connection is returned to the pool with its default
+    // timeout, preventing 5-minute timeouts on subsequent app requests.
+    await client.query("SET statement_timeout = '300000'");
+
     await ensureMigrationsTable(client);
 
     const applied = await appliedMigrations(client);
@@ -225,6 +235,9 @@ export async function runMigrations(): Promise<void> {
     console.log(`[migrate] Done — ${pending.length} migration(s) applied successfully.`);
     writeCachedHash(currentHash);
   } finally {
+    // Reset statement_timeout to the server default before returning the
+    // connection to the pool, so subsequent app queries are not affected.
+    try { await client.query("RESET statement_timeout"); } catch { /* ignore */ }
     client.release();
   }
 }
