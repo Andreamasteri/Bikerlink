@@ -50,6 +50,14 @@ const essentialUsers: EssentialUserDef[] = [
     userType: "biker",
     sex: "M",
   },
+  {
+    nickname: "mendo",
+    email: "andreagranara@gmail.com",
+    passwordEnvVar: "MENDO_SEED_PASSWORD",
+    role: "admin",
+    userType: "biker",
+    sex: "M",
+  },
 ];
 
 export async function autoSeedEssentialUsers() {
