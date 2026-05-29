@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
+import { Pool } from "pg";
 import { db } from "../db";
 import { messages, conversations } from "@shared/db/conversations";
 import { users } from "@shared/db/users";
@@ -213,6 +214,71 @@ router.get("/chat-export", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[chat-export] Errore:", err);
     return res.status(500).json({ message: "Errore interno durante l'export" });
+  }
+});
+
+router.post("/purge-fake-users", async (req: Request, res: Response) => {
+  if (!requireExportToken(req, res)) return;
+
+  const applyMode = req.body?.apply === true;
+  const FAKE_EMAIL_DOMAIN = "@fakeuser.bikerlink.it";
+
+  try {
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+    const statsRows = await pool.query<{
+      total: string; by_is_fake: string; by_email_domain: string; by_invitation_code: string;
+    }>(`
+      SELECT
+        COUNT(*)                                                       AS total,
+        COUNT(*) FILTER (WHERE is_fake = true)                        AS by_is_fake,
+        COUNT(*) FILTER (WHERE email LIKE $1)                         AS by_email_domain,
+        COUNT(*) FILTER (WHERE invitation_code LIKE 'mass_seed%')     AS by_invitation_code
+      FROM users
+      WHERE is_fake = true OR email LIKE $1 OR invitation_code LIKE 'mass_seed%'
+    `, [`%${FAKE_EMAIL_DOMAIN}`]);
+
+    const s = statsRows.rows[0];
+    const total = parseInt(s?.total ?? "0", 10);
+    const dryRunInfo = {
+      total,
+      by_is_fake: parseInt(s?.by_is_fake ?? "0", 10),
+      by_email_domain: parseInt(s?.by_email_domain ?? "0", 10),
+      by_invitation_code: parseInt(s?.by_invitation_code ?? "0", 10),
+    };
+
+    if (!applyMode) {
+      await pool.end();
+      return res.json({ mode: "dry-run", ...dryRunInfo });
+    }
+
+    if (total === 0) {
+      await pool.end();
+      return res.json({ mode: "apply", deleted: 0, remaining: 0, message: "Already clean" });
+    }
+
+    const idsResult = await pool.query<{ id: string }>(`
+      SELECT id FROM users
+      WHERE is_fake = true OR email LIKE $1 OR invitation_code LIKE 'mass_seed%'
+    `, [`%${FAKE_EMAIL_DOMAIN}`]);
+    const ids = idsResult.rows.map(r => r.id);
+
+    const deleteResult = await pool.query(`DELETE FROM users WHERE id = ANY($1::text[])`, [ids]);
+    const deleted = deleteResult.rowCount ?? 0;
+
+    const verifyResult = await pool.query<{ remaining: string }>(`
+      SELECT COUNT(*) AS remaining FROM users
+      WHERE is_fake = true OR email LIKE $1 OR invitation_code LIKE 'mass_seed%'
+    `, [`%${FAKE_EMAIL_DOMAIN}`]);
+    const remaining = parseInt(verifyResult.rows[0]?.remaining ?? "0", 10);
+
+    await pool.end();
+
+    console.log(`[internal/purge-fake-users] APPLY: deleted=${deleted} remaining=${remaining}`);
+    return res.json({ mode: "apply", deleted, remaining, scan: dryRunInfo });
+  } catch (err) {
+    console.error("[internal/purge-fake-users] ERROR:", err);
+    return res.status(500).json({ message: "Errore durante la purge" });
   }
 });
 

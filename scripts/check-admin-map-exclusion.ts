@@ -204,6 +204,7 @@ function checkTrackerMethods(tracker: OnlineTracker): void {
     ghostMode: false,
     country: "IT",
     isFake: false,
+    isSystem: false,
   });
 
   assert(
