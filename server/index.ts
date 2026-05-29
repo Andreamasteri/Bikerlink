@@ -20,12 +20,13 @@ import { initSentry, attachSentryErrorHandler } from "./sentry";
 // ── Phase timeout helper ─────────────────────────────────────────────────────
 // Fatal phases: timeout rejects → propagates → process.exit(1)
 const BOOT_PHASE_TIMEOUT_MS = Number(process.env.BOOT_PHASE_TIMEOUT_MS) || 30_000;
+const MIGRATION_TIMEOUT_MS = Number(process.env.MIGRATION_TIMEOUT_MS) || 600_000;
 
-function withPhaseTimeout<T>(label: string, promise: Promise<T>): Promise<T> {
+function withPhaseTimeout<T>(label: string, promise: Promise<T>, timeoutMs = BOOT_PHASE_TIMEOUT_MS): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => {
-      reject(new Error(`[BOOT] Timeout ${BOOT_PHASE_TIMEOUT_MS}ms exceeded in phase: ${label}`));
-    }, BOOT_PHASE_TIMEOUT_MS);
+      reject(new Error(`[BOOT] Timeout ${timeoutMs}ms exceeded in phase: ${label}`));
+    }, timeoutMs);
     promise.then(
       (val) => { clearTimeout(timer); resolve(val); },
       (err) => { clearTimeout(timer); reject(err); },
@@ -170,7 +171,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   // FUORI dal percorso critico dello startup probe: la porta è già aperta.
   bootLog(2, TOTAL, "Migrations", "start");
   try {
-    await withPhaseTimeout("Migrations", runMigrations());
+    await withPhaseTimeout("Migrations", runMigrations(), MIGRATION_TIMEOUT_MS);
     bootLog(2, TOTAL, "Migrations", "done");
   } catch (err) {
     console.error("[startup] FATAL — Migrations failed, aborting:", err);

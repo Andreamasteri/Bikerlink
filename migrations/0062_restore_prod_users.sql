@@ -12,6 +12,214 @@
   --      idempotente. Gli account di sistema (admin, moderatore, reviewer,
   --      ecc., già is_fake=false) NON vengono toccati dal DELETE.
 
+  -- ── -1. INDICI FK PRE-DELETE ─────────────────────────────────────────
+  -- Senza indici Postgres fa seq-scan di ogni tabella figlia per ogni utente
+  -- (cascade/set-null): 5000 finti × N tabelle = milioni di confronti → timeout.
+  -- CREATE INDEX IF NOT EXISTS è idempotente: sicuro anche se già esiste.
+  -- Ogni statement è separato perché migrate.ts usa SAVEPOINT per ognuno.
+CREATE INDEX IF NOT EXISTS idx_fk_ab_assignments_user_id ON ab_assignments (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_ab_events_user_id ON ab_events (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_ad_clicks_user_id ON ad_clicks (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_app_crash_logs_user_id ON app_crash_logs (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_arcade_scores_user_id ON arcade_scores (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_biker_biker_matches_biker1_id ON biker_biker_matches (biker1_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_biker_biker_matches_biker2_id ON biker_biker_matches (biker2_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_biker_zavorrina_matches_biker_id ON biker_zavorrina_matches (biker_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_biker_zavorrina_matches_zavorrina_id ON biker_zavorrina_matches (zavorrina_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_bio_affinity_matches_user_a_id ON bio_affinity_matches (user_a_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_bio_affinity_matches_user_b_id ON bio_affinity_matches (user_b_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_collected_easter_eggs_user_id ON collected_easter_eggs (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_conversation_participants_user_id ON conversation_participants (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_coordinate_history_user_id ON coordinate_history (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_custom_routes_user_id ON custom_routes (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_daily_push_counts_user_id ON daily_push_counts (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_daily_vote_counts_user_id ON daily_vote_counts (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_direct_match_requests_receiver_id ON direct_match_requests (receiver_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_direct_match_requests_sender_id ON direct_match_requests (sender_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_email_verification_tokens_user_id ON email_verification_tokens (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_event_participants_user_id ON event_participants (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_events_creator_id ON events (creator_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_fake_user_interactions_fake_user_id ON fake_user_interactions (fake_user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_fake_user_interactions_real_user_id ON fake_user_interactions (real_user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_feedback_tickets_user_id ON feedback_tickets (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_gps_errors_user_id ON gps_errors (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_gps_rejection_stats_user_id ON gps_rejection_stats (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_invitation_codes_created_by ON invitation_codes (created_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_invitation_codes_used_by ON invitation_codes (used_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_match_feedback_other_user_id ON match_feedback (other_user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_match_feedback_user_id ON match_feedback (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_match_negative_preferences_user_id ON match_negative_preferences (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_match_notification_deliveries_user_id ON match_notification_deliveries (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_match_preferences_user_id ON match_preferences (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_messages_sender_id ON messages (sender_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_moderator_logs_moderator_id ON moderator_logs (moderator_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_moto_club_invites_user_id ON moto_club_invites (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_moto_club_members_user_id ON moto_club_members (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_moto_club_requests_requested_by ON moto_club_requests (requested_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_moto_club_requests_reviewed_by ON moto_club_requests (reviewed_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_moto_clubs_created_by ON moto_clubs (created_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_moto_clubs_proposed_by ON moto_clubs (proposed_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_music_affinity_matches_user_a_id ON music_affinity_matches (user_a_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_music_affinity_matches_user_b_id ON music_affinity_matches (user_b_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_notifications_user_id ON notifications (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_ota_assistant_runs_admin_id ON ota_assistant_runs (admin_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_ota_boot_events_user_id ON ota_boot_events (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_ota_releases_approved_by ON ota_releases (approved_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_ota_releases_rejected_by ON ota_releases (rejected_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_ota_watchdog_reports_triggered_by ON ota_watchdog_reports (triggered_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_password_reset_tokens_user_id ON password_reset_tokens (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_pending_auto_suggestions_user_id ON pending_auto_suggestions (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_photo_contest_entries_user_id ON photo_contest_entries (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_photo_votes_user_id ON photo_votes (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_photo_winners_user_id ON photo_winners (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_planned_route_invites_owner_id ON planned_route_invites (owner_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_planned_route_invites_suggested_user_id ON planned_route_invites (suggested_user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_planned_routes_user_id ON planned_routes (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_proposal_matches_user_id_1 ON proposal_matches (user_id_1);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_proposal_matches_user_id_2 ON proposal_matches (user_id_2);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_proposal_participants_user_id ON proposal_participants (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_proposal_profile_matches_biker_id ON proposal_profile_matches (biker_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_proposal_profile_matches_zavorrina_id ON proposal_profile_matches (zavorrina_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_proposal_zone_notifications_user_id ON proposal_zone_notifications (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_proposals_user_id ON proposals (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_reports_reported_user_id ON reports (reported_user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_reports_reporter_id ON reports (reporter_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_reports_resolved_by ON reports (resolved_by);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_ride_telemetry_user_id ON ride_telemetry (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_road_hazard_comments_user_id ON road_hazard_comments (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_road_hazard_confirms_user_id ON road_hazard_confirms (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_road_hazards_user_id ON road_hazards (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_route_affinity_matches_user_a_id ON route_affinity_matches (user_a_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_route_affinity_matches_user_b_id ON route_affinity_matches (user_b_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_routes_user_id ON routes (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_shared_playlists_from_user_id ON shared_playlists (from_user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_shared_playlists_to_user_id ON shared_playlists (to_user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_site_visits_user_id ON site_visits (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_sos_requests_helper_id ON sos_requests (helper_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_sos_requests_requester_id ON sos_requests (requester_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_sprint_results_user_id ON sprint_results (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_blocks_blocked_id ON user_blocks (blocked_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_blocks_blocker_id ON user_blocks (blocker_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_curvy_profile_user_id ON user_curvy_profile (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_devices_user_id ON user_devices (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_favorites_favorite_user_id ON user_favorites (favorite_user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_favorites_user_id ON user_favorites (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_lastfm_sessions_user_id ON user_lastfm_sessions (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_match_profile_user_id ON user_match_profile (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_motorcycles_user_id ON user_motorcycles (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_music_tokens_user_id ON user_music_tokens (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_music_tracks_user_id ON user_music_tracks (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_photos_user_id ON user_photos (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_playlist_snapshots_user_id ON user_playlist_snapshots (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_profiles_user_id ON user_profiles (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_route_fingerprints_user_id ON user_route_fingerprints (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_user_time_profile_user_id ON user_time_profile (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_verification_codes_user_id ON verification_codes (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_weekly_recaps_user_id ON weekly_recaps (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_workshop_contacts_user_id ON workshop_contacts (user_id);
+--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS idx_fk_zavorrina_wishlists_user_id ON zavorrina_wishlists (user_id);
+--> statement-breakpoint
+
   -- ── 0. PULIZIA UTENTI FINTI DEV ─────────────────────────────────────
 DELETE FROM users WHERE is_fake = true;
 --> statement-breakpoint
