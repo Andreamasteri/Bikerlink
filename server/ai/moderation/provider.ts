@@ -34,8 +34,18 @@ export function estimateCostUsd(modelId: string, tokensIn: number, tokensOut: nu
   return (tokensIn / 1000) * p.in + (tokensOut / 1000) * p.out;
 }
 
-// Soft circuit-breaker per ogni provider: 60s di cooldown dopo errore non-rate-limit.
+// Soft circuit-breaker per ogni provider: 60s di cooldown dopo errore generico,
+// 6 ore di cooldown per errori di quota (evita spam nei log per tutta la notte).
 const COOLDOWN_MS = 60_000;
+const QUOTA_COOLDOWN_MS = 6 * 60 * 60 * 1000; // 6 ore
+
+const QUOTA_ERROR_PATTERNS = ["quota", "rate_limit", "RESOURCE_EXHAUSTED"];
+
+function isQuotaError(msg: string): boolean {
+  const lower = msg.toLowerCase();
+  return QUOTA_ERROR_PATTERNS.some((p) => lower.includes(p.toLowerCase()));
+}
+
 const health: Record<AiProviderId, AiProviderHealth & { cooldownUntil: number }> = {
   anthropic: { id: "anthropic", available: true, cooldownUntil: 0 },
   openai: { id: "openai", available: true, cooldownUntil: 0 },
@@ -47,7 +57,8 @@ export function markProviderError(id: AiProviderId, err: unknown): void {
   health[id].available = false;
   health[id].lastError = msg.slice(0, 200);
   health[id].lastErrorAt = new Date().toISOString();
-  health[id].cooldownUntil = Date.now() + COOLDOWN_MS;
+  // Errori di quota: cooldown lungo (6 ore) per non intasare i log con retry inutili.
+  health[id].cooldownUntil = Date.now() + (isQuotaError(msg) ? QUOTA_COOLDOWN_MS : COOLDOWN_MS);
 }
 
 export function markProviderOk(id: AiProviderId): void {
@@ -94,6 +105,10 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
       };
     }
     if (id === "google") {
+      // Per riattivare Gemini: imposta GEMINI_API_KEY nel pannello Secrets con una chiave
+      // pagante (Google AI Studio → piano a pagamento). La chiave free tier ha quota 0
+      // e genera "RESOURCE_EXHAUSTED" continuamente. Senza chiave pagante Gemini resta
+      // disabilitato e il sistema usa Anthropic/OpenAI come fallback.
       const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
       if (!key) return null;
       const modelId = forcedModelId ?? (role === "router" ? "gemini-2.5-flash-lite" : "gemini-2.5-pro");
