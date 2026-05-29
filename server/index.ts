@@ -65,6 +65,20 @@ app.get("/api/metrics", (_req: Request, res: Response) => {
   });
 });
 
+// Task #2789 — Gate delle rotte applicative durante il boot.
+// Con la porta HTTP aperta PRIMA di migrazioni/seed (vedi sequenza sotto), le
+// rotte `/api/*` sono raggiungibili mentre lo schema/seed non sono ancora
+// pronti. Per evitare di servire dati parziali o errori DB grezzi, finché
+// initState.initializing è true rispondiamo 503 a tutte le `/api/*` tranne
+// `/api/health` (che ha il proprio handler initializing-aware) e `/api/metrics`
+// (montato sopra, fuori dal gate). Lo startup probe autoscale colpisce `GET /`,
+// che NON è sotto questo gate e risponde 200 subito.
+app.use("/api", (req: Request, res: Response, next) => {
+  if (!initState.initializing) return next();
+  if (req.path === "/health") return next();
+  return res.status(503).json({ status: "initializing", initializing: true });
+});
+
 registerAllRoutes(app);
 setupStaticRoutes(app);
 // Task #2527 — Catena deterministica per gli error handler:
@@ -125,35 +139,43 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   // Read by the post-boot fire-and-forget block to decide if autoSeedFakeUsers should run.
   let needsFakeSeed = false;
 
-  // ── Phase 1: Migrations ───────────────────────────────────────────────────
-  bootLog(1, TOTAL, "Migrations", "start");
-  try {
-    await withPhaseTimeout("Migrations", runMigrations());
-    bootLog(1, TOTAL, "Migrations", "done");
-  } catch (err) {
-    console.error("[startup] FATAL — Migrations failed, aborting:", err);
-    process.exit(1);
-  }
-
   // Task #2527 — assicura che Sentry sia inizializzato, l'error handler
   // Sentry montato e poi il custom error handler montato dopo, prima di
   // accettare traffico (no-op se SENTRY_DSN non è impostato).
   await errorHandlersReady;
 
-  // ── Phase 2: HTTP Listen ──────────────────────────────────────────────────
+  // ── Phase 1: HTTP Listen (FIRST) ──────────────────────────────────────────
+  // Task #2789 — apriamo la porta HTTP PRIMA di migrazioni e seed. Lo startup
+  // probe di Replit autoscale colpisce `GET /`, che risponde 200 subito (la
+  // landing page degrada a {} se il DB non è ancora pronto). Tutte le rotte
+  // applicative reali restano gated da initState.initializing (503) finché le
+  // fasi successive non sono completate. Così la promote non va più in timeout
+  // aspettando che migrazioni/seed bloccanti finiscano prima del listen.
   const PORT = parseInt(process.env.PORT ?? "5000", 10);
-  bootLog(2, TOTAL, "HTTP Listen", `binding 0.0.0.0:${PORT}`);
+  bootLog(1, TOTAL, "HTTP Listen", `binding 0.0.0.0:${PORT}`);
   await new Promise<void>((resolve) => {
     server.listen(PORT, "0.0.0.0", () => {
       const formattedDate = new Date().toLocaleString("it-IT", { timeZone: "Europe/Rome" });
       console.log(`[${formattedDate}] Server started on 0.0.0.0:${PORT} (initializing...)`);
-      bootLog(2, TOTAL, "HTTP Listen", "ready — health returns 503 until boot completes");
+      bootLog(1, TOTAL, "HTTP Listen", "ready — health returns 503 until boot completes");
       resolve();
     });
   });
 
   initUptimeTracking();
   startMetroMonitor();
+
+  // ── Phase 2: Migrations (FATAL — gira dopo il listen) ─────────────────────
+  // Il fallimento reale resta fatale (process.exit(1)) e visibile, ma ora gira
+  // FUORI dal percorso critico dello startup probe: la porta è già aperta.
+  bootLog(2, TOTAL, "Migrations", "start");
+  try {
+    await withPhaseTimeout("Migrations", runMigrations());
+    bootLog(2, TOTAL, "Migrations", "done");
+  } catch (err) {
+    console.error("[startup] FATAL — Migrations failed, aborting:", err);
+    process.exit(1);
+  }
 
   // ── Phase 3: DB Init (non-fatal sub-steps) ────────────────────────────────
   bootLog(3, TOTAL, "DB Init", "start");
