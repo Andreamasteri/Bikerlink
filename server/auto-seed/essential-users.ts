@@ -4,12 +4,12 @@ import { users, userProfiles } from "@shared/db";
 import { eq } from "drizzle-orm";
 
 export const FORBIDDEN_SEED_PASSWORDS = new Set<string>([
-  "wF5ws73,d;*E",
-  "mod2025!",
   "admin",
   "password",
   "123456",
   "changeme",
+  "qwerty",
+  "letmein",
 ]);
 
 export const MIN_SEED_PASSWORD_LENGTH = 12;
