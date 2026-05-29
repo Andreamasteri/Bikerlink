@@ -853,10 +853,7 @@ export async function reloadSimulatorUsers(): Promise<void> {
     .from(users)
     .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
     .where(
-      and(
-        eq(users.isFake, true),
-        ...systemAccountConditions(users),
-      ),
+      and(eq(users.isFake, true), ...systemAccountConditions(users)),
     );
 
   if (rows.length === 0) return;
