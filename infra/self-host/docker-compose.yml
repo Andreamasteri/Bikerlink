@@ -1,0 +1,155 @@
+# =============================================================================
+# BikerLink — Self-Host Stack (PC di casa / Ubuntu Server 24.04 LTS)
+#
+# Servizi:
+#   - postgres   PostgreSQL 16 + PostGIS 3.4   → :5432
+#   - redis      Redis 7 Alpine                → :6379
+#   - graphhopper GraphHopper 9.x (motorcycle) → :8989
+#   - valhalla   Valhalla (motorcycle nativo)  → :8002
+#   - pgadmin    pgAdmin 4 (UI DB)             → :5050
+#
+# Tutti i dati persistono su volumi nominati. Il file PBF unificato
+# (data/europe-ecuador-merged.osm.pbf) viene generato da download-osm.sh
+# nella cartella ./data prima di avviare GraphHopper e Valhalla.
+#
+# Variabili lette da .env (generato da setup.sh a partire da .env.local.template):
+#   POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+#   PGADMIN_EMAIL, PGADMIN_PASSWORD
+#   GRAPHHOPPER_JAVA_OPTS
+# =============================================================================
+
+name: bikerlink-selfhost
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL 16 + PostGIS 3.4
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgis/postgis:16-3.4
+    container_name: bikerlink-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bikerlink}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD non impostata - vedi .env}
+      POSTGRES_DB: ${POSTGRES_DB:-bikerlink}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bikerlink} -d ${POSTGRES_DB:-bikerlink}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Redis 7 (cache, code, heartbeat)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: bikerlink-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "1gb", "--maxmemory-policy", "allkeys-lru"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # GraphHopper 9.x — profilo motorcycle curvy (engine principale)
+  # ---------------------------------------------------------------------------
+  graphhopper:
+    image: israelhikingmap/graphhopper:latest
+    container_name: bikerlink-graphhopper
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # All'avvio: importa il grafo se non esiste, poi serve. La JVM eredita
+    # le opzioni heap da GRAPHHOPPER_JAVA_OPTS (settata da setup.sh in base alla RAM).
+    environment:
+      JAVA_OPTS: ${GRAPHHOPPER_JAVA_OPTS:--Xmx16g -Xms4g -XX:+UseG1GC}
+    command:
+      - "--input"
+      - "/data/europe-ecuador-merged.osm.pbf"
+      - "--config"
+      - "/graphhopper/config.yml"
+      - "--host"
+      - "0.0.0.0"
+    ports:
+      - "8989:8989"
+    volumes:
+      # PBF unificato + grafo buildato persistente
+      - ./data:/data
+      # Config montata read-only
+      - ./graphhopper/config.yml:/graphhopper/config.yml:ro
+      - ghgraph:/graphhopper/graph-cache
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8989/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      # Il primo import del grafo Europa può richiedere 30-60 min.
+      start_period: 60m
+
+  # ---------------------------------------------------------------------------
+  # Valhalla — engine alternativo (motorcycle nativo, fallback robusto)
+  # ---------------------------------------------------------------------------
+  valhalla:
+    image: ghcr.io/gis-ops/docker-valhalla/valhalla:latest
+    container_name: bikerlink-valhalla
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      # Usa il PBF già scaricato in ./data (no download interno).
+      use_tiles_ignore_pbf: "False"
+      serve_tiles: "True"
+      build_admins: "True"
+      build_time_zones: "True"
+      build_elevation: "False"
+      force_rebuild: "False"
+    volumes:
+      # custom_files contiene i .pbf da cui Valhalla builda i tile.
+      - ./data:/custom_files
+      - valhalladata:/custom_files/valhalla_tiles
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8002/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 30
+      # Il build dei tile Valhalla per l'Europa può richiedere fino a 3h.
+      start_period: 180m
+
+  # ---------------------------------------------------------------------------
+  # pgAdmin 4 — UI di amministrazione DB
+  # ---------------------------------------------------------------------------
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: bikerlink-pgadmin
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@bikerlink.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?PGADMIN_PASSWORD non impostata - vedi .env}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmindata:/var/lib/pgadmin
+
+volumes:
+  pgdata:
+  redisdata:
+  ghgraph:
+  valhalladata:
+  pgadmindata:
