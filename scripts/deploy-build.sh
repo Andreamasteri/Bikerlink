@@ -40,9 +40,9 @@ echo "=== [1/2] Sync database schema ==="
 #
 # Task #2700 — sostituito `npx drizzle-kit push --force` con il wrapper
 # `scripts/db-push-safe.sh`. In prod drizzle-kit, nonostante il tablesFilter,
-# emette un `ALTER TABLE spatial_ref_sys ADD PRIMARY KEY` (oggetto PostGIS
-# di proprietà di `postgres`) che fallisce con "must be owner of table
-# spatial_ref_sys" bloccando il deploy. Il wrapper:
+# genera DDL di tipo ADD PRIMARY KEY su oggetti PostGIS (proprietà di `postgres`)
+# che fallisce con "must be owner of table spatial_ref_sys" bloccando il deploy.
+# Il wrapper:
 #  - swallowa SOLO gli errori di ownership sui 3 oggetti PostGIS noti
 #    (spatial_ref_sys, geography_columns, geometry_columns);
 #  - fa fail-fast su qualunque altro errore (nessun masking di bug reali);

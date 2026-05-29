@@ -13,16 +13,14 @@
 -- ║    ERROR: must be owner of table spatial_ref_sys                       ║
 -- ╚══════════════════════════════════════════════════════════════════════════╝
 --
--- Contesto: il deploy in produzione falliva con
---   ALTER TABLE "spatial_ref_sys" ADD PRIMARY KEY ("srid");
---   must be owner of table spatial_ref_sys
--- perché `spatial_ref_sys` è una tabella di sistema PostGIS di proprietà del
--- ruolo `postgres`, non dell'utente applicativo.
+-- Contesto: il deploy in produzione falliva perché drizzle-kit generava un DDL
+-- di tipo ADD PRIMARY KEY su spatial_ref_sys (owner: ruolo postgres, non l'utente
+-- applicativo) → errore "must be owner of table spatial_ref_sys".
 --
 -- La versione precedente di questa migration (Task #2702) provava a gestire il
 -- caso con un DO block + EXCEPTION WHEN insufficient_privilege. Tuttavia il
 -- pipeline di deploy di Replit analizza il TESTO SQL della migration e blocca
--- l'esecuzione (validation failure) appena trova `ALTER TABLE spatial_ref_sys`,
+-- l'esecuzione (validation failure) non appena trova DDL su spatial_ref_sys,
 -- senza mai arrivare a eseguire il blocco EXCEPTION.
 --
 -- Soluzione: svuotare completamente la migration lasciando solo commenti
