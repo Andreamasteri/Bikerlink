@@ -42,6 +42,39 @@ conoscerli. Devono coincidere tra il proxy e le variabili dell'app.
 
 ---
 
+## Generazione automatica dei config (consigliata)
+
+Invece di sostituire i segnaposto a mano, usa lo script `setup-expose.sh`: legge
+i token dal `.env.local`, chiede dominio / origin / Tunnel UUID, **valida che i
+token coincidano** con quelli del `.env.local` e produce i file già compilati
+in `generated/`.
+
+```bash
+chmod +x setup-expose.sh
+./setup-expose.sh
+```
+
+Output (token in chiaro, `chmod 600`, cartella ignorata da git):
+
+- `generated/nginx-bikerlink.conf`
+- `generated/cloudflared-config.yml`
+
+I template originali (`nginx-bikerlink.conf`, `cloudflared-config.yml`) restano
+intatti come riferimento. Modalità non-interattiva per scripting:
+
+```bash
+NONINTERACTIVE=1 BASE_DOMAIN=bikerlink.app APP_ORIGIN=https://bikerlink.app \
+  TUNNEL_UUID=<uuid> ./setup-expose.sh
+```
+
+Variabili opzionali: `GRAPHHOPPER_TOKEN`, `VALHALLA_API_KEY` (override del
+`.env.local`), `ENV_LOCAL_FILE` (percorso alternativo), `SKIP_TOKEN_VALIDATION=1`
+(forza la generazione anche con token non coincidenti).
+
+Se preferisci farlo a mano, segui le sezioni sottostanti.
+
+---
+
 ## Opzione A — Cloudflare Tunnel (consigliata per il PC di casa)
 
 Nessuna porta da aprire sul router, funziona anche dietro CG-NAT.
