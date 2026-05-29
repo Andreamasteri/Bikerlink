@@ -19,6 +19,18 @@ set -e
 #     rispecchiare GENERATED ALWAYS del DB ed evitare ALTER distruttivi
 # drizzle-kit push --force ora gira senza TTY e senza prompt interattivi.
 
+# Task #2800-fix — Pulizia asset non necessari prima del push del Repl layer.
+# attached_assets/ contiene screenshot del workspace Replit (usati dall'agente
+# per riferimento visivo) che crescono nel tempo e gonfiano il Repl layer fino
+# a superare il limite Cloud Run (~2 GB), facendo fallire silenziosamente
+# "Creating Autoscale service" senza alcun log di errore.
+# Questi file non servono a runtime: il server Express non li serve.
+# La pulizia avviene PRIMA del build così il layer risultante è snello.
+echo "=== [0/2] Pulizia asset workspace non necessari ==="
+rm -rf attached_assets/
+mkdir -p attached_assets   # ricrea la dir vuota (evita errori se qualcuno la referenzia)
+echo "  attached_assets/ svuotata."
+
 echo "=== [1/2] Sync database schema ==="
 # Task #2682 — root cause TTY prompt risolto:
 # shared/db/drizzle-schema.ts ora importa ./matching-extra (match_rules,
