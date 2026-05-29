@@ -17,6 +17,11 @@
 #
 # Uso:
 #   chmod +x setup.sh && ./setup.sh
+#   ./setup.sh --gen-secrets   # genera anche i secret locali mancanti nel .env.local
+#
+# Variabili d'ambiente utili (CI / scripting non-interattivo):
+#   GEN_SECRETS=1   genera i secret locali mancanti senza prompt
+#   NONINTERACTIVE=1 disabilita i prompt (i secret restano <INSERIRE> se non opt-in)
 # =============================================================================
 set -euo pipefail
 
@@ -28,6 +33,12 @@ ENV_FILE="${SCRIPT_DIR}/.env"
 ENV_LOCAL_FILE="${SCRIPT_DIR}/.env.local"
 TEMPLATE_FILE="${SCRIPT_DIR}/.env.local.template"
 MIN_FREE_GB=100
+PLACEHOLDER_VALUE="<INSERIRE>"
+
+# Opt-in generazione secret locali (SESSION_SECRET, OSM_UPDATE_SECRET).
+# Coerente con expose/setup-expose.sh: accetta --gen-secrets/--gen-tokens o GEN_SECRETS/GEN_TOKENS=1.
+GEN_SECRETS="${GEN_SECRETS:-${GEN_TOKENS:-0}}"
+NONINTERACTIVE="${NONINTERACTIVE:-0}"
 
 # Timeout health check (secondi)
 TIMEOUT_FAST=120          # postgres, redis, pgadmin
@@ -41,6 +52,20 @@ warn()  { echo -e "  \033[33m!\033[0m $*"; }
 info()  { echo -e "  \033[36m→\033[0m $*"; }
 die()   { echo -e "\033[31m✗ ERRORE:\033[0m $*" >&2; exit 1; }
 section() { echo; bold "━━━ $* ━━━"; }
+
+# ── Argomenti CLI ─────────────────────────────────────────────────────────────
+for arg in "$@"; do
+  case "$arg" in
+    --gen-secrets|--gen-tokens) GEN_SECRETS=1 ;;
+    -h|--help)
+      echo "Uso: $0 [--gen-secrets]"
+      echo "  --gen-secrets  Genera automaticamente i secret locali mancanti/placeholder"
+      echo "                 (SESSION_SECRET, OSM_UPDATE_SECRET) con 'openssl rand -base64 32'"
+      echo "                 e li scrive nel .env.local. Equivalente a GEN_SECRETS=1."
+      exit 0 ;;
+    *) die "Argomento sconosciuto: $arg (usa --help)" ;;
+  esac
+done
 
 [[ "$(id -u)" -eq 0 ]] && SUDO="" || SUDO="sudo"
 
@@ -121,6 +146,56 @@ section "4/7 — Configurazione .env"
 # ─────────────────────────────────────────────────────────────────────────────
 gen_secret() { openssl rand -hex 24 2>/dev/null || head -c 36 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 36; }
 
+# Genera un secret robusto (32 byte base64), coerente coi token di routing.
+gen_b64_secret() {
+  command -v openssl >/dev/null 2>&1 || die "openssl non disponibile: impossibile generare i secret."
+  openssl rand -base64 32
+}
+
+# Legge il valore di una chiave da un file .env (ultima occorrenza, trim quote).
+read_env_value() {
+  local key="$1" file="$2" line val
+  [[ -r "$file" ]] || return 1
+  line="$(grep -E "^[[:space:]]*${key}=" "$file" | tail -n1 || true)"
+  [[ -n "$line" ]] || return 1
+  val="${line#*=}"
+  val="${val%\"}"; val="${val#\"}"
+  val="${val%\'}"; val="${val#\'}"
+  printf '%s' "$val"
+}
+
+# Escape per sed (sostituzione sicura su separatore '#').
+sed_escape() { printf '%s' "$1" | sed -e 's/[\#&]/\\&/g'; }
+
+# Inserisce/aggiorna una chiave nel file .env.local (crea il file se assente).
+upsert_env_value() {
+  local key="$1" value="$2" file="$3" tmp esc_val
+  if [[ ! -e "$file" ]]; then
+    mkdir -p "$(dirname "$file")"
+    : > "$file"
+  fi
+  [[ -w "$file" ]] || die "Impossibile scrivere su $file (permessi?)."
+  esc_val="$(sed_escape "$value")"
+  if grep -qE "^[[:space:]]*${key}=" "$file"; then
+    tmp="$(mktemp)"
+    sed -E "s#^[[:space:]]*${key}=.*#${key}=${esc_val}#" "$file" > "$tmp"
+    cat "$tmp" > "$file"
+    rm -f "$tmp"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$file"
+  fi
+}
+
+# Decide se generare un secret mancante: opt-in via --gen-secrets/GEN_SECRETS=1,
+# oppure prompt interattivo. In NONINTERACTIVE senza opt-in: no.
+should_generate_secret() {
+  local name="$1" reply
+  [[ "$GEN_SECRETS" == "1" ]] && return 0
+  [[ "$NONINTERACTIVE" == "1" ]] && return 1
+  read -r -p "  ${name} assente: generarlo automaticamente e salvarlo in .env.local? [s/N] " reply
+  [[ "${reply,,}" == "s" || "${reply,,}" == "y" ]]
+}
+
 # Calcola lo heap GraphHopper in base alla RAM disponibile (~60%, min 4g, max 24g).
 TOTAL_RAM_GB="$(free -g | awk '/^Mem:/{print $2}')"
 GH_HEAP_GB=$(( TOTAL_RAM_GB * 6 / 10 ))
@@ -161,6 +236,24 @@ if [[ -f "$TEMPLATE_FILE" ]]; then
   ok "Generato .env.local per l'app (DATABASE_URL valorizzato, altri secret cloud da compilare)"
 else
   warn ".env.local.template non trovato — salto la generazione di .env.local"
+fi
+
+# Genera i secret puramente locali (SESSION_SECRET, OSM_UPDATE_SECRET) se assenti
+# o lasciati come placeholder. Opt-in: --gen-secrets / GEN_SECRETS=1 oppure prompt.
+if [[ -f "$ENV_LOCAL_FILE" ]]; then
+  for secret_key in SESSION_SECRET OSM_UPDATE_SECRET; do
+    cur_val="$(read_env_value "$secret_key" "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+    if [[ -n "$cur_val" && "$cur_val" != "$PLACEHOLDER_VALUE" ]]; then
+      ok "${secret_key} già valorizzato in .env.local — non sovrascrivo."
+      continue
+    fi
+    if should_generate_secret "$secret_key"; then
+      upsert_env_value "$secret_key" "$(gen_b64_secret)" "$ENV_LOCAL_FILE"
+      ok "${secret_key} generato (openssl rand -base64 32) e scritto in .env.local"
+    else
+      warn "${secret_key} lasciato come ${PLACEHOLDER_VALUE}: inseriscilo a mano nel .env.local."
+    fi
+  done
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -232,6 +325,8 @@ $(bold "BikerLink self-host — servizi attivi")
 $(bold "File generati")
   .env         credenziali dei container Docker
   .env.local   variabili per l'app BikerLink (DATABASE_URL già pronto)
+               SESSION_SECRET / OSM_UPDATE_SECRET: generati con --gen-secrets,
+               altrimenti restano <INSERIRE> (genera: openssl rand -base64 32)
 
 $(bold "Comandi utili")
   docker compose ps                 stato dei servizi
