@@ -99,31 +99,64 @@ fi
 # originale di Task #2700 viene ripristinato con il discriminatore aggiuntivo
 # "altri errori presenti?".
 if grep -qEi "$POSTGIS_OBJECTS_PATTERN" "$tmp_out"; then
-  # Rimuove l'intero blocco di 3 righe dell'errore PostGIS usando perl.
-  # drizzle-kit emette errori nel formato:
-  #   Failed to run database migration statement     ← riga 1: nessun nome PostGIS
-  #   ALTER TABLE "spatial_ref_sys" ADD PRIMARY KEY; ← riga 2: contiene nome PostGIS
-  #   must be owner of table spatial_ref_sys         ← riga 3: conseguenza PostGIS
-  # grep -v rimuoveva solo righe 2 e 3, lasciando riga 1 "Failed..." che
-  # scattava erroneamente il fail-fast. perl rimuove l'intero blocco.
-  stripped=$(perl -0777 -pe \
-    's/[^\n]*\n[^\n]*(spatial_ref_sys|geography_columns|geometry_columns)[^\n]*\n[^\n]*(\n|$)//gi' \
-    "$tmp_out" 2>/dev/null || grep -vEi "$POSTGIS_OBJECTS_PATTERN" "$tmp_out" || true)
-  if echo "$stripped" | grep -qEi "error|Error|ERROR|failed|exception"; then
-    echo "[db-push-safe] ERRORE: drizzle-kit ha fallito con errori PostGIS E altri errori non-PostGIS." >&2
-    echo "Gli errori non-PostGIS indicano un problema reale che non può essere ignorato." >&2
-    echo "Output non-PostGIS rilevante:" >&2
-    echo "$stripped" | grep -Ei "error|Error|ERROR|failed|exception" >&2
+  # ─── RILEVAZIONE ROBUSTA basata sul CONTEGGIO ──────────────────────────────
+  # BUG FIX (2026-05-29, v2): la versione precedente faceva lo strip del blocco
+  # PostGIS con perl e poi un grep GENERICO "error|failed|exception" sul resto.
+  # Con l'output reale di drizzle-kit in produzione (più ricco del test sintetico)
+  # quel grep scattava su righe innocue (es. testo dello statement, summary,
+  # spinner) → fail-fast erroneo → BUILD FALLITO. Sostituito con un conteggio
+  # esatto: il deploy prosegue SOLO se OGNI fallimento riportato da drizzle-kit
+  # riguarda un oggetto PostGIS di sistema.
+  #
+  # drizzle-kit, quando uno statement fallisce, stampa il marker
+  #   "Failed to run database migration statement"
+  # seguito (nelle ~2 righe successive) dallo statement SQL e dal messaggio
+  # Postgres "must be owner of ...".
+  #
+  # STRATEGIA (residuo + anchor): un awk a stati RIMUOVE dall'output i blocchi
+  # interamente PostGIS (marker + max 2 righe che contengono un oggetto PostGIS)
+  # e le righe isolate "must be owner of <PostGIS>". Ciò che resta è il "residuo".
+  # Se nel residuo compare QUALSIASI anchor di errore ad alto segnale → fail-fast
+  # (errore reale, anche se fuori dai blocchi PostGIS, es. timeout di rete).
+  # Solo se il residuo è pulito lo skip è benigno.
+  #
+  # Perché non un grep generico (come la versione precedente)? "error|failed"
+  # scattava sulle righe stesse del blocco PostGIS e su testo innocuo → fail-fast
+  # erroneo → BUILD FALLITO. Qui prima si rimuovono i blocchi benigni, poi si
+  # cercano SOLO anchor specifici sul residuo.
+  residual=$(awk '
+    function emit() { if (binblock) { if (!bhaspg) for (i=0;i<bn;i++) print bbuf[i]; binblock=0; bn=0; bhaspg=0 } }
+    /Failed to run database migration statement/ { emit(); binblock=1; bn=0; bhaspg=0; bbuf[bn++]=$0; bcnt=0; next }
+    binblock {
+      bbuf[bn++]=$0
+      if (tolower($0) ~ /spatial_ref_sys|geography_columns|geometry_columns/) bhaspg=1
+      bcnt++; if (bcnt>=2) emit()
+      next
+    }
+    {
+      if (tolower($0) ~ /must be owner of/ && tolower($0) ~ /spatial_ref_sys|geography_columns|geometry_columns/) next
+      print
+    }
+    END { emit() }
+  ' "$tmp_out")
+
+  # Anchor di errore ad alto segnale cercati SOLO sul residuo (post-rimozione
+  # dei blocchi PostGIS benigni). Tutto ciò che resta e fa match è un bug reale.
+  ERROR_ANCHORS='Failed to run database migration statement|must be owner of|(^|[[:space:]])(Error|error|ERROR):|DrizzleQueryError|Postgres(Query)?Error|PgError|syntax error|does not exist|permission denied|violates|could not|cannot |ECONNREFUSED|ETIMEDOUT|getaddrinfo|timeout'
+
+  if echo "$residual" | grep -qEi "$ERROR_ANCHORS"; then
+    echo "[db-push-safe] ERRORE: drizzle-kit ha fallito con errori NON riconducibili solo a PostGIS." >&2
+    echo "Righe di errore residue (fuori dai blocchi PostGIS benigni):" >&2
+    echo "$residual" | grep -Ei "$ERROR_ANCHORS" >&2
+    echo "Fail-fast per non mascherare bug reali." >&2
     rm -f "$tmp_out"
     exit "$rc"
   fi
-  # Solo errori PostGIS: skip benigno.
-  echo "[db-push-safe] WARNING: drizzle-kit ha prodotto errori su oggetti PostGIS di sistema." >&2
-  echo "Questo accade quando extensionsFilters non filtra correttamente in drizzle-kit 0.31.x." >&2
-  echo "Gli oggetti spatial_ref_sys/geography_columns/geometry_columns sono di proprietà del" >&2
-  echo "ruolo 'postgres' e NON devono essere modificati dall'utente applicativo." >&2
-  echo "Skip benigno: il deploy continua. I livelli 1+2 (extensionsFilters + tablesFilter)" >&2
-  echo "impediscono che questi oggetti vengano modificati nel database." >&2
+
+  # Residuo pulito: tutti gli errori erano su oggetti PostGIS di sistema → benigno.
+  echo "[db-push-safe] WARNING: drizzle-kit ha fallito SOLO su oggetti PostGIS di sistema." >&2
+  echo "Gli oggetti spatial_ref_sys/geography_columns/geometry_columns sono di proprietà del ruolo" >&2
+  echo "'postgres' e NON vengono modificati. Skip benigno: il deploy continua (livelli 1+2 attivi)." >&2
   rm -f "$tmp_out"
   exit 0
 fi
