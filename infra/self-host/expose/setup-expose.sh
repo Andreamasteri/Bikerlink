@@ -17,15 +17,30 @@
 #
 # Uso:
 #   chmod +x setup-expose.sh && ./setup-expose.sh
+#   ./setup-expose.sh --gen-tokens   # genera i token mancanti e li scrive nel .env.local
 #
 # Variabili d'ambiente per modalità non-interattiva (CI / scripting):
 #   BASE_DOMAIN, APP_ORIGIN, TUNNEL_UUID, GRAPHHOPPER_TOKEN, VALHALLA_API_KEY,
-#   ENV_LOCAL_FILE, NONINTERACTIVE=1
+#   ENV_LOCAL_FILE, NONINTERACTIVE=1, GEN_TOKENS=1
 # =============================================================================
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+# ── Argomenti CLI ─────────────────────────────────────────────────────────────
+GEN_TOKENS="${GEN_TOKENS:-0}"
+for arg in "$@"; do
+  case "$arg" in
+    --gen-tokens) GEN_TOKENS=1 ;;
+    -h|--help)
+      echo "Uso: $0 [--gen-tokens]"
+      echo "  --gen-tokens   Genera automaticamente i token mancanti/placeholder"
+      echo "                 (openssl rand -base64 32) e li scrive nel .env.local."
+      exit 0 ;;
+    *) echo "Argomento sconosciuto: $arg (usa --help)" >&2; exit 2 ;;
+  esac
+done
 
 ENV_LOCAL_FILE="${ENV_LOCAL_FILE:-${SCRIPT_DIR}/../.env.local}"
 NGINX_TEMPLATE="${SCRIPT_DIR}/nginx-bikerlink.conf"
@@ -76,6 +91,31 @@ ask() {
 # Escape per sed (sostituzione sicura su separatore '#').
 sed_escape() { printf '%s' "$1" | sed -e 's/[\#&]/\\&/g'; }
 
+# Genera un token casuale robusto (32 byte base64).
+gen_token() {
+  command -v openssl >/dev/null 2>&1 || die "openssl non disponibile: impossibile generare token."
+  openssl rand -base64 32
+}
+
+# Inserisce/aggiorna una chiave nel file .env.local (crea il file se assente).
+upsert_env_value() {
+  local key="$1" value="$2" file="$3" tmp esc_val
+  if [[ ! -e "$file" ]]; then
+    mkdir -p "$(dirname "$file")"
+    : > "$file"
+  fi
+  [[ -w "$file" ]] || die "Impossibile scrivere su $file (permessi?)."
+  esc_val="$(sed_escape "$value")"
+  if grep -qE "^[[:space:]]*${key}=" "$file"; then
+    tmp="$(mktemp)"
+    sed -E "s#^[[:space:]]*${key}=.*#${key}=${esc_val}#" "$file" > "$tmp"
+    cat "$tmp" > "$file"
+    rm -f "$tmp"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$file"
+  fi
+}
+
 # ─────────────────────────────────────────────────────────────────────────────
 section "1/4 — Verifica template e .env.local"
 # ─────────────────────────────────────────────────────────────────────────────
@@ -115,27 +155,59 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 section "3/4 — Token e validazione con .env.local"
 # ─────────────────────────────────────────────────────────────────────────────
-# Risolve un token: usa la variabile d'ambiente se passata, altrimenti il valore
-# del .env.local; se entrambi mancano/placeholder lo chiede all'utente.
-resolve_token() {
-  local name="$1" env_val="$2" provided="${3:-}" resolved
-  if [[ -n "$provided" ]]; then
-    resolved="$provided"
-  elif [[ -n "$env_val" && "$env_val" != "$PLACEHOLDER_VALUE" ]]; then
-    resolved="$env_val"
-  else
-    resolved="$(ask "Inserisci ${name}")"
+# Decide se generare un token mancante/placeholder: opt-in via --gen-tokens/
+# GEN_TOKENS=1, oppure prompt interattivo. Aggiorna GENERATED_TOKENS se sì.
+GENERATED_ANY=0
+should_generate() {
+  local name="$1"
+  if [[ "$GEN_TOKENS" == "1" ]]; then
+    return 0
   fi
-  printf '%s' "$resolved"
+  if [[ "$NONINTERACTIVE" == "1" ]]; then
+    return 1
+  fi
+  local reply
+  reply="$(ask "${name} assente: vuoi generarlo automaticamente e salvarlo nel .env.local? [s/N]" "N")"
+  [[ "$reply" =~ ^[sSyY]$ ]]
 }
 
-GH_TOKEN="$(resolve_token "GRAPHHOPPER_TOKEN" "$ENV_GH_TOKEN" "${GRAPHHOPPER_TOKEN:-}")"
-VALHALLA_KEY="$(resolve_token "VALHALLA_API_KEY" "$ENV_VALHALLA_KEY" "${VALHALLA_API_KEY:-}")"
+# Risolve un token: usa la variabile d'ambiente se passata, altrimenti il valore
+# del .env.local; se entrambi mancano/placeholder lo genera (opt-in) o lo chiede.
+# NB: imposta la variabile globale RESOLVED_TOKEN (non usa command substitution,
+# così l'eventuale aggiornamento di GENERATED_ANY resta visibile al chiamante).
+RESOLVED_TOKEN=""
+resolve_token() {
+  local name="$1" env_val="$2" provided="${3:-}"
+  if [[ -n "$provided" && "$provided" != "$PLACEHOLDER_VALUE" ]]; then
+    RESOLVED_TOKEN="$provided"
+  elif [[ -n "$env_val" && "$env_val" != "$PLACEHOLDER_VALUE" ]]; then
+    RESOLVED_TOKEN="$env_val"
+  elif should_generate "$name"; then
+    RESOLVED_TOKEN="$(gen_token)"
+    upsert_env_value "$name" "$RESOLVED_TOKEN" "$ENV_LOCAL_FILE"
+    GENERATED_ANY=1
+    info "${name} generato e scritto in ${ENV_LOCAL_FILE}"
+  else
+    RESOLVED_TOKEN="$(ask "Inserisci ${name}")"
+  fi
+}
+
+resolve_token "GRAPHHOPPER_TOKEN" "$ENV_GH_TOKEN" "${GRAPHHOPPER_TOKEN:-}"
+GH_TOKEN="$RESOLVED_TOKEN"
+resolve_token "VALHALLA_API_KEY" "$ENV_VALHALLA_KEY" "${VALHALLA_API_KEY:-}"
+VALHALLA_KEY="$RESOLVED_TOKEN"
+
+# Se abbiamo generato token, rileggiamo i valori dal .env.local così la
+# validazione successiva li riconosce come coincidenti (non più placeholder).
+if [[ "$GENERATED_ANY" == "1" ]]; then
+  ENV_GH_TOKEN="$(read_env_value GRAPHHOPPER_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+  ENV_VALHALLA_KEY="$(read_env_value VALHALLA_API_KEY "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+fi
 
 [[ -n "$GH_TOKEN" && "$GH_TOKEN" != "$PLACEHOLDER_VALUE" ]] \
-  || die "GRAPHHOPPER_TOKEN mancante. Generane uno con: openssl rand -base64 32"
+  || die "GRAPHHOPPER_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
 [[ -n "$VALHALLA_KEY" && "$VALHALLA_KEY" != "$PLACEHOLDER_VALUE" ]] \
-  || die "VALHALLA_API_KEY mancante. Generane uno con: openssl rand -base64 32"
+  || die "VALHALLA_API_KEY mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
 
 # Validazione: i token usati devono coincidere con quelli del .env.local
 # (se presenti e valorizzati). Disabilitabile con SKIP_TOKEN_VALIDATION=1.
@@ -211,7 +283,7 @@ $(bold "Cloudflare Tunnel")
   sudo systemctl enable --now cloudflared
 
 $(bold "Nota")
-  I file contengono i token in chiaro (chmod 600). NON committarli.
+  $(if [[ "$GENERATED_ANY" == "1" ]]; then printf 'Token generati e salvati in %s (riusati nei config). ' "$ENV_LOCAL_FILE"; fi)I file contengono i token in chiaro (chmod 600). NON committarli.
   La cartella generated/ è ignorata da git.
 
 EOF
