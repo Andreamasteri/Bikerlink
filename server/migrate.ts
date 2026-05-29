@@ -42,6 +42,26 @@ function isSkippableError(err: unknown): boolean {
   return typeof code === "string" && SKIPPABLE_ERROR_CODES.has(code);
 }
 
+const POSTGIS_SYSTEM_TABLES = ["spatial_ref_sys", "geography_columns", "geometry_columns"];
+
+/**
+ * Returns true when a 42501 (insufficient_privilege) error is caused by an
+ * attempt to modify a PostGIS-owned system table.  Those tables belong to the
+ * `postgres` role; the application user can never own them.  The PK on
+ * `spatial_ref_sys.srid` (and similar constraints) already exists, so the
+ * statement is a safe no-op that should be skipped rather than crashing the
+ * server.
+ *
+ * Any 42501 on an application-owned table is still a real bug and must
+ * propagate normally.
+ */
+function isPostgisOwnerError(err: unknown): boolean {
+  const code = (err as { code?: string })?.code;
+  if (code !== "42501") return false;
+  const message = err instanceof Error ? err.message : String(err);
+  return POSTGIS_SYSTEM_TABLES.some((table) => message.includes(table));
+}
+
 /**
  * Bootstrap the migration-tracking table.
  *
@@ -151,6 +171,14 @@ async function applyMigration(
           const code = (err as { code?: string }).code;
           const msg = err instanceof Error ? err.message : String(err);
           console.warn(`[migrate]   skip stmt #${i + 1} in ${filename} (code ${code}): ${msg}`);
+          await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
+          await client.query(`RELEASE SAVEPOINT ${sp}`);
+          skipped++;
+        } else if (isPostgisOwnerError(err)) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(
+            `[migrate]   skip stmt #${i + 1} in ${filename} (42501 on PostGIS system table — not owner, safe to ignore): ${msg}`
+          );
           await client.query(`ROLLBACK TO SAVEPOINT ${sp}`);
           await client.query(`RELEASE SAVEPOINT ${sp}`);
           skipped++;
