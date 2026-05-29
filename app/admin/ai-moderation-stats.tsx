@@ -2,7 +2,7 @@
  * Task #2532 — Stats Co-Pilot AI Moderazione: budget, provider health,
  * coda triage, accettazione draft, anomalie recenti.
  */
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
@@ -71,7 +71,9 @@ export default function AiModerationStatsScreen() {
                 <View style={styles.providerStatusCol}>
                   <Text style={[styles.providerStatus, !p.available && p.isQuotaError && styles.providerStatusQuota]}>
                     {p.available ? "online" : p.isQuotaError ? "quota lockout" : "error"}
-                    {!p.available && p.cooldownRemainingMs ? ` — ${formatCooldown(p.cooldownRemainingMs)}` : ""}
+                    {!p.available && p.cooldownRemainingMs != null ? (
+                      <CooldownTimer initialMs={p.cooldownRemainingMs} style={[styles.providerStatus, !p.available && p.isQuotaError && styles.providerStatusQuota]} />
+                    ) : null}
                   </Text>
                   {!p.available && p.lastError ? <Text style={styles.providerError} numberOfLines={1}>{p.lastError}</Text> : null}
                 </View>
@@ -142,6 +144,28 @@ export default function AiModerationStatsScreen() {
       )}
     </ScrollView>
   );
+}
+
+function CooldownTimer({ initialMs, style }: { initialMs: number; style?: any }) {
+  const fetchedAt = useRef(Date.now());
+  const [remaining, setRemaining] = useState(initialMs);
+
+  useEffect(() => {
+    fetchedAt.current = Date.now();
+    setRemaining(initialMs);
+  }, [initialMs]);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const elapsed = Date.now() - fetchedAt.current;
+      const left = initialMs - elapsed;
+      setRemaining(left > 0 ? left : 0);
+    }, 1000);
+    return () => clearInterval(id);
+  }, [initialMs]);
+
+  if (remaining <= 0) return <Text style={style}> — scaduto</Text>;
+  return <Text style={style}>{` — ${formatCooldown(remaining)}`}</Text>;
 }
 
 function formatCooldown(ms: number): string {
