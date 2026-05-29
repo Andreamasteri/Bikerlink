@@ -123,6 +123,7 @@ router.post("/login", loginLimiter, async (req: Request, res: Response) => {
       ghostMode: isGhost,
       country: userRecord?.country ?? user.country ?? null,
       isFake: userRecord?.isFake ?? user.isFake ?? false,
+      isSystem: userRecord?.isSystem ?? user.isSystem ?? false,
     });
 
     const { password: _, ...safeUser } = userRecord ?? user;

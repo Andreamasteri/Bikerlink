@@ -9,11 +9,14 @@ interface TrackedUser {
   ghostMode: boolean;
   country: string | null;
   isFake: boolean;
+  isSystem: boolean;
   lastSeen: Date;
 }
 
-function isSystemEntry(entry: Pick<TrackedUser, "role" | "nickname">): boolean {
-  return entry.role === "admin" || PROTECTED_NICKNAMES.includes(entry.nickname);
+// Task #2794: prefer the dedicated `isSystem` flag, with admin role and
+// PROTECTED_NICKNAMES kept as legacy fallbacks.
+function isSystemEntry(entry: Pick<TrackedUser, "role" | "nickname" | "isSystem">): boolean {
+  return entry.isSystem === true || entry.role === "admin" || PROTECTED_NICKNAMES.includes(entry.nickname);
 }
 
 export class OnlineTracker {

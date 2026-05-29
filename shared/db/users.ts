@@ -53,6 +53,10 @@ export const users = pgTable("users", {
   invitationCode: varchar("invitation_code", { length: 50 }),
   isFake: boolean("is_fake").notNull().default(false),
   isPrimal: boolean("is_primal").notNull().default(false),
+  // Task #2794 — flag dedicato per gli account di sistema (es. BikerLink_Official).
+  // Rende l'identificazione auto-descrittiva e indipendente dal nickname
+  // (sostituisce/affianca PROTECTED_NICKNAMES in server/constants.ts).
+  isSystem: boolean("is_system").notNull().default(false),
   country: varchar("country", { length: 2 }),
   spokenLanguages: jsonb("spoken_languages").$type<string[]>().default([]),
   autoJoinClubs: boolean("auto_join_clubs").notNull().default(true),
