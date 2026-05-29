@@ -76,5 +76,9 @@ server/data/schema-snapshot.json
 # Screenshot e asset incollati dalla chat — non devono essere tracciati
 attached_assets/
 
+# Exports — contengono dati di esportazione (ZIP, task, chat history) che
+# gonfiano il Repl layer. Mettere in Object Storage, non in git.
+exports/
+
 # Runtime upload assets (transient, not tracked)
 uploads/ads/
