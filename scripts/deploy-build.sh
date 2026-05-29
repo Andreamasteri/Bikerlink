@@ -43,4 +43,15 @@ echo "  Schema sync completato."
 echo "=== [2/2] Build server TypeScript ==="
 node scripts/server-build.js
 
+# Task #2781-fix — invalida la cache hash delle migration.
+# server/migrate.ts ha un fast-skip basato su server_dist/.migrations-hash
+# (hash dei nomi file). In produzione il filesystem PERSISTE tra i deploy:
+# una cache vecchia (ferma a 0061) combaciava con l'hash corrente e faceva
+# saltare l'intero controllo DB ("cache hit — schema hash unchanged"),
+# impedendo l'esecuzione di nuove migration DML come 0062.
+# Rimuovendo il file qui, al primo avvio il runner fa SEMPRE il round-trip
+# sul DB e confronta con schema_migrations (la vera fonte di verità).
+rm -f server_dist/.migrations-hash
+echo "  Cache migration invalidata (forza controllo DB al boot)."
+
 echo "=== Deploy build completato ==="
