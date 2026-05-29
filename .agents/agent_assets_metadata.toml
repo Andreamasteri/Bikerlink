@@ -659,3 +659,9 @@ id = "tSI0bcgbi3fIrI9M5ZjM-"
 uri = "file://docs/sweep-2632-artifacts/sweep-run.sh.log"
 type = "unspecified"
 title = "Script sweep riproducibile (.log per visibilità)"
+
+[[outputs]]
+id = "CP9JLeXfCJwGj-GGkA-rr"
+uri = "file://support-ticket-spatial-ref-sys.md"
+type = "text"
+title = "Richiesta Support Replit — spatial_ref_sys deploy block (EN)"
