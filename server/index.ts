@@ -181,6 +181,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   // ── Phase 3: DB Init (non-fatal sub-steps) ────────────────────────────────
   bootLog(3, TOTAL, "DB Init", "start");
 
+  // Task #2817 — Ripristina il cooldown quota AI provider persistito prima del riavvio.
+  try {
+    const { initProviderHealth } = await import("./ai/moderation/provider");
+    await initProviderHealth();
+  } catch (e) {
+    console.warn("[INIT] Phase 3: initProviderHealth failed (non-fatal):", e);
+  }
+
   bootLog(3, TOTAL, "DB Init", "done");
 
   // ── Phase 4: Seed + Core services (FATAL — timeout → process.exit) ────────

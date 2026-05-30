@@ -52,6 +52,23 @@ const health: Record<AiProviderId, AiProviderHealth & { cooldownUntil: number; q
   google: { id: "google", available: true, cooldownUntil: 0, quotaError: false },
 };
 
+const COOLDOWN_DB_KEY = (id: AiProviderId) => `ai_provider_cooldown_${id}`;
+
+interface PersistedCooldown {
+  cooldownUntil: number;
+  quotaError: boolean;
+  lastError?: string;
+  lastErrorAt?: string;
+}
+
+function persistCooldown(id: AiProviderId, data: PersistedCooldown | null): void {
+  if (data === null) {
+    storage.upsertAppSetting(COOLDOWN_DB_KEY(id), undefined, { cooldownUntil: 0, quotaError: false }).catch(() => {});
+  } else {
+    storage.upsertAppSetting(COOLDOWN_DB_KEY(id), undefined, data).catch(() => {});
+  }
+}
+
 export function markProviderError(id: AiProviderId, err: unknown): void {
   const msg = err instanceof Error ? err.message : String(err);
   const quota = isQuotaError(msg);
@@ -61,12 +78,44 @@ export function markProviderError(id: AiProviderId, err: unknown): void {
   health[id].quotaError = quota;
   // Errori di quota: cooldown lungo (6 ore) per non intasare i log con retry inutili.
   health[id].cooldownUntil = Date.now() + (quota ? QUOTA_COOLDOWN_MS : COOLDOWN_MS);
+  // Persist only quota errors (long cooldown) — short cooldowns (60s) don't survive restarts.
+  if (quota) {
+    persistCooldown(id, {
+      cooldownUntil: health[id].cooldownUntil,
+      quotaError: true,
+      lastError: health[id].lastError,
+      lastErrorAt: health[id].lastErrorAt,
+    });
+  }
 }
 
 export function markProviderOk(id: AiProviderId): void {
   health[id].available = true;
   health[id].cooldownUntil = 0;
   health[id].quotaError = false;
+  persistCooldown(id, null);
+}
+
+// Chiamare una volta dopo le migrazioni DB per ripristinare i cooldown quota
+// persistiti prima del riavvio del server.
+export async function initProviderHealth(): Promise<void> {
+  const ids: AiProviderId[] = ["anthropic", "openai", "google"];
+  await Promise.all(ids.map(async (id) => {
+    try {
+      const row = await storage.getAppSetting(COOLDOWN_DB_KEY(id));
+      if (!row?.valueJson) return;
+      const data = row.valueJson as PersistedCooldown;
+      if (!data.quotaError || !data.cooldownUntil) return;
+      const remaining = data.cooldownUntil - Date.now();
+      if (remaining <= 0) return;
+      health[id].available = false;
+      health[id].cooldownUntil = data.cooldownUntil;
+      health[id].quotaError = true;
+      if (data.lastError) health[id].lastError = data.lastError;
+      if (data.lastErrorAt) health[id].lastErrorAt = data.lastErrorAt;
+      console.log(`[ai-provider] ${id} quota cooldown ripristinato: ${Math.round(remaining / 60_000)}min rimasti`);
+    } catch {/* best-effort */}
+  }));
 }
 
 export function getProviderHealth(): AiProviderHealth[] {
