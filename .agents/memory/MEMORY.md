@@ -1,0 +1,1 @@
+- [Repl Layer Size Limit](repl-layer-size.md) — .local/state/replit/ cresce nel tempo (transcript agente + log-query.db) → supera limite Cloud Run 2 GB → deploy silenziosamente fallisce senza log.
