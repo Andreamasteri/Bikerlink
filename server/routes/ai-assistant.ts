@@ -6,7 +6,8 @@
 // - PATCH /api/users/me/assistant-prefs — aggiorna prefs utente
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+import { getTrustedClientIp } from "../lib/abuse-rate-limit";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { storage } from "../storage";
@@ -50,7 +51,7 @@ const messageLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => String((req.session as { userId?: string })?.userId ?? req.ip),
+  keyGenerator: (req) => (req.session as { userId?: string })?.userId ?? ipKeyGenerator(getTrustedClientIp(req) ?? ""),
   message: { message: "Troppi messaggi all'AI Assistant — riprova tra un po'." },
 });
 
@@ -59,7 +60,7 @@ const actionLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => String((req.session as { userId?: string })?.userId ?? req.ip),
+  keyGenerator: (req) => (req.session as { userId?: string })?.userId ?? ipKeyGenerator(getTrustedClientIp(req) ?? ""),
   message: { message: "Troppe azioni all'AI Assistant — riprova tra un po'." },
 });
 

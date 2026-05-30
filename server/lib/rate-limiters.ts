@@ -1,11 +1,12 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import type { Request } from "express";
 import { getTrustedClientIp } from "./abuse-rate-limit";
 
 function userOrIpKey(req: Request): string {
   const sess = (req as Request & { session?: { userId?: string } }).session;
   if (sess?.userId) return `u:${sess.userId}`;
-  return `ip:${getTrustedClientIp(req) ?? "unknown"}`;
+  const ip = getTrustedClientIp(req) ?? "";
+  return `ip:${ipKeyGenerator(ip)}`;
 }
 
 // Admin matching endpoints — 30/min per admin user (or IP fallback).
