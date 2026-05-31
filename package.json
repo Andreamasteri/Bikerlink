@@ -130,6 +130,7 @@
     "ngeohash": "^0.6.3",
     "node-forge": "^1.4.0",
     "nodemailer": "^8.0.7",
+    "ollama-ai-provider-v2": "^3.5.1",
     "p-limit": "^7.3.0",
     "p-queue": "^9.3.0",
     "p-retry": "^6.2.1",

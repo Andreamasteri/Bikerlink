@@ -5,14 +5,14 @@ import { Router, Request, Response } from "express";
 import { requireAuth, computeBikerScoreFromPoints } from "./utils";
 import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, poiRequestSchema } from "@shared/validators";
 import { z } from "zod";
-import { generateObject, streamText } from "ai";
+import { generateRouteObject, streamRouteText } from "./waypoints.next";
+import { isOllamaConfigured } from "../../lib/ollama-client";
 const weatherWaypointsSchema = z.object({
   routeId: z.string().optional(),
   waypoints: z.array(z.object({ lat: z.number().finite(), lng: z.number().finite(), name: z.string().optional() })).min(1).max(8),
   departureIso: z.string().optional(),
   avgSpeedKmh: z.number().optional(),
 });
-import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { haversineKm } from "../../geo";
 // Task #2633 — weather helpers estratti per riuso da /weather/:id (GET).
 import { fetchWeatherForWaypoints } from "./weather-helper";
@@ -139,20 +139,19 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   const { prompt } = parsedAi.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return sendError(res, 503, "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante");
+  if (!apiKey && !isOllamaConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama o GEMINI_API_KEY)");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   const onClose = () => { controller.abort(); clearTimeout(timeout); };
   req.on("close", onClose);
 
-  const googleProvider = createGoogleGenerativeAI({ apiKey });
-
   try {
-    const { object } = await generateObject({
-      model: googleProvider("gemini-1.5-flash"),
+    const object = await generateRouteObject({
+      prompt,
+      apiKey,
+      system: AI_SYSTEM_PROMPT,
       schema: routeSchema,
-      prompt: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
       maxRetries: AI_MAX_RETRIES,
       temperature: 0.1,
       abortSignal: controller.signal,
@@ -178,7 +177,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   const { prompt } = parsedAiStream.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return sendError(res, 503, "Servizio AI non disponibile: chiave GEMINI_API_KEY mancante");
+  if (!apiKey && !isOllamaConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama o GEMINI_API_KEY)");
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -191,19 +190,16 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   const onClose = () => { controller.abort(); clearTimeout(timeout); };
   req.on("close", onClose);
 
-  const googleProvider = createGoogleGenerativeAI({ apiKey });
-
   try {
-    const result = streamText({
-      model: googleProvider("gemini-1.5-flash"),
-      prompt: `${AI_SYSTEM_PROMPT}\n\nRichiesta: ${prompt}`,
+    let fullText = "";
+    for await (const chunk of streamRouteText({
+      prompt,
+      apiKey,
+      system: AI_SYSTEM_PROMPT,
       maxRetries: AI_MAX_RETRIES,
       temperature: 0.1,
       abortSignal: controller.signal,
-    });
-
-    let fullText = "";
-    for await (const chunk of result.textStream) {
+    })) {
       if (chunk) {
         fullText += chunk;
         res.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);

@@ -462,6 +462,21 @@ Infrastruttura riusabile per embeddings semantici (matching musicale, bio libere
 ### Secret
 `OPENAI_API_KEY` (già presente nei Secrets, riusata da `server/routes/admin/ota-assistant.ts` e `server/routes/admin/translations.ts`). **MAI hardcoded**.
 
+### AI self-hosted — Ollama (Task #2847)
+Ollama è il provider AI **primario** per due flussi, con il cloud come **fallback automatico e trasparente**:
+- **Route parsing** (`POST /api/planned-routes/ai-parse` e `/ai-stream`): Ollama → fallback Google Gemini.
+- **Traduzioni i18n** (`scripts/translate-i18n.ts`): Ollama → fallback OpenAI.
+- **Fuori scope** (restano sempre cloud): moderazione, console admin, assistente utente.
+
+Client condiviso: `server/lib/ollama-client.ts` — `isOllamaConfigured`, `getOllamaModel(model?)` (lancia un errore catchabile se `OLLAMA_URL` manca), `callOllamaChat(prompt, schema?, options)` (usa `generateObject` se passato uno schema Zod, altrimenti `generateText`). `baseURL = ${OLLAMA_URL}/api`, header auth `X-Ollama-Token`. Pacchetto: `ollama-ai-provider-v2` (export `createOllama`). Helper route parsing: `server/routes/planned-routes/waypoints.next.ts`.
+
+Variabili d'ambiente (tutte **opzionali** — segue il pattern URL/token-from-env di GraphHopper):
+- `OLLAMA_URL` — URL base del server Ollama self-hosted. **Se non impostata, Ollama è disabilitato e i flussi usano direttamente il cloud (zero breaking changes).**
+- `OLLAMA_TOKEN` — token opzionale inviato come header `X-Ollama-Token`.
+- `OLLAMA_MODEL` — modello da usare (default `llama3.2:latest`).
+
+**Nota deviazione streaming**: il fallback su `/ai-stream` copre solo il caso "Ollama irraggiungibile" (probe sul primo chunk → fallback a Gemini). Un JSON invalido a metà stream **non** fa fallback (i chunk già emessi non sono ri-inviabili). Documentato nei commenti di `waypoints.next.ts`.
+
 ### Pacchetti npm aggiunti (Task #2514)
 - `pgvector@^0.2.1` (in package.json per usi futuri / formattazione utility; helper drizzle non esposto in subpath exports → si usa `vector` nativo di drizzle-orm)
 - `@huggingface/transformers@^4.2.0` (piano B / fallback offline, non usato di default — vedi sopra)

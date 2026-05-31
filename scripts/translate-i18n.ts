@@ -2,6 +2,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
+import { z } from "zod";
 
 type Lang = "en" | "es" | "fr" | "de" | "el" | "tr";
 const TARGET_LANGS: Lang[] = ["en", "es", "fr", "de", "el", "tr"];
@@ -234,6 +235,83 @@ Rules:
   return out;
 }
 
+// ─── Ollama (Task #2847) ────────────────────────────────────────────────────
+// Provider primario: tenta il modello locale Ollama prima di OpenAI. Stesso
+// prompt strutturato; il client gestisce i retry su JSON malformato (i modelli
+// 7-8B a volte rompono il JSON). Se Ollama fallisce, il chiamante ricade su OpenAI.
+
+const ollamaTranslationsSchema = z.object({
+  translations: z.record(z.string(), z.string()),
+});
+
+async function translateWithOllama(
+  items: { key: string; italian: string }[],
+  lang: Lang,
+  glossary: Glossary,
+): Promise<Record<string, string>> {
+  const { callOllamaChat } = await import("../server/lib/ollama-client");
+  const glossaryBlock = buildGlossaryPrompt(glossary, lang);
+  const system = `You are a professional translator for BikerLink, a mobile app for motorcyclists.
+Translate from Italian to ${LANG_NAMES[lang]}.
+
+Rules:
+- Keep the tone casual, friendly, and concise — this is a mobile UI.
+- Preserve placeholders verbatim: {nickname}, {count}, {n}, %s, %d, etc.
+- Preserve newlines (\\n), tabs, and trailing punctuation exactly.
+- Match the original string length as closely as possible (mobile UI constraints).
+- Keep proper nouns, brand names, and technical motorcycle terms when appropriate.
+- Do NOT translate keys; translate only the Italian string values.
+- Output strict JSON: {"translations": {"<key>": "<translated value>", ...}}.${glossaryBlock}`;
+
+  const user = `Translate the following Italian strings to ${LANG_NAMES[lang]}:\n\n${JSON.stringify(
+    Object.fromEntries(items.map((i) => [i.key, i.italian])),
+    null,
+    2,
+  )}`;
+
+  const result = await callOllamaChat(`${user}`, ollamaTranslationsSchema, {
+    system,
+    temperature: 0.2,
+    jsonRetries: 2,
+  });
+  const translations = result.translations;
+  const out: Record<string, string> = {};
+  for (const item of items) {
+    const v = translations[item.key];
+    if (typeof v !== "string") {
+      throw new Error(`Translation for key "${item.key}" missing in Ollama response`);
+    }
+    out[item.key] = v;
+  }
+  return out;
+}
+
+/**
+ * Orchestratore per-batch: tenta Ollama (se OLLAMA_URL impostato), poi OpenAI
+ * come fallback trasparente. Fallback silenzioso (solo warning) se Ollama non
+ * risponde o restituisce JSON non valido.
+ */
+async function translateBatchSmart(
+  items: { key: string; italian: string }[],
+  lang: Lang,
+  glossary: Glossary,
+  apiKey: string | undefined,
+): Promise<Record<string, string>> {
+  if (process.env.OLLAMA_URL) {
+    try {
+      return await translateWithOllama(items, lang, glossary);
+    } catch (err) {
+      console.warn(
+        `\n[i18n] [${lang}] Ollama non disponibile (${err instanceof Error ? err.message : String(err)}), fallback OpenAI...`,
+      );
+    }
+  }
+  if (!apiKey) {
+    throw new Error("Ollama non disponibile e OPENAI_API_KEY mancante: impossibile tradurre.");
+  }
+  return translateBatch(items, lang, glossary, apiKey);
+}
+
 interface CliFlags {
   dryRun: boolean;
   langs: Lang[];
@@ -291,13 +369,16 @@ Flags:
 Behaviour:
   - lib/i18n/it.ts is the source of truth.
   - For each target language file, missing keys and keys whose Italian source
-    has changed (per-key hash snapshot) are translated via OpenAI ${MODEL}.
+    has changed (per-key hash snapshot) are translated. Primary provider is
+    self-hosted Ollama (when OLLAMA_URL is set); on failure it falls back
+    transparently to OpenAI ${MODEL}.
   - Keys flagged with "${MANUAL_MARKER}" inline comment are NEVER touched.
   - File structure (key order, blank-line section separators) mirrors it.ts.
   - State snapshot: lib/i18n/.translations-state.json
   - Glossary: scripts/i18n-glossary.json
 
-Required env: OPENAI_API_KEY
+Required env: at least one of OLLAMA_URL (primary) or OPENAI_API_KEY (fallback).
+Optional: OLLAMA_TOKEN, OLLAMA_MODEL (default llama3.2:latest).
 `);
 }
 
@@ -305,10 +386,14 @@ async function main() {
   const flags = parseArgs(process.argv.slice(2));
 
   const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey && !flags.dryRun) {
-    console.error("[i18n] FATAL: OPENAI_API_KEY is not set. Aborting.");
+  const ollamaConfigured = Boolean(process.env.OLLAMA_URL);
+  if (!apiKey && !ollamaConfigured && !flags.dryRun) {
+    console.error("[i18n] FATAL: né OPENAI_API_KEY né OLLAMA_URL sono impostati. Aborting.");
     console.error("[i18n] Hint: re-run with --dry-run to preview changes without an API key.");
     process.exit(1);
+  }
+  if (ollamaConfigured) {
+    console.log(`[i18n] Provider primario: Ollama (${process.env.OLLAMA_MODEL ?? "llama3.2:latest"})${apiKey ? " — fallback OpenAI" : " — nessun fallback OpenAI (OPENAI_API_KEY mancante)"}`);
   }
 
   const itPath = path.join(I18N_DIR, `${SOURCE_LANG}.ts`);
@@ -424,7 +509,7 @@ async function main() {
       process.stdout.write(
         `[i18n] [${lang}] batch ${batchIdx}/${totalBatches} (${batch.length} keys)... `,
       );
-      const result = await translateBatch(batch, lang, glossary, apiKey!);
+      const result = await translateBatchSmart(batch, lang, glossary, apiKey);
       totalApiCalls++;
       for (const item of batch) {
         finalMap.set(item.key, { value: result[item.key], manual: false });
