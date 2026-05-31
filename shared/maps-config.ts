@@ -76,7 +76,7 @@ export const ROUTING_OPTIONS: MapsOption<RoutingEngineId>[] = [
     id: "mapbox-directions",
     label: "Mapbox Directions",
     description: "Cloud emergency fallback — 100k richieste/mese gratuiti. Attivare solo se entrambi i self-hosted sono down.",
-    implemented: true,
+    implemented: false,
   },
   {
     id: "tomtom",

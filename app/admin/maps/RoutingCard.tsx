@@ -110,7 +110,8 @@ export function RoutingCard({ engine, profile, routingNotes, mapboxQuota, isPend
   React.useEffect(() => { setLocalProfile(profile); }, [profile]);
 
   const handleEngineSelect = (e: RoutingEngineId) => {
-    if (!isPending) onRoutingChange(e, localProfile);
+    const opt = ROUTING_OPTIONS.find((r) => r.id === e);
+    if (!isPending && opt?.implemented) onRoutingChange(e, localProfile);
   };
 
   const handleProfileSelect = (p: RoutingProfileId) => {
@@ -169,7 +170,7 @@ export function RoutingCard({ engine, profile, routingNotes, mapboxQuota, isPend
               opt={opt}
               isSelected={engine === opt.id}
               onPress={() => handleEngineSelect(opt.id)}
-              disabled={isPending}
+              disabled={isPending || !opt.implemented}
             />
           ))}
 
