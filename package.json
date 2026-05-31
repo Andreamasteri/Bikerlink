@@ -67,6 +67,7 @@
     "date-fns-tz": "^3.2.0",
     "depcheck": "^1.4.7",
     "docx": "^9.6.1",
+    "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "eslint-plugin-unused-imports": "^4.4.1",
     "expo": "~56.0.8",
