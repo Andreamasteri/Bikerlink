@@ -66,37 +66,70 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<T
   return object;
 }
 
+export interface StreamRouteOptions extends Omit<RouteAiOptions<unknown>, "schema"> {
+  /**
+   * Valida il testo COMPLETO prodotto da Ollama prima che venga emesso al client.
+   * Restituisce true se il contenuto è utilizzabile (es. JSON che rispetta lo
+   * schema), false se è corrotto/incompleto. Se assente, si considera valido
+   * qualunque testo non vuoto.
+   *
+   * Quando la validazione fallisce, l'output di Ollama viene scartato (nulla è
+   * stato emesso) e — se disponibile — si ricade in modo pulito su Gemini.
+   */
+  validate?: (fullText: string) => boolean;
+}
+
 /**
- * /ai-stream — stream testuale token-per-token.
- * Prova Ollama (se configurato): se la connessione fallisce PRIMA del primo
- * token, ricade su Gemini. Una volta emesso il primo chunk Ollama, vi resta:
- * un errore a metà stream viene propagato (NON si passa a Gemini) perché i
- * chunk già inviati al client non sono ritrasmettibili e mescolare due provider
- * produrrebbe output incoerente. La validazione JSON finale resta al chiamante.
- * Se Ollama è configurato e risponde, GEMINI_API_KEY non è necessaria.
+ * /ai-stream — stream testuale resiliente con buffering + validazione.
+ *
+ * Problema risolto (Task #2853): se Ollama inizia a rispondere ma produce JSON
+ * malformato a metà stream, i chunk già emessi non sono ritrasmettibili e
+ * l'utente riceverebbe una risposta corrotta, senza possibilità di fallback.
+ *
+ * Strategia:
+ *   1. Ollama (provider primario): il suo output viene BUFFERIZZATO interamente
+ *      lato server — NESSUN chunk viene emesso al client durante la generazione.
+ *      A stream concluso, il testo completo viene validato (`validate`). Solo se
+ *      valido i chunk bufferizzati vengono emessi (UX a blocchi, non corrotta).
+ *      Se la validazione fallisce, o se lo stream si interrompe con errore, il
+ *      buffer viene scartato e si passa a Gemini (nulla è ancora stato emesso,
+ *      quindi non si mescolano provider né si corrompe l'output).
+ *   2. Gemini (fallback cloud): essendo l'ultima risorsa, viene emesso in
+ *      streaming diretto token-per-token. La validazione JSON finale resta al
+ *      chiamante (route handler).
+ *
+ * Se Ollama produce output invalido e non c'è una GEMINI_API_KEY per il
+ * fallback, viene lanciato un errore catchable invece di emettere testo rotto.
+ * Se Ollama è configurato e risponde correttamente, GEMINI_API_KEY non serve.
  */
-export async function* streamRouteText(opts: Omit<RouteAiOptions<unknown>, "schema">): AsyncGenerator<string> {
-  const { prompt, apiKey, system, abortSignal, maxRetries = 2, temperature = 0.1 } = opts;
+export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator<string> {
+  const { prompt, apiKey, system, abortSignal, maxRetries = 2, temperature = 0.1, validate } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
 
   if (isOllamaConfigured) {
-    let started = false;
     try {
       const result = streamText({ model: getOllamaModel(), prompt: fullPrompt, maxRetries, temperature, abortSignal });
-      const iterator = result.textStream[Symbol.asyncIterator]();
-      const first = await iterator.next(); // può lanciare se Ollama è offline (prima del primo chunk)
-      if (!first.done) {
-        started = true;
-        yield first.value;
-        for (let n = await iterator.next(); !n.done; n = await iterator.next()) {
-          yield n.value;
-        }
+      // Buffer completo: niente viene emesso finché Ollama non ha finito E il testo
+      // non è stato validato. Così un JSON rotto a metà stream non raggiunge mai il client.
+      const buffered: string[] = [];
+      for await (const chunk of result.textStream) {
+        if (chunk) buffered.push(chunk);
       }
-      return;
+      const fullText = buffered.join("");
+      const isValid = validate ? validate(fullText) : fullText.trim().length > 0;
+      if (isValid) {
+        for (const chunk of buffered) yield chunk;
+        return;
+      }
+      // Output Ollama corrotto/incompleto: scarta il buffer e ricadi sul cloud.
+      if (!apiKey) {
+        throw new Error("Ollama ha prodotto una risposta non valida e nessun provider cloud è disponibile per il fallback.");
+      }
+      console.warn("[AI stream] Ollama ha prodotto output non valido, fallback Gemini (non-streaming sorgente).");
     } catch (err) {
-      // Stream già iniziato o nessun fallback possibile → propaga senza mescolare provider.
-      if (started || !apiKey) throw err;
-      console.warn("[AI stream] Ollama non disponibile, fallback Gemini:", (err as Error)?.message ?? err);
+      // Errore di connessione/stream o nessun fallback possibile → propaga.
+      if (!apiKey) throw err;
+      console.warn("[AI stream] Ollama non disponibile/risposta non valida, fallback Gemini:", (err as Error)?.message ?? err);
     }
   }
 

@@ -73,6 +73,60 @@ const routeSchema = z.object({
   notes: z.string(),
 });
 
+type RouteObject = z.infer<typeof routeSchema>;
+
+/**
+ * Estrae TUTTI i blocchi { ... } con graffe BILANCIATE di primo livello da una
+ * stringa, ignorando le graffe contenute dentro stringhe JSON (e i relativi escape).
+ * Restituire più candidati evita i falsi negativi quando il testo di contorno
+ * contiene altre graffe (es. "{placeholder}") prima/dopo il JSON vero.
+ */
+function extractBalancedJsonBlocks(text: string): string[] {
+  const blocks: string[] = [];
+  let depth = 0;
+  let start = -1;
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === "}" && depth > 0) {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        blocks.push(text.slice(start, i + 1));
+        start = -1;
+      }
+    }
+  }
+  return blocks;
+}
+
+/**
+ * Estrae e valida un oggetto route dal testo grezzo del modello.
+ * I modelli locali a volte avvolgono il JSON in fence markdown o aggiungono
+ * testo prima/dopo: proviamo prima il testo intero, poi ciascun blocco { ... }
+ * bilanciato. Restituisce null se non c'è JSON valido (nessuna eccezione).
+ */
+function tryParseRoute(text: string): RouteObject | null {
+  if (!text) return null;
+  const candidates: string[] = [text.trim(), ...extractBalancedJsonBlocks(text)];
+  for (const candidate of candidates) {
+    try {
+      return routeSchema.parse(JSON.parse(candidate));
+    } catch { /* prova il prossimo candidato */ }
+  }
+  return null;
+}
+
 function geminiErrorMessage(err: unknown): { httpStatus: number; message: string } {
   const e = err as { name?: string; message?: string; status?: number; statusCode?: number; code?: number };
   if (e.name === "AbortError") {
@@ -199,6 +253,10 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
       maxRetries: AI_MAX_RETRIES,
       temperature: 0.1,
       abortSignal: controller.signal,
+      // Buffering + validazione lato Ollama: i chunk vengono emessi solo se il testo
+      // completo è un JSON valido secondo routeSchema. In caso contrario lo stream
+      // ricade su Gemini senza emettere output corrotto (Task #2853).
+      validate: (text) => tryParseRoute(text) !== null,
     })) {
       if (chunk) {
         fullText += chunk;
@@ -209,8 +267,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
     clearTimeout(timeout);
     req.off("close", onClose);
 
-    let parsed: unknown = null;
-    try { parsed = routeSchema.parse(JSON.parse(fullText)); } catch { /* keep null */ }
+    const parsed = tryParseRoute(fullText);
     res.write(`event: done\ndata: ${JSON.stringify({ parsed })}\n\n`);
     res.end();
   } catch (err: unknown) {

@@ -41,6 +41,14 @@ vi.mock("@ai-sdk/google", () => ({
   createGoogleGenerativeAI: vi.fn(() => vi.fn(() => ({ provider: "google", modelId: "gemini-2.5-flash" }))),
 }));
 
+// Questi test coprono il flusso Gemini-only (provider cloud). Forziamo Ollama come
+// NON configurato così il comportamento è deterministico anche quando OLLAMA_URL è
+// presente nell'ambiente (vedi ai-stream-robustness.test.ts per il flusso Ollama).
+vi.mock("../lib/ollama-client", () => ({
+  isOllamaConfigured: false,
+  getOllamaModel: vi.fn(() => { throw new Error("Ollama non configurato (mock)"); }),
+}));
+
 // ---------------------------------------------------------------------------
 // Import router and the exported utility after mocks are in place
 // ---------------------------------------------------------------------------
