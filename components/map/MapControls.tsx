@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   },
   availabilityContainer: {
     position: "absolute",
-    bottom: 12,
+    bottom: 22,
     left: 12,
     zIndex: 10,
   },

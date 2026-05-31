@@ -259,7 +259,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
       <MapControls
         isAvailable={isAvailable} ghostMode={ghostMode}
         onCenterOnUser={centerOnUser}
-        availabilityBottomOffset={filterBarTopOffset != null ? 100 : undefined}
+        availabilityBottomOffset={filterBarTopOffset != null ? 110 : undefined}
         locationButtonBottomOffset={filterBarTopOffset != null ? 205 : undefined}
         compact={filterBarTopOffset == null}
         hideAvailability={filterBarTopOffset == null}
@@ -268,7 +268,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         <MapStyleToggle
           currentStyleId={styleId}
           onSelectStyle={setStyle}
-          bottomOffset={filterBarTopOffset != null ? 160 : undefined}
+          bottomOffset={filterBarTopOffset != null ? 313 : undefined}
           compact={filterBarTopOffset == null}
         />
       )}
@@ -278,9 +278,9 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           minZoom={viewState.minZoom}
           maxZoom={viewState.maxZoom}
           latitude={viewState.lat}
-          topOffset={filterBarTopOffset + 72}
+          topOffset={filterBarTopOffset + 96}
           bottomOffset={313}
-          leftOffset={12}
+          leftOffset={15}
           onZoomChange={handleZoomChange}
         />
       )}
@@ -288,7 +288,7 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         <MapNorthCompass
           bearing={viewState.bearing}
           onResetBearing={handleResetBearing}
-          topOffset={filterBarTopOffset + 18}
+          topOffset={filterBarTopOffset + 52}
           leftOffset={12}
           disabled
         />
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   },
   hazardFab: {
     position: "absolute",
-    bottom: 175,
+    bottom: 157,
     right: 12,
     backgroundColor: Colors.surface,
     width: 44,

@@ -143,17 +143,6 @@ export function MapFilterBar({
         </TouchableOpacity>
       )}
 
-      {showEventPins && onToggleFilterEvents != null && (
-        <TouchableOpacity
-          style={[styles.filterChip, filterEvents && { backgroundColor: "#F57C00" }]}
-          onPress={onToggleFilterEvents}
-          activeOpacity={0.7}
-        >
-          <MaterialCommunityIcons name="calendar-star" size={16} color={filterEvents ? "#fff" : "#F57C00"} />
-          <Text style={[styles.filterText, filterEvents && styles.filterTextActive]}>Eventi</Text>
-        </TouchableOpacity>
-      )}
-
       {onChangeMotoTags != null && (
         <TouchableOpacity
           style={[styles.filterChip, motoTagFilterActive && { backgroundColor: "#6A1B9A" }]}
