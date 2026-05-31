@@ -19,6 +19,37 @@ async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+// Task #2851 — Monitor Efficienza Server: campionamento rete + CPU processo.
+// Stato modulo-level per calcolare i delta/rate tra due richieste consecutive.
+let lastServerSample: {
+  at: number;
+  rx: number;
+  tx: number;
+  cpu: { user: number; system: number };
+} | null = null;
+
+function readNetDev(): { rx: number; tx: number } {
+  try {
+    const fsInner = require("fs") as typeof import("fs");
+    const data = fsInner.readFileSync("/proc/net/dev", "utf-8");
+    const lines = data.trim().split("\n").slice(2);
+    let rx = 0;
+    let tx = 0;
+    for (const line of lines) {
+      const idx = line.indexOf(":");
+      if (idx === -1) continue;
+      const name = line.slice(0, idx).trim();
+      if (name === "lo") continue;
+      const cols = line.slice(idx + 1).trim().split(/\s+/).map(Number);
+      rx += Number.isFinite(cols[0]) ? cols[0] : 0;
+      tx += Number.isFinite(cols[8]) ? cols[8] : 0;
+    }
+    return { rx, tx };
+  } catch {
+    return { rx: 0, tx: 0 };
+  }
+}
+
 export function registerMoreRoutes(app: Express) {
   app.post("/api/matching/trigger", (req, res) => {
     if (!req.session?.userId) {
@@ -90,6 +121,87 @@ export function registerMoreRoutes(app: Express) {
       metroUptimeSec,
       events,
     });
+  });
+
+  // Task #2851 — Metriche live del server (CPU/RAM/rete/uptime) per la card admin.
+  app.get("/api/admin/server-metrics", requireAdmin, async (_req, res) => {
+    const os = await import("os");
+    const { SERVER_START_TIME } = await import("../uptime");
+    const now = Date.now();
+
+    const [load1, load5, load15] = os.loadavg();
+    const cores = os.cpus().length || 1;
+
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const mem = process.memoryUsage();
+
+    const net = readNetDev();
+    const cpu = process.cpuUsage();
+
+    // Calcolo rate rete + percentuale CPU processo tra due campionamenti.
+    let rxRate = 0;
+    let txRate = 0;
+    let processCpuPercent = 0;
+    if (lastServerSample && now > lastServerSample.at) {
+      const dtSec = (now - lastServerSample.at) / 1000;
+      if (dtSec > 0) {
+        rxRate = Math.max(0, (net.rx - lastServerSample.rx) / dtSec);
+        txRate = Math.max(0, (net.tx - lastServerSample.tx) / dtSec);
+        const cpuDeltaMicros =
+          cpu.user - lastServerSample.cpu.user + (cpu.system - lastServerSample.cpu.system);
+        processCpuPercent = Math.max(0, (cpuDeltaMicros / (dtSec * 1_000_000)) * 100);
+      }
+    }
+    lastServerSample = { at: now, rx: net.rx, tx: net.tx, cpu };
+
+    res.json({
+      cpu: {
+        loadAvg1: load1,
+        loadAvg5: load5,
+        loadAvg15: load15,
+        cores,
+        loadPerCore: load1 / cores,
+        processCpuPercent,
+      },
+      memory: {
+        total: totalMem,
+        free: freeMem,
+        used: usedMem,
+        usedPercent: totalMem > 0 ? (usedMem / totalMem) * 100 : 0,
+        processRss: mem.rss,
+        processHeapUsed: mem.heapUsed,
+        processHeapTotal: mem.heapTotal,
+      },
+      network: {
+        rxBytes: net.rx,
+        txBytes: net.tx,
+        rxRate,
+        txRate,
+      },
+      uptimeSec: Math.floor((now - SERVER_START_TIME) / 1000),
+      serverNow: now,
+    });
+  });
+
+  // Task #2851 — Anteprima ultime righe di log del server (stessa sorgente di system-health).
+  app.get("/api/admin/server-logs", requireAdmin, async (req, res) => {
+    const requested = parseInt(String(req.query.lines ?? "40"), 10);
+    const limit = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 200) : 40;
+    const lines: string[] = [];
+    try {
+      const fsInner = await import("fs");
+      const pathInner = await import("path");
+      const logPath = pathInner.join(process.cwd(), "logs", "uptime-resets.log");
+      if (fsInner.existsSync(logPath)) {
+        const all = fsInner.readFileSync(logPath, "utf-8").trim().split("\n").filter(Boolean);
+        lines.push(...all.slice(-limit).reverse());
+      }
+    } catch (err) {
+      console.warn("[admin/server-logs] read failed:", (err as Error).message);
+    }
+    res.json({ lines, count: lines.length });
   });
 
   app.get("/api/admin/restart-history", requireAdmin, async (_req, res) => {

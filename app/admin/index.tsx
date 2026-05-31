@@ -5,7 +5,7 @@ import type { Href } from "expo-router";
 import { MaterialCommunityIcons, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
-import { TelemetryCard, GraphHopperCard } from "@/components/admin/AdminStatsCards";
+import { TelemetryCard, GraphHopperCard, ServerEfficiencyCard } from "@/components/admin/AdminStatsCards";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -284,6 +284,7 @@ export default function AdminDashboard() {
 
       {!isSearching && (
         <>
+          <ServerEfficiencyCard />
           <TelemetryCard />
           <GraphHopperCard />
         </>
