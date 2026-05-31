@@ -155,16 +155,57 @@ ok "whisper.cpp compilato: ${SERVER_BIN}"
 
 # ── Validazione flag supportati dal binario ───────────────────────────────────
 # I flag del wrapper vengono verificati contro l'output di --help.
-# Se un flag manca il binario è stato aggiornato e il wrapper va adeguato.
+# Se un flag essenziale manca lo script si ferma con die() per evitare che il
+# wrapper venga scritto e il servizio parta con flag non riconosciuti (crash
+# silenzioso). In caso di flag rinominato viene suggerito il candidato più
+# probabile dall'help.
 log "Verifico i flag supportati dal binario whisper-server..."
 HELP_OUTPUT="$("${SERVER_BIN}" --help 2>&1 || true)"
+FLAG_ERRORS=0
+
+# Mappa: flag essenziale → prefissi alternativi da cercare nell'help se il flag
+# principale non è presente.
+declare -A FLAG_ALTERNATIVES
+FLAG_ALTERNATIVES["--model"]="--model"
+FLAG_ALTERNATIVES["--host"]="--host --address --addr"
+FLAG_ALTERNATIVES["--port"]="--port"
+FLAG_ALTERNATIVES["--language"]="--lang --language"
+FLAG_ALTERNATIVES["--threads"]="--threads --nthreads --num-threads"
+
 for FLAG in --model --host --port --language --threads; do
-  if echo "$HELP_OUTPUT" | grep -q -- "${FLAG}"; then
-    :
+  if echo "$HELP_OUTPUT" | grep -qE "(^|[[:space:]])${FLAG}([[:space:]=,\[<]|$)"; then
+    ok "  Flag '${FLAG}' presente."
   else
-    warn "Flag '${FLAG}' non trovato nell'help di whisper-server — aggiorna il wrapper in setup-whisper-server.sh se il server non parte."
+    # Cerca candidati alternativi nell'help (eventuali rinominazioni upstream)
+    SUGGESTION=""
+    for ALT in ${FLAG_ALTERNATIVES["${FLAG}"]}; do
+      if [[ "$ALT" == "$FLAG" ]]; then continue; fi
+      CANDIDATE="$(echo "$HELP_OUTPUT" | grep -oE "(^|[[:space:]])${ALT}([[:space:]=,\[<]|$)" | head -1 | grep -oE -- '--[a-z][a-z0-9-]+' || true)"
+      if [[ -n "$CANDIDATE" ]]; then
+        SUGGESTION="$CANDIDATE"
+        break
+      fi
+    done
+
+    if [[ -n "$SUGGESTION" ]]; then
+      err "Flag '${FLAG}' NON trovato nell'help di whisper-server."
+      err "  ↳ Possibile rinominazione rilevata: usa '${SUGGESTION}' al posto di '${FLAG}'."
+      err "  ↳ Aggiorna il wrapper in setup-whisper-server.sh (blocco WRAPPER_EOF, righe con --model/--host/--port/--language/--threads)."
+    else
+      # Mostra tutti i flag che iniziano con '--' trovati nell'help come riferimento
+      ALL_FLAGS="$(echo "$HELP_OUTPUT" | grep -oE '\-\-[a-z][a-z0-9-]+' | sort -u | tr '\n' ' ' || true)"
+      err "Flag '${FLAG}' NON trovato nell'help di whisper-server."
+      err "  ↳ Nessun candidato alternativo trovato automaticamente."
+      err "  ↳ Flag disponibili nel binario: ${ALL_FLAGS:-<nessuno rilevato>}"
+      err "  ↳ Aggiorna il wrapper in setup-whisper-server.sh (blocco WRAPPER_EOF) con il flag corretto."
+    fi
+    FLAG_ERRORS=$((FLAG_ERRORS + 1))
   fi
 done
+
+if [[ "$FLAG_ERRORS" -gt 0 ]]; then
+  die "${FLAG_ERRORS} flag essenziale/i mancante/i dall'help di whisper-server. Il wrapper non verrebbe generato correttamente. Correggi setup-whisper-server.sh e riesegui."
+fi
 echo ""
 
 # =============================================================================
