@@ -271,6 +271,8 @@ import metricsRouter from './admin/metrics';
 // Task #2698 — AI Assistant per utenti normali (admin config/telemetria).
 import aiAssistantAdminRouter from './admin/ai-assistant';
 import backupPreviewRouter from './admin/backup-preview';
+// Task #2852 — Test stato server Ollama (provider AI primario).
+import aiTestOllamaRouter from './admin/ai/test-ollama';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -356,6 +358,7 @@ router.use('/stregatti', _requireAdmin, stregattiRouter);
 router.use('/ota/assistant', _requireAdmin, otaAssistantRouter);
 router.use('/ota', _requireAdmin, otaRouter);
 router.use('/maps', _requireAdmin, mapsAdminRouter);
+router.use('/ai', _requireAdmin, aiTestOllamaRouter);
 router.use('/routing', _requireAdmin, routingAdminRouter);
 router.use('/', _requireAdmin, dbAdminRouter);
 router.use('/', _requireAdmin, telemetryAdminRouter);
