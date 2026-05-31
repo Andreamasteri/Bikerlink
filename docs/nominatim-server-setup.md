@@ -257,7 +257,134 @@ geocoding. Verifica nei log del backend l'assenza di errori 403/timeout.
 
 ---
 
-## 6. Troubleshooting
+## 6. Aggiornamenti automatici
+
+I dati OSM invecchiano nel tempo: strade nuove, modifiche ai nomi di vie o
+chiusure non vengono recepite senza aggiornamenti incrementali. Lo script
+`scripts/update-nominatim-osm.sh` applica il **diff settimanale** di Geofabrik
+(Italy) al database Nominatim locale, e il timer systemd lo esegue ogni domenica
+alle 02:00.
+
+### 6.1 — Installare lo script e i file systemd
+
+```bash
+# 1) Copia i file sul server (eseguito dal tuo PC, sostituisci utente/host)
+scp scripts/update-nominatim-osm.sh \
+    scripts/systemd/nominatim-update.service \
+    scripts/systemd/nominatim-update.timer \
+    utente@bikerlink.tail5056aa.ts.net:~/
+
+ssh utente@bikerlink.tail5056aa.ts.net
+
+# 2) Installa lo script nella directory degli script Nominatim
+sudo mkdir -p /opt/nominatim/scripts
+sudo cp ~/update-nominatim-osm.sh /opt/nominatim/scripts/update-nominatim-osm.sh
+sudo chmod +x /opt/nominatim/scripts/update-nominatim-osm.sh
+
+# 3) Installa i file systemd
+sudo cp ~/nominatim-update.service /etc/systemd/system/
+sudo cp ~/nominatim-update.timer   /etc/systemd/system/
+
+# 4) Ricarica systemd e abilita il timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now nominatim-update.timer
+```
+
+### 6.2 — Configurare la URL di replicazione Geofabrik
+
+Lo script configura automaticamente `NOMINATIM_REPLICATION_URL` nel file
+`/opt/nominatim/.env` alla prima esecuzione. Se vuoi configurarla in anticipo:
+
+```bash
+echo "NOMINATIM_REPLICATION_URL=https://download.geofabrik.de/europe/italy-updates/" \
+  | sudo tee -a /opt/nominatim/.env
+```
+
+> **Cambiare area geografica**: per aggiornare un'area diversa (es. Europa),
+> modifica la variabile `REPLICATION_URL` nello script oppure aggiorna il file
+> `.env`. La URL deve corrispondere all'area del PBF importato durante il setup.
+
+### 6.3 — Verificare che il timer sia attivo
+
+```bash
+# Mostra i timer attivi con la prossima esecuzione pianificata
+systemctl list-timers nominatim-update.timer
+
+# Stato del timer
+systemctl status nominatim-update.timer
+
+# Stato del servizio (utile subito dopo un'esecuzione)
+systemctl status nominatim-update.service
+```
+
+Output atteso di `list-timers`:
+
+```
+NEXT                         LEFT     LAST                         PASSED  UNIT
+Sun 2026-06-07 02:13:45 CET  6 days   Sun 2026-06-01 02:07:12 CET  3 days  nominatim-update.timer
+```
+
+### 6.4 — Leggere i log
+
+Il log di ogni aggiornamento viene scritto in `/var/log/nominatim-update.log`:
+
+```bash
+# Ultime 50 righe del log
+tail -50 /var/log/nominatim-update.log
+
+# Segui il log in tempo reale (durante un aggiornamento manuale)
+tail -f /var/log/nominatim-update.log
+
+# Log systemd (output del servizio)
+journalctl -u nominatim-update.service -n 100 --no-pager
+```
+
+Esempio di log di successo:
+
+```
+[2026-06-01 02:07:12] [INFO ] ============================================================
+[2026-06-01 02:07:12] [INFO ] Avvio aggiornamento Nominatim OSM (diff Geofabrik)
+[2026-06-01 02:07:12] [INFO ]   Replica URL:https://download.geofabrik.de/europe/italy-updates/
+[2026-06-01 02:07:12] [OK   ] Servizio 'nominatim' attivo.
+[2026-06-01 02:07:13] [INFO ] Replication già inizializzata.
+[2026-06-01 02:07:13] [INFO ] Avvio nominatim replication --once...
+[2026-06-01 02:11:47] [OK   ] Aggiornamento completato in 274s.
+[2026-06-01 02:11:47] [OK   ] Aggiornamento OSM terminato. Log: /var/log/nominatim-update.log
+```
+
+Se il servizio Nominatim non è attivo al momento dell'aggiornamento, lo script
+lo segnala nel log e termina senza aggiornare:
+
+```
+[2026-06-01 02:07:12] [WARN ] Il servizio 'nominatim' non è attivo (stato: inactive).
+[2026-06-01 02:07:12] [WARN ] Aggiornamento annullato.
+```
+
+### 6.5 — Forzare un aggiornamento manuale
+
+Per applicare il diff immediatamente senza aspettare il timer:
+
+```bash
+# Esecuzione diretta dello script (con log)
+sudo bash /opt/nominatim/scripts/update-nominatim-osm.sh
+
+# Oppure tramite systemd (registra anche nei log di sistema)
+sudo systemctl start nominatim-update.service
+
+# Segui il progresso in tempo reale
+tail -f /var/log/nominatim-update.log
+```
+
+### 6.6 — Prima inizializzazione della replication
+
+Se è la prima volta che viene eseguito `nominatim replication`, lo script
+esegue automaticamente `nominatim replication --init` per allineare lo stato
+locale con il server Geofabrik. Questa operazione scarica i metadati di
+sequenza senza applicare diff — è rapida (~30 secondi).
+
+---
+
+## 7. Troubleshooting
 
 **`nominatim.service` non parte**
 ```bash
@@ -305,21 +432,11 @@ OSM_PBF_URL="file:///path/to/merged.osm.pbf" bash setup-nominatim-server.sh
 
 **Aggiornare i dati OSM (daily/weekly diff)**
 
-L'aggiornamento incrementale non è incluso in questo script (task futuro).
-Nel frattempo è possibile farlo manualmente:
+Vedi la sezione **6. Aggiornamenti automatici** per la guida completa.
+Per un aggiornamento manuale immediato:
 
 ```bash
-# Installa pyosmium
-sudo pip3 install osmium
-
-# Configura le repliche Geofabrik
-sudo -u nominatim /opt/nominatim/build/nominatim replication \
-  --project-dir /opt/nominatim \
-  --init
-
-# Esegui un aggiornamento
-sudo -u nominatim /opt/nominatim/build/nominatim replication \
-  --project-dir /opt/nominatim
+sudo bash /opt/nominatim/scripts/update-nominatim-osm.sh
 ```
 
 **Disco pieno durante l'import**
@@ -331,7 +448,7 @@ df -h /opt/nominatim
 
 ---
 
-## 7. Struttura dei file installati
+## 8. Struttura dei file installati
 
 ```
 /opt/nominatim/
@@ -339,19 +456,38 @@ df -h /opt/nominatim
 │   └── nominatim     ← eseguibile principale
 ├── data/
 │   └── italy-latest.osm.pbf  ← dati OSM scaricati
+├── scripts/
+│   └── update-nominatim-osm.sh  ← script aggiornamento incrementale
+├── .env              ← configurazione Nominatim (REPLICATION_URL, …)
 └── nominatim.log     ← log runtime (via journald)
 
-/etc/systemd/system/nominatim.service        ← unit file systemd
+/etc/systemd/system/nominatim.service        ← unit file systemd (server)
+/etc/systemd/system/nominatim-update.service ← unit file aggiornamento
+/etc/systemd/system/nominatim-update.timer   ← timer settimanale (dom. 02:00)
 /etc/nginx/snippets/bikerlink-nominatim.conf ← snippet nginx (generato)
+/var/log/nominatim-update.log                ← log aggiornamenti OSM
+```
+
+**File template nel repository** (da copiare sul server):
+```
+scripts/
+├── setup-nominatim-server.sh   ← setup iniziale
+├── update-nominatim-osm.sh     ← script aggiornamento incrementale
+└── systemd/
+    ├── nominatim-update.service ← template unit file
+    └── nominatim-update.timer   ← template timer
 ```
 
 ---
 
-## 8. Riferimenti
+## 9. Riferimenti
 
 - Script di setup: [`scripts/setup-nominatim-server.sh`](../scripts/setup-nominatim-server.sh)
+- Script aggiornamento OSM: [`scripts/update-nominatim-osm.sh`](../scripts/update-nominatim-osm.sh)
+- Template systemd: [`scripts/systemd/`](../scripts/systemd/)
 - Pattern token auth di riferimento: [`server/graphhopper-client.ts`](../server/graphhopper-client.ts)
 - Script analoga per Ollama: [`scripts/setup-ollama-server.sh`](../scripts/setup-ollama-server.sh)
 - Download dati Geofabrik: <https://download.geofabrik.de/europe/italy.html>
 - Documentazione API Nominatim: <https://nominatim.org/release-docs/latest/api/Search/>
 - Documentazione installazione Nominatim: <https://nominatim.org/release-docs/latest/admin/Installation/>
+- Documentazione replication Nominatim: <https://nominatim.org/release-docs/latest/admin/Update/>

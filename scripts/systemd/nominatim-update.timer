@@ -1,0 +1,16 @@
+[Unit]
+Description=Nominatim OSM Update — timer settimanale (domenica 02:00)
+Requires=nominatim-update.service
+
+[Timer]
+# Esegue ogni domenica alle 02:00 (ora locale del server, fuori dagli orari di punta).
+OnCalendar=Sun 02:00
+# Se il server era spento all'orario pianificato, esegue al prossimo avvio
+# solo se l'ultima esecuzione risale a più di 1 settimana fa.
+Persistent=true
+# Distribuzione casuale fino a 30 minuti per evitare picchi sul server Geofabrik.
+RandomizedDelaySec=1800
+Unit=nominatim-update.service
+
+[Install]
+WantedBy=timers.target
