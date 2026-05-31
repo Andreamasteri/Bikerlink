@@ -1,0 +1,9 @@
+[
+  {
+    "_example": true,
+    "name": "Nome del Motoclub",
+    "city": "Città",
+    "description": "Descrizione del club",
+    "memberCount": 0
+  }
+]

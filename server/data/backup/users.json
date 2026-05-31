@@ -1,0 +1,9 @@
+[
+  {
+    "_example": true,
+    "user": "nickname_utente",
+    "email": "utente@esempio.it",
+    "password": "passwordInChiaro123",
+    "country": "Italia"
+  }
+]

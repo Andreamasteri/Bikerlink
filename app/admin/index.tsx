@@ -126,6 +126,7 @@ const adminGroups: AdminGroup[] = [
       { key: "privacy", label: "Gestione Privacy", icon: "shield-lock", iconSet: "MaterialCommunityIcons", route: "/admin/privacy", accentColor: "#4CAF50" },
       { key: "invite-codes", label: "Codici Invito", icon: "gift", iconSet: "Ionicons", route: "/admin/invite-codes" },
       { key: "backup", label: "Backup automatici", icon: "cloud-upload", iconSet: "MaterialCommunityIcons", route: "/admin/backup" },
+      { key: "backup-preview", label: "Esplora Backup", icon: "database-search", iconSet: "MaterialCommunityIcons", route: "/admin/backup-preview", accentColor: "#F59E0B" },
       { key: "tags", label: "Sistema Tag", icon: "tag-multiple", iconSet: "MaterialCommunityIcons", route: "/admin/tags", accentColor: "#9C27B0" },
       { key: "text-aliases", label: "Alias Testo", icon: "spellcheck", iconSet: "MaterialCommunityIcons", route: "/admin/text-aliases", accentColor: "#FF9800" },
     ],
