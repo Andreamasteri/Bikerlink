@@ -251,3 +251,75 @@ describe("POST /api/planned-routes/ai-stream — resilienza JSON Ollama (Task #2
     expect(providersCalled).not.toContain("google");
   });
 });
+
+describe("POST /api/planned-routes/ai-stream — resilienza JSON Gemini (Task #2862)", () => {
+  let app: express.Application;
+
+  beforeEach(() => {
+    process.env.GEMINI_API_KEY = "test-key-gemini";
+    app = buildApp();
+    aiMocks.streamText.mockReset();
+  });
+
+  afterEach(() => {
+    delete process.env.GEMINI_API_KEY;
+  });
+
+  it("JSON Gemini corrotto → evento error SSE, nessun output corrotto emesso", async () => {
+    const brokenGemini = '{"title":"GEMINI_BROKEN","startLoc'; // JSON troncato
+    aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
+      if (model?.__provider === "ollama") return streamFrom(chunkify('{"bad":"ollama"}'));
+      // Gemini restituisce JSON malformato
+      return streamFrom(chunkify(brokenGemini));
+    });
+
+    const res = await request(app).post("/api/planned-routes/ai-stream").send({ prompt: "Giro" });
+    const sse = parseSse(res.text);
+
+    expect(res.status).toBe(200); // headers già inviati: errore come evento SSE
+    // Nessun frammento corrotto raggiunge il client
+    expect(sse.text).not.toContain("GEMINI_BROKEN");
+    expect(sse.text).toBe("");
+    // Deve esserci un evento error con messaggio non vuoto
+    expect(typeof sse.error).toBe("string");
+    expect(sse.error!.length).toBeGreaterThan(0);
+    // Entrambi i provider sono stati tentati
+    const providersCalled = aiMocks.streamText.mock.calls.map((c) => c[0].model.__provider);
+    expect(providersCalled).toContain("ollama");
+    expect(providersCalled).toContain("google");
+  });
+
+  it("Ollama non disponibile + Gemini corrotto → evento error SSE, nessun output corrotto", async () => {
+    const brokenGemini = '{"title":"GEMINI_BROKEN"'; // troncato
+    aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
+      if (model?.__provider === "ollama") throw new Error("ECONNREFUSED");
+      return streamFrom(chunkify(brokenGemini));
+    });
+
+    const res = await request(app).post("/api/planned-routes/ai-stream").send({ prompt: "Giro" });
+    const sse = parseSse(res.text);
+
+    expect(res.status).toBe(200);
+    expect(sse.text).not.toContain("GEMINI_BROKEN");
+    expect(sse.text).toBe("");
+    expect(typeof sse.error).toBe("string");
+    expect(sse.error!.length).toBeGreaterThan(0);
+  });
+
+  it("Gemini valido dopo fallback Ollama → output pulito, nessun evento error", async () => {
+    const brokenOllama = '{"bad":"json"'; // JSON invalido per lo schema
+    const validGemini = JSON.stringify(VALID_ROUTE);
+    aiMocks.streamText.mockImplementation(({ model }: { model: { __provider?: string } }) => {
+      if (model?.__provider === "ollama") return streamFrom(chunkify(brokenOllama));
+      return streamFrom(chunkify(validGemini));
+    });
+
+    const res = await request(app).post("/api/planned-routes/ai-stream").send({ prompt: "Giro" });
+    const sse = parseSse(res.text);
+
+    expect(res.status).toBe(200);
+    expect(sse.error).toBeUndefined();
+    expect(sse.text).toBe(validGemini);
+    expect(sse.done).toMatchObject({ title: "Giro sulle Alpi" });
+  });
+});

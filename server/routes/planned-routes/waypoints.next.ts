@@ -95,9 +95,11 @@ export interface StreamRouteOptions extends Omit<RouteAiOptions<unknown>, "schem
  *      Se la validazione fallisce, o se lo stream si interrompe con errore, il
  *      buffer viene scartato e si passa a Gemini (nulla è ancora stato emesso,
  *      quindi non si mescolano provider né si corrompe l'output).
- *   2. Gemini (fallback cloud): essendo l'ultima risorsa, viene emesso in
- *      streaming diretto token-per-token. La validazione JSON finale resta al
- *      chiamante (route handler).
+ *   2. Gemini (fallback cloud): anch'esso viene BUFFERIZZATO interamente lato
+ *      server prima di emettere qualsiasi chunk al client (Task #2862). Il testo
+ *      completo viene validato con la stessa funzione `validate`; se non supera la
+ *      validazione, viene lanciato un errore che il route handler cattura e converte
+ *      in un evento SSE `error` pulito — nessun testo corrotto raggiunge mai il client.
  *
  * Se Ollama produce output invalido e non c'è una GEMINI_API_KEY per il
  * fallback, viene lanciato un errore catchable invece di emettere testo rotto.
@@ -135,10 +137,20 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
   }
 
   if (!apiKey) throw new Error(NO_PROVIDER_MSG);
+  // Anche il ramo Gemini viene bufferizzato e validato prima di emettere al client
+  // (Task #2862). Se Gemini produce JSON malformato, lanciamo un errore pulito invece
+  // di emettere testo rotto: il route handler lo cattura e invia un evento SSE error.
   const result = streamText({ model: geminiModel(apiKey), prompt: fullPrompt, maxRetries, temperature, abortSignal });
+  const geminiBuffer: string[] = [];
   for await (const chunk of result.textStream) {
-    yield chunk;
+    if (chunk) geminiBuffer.push(chunk);
   }
+  const geminiText = geminiBuffer.join("");
+  const isGeminiValid = validate ? validate(geminiText) : geminiText.trim().length > 0;
+  if (!isGeminiValid) {
+    throw new Error("Gemini ha prodotto una risposta non valida: nessun provider disponibile ha restituito output utilizzabile.");
+  }
+  for (const chunk of geminiBuffer) yield chunk;
 }
 
 // ─── POI routes (moved from waypoints.ts to keep it under 550 lines) ──────────
