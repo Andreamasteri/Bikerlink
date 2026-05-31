@@ -136,6 +136,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 (async () => {
   const TOTAL = 5;
+  // ── FASE 4/4 del deploy/publish: avvio del container in produzione ──────────
+  // Le fasi 1-3 (copia dev→prod DB, build script, creazione Autoscale) sono già
+  // avvenute prima che questo processo partisse e sono loggate nel pannello
+  // Publish. Da qui in poi siamo nella FASE 4: i TOTAL step sotto (bootLog n/5)
+  // sono i sotto-step interni di QUESTA fase, e [migrate] mostra le migrazioni.
+  console.log(
+    `[${new Date().toISOString()}] ════════ FASE 4/4 DEPLOY — Runtime: avvio container (${TOTAL} step interni) ════════`,
+  );
   // Tracks whether the initial DB seed was skipped (already populated).
   // Read by the post-boot fire-and-forget block to decide if autoSeedFakeUsers should run.
   let needsFakeSeed = false;

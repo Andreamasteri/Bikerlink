@@ -23,7 +23,15 @@ log()  { echo "[deploy $(date -u '+%H:%M:%SZ')] $*"; }
 size() { [ -e "$1" ] && du -sh "$1" 2>/dev/null | cut -f1 || echo "-"; }
 
 BUILD_START=$(date -u '+%H:%M:%SZ')
-log "════════ Inizio deploy build (deploy-build.sh) ════════"
+log "════════════════════════════════════════════════════════════"
+log " DEPLOY/PUBLISH — mappa delle 4 fasi:"
+log "   FASE 1/4 [piattaforma] security scan · copia dev→prod DB · install pacchetti"
+log " ▶ FASE 2/4 [questo script] pulizia workspace + build server   ◀ SEI QUI"
+log "   FASE 3/4 [piattaforma] Creating image · Pushing Repl layer · Creating Autoscale"
+log "   FASE 4/4 [runtime]     avvio container + migrazioni DB (log [boot]/[migrate])"
+log " NB: le fasi 1 e 3 le logga Replit (pannello Publish); le fasi 2 e 4 le logghiamo noi."
+log "════════════════════════════════════════════════════════════"
+log "▶ FASE 2/4 — INIZIO build script (start $BUILD_START)"
 log "Workspace iniziale: $(size .) totali"
 
 # Task #2800-fix — Pulizia asset non necessari prima del push del Repl layer.
@@ -100,9 +108,11 @@ log "  Cache migration invalidata (al boot migrate.ts farà sempre il controllo 
 # Conclusione: la piattaforma gestisce .cache/ come layer separato; non va toccata
 # dal build script. Pulire .cache/ era sia la CAUSA del fallimento sia inutile.
 
-log "════════ [3/3] Deploy build completato (start $BUILD_START) ════════"
+log "▶ FASE 2/4 — FINE build script (iniziata $BUILD_START)"
 log "Workspace finale che entra nel Repl layer: $(size .) totali"
-log "Prossimi step (gestiti dalla piattaforma Replit, visibili nel pannello Publish):"
-log "  → Creating image / Pushing Repl layer / Pushing Repl (cache) layer"
-log "  → Creating Autoscale service → Waiting for service to be ready → Deployment successful"
-log "Poi, all'avvio del container, i log [migrate] mostreranno le migrazioni applicate al DB."
+log "────────────────────────────────────────────────────────────"
+log "▶ FASE 3/4 [piattaforma Replit] — prossimi step nel pannello Publish:"
+log "    Creating image → Pushing Repl layer → Pushing Repl (cache) layer"
+log "    → Creating Autoscale service → Waiting for service to be ready → Deployment successful"
+log "▶ FASE 4/4 [runtime] — all'avvio del container vedrai, nei log di produzione:"
+log "    [.../5] (boot in 5 step interni) e [migrate] (migrazioni applicate al DB)"
