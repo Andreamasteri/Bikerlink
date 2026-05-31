@@ -176,6 +176,20 @@ read_env_value() {
 # Escape per sed (sostituzione sicura su separatore '#').
 sed_escape() { printf '%s' "$1" | sed -e 's/[\#&]/\\&/g'; }
 
+# Verifica che GRAPHHOPPER_JAVA_OPTS nel file .env sia tra virgolette.
+# Se il valore contiene spazi ma non è quotato, bash `source` fallisce con
+# "command not found". In quel caso stampa il fix manuale e termina.
+check_ghopt_quoted() {
+  local envf="$1"
+  [[ -r "$envf" ]] || return 0
+  if grep -qE '^GRAPHHOPPER_JAVA_OPTS=[^"'"'"'][^ ]*[[:space:]]' "$envf" 2>/dev/null; then
+    die "GRAPHHOPPER_JAVA_OPTS nel file ${envf} non è tra virgolette e contiene spazi.
+       Questo causa un errore al momento del 'source'. Correggi con:
+         sed -i 's/^GRAPHHOPPER_JAVA_OPTS=\(.*\)\$/GRAPHHOPPER_JAVA_OPTS=\"\1\"/' \"${envf}\"
+       Poi rilancia questo script."
+  fi
+}
+
 # Inserisce/aggiorna una chiave nel file .env.local (crea il file se assente).
 upsert_env_value() {
   local key="$1" value="$2" file="$3" tmp esc_val
@@ -205,6 +219,7 @@ should_generate_secret() {
 
 if [[ -f "$ENV_FILE" ]]; then
   warn ".env già presente — riuso le credenziali esistenti (non sovrascrivo)."
+  check_ghopt_quoted "$ENV_FILE"
   # shellcheck disable=SC1090
   set -a; . "$ENV_FILE"; set +a
 else
@@ -225,7 +240,7 @@ POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
 POSTGRES_DB=${POSTGRES_DB}
 PGADMIN_EMAIL=${PGADMIN_EMAIL}
 PGADMIN_PASSWORD=${PGADMIN_PASSWORD}
-GRAPHHOPPER_JAVA_OPTS=${GRAPHHOPPER_JAVA_OPTS}
+GRAPHHOPPER_JAVA_OPTS="${GRAPHHOPPER_JAVA_OPTS}"
 EOF
   chmod 600 "$ENV_FILE"
   ok "Generato .env con password casuali sicure."
@@ -417,6 +432,7 @@ wait_valhalla_tiles_ready && VALHALLA_TILES_READY=1 || true
 # =============================================================================
 section "6/6 — Riepilogo"
 # =============================================================================
+check_ghopt_quoted "$ENV_FILE"
 # shellcheck disable=SC1090
 set -a; . "$ENV_FILE"; set +a
 
