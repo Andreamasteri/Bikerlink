@@ -1,6 +1,10 @@
 import { getApiUrl } from "@/lib/query-client";
 import { Ionicons } from "@expo/vector-icons";
+import { AiKeyMissingError, isAiKeyMissingResponse } from "@/lib/ai-errors";
 import { Waypoint, Style, DrivingProfile, RouteResult, WeatherWaypoint } from "./types";
+
+// Re-export per i consumatori che importano da questo modulo.
+export { AiKeyMissingError } from "@/lib/ai-errors";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
 export async function geocode(q: string): Promise<any[]> {
@@ -42,14 +46,6 @@ export async function calcRoute(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AI parse result shape from API
-export class AiKeyMissingError extends Error {
-  code = "AI_KEY_MISSING" as const;
-  constructor() {
-    super("Funzione AI non attivata — contatta l'amministratore");
-    this.name = "AiKeyMissingError";
-  }
-}
-
 export async function parseAI(prompt: string): Promise<any> {
   const url = new URL("/api/planned-routes/ai-parse", getApiUrl());
   const resp = await fetch(url.toString(), {
@@ -59,7 +55,7 @@ export async function parseAI(prompt: string): Promise<any> {
   });
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}));
-    if (resp.status === 503 && String(body.message ?? "").includes("GEMINI_API_KEY")) {
+    if (isAiKeyMissingResponse(resp.status, body.message)) {
       throw new AiKeyMissingError();
     }
     throw new Error(body.message ?? "Servizio AI non disponibile");

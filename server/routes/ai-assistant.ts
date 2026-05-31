@@ -19,6 +19,7 @@ import {
   type AssistantPlatform,
 } from "../ai/assistant/config";
 import { runAssistantAgent, extractActions } from "../ai/assistant/agent";
+import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../ai/moderation/provider";
 import {
   ASSISTANT_ACTIONS,
   isWhitelistedAction,
@@ -113,6 +114,13 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   const config = await loadAssistantConfig(platformForConfig);
   if (!config.enabled) {
     sendError(res, 403, "Assistente disattivato dall'amministratore");
+    return;
+  }
+
+  // Task #2825 — Nessun provider AI configurato: rispondi 503 con il nome delle
+  // variabili mancanti così il client può mostrare il banner "Funzione AI non attivata".
+  if (!hasAnyAiProvider()) {
+    sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
     return;
   }
 

@@ -9,7 +9,7 @@ import { streamChat } from "../../ai/moderation/chat";
 import { runTriage } from "../../ai/moderation/triage";
 import { enqueueTriage, getQueueStats } from "../../ai/moderation/queue";
 import { getBudgetStatus, setBudgetLimit } from "../../ai/moderation/budget";
-import { getProviderHealth } from "../../ai/moderation/provider";
+import { getProviderHealth, hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../../ai/moderation/provider";
 import { runAnomalyScan } from "../../ai/moderation/anomalies";
 import { runDigestForAll, getLatestDigestWithReadState, markDigestRead, hasUnreadDigest } from "../../ai/moderation/digest";
 import { storage } from "../../storage";
@@ -30,6 +30,9 @@ router.post("/ai/chat", async (req: Request, res: Response) => {
   if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
   const modId = req.session?.userId as string | undefined;
   if (!modId) return sendError(res, 401, "Sessione scaduta");
+
+  // Task #2825 — Nessun provider AI configurato: 503 + var mancanti prima di aprire l'SSE.
+  if (!hasAnyAiProvider()) return sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
 
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
@@ -74,6 +77,7 @@ router.post("/ai/triage/:reportId", async (req: Request, res: Response) => {
     enqueueTriage(reportId);
     return res.json({ queued: true });
   }
+  if (!hasAnyAiProvider()) return sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
   const out = await runTriage({ reportId });
   if (!out) return sendError(res, 503, "Triage non disponibile (budget/provider)");
   return res.json({ analysis: out });
@@ -277,6 +281,7 @@ router.patch("/ai/settings", async (req: Request, res: Response) => {
 
 router.post("/ai/anomaly/scan", async (_req: Request, res: Response) => {
   try {
+    if (!hasAnyAiProvider()) return sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
     const out = await runAnomalyScan();
     return res.json(out);
   } catch (err) {
@@ -286,7 +291,10 @@ router.post("/ai/anomaly/scan", async (_req: Request, res: Response) => {
 });
 
 router.post("/ai/digest/run", async (_req: Request, res: Response) => {
-  try { return res.json(await runDigestForAll()); }
+  try {
+    if (!hasAnyAiProvider()) return sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
+    return res.json(await runDigestForAll());
+  }
   catch (err) {
     console.error("[ai/digest/run] error:", err);
     return sendError(res, 500, "Errore digest");

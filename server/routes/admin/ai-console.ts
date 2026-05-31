@@ -18,6 +18,7 @@ import {
 } from "@shared/db";
 import { routeMessage } from "../../ai/console/router";
 import { runAgent } from "../../ai/console/agent";
+import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../../ai/moderation/provider";
 import { buildSystemContext, loadMemory, updateMemory } from "../../ai/console/memory";
 import { SCOPES, type Scope } from "../../ai/console/tools";
 
@@ -56,6 +57,9 @@ router.post("/ai/console/message", async (req: Request, res: Response) => {
   const userId = (req.session as { userId?: string }).userId as string;
   const { message } = parsed.data;
   let conversationId = parsed.data.conversationId;
+
+  // Task #2825 — Nessun provider AI configurato: 503 + var mancanti prima di aprire l'SSE.
+  if (!hasAnyAiProvider()) { sendError(res, 503, AI_NO_PROVIDER_MESSAGE); return; }
 
   // SSE headers
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");

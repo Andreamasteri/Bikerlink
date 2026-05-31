@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, MaterialIcons } from "@expo/vector-icons";
 import { apiRequest } from "@/lib/query-client";
+import { isAiKeyMissingError, AI_KEY_MISSING_MESSAGE } from "@/lib/ai-errors";
 import Colors from "@/constants/colors";
 
 import {
@@ -71,7 +72,10 @@ export default function TabellaLingue() {
       setAiResult({ ok: true, msg: data.message || "Completamento AI riuscito" });
       loadTable();
     } catch (e: unknown) {
-      setAiResult({ ok: false, msg: e instanceof Error ? (e as Error).message : "Errore AI" });
+      const msg = isAiKeyMissingError(e)
+        ? AI_KEY_MISSING_MESSAGE
+        : e instanceof Error ? (e as Error).message : "Errore AI";
+      setAiResult({ ok: false, msg });
     } finally {
       setAiLoading(false);
     }

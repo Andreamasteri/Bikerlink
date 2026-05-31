@@ -9,6 +9,7 @@ import { runIntegrityScan, getLatestRunSummary, listOpenViolations } from "../..
 import { loadAllChecks } from "../../ai/integrity/registry";
 import { runOneAutofix } from "../../ai/integrity/autofix";
 import { explainViolation } from "../../ai/integrity/explain";
+import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../../ai/moderation/provider";
 import { restoreFromQuarantine, purgeQuarantineRow } from "../../ai/integrity/quarantine";
 import { getAppIntegrityScheduleInfo } from "../../ai/integrity/scheduler";
 import { ALL_FAMILIES, type Family } from "../../ai/integrity/types";
@@ -91,6 +92,7 @@ router.post("/app-integrity/violations/:id/explain", async (req, res) => {
   const checks = loadAllChecks();
   const check = checks.find((c) => c.id === row.checkId);
   if (!check) return sendError(res, 404, "Check non più registrato");
+  if (!hasAnyAiProvider()) return sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
   const sample = (row.sample as Array<{ pk?: string; data: Record<string, unknown> }>) ?? [];
   const out = await explainViolation({
     check, hash: row.hash, count: row.count, sample,

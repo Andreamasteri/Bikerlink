@@ -248,5 +248,27 @@ export async function runWithFallback<T>(
   throw new Error("AI_PROVIDER_UNAVAILABLE: nessun provider AI configurato o disponibile");
 }
 
+// Task #2825 — Variabili d'ambiente che attivano almeno un provider AI.
+export const AI_PROVIDER_ENV_VARS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"] as const;
+
+// Messaggio standard 503 quando nessun provider AI è configurato. Contiene i nomi
+// delle variabili mancanti così il client può riconoscere il caso "chiave mancante".
+export const AI_NO_PROVIDER_MESSAGE =
+  "Servizio AI non disponibile: nessuna chiave AI configurata (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY mancante)";
+
+// Ritorna gli ID dei provider che hanno una chiave configurata (ignora il cooldown).
+export function getConfiguredProviders(): AiProviderId[] {
+  const out: AiProviderId[] = [];
+  if (process.env.ANTHROPIC_API_KEY) out.push("anthropic");
+  if (process.env.OPENAI_API_KEY) out.push("openai");
+  if (process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY) out.push("google");
+  return out;
+}
+
+// True se almeno un provider AI è configurato con una chiave.
+export function hasAnyAiProvider(): boolean {
+  return getConfiguredProviders().length > 0;
+}
+
 export { readPreferredProvider };
 export type { ResolvedModel };

@@ -19,6 +19,7 @@ import { useColors } from "@/hooks/useColors";
 import { useT, useLanguage } from "@/lib/language-context";
 import { apiRequest } from "@/lib/query-client";
 import { streamAssistantMessage } from "@/lib/ai-assistant/sse-client";
+import { isAiKeyMissingResponse, isAiKeyMissingError, AI_KEY_MISSING_MESSAGE } from "@/lib/ai-errors";
 import { currentAssistantPlatform } from "@/hooks/useAssistantConfig";
 import { executeClientAction } from "@/lib/ai-assistant/client-actions";
 import AssistantActionConfirmSheet from "./AssistantActionConfirmSheet";
@@ -83,16 +84,20 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
                 : m,
             ));
           } else if (ev.event === "error") {
-            const d = ev.data as { message?: string };
+            const d = ev.data as { code?: number; message?: string };
+            const text = isAiKeyMissingResponse(d.code ?? 0, d.message)
+              ? AI_KEY_MISSING_MESSAGE
+              : (d.message ?? "errore");
             setMessages((prev) => prev.map((m) =>
-              m.id === asstId ? { ...m, content: `⚠️ ${d.message ?? "errore"}` } : m,
+              m.id === asstId ? { ...m, content: `⚠️ ${text}` } : m,
             ));
           }
         },
       });
     } catch (e) {
+      const text = isAiKeyMissingError(e) ? AI_KEY_MISSING_MESSAGE : (e as Error).message;
       setMessages((prev) => prev.map((m) =>
-        m.id === asstId ? { ...m, content: `⚠️ ${(e as Error).message}` } : m,
+        m.id === asstId ? { ...m, content: `⚠️ ${text}` } : m,
       ));
     } finally {
       setStreaming(false);

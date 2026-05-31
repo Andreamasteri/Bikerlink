@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { AiKeyMissingError, isAiKeyMissingResponse } from "@/lib/ai-errors";
 
 export function getApiUrl(): string {
   let host = process.env.EXPO_PUBLIC_DOMAIN;
@@ -136,6 +137,18 @@ export async function silentAuthRecheck(): Promise<boolean> {
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     if (res.status === 503) {
+      // Task #2825 — Un 503 "chiave AI mancante" NON è un errore transitorio (un retry
+      // non risolve): leggi il body e, se è il caso chiave-mancante, lancia
+      // AiKeyMissingError così ogni chiamante può mostrare il banner AI dedicato.
+      const bodyText = await res.text().catch(() => "");
+      let msg503: string | undefined;
+      try {
+        const parsed = JSON.parse(bodyText) as { message?: unknown };
+        if (typeof parsed?.message === "string") msg503 = parsed.message;
+      } catch { /* body non JSON */ }
+      if (msg503 && isAiKeyMissingResponse(503, msg503)) {
+        throw new AiKeyMissingError();
+      }
       const retryAfterHeader = res.headers.get("Retry-After");
       const retryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) : 3;
       throw new ServerBusyError(isNaN(retryAfter) ? 3 : retryAfter);

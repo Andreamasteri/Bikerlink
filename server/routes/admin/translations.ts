@@ -97,9 +97,11 @@ router.delete("/keys/:key", async (req: Request, res: Response) => {
 
 router.post("/ai-complete", async (_req: Request, res: Response) => {
   try {
+    // Task #2825 — Chiave AI mancante → 503 + var mancante (stesso contratto degli
+    // altri endpoint AI) così il client mostra il banner "Funzione AI non attivata".
     const openaiKey = process.env.OPENAI_API_KEY;
     if (!openaiKey) {
-      return res.json({ message: "AI non configurata: OPENAI_API_KEY mancante" });
+      return sendError(res, 503, "Servizio AI non disponibile: chiave OPENAI_API_KEY mancante");
     }
     return res.json({ message: "AI non configurata" });
   } catch (err) {

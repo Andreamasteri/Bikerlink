@@ -11,6 +11,7 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { isAiKeyMissingResponse, AI_KEY_MISSING_MESSAGE } from "@/lib/ai-errors";
 import AiSuggestionItem, { type AiDraft } from "./AiSuggestionItem";
 
 interface Msg { role: "user" | "assistant"; content: string; drafts?: AiDraft[] }
@@ -73,7 +74,14 @@ export default function AiCopilotDrawer({
         }),
         signal: ac.signal,
       });
-      if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) {
+        const bodyTxt = await resp.text().catch(() => "");
+        let m: string | undefined;
+        try { const j = JSON.parse(bodyTxt) as { message?: unknown }; if (typeof j?.message === "string") m = j.message; } catch { /* non JSON */ }
+        if (isAiKeyMissingResponse(resp.status, m)) { setErrorMsg(AI_KEY_MISSING_MESSAGE); return; }
+        throw new Error(m || `HTTP ${resp.status}`);
+      }
+      if (!resp.body) throw new Error(`HTTP ${resp.status}`);
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buf = "";

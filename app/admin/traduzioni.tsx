@@ -8,6 +8,7 @@ import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
+import { isAiKeyMissingError, AI_KEY_MISSING_MESSAGE } from "@/lib/ai-errors";
 import { useT } from "@/lib/language-context";
 import { StepStatus } from "@/components/admin/traduzioni/StepCard";
 import { CellState } from "@/components/admin/traduzioni/TranslationRow";
@@ -398,7 +399,11 @@ export default function TraduzioniScreen() {
       if (data.summary) setAiSummary(data.summary as Record<string, number>);
     } catch (e: unknown) {
       setAiStatus("error");
-      setAiResult((e instanceof Error ? e.message : null) || "Errore durante il completamento AI");
+      setAiResult(
+        isAiKeyMissingError(e)
+          ? AI_KEY_MISSING_MESSAGE
+          : (e instanceof Error ? e.message : null) || "Errore durante il completamento AI",
+      );
     }
   }
 
