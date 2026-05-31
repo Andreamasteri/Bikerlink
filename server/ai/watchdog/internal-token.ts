@@ -6,6 +6,9 @@
 import crypto from "crypto";
 
 const HEADER_NAME = "x-internal-probe-token";
+// Task #2845 — header con cui il self-check indica quale moderatore impersonare
+// quando esercita le route /api/moderator/* via loopback + probe token.
+const MODERATOR_HEADER_NAME = "x-internal-probe-moderator-id";
 let token: string | null = null;
 
 export function getInternalProbeToken(): string {
@@ -15,6 +18,10 @@ export function getInternalProbeToken(): string {
 
 export function getInternalProbeHeaderName(): string {
   return HEADER_NAME;
+}
+
+export function getInternalProbeModeratorHeaderName(): string {
+  return MODERATOR_HEADER_NAME;
 }
 
 export function isLoopback(ip?: string | null): boolean {

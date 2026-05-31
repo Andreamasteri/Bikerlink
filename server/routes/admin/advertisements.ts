@@ -10,6 +10,7 @@ import fs from "fs";
 import { uploadBuffer, deleteObject } from "../../objectStorage";
 import { cacheAdImage } from "../ads";
 import { sendSuccess, sendError } from "../../lib/api-response";
+import { safeModLog } from "../../lib/safe-mod-log";
 import crypto from "crypto";
 
 const router = Router();
@@ -26,18 +27,6 @@ const adUpload = multer({
 
 function paramStr(v: string | string[] | undefined): string | null {
   return typeof v === "string" ? v : null;
-}
-
-// Task #2694 — best-effort audit log: il watchdog interno chiama queste route
-// con un pseudo-userId ("__watchdog__") che non esiste in DB, e l'insert con
-// FK violation farebbe 500. Per le chiamate reali admin l'errore resta loggato.
-async function safeModLog(entry: Parameters<typeof storage.createModeratorLog>[0]): Promise<void> {
-  try {
-    if (!entry.moderatorId || entry.moderatorId === "__watchdog__") return;
-    await storage.createModeratorLog(entry);
-  } catch (err) {
-    console.warn("[ads/mod-log] insert failed (non-fatal):", err);
-  }
 }
 
 async function uploadAdImageToObjectStorage(buffer: Buffer, originalname: string, mimetype: string): Promise<string> {

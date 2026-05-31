@@ -9,7 +9,7 @@ import { generateText } from "ai";
 import { runWithFallback, estimateCostUsd } from "../moderation/provider";
 import { writeWatchdogLog } from "./log";
 import { uploadBuffer, deleteObject, objectExists } from "../../objectStorage";
-import { getInternalProbeToken, getInternalProbeHeaderName } from "./internal-token";
+import { getInternalProbeToken, getInternalProbeHeaderName, getInternalProbeModeratorHeaderName } from "./internal-token";
 import { storage } from "../../storage";
 
 export type CheckStatus = "ok" | "warn" | "error";
@@ -135,6 +135,10 @@ function deriveSuggestedFix(checks: SelfCheckEntry[]): string | null {
       "Verifica storage.deleteCampaign e che le FK su ad_campaigns siano in cascade.",
     "verify_object_removed_public":
       "deleteAdImageIfUnreferenced non rimuove il file da object storage. Controlla deleteObject().",
+    "POST /api/moderator/advertisements (moderator create)":
+      "Verifica requireModerator e che createModeratorLog sia protetto da safeModLog (un fallimento del log non deve causare 500).",
+    "PUT /api/moderator/advertisements/:id (moderator update)":
+      "Verifica la route PUT moderatore: log protetto da safeModLog e fallback graceful sull'upload immagine.",
   };
   return map[failed.name] ?? `Indagare il passo fallito: ${failed.name}.`;
 }
@@ -169,6 +173,33 @@ async function buildAiBrief(
   }
 }
 
+// Task #2845 — account moderatore di test usato solo dal self-check per
+// esercitare il flusso /api/moderator/advertisements via probe loopback.
+// Persistente (riusato fra run) e non-loggabile (password segnaposto).
+const SELFCHECK_MOD_EMAIL = "__selfcheck_mod__@bikerlink.internal";
+async function ensureSelfCheckModerator(): Promise<string> {
+  const existing = await storage.getUserByEmail(SELFCHECK_MOD_EMAIL);
+  if (existing) {
+    if (existing.role !== "moderator" && existing.role !== "admin") {
+      await storage.updateUser(existing.id, { role: "moderator", status: "active" });
+    } else if (existing.status !== "active") {
+      await storage.updateUser(existing.id, { status: "active" });
+    }
+    return existing.id;
+  }
+  const created = await storage.createUser({
+    nickname: "__selfcheck_mod__",
+    email: SELFCHECK_MOD_EMAIL,
+    password: "!selfcheck-no-login!",
+    role: "moderator",
+    status: "active",
+    isFake: true,
+    isSystem: true,
+    emailVerified: true,
+  });
+  return created.id;
+}
+
 export interface RunSelfCheckOpts {
   triggeredBy: CampaignsSelfCheckResult["triggeredBy"];
   withAi?: boolean;
@@ -188,6 +219,8 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
 
   let createdCampaignId: string | null = null;
   let createdGroupId: string | null = null;
+  let modCampaignId: string | null = null;
+  let selfCheckModeratorId: string | null = null;
 
   // Se le ads sono globalmente disattivate, /api/ads/placement/all ritorna []
   // a priori: in quel caso usiamo getActiveAdsByUserType direttamente come
@@ -319,6 +352,37 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
       return { message: "rimosso" };
     }));
 
+    // 11. Task #2845 — flusso moderatore: create senza immagine deve riuscire
+    //     (201) e il log di audit non deve mai causare un 500.
+    checks.push(await runStep("POST /api/moderator/advertisements (moderator create)", async () => {
+      selfCheckModeratorId = await ensureSelfCheckModerator();
+      const r = await httpProbe("POST", "/api/moderator/advertisements", {
+        name: `${probeBaseName}-mod`,
+        sponsor: "BikerLink SelfCheck",
+        targetUserType: "tutti",
+        rotationDuration: 10,
+        rotationMode: "sequential",
+        sortOrder: 9999,
+        placement: "all",
+      }, { [getInternalProbeModeratorHeaderName()]: selfCheckModeratorId });
+      if (r.status !== 201) throw new Error(`status ${r.status} body=${r.body.slice(0, 200)}`);
+      const c = r.json as { id?: string } | null;
+      if (!c?.id) throw new Error("create moderatore non ha restituito id");
+      modCampaignId = c.id;
+      return { message: `id=${c.id}` };
+    }));
+
+    // 12. Update via route moderatore — deve riuscire (200) col log protetto.
+    if (modCampaignId && selfCheckModeratorId) {
+      checks.push(await runStep("PUT /api/moderator/advertisements/:id (moderator update)", async () => {
+        const r = await httpProbe("PUT", `/api/moderator/advertisements/${modCampaignId}`, {
+          sortOrder: 1234,
+        }, { [getInternalProbeModeratorHeaderName()]: selfCheckModeratorId! });
+        if (r.status !== 200) throw new Error(`status ${r.status} body=${r.body.slice(0, 200)}`);
+        return { message: "update ok" };
+      }));
+    }
+
   } finally {
     // Cleanup di sicurezza: probe privata sempre rimossa
     try { await deleteObject(privateObjectPath); } catch {/* ignore */}
@@ -329,6 +393,11 @@ export async function runCampaignsSelfCheck(opts: RunSelfCheckOpts): Promise<Cam
         if (stillExists) await deleteObject(publicObjectPath);
       } catch {/* ignore */}
       try { await httpProbe("DELETE", `/api/admin/advertisements/${createdCampaignId}`); } catch {/* ignore */}
+    }
+    // La route moderatore non espone DELETE: la campagna creata dal probe viene
+    // rimossa tramite la route admin (idempotente, stesso storage).
+    if (modCampaignId) {
+      try { await httpProbe("DELETE", `/api/admin/advertisements/${modCampaignId}`); } catch {/* ignore */}
     }
   }
 

@@ -7,10 +7,35 @@ import { uploadBuffer, deleteObject } from "../objectStorage";
 import { cacheAdImage } from "./ads";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";
+import { safeModLog } from "../lib/safe-mod-log";
+import { getInternalProbeToken, getInternalProbeHeaderName, getInternalProbeModeratorHeaderName, isLoopback } from "../ai/watchdog/internal-token";
 
 const router = Router();
 
+// Bypass loopback per il self-check interno: se la richiesta arriva da 127.0.0.1
+// con un probe token valido e indica un moderator id, lo validiamo e lo usiamo
+// al posto della sessione. Restituisce l'id solo se l'utente esiste, è
+// admin/moderatore ed è attivo. Negli altri casi torna null (nessun bypass).
+async function tryProbeModerator(req: Request): Promise<string | null> {
+  try {
+    const tokenHdr = req.headers[getInternalProbeHeaderName()];
+    const token = Array.isArray(tokenHdr) ? tokenHdr[0] : tokenHdr;
+    if (!token || token !== getInternalProbeToken() || !isLoopback(req.ip)) return null;
+    const modHdr = req.headers[getInternalProbeModeratorHeaderName()];
+    const moderatorId = Array.isArray(modHdr) ? modHdr[0] : modHdr;
+    if (!moderatorId) return null;
+    const user = await storage.getUser(moderatorId);
+    if (!user || (user.role !== "admin" && user.role !== "moderator") || user.status !== "active") return null;
+    return moderatorId;
+  } catch {
+    return null;
+  }
+}
+
 async function requireModerator(req: Request, res: Response): Promise<string | null> {
+  const probeId = await tryProbeModerator(req);
+  if (probeId) return probeId;
+
   const userId = requireUserId(req, res);
   if (!userId) return null;
 
@@ -225,8 +250,15 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
       return sendError(res, 400, "Nome campagna obbligatorio");
     }
     let imageUrl: string | null = null;
+    let imageUploadFailed = false;
     if (req.file) {
-      imageUrl = await uploadAdImage(req.file.buffer, req.file.originalname, req.file.mimetype);
+      try {
+        imageUrl = await uploadAdImage(req.file.buffer, req.file.originalname, req.file.mimetype);
+      } catch (uploadErr) {
+        console.error("Moderator create campaign — upload immagine fallito (fallback senza immagine):", uploadErr);
+        imageUrl = null;
+        imageUploadFailed = true;
+      }
     } else if (req.body.imageUrl) {
       if (!String(req.body.imageUrl).startsWith("/api/ads/images/")) {
         return sendError(res, 400, "imageUrl non valido: sono accettati solo percorsi interni");
@@ -248,7 +280,7 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
       endDate: endDate ? new Date(endDate) : null,
       placement: placement || "all",
     });
-    await storage.createModeratorLog({
+    await safeModLog({
       moderatorId,
       action: "create_advertisement",
       targetType: "campaign",
@@ -256,7 +288,7 @@ router.post("/advertisements", adUpload.single("image"), async (req: Request, re
       details: `Campagna creata dal moderatore: ${campaign.name} (${targetUserType || "biker"})`,
     });
     cacheAdImage(campaign.imageUrl).catch(() => {});
-    return res.status(201).json(campaign);
+    return res.status(201).json(imageUploadFailed ? { ...campaign, imageUploadFailed: true } : campaign);
   } catch (error) {
     console.error("Moderator create campaign error:", error);
     return sendError(res, 500, "Errore interno del server");
@@ -284,10 +316,16 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     if (req.body.rotationMode !== undefined) updates.rotationMode = req.body.rotationMode as string;
     if (req.body.sortOrder !== undefined) updates.sortOrder = parseInt(req.body.sortOrder as string);
     if (req.body.placement !== undefined) updates.placement = req.body.placement as string;
+    let imageUploadFailed = false;
     if (req.file) {
-      updates.imageUrl = await uploadAdImage(req.file.buffer, req.file.originalname, req.file.mimetype);
-      const existing = await storage.getAdCampaign(id);
-      updates.imageVersion = ((existing?.imageVersion ?? 0) + 1);
+      try {
+        updates.imageUrl = await uploadAdImage(req.file.buffer, req.file.originalname, req.file.mimetype);
+        const existing = await storage.getAdCampaign(id);
+        updates.imageVersion = ((existing?.imageVersion ?? 0) + 1);
+      } catch (uploadErr) {
+        console.error("Moderator update campaign — upload immagine fallito (aggiornamento senza immagine):", uploadErr);
+        imageUploadFailed = true;
+      }
     } else if (req.body.imageUrl !== undefined) {
       if (req.body.imageUrl !== null && req.body.imageUrl !== "" && !String(req.body.imageUrl).startsWith("/api/ads/images/")) {
         return sendError(res, 400, "imageUrl non valido: sono accettati solo percorsi interni");
@@ -302,7 +340,7 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     if (!campaign) {
       return sendError(res, 404, "Campagna non trovata");
     }
-    await storage.createModeratorLog({
+    await safeModLog({
       moderatorId,
       action: "update_advertisement",
       targetType: "campaign",
@@ -312,7 +350,7 @@ router.put("/advertisements/:id", adUpload.single("image"), async (req: Request,
     if (req.file || req.body.imageUrl !== undefined) {
       cacheAdImage(campaign.imageUrl).catch(() => {});
     }
-    return res.json(campaign);
+    return res.json(imageUploadFailed ? { ...campaign, imageUploadFailed: true } : campaign);
   } catch (error) {
     console.error("Moderator update campaign error:", error);
     return sendError(res, 500, "Errore interno del server");
