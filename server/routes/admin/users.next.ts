@@ -25,15 +25,15 @@ import { sendError } from "../../lib/api-response";
 const router = Router();
 
 const adminCreateUserSchema = z.object({
-  nickname: z.string().min(1, "Nickname obbligatorio").max(30, "Nickname troppo lungo"),
-  email: z.string().email("Email non valida"),
+  nickname: z.string().min(1, "Nickname obbligatorio").max(30, "Nickname troppo lungo").transform((s) => s.trim()),
+  email: z.string().email("Email non valida").transform((s) => s.trim().toLowerCase()),
   password: z.string().min(8, "La password deve avere almeno 8 caratteri"),
   userType: z.enum(["biker", "zavorrina", "coppia"], {
     error: "Tipo utente non valido (biker / zavorrina / coppia)",
   }),
-  sex: z.string().optional().nullable(),
+  sex: z.enum(["M", "F"]).optional().nullable(),
   birthYear: z.number().int().min(1920).max(new Date().getFullYear()).optional().nullable(),
-  region: z.string().optional().nullable(),
+  region: z.string().optional().nullable().transform((s) => s?.trim() || null),
 });
 
 router.post("/", async (req: Request, res: Response) => {

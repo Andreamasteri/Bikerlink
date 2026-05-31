@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -53,6 +53,18 @@ export const CreateUserModal: React.FC<CreateUserModalProps> = ({
   const [sex, setSex] = useState<"M" | "F" | null>(null);
   const [birthYearStr, setBirthYearStr] = useState("");
   const [region, setRegion] = useState("");
+
+  useEffect(() => {
+    if (!visible) {
+      setNickname("");
+      setEmail("");
+      setPassword("");
+      setUserType("biker");
+      setSex(null);
+      setBirthYearStr("");
+      setRegion("");
+    }
+  }, [visible]);
 
   function handleReset() {
     setNickname("");
