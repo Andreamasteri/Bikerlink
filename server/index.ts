@@ -216,10 +216,13 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     }
 
     if (!skipSeed) {
-      await withPhaseTimeout("autoSeedEssentialUsers", autoSeedEssentialUsers());
       // autoSeedFakeUsers is non-essential (bulk fake users) — moved to fire-and-forget below
       needsFakeSeed = true;
     }
+
+    // Essential users (admin/moderatore/mendo/smoke) must be synced on EVERY boot,
+    // regardless of DB user count — the function is idempotent (guards on existing rows).
+    await withPhaseTimeout("autoSeedEssentialUsers", autoSeedEssentialUsers());
 
     // Reviewer accounts and BikerLink official are fast and required before serving traffic
     await withPhaseTimeout("seedAppleReviewerAccount", seedAppleReviewerAccount());

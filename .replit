@@ -202,6 +202,7 @@ ROUTING_DISABLED = "0"
 
 [userenv.development]
 EXPO_WEB_URL = "http://localhost:8081"
+SMOKE_SEED_PASSWORD = "SmokeEQ_or56xnLYexcAg"
 
 [[ports]]
 localPort = 5000

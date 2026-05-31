@@ -58,6 +58,14 @@ const essentialUsers: EssentialUserDef[] = [
     userType: "biker",
     sex: "M",
   },
+  {
+    nickname: "smoke",
+    email: "smoke@bikerlink.test",
+    passwordEnvVar: "SMOKE_SEED_PASSWORD",
+    role: "user",
+    userType: "biker",
+    sex: "M",
+  },
 ];
 
 export async function autoSeedEssentialUsers() {
@@ -111,6 +119,8 @@ export async function autoSeedEssentialUsers() {
           userType: userData.userType,
           sex: userData.sex,
           eulaAccepted: true,
+          emailVerified: true,
+          isFake: false,
         })
         .returning();
 
