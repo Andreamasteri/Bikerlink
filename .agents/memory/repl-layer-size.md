@@ -17,6 +17,13 @@ Prima di ogni deploy, il build script (scripts/deploy-build.sh) deve pulire le d
 - `.local/state/replit/` — transcript agente AI + log-query.db (~500 MB nel tempo)
 - `.local/state/scribe/` — log scribe (~4 MB)
 - `.local/state/workflow-logs/` — log workflow (~0.1 MB)
+- `.cache/` — cache tooling: dotslash (~572 MB) + uv (~269 MB) + node-gyp + typescript (~894 MB totali). CAUSA RICORRENTE: ricresce dopo ogni fix. Rimuovere come ULTIMO step (dopo `node scripts/server-build.js`, perché esbuild usa `.cache/typescript`).
+- `.local/backups/` — dump/JSONL backup DB (~53 MB)
+- `dist/`, `dist-ota-env/` — export web/OTA Expo; il server gira da `server_dist/`, NON da `dist/`
+- `tmp_review_frames/`, `tmp_check/`, `logs/` — artefatti temporanei
+
+## NON rimuovere (serviti a runtime via express.static)
+- `uploads/` (foto moto/ads/wishlist), `assets/`, `server/public/` (music), `server_dist/`
 
 **Why:** Queste directory non sono necessarie a runtime (il server Express non le usa) ma vengono incluse nel Repl layer perché non sono in .gitignore. Senza pulizia, il layer supera il limite 2 GB.
 

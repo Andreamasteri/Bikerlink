@@ -33,13 +33,30 @@ echo "  attached_assets/ svuotata."
 # il fallimento silenzioso di "Creating Autoscale service" senza alcun log.
 # Misurato: .local/state/replit/ = 504 MB → Repl layer totale ~1.7 GB → KO.
 # Dopo la pulizia: ~1.2 GB → ampiamente sotto il limite.
-echo "=== [1/3] Pulizia .local/state/ (transcript agente + log DB) ==="
+echo "=== [1/4] Pulizia .local/state/ (transcript agente + log DB) ==="
 rm -rf .local/state/replit/
 rm -rf .local/state/scribe/
 rm -rf .local/state/workflow-logs/
 echo "  .local/state/replit/, scribe/ e workflow-logs/ rimossi (non necessari a runtime)."
 
-echo "=== [2/3] Build server TypeScript ==="
+# Task #2821-fix — altre directory di workspace cresciute nel tempo, non necessarie
+# a runtime (il server Express non le serve). Senza questa pulizia tornano a gonfiare
+# il Repl layer oltre il limite Cloud Run (~2 GB) → deploy fallisce silenziosamente.
+# - .local/backups/      → dump/JSONL di backup DB (~53 MB)
+# - dist/                → export web/OTA Expo (server gira da server_dist/, non da dist/)
+# - dist-ota-env/        → ambiente di build OTA
+# - tmp_review_frames/, tmp_check/, logs/ → artefatti temporanei
+# NB: uploads/ e assets/ NON si toccano — sono serviti a runtime (express.static).
+echo "=== [1b/4] Pulizia directory transitorie non runtime ==="
+rm -rf .local/backups/
+rm -rf dist/
+rm -rf dist-ota-env/
+rm -rf tmp_review_frames/
+rm -rf tmp_check/
+rm -rf logs/
+echo "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
+
+echo "=== [2/4] Build server TypeScript ==="
 node scripts/server-build.js
 
 # Task #2781-fix — invalida la cache hash delle migration.
@@ -53,4 +70,15 @@ node scripts/server-build.js
 rm -f server_dist/.migrations-hash
 echo "  Cache migration invalidata (forza controllo DB al boot)."
 
-echo "=== [3/3] Deploy build completato ==="
+# Task #2821-fix — pulizia .cache/ come ULTIMO step (dopo il build TS).
+# .cache/ contiene cache di tooling (dotslash ~572 MB, uv ~269 MB, node-gyp,
+# typescript) che cresce nel tempo ed è la causa del nuovo superamento del limite
+# Cloud Run (~2 GB): col layer base a ~1.2 GB, .cache a ~894 MB lo riporta a ~2.1 GB
+# → "Creating Autoscale service" fallisce silenziosamente, fetch_deployment_logs
+# restituisce zero log. .cache NON serve a runtime e viene rigenerata se necessario.
+# Va rimossa DOPO il build perché esbuild usa .cache/typescript durante la compilazione.
+echo "=== [3/4] Pulizia .cache/ (cache tooling, non runtime) ==="
+rm -rf .cache/
+echo "  .cache/ rimossa (rigenerata al bisogno; non necessaria a runtime)."
+
+echo "=== [4/4] Deploy build completato ==="
