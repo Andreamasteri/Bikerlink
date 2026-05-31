@@ -33,7 +33,7 @@ import {
   formatDistance,
   formatDuration,
 } from "./[id].helpers";
-import { makeStyles } from "./[id].styles";
+import { makeStyles } from "@/components/navigate/[id].styles";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

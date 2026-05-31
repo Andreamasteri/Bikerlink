@@ -24,7 +24,7 @@ import { ProfileDetailMoto } from "@/components/profile/detail/ProfileDetailMoto
 import { ProfileDetailGallery } from "@/components/profile/detail/ProfileDetailGallery";
 import { ProfileDetailActions } from "@/components/profile/detail/ProfileDetailActions";
 import { ProfileReportModal } from "@/components/profile/detail/ProfileReportModal";
-import { styles } from "@/app/profile/[id].styles";
+import { styles } from "@/components/profile/[id].styles";
 
 function formatLastSeen(dateStr: string | null): string {
   if (!dateStr) return "";

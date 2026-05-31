@@ -12,7 +12,7 @@ import { ActiveUsersModal } from "@/components/admin/analytics/ActiveUsersModal"
 import { AdClicksModal } from "@/components/admin/analytics/AdClicksModal";
 import { PendingReportsModal } from "@/components/admin/analytics/PendingReportsModal";
 import { UserStatsContent } from "@/components/admin/analytics/UserStatsContent";
-import { styles } from "./analytics.styles";
+import { styles } from "@/components/admin/analytics.styles";
 
 interface Analytics {
   totalUsers: number;

@@ -19,7 +19,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
 import MapPickerContent from "@/components/MapPickerModal";
 
-import { styles } from "./create.styles";
+import { styles } from "@/components/proposals/create.styles";
 import {
   formatDateInput,
   formatTimeInput,
