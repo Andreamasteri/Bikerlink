@@ -74,7 +74,73 @@ SKIP_BUILD=1 bash setup-whisper-server.sh
 
 # Salta il download del modello (se già presente)
 SKIP_MODEL=1 bash setup-whisper-server.sh
+
+# Salta la validazione dei flag del binario whisper-server
+# Usare in ambienti CI/test dove il binario non è disponibile o ha versione diversa da prod
+SKIP_FLAG_CHECK=1 bash setup-whisper-server.sh
 ```
+
+### Tabella riepilogativa dei flag SKIP_*
+
+| Flag | Salta | Quando usarlo |
+|------|-------|---------------|
+| `SKIP_BUILD=1` | Compilazione di whisper.cpp | Il binario è già compilato e presente in `/opt/whisper.cpp/build/bin/` |
+| `SKIP_MODEL=1` | Download del modello ggml | Il file modello è già presente in `/opt/whisper.cpp/models/` |
+| `SKIP_FLAG_CHECK=1` | Validazione dei flag del binario | Ambienti CI/test senza binario installato, o con versione diversa da prod |
+
+> **Avviso**: i flag `SKIP_*` bypassano controlli di integrità. Non usarli in
+> produzione a meno che non tu sappia esattamente cosa stai saltando.
+
+---
+
+### Uso in ambienti CI / pipeline automatizzate
+
+In un ambiente CI (GitHub Actions, GitLab CI, Jenkins, ecc.) il binario
+`whisper-server` normalmente non è installato. Eseguire lo script senza override
+causerebbe il fallimento sul controllo dei flag del binario, sulla compilazione e
+sul download del modello (~1.5 GB).
+
+**Invocazione consigliata per CI/test:**
+
+```bash
+SKIP_BUILD=1 SKIP_MODEL=1 SKIP_FLAG_CHECK=1 bash scripts/setup-whisper-server.sh
+```
+
+Questa combinazione:
+- **`SKIP_BUILD=1`** — non tenta di clonare o compilare whisper.cpp (nessun `git clone`, nessun `cmake`);
+- **`SKIP_MODEL=1`** — non scarica il modello ggml (~1.5 GB), evitando timeout di rete;
+- **`SKIP_FLAG_CHECK=1`** — non interroga il binario per validarne i flag, evitando errori
+  da binario assente o versione non corrispondente.
+
+> **Importante**: con tutti e tre i flag attivi, lo script configura
+> solo il servizio systemd, nginx e il token di autenticazione — senza
+> verificare che il binario sia funzionante. Assicurati che i passi di
+> integrazione reale (avvio del servizio, test audio) avvengano su un
+> runner che abbia effettivamente whisper-server compilato e il modello
+> scaricato.
+
+**Esempio job GitHub Actions:**
+
+```yaml
+- name: Setup whisper (CI dry-run — no build, no model, no binary check)
+  run: SKIP_BUILD=1 SKIP_MODEL=1 SKIP_FLAG_CHECK=1 bash scripts/setup-whisper-server.sh
+  env:
+    WHISPER_TOKEN: ${{ secrets.WHISPER_TOKEN }}
+```
+
+**Usare solo `SKIP_FLAG_CHECK=1` (binario presente, versione diversa da prod):**
+
+Se il runner ha whisper-server già compilato ma con una versione non identica
+a quella di produzione (es. `HEAD~3` del repo upstream), il controllo dei flag
+potrebbe fallire perché un flag sperimentale è stato aggiunto o rimosso.
+In questo caso è sufficiente saltare solo la validazione:
+
+```bash
+SKIP_FLAG_CHECK=1 bash scripts/setup-whisper-server.sh
+```
+
+La compilazione e il download del modello avvengono normalmente; salta solo
+l'asserzione sulla lista dei flag supportati dal binario.
 
 ---
 
