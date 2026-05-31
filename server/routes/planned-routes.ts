@@ -1,6 +1,7 @@
 import { Router } from "express";
 import crudRouter from "./planned-routes/crud";
 import waypointsRouter from "./planned-routes/waypoints";
+import { poiExtraRouter } from "./planned-routes/waypoints.next";
 import sharingRouter from "./planned-routes/sharing";
 import extrasRouter from "./planned-routes/extras";
 import matchingIntegrationRouter from "./planned-routes/matching-integration";
@@ -13,6 +14,9 @@ router.use("/", crudRouter);
 
 // Waypoint management, AI, routing, weather, POI
 router.use("/", waypointsRouter);
+
+// POI extra routes (poi-photo, poi-search) — companion di waypoints.ts
+router.use("/", poiExtraRouter);
 
 // Sharing, GPX import/export, compatible bikers
 router.use("/", sharingRouter);

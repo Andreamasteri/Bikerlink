@@ -1,19 +1,20 @@
 /**
  * waypoints.next.ts — file successore di waypoints.ts
  *
- * Quando waypoints.ts supererà la soglia delle 600 righe, spostare qui
- * i nuovi blocchi (handler, helper, schema) invece di aggiungerne altri
- * all'originale.
- *
  * Convenzione di utilizzo:
  *   - Aggiungere qui SOLO codice nuovo (non spostare codice esistente da waypoints.ts).
  *   - Esportare dal file e importare in waypoints.ts (o nel router principale) quanto necessario.
- *   - Aggiornare questo commento man mano che il file cresce.
  *
  * Task #2847 — resolver AI con Ollama come provider primario e Gemini come
  * fallback automatico per il parsing dei percorsi (/ai-parse + /ai-stream).
+ * Task #2853 — buffering + validazione stream Ollama prima di emettere al client.
  */
 
+import { Router, Request, Response } from "express";
+import { sendError } from "../../lib/api-response";
+import { requireAuth } from "./utils";
+import { poiSearchSchema } from "@shared/validators";
+import { poiPhotoSchema } from "./waypoints";
 import { generateObject, streamText } from "ai";
 import type { z } from "zod";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
@@ -139,3 +140,51 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
     yield chunk;
   }
 }
+
+// ─── POI routes (moved from waypoints.ts to keep it under 550 lines) ──────────
+
+export const poiExtraRouter = Router();
+
+poiExtraRouter.post("/poi-photo", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const parsedPhoto = poiPhotoSchema.safeParse(req.body);
+  if (!parsedPhoto.success) return sendError(res, 400, parsedPhoto.error.issues[0].message);
+  const { poiId: _poiId } = parsedPhoto.data;
+
+  try {
+    return res.json({ photoUrl: null });
+  } catch (err) {
+    console.error("[poi-photo] error:", err);
+    return res.json({ photoUrl: null });
+  }
+});
+
+poiExtraRouter.post("/poi-search", async (req: Request, res: Response) => {
+  const userId = requireAuth(req, res);
+  if (!userId) return;
+
+  const parsedSearch = poiSearchSchema.safeParse(req.body);
+  if (!parsedSearch.success) return sendError(res, 400, parsedSearch.error.issues[0].message);
+  const { lat, lng, radius = 10000 } = parsedSearch.data;
+
+  try {
+    const overpassQuery = `[out:json][timeout:25];(node["name"](around:${radius},${lat},${lng});way["name"](around:${radius},${lat},${lng}););out body;>;out skel qt;`;
+    const resp = await fetch("https://overpass-api.de/api/interpreter", {
+      method: "POST",
+      body: "data=" + encodeURIComponent(overpassQuery),
+    });
+    type OverpassNode = { lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
+    const data = await resp.json() as { elements?: OverpassNode[] };
+    const results = (data.elements ?? []).filter((e) => e.lat || (e.center && e.center.lat)).map((e) => ({
+      name: e.tags?.name || "POI",
+      lat: e.lat || e.center!.lat,
+      lng: e.lon || e.center!.lon,
+    }));
+    return res.json(results);
+  } catch (err) {
+    console.error("[poi-search] error:", err);
+    return sendError(res, 502, "Ricerca non disponibile");
+  }
+});

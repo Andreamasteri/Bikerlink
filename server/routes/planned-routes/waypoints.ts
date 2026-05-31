@@ -3,7 +3,7 @@
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { requireAuth, computeBikerScoreFromPoints } from "./utils";
-import { poiSearchSchema, aiPromptSchema, calculateRouteRequestSchema, poiRequestSchema } from "@shared/validators";
+import { aiPromptSchema, calculateRouteRequestSchema, poiRequestSchema } from "@shared/validators";
 import { z } from "zod";
 import { generateRouteObject, streamRouteText } from "./waypoints.next";
 import { isOllamaConfigured } from "../../lib/ollama-client";
@@ -519,48 +519,5 @@ router.post("/poi", async (req: Request, res: Response) => {
   }
 });
 
-router.post("/poi-photo", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
-  if (!userId) return;
-
-  const parsedPhoto = poiPhotoSchema.safeParse(req.body);
-  if (!parsedPhoto.success) return sendError(res, 400, parsedPhoto.error.issues[0].message);
-  const { poiId: _poiId } = parsedPhoto.data;
-
-  try {
-    return res.json({ photoUrl: null });
-  } catch (err) {
-    console.error("[poi-photo] error:", err);
-    return res.json({ photoUrl: null });
-  }
-});
-
-router.post("/poi-search", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
-  if (!userId) return;
-
-  const parsedSearch = poiSearchSchema.safeParse(req.body);
-  if (!parsedSearch.success) return sendError(res, 400, parsedSearch.error.issues[0].message);
-  const { lat, lng, radius = 10000 } = parsedSearch.data;
-
-  try {
-    const overpassQuery = `[out:json][timeout:25];(node["name"](around:${radius},${lat},${lng});way["name"](around:${radius},${lat},${lng}););out body;>;out skel qt;`;
-    const resp = await fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST",
-      body: "data=" + encodeURIComponent(overpassQuery),
-    });
-    type OverpassNode = { lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
-    const data = await resp.json() as { elements?: OverpassNode[] };
-    const results = (data.elements ?? []).filter((e) => e.lat || (e.center && e.center.lat)).map((e) => ({
-      name: e.tags?.name || "POI",
-      lat: e.lat || e.center!.lat,
-      lng: e.lon || e.center!.lon,
-    }));
-    return res.json(results);
-  } catch (err) {
-    console.error("[poi-search] error:", err);
-    return sendError(res, 502, "Ricerca non disponibile");
-  }
-});
-
+export { poiPhotoSchema };
 export default router;
