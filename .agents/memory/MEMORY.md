@@ -2,3 +2,4 @@
 - [Expo (tabs) route pollution](expo-tabs-route-pollution.md) — file helper (es. *.styles.ts) dentro app/(tabs)/ diventano tab-icona rotte; la custom tab bar renderizza ogni state.route. Tenerli in components/.
 - [spatial_ref_sys deploy failure](spatial-ref-sys-deploy.md) — publish fallisce su copy-OFF con ALTER TABLE spatial_ref_sys ADD PRIMARY KEY; è migrazione interna di Replit, non fixabile lato nostro (filtri drizzle.config.ts ignorati). Copy ON cancella i dati prod. Da supporto Replit.
 - [Deploy build .cache cleanup](deploy-build-cache.md) — NON fare rm su .cache/ in deploy-build.sh: è un layer gestito dalla piattaforma e contiene file read-only di altro utente → build fallisce con set -e.
+- [Routing kill-switch](routing-kill-switch.md) — routing on/off: env ROUTING_DISABLED hard override ("0"=ON, altro=OFF) vince sul soft toggle DB routing_kill_switch; in prod env è unset → comanda il toggle admin.

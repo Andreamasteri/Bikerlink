@@ -29,16 +29,19 @@ export const isSelfHosted = Boolean(SELF_HOSTED_URL);
 export const canFallbackToCloud = isSelfHosted && Boolean(CLOUD_API_KEY);
 
 /**
- * KILL-SWITCH ROUTING — BikerLink
+ * KILL-SWITCH ROUTING — BikerLink (Task #2824)
  *
- * Quando true, TUTTE le chiamate a GraphHopper (route, map-matching, server-info)
- * vengono bloccate. Le route che dipendono dal routing devono usare un fallback
- * (es: buildFallbackRoute in waypoints.ts) oppure ritornare 503.
+ * Quando il routing è disabilitato, TUTTE le chiamate a GraphHopper (route,
+ * map-matching, server-info) vengono bloccate. Le route che dipendono dal
+ * routing devono usare un fallback (es: buildFallbackRoute in waypoints.ts)
+ * oppure ritornare 503.
  *
- * Per riabilitare: impostare `ROUTING_DISABLED = false` o env `ROUTING_DISABLED=0`.
- * Il sistema renderer mappa (Leaflet + Carto/Esri tiles) NON è impattato.
+ * Lo stato è ora gestito da `routing/routing-kill-switch.ts`: hard override env
+ * `ROUTING_DISABLED` + soft toggle DB `routing_kill_switch` (modificabile da
+ * admin). Il sistema renderer mappa (Leaflet + Carto/Esri tiles) NON è impattato.
  */
-export const ROUTING_DISABLED = process.env.ROUTING_DISABLED !== "0";
+export { isRoutingEnabled } from "./routing/routing-kill-switch";
+import { isRoutingEnabled as _isRoutingEnabled } from "./routing/routing-kill-switch";
 
 /**
  * Profilo attivo: "motorcycle" quando si usa il server self-hosted,
@@ -47,15 +50,18 @@ export const ROUTING_DISABLED = process.env.ROUTING_DISABLED !== "0";
 export const ACTIVE_PROFILE = isSelfHosted ? "motorcycle" : "car";
 
 // ─── Startup log ───────────────────────────────────────────────────────────────
-if (ROUTING_DISABLED) {
-  console.warn("[GraphHopper] ROUTING DISABILITATO via kill-switch — tutte le chiamate verranno bloccate. Rendering mappa non impattato.");
-} else if (isSelfHosted) {
-  console.log(`[GraphHopper] Self-hosted mode — URL: ${GH_BASE_URL} — profile: motorcycle`);
-} else if (CLOUD_API_KEY) {
-  console.warn("[GraphHopper] Cloud API mode — profile forced to 'car' (motorcycle not available on free plan)");
-} else {
-  console.warn("[GraphHopper] Non configurato — nessuna variabile GRAPHHOPPER_URL o GRAPHHOPPER_API_KEY. Routing approssimativo attivo.");
-}
+// Lo stato kill-switch soft è risolto a runtime dal DB: log async fire-and-forget.
+void _isRoutingEnabled().then((enabled) => {
+  if (!enabled) {
+    console.warn("[GraphHopper] ROUTING DISABILITATO via kill-switch — tutte le chiamate verranno bloccate. Rendering mappa non impattato.");
+  } else if (isSelfHosted) {
+    console.log(`[GraphHopper] Self-hosted mode — URL: ${GH_BASE_URL} — profile: motorcycle`);
+  } else if (CLOUD_API_KEY) {
+    console.warn("[GraphHopper] Cloud API mode — profile forced to 'car' (motorcycle not available on free plan)");
+  } else {
+    console.warn("[GraphHopper] Non configurato — nessuna variabile GRAPHHOPPER_URL o GRAPHHOPPER_API_KEY. Routing approssimativo attivo.");
+  }
+});
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
@@ -211,8 +217,8 @@ export async function mapMatch(
   points: GHPoint[],
   profile = "motorcycle",
 ): Promise<MapMatchResult> {
-  if (ROUTING_DISABLED) {
-    throw new Error("Routing disabilitato via kill-switch (ROUTING_DISABLED).");
+  if (!(await _isRoutingEnabled())) {
+    throw new Error("Routing disabilitato via kill-switch.");
   }
   if (!isSelfHosted && !CLOUD_API_KEY) {
     throw new Error(
@@ -283,8 +289,8 @@ export interface RouteResult {
  * Supporta sia self-hosted che Cloud API come fallback.
  */
 export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
-  if (ROUTING_DISABLED) {
-    throw new Error("Routing disabilitato via kill-switch (ROUTING_DISABLED).");
+  if (!(await _isRoutingEnabled())) {
+    throw new Error("Routing disabilitato via kill-switch.");
   }
   if (!isSelfHosted && !CLOUD_API_KEY) {
     throw new Error(
@@ -364,7 +370,7 @@ export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
  * Per la Cloud API chiama /info.
  */
 export async function getServerInfo(): Promise<GHServerInfo> {
-  if (ROUTING_DISABLED) {
+  if (!(await _isRoutingEnabled())) {
     return { status: "disabled", graph_loaded: false, version: "routing-kill-switch" };
   }
   const start = Date.now();

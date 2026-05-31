@@ -7,6 +7,15 @@ import { calculateRoute as tomtomCalculateRoute } from "./tomtom-routing-client"
 import { checkQuota } from "./mapbox/quota-guard";
 import { checkQuota as checkTomTomQuota } from "./tomtom/quota-guard";
 import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } from "./routing-metrics";
+import { isRoutingEnabled } from "./routing-kill-switch";
+
+/** Errore lanciato quando il routing è disabilitato dal kill-switch (admin/env). */
+export class RoutingDisabledError extends Error {
+  constructor() {
+    super("Routing disabilitato dal kill-switch.");
+    this.name = "RoutingDisabledError";
+  }
+}
 
 interface RouterSelectorOptions {
   rollout: MapsRollout;
@@ -171,6 +180,10 @@ export async function getActiveRouter(
   opts: RouterSelectorOptions,
   res?: Response
 ): Promise<RouteResult> {
+  if (!(await isRoutingEnabled())) {
+    throw new RoutingDisabledError();
+  }
+
   const wrapMetrics = async (
     engine: "graphhopper" | "valhalla" | "mapbox" | "tomtom",
     fn: () => Promise<RouteResult>,

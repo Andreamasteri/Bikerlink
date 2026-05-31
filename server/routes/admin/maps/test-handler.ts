@@ -12,10 +12,11 @@ import { getActiveRouter } from "../../../routing/router-selector";
 import type { RouteRequest } from "../../../routing/graphhopper-adapter";
 import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
 import {
-  GH_BASE_URL, isSelfHosted, ROUTING_DISABLED, getServerInfo,
+  GH_BASE_URL, isSelfHosted, getServerInfo,
   getRoutingHealthSnapshot,
   type GHServerInfo,
 } from "../../../graphhopper-client";
+import { isRoutingEnabled } from "../../../routing/routing-kill-switch";
 import { getInfo as getValhallaInfo } from "../../../routing/valhalla-client";
 import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-tiles";
 
@@ -47,6 +48,7 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
   ]);
 
   const activeEngine = (engineSetting?.value ?? "graphhopper") as RoutingEngineId;
+  const routingDisabled = !(await isRoutingEnabled());
   const snap = getRoutingHealthSnapshot();
   const ghOk = ghInfo.status !== "error" && ghInfo.status !== "disabled";
   const ghDown = snap.selfHosted && !ghOk;
@@ -60,7 +62,7 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
     activeEngine === "valhalla" ? valhallaDown : ghDown;
 
   let message: string;
-  if (ROUTING_DISABLED) {
+  if (routingDisabled) {
     message = "Routing disabilitato via kill-switch.";
   } else if (activeEngine === "valhalla" && valhallaDown) {
     message = "Valhalla (server di casa) OFFLINE — fallback automatico a GraphHopper.";
@@ -94,7 +96,7 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
     },
     cloud_fallback_available: snap.cloudFallbackAvailable,
     cloud_fallback_active: snap.cloudFallbackActive,
-    routing_disabled: ROUTING_DISABLED,
+    routing_disabled: routingDisabled,
     // Riepilogo per banner admin — riflette l'engine attivo
     degraded: activeEngineDown,
     message,
@@ -102,7 +104,7 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
 });
 
 router.get("/test-routing", async (req: Request, res: Response) => {
-  if (ROUTING_DISABLED) {
+  if (!(await isRoutingEnabled())) {
     return res.json({
       ok: false,
       source: "disabled",
@@ -112,7 +114,7 @@ router.get("/test-routing", async (req: Request, res: Response) => {
       is_tiles_self_hosted: false,
       latency_ms: null,
       status: "disabled",
-      message: "Routing disabilitato via kill-switch (ROUTING_DISABLED)",
+      message: "Routing disabilitato via kill-switch",
     });
   }
 
