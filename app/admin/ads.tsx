@@ -48,6 +48,7 @@ import { AdRotationSection } from "@/components/admin/ads/AdRotationSection";
 import { CreateAdModal } from "@/components/admin/ads/CreateAdModal";
 import { useAdAdmin } from "@/components/admin/ads/useAdAdmin";
 import { AdTabs, AdHealthBanner, AdToolbar } from "@/components/admin/ads/AdLayoutComponents";
+import { AdsControlPanel } from "@/components/admin/ads/AdsControlPanel";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
@@ -177,6 +178,8 @@ function AdminAdsInner() {
 
   return (
     <View style={styles.container}>
+      <AdsControlPanel />
+
       <AdTabs tabs={TABS} activeTab={activeTab} onTabPress={setActiveTab} />
 
       {campaignsError && (
