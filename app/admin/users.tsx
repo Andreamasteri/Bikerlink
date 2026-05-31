@@ -12,10 +12,11 @@ import { UserFilters } from "@/components/admin/users/UserFilters";
 import { UserSummary } from "@/components/admin/users/UserSummary";
 import { UserDetailModal, UserStats, SessionsData, GeoZone } from "@/components/admin/users/UserDetailModal";
 import { UserEditModal } from "@/components/admin/users/UserEditModal";
+import { CreateUserModal, CreateUserPayload } from "@/components/admin/users/CreateUserModal";
 import { ZoneMapModal } from "@/components/admin/users/ZoneMapModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import AiCopilotDrawer from "@/components/admin/ai/AiCopilotDrawer";
-import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { TouchableOpacity } from "react-native";
 
 let MapView: React.ComponentType<Record<string, unknown>> | null = null;
@@ -43,6 +44,7 @@ export default function AdminUsers() {
 
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [statsModalVisible, setStatsModalVisible] = useState(false);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
   const [editEmail, setEditEmail] = useState("");
   const [editPassword, setEditPassword] = useState("");
@@ -177,6 +179,24 @@ export default function AdminUsers() {
       Alert.alert("Successo", "Profilo eliminato");
     },
     onError: () => Alert.alert("Errore", "Impossibile eliminare il profilo"),
+  });
+
+  const createUserMutation = useMutation({
+    mutationFn: async (payload: CreateUserPayload) => {
+      const res = await apiRequest("POST", "/api/admin/users", payload);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users/stats/summary"] });
+      setCreateModalVisible(false);
+      Alert.alert("Utente creato", "L'utente è stato creato con successo e può accedere subito.");
+    },
+    onError: (err: Error) => Alert.alert("Errore creazione", err.message || "Impossibile creare l'utente"),
   });
 
   const primalMutation = useMutation({
@@ -385,13 +405,24 @@ export default function AdminUsers() {
         ListHeaderComponent={
           <>
             <UserSummary summary={summary} />
-            <UserFilters
-              searchText={searchText}
-              onSearchChange={setSearchText}
-              hideFake={hideFake}
-              onToggleHideFake={() => setHideFake(!hideFake)}
-              t={t}
-            />
+            <View style={styles.filtersRow}>
+              <View style={{ flex: 1 }}>
+                <UserFilters
+                  searchText={searchText}
+                  onSearchChange={setSearchText}
+                  hideFake={hideFake}
+                  onToggleHideFake={() => setHideFake(!hideFake)}
+                  t={t}
+                />
+              </View>
+              <TouchableOpacity
+                style={styles.createBtn}
+                onPress={() => setCreateModalVisible(true)}
+                accessibilityLabel="Crea nuovo utente"
+              >
+                <Ionicons name="person-add-outline" size={18} color="#0D0D0D" />
+              </TouchableOpacity>
+            </View>
           </>
         }
         contentContainerStyle={{ padding: 16, paddingTop: 0 }}
@@ -423,6 +454,13 @@ export default function AdminUsers() {
           getStatusColor={getStatusColor}
         />
       </ErrorBoundary>
+
+      <CreateUserModal
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={(payload) => createUserMutation.mutate(payload)}
+        isLoading={createUserMutation.isPending}
+      />
 
       <ErrorBoundary>
         <UserEditModal
@@ -476,6 +514,20 @@ export default function AdminUsers() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   emptyText: { fontFamily: "Inter_400Regular", fontSize: 14, color: Colors.textSecondary, textAlign: "center", marginTop: 40 },
+  filtersRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  createBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
   aiFab: {
     position: "absolute", right: 16, bottom: 24,
     width: 52, height: 52, borderRadius: 26,

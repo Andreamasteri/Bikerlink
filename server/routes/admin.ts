@@ -241,6 +241,7 @@ router.post("/startup-beacon", startupBeaconLimiter, startupBeaconJson, (req: Re
 });
 
 import usersRouter from './admin/users';
+import usersNextRouter from './admin/users.next';
 import settingsRouter from './admin/settings';
 import adsRouter from './admin/advertisements';
 import analyticsRouter from './admin/analytics';
@@ -344,6 +345,7 @@ router.use('/translations', _requireAdmin, translationsRouter);
 router.use('/tags', _requireAdmin, tagsRouter);
 router.use('/', _requireAdmin, textAliasesRouter);
 router.use('/users', _requireAdmin, usersRouter);
+router.use('/users', _requireAdmin, usersNextRouter);
 router.use('/settings', settingsRouter);
 router.use('/advertisements', _requireAdmin, adsRouter);
 router.use('/analytics', _requireAdmin, analyticsRouter);
