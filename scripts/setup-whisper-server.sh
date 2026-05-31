@@ -152,6 +152,19 @@ fi
 
 SERVER_BIN="${WHISPER_INSTALL_DIR}/build/bin/whisper-server"
 ok "whisper.cpp compilato: ${SERVER_BIN}"
+
+# ── Validazione flag supportati dal binario ───────────────────────────────────
+# I flag del wrapper vengono verificati contro l'output di --help.
+# Se un flag manca il binario è stato aggiornato e il wrapper va adeguato.
+log "Verifico i flag supportati dal binario whisper-server..."
+HELP_OUTPUT="$("${SERVER_BIN}" --help 2>&1 || true)"
+for FLAG in --model --host --port --language --threads; do
+  if echo "$HELP_OUTPUT" | grep -q -- "${FLAG}"; then
+    :
+  else
+    warn "Flag '${FLAG}' non trovato nell'help di whisper-server — aggiorna il wrapper in setup-whisper-server.sh se il server non parte."
+  fi
+done
 echo ""
 
 # =============================================================================
@@ -227,9 +240,7 @@ exec "\${SERVER_BIN}" \
   --host 127.0.0.1 \
   --port ${WHISPER_PORT} \
   --language "\${LANG}" \
-  --threads \$(nproc) \
-  --processors 1 \
-  --timeout 0
+  --threads \$(nproc)
 WRAPPER_EOF
 $SUDO chmod +x "${WRAPPER_SCRIPT}"
 ok "Script wrapper scritto: ${WRAPPER_SCRIPT}"
@@ -588,4 +599,10 @@ if [[ "$TRANSCRIPT_OK" -eq 0 ]]; then
 fi
 echo "Per cambiare la lingua di trascrizione in futuro:"
 echo "  WHISPER_LANG=en bash setup-whisper-server.sh   # ricrea wrapper + riavvia"
+echo ""
+echo "Se run-server.sh esiste già e il servizio non parte (flag obsoleti):"
+echo "  SKIP_BUILD=1 SKIP_MODEL=1 bash setup-whisper-server.sh  # rigenera solo il wrapper"
+echo ""
+echo "Verifica rapida stato servizio:"
+echo "  systemctl status whisper --no-pager -l | grep -E 'active|failed'"
 echo "============================================================"
