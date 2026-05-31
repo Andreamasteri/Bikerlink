@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../../storage";
 import { sendError } from "../../../lib/api-response";
+import { getGeocodeCacheStats } from "../../../lib/nominatim-client";
 import {
   AVAILABLE_RENDERERS, AVAILABLE_TILES, AVAILABLE_ENGINES, AVAILABLE_PROFILES,
   DEFAULT_RENDERER, DEFAULT_TILE, DEFAULT_ENGINE, DEFAULT_PROFILE,
@@ -167,6 +168,14 @@ router.put("/matching-integration", async (req: Request, res: Response) => {
     console.error("[admin/maps/config] PUT matching-integration error:", err);
     return sendError(res, 500, "Errore aggiornamento integrazione matching");
   }
+});
+
+/**
+ * GET /admin/maps/geocode-cache — statistiche cache Nominatim (hits, misses, size).
+ * Utile per monitorare l'efficacia del caching e il carico sul server Nominatim.
+ */
+router.get("/geocode-cache", (_req: Request, res: Response) => {
+  return res.json(getGeocodeCacheStats());
 });
 
 export default router;
