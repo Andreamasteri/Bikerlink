@@ -3,6 +3,7 @@ import crudRouter from "./planned-routes/crud";
 import waypointsRouter from "./planned-routes/waypoints";
 import { poiExtraRouter } from "./planned-routes/waypoints.next";
 import sharingRouter from "./planned-routes/sharing";
+import sharingNextRouter from "./planned-routes/sharing.next";
 import extrasRouter from "./planned-routes/extras";
 import matchingIntegrationRouter from "./planned-routes/matching-integration";
 
@@ -20,6 +21,9 @@ router.use("/", poiExtraRouter);
 
 // Sharing, GPX import/export, compatible bikers
 router.use("/", sharingRouter);
+
+// KML export (Google Maps compatible)
+router.use("/", sharingNextRouter);
 
 // Elevation, multiday, style profile, hotels
 router.use("/", extrasRouter);

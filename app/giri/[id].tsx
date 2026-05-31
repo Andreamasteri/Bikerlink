@@ -365,6 +365,11 @@ export default function GiriDetailScreen() {
     Linking.openURL(url.toString());
   };
 
+  const handleExportKML = () => {
+    const url = new URL(`/api/planned-routes/${id}/export.kml`, getApiUrl());
+    Linking.openURL(url.toString());
+  };
+
   const handleOpenInGoogleMaps = () => {
     if (!route?.waypoints?.length) return;
     const wps = route.waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
@@ -483,6 +488,7 @@ export default function GiriDetailScreen() {
           onOpenWaze={handleOpenInWaze}
           onOpenAppleMaps={handleOpenInAppleMaps}
           onExportGPX={handleExportGPX}
+          onExportKML={handleExportKML}
           onShare={handleShare}
         />
 

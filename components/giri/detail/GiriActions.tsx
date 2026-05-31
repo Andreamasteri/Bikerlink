@@ -10,6 +10,7 @@ interface GiriActionsProps {
   onOpenWaze: () => void;
   onOpenAppleMaps: () => void;
   onExportGPX: () => void;
+  onExportKML: () => void;
   onShare: () => void;
 }
 
@@ -19,6 +20,7 @@ export const GiriActions: React.FC<GiriActionsProps> = ({
   onOpenWaze,
   onOpenAppleMaps,
   onExportGPX,
+  onExportKML,
   onShare,
 }) => {
   const colors = useColors();
@@ -51,13 +53,13 @@ export const GiriActions: React.FC<GiriActionsProps> = ({
           <Ionicons name="download-outline" size={24} color={colors.accent} />
           <Text style={s.actionLabel}>Esporta GPX</Text>
         </Pressable>
+        <Pressable style={s.actionCard} onPress={onExportKML}>
+          <Ionicons name="earth-outline" size={24} color={colors.accent} />
+          <Text style={s.actionLabel}>Esporta KML</Text>
+        </Pressable>
         <Pressable style={s.actionCard} onPress={onShare}>
           <Ionicons name="share-social-outline" size={24} color={colors.accent} />
           <Text style={s.actionLabel}>Condividi</Text>
-        </Pressable>
-        <Pressable style={s.actionCard}>
-          <Ionicons name="duplicate-outline" size={24} color={colors.accent} />
-          <Text style={s.actionLabel}>Duplica</Text>
         </Pressable>
       </View>
     </View>
