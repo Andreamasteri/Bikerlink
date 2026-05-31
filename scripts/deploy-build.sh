@@ -78,7 +78,20 @@ echo "  Cache migration invalidata (forza controllo DB al boot)."
 # restituisce zero log. .cache NON serve a runtime e viene rigenerata se necessario.
 # Va rimossa DOPO il build perché esbuild usa .cache/typescript durante la compilazione.
 echo "=== [3/4] Pulizia .cache/ (cache tooling, non runtime) ==="
-rm -rf .cache/
-echo "  .cache/ rimossa (rigenerata al bisogno; non necessaria a runtime)."
+# NB: alcuni file dentro .cache/dotslash (es. "React Native DevTools-linux-x64"
+# scaricato da dotslash) sono di proprietà di un altro utente / read-only
+# nell'ambiente di build Replit → `rm -rf .cache/` stampa "Permission denied"
+# e restituisce un exit code NON-ZERO. Con `set -e` (riga 2) questo faceva
+# FALLIRE l'intero deploy build proprio all'ultimo step, nonostante la copia
+# DB e il build del server fossero già andati a buon fine.
+# Soluzione: pulizia best-effort. Si prova a rendere scrivibili e rimuovere
+# tutto il rimovibile, ma questo step NON deve MAI far fallire il build.
+chmod -R u+w .cache 2>/dev/null || true
+rm -rf .cache/ 2>/dev/null || true
+find .cache -mindepth 1 -delete 2>/dev/null || true
+echo "  .cache/ ripulita best-effort (eventuali file read-only ignorati; non necessaria a runtime)."
+# Visibilità: logga il residuo (se i file read-only di dotslash restano) così un
+# eventuale superamento del limite Cloud Run ~2 GB è diagnosticabile dai build log.
+echo "  Residuo .cache: $(du -sh .cache 2>/dev/null | cut -f1 || echo '0 (rimossa)')"
 
 echo "=== [4/4] Deploy build completato ==="
