@@ -11,10 +11,18 @@ unico file e genera un `.env.local` precompilato con tutti gli URL locali.
 
 ---
 
-## Sistema operativo richiesto
+## Sistema operativo supportato
 
-**Ubuntu Server 24.04 LTS (Noble Numbat)**, con accesso diretto (monitor + tastiera).
-Lo script `setup.sh` usa `apt` e `systemd`. Funziona anche su Debian recenti.
+| Distro | Versioni testate | Note |
+|--------|-----------------|------|
+| **Ubuntu Server** | 22.04 LTS (Jammy), **24.04 LTS (Noble)** | versione raccomandata |
+| **Debian** | 11 (Bullseye), **12 (Bookworm)** | testato su Debian 12 |
+
+Lo script richiede accesso diretto (monitor + tastiera) oppure SSH con sudo.
+Usa `apt` e `systemd`; non funziona su distribuzioni non-Debian (CentOS, Arch, ecc.).
+
+Gli script rilevano automaticamente la distro da `/etc/os-release` e configurano
+il repository Docker corretto (`download.docker.com/linux/ubuntu` o `.../debian`).
 
 ## Requisiti hardware
 

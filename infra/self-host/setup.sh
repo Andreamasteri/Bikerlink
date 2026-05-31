@@ -99,13 +99,35 @@ install_docker() {
   fi
   info "Installo Docker Engine + plugin compose dal repo ufficiale Docker..."
   $SUDO install -m 0755 -d /etc/apt/keyrings
+
+  # Rileva la distro (ubuntu o debian) per usare l'URL corretto del repo Docker.
+  local distro codename os_id
+  os_id="$(. /etc/os-release 2>/dev/null && echo "${ID:-ubuntu}")"
+  case "$os_id" in
+    ubuntu) distro="ubuntu" ;;
+    debian) distro="debian" ;;
+    *)
+      warn "Distro '${os_id}' non riconosciuta — uso il repo Docker per Ubuntu come fallback."
+      distro="ubuntu"
+      ;;
+  esac
+
+  codename="$(. /etc/os-release 2>/dev/null && echo "${VERSION_CODENAME:-}")"
+  if [[ -z "$codename" ]]; then
+    codename="$(lsb_release -cs 2>/dev/null || true)"
+  fi
+  if [[ -z "$codename" ]]; then
+    [[ "$distro" == "debian" ]] && codename="bookworm" || codename="noble"
+    warn "VERSION_CODENAME non trovato — uso il default '${codename}'."
+  fi
+  info "Distro rilevata: ${distro} (${codename})"
+
   if [[ ! -f /etc/apt/keyrings/docker.gpg ]]; then
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    curl -fsSL "https://download.docker.com/linux/${distro}/gpg" \
+      | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
     $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
   fi
-  local codename
-  codename="$(. /etc/os-release && echo "${VERSION_CODENAME:-noble}")"
-  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu ${codename} stable" \
+  echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${distro} ${codename} stable" \
     | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
   $SUDO apt-get update -y
   $SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
