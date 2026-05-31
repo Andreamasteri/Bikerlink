@@ -189,6 +189,36 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   // ── Phase 3: DB Init (non-fatal sub-steps) ────────────────────────────────
   bootLog(3, TOTAL, "DB Init", "start");
 
+  // Task #2838 — Email bootstrap: se le credenziali Gmail non sono nel DB,
+  // le legge dai Replit secrets e le scrive in app_settings. Questo garantisce
+  // che dopo un reset del DB le email funzionino senza intervento manuale.
+  // Il DB ha sempre priorità: se l'admin sovrascrive dal pannello, queste vincono.
+  try {
+    const { storage } = await import("./storage");
+    const [gmailUserSetting, gmailPassSetting] = await Promise.all([
+      storage.getAppSetting("gmail_user"),
+      storage.getAppSetting("gmail_app_password"),
+    ]);
+    const envUser = process.env.GMAIL_USER;
+    const envPass = process.env.GMAIL_APP_PASSWORD;
+    if (envUser && !gmailUserSetting?.value) {
+      await storage.upsertAppSetting("gmail_user", envUser);
+      console.log("[EMAIL BOOTSTRAP] gmail_user scritto in app_settings da secret env");
+    }
+    if (envPass && !gmailPassSetting?.value) {
+      await storage.upsertAppSetting("gmail_app_password", envPass);
+      console.log("[EMAIL BOOTSTRAP] gmail_app_password scritto in app_settings da secret env");
+    }
+    if (!envUser && !gmailUserSetting?.value) {
+      console.warn("[EMAIL BOOTSTRAP] GMAIL_USER non trovato né in env né in DB — email non funzionerà");
+    }
+    if (!envPass && !gmailPassSetting?.value) {
+      console.warn("[EMAIL BOOTSTRAP] GMAIL_APP_PASSWORD non trovato né in env né in DB — email non funzionerà");
+    }
+  } catch (e) {
+    console.warn("[INIT] Phase 3: email bootstrap failed (non-fatal):", e);
+  }
+
   // Task #2817 — Ripristina il cooldown quota AI provider persistito prima del riavvio.
   try {
     const { initProviderHealth } = await import("./ai/moderation/provider");
