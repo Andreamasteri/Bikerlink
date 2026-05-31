@@ -273,6 +273,8 @@ import aiAssistantAdminRouter from './admin/ai-assistant';
 import backupPreviewRouter from './admin/backup-preview';
 // Task #2852 — Test stato server Ollama (provider AI primario).
 import aiTestOllamaRouter from './admin/ai/test-ollama';
+// Salute unificata servizi self-hosted ThinkCentre (GraphHopper/Ollama/Whisper/Nominatim).
+import thinkcentreHealthRouter from './admin/thinkcentre-health';
 
 router.post('/maps/osm-updated', async (req: Request, res: Response) => {
   try {
@@ -359,6 +361,7 @@ router.use('/ota/assistant', _requireAdmin, otaAssistantRouter);
 router.use('/ota', _requireAdmin, otaRouter);
 router.use('/maps', _requireAdmin, mapsAdminRouter);
 router.use('/ai', _requireAdmin, aiTestOllamaRouter);
+router.use('/', _requireAdmin, thinkcentreHealthRouter);
 router.use('/routing', _requireAdmin, routingAdminRouter);
 router.use('/', _requireAdmin, dbAdminRouter);
 router.use('/', _requireAdmin, telemetryAdminRouter);

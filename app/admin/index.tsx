@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { TelemetryCard, GraphHopperCard } from "@/components/admin/AdminStatsCards";
 import { ServerEfficiencyCard } from "@/components/admin/ServerEfficiencyCard";
+import { ThinkCentreCard } from "@/components/admin/ThinkCentreCard";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -288,6 +289,7 @@ export default function AdminDashboard() {
       {!isSearching && (
         <>
           <ServerEfficiencyCard />
+          <ThinkCentreCard />
           <TelemetryCard />
           <GraphHopperCard />
         </>
