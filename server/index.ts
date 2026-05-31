@@ -215,6 +215,24 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     if (!envPass && !gmailPassSetting?.value) {
       console.warn("[EMAIL BOOTSTRAP] GMAIL_APP_PASSWORD non trovato né in env né in DB — email non funzionerà");
     }
+
+    // Verifica SMTP live — non bloccante, eseguita in background.
+    // Se le credenziali sono valide stampa ✅, altrimenti ⚠️ con l'errore.
+    setImmediate(async () => {
+      try {
+        const { createTransporter, maskEmail } = await import("./email/templates");
+        const t = await createTransporter();
+        if (!t) {
+          console.warn("[EMAIL] ⚠️  SMTP verify skipped — credenziali non configurate");
+          return;
+        }
+        await t.transporter.verify();
+        console.log(`[EMAIL] ✅ Credenziali Gmail OK — SMTP auth verificata (${maskEmail(t.creds.user)}, source=${t.creds.source})`);
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn(`[EMAIL] ⚠️  CREDENZIALI GMAIL NON VALIDE — verifica SMTP fallita, controllare GMAIL_APP_PASSWORD. Errore: ${msg.slice(0, 120)}`);
+      }
+    });
   } catch (e) {
     console.warn("[INIT] Phase 3: email bootstrap failed (non-fatal):", e);
   }
