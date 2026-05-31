@@ -42,6 +42,14 @@ export async function calcRoute(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- AI parse result shape from API
+export class AiKeyMissingError extends Error {
+  code = "AI_KEY_MISSING" as const;
+  constructor() {
+    super("Funzione AI non attivata — contatta l'amministratore");
+    this.name = "AiKeyMissingError";
+  }
+}
+
 export async function parseAI(prompt: string): Promise<any> {
   const url = new URL("/api/planned-routes/ai-parse", getApiUrl());
   const resp = await fetch(url.toString(), {
@@ -51,6 +59,9 @@ export async function parseAI(prompt: string): Promise<any> {
   });
   if (!resp.ok) {
     const body = await resp.json().catch(() => ({}));
+    if (resp.status === 503 && String(body.message ?? "").includes("GEMINI_API_KEY")) {
+      throw new AiKeyMissingError();
+    }
     throw new Error(body.message ?? "Servizio AI non disponibile");
   }
   return resp.json();

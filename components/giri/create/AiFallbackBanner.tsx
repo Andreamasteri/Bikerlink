@@ -4,13 +4,23 @@ import { Ionicons } from "@expo/vector-icons";
 
 interface AiFallbackBannerProps {
   onDismiss: () => void;
+  reason?: "key_missing" | "generic";
 }
 
-export const AiFallbackBanner: React.FC<AiFallbackBannerProps> = ({ onDismiss }) => {
+export const AiFallbackBanner: React.FC<AiFallbackBannerProps> = ({ onDismiss, reason = "generic" }) => {
+  const isKeyMissing = reason === "key_missing";
   return (
     <View style={styles.aiFallbackBanner}>
-      <Ionicons name="information-circle-outline" size={16} color="#b45309" />
-      <Text style={styles.aiFallbackBannerText}>AI non disponibile, compilazione manuale</Text>
+      <Ionicons
+        name={isKeyMissing ? "alert-circle-outline" : "information-circle-outline"}
+        size={16}
+        color="#b45309"
+      />
+      <Text style={styles.aiFallbackBannerText}>
+        {isKeyMissing
+          ? "Funzione AI non attivata — contatta l'amministratore"
+          : "AI non disponibile, compilazione manuale"}
+      </Text>
       <Pressable onPress={onDismiss} hitSlop={8}>
         <Ionicons name="close-outline" size={16} color="#b45309" />
       </Pressable>

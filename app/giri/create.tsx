@@ -50,7 +50,7 @@ export default function GiriCreateScreen() {
     debugLogs, clearDebugLogs, debugVisible, handleTitleTap,
     isImportingGpx, handleImportGpx,
     mode, setMode, aiPrompt, setAiPrompt, aiLoading, handleAiParse,
-    aiPreview, setAiPreview, aiFallbackBanner, setAiFallbackBanner,
+    aiPreview, setAiPreview, aiFallbackBanner, setAiFallbackBanner, aiBannerReason,
     aiSuccessBanner, setAiSuccessBanner, aiSuccessTimer,
     title, setTitle, style, setStyle, drivingProfile, setDrivingProfile,
     isRoundTrip, setIsRoundTrip, roundTripHours, setRoundTripHours,
@@ -190,7 +190,7 @@ export default function GiriCreateScreen() {
         {mode === "manual" && (
           <>
             <ImportGpxBanner isImporting={isImportingGpx} colors={colors} />
-            {aiFallbackBanner && <AiFallbackBanner onDismiss={() => setAiFallbackBanner(false)} />}
+            {aiFallbackBanner && <AiFallbackBanner onDismiss={() => setAiFallbackBanner(false)} reason={aiBannerReason} />}
             <RouteTitleSection title={title} setTitle={setTitle} />
             <RouteStyleSection style={style} setStyle={setStyle} STYLE_LEVELS={STYLE_LEVELS} />
             <DrivingProfileSection drivingProfile={drivingProfile} setDrivingProfile={setDrivingProfile} myStyleProfile={myStyleProfile} />

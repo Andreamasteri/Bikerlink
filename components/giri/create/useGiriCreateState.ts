@@ -10,7 +10,7 @@ import {
   Waypoint, Style, DrivingProfile, Mode, RouteResult, 
   WeatherWaypoint, AiPreviewState, AiPreviewItem, COMPASS_DIRECTIONS 
 } from "./types";
-import { calcRoute, parseAI, clientFallbackAiParse, fetchWeatherPreview } from "./api";
+import { calcRoute, parseAI, clientFallbackAiParse, fetchWeatherPreview, AiKeyMissingError } from "./api";
 
 export function useGiriCreateState(language?: string) {
   const router = useRouter();
@@ -26,6 +26,7 @@ export function useGiriCreateState(language?: string) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
   const [aiFallbackBanner, setAiFallbackBanner] = useState(false);
+  const [aiBannerReason, setAiBannerReason] = useState<"key_missing" | "generic">("generic");
   const [aiSuccessBanner, setAiSuccessBanner] = useState(false);
   const aiSuccessTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -189,6 +190,7 @@ export function useGiriCreateState(language?: string) {
       setIsMultiDay(fallback.isMultiDay);
       setDaysCount(fallback.daysEstimate);
       setAvoidHighways(fallback.avoidHighways);
+      setAiBannerReason(err instanceof AiKeyMissingError || (err as { code?: string })?.code === "AI_KEY_MISSING" ? "key_missing" : "generic");
       setAiFallbackBanner(true);
       setMode("manual");
     } finally {
@@ -433,7 +435,7 @@ export function useGiriCreateState(language?: string) {
     debugLogs, clearDebugLogs, debugVisible, setDebugVisible, handleTitleTap,
     isImportingGpx, handleImportGpx,
     mode, setMode, aiPrompt, setAiPrompt, aiLoading, handleAiParse,
-    aiPreview, setAiPreview, aiFallbackBanner, setAiFallbackBanner,
+    aiPreview, setAiPreview, aiFallbackBanner, setAiFallbackBanner, aiBannerReason,
     aiSuccessBanner, setAiSuccessBanner, aiSuccessTimer,
     title, setTitle, style, setStyle, drivingProfile, setDrivingProfile,
     isRoundTrip, setIsRoundTrip, roundTripHours, setRoundTripHours,
