@@ -33,6 +33,8 @@ type AdminGroup = AdminGroupHeader & {
   items: AdminItem[];
 };
 
+const OPEN_BY_DEFAULT = new Set(["Utenti", "Contenuti", "Monitoraggio"]);
+
 const adminGroups: AdminGroup[] = [
   {
     title: "Utenti",
@@ -215,7 +217,7 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState("");
 
   const initialCollapsed = useMemo<Record<string, boolean>>(
-    () => Object.fromEntries(adminGroups.map((g) => [g.title, true])),
+    () => Object.fromEntries(adminGroups.map((g) => [g.title, !OPEN_BY_DEFAULT.has(g.title)])),
     []
   );
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(initialCollapsed);
