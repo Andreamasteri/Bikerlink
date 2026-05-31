@@ -13,6 +13,19 @@ set -e
 # (legge migrations/0001-NNN.sql, traccia in schema_migrations, gira a ogni boot).
 # Regola: ogni cambio schema → file .sql numerato in migrations/ → commit.
 
+# --- Helper di logging -------------------------------------------------------
+# Obiettivo: rendere i build log del pannello Publish auto-esplicativi.
+# log()  → riga con timestamp UTC, così si vede QUANDO succede ogni step.
+# size() → dimensione di una dir (vuota/assente → "-"), per vedere quanto pesa
+#          e quanto libera ogni pulizia. È proprio la metrica che mancava quando
+#          il Repl layer superava i ~2 GB e il deploy falliva senza spiegazioni.
+log()  { echo "[deploy $(date -u '+%H:%M:%SZ')] $*"; }
+size() { [ -e "$1" ] && du -sh "$1" 2>/dev/null | cut -f1 || echo "-"; }
+
+BUILD_START=$(date -u '+%H:%M:%SZ')
+log "════════ Inizio deploy build (deploy-build.sh) ════════"
+log "Workspace iniziale: $(size .) totali"
+
 # Task #2800-fix — Pulizia asset non necessari prima del push del Repl layer.
 # attached_assets/ contiene screenshot del workspace Replit (usati dall'agente
 # per riferimento visivo) che crescono nel tempo e gonfiano il Repl layer fino
@@ -20,10 +33,11 @@ set -e
 # "Creating Autoscale service" senza alcun log di errore.
 # Questi file non servono a runtime: il server Express non li serve.
 # La pulizia avviene PRIMA del build così il layer risultante è snello.
-echo "=== [0/3] Pulizia asset workspace non necessari ==="
+log "=== [0/3] Pulizia asset workspace non necessari ==="
+log "  attached_assets/ prima: $(size attached_assets)"
 rm -rf attached_assets/
 mkdir -p attached_assets   # ricrea la dir vuota (evita errori se qualcuno la referenzia)
-echo "  attached_assets/ svuotata."
+log "  attached_assets/ svuotata → $(size attached_assets)"
 
 # Task #2820-fix — Pulizia .local/state/replit/ prima del push del Repl layer.
 # .local/state/replit/ contiene transcript dell'agente AI (~376 MB) e un database
@@ -33,11 +47,12 @@ echo "  attached_assets/ svuotata."
 # il fallimento silenzioso di "Creating Autoscale service" senza alcun log.
 # Misurato: .local/state/replit/ = 504 MB → Repl layer totale ~1.7 GB → KO.
 # Dopo la pulizia: ~1.2 GB → ampiamente sotto il limite.
-echo "=== [1/3] Pulizia .local/state/ (transcript agente + log DB) ==="
+log "=== [1/3] Pulizia .local/state/ (transcript agente + log DB) ==="
+log "  .local/state/ prima: $(size .local/state)"
 rm -rf .local/state/replit/
 rm -rf .local/state/scribe/
 rm -rf .local/state/workflow-logs/
-echo "  .local/state/replit/, scribe/ e workflow-logs/ rimossi (non necessari a runtime)."
+log "  .local/state/ dopo:  $(size .local/state) (replit/, scribe/, workflow-logs/ rimossi)"
 
 # Task #2821-fix — altre directory di workspace cresciute nel tempo, non necessarie
 # a runtime (il server Express non le serve). Senza questa pulizia tornano a gonfiare
@@ -47,17 +62,19 @@ echo "  .local/state/replit/, scribe/ e workflow-logs/ rimossi (non necessari a 
 # - dist-ota-env/        → ambiente di build OTA
 # - tmp_review_frames/, tmp_check/, logs/ → artefatti temporanei
 # NB: uploads/ e assets/ NON si toccano — sono serviti a runtime (express.static).
-echo "=== [1b/3] Pulizia directory transitorie non runtime ==="
+log "=== [1b/3] Pulizia directory transitorie non runtime ==="
+log "  backups=$(size .local/backups) dist=$(size dist) dist-ota-env=$(size dist-ota-env) logs=$(size logs)"
 rm -rf .local/backups/
 rm -rf dist/
 rm -rf dist-ota-env/
 rm -rf tmp_review_frames/
 rm -rf tmp_check/
 rm -rf logs/
-echo "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
+log "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
 
-echo "=== [2/3] Build server TypeScript ==="
+log "=== [2/3] Build server TypeScript ==="
 node scripts/server-build.js
+log "  server_dist/ prodotto → $(size server_dist) ($(size server_dist/index.js 2>/dev/null) il bundle)"
 
 # Task #2781-fix — invalida la cache hash delle migration.
 # server/migrate.ts ha un fast-skip basato su server_dist/.migrations-hash
@@ -68,7 +85,7 @@ node scripts/server-build.js
 # Rimuovendo il file qui, al primo avvio il runner fa SEMPRE il round-trip
 # sul DB e confronta con schema_migrations (la vera fonte di verità).
 rm -f server_dist/.migrations-hash
-echo "  Cache migration invalidata (forza controllo DB al boot)."
+log "  Cache migration invalidata (al boot migrate.ts farà sempre il controllo DB)."
 
 # NB: NON rimuovere .cache/ qui.
 # Verificato dai build log Replit (31 mag 2026):
@@ -83,4 +100,9 @@ echo "  Cache migration invalidata (forza controllo DB al boot)."
 # Conclusione: la piattaforma gestisce .cache/ come layer separato; non va toccata
 # dal build script. Pulire .cache/ era sia la CAUSA del fallimento sia inutile.
 
-echo "=== [3/3] Deploy build completato ==="
+log "════════ [3/3] Deploy build completato (start $BUILD_START) ════════"
+log "Workspace finale che entra nel Repl layer: $(size .) totali"
+log "Prossimi step (gestiti dalla piattaforma Replit, visibili nel pannello Publish):"
+log "  → Creating image / Pushing Repl layer / Pushing Repl (cache) layer"
+log "  → Creating Autoscale service → Waiting for service to be ready → Deployment successful"
+log "Poi, all'avvio del container, i log [migrate] mostreranno le migrazioni applicate al DB."
