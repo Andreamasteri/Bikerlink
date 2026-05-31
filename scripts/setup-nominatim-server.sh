@@ -164,19 +164,26 @@ if [[ -x "$NOMINATIM_BIN" ]]; then
   ok "Nominatim già compilato: ${INSTALLED_VER}"
   log "Per reinstallare, rimuovi ${NOMINATIM_BUILD_DIR} e riesegui."
 else
-  TARBALL_URL="https://github.com/osm-search/Nominatim/releases/download/v${NOMINATIM_VERSION}/Nominatim_${NOMINATIM_VERSION}.tar.bz2"
-  TARBALL_FILE="/tmp/nominatim-${NOMINATIM_VERSION}.tar.bz2"
-  SRC_DIR="/tmp/Nominatim_${NOMINATIM_VERSION}"
+  TARBALL_URL="https://github.com/osm-search/Nominatim/archive/refs/tags/v${NOMINATIM_VERSION}.tar.gz"
+  TARBALL_FILE="/tmp/nominatim-${NOMINATIM_VERSION}.tar.gz"
+  SRC_DIR="/tmp/Nominatim-${NOMINATIM_VERSION}"
 
   log "  Download Nominatim ${NOMINATIM_VERSION} da GitHub..."
-  wget -q --show-progress -O "$TARBALL_FILE" "$TARBALL_URL" \
-    || die "Download fallito: ${TARBALL_URL}"
-  ok "  Download completato."
-
-  log "  Estrazione sorgenti..."
-  rm -rf "$SRC_DIR"
-  tar xjf "$TARBALL_FILE" -C /tmp
-  ok "  Sorgenti estratti in ${SRC_DIR}."
+  if wget -q --show-progress -O "$TARBALL_FILE" "$TARBALL_URL"; then
+    ok "  Download completato."
+    log "  Estrazione sorgenti..."
+    rm -rf "$SRC_DIR"
+    tar xzf "$TARBALL_FILE" -C /tmp
+    ok "  Sorgenti estratti in ${SRC_DIR}."
+  else
+    log "  Download tarball fallito, tentativo via git clone..."
+    rm -f "$TARBALL_FILE"
+    rm -rf "$SRC_DIR"
+    git clone --depth 1 --branch "v${NOMINATIM_VERSION}" \
+      https://github.com/osm-search/Nominatim.git "$SRC_DIR" \
+      || die "Impossibile scaricare Nominatim (wget e git clone entrambi falliti)."
+    ok "  Sorgenti clonati via git in ${SRC_DIR}."
+  fi
 
   log "  Compilazione con cmake (può richiedere 5-10 minuti)..."
   rm -rf "${NOMINATIM_BUILD_DIR}"
