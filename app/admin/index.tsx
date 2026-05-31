@@ -212,6 +212,16 @@ export default function AdminDashboard() {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
 
+  const initialCollapsed = useMemo<Record<string, boolean>>(
+    () => Object.fromEntries(adminGroups.map((g) => [g.title, true])),
+    []
+  );
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(initialCollapsed);
+
+  function toggleGroup(title: string) {
+    setCollapsed((prev) => ({ ...prev, [title]: !prev[title] }));
+  }
+
   function handleItemPress(item: AdminItem) {
     if (item.route) {
       router.push(item.route as Href);
@@ -284,36 +294,55 @@ export default function AdminDashboard() {
         </View>
       )}
 
-      {filteredGroups.map((group) => (
-        <React.Fragment key={group.title}>
-          <View style={styles.groupContainer}>
-            <View style={styles.groupHeader}>
-              {renderGroupHeaderIcon(group)}
-              <Text style={styles.groupTitle}>{group.title}</Text>
+      {filteredGroups.map((group) => {
+        const isCollapsed = !isSearching && !!collapsed[group.title];
+        return (
+          <React.Fragment key={group.title}>
+            <View style={styles.groupContainer}>
+              <TouchableOpacity
+                style={styles.groupHeader}
+                onPress={() => toggleGroup(group.title)}
+                activeOpacity={0.7}
+                disabled={isSearching}
+              >
+                <View style={styles.groupHeaderLeft}>
+                  {renderGroupHeaderIcon(group)}
+                  <Text style={styles.groupTitle}>{group.title}</Text>
+                </View>
+                {!isSearching && (
+                  <Ionicons
+                    name={isCollapsed ? "chevron-down" : "chevron-up"}
+                    size={18}
+                    color={Colors.textSecondary}
+                  />
+                )}
+              </TouchableOpacity>
+              {!isCollapsed && (
+                <View style={styles.grid}>
+                  {group.items.map((section) => {
+                    const iconColor = section.accentColor || Colors.accent;
+                    return (
+                      <TouchableOpacity
+                        key={section.key}
+                        style={styles.card}
+                        onPress={() => handleItemPress(section)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.cardIcon}>
+                          {renderIcon(section, 28, iconColor)}
+                        </View>
+                        <Text style={styles.cardLabel}>
+                          {section.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
             </View>
-            <View style={styles.grid}>
-              {group.items.map((section) => {
-                const iconColor = section.accentColor || Colors.accent;
-                return (
-                  <TouchableOpacity
-                    key={section.key}
-                    style={styles.card}
-                    onPress={() => handleItemPress(section)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.cardIcon}>
-                      {renderIcon(section, 28, iconColor)}
-                    </View>
-                    <Text style={styles.cardLabel}>
-                      {section.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-        </React.Fragment>
-      ))}
+          </React.Fragment>
+        );
+      })}
     </ScrollView>
   );
 }
@@ -370,8 +399,14 @@ const styles = StyleSheet.create({
   groupHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  groupHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
-    marginBottom: 12,
   },
   groupTitle: {
     fontFamily: "Inter_700Bold",
