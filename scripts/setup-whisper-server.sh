@@ -33,6 +33,9 @@
 #   WHISPER_LANG=<lang>    Lingua di default (default: it). Es: en, fr, de, es.
 #   SKIP_BUILD=1           Salta la compilazione (solo se whisper.cpp è già compilato).
 #   SKIP_MODEL=1           Salta il download del modello (solo se già presente).
+#   SKIP_FLAG_CHECK=1      Salta la validazione dei flag del binario whisper-server.
+#                          Usare in ambienti CI/test dove il binario potrebbe non
+#                          essere presente o avere una versione diversa da prod.
 # =============================================================================
 
 set -euo pipefail
@@ -159,6 +162,10 @@ ok "whisper.cpp compilato: ${SERVER_BIN}"
 # wrapper venga scritto e il servizio parta con flag non riconosciuti (crash
 # silenzioso). In caso di flag rinominato viene suggerito il candidato più
 # probabile dall'help.
+if [[ "${SKIP_FLAG_CHECK:-0}" == "1" ]]; then
+  warn "SKIP_FLAG_CHECK=1: salto la validazione dei flag del binario whisper-server."
+  warn "  ↳ Usare solo in ambienti CI/test senza binario compilato — NON in produzione."
+else
 log "Verifico i flag supportati dal binario whisper-server..."
 HELP_OUTPUT="$("${SERVER_BIN}" --help 2>&1 || true)"
 FLAG_ERRORS=0
@@ -206,6 +213,7 @@ done
 if [[ "$FLAG_ERRORS" -gt 0 ]]; then
   die "${FLAG_ERRORS} flag essenziale/i mancante/i dall'help di whisper-server. Il wrapper non verrebbe generato correttamente. Correggi setup-whisper-server.sh e riesegui."
 fi
+fi  # end SKIP_FLAG_CHECK
 echo ""
 
 # =============================================================================
