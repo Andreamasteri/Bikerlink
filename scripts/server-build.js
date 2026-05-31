@@ -12,6 +12,7 @@ const cmd = [
   "--format=cjs",
   "--outdir=server_dist",
   `--alias:@shared=${sharedDir}`,
+  "--log-override:direct-eval=silent",
 ].join(" ");
 
 console.log("Building server with esbuild...");
