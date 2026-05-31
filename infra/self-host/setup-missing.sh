@@ -176,16 +176,36 @@ read_env_value() {
 # Escape per sed (sostituzione sicura su separatore '#').
 sed_escape() { printf '%s' "$1" | sed -e 's/[\#&]/\\&/g'; }
 
-# Verifica che GRAPHHOPPER_JAVA_OPTS nel file .env sia tra virgolette.
-# Se il valore contiene spazi ma non è quotato, bash `source` fallisce con
-# "command not found". In quel caso stampa il fix manuale e termina.
-check_ghopt_quoted() {
+# Verifica che ogni valore nel file .env contenente spazi o metacaratteri shell
+# sia racchiuso tra virgolette doppie o singole. Se bash `source` trova un valore
+# non quotato con spazi o caratteri come ; & | ( ) < > ` questi rompono il parsing.
+# Stampa l'elenco delle chiavi problematiche e termina con errore.
+check_env_quoted() {
   local envf="$1"
   [[ -r "$envf" ]] || return 0
-  if grep -qE '^GRAPHHOPPER_JAVA_OPTS=[^"'"'"'][^ ]*[[:space:]]' "$envf" 2>/dev/null; then
-    die "GRAPHHOPPER_JAVA_OPTS nel file ${envf} non è tra virgolette e contiene spazi.
-       Questo causa un errore al momento del 'source'. Correggi con:
-         sed -i 's/^GRAPHHOPPER_JAVA_OPTS=\(.*\)\$/GRAPHHOPPER_JAVA_OPTS=\"\1\"/' \"${envf}\"
+  # ERE che copre spazi e metacaratteri shell pericolosi
+  local UNSAFE='[[:space:];&|()<>`]'
+  local bad_keys=()
+  while IFS= read -r line; do
+    # Ignora commenti e righe vuote
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line// /}" ]] && continue
+    # Estrai chiave e valore grezzo
+    local key raw_val
+    key="${line%%=*}"
+    raw_val="${line#*=}"
+    # Se il valore contiene caratteri non sicuri e non inizia con " o ' → problema
+    if [[ "$raw_val" =~ $UNSAFE && ! "$raw_val" =~ ^[\"\'] ]]; then
+      bad_keys+=("$key")
+    fi
+  done < "$envf"
+  if [[ ${#bad_keys[@]} -gt 0 ]]; then
+    local keys_list
+    keys_list="$(printf '  - %s\n' "${bad_keys[@]}")"
+    die "Le seguenti variabili in ${envf} contengono spazi o metacaratteri shell ma non sono tra virgolette:
+${keys_list}
+       Questo causa un errore al momento del 'source'. Racchiudi il valore tra virgolette doppie:
+         KEY=\"valore con spazi o caratteri speciali\"
        Poi rilancia questo script."
   fi
 }
@@ -219,7 +239,7 @@ should_generate_secret() {
 
 if [[ -f "$ENV_FILE" ]]; then
   warn ".env già presente — riuso le credenziali esistenti (non sovrascrivo)."
-  check_ghopt_quoted "$ENV_FILE"
+  check_env_quoted "$ENV_FILE"
   # shellcheck disable=SC1090
   set -a; . "$ENV_FILE"; set +a
 else
@@ -235,11 +255,11 @@ else
   cat > "$ENV_FILE" <<EOF
 # Generato automaticamente da setup-missing.sh il $(date '+%Y-%m-%d %H:%M:%S')
 # NON committare questo file. Contiene le credenziali dei servizi locali.
-POSTGRES_USER=${POSTGRES_USER}
-POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-POSTGRES_DB=${POSTGRES_DB}
-PGADMIN_EMAIL=${PGADMIN_EMAIL}
-PGADMIN_PASSWORD=${PGADMIN_PASSWORD}
+POSTGRES_USER="${POSTGRES_USER}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
+POSTGRES_DB="${POSTGRES_DB}"
+PGADMIN_EMAIL="${PGADMIN_EMAIL}"
+PGADMIN_PASSWORD="${PGADMIN_PASSWORD}"
 GRAPHHOPPER_JAVA_OPTS="${GRAPHHOPPER_JAVA_OPTS}"
 EOF
   chmod 600 "$ENV_FILE"
@@ -432,7 +452,7 @@ wait_valhalla_tiles_ready && VALHALLA_TILES_READY=1 || true
 # =============================================================================
 section "6/6 — Riepilogo"
 # =============================================================================
-check_ghopt_quoted "$ENV_FILE"
+check_env_quoted "$ENV_FILE"
 # shellcheck disable=SC1090
 set -a; . "$ENV_FILE"; set +a
 
