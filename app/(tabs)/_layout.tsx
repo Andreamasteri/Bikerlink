@@ -175,7 +175,11 @@ export default function TabLayout() {
     const tabs: TabItem[] = state.routes
       .filter((route) => {
         const options = descriptors[route.key].options as Record<string, unknown>;
-        return typeof options.tabBarButton !== "function";
+        // Exclude href:null screens (tabBarButton is a null-returning function)
+        if (typeof options.tabBarButton === "function") return false;
+        // Exclude auto-discovered / phantom routes that have no icon configured
+        if (!options.tabBarIcon) return false;
+        return true;
       })
       .map((route) => {
         const descriptor = descriptors[route.key];
