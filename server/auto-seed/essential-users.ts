@@ -25,13 +25,35 @@ export function isPasswordTooWeak(pw: string): string | null {
   return null;
 }
 
+/**
+ * Genera una password casuale forte con almeno un carattere per categoria:
+ * uppercase, lowercase, cifra, simbolo. Lunghezza finale: 20 caratteri.
+ */
 function generateFirstBootPassword(): string {
-  const chars =
-    "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%^&*-_=+";
-  const bytes = crypto.randomBytes(20);
-  return Array.from(bytes)
-    .map((b) => chars[b % chars.length])
-    .join("");
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnpqrstuvwxyz";
+  const digits = "23456789";
+  const symbols = "!@#$%^&*-_=+";
+  const all = upper + lower + digits + symbols;
+
+  const pick = (charset: string) =>
+    charset[crypto.randomBytes(1)[0] % charset.length];
+
+  // Garantisce almeno uno per categoria
+  const mandatory = [pick(upper), pick(lower), pick(digits), pick(symbols)];
+
+  // Riempie i restanti 16 caratteri dal charset completo
+  const rest = Array.from(crypto.randomBytes(16)).map((b) => all[b % all.length]);
+
+  // Mischia tutto con Fisher-Yates basato su crypto.randomBytes
+  const combined = [...mandatory, ...rest];
+  const shuffleBytes = crypto.randomBytes(combined.length);
+  for (let i = combined.length - 1; i > 0; i--) {
+    const j = shuffleBytes[i] % (i + 1);
+    [combined[i], combined[j]] = [combined[j], combined[i]];
+  }
+
+  return combined.join("");
 }
 
 function printFirstBootBox(nickname: string, email: string, password: string): void {
@@ -56,6 +78,13 @@ interface EssentialUserDef {
   role: string;
   userType: string;
   sex: string;
+  /**
+   * Se true, in ambiente di sviluppo (REPLIT_DEPLOYMENT !== "1") l'utente
+   * viene creato con una first-boot credential casuale quando l'env var
+   * non è impostata. Solo per account non-admin che devono essere
+   * sempre presenti in dev (es. moderatore).
+   */
+  allowFirstBootSeed?: boolean;
 }
 
 const essentialUsers: EssentialUserDef[] = [
@@ -74,6 +103,7 @@ const essentialUsers: EssentialUserDef[] = [
     role: "moderator",
     userType: "biker",
     sex: "M",
+    allowFirstBootSeed: true,
   },
   {
     nickname: "mendo",
@@ -99,11 +129,13 @@ export async function autoSeedEssentialUsers() {
       const seedPassword = process.env[userData.passwordEnvVar];
 
       if (!seedPassword) {
-        // In produzione (autoscale deployato) non creiamo mai account privilegiati
-        // con password casuali — un env var esplicita è obbligatoria.
-        // REPLIT_DEPLOYMENT=1 è presente solo nei container autoscale deployati,
-        // assente nel workspace di sviluppo (anche se NODE_ENV=production).
-        if (process.env.REPLIT_DEPLOYMENT === "1") {
+        // First-boot credential: solo per gli utenti con allowFirstBootSeed=true
+        // e solo fuori dal container autoscale deployato.
+        // REPLIT_DEPLOYMENT=1 è presente solo nei container autoscale (produzione);
+        // assente nel workspace di sviluppo (dove NODE_ENV=production è forzato
+        // da start-backend.sh, rendendolo inutilizzabile come discriminante).
+        const isDeployed = process.env.REPLIT_DEPLOYMENT === "1";
+        if (!userData.allowFirstBootSeed || isDeployed) {
           console.warn(
             `[auto-seed] Skipping ${userData.role} seed: ${userData.passwordEnvVar} env var not set`,
           );
@@ -111,8 +143,7 @@ export async function autoSeedEssentialUsers() {
         }
 
         // In sviluppo: se l'utente non esiste ancora, lo creiamo con una
-        // password casuale forte (first-boot credential) e la stampiamo
-        // UNA SOLA VOLTA nel log. Se esiste già, saltiamo silenziosamente.
+        // password casuale forte e la stampiamo UNA SOLA VOLTA nel log.
         const existing = await db
           .select({ id: users.id })
           .from(users)
