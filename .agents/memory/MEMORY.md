@@ -1,3 +1,4 @@
 - [Repl Layer Size Limit](repl-layer-size.md) — .local/state/replit/ cresce nel tempo (transcript agente + log-query.db) → supera limite Cloud Run 2 GB → deploy silenziosamente fallisce senza log.
+- [Expo (tabs) route pollution](expo-tabs-route-pollution.md) — file helper (es. *.styles.ts) dentro app/(tabs)/ diventano tab-icona rotte; la custom tab bar renderizza ogni state.route. Tenerli in components/.
 - [spatial_ref_sys deploy failure](spatial-ref-sys-deploy.md) — publish fallisce su copy-OFF con ALTER TABLE spatial_ref_sys ADD PRIMARY KEY; è migrazione interna di Replit, non fixabile lato nostro (filtri drizzle.config.ts ignorati). Copy ON cancella i dati prod. Da supporto Replit.
 - [Deploy build .cache cleanup](deploy-build-cache.md) — NON fare rm su .cache/ in deploy-build.sh: è un layer gestito dalla piattaforma e contiene file read-only di altro utente → build fallisce con set -e.

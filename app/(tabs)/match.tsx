@@ -24,7 +24,7 @@ import { MatchCardStack } from "@/components/match/tabs/MatchCardStack";
 import { MatchFiltersPanel } from "@/components/match/tabs/MatchFiltersPanel";
 import { NegativeSuggestionsCard } from "@/components/match/tabs/NegativeSuggestionsCard";
 import { useRenderItem } from "@/components/match/useRenderItem";
-import { styles } from "./match.styles";
+import { styles } from "@/components/match/match.styles";
 
 export default function MatchScreen() {
   const router = useRouter();
