@@ -153,6 +153,26 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
   for (const chunk of geminiBuffer) yield chunk;
 }
 
+// ─── Reverse Geocoding route ───────────────────────────────────────────────────
+
+export const geocodeRouter = Router();
+
+geocodeRouter.get("/reverse", async (req: Request, res: Response) => {
+  const { lat, lon } = req.query as { lat?: string; lon?: string };
+  if (!lat || !lon) return sendError(res, 400, "Parametri lat e lon obbligatori");
+  const latNum = parseFloat(lat);
+  const lonNum = parseFloat(lon);
+  if (isNaN(latNum) || isNaN(lonNum)) return sendError(res, 400, "lat e lon devono essere numeri validi");
+  try {
+    const { reverseGeocode } = await import("../../lib/nominatim-client");
+    const result = await reverseGeocode(latNum, lonNum);
+    return res.json(result);
+  } catch (err) {
+    console.error("[reverse-geocode] error:", err);
+    return sendError(res, 502, "Reverse geocoding non disponibile");
+  }
+});
+
 // ─── POI routes (moved from waypoints.ts to keep it under 550 lines) ──────────
 
 export const poiExtraRouter = Router();

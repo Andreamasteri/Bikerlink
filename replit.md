@@ -475,6 +475,17 @@ Variabili d'ambiente (tutte **opzionali** — segue il pattern URL/token-from-en
 - `OLLAMA_TOKEN` — token opzionale inviato come header `X-Ollama-Token`.
 - `OLLAMA_MODEL` — modello da usare (default `llama3.2:latest`).
 
+### Nominatim self-hosted (geocoding)
+
+Client: `server/lib/nominatim-client.ts` — `geocode(query)` (forward) e `reverseGeocode(lat, lon)` (reverse). Stesso pattern URL/token di GraphHopper e Ollama.
+
+- Endpoint forward: `GET /api/planned-routes/geocode?q=…` — usato dal form waypoint e dall'AI preview.
+- Endpoint reverse: `GET /api/geocode/reverse?lat=…&lon=…` — usato da `handleMapTap` in `useGiriCreateState.ts` (nessuna chiamata diretta da client a Nominatim pubblico).
+
+Variabili d'ambiente (entrambe **opzionali**):
+- `NOMINATIM_URL` — URL base del server Nominatim self-hosted (es. `https://nominatim.bikerlink.app`). **Se non impostata, fallback automatico a `nominatim.openstreetmap.org` (pubblico, rate-limited, nessun token).**
+- `NOMINATIM_TOKEN` — Token inviato come header `X-Nominatim-Token` al server self-hosted. Ignorato se `NOMINATIM_URL` non è impostata.
+
 **Nota deviazione streaming**: il fallback su `/ai-stream` copre solo il caso "Ollama irraggiungibile" (probe sul primo chunk → fallback a Gemini). Un JSON invalido a metà stream **non** fa fallback (i chunk già emessi non sono ri-inviabili). Documentato nei commenti di `waypoints.next.ts`.
 
 ### Pacchetti npm aggiunti (Task #2514)

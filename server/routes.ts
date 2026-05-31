@@ -300,6 +300,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { default: plannedRoutesRoutes } = await import("./routes/planned-routes");
   app.use("/api/planned-routes", plannedRoutesRoutes);
 
+  const { geocodeRouter } = await import("./routes/planned-routes/waypoints.next");
+  app.use("/api/geocode", geocodeRouter);
+
   // Task #2698 — AI Assistant utente (sessione richiesta, no admin role).
   const { default: aiAssistantRoutes } = await import("./routes/ai-assistant");
   app.use("/api", aiAssistantRoutes);

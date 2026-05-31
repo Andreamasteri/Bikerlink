@@ -401,34 +401,30 @@ export function useGiriCreateState(language?: string) {
   };
 
   const handleMapTap = async (lat: number, lng: number) => {
+    const coordName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    let name = coordName;
     try {
-      const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&accept-language=it`;
-      const resp = await fetch(url, { headers: { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" } });
-      let name = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      if (resp.ok) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Nominatim response shape
-        const data = await resp.json() as any;
-        const d = data.address ?? {};
-        name = d.road ?? d.suburb ?? d.town ?? d.city ?? d.county ?? name;
-      }
-      const newWps = [...waypoints];
-      const newInputs = [...wpInputs];
-      const emptyIdx = newWps.findIndex((w) => w.lat === 0 && w.lng === 0);
-      if (emptyIdx !== -1) {
-        newWps[emptyIdx] = { lat, lng, name };
-        newInputs[emptyIdx] = name;
-      } else {
-        const insertAt = Math.max(0, newWps.length - 1);
-        newWps.splice(insertAt, 0, { lat, lng, name });
-        newInputs.splice(insertAt, 0, name);
-      }
-      setWaypoints(newWps);
-      setWpInputs(newInputs);
-      setRouteResult(null);
-      setWeatherPreview(null);
+      const resp = await apiRequest("GET", `/api/geocode/reverse?lat=${lat}&lon=${lng}`);
+      const data = await resp.json() as { road?: string; suburb?: string; town?: string; city?: string; county?: string };
+      name = data.road ?? data.suburb ?? data.town ?? data.city ?? data.county ?? coordName;
     } catch {
-      // no-op: ignore reverse geocoding failures on map tap
+      // fallback to coordinate name if reverse geocoding fails
     }
+    const newWps = [...waypoints];
+    const newInputs = [...wpInputs];
+    const emptyIdx = newWps.findIndex((w) => w.lat === 0 && w.lng === 0);
+    if (emptyIdx !== -1) {
+      newWps[emptyIdx] = { lat, lng, name };
+      newInputs[emptyIdx] = name;
+    } else {
+      const insertAt = Math.max(0, newWps.length - 1);
+      newWps.splice(insertAt, 0, { lat, lng, name });
+      newInputs.splice(insertAt, 0, name);
+    }
+    setWaypoints(newWps);
+    setWpInputs(newInputs);
+    setRouteResult(null);
+    setWeatherPreview(null);
   };
 
   return {

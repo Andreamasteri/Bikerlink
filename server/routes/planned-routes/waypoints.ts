@@ -291,13 +291,9 @@ router.get("/geocode", async (req: Request, res: Response) => {
   const { q } = req.query as { q?: string };
   if (!q) return sendError(res, 400, "Query richiesta");
   try {
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&accept-language=it`;
-    const resp = await fetch(url, { headers: { "User-Agent": "BikerLink/4.0 (info@bikerlink.it)" } });
-    type NominatimResult = { display_name: string; lat: string; lon: string };
-    const data = await resp.json() as NominatimResult[];
-    return res.json(data.map((r) => ({
-      name: r.display_name, lat: parseFloat(r.lat), lng: parseFloat(r.lon),
-    })));
+    const { geocode } = await import("../../lib/nominatim-client");
+    const results = await geocode(q);
+    return res.json(results);
   } catch (err) {
     console.error("[geocode] error:", err);
     return sendError(res, 502, "Geocoding non disponibile");
