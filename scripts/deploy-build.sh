@@ -33,7 +33,7 @@ echo "  attached_assets/ svuotata."
 # il fallimento silenzioso di "Creating Autoscale service" senza alcun log.
 # Misurato: .local/state/replit/ = 504 MB → Repl layer totale ~1.7 GB → KO.
 # Dopo la pulizia: ~1.2 GB → ampiamente sotto il limite.
-echo "=== [1/4] Pulizia .local/state/ (transcript agente + log DB) ==="
+echo "=== [1/3] Pulizia .local/state/ (transcript agente + log DB) ==="
 rm -rf .local/state/replit/
 rm -rf .local/state/scribe/
 rm -rf .local/state/workflow-logs/
@@ -47,7 +47,7 @@ echo "  .local/state/replit/, scribe/ e workflow-logs/ rimossi (non necessari a 
 # - dist-ota-env/        → ambiente di build OTA
 # - tmp_review_frames/, tmp_check/, logs/ → artefatti temporanei
 # NB: uploads/ e assets/ NON si toccano — sono serviti a runtime (express.static).
-echo "=== [1b/4] Pulizia directory transitorie non runtime ==="
+echo "=== [1b/3] Pulizia directory transitorie non runtime ==="
 rm -rf .local/backups/
 rm -rf dist/
 rm -rf dist-ota-env/
@@ -56,7 +56,7 @@ rm -rf tmp_check/
 rm -rf logs/
 echo "  backups, dist, dist-ota-env e artefatti temporanei rimossi."
 
-echo "=== [2/4] Build server TypeScript ==="
+echo "=== [2/3] Build server TypeScript ==="
 node scripts/server-build.js
 
 # Task #2781-fix — invalida la cache hash delle migration.
@@ -70,28 +70,17 @@ node scripts/server-build.js
 rm -f server_dist/.migrations-hash
 echo "  Cache migration invalidata (forza controllo DB al boot)."
 
-# Task #2821-fix — pulizia .cache/ come ULTIMO step (dopo il build TS).
-# .cache/ contiene cache di tooling (dotslash ~572 MB, uv ~269 MB, node-gyp,
-# typescript) che cresce nel tempo ed è la causa del nuovo superamento del limite
-# Cloud Run (~2 GB): col layer base a ~1.2 GB, .cache a ~894 MB lo riporta a ~2.1 GB
-# → "Creating Autoscale service" fallisce silenziosamente, fetch_deployment_logs
-# restituisce zero log. .cache NON serve a runtime e viene rigenerata se necessario.
-# Va rimossa DOPO il build perché esbuild usa .cache/typescript durante la compilazione.
-echo "=== [3/4] Pulizia .cache/ (cache tooling, non runtime) ==="
-# NB: alcuni file dentro .cache/dotslash (es. "React Native DevTools-linux-x64"
-# scaricato da dotslash) sono di proprietà di un altro utente / read-only
-# nell'ambiente di build Replit → `rm -rf .cache/` stampa "Permission denied"
-# e restituisce un exit code NON-ZERO. Con `set -e` (riga 2) questo faceva
-# FALLIRE l'intero deploy build proprio all'ultimo step, nonostante la copia
-# DB e il build del server fossero già andati a buon fine.
-# Soluzione: pulizia best-effort. Si prova a rendere scrivibili e rimuovere
-# tutto il rimovibile, ma questo step NON deve MAI far fallire il build.
-chmod -R u+w .cache 2>/dev/null || true
-rm -rf .cache/ 2>/dev/null || true
-find .cache -mindepth 1 -delete 2>/dev/null || true
-echo "  .cache/ ripulita best-effort (eventuali file read-only ignorati; non necessaria a runtime)."
-# Visibilità: logga il residuo (se i file read-only di dotslash restano) così un
-# eventuale superamento del limite Cloud Run ~2 GB è diagnosticabile dai build log.
-echo "  Residuo .cache: $(du -sh .cache 2>/dev/null | cut -f1 || echo '0 (rimossa)')"
+# NB: NON rimuovere .cache/ qui.
+# Verificato dai build log Replit (31 mag 2026):
+#  - il build RIUSCITO (09:38) NON aveva alcuno step di pulizia .cache/ e ha
+#    spinto .cache come layer dedicato ("Pushing Repl (cache) layer" →
+#    "Created Repl (cache) layer") arrivando a "Deployment successful".
+#  - i build FALLITI (09:46 / 09:58) avevano lo step di pulizia .cache/ e sono
+#    morti ESATTAMENTE lì: i file dentro .cache/dotslash ("React Native
+#    DevTools-linux-x64") nell'ambiente di build sono di proprietà di un altro
+#    utente → `rm -rf .cache/` dà "Permission denied" ed exit NON-ZERO → con
+#    `set -e` l'intero deploy falliva all'ultimo step.
+# Conclusione: la piattaforma gestisce .cache/ come layer separato; non va toccata
+# dal build script. Pulire .cache/ era sia la CAUSA del fallimento sia inutile.
 
-echo "=== [4/4] Deploy build completato ==="
+echo "=== [3/3] Deploy build completato ==="

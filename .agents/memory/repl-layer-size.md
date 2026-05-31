@@ -17,7 +17,7 @@ Prima di ogni deploy, il build script (scripts/deploy-build.sh) deve pulire le d
 - `.local/state/replit/` — transcript agente AI + log-query.db (~500 MB nel tempo)
 - `.local/state/scribe/` — log scribe (~4 MB)
 - `.local/state/workflow-logs/` — log workflow (~0.1 MB)
-- `.cache/` — cache tooling: dotslash (~572 MB) + uv (~269 MB) + node-gyp + typescript (~894 MB totali). CAUSA RICORRENTE: ricresce dopo ogni fix. Rimuovere come ULTIMO step (dopo `node scripts/server-build.js`, perché esbuild usa `.cache/typescript`).
+- `.cache/` — NON rimuovere dal build script (vedi sezione dedicata sotto): la piattaforma la gestisce come layer separato e `rm` su file dotslash di altro utente faceva fallire il build.
 - `.local/backups/` — dump/JSONL backup DB (~53 MB)
 - `dist/`, `dist-ota-env/` — export web/OTA Expo; il server gira da `server_dist/`, NON da `dist/`
 - `tmp_review_frames/`, `tmp_check/`, `logs/` — artefatti temporanei
@@ -34,7 +34,8 @@ Prima di ogni deploy, il build script (scripts/deploy-build.sh) deve pulire le d
 - Repl layer totale = ~1.7 GB → oltre il limite
 - Dopo pulizia: ~1.2 GB → OK
 
-## Trappola: la pulizia .cache/ NON deve far fallire il build
-- `.cache/dotslash` (React Native DevTools) contiene file read-only di proprietà di un altro utente nell'ambiente di BUILD Replit (in dev sono tutti `runner`). Lì `rm -rf .cache/` stampa "Permission denied" ed esce NON-ZERO.
-- Con `set -e` in deploy-build.sh questo faceva FALLIRE l'intero publish all'ULTIMO step, DOPO che copia DB + build server erano già riusciti. Sintomo diverso dal fallimento silenzioso da size: qui i build log esistono e mostrano centinaia di righe "Permission denied".
-- **Regola:** ogni step di pulizia di `.cache/` deve essere best-effort (`chmod -R u+w .cache 2>/dev/null || true; rm -rf .cache 2>/dev/null || true; find .cache -mindepth 1 -delete 2>/dev/null || true`) e loggare il residuo (`du -sh .cache`). I file rimovibili (uv ~269 MB, node-gyp, typescript ~343 MB) bastano a tenere il layer sotto 2 GB anche se dotslash (~572 MB) resta.
+## NON pulire .cache/ nel deploy-build.sh
+- **Regola:** il build script NON deve rimuovere `.cache/`. La piattaforma Replit la gestisce come layer dedicato ("Pushing Repl (cache) layer" → "Created Repl (cache) layer"), separato dal Repl layer su cui vale il limite ~2 GB.
+- **Why (provato dai build log 31 mag 2026):** il build RIUSCITO (09:38) NON aveva alcuno step di pulizia `.cache/` e ha deployato con successo. I build FALLITI (09:46/09:58) avevano lo step `rm -rf .cache/` e sono morti ESATTAMENTE lì: i file in `.cache/dotslash` (React Native DevTools) nell'ambiente di BUILD sono di proprietà di un altro utente (in dev sono tutti `runner`) → `rm` dà "Permission denied" ed exit NON-ZERO → con `set -e` l'intero publish falliva all'ULTIMO step, dopo che copia DB + build server erano già riusciti.
+- Diagnosi: questo fallimento NON è quello silenzioso da size (qui i build log ESISTONO e finiscono con centinaia di righe "Permission denied", senza mai arrivare a "Creating Autoscale service").
+- NB: `.cache/` NON era nemmeno la causa del superamento size — la pulizia di `.local/state/` (~504 MB) + attached_assets/ + backups/dist basta a tenere il Repl layer sotto il limite.
