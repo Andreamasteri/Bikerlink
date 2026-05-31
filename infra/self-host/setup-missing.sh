@@ -363,6 +363,57 @@ wait_healthy redis    "$TIMEOUT_FAST"    || true
 wait_healthy pgadmin  "$TIMEOUT_FAST"    || true
 wait_healthy valhalla "$TIMEOUT_VALHALLA" || true
 
+# Verifica che Valhalla abbia i tile pronti (non solo "vivo").
+# Dopo l'healthy-check il container è up ma i tile potrebbero essere ancora in build.
+# Esegue una route di prova Milano → Torino; stampa avviso ma NON esce in errore.
+wait_valhalla_tiles_ready() {
+  local attempts=3 interval=15 attempt=0
+  local valhalla_url="http://localhost:8002"
+  # Rotta di prova: Milano → Torino (entrambe in Europa, sempre nel PBF).
+  local route_body='{"locations":[{"lon":9.1895,"lat":45.4654},{"lon":7.6869,"lat":45.0703}],"costing":"auto","directions_options":{"units":"kilometers"}}'
+
+  info "Verifico che i tile Valhalla siano pronti (route di prova Milano → Torino)..."
+
+  while (( attempt < attempts )); do
+    attempt=$(( attempt + 1 ))
+    local raw_response http_code body
+    raw_response="$(curl -s -w '\n__HTTP_CODE__:%{http_code}' \
+      -X POST \
+      -H 'Content-Type: application/json' \
+      -d "$route_body" \
+      "${valhalla_url}/route" \
+      --max-time 30 2>/dev/null || true)"
+    http_code="$(printf '%s' "$raw_response" | grep '__HTTP_CODE__:' | sed 's/__HTTP_CODE__://' | tr -d '[:space:]')"
+    body="$(printf '%s' "$raw_response" | grep -v '__HTTP_CODE__:' || true)"
+
+    if [[ "$http_code" == "200" ]]; then
+      ok "Tile Valhalla pronti — route di prova completata con successo."
+      return 0
+    fi
+
+    if [[ -z "$http_code" ]]; then
+      warn "Tentativo ${attempt}/${attempts}: Valhalla non raggiungibile su ${valhalla_url}."
+    elif printf '%s' "$body" | grep -qiE "no data|no route|no path|tile.*not.*found|data.*not.*found|insufficient"; then
+      warn "Tentativo ${attempt}/${attempts}: tile ancora in costruzione (HTTP ${http_code})."
+    else
+      warn "Tentativo ${attempt}/${attempts}: risposta inattesa (HTTP ${http_code}): $(printf '%s' "$body" | head -c 200)"
+    fi
+
+    if (( attempt < attempts )); then
+      info "Riprovo tra ${interval}s..."
+      sleep "$interval"
+    fi
+  done
+
+  warn "Tile Valhalla NON ancora pronti dopo ${attempts} tentativi."
+  warn "Il build dei tile può richiedere ore — Valhalla è vivo ma il calcolo percorsi non è ancora disponibile."
+  warn "Per monitorare il progresso: $DOCKER compose logs -f valhalla"
+  return 1
+}
+
+VALHALLA_TILES_READY=0
+wait_valhalla_tiles_ready && VALHALLA_TILES_READY=1 || true
+
 # =============================================================================
 section "6/6 — Riepilogo"
 # =============================================================================
@@ -382,7 +433,15 @@ $(bold "BikerLink self-host — servizi avviati")
   Redis                  redis://localhost:6379
 
   Valhalla               http://localhost:8002   (status: /status)
-$(if [[ ! -f "$PBF_FILE" ]]; then echo "      ⚠  Nessun PBF trovato — tile non costruiti. Esegui ./download-osm.sh"; fi)
+$(if [[ "$VALHALLA_TILES_READY" == "1" ]]; then
+    echo "      ✓  Tile pronti — calcolo percorsi attivo."
+  elif [[ ! -f "$PBF_FILE" ]]; then
+    echo "      ⚠  Nessun PBF trovato — tile non costruiti. Esegui ./download-osm.sh"
+  else
+    echo "      ⚠  Tile ancora in costruzione (build in corso). Valhalla è vivo ma"
+    echo "         il calcolo percorsi non è ancora disponibile."
+    echo "         Monitora con: docker compose logs -f valhalla"
+  fi)
 
   pgAdmin 4              http://localhost:5050
       email    : ${PGADMIN_EMAIL}
