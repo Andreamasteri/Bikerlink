@@ -6,6 +6,7 @@ import {
   Linking,
   ActivityIndicator,
   Pressable,
+  TouchableOpacity,
 } from "react-native";
 import WebView from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,6 +35,7 @@ import {
   formatDuration,
 } from "./[id].helpers";
 import { makeStyles } from "@/components/navigate/[id].styles";
+import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,7 @@ export default function NavigateScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const locale = useLocale();
   const t = useT();
+  const whisper = useWhisperRecorder();
 
   const topPad = insets.top;
   const bottomPad = insets.bottom;
@@ -64,6 +67,7 @@ export default function NavigateScreen() {
   // Rerouting refs
   const offRouteStartRef = useRef<number | null>(null);
   const isReroutingRef = useRef(false);
+  const lastKnownPosRef = useRef<{ lat: number; lng: number } | null>(null);
   const activeStepsRef = useRef<NavigationStep[] | null>(null);
   const activeTotalKmRef = useRef<number | null>(null);
   const activeTotalMinRef = useRef<number | null>(null);
@@ -226,8 +230,61 @@ export default function NavigateScreen() {
   const triggerRerouteRef = useRef(triggerReroute);
   useEffect(() => { triggerRerouteRef.current = triggerReroute; }, [triggerReroute]);
 
+  // Route from current GPS position to a new destination (used by voice command)
+  const triggerRerouteToDestination = useCallback(async (destLat: number, destLng: number) => {
+    if (isReroutingRef.current || !route) return;
+    isReroutingRef.current = true;
+    offRouteStartRef.current = null;
+    setIsRerouting(true);
+
+    try {
+      const origin = lastKnownPosRef.current;
+      if (!origin) {
+        // No GPS fix yet — fall back to first route waypoint as origin
+        const wps = (route.waypoints ?? []).filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+        if (wps.length === 0) return;
+        lastKnownPosRef.current = { lat: wps[0].lat, lng: wps[0].lng };
+      }
+      const { lat: oLat, lng: oLng } = lastKnownPosRef.current!;
+
+      const resp = await apiRequest("POST", "/api/planned-routes/calculate", {
+        waypoints: [{ lat: oLat, lng: oLng }, { lat: destLat, lng: destLng }],
+        style: "curvy",
+      });
+      const newRoute = await resp.json();
+
+      let newPts: Array<[number, number]> = [];
+      if (newRoute.polyline) {
+        newPts = decodePolyline(newRoute.polyline);
+      } else if (newRoute.waypoints?.length) {
+        newPts = (newRoute.waypoints as Array<{ lat: number; lng: number }>)
+          .filter((wp) => wp.lat !== 0 || wp.lng !== 0)
+          .map((wp) => [wp.lat, wp.lng]);
+      }
+
+      if (newPts.length > 1) {
+        activeStepsRef.current = newRoute.navigationSteps ?? null;
+        if (newRoute.distanceKm) activeTotalKmRef.current = newRoute.distanceKm;
+        if (newRoute.durationMinutes) activeTotalMinRef.current = newRoute.durationMinutes;
+        announcedFarRef.current.clear();
+        announcedNearRef.current.clear();
+        setCurrentStep(0);
+        setMapReady(false);
+        setPolylinePoints(newPts);
+        Speech.speak(t("nav.rerouted"), { language: locale });
+      }
+    } catch (e) {
+      console.warn("[VoiceReroute] failed:", e);
+    } finally {
+      isReroutingRef.current = false;
+      setIsRerouting(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route]);
+
   const handlePositionUpdate = useCallback((lat: number, lng: number, heading: number) => {
     if (polylinePoints.length === 0) return;
+    lastKnownPosRef.current = { lat, lng };
 
     const closestIdx = closestPointIndexOnPolyline(lat, lng, polylinePoints);
     const closestDist = haversineM(lat, lng, polylinePoints[closestIdx][0], polylinePoints[closestIdx][1]);
@@ -348,6 +405,40 @@ export default function NavigateScreen() {
     const dest = wps[wps.length - 1];
     Linking.openURL(`maps://maps.apple.com/?daddr=${dest.lat},${dest.lng}&dirflg=d`);
   };
+
+  const [voiceCmdToast, setVoiceCmdToast] = useState<string | null>(null);
+
+  const handleVoiceCommand = useCallback(async () => {
+    const text = await whisper.stopAndTranscribe();
+    if (!text) {
+      setVoiceCmdToast(whisper.error ?? "Trascrizione fallita");
+      setTimeout(() => setVoiceCmdToast(null), 3000);
+      return;
+    }
+
+    setVoiceCmdToast(`🎤 "${text}" — geocodifica...`);
+
+    try {
+      const geocodeUrl = new URL("/api/planned-routes/geocode", getApiUrl());
+      geocodeUrl.searchParams.set("q", text);
+      const geocodeRes = await apiRequest("GET", geocodeUrl.pathname + geocodeUrl.search);
+      const results = await geocodeRes.json() as Array<{ lat: number; lon: number; display_name?: string }>;
+
+      if (!Array.isArray(results) || results.length === 0) {
+        setVoiceCmdToast("Destinazione non trovata");
+        setTimeout(() => setVoiceCmdToast(null), 3000);
+        return;
+      }
+
+      const { lat, lon } = results[0];
+      setVoiceCmdToast(`Ricalcolo verso ${results[0].display_name ?? text}...`);
+      await triggerRerouteToDestination(lat, lon);
+      setTimeout(() => setVoiceCmdToast(null), 4000);
+    } catch {
+      setVoiceCmdToast("Errore geocodifica");
+      setTimeout(() => setVoiceCmdToast(null), 3000);
+    }
+  }, [whisper, triggerRerouteToDestination]);
 
   const handleClose = () => {
     Speech.stop();
@@ -499,6 +590,34 @@ export default function NavigateScreen() {
           <Text style={s.staleBannerText}>
             Mappe offline non coprono il percorso ricalcolato
           </Text>
+        </View>
+      )}
+
+      {/* Voice command button */}
+      <TouchableOpacity
+        style={[
+          s.voiceMicBtn,
+          whisper.recording && s.voiceMicBtnActive,
+        ]}
+        onPressIn={() => whisper.startRecording()}
+        onPressOut={handleVoiceCommand}
+        activeOpacity={0.8}
+      >
+        {whisper.transcribing ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <Ionicons
+            name={whisper.recording ? "mic" : "mic-outline"}
+            size={22}
+            color="#fff"
+          />
+        )}
+      </TouchableOpacity>
+
+      {/* Voice command toast */}
+      {voiceCmdToast !== null && (
+        <View style={s.voiceToast}>
+          <Text style={s.voiceToastText} numberOfLines={2}>{voiceCmdToast}</Text>
         </View>
       )}
 

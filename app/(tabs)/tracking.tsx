@@ -1,5 +1,5 @@
-import React from "react";
-import { ActivityIndicator, Animated, Modal, Text, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { ActivityIndicator, Animated, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -13,6 +13,7 @@ import { useTrackingState } from "@/components/tracking/useTrackingState";
 import { apiRequest } from "@/lib/query-client";
 import { trackingStyles as styles } from "@/components/tracking/tracking-styles";
 import DebugPanel from "@/components/DebugPanel";
+import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 
 // Extracted Components
 import { RecordCard } from "@/components/tracking/RecordCard";
@@ -33,6 +34,26 @@ function TrackingScreenInner() {
   const { activeTileUrl, activeTileMaxZoom } = useMapConfig();
 
   const { state, handlers } = useTrackingState();
+  const whisper = useWhisperRecorder();
+  const [voiceNoteToast, setVoiceNoteToast] = useState<string | null>(null);
+
+  const handleVoiceNote = async () => {
+    if (whisper.recording) {
+      const text = await whisper.stopAndTranscribe();
+      if (text) {
+        const saved = await handlers.handleSaveVoiceNote(text);
+        const msg = saved ? `📝 Nota: "${text.slice(0, 60)}"` : `📝 "${text.slice(0, 60)}" (non salvata)`;
+        setVoiceNoteToast(msg);
+        setTimeout(() => setVoiceNoteToast(null), 4000);
+      } else {
+        setVoiceNoteToast(whisper.error ?? "Trascrizione fallita");
+        setTimeout(() => setVoiceNoteToast(null), 3000);
+      }
+    } else {
+      await whisper.startRecording();
+      setVoiceNoteToast("🎙 Registrazione in corso… tocca di nuovo per fermare");
+    }
+  };
   const handsOffAnim = React.useRef(new Animated.Value(1)).current;
 
   const isFermo = state.currentSpeed <= 2; // IDLE_THRESHOLD_KMH
@@ -98,6 +119,36 @@ function TrackingScreenInner() {
           router={router}
           styles={styles}
         />
+      )}
+
+      {/* ── VOICE NOTE FLOATING BUTTON (active / paused) ─────────────────── */}
+      {(state.phase === "active" || state.phase === "paused") && (
+        <>
+          <TouchableOpacity
+            style={[
+              voiceStyles.voiceFab,
+              { bottom: insets.bottom + 90 },
+              whisper.recording && voiceStyles.voiceFabActive,
+            ]}
+            onPress={handleVoiceNote}
+            activeOpacity={0.85}
+          >
+            {whisper.transcribing ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Ionicons
+                name={whisper.recording ? "mic" : "mic-outline"}
+                size={22}
+                color="#fff"
+              />
+            )}
+          </TouchableOpacity>
+          {voiceNoteToast !== null && (
+            <View style={[voiceStyles.voiceToast, { bottom: insets.bottom + 150 }]}>
+              <Text style={voiceStyles.voiceToastText} numberOfLines={3}>{voiceNoteToast}</Text>
+            </View>
+          )}
+        </>
       )}
 
       {/* ── COUNTDOWN ────────────────────────────────────────────────────── */}
@@ -354,6 +405,35 @@ function TrackingScreenInner() {
     </View>
   );
 }
+
+const voiceStyles = StyleSheet.create({
+  voiceFab: {
+    position: "absolute",
+    right: 14,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "rgba(0,0,0,0.62)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 5,
+  },
+  voiceFabActive: { backgroundColor: Colors.accent },
+  voiceToast: {
+    position: "absolute",
+    left: 14,
+    right: 70,
+    backgroundColor: "rgba(0,0,0,0.78)",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  voiceToastText: { fontFamily: "Inter_400Regular", fontSize: 13, color: "#fff" },
+});
 
 export default function TrackingScreen() {
   return <TrackingScreenInner />;

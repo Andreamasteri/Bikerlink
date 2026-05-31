@@ -1,16 +1,17 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
-
   TextInput,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
+import { useWhisperRecorder } from "@/hooks/useWhisperRecorder";
 
 interface ChatInputProps {
   inputText: string;
@@ -35,6 +36,45 @@ export function ChatInput({
 }: ChatInputProps) {
   const t = useT();
   const insets = useSafeAreaInsets();
+  const whisper = useWhisperRecorder();
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  const startPulse = () => {
+    pulseLoopRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.3, duration: 500, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ])
+    );
+    pulseLoopRef.current.start();
+  };
+
+  const stopPulse = () => {
+    pulseLoopRef.current?.stop();
+    pulseAnim.setValue(1);
+  };
+
+  const handleMicPressIn = async () => {
+    await whisper.startRecording();
+    startPulse();
+  };
+
+  const handleMicPressOut = async () => {
+    stopPulse();
+    const text = await whisper.stopAndTranscribe();
+    if (text) {
+      onChangeText(inputText ? inputText + " " + text : text);
+    }
+  };
+
+  const micColor = whisper.recording
+    ? Colors.accent
+    : whisper.transcribing
+    ? Colors.warning
+    : Colors.accent;
+
+  const isMicBusy = whisper.recording || whisper.transcribing;
 
   return (
     <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
@@ -72,6 +112,25 @@ export function ChatInput({
             maxLength={1000}
           />
         </View>
+
+        <TouchableOpacity
+          onPressIn={handleMicPressIn}
+          onPressOut={handleMicPressOut}
+          style={[styles.micButton, isMicBusy && styles.micButtonActive]}
+          disabled={whisper.transcribing}
+        >
+          {whisper.transcribing ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Animated.View style={{ transform: [{ scale: pulseAnim }] }}>
+              <Ionicons
+                name={whisper.recording ? "mic" : "mic-outline"}
+                size={20}
+                color={isMicBusy ? "#fff" : micColor}
+              />
+            </Animated.View>
+          )}
+        </TouchableOpacity>
 
         <TouchableOpacity
           onPress={onSend}
@@ -117,6 +176,19 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     paddingTop: 0,
     paddingBottom: 0,
+  },
+  micButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.surfaceLight,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 2,
+    marginHorizontal: 2,
+  },
+  micButtonActive: {
+    backgroundColor: Colors.accent,
   },
   sendButton: {
     width: 40,

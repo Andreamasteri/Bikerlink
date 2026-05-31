@@ -522,6 +522,16 @@ export function useTrackingState() {
       setMapModalVisible: mapState.setMapModalVisible, setRouteMapVisible: mapState.setRouteMapVisible, setPublishRecord: session.setPublishRecord, setPublishCaption: session.setPublishCaption, setRideTitle: session.setRideTitle, setHistMapVisible: mapState.setHistMapVisible,
       setShowSensorOverlay: sensors.setShowSensorOverlay, setShowBatteryStats: battery.setShowBatteryStats, setDebugVisible, handleDebugTap, clearDebugLogs, handleStart, handleStop, handlePause, handleRecalibrate,
       handleDeleteRecord: (id: string) => stats.handleDeleteRecord(id, refetchRecords), handleViewHistoricalRoute: mapState.handleViewHistoricalRoute, handleExportGpx: mapState.handleExportGpx, handlePublish: session.handlePublish, discardSprintAttempt, refetchRecords,
+      handleSaveVoiceNote: async (note: string): Promise<boolean> => {
+        const rId = refs.routeIdRef.current;
+        if (!rId) return false;
+        try {
+          await apiRequest("POST", `/api/routes/${rId}/voice-notes`, { text: note.slice(0, 2000) });
+          return true;
+        } catch {
+          return false;
+        }
+      },
     },
     avgSpeedDisplayKmh: stats.avgSpeedDisplayKmh,
   };

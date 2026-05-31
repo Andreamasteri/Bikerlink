@@ -16,6 +16,7 @@ import {
   eventParticipants,
   routes,
   routePoints,
+  routeVoiceNotes,
   matchPreferences,
   type InsertEventParticipant,
 } from "@shared/db";
@@ -474,6 +475,59 @@ router.patch("/routes/:id", requireAuth, async (req: Request, res: Response) => 
     return res.json({ route: updated });
   } catch (err) {
     console.error("[routes/:id PATCH]", err);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+// ── /api/routes/:id/voice-notes (POST) ──────────────────────────────────
+// Appende una nota vocale trascritta alla corsa in corso.
+// Non sovrascrive il titolo — usa una tabella dedicata route_voice_notes.
+router.post("/routes/:id/voice-notes", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const id = req.params.id as string;
+    const route = await storage.getRoute(id);
+    if (!route) return sendError(res, 404, "Route non trovata");
+    if (route.userId !== userId) return sendError(res, 403, "Non autorizzato");
+
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const rawText = body.text;
+    if (typeof rawText !== "string" || rawText.trim().length === 0) {
+      return sendError(res, 400, "Campo 'text' obbligatorio");
+    }
+    const text = rawText.slice(0, 2000);
+
+    const [note] = await db
+      .insert(routeVoiceNotes)
+      .values({ routeId: id, text })
+      .returning();
+
+    return res.status(201).json({ note });
+  } catch (err) {
+    console.error("[routes/:id/voice-notes POST]", err);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+// ── /api/routes/:id/voice-notes (GET) ───────────────────────────────────
+// Restituisce tutte le note vocali associate a una corsa.
+router.get("/routes/:id/voice-notes", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const id = req.params.id as string;
+    const route = await storage.getRoute(id);
+    if (!route) return sendError(res, 404, "Route non trovata");
+    if (route.userId !== userId) return sendError(res, 403, "Non autorizzato");
+
+    const notes = await db
+      .select()
+      .from(routeVoiceNotes)
+      .where(eq(routeVoiceNotes.routeId, id))
+      .orderBy(asc(routeVoiceNotes.createdAt));
+
+    return res.json({ notes });
+  } catch (err) {
+    console.error("[routes/:id/voice-notes GET]", err);
     return sendError(res, 500, "Errore interno del server");
   }
 });

@@ -116,6 +116,22 @@ export const customRouteWaypoints = pgTable("custom_route_waypoints", {
   index("custom_route_waypoints_route_id_idx").on(table.routeId),
 ]);
 
+export const routeVoiceNotes = pgTable("route_voice_notes", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  routeId: varchar("route_id", { length: 36 })
+    .notNull()
+    .references(() => routes.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("route_voice_notes_route_id_idx").on(table.routeId),
+]);
+
+export type RouteVoiceNote = typeof routeVoiceNotes.$inferSelect;
+export type InsertRouteVoiceNote = typeof routeVoiceNotes.$inferInsert;
+
 export type Route = typeof routes.$inferSelect;
 export type InsertRoute = typeof routes.$inferInsert;
 export type SprintResult = typeof sprintResults.$inferSelect;
