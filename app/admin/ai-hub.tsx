@@ -8,17 +8,238 @@
  * gli hooks esistenti senza nuove API.
  */
 import React from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import type { Href } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { useAiActionQueue } from "@/hooks/admin/ai-console/useAiActionQueue";
 import { useAiAlertsState } from "@/hooks/admin/ai-console/useAiAlerts";
 import { useAiPinned } from "@/hooks/admin/ai-console/useAiPinned";
+
+interface OllamaTestResult {
+  configured: boolean;
+  model: string;
+  url: string | null;
+  token_configured: boolean;
+  latency_ms: number | null;
+  ok: boolean;
+  reply?: string | null;
+  error?: string;
+}
+
+function OllamaStatusCard() {
+  const [result, setResult] = React.useState<OllamaTestResult | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const runTest = async () => {
+    setLoading(true);
+    try {
+      const url = new URL("/api/admin/ai/test-ollama", getApiUrl()).toString();
+      const res = await fetch(url, {
+        headers: authFetchHeaders(),
+        credentials: "include",
+      });
+      const data: OllamaTestResult = await res.json();
+      setResult(data);
+    } catch {
+      setResult(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const badgeColor = !result
+    ? Colors.textSecondary
+    : !result.configured
+      ? Colors.textSecondary
+      : result.ok
+        ? Colors.success
+        : Colors.error;
+
+  const badgeLabel = !result
+    ? "—"
+    : !result.configured
+      ? "NON CONFIG."
+      : result.ok
+        ? "ONLINE"
+        : "OFFLINE";
+
+  const badgeIcon: keyof typeof MaterialCommunityIcons.glyphMap = !result
+    ? "circle-outline"
+    : !result.configured
+      ? "circle-off-outline"
+      : result.ok
+        ? "check-circle-outline"
+        : "alert-circle-outline";
+
+  return (
+    <View style={ollamaStyles.card}>
+      <View style={ollamaStyles.header}>
+        <View style={ollamaStyles.headerLeft}>
+          <MaterialCommunityIcons name="brain" size={20} color="#FF6600" />
+          <Text style={ollamaStyles.title}>Ollama AI Server</Text>
+        </View>
+        <View style={ollamaStyles.headerRight}>
+          {result && (
+            <View style={[ollamaStyles.badge, { borderColor: badgeColor, backgroundColor: badgeColor + "22" }]}>
+              <MaterialCommunityIcons name={badgeIcon} size={12} color={badgeColor} />
+              <Text style={[ollamaStyles.badgeText, { color: badgeColor }]}>{badgeLabel}</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={[ollamaStyles.testBtn, loading && ollamaStyles.testBtnDisabled]}
+            onPress={runTest}
+            disabled={loading}
+            activeOpacity={0.7}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <MaterialCommunityIcons name="play-circle-outline" size={14} color="#fff" />
+                <Text style={ollamaStyles.testBtnText}>Test</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {result && (
+        <View style={ollamaStyles.body}>
+          <View style={ollamaStyles.row}>
+            <Text style={ollamaStyles.label}>Modello</Text>
+            <Text style={ollamaStyles.value}>{result.model}</Text>
+          </View>
+          {result.url && (
+            <View style={ollamaStyles.row}>
+              <Text style={ollamaStyles.label}>URL</Text>
+              <Text style={ollamaStyles.value}>{result.url}</Text>
+            </View>
+          )}
+          <View style={ollamaStyles.row}>
+            <Text style={ollamaStyles.label}>Token</Text>
+            <Text style={ollamaStyles.value}>{result.token_configured ? "Configurato" : "Assente"}</Text>
+          </View>
+          {result.latency_ms != null && (
+            <View style={ollamaStyles.row}>
+              <Text style={ollamaStyles.label}>Latenza</Text>
+              <Text style={[ollamaStyles.value, { color: result.ok ? Colors.success : Colors.error }]}>
+                {result.latency_ms} ms
+              </Text>
+            </View>
+          )}
+          {!result.configured && (
+            <Text style={ollamaStyles.hint}>
+              Imposta OLLAMA_URL nelle variabili d'ambiente per abilitare il provider AI self-hosted.
+            </Text>
+          )}
+          {result.configured && !result.ok && result.error && (
+            <View style={ollamaStyles.errorBox}>
+              <MaterialCommunityIcons name="alert-circle-outline" size={13} color={Colors.error} />
+              <Text style={ollamaStyles.errorText} numberOfLines={3}>{result.error}</Text>
+            </View>
+          )}
+          {result.configured && result.ok && result.reply && (
+            <View style={ollamaStyles.replyBox}>
+              <MaterialCommunityIcons name="message-check-outline" size={13} color={Colors.success} />
+              <Text style={ollamaStyles.replyText}>{result.reply}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {!result && (
+        <Text style={ollamaStyles.hint}>
+          Premi Test per verificare la raggiungibilità del server Ollama (route parsing + traduzioni).
+        </Text>
+      )}
+    </View>
+  );
+}
+
+const ollamaStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+  },
+  headerLeft: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  title: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  badgeText: { fontFamily: "Inter_700Bold", fontSize: 10, letterSpacing: 0.3 },
+  testBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: Colors.accent,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    minWidth: 62,
+    justifyContent: "center",
+  },
+  testBtnDisabled: { opacity: 0.6 },
+  testBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#fff" },
+  body: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    padding: 14,
+    gap: 8,
+  },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  label: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary },
+  value: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, flexShrink: 1, textAlign: "right" },
+  hint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+    lineHeight: 18,
+  },
+  errorBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: Colors.error + "15",
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 4,
+  },
+  errorText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.error, flex: 1, lineHeight: 17 },
+  replyBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: Colors.success + "15",
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 4,
+  },
+  replyText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.success, flex: 1 },
+});
 
 interface AiHubCardData {
   state: "ok" | "warn" | "frozen";
@@ -181,6 +402,7 @@ export default function AiHubScreen() {
           />
         </TouchableOpacity>
       ) : null}
+      <OllamaStatusCard />
       <View style={styles.grid}>
         {cards.map((card) => (
           <TouchableOpacity
