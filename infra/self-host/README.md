@@ -195,22 +195,47 @@ chmod +x setup-missing.sh
 | GraphHopper | avviato | **saltato** (già attivo) |
 | Ollama | non gestito | **saltato** (già attivo) |
 | Verifica spazio disco | ✓ (>100 GB richiesti) | ✗ (non effettuata) |
-| Download dati OSM | ✓ (interattivo) | ✗ (solo warning se PBF assente) |
+| Download dati OSM | ✓ (interattivo) | ✓ (prompt opzionale se PBF assente) |
 | Generazione `.env` | ✓ | ✓ (stessa logica, non sovrascrive) |
 | Generazione `.env.local` | ✓ | ✓ (non sovrascrive se già presente) |
 
 ### Dati OSM per Valhalla
 
-Se vuoi che Valhalla costruisca i tile all'avvio, il file PBF deve essere già presente
-in `./data/` prima di lanciare `setup-missing.sh`. Se non è presente lo script emette
-un warning ma procede comunque ad avviare i servizi.
+Se il file PBF non è presente in `./data/`, lo script lo rileva e chiede se vuoi
+scaricarlo subito:
+
+```
+  → Nessun file PBF trovato in ./data/
+  → Il download scarica Europa + Ecuador (~35 GB) e richiede circa 2 ore.
+  Vuoi scaricare i dati OSM ora? [s/N]
+```
+
+- **Rispondi `s`**: `download-osm.sh` viene eseguito in sequenza (download + verifica MD5
+  + merge osmium), poi Valhalla viene avviato con `--force-recreate` per triggerare il
+  build dei tile.
+- **Rispondi `N` / invio**: lo script salta il download e avvia ugualmente tutti i
+  servizi. Valhalla partirà vuoto e non calcolerà percorsi finché non riceverà i dati.
+
+> **Nota:** ogni volta che il file PBF è presente in `./data/`, lo script avvia Valhalla
+> con `--force-recreate`. Questo garantisce che il container costruisca i tile anche se
+> era già in esecuzione da prima del download. I tile già costruiti (nel volume Docker)
+> vengono preservati: se sono aggiornati, Valhalla li rileva e non riesegue il build.
+
+Puoi scaricare i dati in un secondo momento e poi rilanciare lo script:
 
 ```bash
-# Scarica i dati OSM prima di avviare (opzionale — lo puoi fare anche dopo)
+# Download dei dati OSM (Europa + Ecuador, ~35 GB, idempotente)
 ./download-osm.sh
-# Poi avvia i servizi mancanti
+
+# Rilancia setup-missing.sh: rileverà il PBF e riavvierà Valhalla con --force-recreate
 ./setup-missing.sh
+
+# Oppure, se i servizi sono già tutti in piedi, riavvia solo Valhalla manualmente:
+docker compose up -d --force-recreate valhalla
 ```
+
+In modalità non-interattiva (`NONINTERACTIVE=1`), il download viene saltato
+automaticamente e viene stampato solo un avviso.
 
 ### Secret locali
 

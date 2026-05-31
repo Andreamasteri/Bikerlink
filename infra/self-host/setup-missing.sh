@@ -270,21 +270,66 @@ DATA_DIR="${DATA_DIR:-${SCRIPT_DIR}/data}"
 mkdir -p "$DATA_DIR"
 
 PBF_FILE="${DATA_DIR}/europe-ecuador-merged.osm.pbf"
+VALHALLA_FORCE_RECREATE=0
+
 if [[ -f "$PBF_FILE" ]]; then
   ok "PBF trovato: ${PBF_FILE}"
   info "Valhalla builderà i tile all'avvio (può richiedere fino a 3h per l'Europa)."
 else
   warn "Nessun file PBF trovato in ${DATA_DIR}/"
-  warn "Valhalla si avvierà ma NON potrà costruire i tile senza dati OSM."
-  warn "Per scaricare i dati esegui: ./download-osm.sh"
-  warn "Oppure copia un file .pbf in ${DATA_DIR}/ e rilancia questo script."
+  warn "Senza dati OSM Valhalla si avvierà vuoto e non potrà calcolare percorsi."
+
+  _do_download=0
+  if [[ "$NONINTERACTIVE" == "1" ]]; then
+    warn "Modalità non-interattiva: skip download automatico."
+    warn "Esegui './download-osm.sh' manualmente e poi rilancia questo script."
+  else
+    echo ""
+    info "Il download scarica Europa + Ecuador (~35 GB) e richiede circa 2 ore."
+    read -r -p "  Vuoi scaricare i dati OSM ora? [s/N] " _dl_reply
+    [[ "${_dl_reply,,}" == "s" || "${_dl_reply,,}" == "y" ]] && _do_download=1
+  fi
+
+  if [[ "$_do_download" == "1" ]]; then
+    DOWNLOAD_SCRIPT="${SCRIPT_DIR}/download-osm.sh"
+    [[ -f "$DOWNLOAD_SCRIPT" ]] || die "download-osm.sh non trovato in ${SCRIPT_DIR}/"
+    chmod +x "$DOWNLOAD_SCRIPT"
+    info "Avvio download-osm.sh (puoi interrompere con Ctrl-C e riprendere dopo)..."
+    "$DOWNLOAD_SCRIPT"
+    if [[ -f "$PBF_FILE" ]]; then
+      ok "PBF pronto: ${PBF_FILE}"
+      VALHALLA_FORCE_RECREATE=1
+    else
+      warn "download-osm.sh terminato ma il file PBF non risulta presente — controlla gli errori sopra."
+    fi
+  else
+    warn "Download saltato."
+    warn "Per scaricare i dati in seguito esegui: ./download-osm.sh"
+    warn "Poi rilancia questo script (o: docker compose up -d --force-recreate valhalla)."
+  fi
 fi
 
 # =============================================================================
 section "5/6 — Avvio servizi mancanti (GraphHopper escluso)"
 # =============================================================================
-info "Avvio: postgres redis valhalla pgadmin  (GraphHopper già attivo — saltato)"
-$DOCKER compose --env-file "$ENV_FILE" up -d postgres redis valhalla pgadmin
+info "Avvio: postgres redis pgadmin  (GraphHopper già attivo — saltato)"
+$DOCKER compose --env-file "$ENV_FILE" up -d postgres redis pgadmin
+
+info "Avvio Valhalla..."
+if [[ -f "$PBF_FILE" ]]; then
+  # PBF presente: usa --force-recreate per garantire che Valhalla (anche se già
+  # in esecuzione senza dati) venga riavviato e costruisca i tile.
+  # I tile già costruiti (nel volume Docker) vengono preservati; il container
+  # li rileva all'avvio e non riesegue il build se sono aggiornati.
+  if [[ "$VALHALLA_FORCE_RECREATE" == "1" ]]; then
+    info "PBF appena scaricato — avvio Valhalla con --force-recreate per triggerare il build dei tile."
+  else
+    info "PBF presente — avvio Valhalla con --force-recreate per garantire il build dei tile."
+  fi
+  $DOCKER compose --env-file "$ENV_FILE" up -d --force-recreate valhalla
+else
+  $DOCKER compose --env-file "$ENV_FILE" up -d valhalla
+fi
 
 # Attesa health check per servizio.
 wait_healthy() {
