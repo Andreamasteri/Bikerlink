@@ -167,11 +167,60 @@ docker compose down -v      # ATTENZIONE: cancella anche i volumi (dati persi)
 
 ---
 
+## Setup parziale (GraphHopper già installato)
+
+Se GraphHopper (porta 8989) e Ollama sono già attivi sul server e vuoi aggiungere
+solo i servizi rimanenti (**PostgreSQL, Redis, Valhalla, pgAdmin**), usa lo script
+dedicato invece del `setup.sh` completo:
+
+```bash
+cd infra/self-host
+chmod +x setup-missing.sh
+./setup-missing.sh
+```
+
+### Differenze rispetto a `setup.sh`
+
+| Aspetto | `setup.sh` | `setup-missing.sh` |
+|---------|------------|--------------------|
+| Servizi avviati | tutti e 5 | postgres, redis, valhalla, pgadmin |
+| GraphHopper | avviato | **saltato** (già attivo) |
+| Ollama | non gestito | **saltato** (già attivo) |
+| Verifica spazio disco | ✓ (>100 GB richiesti) | ✗ (non effettuata) |
+| Download dati OSM | ✓ (interattivo) | ✗ (solo warning se PBF assente) |
+| Generazione `.env` | ✓ | ✓ (stessa logica, non sovrascrive) |
+| Generazione `.env.local` | ✓ | ✓ (non sovrascrive se già presente) |
+
+### Dati OSM per Valhalla
+
+Se vuoi che Valhalla costruisca i tile all'avvio, il file PBF deve essere già presente
+in `./data/` prima di lanciare `setup-missing.sh`. Se non è presente lo script emette
+un warning ma procede comunque ad avviare i servizi.
+
+```bash
+# Scarica i dati OSM prima di avviare (opzionale — lo puoi fare anche dopo)
+./download-osm.sh
+# Poi avvia i servizi mancanti
+./setup-missing.sh
+```
+
+### Secret locali
+
+Come `setup.sh`, anche `setup-missing.sh` supporta `--gen-secrets` per generare
+automaticamente `SESSION_SECRET` e `OSM_UPDATE_SECRET` nel `.env.local`:
+
+```bash
+./setup-missing.sh --gen-secrets
+```
+
+---
+
 ## File in questa cartella
 
 | File | Scopo |
 |------|-------|
 | `setup.sh` | Setup end-to-end (prerequisiti, download, avvio, health check). |
+| `setup-missing.sh` | Setup parziale: installa solo postgres, redis, valhalla, pgadmin (GraphHopper già attivo). |
 | `download-osm.sh` | Scarica Europa + Ecuador, verifica MD5, merge in un unico PBF. |
 | `update-osm.sh` | Aggiornamento incrementale dati OSM (diff) + rebuild a caldo. |
 | `docker-compose.yml` | Definizione dei 5 servizi e dei volumi persistenti. |
