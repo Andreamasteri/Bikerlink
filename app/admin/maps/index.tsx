@@ -11,6 +11,8 @@ import { RolloutCard } from "./RolloutCard";
 import { RendererCard } from "./RendererCard";
 import { RoutingCard } from "./RoutingCard";
 import { TileProvidersCard } from "./TileProvidersCard";
+import { GeocodingCard } from "./GeocodingCard";
+import type { NominatimHealth } from "./GeocodingCard";
 
 interface AdminMapsConfig {
   rollout: MapsRollout;
@@ -30,6 +32,7 @@ interface AdminMapsConfig {
     resets_at: string;
     warning_threshold: number;
   };
+  nominatim?: NominatimHealth;
 }
 
 export default function AdminMapsPage() {
@@ -137,6 +140,8 @@ export default function AdminMapsPage() {
         isPending={routingMutation.isPending}
         onRoutingChange={(engine, profile) => routingMutation.mutate({ engine, profile })}
       />
+
+      {data.nominatim && <GeocodingCard nominatim={data.nominatim} />}
 
       <TileProvidersCard />
 

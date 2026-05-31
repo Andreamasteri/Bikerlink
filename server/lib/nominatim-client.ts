@@ -21,6 +21,15 @@ const PUBLIC_URL = "https://nominatim.openstreetmap.org";
 const BASE_URL = SELF_HOSTED_URL ?? PUBLIC_URL;
 const isSelfHosted = Boolean(SELF_HOSTED_URL);
 
+function maskUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.protocol}//${parsed.hostname}`;
+  } catch {
+    return url.slice(0, 40);
+  }
+}
+
 const DEFAULT_TIMEOUT_MS = 10_000;
 const USER_AGENT = "BikerLink/4.0 (info@bikerlink.it)";
 
@@ -122,6 +131,37 @@ async function nominatimFetch(path: string): Promise<Response> {
 }
 
 // ─── Public interfaces ────────────────────────────────────────────────────────
+
+export interface NominatimHealthSnapshot {
+  configured: boolean;
+  url: string;
+  latencyMs: number | null;
+  ok: boolean;
+}
+
+/**
+ * Probe leggero verso il server Nominatim (endpoint /status).
+ * Usato dal pannello admin mappe per mostrare latenza e stato del geocoder.
+ * Timeout ridotto a 5 s per non rallentare il caricamento dell'admin panel.
+ */
+export async function getNominatimHealthSnapshot(): Promise<NominatimHealthSnapshot> {
+  const maskedUrl = maskUrl(BASE_URL);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  const t0 = Date.now();
+  try {
+    const res = await fetch(`${BASE_URL}/status?format=json`, {
+      headers: buildHeaders(),
+      signal: controller.signal,
+    });
+    const latencyMs = Date.now() - t0;
+    return { configured: isSelfHosted, url: maskedUrl, latencyMs, ok: res.ok };
+  } catch {
+    return { configured: isSelfHosted, url: maskedUrl, latencyMs: null, ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export interface GeocodeResult {
   name: string;

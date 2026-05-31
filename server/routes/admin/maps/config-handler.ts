@@ -9,6 +9,7 @@ import {
 import type { MapsRendererId, MapsTileId, RoutingEngineId, RoutingProfileId, MapsRollout } from "@shared/maps-config";
 import { checkQuota } from "../../../routing/mapbox/quota-guard";
 import { getDemSource } from "../../../../lib/maplibre/style-3d";
+import { getNominatimHealthSnapshot } from "../../../lib/nominatim-client";
 
 const router = Router();
 
@@ -22,7 +23,7 @@ function isMapboxAvailable(): boolean {
 
 router.get("/config", async (_req: Request, res: Response) => {
   try {
-    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting, osmSetting, matchingIntegrationSetting] =
+    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting, osmSetting, matchingIntegrationSetting, nominatimHealth] =
       await Promise.all([
         storage.getAppSetting("maps_rollout"),
         storage.getAppSetting("maps_renderer"),
@@ -31,6 +32,7 @@ router.get("/config", async (_req: Request, res: Response) => {
         storage.getAppSetting("maps_routing_profile"),
         storage.getAppSetting("osm_last_updated_at"),
         storage.getAppSetting("matching_integration"),
+        getNominatimHealthSnapshot(),
       ]);
 
     const routing = (engineSetting?.value ?? DEFAULT_ENGINE) as RoutingEngineId;
@@ -81,6 +83,7 @@ router.get("/config", async (_req: Request, res: Response) => {
       available_profiles: AVAILABLE_PROFILES,
       // Task #2528 — toggle integrazione matching ↔ planned routes
       matching_integration: matchingIntegrationSetting?.value !== "false",
+      nominatim: nominatimHealth,
     };
 
     if (mapbox_quota !== undefined) {
