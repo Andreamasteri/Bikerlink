@@ -151,7 +151,7 @@ export class MatchingStorage extends ContestStorage {
         m.id AS m_id, m.user_id AS m_user_id, m.brand AS m_brand,
         m.model AS m_model, m.motorcycle_type AS m_motorcycle_type,
         m.riding_style AS m_riding_style, m.year AS m_year,
-        m.engine_size AS m_engine_size, m.is_primary AS m_is_primary,
+        m.displacement AS m_displacement, m.is_default AS m_is_default,
         m.created_at AS m_created_at,
         wl.user_id AS zavarrina_id,
         m.user_id AS biker_id
@@ -189,8 +189,8 @@ export class MatchingStorage extends ContestStorage {
       motorcycle: {
         id: r.m_id, userId: r.m_user_id, brand: r.m_brand, model: r.m_model,
         motorcycleType: r.m_motorcycle_type, ridingStyle: r.m_riding_style,
-        year: r.m_year, engineSize: r.m_engine_size,
-        isPrimary: r.m_is_primary, createdAt: r.m_created_at,
+        year: r.m_year, displacement: r.m_displacement,
+        isDefault: r.m_is_default, createdAt: r.m_created_at,
       } as unknown as import("@shared/db").UserMotorcycle,
     }));
   }
