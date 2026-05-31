@@ -234,7 +234,8 @@ location /ollama/ {
     rewrite ^/ollama/(.*)\$ /\$1 break;
 
     proxy_pass http://127.0.0.1:${OLLAMA_PORT};
-    proxy_set_header Host \$host;
+    # Ollama accetta solo Host localhost — passiamo quello per evitare 403 vuoto.
+    proxy_set_header Host localhost;
     proxy_set_header X-Real-IP \$remote_addr;
     proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto \$scheme;
