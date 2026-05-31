@@ -20,6 +20,13 @@ const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio")
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
 import { getActiveRouter } from "../../routing/router-selector";
 import type { RouteRequest } from "../../routing/graphhopper-adapter";
+import {
+  buildGeometricWeights,
+  buildTelemetryWeightsForRoute,
+  extractRouteWayIds,
+  normalizeStyle,
+  normalizeDrivingProfile,
+} from "../../routing/route-weights";
 
 const router = Router();
 
@@ -320,6 +327,9 @@ router.post("/calculate", async (req: Request, res: Response) => {
     language: _language,
   } = parsedCalc.data;
 
+  const normStyle = normalizeStyle(style);
+  const normProfile = normalizeDrivingProfile(drivingProfile);
+
   const DIRECTION_DEGREES: Record<string, number> = {
     N: 0, NE: 45, E: 90, SE: 135, S: 180, SO: 225, O: 270, NO: 315,
   };
@@ -329,8 +339,8 @@ router.post("/calculate", async (req: Request, res: Response) => {
     const headingDeg = DIRECTION_DEGREES[roundTripDirection];
     const headingRad = headingDeg * Math.PI / 180;
     const start = waypoints[0];
-    const styleAvgSpeed: Record<string, number> = { curvy: 55, balanced: 65, fast: 85 };
-    const avgKmh = styleAvgSpeed[style] ?? 65;
+    const styleAvgSpeed: Record<string, number> = { direct: 80, curvy: 55, balanced: 65, fast: 85, extra_curvy: 50 };
+    const avgKmh = styleAvgSpeed[normStyle] ?? 65;
     const offsetKm = (roundTripHours ?? 2) * avgKmh * 0.4;
     const deltaLat = offsetKm / 111.32;
     const deltaLng = offsetKm / (111.32 * Math.cos(start.lat * Math.PI / 180));
@@ -363,62 +373,13 @@ router.post("/calculate", async (req: Request, res: Response) => {
       body.heading = headingDeg;
     }
 
-    const priority: Array<{ if: string; multiply_by: number }> = [];
-
-    if (style === "curvy") {
-      priority.push(
-        { if: "road_class == MOTORWAY", multiply_by: avoidHighways ? 0.0 : 0.1 },
-        { if: "road_class == TRUNK", multiply_by: 0.2 },
-        { if: "road_class == PRIMARY", multiply_by: 0.5 },
-        { if: "road_class == SECONDARY", multiply_by: 1.0 },
-        { if: "road_class == TERTIARY", multiply_by: 1.2 },
-        { if: "road_class == UNCLASSIFIED", multiply_by: 1.1 }
-      );
-    } else if (style === "balanced") {
-      priority.push(
-        { if: "road_class == MOTORWAY", multiply_by: avoidHighways ? 0.0 : 0.4 },
-        { if: "road_class == SECONDARY", multiply_by: 1.1 }
-      );
-    } else if (style === "fast") {
-      if (avoidHighways) {
-        priority.push({ if: "road_class == MOTORWAY", multiply_by: 0.0 });
-      }
-    }
-
-    if (avoidTolls) {
-      priority.push({ if: "toll == ALL", multiply_by: 0.0 });
-    }
-    if (avoidHighways && style !== "curvy" && style !== "balanced" && style !== "fast") {
-      priority.push({ if: "road_class == MOTORWAY", multiply_by: 0.0 });
-    }
-    if (avoidFerries) {
-      priority.push({ if: "road_environment == FERRY", multiply_by: 0.0 });
-    }
-    if (avoidUnpaved) {
-      priority.push({ if: "road_environment == UNPAVED", multiply_by: 0.0 });
-    }
-
-    if (drivingProfile === "my_style") {
-      const { getUserStyleProfile } = await import("../../curvy-score-job");
-      const { storage: st } = await import("../../storage");
-      const [uProfile, targetKmSetting] = await Promise.all([
-        getUserStyleProfile(userId),
-        st.getAppSetting("telemetry_target_km"),
-      ]);
-      const targetKm = parseInt(targetKmSetting?.value ?? "400", 10);
-      const userKm = uProfile?.totalKm ?? 0;
-
-      if (userKm >= targetKm && uProfile?.avgLeanAngle) {
-        const leanFactor = Math.min(1.5, Math.max(0.8, (uProfile.avgLeanAngle / 30)));
-        priority.push({ if: "road_class == SECONDARY || road_class == TERTIARY", multiply_by: leanFactor });
-      } else {
-        myStyleWarning = "insufficient_data";
-      }
-    }
-
-    if (priority.length > 0) {
-      body.custom_model = { priority };
-    }
+    // Strato geometrico (base stabile per tutti i profili) + regole di avoidance.
+    const geo = buildGeometricWeights(normStyle, { avoidHighways });
+    const avoidRules: Array<{ if: string; multiply_by: number }> = [];
+    if (avoidTolls) avoidRules.push({ if: "toll == ALL", multiply_by: 0.0 });
+    if (avoidFerries) avoidRules.push({ if: "road_environment == FERRY", multiply_by: 0.0 });
+    if (avoidUnpaved) avoidRules.push({ if: "road_environment == UNPAVED", multiply_by: 0.0 });
+    const basePriority = [...geo.priority, ...avoidRules];
 
     const { storage: _st } = await import("../../storage");
     const [rolloutSetting, engineSetting, routeUser] = await Promise.all([
@@ -426,16 +387,49 @@ router.post("/calculate", async (req: Request, res: Response) => {
       _st.getAppSetting("maps_routing_engine"),
       _st.getUser(userId),
     ]);
-    const routeResult = await getActiveRouter(
-      body as unknown as RouteRequest,
-      {
-        rollout: (rolloutSetting?.value ?? "disabled") as import("@shared/maps-config").MapsRollout,
-        engine: (engineSetting?.value ?? "graphhopper") as import("@shared/maps-config").RoutingEngineId,
-        isMapTester: routeUser?.mapTester ?? false,
-      },
-      res
-    );
-    const path = routeResult.paths[0];
+    const routerOpts = {
+      rollout: (rolloutSetting?.value ?? "disabled") as import("@shared/maps-config").MapsRollout,
+      engine: (engineSetting?.value ?? "graphhopper") as import("@shared/maps-config").RoutingEngineId,
+      isMapTester: routeUser?.mapTester ?? false,
+    };
+
+    const runRoute = (priorityRules: Array<{ if: string; multiply_by: number }>) => {
+      // Richiediamo i details osm_way_id per poter valutare la copertura
+      // telemetrica sui segmenti effettivi del percorso.
+      const reqBody: Record<string, unknown> = { ...body, details: ["osm_way_id"] };
+      const customModel: Record<string, unknown> = {};
+      if (priorityRules.length > 0) customModel.priority = priorityRules;
+      if (geo.distanceInfluence !== undefined) customModel.distance_influence = geo.distanceInfluence;
+      if (Object.keys(customModel).length > 0) reqBody.custom_model = customModel;
+      return getActiveRouter(reqBody as unknown as RouteRequest, routerOpts, res);
+    };
+
+    // Percorso geometrico di base: è il risultato per il profilo "geometric" e
+    // la base su cui valutare la copertura telemetrica del percorso richiesto.
+    const baseResult = await runRoute(basePriority);
+    let path = baseResult.paths[0];
+
+    // Strato telemetrico opzionale (real / my_style): applicato SOLO se i
+    // segmenti effettivi del percorso hanno copertura curvy_score valida.
+    // Altrimenti si mantiene il percorso geometrico e si segnala il warning.
+    if (normProfile !== "geometric") {
+      const routeWayIds = extractRouteWayIds(path as { details?: Record<string, unknown> });
+      const telemetry = await buildTelemetryWeightsForRoute(normProfile, userId, routeWayIds);
+      if (telemetry.applied) {
+        try {
+          const boosted = await runRoute([...basePriority, ...telemetry.priority]);
+          path = boosted.paths[0];
+        } catch (telemetryErr: unknown) {
+          // Lo strato telemetrico (regole su osm_way_id) può non essere supportato
+          // dal motore di routing: mantieni il geometrico (fallback stabile) e
+          // segnala il warning all'utente.
+          console.warn("[routing] telemetry layer failed, keep geometric:", (telemetryErr as Error)?.message ?? telemetryErr);
+          myStyleWarning = "insufficient_data";
+        }
+      } else {
+        myStyleWarning = telemetry.warning;
+      }
+    }
 
     return res.json({
       encoded: path.points,

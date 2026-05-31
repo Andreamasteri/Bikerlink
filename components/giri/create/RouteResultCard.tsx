@@ -67,13 +67,13 @@ export const RouteResultCard: React.FC<RouteResultCardProps> = ({
           </Pressable>
         </View>
       )}
-      {routeResult.warning === "my_style_fallback" && !dismissedWarnings.has("my_style_fallback") && (
+      {routeResult.warning === "insufficient_data" && !dismissedWarnings.has("insufficient_data") && (
         <View style={s.fallbackRow}>
           <Ionicons name="warning-outline" size={15} color="#f59e0b" />
           <Text style={s.fallbackText}>
-            Profilo "Il mio stile" non disponibile — usato il profilo geometrico
+            Dati telemetria insufficienti — usato il profilo geometrico
           </Text>
-          <Pressable onPress={() => onDismissWarning("my_style_fallback")} hitSlop={8}>
+          <Pressable onPress={() => onDismissWarning("insufficient_data")} hitSlop={8}>
             <Ionicons name="close" size={15} color="#f59e0b" />
           </Pressable>
         </View>
