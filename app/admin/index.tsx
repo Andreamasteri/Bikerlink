@@ -34,7 +34,7 @@ type AdminGroup = AdminGroupHeader & {
   items: AdminItem[];
 };
 
-const OPEN_BY_DEFAULT = new Set(["Utenti", "Contenuti", "Monitoraggio"]);
+const OPEN_BY_DEFAULT = new Set<string>();
 
 const adminGroups: AdminGroup[] = [
   {
@@ -259,8 +259,6 @@ export default function AdminDashboard() {
       ]}
       keyboardShouldPersistTaps="handled"
     >
-      <Text style={styles.subtitle}>Gestisci tutti gli aspetti dell'app</Text>
-
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={18} color={Colors.textSecondary} style={styles.searchIcon} />
         <TextInput
@@ -290,8 +288,8 @@ export default function AdminDashboard() {
         <>
           <ServerEfficiencyCard />
           <ThinkCentreCard />
-          <TelemetryCard />
           <GraphHopperCard />
+          <TelemetryCard />
         </>
       )}
 
@@ -361,12 +359,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-  },
-  subtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 20,
   },
   searchContainer: {
     flexDirection: "row",
