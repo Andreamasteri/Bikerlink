@@ -2,7 +2,7 @@
 // Auth: role IN ('admin','moderator','superadmin').
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { and, desc, eq, gte, lte, sql, isNull, or } from "drizzle-orm";
+import { and, desc, eq, lte, sql, isNull, or } from "drizzle-orm";
 import { db } from "../../db";
 import { storage } from "../../storage";
 import { sendError } from "../../lib/api-response";
@@ -20,12 +20,12 @@ import { routeMessage } from "../../ai/console/router";
 import { runAgent } from "../../ai/console/agent";
 import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../../ai/moderation/provider";
 import { buildSystemContext, loadMemory, updateMemory } from "../../ai/console/memory";
-import { SCOPES, type Scope } from "../../ai/console/tools";
+import { type Scope } from "../../ai/console/tools";
 
 const router = Router();
 
 // ── Auth middleware: admin/moderator/superadmin ───────────────────────────
-async function requireConsoleRole(req: Request, res: Response, next: () => void): Promise<void> {
+export async function requireConsoleRole(req: Request, res: Response, next: () => void): Promise<void> {
   const userId = (req.session as { userId?: string })?.userId;
   if (!userId) { sendError(res, 401, "Non autenticato"); return; }
   try {
@@ -417,89 +417,7 @@ function countBy<T extends Record<string, unknown>>(arr: T[], key: keyof T): Rec
   return out;
 }
 
-// ── GET /console/search?q=... — full-text su aiMessages.content ───────────
-router.get("/ai/console/search", async (req: Request, res: Response) => {
-  const userId = (req.session as { userId?: string }).userId as string;
-  const q = String(req.query.q ?? "").trim();
-  if (q.length < 2) { sendError(res, 400, "q troppo corto (min 2 caratteri)"); return; }
-  const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? "30"), 10) || 30));
-  const sinceParam = req.query.sinceHours ? parseInt(String(req.query.sinceHours), 10) : null;
-  const conds = [
-    eq(aiConversations.adminUserId, userId),
-    sql`${aiMessages.content} ILIKE ${"%" + q + "%"}`,
-  ];
-  if (sinceParam && sinceParam > 0) {
-    conds.push(gte(aiMessages.createdAt, new Date(Date.now() - sinceParam * 3600_000)));
-  }
-  const rows = await db.select({
-    messageId: aiMessages.id, conversationId: aiMessages.conversationId,
-    role: aiMessages.role, content: aiMessages.content, createdAt: aiMessages.createdAt,
-    convTitle: aiConversations.title,
-  }).from(aiMessages)
-    .innerJoin(aiConversations, eq(aiConversations.id, aiMessages.conversationId))
-    .where(and(...conds))
-    .orderBy(desc(aiMessages.createdAt)).limit(limit);
-  res.json({ q, results: rows.map((r) => ({
-    ...r, snippet: snippet(r.content, q),
-    createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
-  })) });
-});
-
-function snippet(content: string, q: string): string {
-  const i = content.toLowerCase().indexOf(q.toLowerCase());
-  if (i < 0) return content.slice(0, 200);
-  const start = Math.max(0, i - 60);
-  const end = Math.min(content.length, i + q.length + 100);
-  return (start > 0 ? "…" : "") + content.slice(start, end) + (end < content.length ? "…" : "");
-}
-
-// ── GET /console/scopes — elenco scope ────────────────────────────────────
-router.get("/ai/console/scopes", (_req: Request, res: Response) => {
-  res.json({ scopes: SCOPES });
-});
-
 // keep `lte` referenced (unused-helper safeguard).
 void lte;
 
 export default router;
-
-// ────────────────────────────────────────────────────────────────────────────
-// Task #2645 — Endpoint aggiuntivi: budget reale + admin prefs.
-// ────────────────────────────────────────────────────────────────────────────
-import { getBudgetStatus } from "../../ai/moderation/budget";
-import { users as usersTable } from "@shared/db";
-
-router.get("/ai/console/budget", async (_req: Request, res: Response) => {
-  try {
-    const status = await getBudgetStatus();
-    res.json(status);
-  } catch (e) {
-    console.error("[ai-console/budget]", e);
-    sendError(res, 500, "Errore lettura budget");
-  }
-});
-
-router.get("/ai/console/admin-prefs", async (req: Request, res: Response) => {
-  const userId = (req.session as { userId?: string }).userId as string;
-  const [row] = await db.select({ adminPrefs: usersTable.adminPrefs })
-    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  const prefs = (row?.adminPrefs ?? {}) as Record<string, unknown>;
-  res.json({ prefs });
-});
-
-const PrefsPatch = z.object({}).catchall(z.unknown());
-router.patch("/ai/console/admin-prefs", async (req: Request, res: Response) => {
-  const userId = (req.session as { userId?: string }).userId as string;
-  const parsed = PrefsPatch.safeParse(req.body ?? {});
-  if (!parsed.success) { sendError(res, 400, "Body invalido"); return; }
-  const [row] = await db.select({ adminPrefs: usersTable.adminPrefs })
-    .from(usersTable).where(eq(usersTable.id, userId)).limit(1);
-  const current = (row?.adminPrefs ?? {}) as Record<string, unknown>;
-  const next = { ...current, ...parsed.data };
-  await db.update(usersTable).set({ adminPrefs: next, updatedAt: new Date() })
-    .where(eq(usersTable.id, userId));
-  res.json({ prefs: next });
-});
-
-// Suppress unused-import warning for `or` (used elsewhere when feature-flagged).
-void or;
