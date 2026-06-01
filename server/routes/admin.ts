@@ -249,6 +249,7 @@ import adsNextRouter from './admin/advertisements.next';
 import analyticsRouter from './admin/analytics';
 import stregattiRouter from './admin/stregatti';
 import miscRouter from './admin/misc';
+import miscNextRouter from './admin/misc.next';
 import reportsHubRouter from './admin/reports-hub';
 import matchingRouter from './admin/matching';
 import abRouter from './admin/ab';
@@ -264,6 +265,7 @@ import translationsRouter from './admin/translations';
 import tagsRouter from './admin/tags';
 import textAliasesRouter from './admin/text-aliases';
 import aiModerationRouter from './admin/ai-moderation';
+import aiModerationNextRouter from './admin/ai-moderation.next';
 import aiWatchdogRouter from './admin/ai-watchdog';
 import dbIntegrityRouter from './admin/db-integrity';
 import appIntegrityRouter from './admin/app-integrity';
@@ -374,11 +376,13 @@ router.use('/', _requireAdmin, dbAdminRouter);
 router.use('/', _requireAdmin, telemetryAdminRouter);
 router.use('/', _requireAdmin, reportsHubRouter);
 router.use('/', _requireAdmin, miscRouter);
+router.use('/', _requireAdmin, miscNextRouter);
 router.use('/', _requireAdmin, matchingRouter);
 router.use('/', _requireAdmin, abRouter);
 router.use('/embeddings', _requireAdmin, embeddingsRouter);
 // Task #2532 — Co-Pilot AI Moderazione.
 router.use('/', _requireAdmin, aiModerationRouter);
+router.use('/', _requireAdmin, aiModerationNextRouter);
 // Task #2533 — AI System Watchdog.
 router.use('/', _requireAdmin, aiWatchdogRouter);
 // Task #2536 — AI Database Integrity.
