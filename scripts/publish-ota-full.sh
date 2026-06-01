@@ -38,10 +38,6 @@ fi
 
 log_info "Messaggio: ${MESSAGE}"
 
-# Prefisso OTA nel messaggio EAS — consente al server prod di estrarre la versione via sync
-EAS_MESSAGE="[OTA:${VERSION}] ${MESSAGE}"
-log_info "Messaggio EAS: ${EAS_MESSAGE}"
-
 # ── 2. Verifica token ────────────────────────────────────────────────────────
 if [[ -z "${EAS_TOKEN:-}" ]]; then
   log_error "EAS_TOKEN non impostato nell'ambiente."
@@ -65,6 +61,10 @@ RUNTIME_VER=$(echo "$RUNTIME_FULL" | cut -d. -f1)
 VERSION="${BUILD_NUM}.${RUNTIME_VER}.${NEXT_OTA}"
 
 log_info "Build: ${BUILD_NUM} | NEXT_OTA: ${NEXT_OTA} | Versione: ${VERSION}"
+
+# Prefisso OTA nel messaggio EAS — consente al server prod di estrarre la versione via sync
+EAS_MESSAGE="[OTA:${VERSION}] ${MESSAGE}"
+log_info "Messaggio EAS: ${EAS_MESSAGE}"
 
 # ── 4. EAS publish FIRST (atomico: se fallisce, niente buildInfo/git) ───────
 log_info "Pubblicazione bundle su EAS production (Metro in corso — attendi 5-8 minuti)..."
