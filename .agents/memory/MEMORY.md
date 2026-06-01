@@ -6,3 +6,4 @@
 - [AI stream robustness & Ollama test quirk](ai-stream-robustness.md) — /ai-stream bufferizza+valida Ollama prima di emettere (no output corrotto, fallback Gemini pulito); OLLAMA_URL è settato nell'env → i test del flusso AI DEVONO mockare ollama-client.
 - [Telemetry routing layer](telemetry-routing-layer.md) — geometric road_class base sempre attiva; telemetria (osm_way_id boost) opzionale per real/my_style con retry-to-geometric se il motore rifiuta le regole. Warning string server "insufficient_data" deve combaciare col check in RouteResultCard.tsx o non si mostra.
 - [ThinkCentre home server](thinkcentre-home-server.md) — "ThinkCentre"/"server di casa" = mini-PC locale che ospita i servizi self-hosted (GraphHopper, Ollama, Whisper, Nominatim); fallback cloud se spento.
+- [Prod DB emergency mode](prod-db-emergency-mode.md) — ogni deploy sovrascrive il DB prod col DB dev. Avvisare sempre prima di suggerire un deploy. Attivo dal 2026-06-01 fino a nuovo ordine.
