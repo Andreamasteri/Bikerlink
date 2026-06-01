@@ -1,4 +1,4 @@
-// LARGE-FILE-LOCKED — limite: 800 righe (attuali: ~795)
+// LARGE-FILE-LOCKED — limite: 820 righe (attuali: ~816)
 // Aggiungi nuove funzionalità in: components/admin/ota/OtaPanelExtra.tsx
 // Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
 //         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
@@ -575,8 +575,22 @@ export default function OtaPanel() {
         <>
           <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Storico</Text>
           {history.map((release) => {
+            const isObsolete = release.status === "rejected" && release.rejectedBy === null;
             const sc = getStatusColor(release.status, colors);
             const otaNum = otaNumberMap.get(release.id) ?? "?";
+
+            if (isObsolete) {
+              return (
+                <View key={release.id} style={[styles.obsoleteRow, { backgroundColor: colors.surfaceLight, borderColor: colors.border }]}>
+                  <View style={[styles.numBadge, { backgroundColor: colors.textSecondary + "99" }]}>
+                    <Text style={styles.numBadgeText}>OTA {otaNum}</Text>
+                  </View>
+                  <Text style={[styles.dateText, { color: colors.textSecondary, flex: 1 }]}>{formatDate(release.publishedAt)}</Text>
+                  <Text style={[styles.badgeText, { color: colors.textSecondary }]}>OBSOLETA</Text>
+                </View>
+              );
+            }
+
             return (
               <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <View style={styles.cardHeader}>
@@ -794,4 +808,5 @@ const styles = StyleSheet.create({
   },
   autoFieldInput: { fontSize: 13, padding: 0, minWidth: 40, textAlign: "right" },
   autoFieldSuffix: { fontSize: 11, marginLeft: 4 },
+  obsoleteRow: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 6, borderWidth: 1, marginBottom: 4 },
 } as const);

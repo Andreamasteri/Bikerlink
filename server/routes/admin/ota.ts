@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { db } from "../../db";
 import { otaReleases } from "@shared/db";
-import { eq, desc, isNull, and, sql } from "drizzle-orm";
+import { eq, desc, isNull, and, sql, ne, inArray } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 
 const execFileAsync = promisify(execFile);
@@ -192,6 +192,20 @@ router.post("/:id/approve", async (req: Request, res: Response) => {
     }
 
     console.log(`[ota][AUDIT] release ${id} (${release.easUpdateId}) APPROVED by user ${userId}`);
+
+    // Auto-reject tutte le altre pending sullo stesso canale (sono obsolete)
+    const otherPending = await db
+      .select({ id: otaReleases.id, easUpdateId: otaReleases.easUpdateId })
+      .from(otaReleases)
+      .where(and(eq(otaReleases.status, "pending"), eq(otaReleases.channel, release.channel), ne(otaReleases.id, id)));
+    if (otherPending.length > 0) {
+      await db
+        .update(otaReleases)
+        .set({ status: "rejected", rejectedAt: new Date(), rejectedBy: null })
+        .where(inArray(otaReleases.id, otherPending.map((r) => r.id)));
+      console.log(`[ota][AUDIT] auto-rejected ${otherPending.length} OTA obsolete: ${otherPending.map((r) => r.easUpdateId).join(", ")}`);
+    }
+
     return res.json(updated);
   } catch (err) {
     console.error("[ota] POST /:id/approve error:", err);
