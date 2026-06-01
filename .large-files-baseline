@@ -17,7 +17,7 @@ LEGACY app/admin/stregatti.tsx 727
 LEGACY app/navigate/[id].tsx 641
 LEGACY app/profile/[id].tsx 628
 LEGACY app/proposals/create.tsx 659
-LEGACY components/admin/ota/OtaPanel.tsx 768
+LEGACY components/admin/ota/OtaPanel.tsx 798
 LEGACY components/admin/users/UserDetailModal.tsx 605
 LEGACY components/match/MatchCard.tsx 892
 LEGACY lib/i18n/de.ts 1162
@@ -25,7 +25,7 @@ LEGACY lib/i18n/el.ts 1153
 LEGACY lib/i18n/en.ts 1225
 LEGACY lib/i18n/es.ts 1162
 LEGACY lib/i18n/fr.ts 1162
-LEGACY lib/i18n/it.ts 1287
+LEGACY lib/i18n/it.ts 1374
 LEGACY lib/i18n/tr.ts 1153
 LEGACY lib/leaflet-bundle.ts 676
 LEGACY lib/leaflet-map-html.ts 642
