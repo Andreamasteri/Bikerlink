@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import {
   Modal, View, Text, StyleSheet, TouchableOpacity, TextInput,
-  KeyboardAvoidingView,
+  KeyboardAvoidingView, useWindowDimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,6 +23,8 @@ interface Props {
 export default function FabDrawer({ visible, onClose }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const sheetHeight = windowHeight * 0.75;
   const router = useRouter();
   const [input, setInput] = useState("");
   const { data: convs } = useAiConversations();
@@ -54,7 +56,7 @@ export default function FabDrawer({ visible, onClose }: Props) {
               backgroundColor: colors.background,
               borderColor: colors.border,
               paddingBottom: insets.bottom + 8,
-              maxHeight: "75%",
+              height: sheetHeight,
             },
           ]}
         >
