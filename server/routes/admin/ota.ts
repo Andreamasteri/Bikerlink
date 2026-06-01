@@ -1,6 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { readFileSync, existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { db } from "../../db";
 import { otaReleases } from "@shared/db";
 import { eq, desc, isNull, and, sql, ne, inArray } from "drizzle-orm";
@@ -397,6 +399,23 @@ router.post("/:id/auto-rollback", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[ota] POST /:id/auto-rollback error:", err);
     return sendError(res, 500, "Errore aggiornamento config auto-rollback");
+  }
+});
+
+// ── GET /timing-log — ultime N righe di logs/ota-timing.log ──────────────────
+router.get("/timing-log", async (req: Request, res: Response) => {
+  try {
+    const n = Math.min(Math.max(parseInt(String(req.query.n ?? "50"), 10) || 50, 1), 500);
+    const logPath = resolve(process.cwd(), "logs/ota-timing.log");
+    if (!existsSync(logPath)) {
+      return res.json({ lines: [], message: "Nessun timing log disponibile ancora." });
+    }
+    const content = readFileSync(logPath, "utf-8");
+    const lines = content.split("\n").filter(Boolean);
+    return res.json({ lines: lines.slice(-n), total: lines.length });
+  } catch (err) {
+    console.error("[ota] GET /timing-log error:", err);
+    return sendError(res, 500, "Errore lettura timing log");
   }
 });
 

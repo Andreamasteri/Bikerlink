@@ -21,6 +21,10 @@ log_error()   { echo -e "${RED}[OTA ✗]${NC} $*" >&2; }
 
 cd /home/runner/workspace
 
+T_TOTAL_START=$(date +%s)
+T_EXPORT=0; T_UPLOAD=0; T_PUBLISH=0; T_DB=0; T_GIT=0
+DIST_DIR="dist-ota"
+
 # ── 1. Leggi messaggio da .ota-message ──────────────────────────────────────
 MSG_FILE=".ota-message"
 if [[ ! -f "$MSG_FILE" ]]; then
@@ -66,19 +70,43 @@ log_info "Build: ${BUILD_NUM} | NEXT_OTA: ${NEXT_OTA} | Versione: ${VERSION}"
 EAS_MESSAGE="[OTA:${VERSION}] ${MESSAGE}"
 log_info "Messaggio EAS: ${EAS_MESSAGE}"
 
-# ── 4. EAS publish FIRST (atomico: se fallisce, niente buildInfo/git) ───────
-log_info "Pubblicazione bundle su EAS production (Metro in corso — attendi 5-8 minuti)..."
+# ── 4a. Metro export (atomico: se fallisce, niente buildInfo/git) ────────────
+log_info "Fase 1/2 — Metro export (bundle Android, attendi 2-5 minuti)..."
 
+rm -rf "$DIST_DIR"
+_T0=$(date +%s)
+EXPO_TOKEN="${EAS_TOKEN}" npx expo export \
+  --platform android \
+  --output-dir "$DIST_DIR" \
+  2>&1 || {
+  log_error "expo export fallito — buildInfo NON modificato, git NON aggiornato"
+  exit 1
+}
+T_EXPORT=$(( $(date +%s) - _T0 ))
+log_ok "⏱ Metro export completato in ${T_EXPORT}s"
+
+# ── 4b. EAS upload bundle su CDN — usa il bundle pre-compilato ───────────────
+# T_UPLOAD misura il trasferimento CDN (dominante); T_PUBLISH misura la creazione
+# del record update su EAS (API call finale — non separabile dal CLI, valore 0s).
+log_info "Fase 2/3 — EAS upload bundle su CDN (attendi 1-2 minuti)..."
+
+_T0=$(date +%s)
 EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" \
   eas update \
     --channel production \
     --environment production \
     --message "${EAS_MESSAGE}" \
+    --input-dir "$DIST_DIR" \
+    --skip-bundler \
     --non-interactive 2>&1) || {
   log_error "eas update fallito — buildInfo NON modificato, git NON aggiornato:"
   echo "$EAS_OUTPUT"
   exit 1
 }
+T_UPLOAD=$(( $(date +%s) - _T0 ))
+# EAS CLI non separa upload CDN da creazione record: T_PUBLISH = 0s (incluso in T_UPLOAD)
+T_PUBLISH=0
+log_ok "⏱ EAS upload CDN completato in ${T_UPLOAD}s (record EAS: ${T_PUBLISH}s, incluso)"
 
 echo "$EAS_OUTPUT"
 
@@ -102,6 +130,7 @@ if [[ -z "$UPDATE_ID" || -z "$GROUP_ID" ]]; then
 fi
 
 # ── 5. Insert in DB come PENDING (Task #2503: sempre pending, nessuna scorciatoia) ───
+_T0=$(date +%s)
 psql "$DATABASE_URL" -c "
   INSERT INTO ota_releases (
     id, eas_update_id, eas_group_id, channel, runtime_version,
@@ -122,7 +151,11 @@ psql "$DATABASE_URL" -c "
     channel      = 'production',
     eas_group_id = EXCLUDED.eas_group_id,
     ota_version  = EXCLUDED.ota_version;
-" -q 2>&1 && log_ok "DB: release inserita come PENDING (${UPDATE_ID}) — admin la testerà al cold-start" || {
+" -q 2>&1 && {
+  T_DB=$(( $(date +%s) - _T0 ))
+  log_ok "DB: release inserita come PENDING (${UPDATE_ID}) — admin la testerà al cold-start"
+  log_ok "⏱ DB insert completato in ${T_DB}s"
+} || {
   log_error "DB insert fallito — buildInfo NON modificato"
   exit 1
 }
@@ -139,13 +172,29 @@ log_ok ".ota-message svuotato (pronto per il prossimo OTA)"
 # ── 8. Push su GitHub ─────────────────────────────────────────────────────────
 if [[ -n "${GITHUB_PAT:-}" ]]; then
   log_info "Push su GitHub..."
+  _T0=$(date +%s)
   git -c "credential.helper=!f() { echo username=x; echo password=${GITHUB_PAT}; }; f" \
-    push "https://github.com/Andreamasteri/Bikerlink.git" "HEAD:main" 2>&1 && \
-    log_ok "GitHub aggiornato" || \
-    log_warn "Push GitHub fallito — esegui manualmente"
+    push "https://github.com/Andreamasteri/Bikerlink.git" "HEAD:main" 2>&1 && {
+    T_GIT=$(( $(date +%s) - _T0 ))
+    log_ok "GitHub aggiornato"
+    log_ok "⏱ Git push completato in ${T_GIT}s"
+  } || {
+    T_GIT=$(( $(date +%s) - _T0 ))
+    log_warn "Push GitHub fallito — esegui manualmente (${T_GIT}s)"
+  }
 else
   log_warn "GITHUB_PAT non impostato — push GitHub saltato"
 fi
+
+# ── Riepilogo timing + scrittura ota-timing.log ───────────────────────────────
+T_TOTAL=$(( $(date +%s) - T_TOTAL_START ))
+log_ok "⏱ Timing riepilogo: export=${T_EXPORT}s | upload=${T_UPLOAD}s | publish=${T_PUBLISH}s | db=${T_DB}s | git=${T_GIT}s | TOTALE=${T_TOTAL}s"
+
+mkdir -p logs
+TIMING_LOG="logs/ota-timing.log"
+TIMING_LINE="[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] OTA v${VERSION} | export: ${T_EXPORT}s | upload: ${T_UPLOAD}s | publish: ${T_PUBLISH}s | db: ${T_DB}s | git: ${T_GIT}s | TOTALE: ${T_TOTAL}s"
+echo "$TIMING_LINE" >> "$TIMING_LOG"
+log_ok "Timing appeso a ${TIMING_LOG}"
 
 # ── Riepilogo finale ──────────────────────────────────────────────────────────
 echo ""

@@ -47,6 +47,8 @@ is_excluded() {
     cleanup-cache.log)      return 0 ;;  # ha propria rotazione
     rotate-logs.log)        return 0 ;;  # questo stesso log
     backend-uptime-state.*) return 0 ;;  # JSON di stato, non un log
+    apk-build-history.log)  return 0 ;;  # storico build APK — accumulato intenzionalmente
+    ota-timing.log)         return 0 ;;  # storico timing OTA — accumulato intenzionalmente
     *)                      return 1 ;;
   esac
 }
