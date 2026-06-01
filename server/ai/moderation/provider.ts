@@ -24,9 +24,12 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "claude-sonnet-4-6": { in: 0.003, out: 0.015 },
   "gpt-5.1": { in: 0.0025, out: 0.01 },
   "gemini-2.5-pro": { in: 0.00125, out: 0.005 },
+  "gemini-2.5-flash": { in: 0.0003, out: 0.0025 },
   "gemini-2.5-flash-lite": { in: 0.0001, out: 0.0004 },
   // Task #2698 — modello leggero per AI Assistant utente
   "gpt-4o-mini": { in: 0.00015, out: 0.0006 },
+  // Groq free tier: costo zero (limitato da RPM/RPD, vedi DAILY_CAPS).
+  "llama-3.3-70b-versatile": { in: 0, out: 0 },
 };
 
 export function estimateCostUsd(modelId: string, tokensIn: number, tokensOut: number): number {
@@ -50,7 +53,61 @@ const health: Record<AiProviderId, AiProviderHealth & { cooldownUntil: number; q
   anthropic: { id: "anthropic", available: true, cooldownUntil: 0, quotaError: false },
   openai: { id: "openai", available: true, cooldownUntil: 0, quotaError: false },
   google: { id: "google", available: true, cooldownUntil: 0, quotaError: false },
+  groq: { id: "groq", available: true, cooldownUntil: 0, quotaError: false },
 };
+
+// Tetti giornalieri (RPD) free tier — guardia proattiva per NON sforare le quote
+// gratuite. Quando un provider raggiunge il cap, isAvailable() lo salta fino al
+// reset di mezzanotte UTC (la chain passa al provider successivo / Ollama).
+// Override con *_RPD_LIMIT se passi a un piano a pagamento. Infinity = nessun cap.
+const DAILY_CAPS: Record<AiProviderId, number> = {
+  groq: Number(process.env.GROQ_RPD_LIMIT ?? 1000),
+  google: Number(process.env.GEMINI_RPD_LIMIT ?? 1500),
+  openai: Number(process.env.OPENAI_RPD_LIMIT ?? Infinity),
+  anthropic: Number(process.env.ANTHROPIC_RPD_LIMIT ?? Infinity),
+};
+
+const dailyUsage: Record<AiProviderId, { day: string; count: number }> = {
+  anthropic: { day: "", count: 0 },
+  openai: { day: "", count: 0 },
+  google: { day: "", count: 0 },
+  groq: { day: "", count: 0 },
+};
+
+function todayUtc(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function getDailyCount(id: AiProviderId): number {
+  const rec = dailyUsage[id];
+  if (rec.day !== todayUtc()) return 0;
+  return rec.count;
+}
+
+function incrDailyCount(id: AiProviderId): void {
+  const day = todayUtc();
+  const rec = dailyUsage[id];
+  if (rec.day !== day) {
+    dailyUsage[id] = { day, count: 1 };
+  } else {
+    rec.count += 1;
+  }
+}
+
+function withinDailyCap(id: AiProviderId): boolean {
+  const cap = DAILY_CAPS[id];
+  if (!Number.isFinite(cap)) return true;
+  return getDailyCount(id) < cap;
+}
+
+// Snapshot uso giornaliero per pannello admin / diagnostica.
+export function getDailyUsage(): Array<{ id: AiProviderId; used: number; cap: number }> {
+  return (Object.keys(DAILY_CAPS) as AiProviderId[]).map((id) => ({
+    id,
+    used: getDailyCount(id),
+    cap: DAILY_CAPS[id],
+  }));
+}
 
 const COOLDOWN_DB_KEY = (id: AiProviderId) => `ai_provider_cooldown_${id}`;
 
@@ -134,7 +191,7 @@ export function getProviderHealth(): AiProviderHealth[] {
 }
 
 function isAvailable(id: AiProviderId): boolean {
-  return Date.now() >= health[id].cooldownUntil;
+  return Date.now() >= health[id].cooldownUntil && withinDailyCap(id);
 }
 
 function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): ResolvedModel | null {
@@ -163,18 +220,31 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
       };
     }
     if (id === "google") {
-      // Per riattivare Gemini: imposta GEMINI_API_KEY nel pannello Secrets con una chiave
-      // pagante (Google AI Studio → piano a pagamento). La chiave free tier ha quota 0
-      // e genera "RESOURCE_EXHAUSTED" continuamente. Senza chiave pagante Gemini resta
-      // disabilitato e il sistema usa Anthropic/OpenAI come fallback.
+      // Free tier (Google AI Studio, nessuna carta): usa i modelli Flash. Gemini 2.5 Pro
+      // dal 1 aprile 2026 è solo a pagamento → su free tier darebbe RESOURCE_EXHAUSTED.
+      // Limiti free gestiti da limiters.gemini (RPM) + DAILY_CAPS.google (RPD 1500).
       const key = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
       if (!key) return null;
-      const modelId = forcedModelId ?? (role === "router" ? "gemini-2.5-flash-lite" : "gemini-2.5-pro");
+      const modelId = forcedModelId ?? (role === "router" ? "gemini-2.5-flash-lite" : "gemini-2.5-flash");
       const client = createGoogleGenerativeAI({ apiKey: key });
       return {
         id, providerName: "google", modelId,
         model: client(modelId) as unknown as LanguageModelV2,
         scheduler: <T>(fn: () => Promise<T>) => limiters.gemini.schedule(fn),
+      };
+    }
+    if (id === "groq") {
+      // Groq è OpenAI-compatibile → riusa createOpenAI con baseURL Groq. Free tier
+      // (nessuna carta): Llama 3.3 70B, qualità nettamente superiore a Ollama locale.
+      // Limiti free gestiti da limiters.groq (RPM 30) + DAILY_CAPS.groq (RPD 1000).
+      const key = process.env.GROQ_API_KEY;
+      if (!key) return null;
+      const modelId = forcedModelId ?? "llama-3.3-70b-versatile";
+      const client = createOpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
+      return {
+        id, providerName: "groq", modelId,
+        model: client(modelId) as unknown as LanguageModelV2,
+        scheduler: <T>(fn: () => Promise<T>) => limiters.groq.schedule(fn),
       };
     }
   } catch (err) {
@@ -184,8 +254,11 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
 }
 
 // Ordine di preferenza: vedi _ai-stack-decision.md.
-const DEFAULT_BRAIN_CHAIN: AiProviderId[] = ["anthropic", "openai", "google"];
-const DEFAULT_ROUTER_CHAIN: AiProviderId[] = ["google", "openai", "anthropic"];
+// Groq primario (free, Llama 3.3 70B) → Gemini (free, Flash) → OpenAI → Anthropic.
+// Quando i free tier esauriscono il cap giornaliero, la chain prosegue; per
+// l'assistente, l'ultima rete è Ollama (illimitato, gestito in agent.ts).
+const DEFAULT_BRAIN_CHAIN: AiProviderId[] = ["groq", "google", "openai", "anthropic"];
+const DEFAULT_ROUTER_CHAIN: AiProviderId[] = ["groq", "google", "openai", "anthropic"];
 
 export interface ResolveOpts {
   role?: ModelRole;
@@ -234,6 +307,7 @@ export async function runWithFallback<T>(
   for (const id of chain) {
     const m = tryBuild(id, role, opts.forcedModelId);
     if (!m) continue;
+    incrDailyCount(m.id); // conteggio proattivo per il cap giornaliero free tier
     try {
       const value = await fn(m);
       markProviderOk(m.id);
@@ -249,7 +323,7 @@ export async function runWithFallback<T>(
 }
 
 // Task #2825 — Variabili d'ambiente che attivano almeno un provider AI.
-export const AI_PROVIDER_ENV_VARS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OLLAMA_URL"] as const;
+export const AI_PROVIDER_ENV_VARS = ["GROQ_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OLLAMA_URL"] as const;
 
 // Messaggio standard 503 quando nessun provider AI è configurato. Contiene i nomi
 // delle variabili mancanti così il client può riconoscere il caso "chiave mancante".
@@ -259,6 +333,7 @@ export const AI_NO_PROVIDER_MESSAGE =
 // Ritorna gli ID dei provider che hanno una chiave configurata (ignora il cooldown).
 export function getConfiguredProviders(): AiProviderId[] {
   const out: AiProviderId[] = [];
+  if (process.env.GROQ_API_KEY) out.push("groq");
   if (process.env.ANTHROPIC_API_KEY) out.push("anthropic");
   if (process.env.OPENAI_API_KEY) out.push("openai");
   if (process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY) out.push("google");

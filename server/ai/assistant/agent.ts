@@ -69,37 +69,45 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
 
   let done = false;
 
-  // 1) Ollama primario (self-hosted, costo zero) — preferito quando disponibile.
-  if (isOllamaConfigured) {
+  // 1) Cloud primario (chain "router": Groq Llama 3.3 70B → Gemini Flash → OpenAI →
+  //    Anthropic). Qualità nettamente superiore al modello locale; free tier protetto
+  //    da RPM/RPD: quando i cap si esauriscono la chain prosegue e poi cade su Ollama.
+  try {
+    const { model } = await runWithFallback(
+      { role: "router" },
+      async (m: ResolvedModel) => {
+        await streamWith(m.model);
+      },
+    );
+    provider = model.providerName;
+    modelId = model.modelId;
+    done = true;
+  } catch (cloudErr) {
+    console.warn("[assistant] cloud non disponibile, fallback Ollama:", (cloudErr as Error).message);
+    finalText = "";
+  }
+
+  // 2) Ollama self-hosted come rete finale illimitata (ThinkCentre acceso).
+  if (!done && isOllamaConfigured) {
     try {
       await streamWith(getOllamaModel() as unknown as Parameters<typeof streamText>[0]["model"]);
       provider = "ollama";
       modelId = OLLAMA_FALLBACK_MODEL_ID;
       done = true;
     } catch (ollamaErr) {
-      console.warn("[assistant] Ollama non disponibile, provo cloud:", (ollamaErr as Error).message);
-      finalText = "";
+      degraded = true;
+      finalText = finalText
+        || `⚠️ Assistente non disponibile al momento (${(ollamaErr as Error).message.slice(0, 100)}). Riprova tra qualche istante.`;
+      opts.onTextDelta?.(finalText);
     }
   }
 
-  // 2) Fallback cloud (chain "router": Gemini → OpenAI → Anthropic, secondo chiavi presenti).
-  if (!done) {
-    try {
-      const { model } = await runWithFallback(
-        { role: "router" },
-        async (m: ResolvedModel) => {
-          await streamWith(m.model);
-        },
-      );
-      provider = model.providerName;
-      modelId = model.modelId;
-      done = true;
-    } catch (cloudErr) {
-      degraded = true;
-      finalText = finalText
-        || `⚠️ Assistente non disponibile al momento (${(cloudErr as Error).message.slice(0, 100)}). Riprova tra qualche istante.`;
-      opts.onTextDelta?.(finalText);
-    }
+  // 3) Nessun provider disponibile (né cloud né Ollama).
+  if (!done && !isOllamaConfigured) {
+    degraded = true;
+    finalText = finalText
+      || "⚠️ Assistente non disponibile al momento (nessun provider AI configurato). Riprova tra qualche istante.";
+    opts.onTextDelta?.(finalText);
   }
 
   return {

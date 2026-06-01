@@ -31,11 +31,20 @@ export const limiters = {
     reservoirRefreshAmount: 500,
     reservoirRefreshInterval: 60 * 1000,
   }),
+  // Free tier Gemini 2.5 Flash: 15 RPM. Override con GEMINI_RPM_LIMIT se passi a pagamento.
   gemini: make({
-    maxConcurrent: 5,
-    minTime: 100,
-    reservoir: 60,
-    reservoirRefreshAmount: 60,
+    maxConcurrent: 3,
+    minTime: 200,
+    reservoir: Number(process.env.GEMINI_RPM_LIMIT ?? 15),
+    reservoirRefreshAmount: Number(process.env.GEMINI_RPM_LIMIT ?? 15),
+    reservoirRefreshInterval: 60 * 1000,
+  }),
+  // Free tier Groq Llama 3.3 70B: 30 RPM. Override con GROQ_RPM_LIMIT se passi al tier Developer.
+  groq: make({
+    maxConcurrent: 3,
+    minTime: 200,
+    reservoir: Number(process.env.GROQ_RPM_LIMIT ?? 30),
+    reservoirRefreshAmount: Number(process.env.GROQ_RPM_LIMIT ?? 30),
     reservoirRefreshInterval: 60 * 1000,
   }),
   anthropic: make({
