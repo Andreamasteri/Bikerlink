@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Constants from "expo-constants";
+import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
+import { useAuth } from "@/lib/auth-context";
 import { APPLIED_OTA_NUMBER } from "@/constants/buildInfo";
 import { loadAppliedOtaNumber, saveAppliedOtaNumber } from "@/lib/otaStorage";
 
@@ -14,19 +16,24 @@ function parseAppVersion(): { releaseNumber: string; otaBundled: string } {
   return { releaseNumber: "—", otaBundled: "—" };
 }
 
+interface OtaReleaseSummary {
+  status: string;
+  otaVersion: string | null;
+  publishedAt: string;
+}
+
 export const ProfileVersionSection: React.FC = () => {
   const colors = useColors();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
-  const [appliedOta, setAppliedOta] = useState<number | null>(
-    APPLIED_OTA_NUMBER
-  );
+  const [appliedOta, setAppliedOta] = useState<number | null>(APPLIED_OTA_NUMBER);
 
   useEffect(() => {
     const syncOtaNumber = async () => {
       try {
         const stored = await loadAppliedOtaNumber();
         const bundled = APPLIED_OTA_NUMBER;
-
         if (bundled !== null && (stored === null || bundled > stored)) {
           await saveAppliedOtaNumber(bundled);
           setAppliedOta(bundled);
@@ -34,13 +41,41 @@ export const ProfileVersionSection: React.FC = () => {
           setAppliedOta(stored);
         }
       } catch {
-        // Fallback silenzioso: badge rimane al valore iniziale (costante bundled o null)
+        // Fallback silenzioso: badge rimane al valore bundled
       }
     };
     syncOtaNumber();
   }, []);
 
+  // Per admin: recupera l'ultimo OTA approvato (distribuito a tutti)
+  const { data: releases } = useQuery<OtaReleaseSummary[]>({
+    queryKey: ["/api/admin/ota/releases"],
+    enabled: isAdmin,
+  });
+
+  const lastApprovedOtaNum = useMemo(() => {
+    if (!releases) return null;
+    const approved = releases
+      .filter((r) => r.status === "approved")
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    if (!approved.length) return null;
+    const v = approved[0].otaVersion;
+    if (!v) return null;
+    const m = v.match(/^\d+\.\d+\.(\d+)$/);
+    return m ? Number(m[1]) : null;
+  }, [releases]);
+
   const { releaseNumber, otaBundled } = parseAppVersion();
+
+  // Riga 1: per admin mostra l'OTA distribuita a tutti; per utenti normali mostra quella corrente
+  const displayOta = isAdmin && lastApprovedOtaNum !== null ? lastApprovedOtaNum : appliedOta;
+
+  // Riga admin (blu): visibile solo quando l'admin sta testando un OTA diverso dall'approvato
+  const showAdminOta =
+    isAdmin &&
+    APPLIED_OTA_NUMBER !== null &&
+    lastApprovedOtaNum !== null &&
+    APPLIED_OTA_NUMBER !== lastApprovedOtaNum;
 
   return (
     <View style={styles.container}>
@@ -55,10 +90,16 @@ export const ProfileVersionSection: React.FC = () => {
         <View style={styles.item}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>OTA applicata</Text>
           <Text style={[styles.value, { color: colors.textSecondary }]}>
-            {appliedOta != null ? `#${appliedOta}` : "—"}
+            {displayOta != null ? `#${displayOta}` : "—"}
           </Text>
         </View>
       </View>
+      {showAdminOta && (
+        <View style={styles.adminRow}>
+          <Text style={[styles.adminLabel, { color: "#3B82F6" }]}>Admin OTA in test</Text>
+          <Text style={[styles.adminValue, { color: "#3B82F6" }]}>#{APPLIED_OTA_NUMBER}</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -92,5 +133,23 @@ const styles = StyleSheet.create({
   dot: {
     fontSize: 14,
     marginHorizontal: 2,
+  },
+  adminRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 4,
+  },
+  adminLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    letterSpacing: 0.4,
+    textTransform: "uppercase",
+  },
+  adminValue: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    fontWeight: "600",
+    letterSpacing: 0.5,
   },
 });
