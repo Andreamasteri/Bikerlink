@@ -38,6 +38,10 @@ fi
 
 log_info "Messaggio: ${MESSAGE}"
 
+# Prefisso OTA nel messaggio EAS — consente al server prod di estrarre la versione via sync
+EAS_MESSAGE="[OTA:${VERSION}] ${MESSAGE}"
+log_info "Messaggio EAS: ${EAS_MESSAGE}"
+
 # ── 2. Verifica token ────────────────────────────────────────────────────────
 if [[ -z "${EAS_TOKEN:-}" ]]; then
   log_error "EAS_TOKEN non impostato nell'ambiente."
@@ -69,7 +73,7 @@ EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" 
   eas update \
     --channel production \
     --environment production \
-    --message "${MESSAGE}" \
+    --message "${EAS_MESSAGE}" \
     --non-interactive 2>&1) || {
   log_error "eas update fallito — buildInfo NON modificato, git NON aggiornato:"
   echo "$EAS_OUTPUT"

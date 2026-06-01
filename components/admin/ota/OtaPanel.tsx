@@ -1,4 +1,4 @@
-// LARGE-FILE-LOCKED — limite: 767 righe (attuali: 767)
+// LARGE-FILE-LOCKED — limite: 800 righe (attuali: ~795)
 // Aggiungi nuove funzionalità in: components/admin/ota/OtaPanelExtra.tsx
 // Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
 //         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
@@ -169,6 +169,13 @@ export default function OtaPanel() {
     },
   });
 
+  const setVersionMutation = useMutation({
+    mutationFn: ({ id, otaVersion }: { id: string; otaVersion: string }) =>
+      apiRequest("PATCH", `/api/admin/ota/${id}/ota-version`, { otaVersion }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/admin/ota/releases"] }); },
+    onError: (err: Error) => { Alert.alert("Errore versione", err.message || "Impossibile impostare versione"); },
+  });
+
   const handleApprove = useCallback((release: OtaRelease) => {
     Alert.alert(
       "Approva e Distribuisci",
@@ -221,6 +228,24 @@ export default function OtaPanel() {
       ]
     );
   }, [rollbackMutation]);
+
+  const handleSetVersion = useCallback((release: OtaRelease) => {
+    Alert.prompt(
+      "Imposta numero OTA",
+      `Formato: MAJOR.MINOR.N (es: 54.10.27)\nGruppo: ${(release.easGroupId ?? "—").slice(0, 8)}…\n(aggiorna tutti i record del gruppo)`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Salva",
+          onPress: (v?: string) => {
+            if (v?.trim()) setVersionMutation.mutate({ id: release.id, otaVersion: v.trim() });
+          },
+        },
+      ],
+      "plain-text",
+      release.otaVersion ?? ""
+    );
+  }, [setVersionMutation]);
 
   const handleForceUpdate = useCallback(async () => {
     if (Platform.OS === "web") {
@@ -473,9 +498,14 @@ export default function OtaPanel() {
               <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
             </View>
 
-            <Text style={[styles.versionText, { color: colors.text }]}>
-              {release.otaVersion ?? "—"}
-            </Text>
+            {release.otaVersion
+              ? <Text style={[styles.versionText, { color: colors.text }]}>{release.otaVersion}</Text>
+              : (
+                <TouchableOpacity onPress={() => handleSetVersion(release)} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                  <Text style={[styles.versionText, { color: colors.textSecondary, fontStyle: "italic" }]}>— versione non impostata</Text>
+                  <Text style={[styles.badgeText, { color: colors.accent }]}>Imposta ›</Text>
+                </TouchableOpacity>
+              )}
 
             {release.message
               ? <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>

@@ -112,6 +112,28 @@ async function syncProductionUpdates(): Promise<void> {
       AND src.eas_group_id = r.eas_group_id
       AND src.ota_version IS NOT NULL
   `);
+
+  // Backfill otaVersion dal messaggio EAS — formato "[OTA:54.10.27] testo utente"
+  // Imposta automaticamente ota_version per tutti i record nello stesso gruppo
+  const noVersionRecords = await db
+    .select({ id: otaReleases.id, message: otaReleases.message, easGroupId: otaReleases.easGroupId })
+    .from(otaReleases)
+    .where(isNull(otaReleases.otaVersion));
+
+  for (const rec of noVersionRecords) {
+    const match = rec.message?.match(/^\[OTA:([\d.]+)\]/);
+    if (!match) continue;
+    const parsed = match[1];
+    if (rec.easGroupId) {
+      await db.update(otaReleases)
+        .set({ otaVersion: parsed })
+        .where(eq(otaReleases.easGroupId, rec.easGroupId));
+    } else {
+      await db.update(otaReleases)
+        .set({ otaVersion: parsed })
+        .where(eq(otaReleases.id, rec.id));
+    }
+  }
 }
 
 // GET /api/admin/ota/releases — restituisce tutto lo storico release con telemetria
@@ -361,6 +383,34 @@ router.post("/:id/auto-rollback", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[ota] POST /:id/auto-rollback error:", err);
     return sendError(res, 500, "Errore aggiornamento config auto-rollback");
+  }
+});
+
+// PATCH /api/admin/ota/:id/ota-version — imposta manualmente ota_version per una release
+// Aggiorna tutti i record dello stesso eas_group_id (Android + iOS insieme)
+router.patch("/:id/ota-version", async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { otaVersion } = req.body as { otaVersion?: unknown };
+    if (!otaVersion || typeof otaVersion !== "string" || !/^\d+\.\d+\.\d+$/.test(otaVersion)) {
+      return sendError(res, 400, "otaVersion obbligatorio, formato: MAJOR.MINOR.OTA (es: 54.10.27)");
+    }
+    const [release] = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+    if (!release) return sendError(res, 404, "OTA release non trovata");
+
+    if (release.easGroupId) {
+      await db.update(otaReleases)
+        .set({ otaVersion })
+        .where(eq(otaReleases.easGroupId, release.easGroupId));
+    } else {
+      await db.update(otaReleases).set({ otaVersion }).where(eq(otaReleases.id, id));
+    }
+    const [updated] = await db.select().from(otaReleases).where(eq(otaReleases.id, id)).limit(1);
+    console.log(`[ota][AUDIT] release ${id} (group: ${release.easGroupId}) ota-version set to ${otaVersion}`);
+    return res.json(updated);
+  } catch (err) {
+    console.error("[ota] PATCH /:id/ota-version error:", err);
+    return sendError(res, 500, "Errore impostazione versione OTA");
   }
 });
 
