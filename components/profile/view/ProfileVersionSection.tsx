@@ -20,6 +20,7 @@ interface OtaReleaseSummary {
   status: string;
   otaVersion: string | null;
   publishedAt: string;
+  message?: string | null;
 }
 
 export const ProfileVersionSection: React.FC = () => {
@@ -59,10 +60,14 @@ export const ProfileVersionSection: React.FC = () => {
       .filter((r) => r.status === "approved")
       .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
     if (!approved.length) return null;
-    const v = approved[0].otaVersion;
-    if (!v) return null;
-    const m = v.match(/^\d+\.\d+\.(\d+)$/);
-    return m ? Number(m[1]) : null;
+    const top = approved[0];
+    // Prova prima otaVersion ("54.10.27" → 27)
+    const fromVersion = top.otaVersion?.match(/^\d+\.\d+\.(\d+)$/);
+    if (fromVersion) return Number(fromVersion[1]);
+    // Fallback: estrai dal messaggio EAS ("[OTA:54.10.27] testo" → 27)
+    const fromMessage = top.message?.match(/^\[OTA:\d+\.\d+\.(\d+)\]/);
+    if (fromMessage) return Number(fromMessage[1]);
+    return null;
   }, [releases]);
 
   const { releaseNumber, otaBundled } = parseAppVersion();
