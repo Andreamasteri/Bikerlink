@@ -249,12 +249,12 @@ export async function runWithFallback<T>(
 }
 
 // Task #2825 — Variabili d'ambiente che attivano almeno un provider AI.
-export const AI_PROVIDER_ENV_VARS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY"] as const;
+export const AI_PROVIDER_ENV_VARS = ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OLLAMA_URL"] as const;
 
 // Messaggio standard 503 quando nessun provider AI è configurato. Contiene i nomi
 // delle variabili mancanti così il client può riconoscere il caso "chiave mancante".
 export const AI_NO_PROVIDER_MESSAGE =
-  "Servizio AI non disponibile: nessuna chiave AI configurata (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY mancante)";
+  "Servizio AI non disponibile: nessuna chiave AI configurata (ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY / OLLAMA_URL mancante)";
 
 // Ritorna gli ID dei provider che hanno una chiave configurata (ignora il cooldown).
 export function getConfiguredProviders(): AiProviderId[] {
@@ -265,9 +265,9 @@ export function getConfiguredProviders(): AiProviderId[] {
   return out;
 }
 
-// True se almeno un provider AI è configurato con una chiave.
+// True se almeno un provider AI è configurato (cloud o Ollama self-hosted).
 export function hasAnyAiProvider(): boolean {
-  return getConfiguredProviders().length > 0;
+  return getConfiguredProviders().length > 0 || Boolean(process.env.OLLAMA_URL);
 }
 
 export { readPreferredProvider };

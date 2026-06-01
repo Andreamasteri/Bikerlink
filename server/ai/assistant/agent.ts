@@ -6,6 +6,7 @@
 import { streamText } from "ai";
 import { runWithFallback, estimateCostUsd, type ResolvedModel } from "../moderation/provider";
 import { buildSystemPrompt, type KnowledgeEntry } from "./knowledge";
+import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
 
 const DEFAULT_MODEL_ID = "gpt-4o-mini";
 
@@ -70,11 +71,37 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     );
     provider = model.providerName;
     modelId = model.modelId;
-  } catch (err) {
-    degraded = true;
-    finalText = finalText
-      || `⚠️ Assistente non disponibile al momento (${(err as Error).message.slice(0, 100)}). Riprova tra qualche istante.`;
-    opts.onTextDelta?.(finalText);
+  } catch (cloudErr) {
+    // Fallback Ollama self-hosted se tutti i provider cloud mancano/falliscono.
+    if (isOllamaConfigured) {
+      try {
+        const ollamaModel = getOllamaModel();
+        const result = streamText({
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          model: ollamaModel as any,
+          system,
+          messages,
+          abortSignal: opts.signal,
+          temperature: 0.3,
+        });
+        for await (const delta of result.textStream) {
+          finalText += delta;
+          opts.onTextDelta?.(delta);
+        }
+        provider = "ollama";
+        modelId = process.env.OLLAMA_MODEL ?? "llama3.2:latest";
+      } catch (ollamaErr) {
+        degraded = true;
+        finalText = finalText
+          || `⚠️ Assistente non disponibile al momento (${(ollamaErr as Error).message.slice(0, 100)}). Riprova tra qualche istante.`;
+        opts.onTextDelta?.(finalText);
+      }
+    } else {
+      degraded = true;
+      finalText = finalText
+        || `⚠️ Assistente non disponibile al momento (${(cloudErr as Error).message.slice(0, 100)}). Riprova tra qualche istante.`;
+      opts.onTextDelta?.(finalText);
+    }
   }
 
   return {
