@@ -453,7 +453,7 @@ export default function OtaPanel() {
             <View style={styles.cardHeader}>
               <View style={styles.badgeRow}>
                 <View style={[styles.numBadge, { backgroundColor: colors.accent }]}>
-                  <Text style={styles.numBadgeText}>#{otaNum}</Text>
+                  <Text style={styles.numBadgeText}>OTA {otaNum}</Text>
                 </View>
                 <View style={[styles.badge, { backgroundColor: colors.accent + "22" }]}>
                   <Text style={[styles.badgeText, { color: colors.accent }]}>IN ATTESA</Text>
@@ -474,15 +474,15 @@ export default function OtaPanel() {
             </View>
 
             <Text style={[styles.versionText, { color: colors.text }]}>
-              {release.otaVersion ?? release.easUpdateId.slice(0, 16) + "…"}
+              {release.otaVersion ?? "—"}
             </Text>
 
             {release.message
               ? <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
               : <Text style={[styles.messageText, { color: colors.textSecondary, fontStyle: "italic" }]}>Nessun messaggio</Text>}
 
-            <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-              ID: {release.easUpdateId.slice(0, 20)}…
+            <Text selectable style={[styles.metaText, { color: colors.textSecondary }]}>
+              ID: {release.easUpdateId}
             </Text>
             {release.runtimeVersion && (
               <Text style={[styles.metaText, { color: colors.textSecondary }]}>Runtime: {release.runtimeVersion}</Text>
@@ -552,7 +552,7 @@ export default function OtaPanel() {
                 <View style={styles.cardHeader}>
                   <View style={styles.badgeRow}>
                     <View style={[styles.numBadge, { backgroundColor: colors.accent }]}>
-                      <Text style={styles.numBadgeText}>#{otaNum}</Text>
+                      <Text style={styles.numBadgeText}>OTA {otaNum}</Text>
                     </View>
                     <View style={[styles.badge, { backgroundColor: sc + "22" }]}>
                       <Text style={[styles.badgeText, { color: sc }]}>
@@ -564,7 +564,7 @@ export default function OtaPanel() {
                 </View>
 
                 <Text style={[styles.versionText, { color: colors.text }]}>
-                  {release.otaVersion ?? release.easUpdateId.slice(0, 16) + "…"}
+                  {release.otaVersion ?? "—"}
                 </Text>
 
                 {release.message && (

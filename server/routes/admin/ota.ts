@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { db } from "../../db";
 import { otaReleases } from "@shared/db";
-import { eq, desc, isNull, and } from "drizzle-orm";
+import { eq, desc, isNull, and, sql } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 
 const execFileAsync = promisify(execFile);
@@ -101,6 +101,17 @@ async function syncProductionUpdates(): Promise<void> {
       .set({ easGroupId: upd.group })
       .where(and(eq(otaReleases.easUpdateId, upd.id), isNull(otaReleases.easGroupId)));
   }
+
+  // Backfill otaVersion: copia dal record Android (stesso gruppo) ai record iOS che non ce l'hanno
+  await db.execute(sql`
+    UPDATE ota_releases r
+    SET ota_version = src.ota_version
+    FROM ota_releases src
+    WHERE r.ota_version IS NULL
+      AND r.eas_group_id IS NOT NULL
+      AND src.eas_group_id = r.eas_group_id
+      AND src.ota_version IS NOT NULL
+  `);
 }
 
 // GET /api/admin/ota/releases — restituisce tutto lo storico release con telemetria
