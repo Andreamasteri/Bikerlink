@@ -47,11 +47,12 @@ website/.next/
 
 .env
 
-# Stress test logs (keep apk-build-history.log tracked)
+# Stress test logs (keep apk-build-history.log tracked; keep ota-timing.log for historical comparisons)
 logs/*.log
 logs/*.txt
 logs/*.json
 !logs/apk-build-history.log
+!logs/ota-timing.log
 
 # Static build (generated artifacts — non includere nel repo)
 static-build/
