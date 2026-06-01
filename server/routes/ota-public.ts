@@ -50,12 +50,26 @@ router.get("/manifest", async (req: Request, res: Response) => {
       return res.json({ allowed: false, isAdmin });
     }
 
+    // Raccogli tutti gli easUpdateId dello stesso gruppo (Android + iOS hanno lo stesso easGroupId
+    // ma easUpdateId diversi). Il client confronta con la lista invece del singolo ID per evitare
+    // il bug "penultima OTA applicata" causato dalla scelta casuale del record per piattaforma.
+    let allowedEasUpdateIds: string[] = [release.easUpdateId];
+    if (release.easGroupId) {
+      const groupRecords = await db
+        .select({ easUpdateId: otaReleases.easUpdateId })
+        .from(otaReleases)
+        .where(eq(otaReleases.easGroupId, release.easGroupId));
+      const ids = groupRecords.map((r) => r.easUpdateId).filter(Boolean) as string[];
+      if (ids.length > 0) allowedEasUpdateIds = ids;
+    }
+
     return res.json({
       allowed: true,
       isAdmin,
       releaseId: release.id,
       allowedEasUpdateId: release.easUpdateId,
       allowedEasGroupId: release.easGroupId,
+      allowedEasUpdateIds,
       runtimeVersion: release.runtimeVersion,
       otaVersion: release.otaVersion,
       status: release.status,

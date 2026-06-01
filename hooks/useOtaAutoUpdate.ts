@@ -50,6 +50,7 @@ interface ManifestResponse {
   releaseId?: string;
   allowedEasUpdateId?: string;
   allowedEasGroupId?: string | null;
+  allowedEasUpdateIds?: string[];
   runtimeVersion?: string | null;
   otaVersion?: string | null;
   status?: string;
@@ -135,14 +136,34 @@ export function useOtaAutoUpdate(): { checking: boolean } {
         const check = await Updates.checkForUpdateAsync();
         if (!check.isAvailable) return;
 
-        // Gating: solo se EAS sta servendo proprio l'updateId che il nostro server autorizza.
-        // (Su build 53, expo-updates non sa di questo gating: validiamo lato client.)
-        const incomingId = (check.manifest as { id?: string } | undefined)?.id;
-        if (incomingId && manifest.allowedEasUpdateId && incomingId !== manifest.allowedEasUpdateId) {
-          console.log(
-            `[useOtaAutoUpdate] update disponibile (${incomingId}) ≠ autorizzato (${manifest.allowedEasUpdateId}) — skip`,
-          );
-          return;
+        // Gating: verifica che l'update in arrivo da EAS corrisponda a quello autorizzato.
+        // FIX "penultima OTA": il confronto precedente usava easUpdateId (platform-specifico).
+        // Il gating server restituisce 1 record su 2 (Android o iOS, il più recente per publishedAt).
+        // Se il device è Android ma il record restituito è iOS → ID diversi → mismatch → skip → OTA non applicata.
+        // Soluzione: confrontare prima per easGroupId (identico per Android e iOS nella stessa publish).
+        // Fallback su easUpdateId solo se il gruppo non è presente nel manifest (formati più vecchi).
+        const incomingId = (check.manifest as { id?: string; group?: string } | undefined)?.id;
+        const incomingGroupId = (check.manifest as { id?: string; group?: string } | undefined)?.group;
+        const allowedGroup = manifest.allowedEasGroupId;
+
+        // Priorità 1: confronto per groupId (platform-agnostic, Android e iOS stesso gruppo)
+        if (allowedGroup && incomingGroupId) {
+          if (incomingGroupId !== allowedGroup) {
+            console.log(`[useOtaAutoUpdate] group (${incomingGroupId}) ≠ autorizzato (${allowedGroup}) — skip`);
+            return;
+          }
+        // Priorità 2: confronto contro la lista di tutti gli updateId del gruppo (Android + iOS)
+        } else if (incomingId && manifest.allowedEasUpdateIds && manifest.allowedEasUpdateIds.length > 0) {
+          if (!manifest.allowedEasUpdateIds.includes(incomingId)) {
+            console.log(`[useOtaAutoUpdate] update (${incomingId}) non nella lista autorizzata — skip`);
+            return;
+          }
+        // Priorità 3 (fallback legacy): confronto singolo easUpdateId
+        } else if (incomingId && manifest.allowedEasUpdateId) {
+          if (incomingId !== manifest.allowedEasUpdateId) {
+            console.log(`[useOtaAutoUpdate] update (${incomingId}) ≠ autorizzato (${manifest.allowedEasUpdateId}) — skip`);
+            return;
+          }
         }
 
         const deviceId = await getOrCreateDeviceId();
