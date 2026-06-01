@@ -70,6 +70,33 @@ Quando il gate ratchet (Task #2584) è attivo e blocca un file LOCKED cresciuto,
 
 ---
 
+## ⛔ REGOLA FERREA — Split di file: verifica prima e dopo (sempre)
+
+Lo split è sempre un'operazione **meccanica**: nessuna logica alterata, solo spostata. Qualsiasi refactoring opportunistico (rinominazione simboli, riorganizzazione logica, semplificazione) durante uno split è vietato — va pianificato come task separato.
+
+### Prima dello split — obbligatorio
+
+1. **Leggere integralmente ogni file coinvolto** (sorgente e destinazione se già esiste). Non fare affidamento su letture precedenti o su ricordi della sessione.
+2. **Verificare il conteggio righe reale** di ogni file con `wc -l` o lo strumento di lettura — non stimarlo.
+
+### Esecuzione dello split — meccanica pura
+
+- Spostare il codice **esattamente com'è**: nessuna modifica di logica, nessuna rinominazione di simboli, nessun refactoring inline.
+- Aggiornare gli import/export strettamente necessari a far compilare i file separati — nulla di più.
+
+### Dopo lo split — checklist obbligatoria (ogni file prodotto)
+
+Rileggere ogni file risultante e verificare **tutti** i punti:
+
+- [ ] Il contenuto corrisponde esattamente all'originale (nulla inventato, nulla perso).
+- [ ] File sorgente ≤ 600 righe.
+- [ ] File destinazione ≤ 600 righe.
+- [ ] Import/export coerenti tra i file (nessun simbolo importato ma non esportato, nessun export orfano).
+
+> **La regola vale sempre, anche per split "ovvi".** La verifica non è facoltativa e non può essere saltata per split "piccoli" o "semplici".
+
+---
+
 ## Anti-pattern dell'agente — leggere prima di lavorare
 
 1. **Gerarchia delle fonti di verità per le dipendenze native**: per dichiarare che una libreria nativa Android non è nell'APK, NON basta verificare `package.json` o gli `import` nel codice JS. Le dipendenze transitive di Expo (es. `expo-camera` tira ML Kit Barcode, `expo-notifications` tira Firebase Cloud Messaging) finiscono nell'APK senza apparire in `package.json`. La sola fonte di verità è il `.apk` compilato (o il gradle dependency tree).
