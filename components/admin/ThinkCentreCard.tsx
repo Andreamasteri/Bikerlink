@@ -61,7 +61,7 @@ function serviceStatusLabel(s: ServiceHealth): string {
 }
 
 export function ThinkCentreCard() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const { data, isLoading, error } = useQuery<ThinkCentreHealth>({
     queryKey: ["/api/admin/thinkcentre-health"],

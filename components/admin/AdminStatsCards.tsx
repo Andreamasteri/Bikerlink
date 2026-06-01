@@ -57,7 +57,7 @@ export function GraphHopperCard() {
   };
   const color = data ? modeColor[data.mode] ?? "#6b7280" : "#6b7280";
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <View style={ghStyles.card}>
@@ -140,7 +140,7 @@ export function TelemetryCard() {
       })()
     : false;
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   return (
     <View style={telStyles.card}>

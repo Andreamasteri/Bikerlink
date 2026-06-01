@@ -79,7 +79,7 @@ function formatUptime(sec: number): string {
 }
 
 export function ServerEfficiencyCard() {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const { data, isLoading, error } = useQuery<ServerMetrics>({
     queryKey: ["/api/admin/server-metrics"],
