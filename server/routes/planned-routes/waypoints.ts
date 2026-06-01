@@ -3,19 +3,11 @@
 import { sendError } from "../../lib/api-response";
 import { Router, Request, Response } from "express";
 import { requireAuth, computeBikerScoreFromPoints } from "./utils";
-import { aiPromptSchema, calculateRouteRequestSchema, poiRequestSchema } from "@shared/validators";
+import { aiPromptSchema, calculateRouteRequestSchema } from "@shared/validators";
 import { z } from "zod";
 import { generateRouteObject, streamRouteText } from "./waypoints.next";
 import { isOllamaConfigured } from "../../lib/ollama-client";
-const weatherWaypointsSchema = z.object({
-  routeId: z.string().optional(),
-  waypoints: z.array(z.object({ lat: z.number().finite(), lng: z.number().finite(), name: z.string().optional() })).min(1).max(8),
-  departureIso: z.string().optional(),
-  avgSpeedKmh: z.number().optional(),
-});
 import { haversineKm } from "../../geo";
-// Task #2633 — weather helpers estratti per riuso da /weather/:id (GET).
-import { fetchWeatherForWaypoints } from "./weather-helper";
 const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
 import { getActiveRouter } from "../../routing/router-selector";
@@ -439,73 +431,6 @@ router.post("/calculate", async (req: Request, res: Response) => {
   } catch (err: unknown) {
     console.error("[routing] error:", (err as Error)?.message ?? err);
     return res.json(buildFallbackRoute(effectiveWaypoints));
-  }
-});
-
-router.post("/weather", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
-  if (!userId) return;
-
-  const parsedWp = weatherWaypointsSchema.safeParse(req.body);
-  if (!parsedWp.success) return sendError(res, 400, parsedWp.error.issues[0].message);
-  const { waypoints, departureIso, avgSpeedKmh } = parsedWp.data;
-
-  try {
-    const departure = departureIso ? new Date(departureIso) : new Date();
-    const weather = await fetchWeatherForWaypoints(waypoints, departure, avgSpeedKmh);
-    return res.json(weather);
-  } catch (err) {
-    console.error("[weather] error:", err);
-    return sendError(res, 502, "Meteo non disponibile");
-  }
-});
-
-router.post("/poi", async (req: Request, res: Response) => {
-  const userId = requireAuth(req, res);
-  if (!userId) return;
-
-  const parsedPoi = poiRequestSchema.safeParse(req.body);
-  if (!parsedPoi.success) return sendError(res, 400, parsedPoi.error.issues[0].message);
-  const { bbox, types } = parsedPoi.data;
-
-  try {
-    const category = types?.[0] || "viewpoint";
-    const overpassCategoryMap: Record<string, string> = {
-      viewpoint: "tourism=viewpoint",
-      parking: "amenity=parking",
-      fuel: "amenity=fuel",
-      restaurant: "amenity=restaurant",
-      hotel: "tourism=hotel",
-      attraction: "tourism=attraction",
-      mechanic: "shop=motorcycle_repair",
-    };
-
-    const filter = overpassCategoryMap[category] || "tourism=viewpoint";
-    const query = `[out:json][timeout:25];(node["${filter.split('=')[0]}"="${filter.split('=')[1]}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng});way["${filter.split('=')[0]}"="${filter.split('=')[1]}"](${bbox.minLat},${bbox.minLng},${bbox.maxLat},${bbox.maxLng}););out body;>;out skel qt;`;
-    const url = "https://overpass-api.de/api/interpreter";
-
-    const resp = await fetch(url, {
-      method: "POST",
-      body: "data=" + encodeURIComponent(query),
-    });
-
-    if (!resp.ok) throw new Error("Overpass API error");
-    type OverpassElement = { id: string; lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> };
-    const data = await resp.json() as { elements?: OverpassElement[] };
-
-    const results = (data.elements ?? []).filter((e) => e.lat || (e.center && e.center.lat)).map((e) => ({
-      id: e.id,
-      name: e.tags?.name || category,
-      lat: e.lat || e.center!.lat,
-      lng: e.lon || e.center!.lon,
-      category,
-      tags: e.tags,
-    }));
-
-    return res.json(results);
-  } catch (err) {
-    console.error("[poi] error:", err);
-    return sendError(res, 502, "Punti di interesse non disponibili");
   }
 });
 

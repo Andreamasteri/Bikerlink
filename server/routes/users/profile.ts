@@ -1,6 +1,6 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
-import { updateUserMeSchema, updateProfileDynamicSchema, pushTokenSchema, ghostModeSchema, privacySettingsSchema, availabilitySchema } from "@shared/validators";
+import { updateUserMeSchema, updateProfileDynamicSchema, ghostModeSchema, privacySettingsSchema, availabilitySchema } from "@shared/validators";
 import { onlineTracker } from "../../online-tracker";
 import { applyFakeZones, applyPositionFuzz, captureFirstAvailabilityLocation } from "../users";
 import { createRegionalClubInvite } from "../motoclubs/utils";
@@ -285,40 +285,6 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
     }
   } catch (error) {
     console.error("Update dynamic profile error:", error);
-    return sendError(res, 500, "Errore interno del server");
-  }
-});
-
-router.put("/me/match-seen", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = req.session.userId!;
-    await storage.updateUser(userId, { lastSeenMatchAt: new Date() });
-    return sendSuccess(res);
-  } catch (error) {
-    console.error("Match seen update error:", error);
-    return sendError(res, 500, "Errore interno del server");
-  }
-});
-
-router.put("/me/push-token", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const userId = req.session.userId!;
-    const parsedPt = pushTokenSchema.safeParse(req.body ?? {});
-    if (!parsedPt.success) return sendError(res, 400, parsedPt.error.issues[0].message);
-    const { token } = parsedPt.data;
-    if (token === null || token === undefined || token === "") {
-      await storage.updateUser(userId, { expoPushToken: null });
-      return sendSuccess(res, { cleared: true });
-    }
-    const isValidToken = typeof token === "string" &&
-      (token.startsWith("ExponentPushToken[") || token.startsWith("ExpoPushToken["));
-    if (!isValidToken) {
-      return sendError(res, 400, "Token Expo push non valido");
-    }
-    await storage.updateUser(userId, { expoPushToken: token });
-    return sendSuccess(res);
-  } catch (error) {
-    console.error("Push token update error:", error);
     return sendError(res, 500, "Errore interno del server");
   }
 });
