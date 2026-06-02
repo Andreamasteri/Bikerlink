@@ -58,6 +58,13 @@ function formatDate(iso?: string | null): string {
   return new Date(iso).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+const DEFAULT_SLIDE_PROMPT =
+  `Sei un esperto di marketing per app mobile. Genera un array JSON di 6 slide "come funziona BikerLink" in italiano.\n` +
+  `BikerLink è un'app per motociclisti con: matching tra biker, pianificazione giri, motoclub, SOS stradale, chat, raduni.\n` +
+  `Ogni slide ha: "title" (max 6 parole, impattante) e "body" (max 30 parole, descrizione concisa della funzione).\n` +
+  `Restituisci SOLO un array JSON valido, senza markdown, senza commenti, esempio:\n` +
+  `[{"title":"Trova il tuo biker","body":"Descrizione..."},...]`;
+
 export default function LegalDocsAdmin() {
   const insets = useSafeAreaInsets();
   const [generating, setGenerating] = useState<DocType | "slides" | null>(null);
@@ -70,7 +77,7 @@ export default function LegalDocsAdmin() {
   const [showUploadPreview, setShowUploadPreview] = useState(false);
   const [showCurrentPreview, setShowCurrentPreview] = useState(false);
   const [publishedMsg, setPublishedMsg] = useState<string | null>(null);
-  const [slidePrompt, setSlidePrompt] = useState("");
+  const [slidePrompt, setSlidePrompt] = useState(DEFAULT_SLIDE_PROMPT);
   const [numSlides, setNumSlides] = useState("6");
 
   const { data: info, refetch } = useQuery<DocsInfoResponse>({

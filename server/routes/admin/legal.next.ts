@@ -20,14 +20,16 @@ import { z } from "zod";
 
 const router = Router();
 
+const ALLOWED_IMAGE_MIMES = ["image/png", "image/jpeg", "image/jpg"];
+
 const imageUpload = multer({
   dest: path.join(process.cwd(), "uploads", "tmp"),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith("image/")) {
+    if (ALLOWED_IMAGE_MIMES.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Solo file immagine sono accettati (PNG, JPEG, WebP)"));
+      cb(new Error("Solo file PNG o JPEG sono accettati"));
     }
   },
 });
