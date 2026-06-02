@@ -9,7 +9,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { showImagePickerMenu } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
@@ -142,8 +142,8 @@ export default function ProfileScreen() {
       const filename = uri.split("/").pop() || "photo.jpg";
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData requires non-standard object shape
-      formData.append("photo", { uri, name: filename, type: mimeType } as any);
+
+      formData.append("photo", await uriToBlob(uri, mimeType), filename);
       const baseUrl = getApiUrl();
       const url = new URL("/api/users/me/photos", baseUrl);
       const res = await globalThis.fetch(url.toString(), {

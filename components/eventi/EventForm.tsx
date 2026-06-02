@@ -14,7 +14,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
-import { showImagePickerMenu } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
 import type { EventType, EventDTO } from "@/shared/event-types";
 import { EventBasicFields } from "./EventBasicFields";
 import { EventLocationFields } from "./EventLocationFields";
@@ -197,7 +197,7 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
         try {
           const formData = new FormData();
           const filename = uri.split("/").pop() ?? "image.jpg";
-          formData.append("image", { uri, name: filename, type: "image/jpeg" } as unknown as Blob);
+          formData.append("image", await uriToBlob(uri, "image/jpeg"), filename);
           const imgRes = await fetch(`${getApiUrl()}/api/events/${evt.id}/images`, {
             method: "POST",
             body: formData,

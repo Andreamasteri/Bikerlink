@@ -13,7 +13,7 @@ import { KeyboardAvoidingView } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
-import { showImagePickerMenu } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
 
 import Colors from "@/constants/colors";
 import { useT } from "@/lib/language-context";
@@ -85,8 +85,7 @@ export default function ContestScreen() {
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1].toLowerCase()}` : "image/jpeg";
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FormData.append React Native overload
-      formData.append("photo", { uri: data.imageUri, name: filename, type: mimeType } as any);
+      formData.append("photo", await uriToBlob(data.imageUri, mimeType), filename);
 
       if (data.caption) {
         formData.append("caption", data.caption);
