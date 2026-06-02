@@ -8,18 +8,20 @@ interface Props {
   currentStyleId: MapStyleId;
   onSelectStyle: (id: MapStyleId) => void;
   bottomOffset?: number;
+  leftOffset?: number;
   compact?: boolean;
 }
 
 const STYLE_ORDER: MapStyleId[] = ["day", "night", "satellite"];
 
-export function MapStyleToggle({ currentStyleId, onSelectStyle, bottomOffset, compact }: Props) {
+export function MapStyleToggle({ currentStyleId, onSelectStyle, bottomOffset, leftOffset, compact }: Props) {
   return (
     <View
       style={[
         styles.container,
         compact && styles.containerCompact,
         !compact && bottomOffset != null && { bottom: bottomOffset },
+        !compact && leftOffset != null && { left: leftOffset },
       ]}
     >
       {STYLE_ORDER.map((id) => {

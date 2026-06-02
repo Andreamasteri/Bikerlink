@@ -268,7 +268,8 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         <MapStyleToggle
           currentStyleId={styleId}
           onSelectStyle={setStyle}
-          bottomOffset={filterBarTopOffset != null ? 313 : undefined}
+          bottomOffset={filterBarTopOffset != null ? 188 : undefined}
+          leftOffset={filterBarTopOffset != null ? 15 : undefined}
           compact={filterBarTopOffset == null}
         />
       )}
@@ -288,8 +289,8 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         <MapNorthCompass
           bearing={viewState.bearing}
           onResetBearing={handleResetBearing}
-          topOffset={filterBarTopOffset + 52}
-          leftOffset={12}
+          topOffset={filterBarTopOffset + 44}
+          leftOffset={15}
           disabled
         />
       )}
@@ -326,7 +327,7 @@ const styles = StyleSheet.create({
   },
   hazardFab: {
     position: "absolute",
-    bottom: 157,
+    bottom: 145,
     right: 12,
     backgroundColor: Colors.surface,
     width: 44,

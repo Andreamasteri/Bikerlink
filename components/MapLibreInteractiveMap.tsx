@@ -200,8 +200,8 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
           <MapNorthCompass
             bearing={viewState.bearing}
             onResetBearing={handleResetBearing}
-            topOffset={filterBarTopOffset + 18}
-            leftOffset={12}
+            topOffset={filterBarTopOffset + 10}
+            leftOffset={15}
           />
         )}
         <MapFilterBar
