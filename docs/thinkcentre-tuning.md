@@ -107,12 +107,11 @@ che incorpora direttamente i flag JVM ottimizzati. Questo garantisce:
 
 #### Pre-requisiti prima di installare
 
-1. **Personalizzare il file `scripts/thinkcentre/graphhopper.service`** — i placeholder `<VERSION>` e i path devono rispecchiare l'installazione locale:
+1. **Verificare i path in `scripts/thinkcentre/graphhopper.service`** — la versione JAR è già impostata a `9.1` (testata su ThinkCentre). Verificare comunque che il JAR esista:
 
 ```bash
-# Verificare la versione del JAR installato:
-ls /opt/graphhopper/graphhopper-web-*.jar
-# es. graphhopper-web-9.1.jar → usare 9.1
+# Confermare che il JAR sia presente:
+ls /opt/graphhopper/graphhopper-web-9.1.jar
 
 # Il file di configurazione:
 ls /opt/graphhopper/config.yml
@@ -309,12 +308,13 @@ sudo systemctl daemon-reload && sudo systemctl restart graphhopper
 Rimuovere `-XX:+ZGenerational` dalla riga `ExecStart` in `/etc/systemd/system/graphhopper.service`.  
 ZGC base funziona con Java 17+.
 
-**graphhopper.service non parte (placeholder `<VERSION>` non sostituito):**  
+**graphhopper.service non parte (JAR non trovato):**  
 ```bash
 journalctl -u graphhopper -n 30
-# Cercare: "Unable to access jarfile /opt/graphhopper/graphhopper-web-<VERSION>.jar"
-# Fix: modificare ExecStart con la versione corretta del JAR
+# Cercare: "Unable to access jarfile /opt/graphhopper/graphhopper-web-9.1.jar"
+# Il file è impostato per la versione 9.1. Se il JAR è diverso, aggiornare ExecStart:
 sudo systemctl edit --full graphhopper   # oppure modificare direttamente il file
+# Cambiare graphhopper-web-9.1.jar con la versione effettivamente installata
 sudo systemctl daemon-reload && sudo systemctl restart graphhopper
 ```
 

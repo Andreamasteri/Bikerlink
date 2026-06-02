@@ -169,7 +169,7 @@ else
   echo ""
   echo -e "  ${YELLOW}ATTENZIONE:${NC} Prima di procedere verificare che in ${BOLD}$GH_SERVICE_SRC${NC}"
   echo -e "  siano corretti:"
-  echo -e "    - Il path del JAR  (graphhopper-web-<VERSION>.jar)"
+  echo -e "    - Il path del JAR  (graphhopper-web-9.1.jar — già impostato)"
   echo -e "    - Il path del config  (/opt/graphhopper/config.yml)"
   echo -e "    - L'utente di sistema  (User=graphhopper)"
   echo ""

@@ -8,7 +8,7 @@
 # Oppure usa: sudo bash apply-tuning.sh  (installa tutto in una volta)
 #
 # PERSONALIZZAZIONE OBBLIGATORIA prima di installare:
-#   1. Aggiornare ExecStart con la versione corretta del JAR (es. 9.1)
+#   1. Verificare che il JAR graphhopper-web-9.1.jar esista in /opt/graphhopper/
 #   2. Verificare i path: /opt/graphhopper/ deve contenere il JAR e config.yml
 #   3. Verificare che l'utente 'graphhopper' esista (o cambiare User= con l'utente corretto)
 #      Per creare l'utente: sudo useradd --system --no-create-home --shell /usr/sbin/nologin graphhopper
@@ -30,7 +30,7 @@ User=graphhopper
 Group=graphhopper
 
 # ── Path ──────────────────────────────────────────────────────────────────────
-# Aggiornare <VERSION> con la versione del JAR installato (es. 9.1)
+# JAR: graphhopper-web-9.1.jar (versione testata su ThinkCentre)
 WorkingDirectory=/opt/graphhopper
 ExecStart=/usr/bin/java \
     -Xms8g \
@@ -41,7 +41,7 @@ ExecStart=/usr/bin/java \
     -XX:+UseNUMA \
     -XX:+UseTransparentHugePages \
     -XX:+UnlockExperimentalVMOptions \
-    -jar /opt/graphhopper/graphhopper-web-<VERSION>.jar \
+    -jar /opt/graphhopper/graphhopper-web-9.1.jar \
     server /opt/graphhopper/config.yml
 
 # ── Restart policy ────────────────────────────────────────────────────────────
