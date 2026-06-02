@@ -19,7 +19,6 @@ import { getApiUrl, apiRequest } from "@/lib/query-client";
 import { appendFileToForm } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { SlidesPanel } from "@/components/admin/SlidesPanel";
-import { styles } from "./legal-docs-styles";
 
 type DocType = "eula" | "privacy" | "manual";
 type SlidePreview = { title: string; imageUrl: string };
