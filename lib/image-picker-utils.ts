@@ -1,5 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
 import { Alert, Platform, ActionSheetIOS } from "react-native";
+import { File as EFSFile } from "expo-file-system";
 
 export interface BulkImageAsset {
   uri: string;
@@ -9,6 +10,25 @@ export interface BulkImageAsset {
 }
 
 const MAX_BULK_FILE_SIZE = 5 * 1024 * 1024;
+
+/**
+ * Converts a local image URI to a Blob-compatible object accepted by Expo's
+ * WinterCG fetch serializer (convertFormData.ts).
+ *
+ * On native the expo-file-system File class satisfies the `'bytes' in entry`
+ * branch; on web a standard Blob is returned via fetch().blob().
+ *
+ * Usage: formData.append("image", await uriToBlob(uri, mimeType), filename)
+ */
+export async function uriToBlob(uri: string, _mimeType: string): Promise<Blob> {
+  if (Platform.OS === "web") {
+    const response = await fetch(uri);
+    return response.blob();
+  }
+  // expo-file-system File implements Blob with .bytes() — satisfies the
+  // `'bytes' in entry` branch in Expo's WinterCG convertFormData.ts
+  return new EFSFile(uri) as unknown as Blob;
+}
 
 export async function pickMultipleImages(
   options: { quality?: number; selectionLimit?: number } = {}

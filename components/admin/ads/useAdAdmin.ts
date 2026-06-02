@@ -3,7 +3,7 @@ import { Alert, BackHandler, Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
-import { showImagePickerMenu, pickMultipleImages, BulkImageAsset } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, pickMultipleImages, BulkImageAsset, uriToBlob } from "@/lib/image-picker-utils";
 import { Campaign } from "./AdCard";
 import { ListItem } from "./AdGroupList";
 
@@ -380,8 +380,8 @@ export function useAdAdmin() {
         const normalised = ["image/jpg", "image/jpe", "image/jfif"].includes(rawMime)
           ? "image/jpeg"
           : rawMime;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData file object
-        formData.append("images", { uri: img.uri, name: filename, type: normalised } as any);
+        const blob = await uriToBlob(img.uri, normalised);
+        formData.append("images", blob, filename);
       }
       try {
         const res = await globalThis.fetch(bulkUrl, {
@@ -457,7 +457,7 @@ export function useAdAdmin() {
     setEditingGroupId(groupId);
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!formName.trim() || !formImageUri) return;
     const formData = new FormData();
     formData.append("name", formName.trim());
@@ -468,9 +468,9 @@ export function useAdAdmin() {
     if (formImageUri) {
       const filename = formImageUri.split("/").pop() || "image.jpg";
       const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : "image/jpeg";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- RN FormData file object
-      formData.append("image", { uri: formImageUri, name: filename, type } as any);
+      const mimeType = match ? `image/${match[1]}` : "image/jpeg";
+      const blob = await uriToBlob(formImageUri, mimeType);
+      formData.append("image", blob, filename);
     }
     createMutation.mutate(formData);
   };

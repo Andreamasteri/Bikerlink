@@ -19,7 +19,7 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { showImagePickerMenu } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
@@ -43,12 +43,6 @@ interface Campaign {
 }
 
 type TabKey = "biker" | "zavorrina" | "coppia" | "tutti";
-
-interface RNFileForUpload {
-  uri: string;
-  name: string;
-  type: string;
-}
 
 const TABS: { key: TabKey; label: string; icon: string; iconSet: "material" | "community" | "ionicons"; color: string }[] = [
   { key: "tutti", label: "Tutti", icon: "people-outline", iconSet: "ionicons", color: Colors.textSecondary },
@@ -233,7 +227,7 @@ export default function ModeratorCampaigns() {
     );
   }, []);
 
-  function buildFormData(targetUserType: string): FormData {
+  async function buildFormData(targetUserType: string): Promise<FormData> {
     const formData = new FormData();
     formData.append("name", formName.trim());
     formData.append("targetUserType", targetUserType);
@@ -244,21 +238,21 @@ export default function ModeratorCampaigns() {
       const filename = formImageUri.split("/").pop() ?? "image.jpg";
       const match = /\.(\w+)$/.exec(filename);
       const mimeType = match ? `image/${match[1]}` : "image/jpeg";
-      const file: RNFileForUpload = { uri: formImageUri, name: filename, type: mimeType };
-      formData.append("image", file as unknown as Blob);
+      const blob = await uriToBlob(formImageUri, mimeType);
+      formData.append("image", blob, filename);
     }
     return formData;
   }
 
-  function handleCreate() {
+  async function handleCreate() {
     if (!formName.trim()) return;
     const target = activeTab === "tutti" ? "biker" : activeTab;
-    createMutation.mutate(buildFormData(target));
+    createMutation.mutate(await buildFormData(target));
   }
 
-  function handleUpdate() {
+  async function handleUpdate() {
     if (!editingCampaign || !formName.trim()) return;
-    updateMutation.mutate({ id: editingCampaign.id, formData: buildFormData(editingCampaign.targetUserType) });
+    updateMutation.mutate({ id: editingCampaign.id, formData: await buildFormData(editingCampaign.targetUserType) });
   }
 
   const renderTab = ({ key, label, icon, iconSet, color }: (typeof TABS)[0]) => {
