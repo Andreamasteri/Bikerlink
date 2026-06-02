@@ -201,7 +201,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   req.on("close", onClose);
 
   try {
-    const object = await generateRouteObject({
+    const { result: object, provider_used } = await generateRouteObject({
       prompt,
       apiKey,
       system: AI_SYSTEM_PROMPT,
@@ -212,7 +212,8 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
     });
     clearTimeout(timeout);
     req.off("close", onClose);
-    return res.json(object);
+    console.info(`[AI parse] provider usato: ${provider_used}`);
+    return res.json({ ...object, provider_used });
   } catch (err: unknown) {
     clearTimeout(timeout);
     req.off("close", onClose);
@@ -246,6 +247,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
 
   try {
     let fullText = "";
+    let aiProvider: string | null = null;
     for await (const chunk of streamRouteText({
       prompt,
       apiKey,
@@ -257,6 +259,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
       // completo è un JSON valido secondo routeSchema. In caso contrario lo stream
       // ricade su Gemini senza emettere output corrotto (Task #2853).
       validate: (text) => tryParseRoute(text) !== null,
+      onProviderSelected: (provider) => { aiProvider = provider; },
     })) {
       if (chunk) {
         fullText += chunk;
@@ -267,8 +270,9 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
     clearTimeout(timeout);
     req.off("close", onClose);
 
+    console.info(`[AI stream] provider usato: ${aiProvider ?? "unknown"}`);
     const parsed = tryParseRoute(fullText);
-    res.write(`event: done\ndata: ${JSON.stringify({ parsed })}\n\n`);
+    res.write(`event: done\ndata: ${JSON.stringify({ parsed, provider_used: aiProvider })}\n\n`);
     res.end();
   } catch (err: unknown) {
     clearTimeout(timeout);

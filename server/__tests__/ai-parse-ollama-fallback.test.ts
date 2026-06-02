@@ -89,12 +89,13 @@ describe("generateRouteObject — Ollama configurato come provider primario", ()
     aiMocks.generateObject.mockResolvedValueOnce({ object: ollamaPayload });
     process.env.GEMINI_API_KEY = "test-gemini-key";
 
-    const result = await generateRouteObject<SimpleRoute>({
+    const { result, provider_used } = await generateRouteObject<SimpleRoute>({
       ...baseOpts,
       apiKey: process.env.GEMINI_API_KEY,
     });
 
     expect(result).toEqual(ollamaPayload);
+    expect(provider_used).toBe("ollama");
 
     // generateObject deve essere stato chiamato UNA SOLA volta (con il modello Ollama)
     expect(aiMocks.generateObject).toHaveBeenCalledTimes(1);
@@ -106,12 +107,13 @@ describe("generateRouteObject — Ollama configurato come provider primario", ()
     const ollamaPayload: SimpleRoute = { title: "Ollama standalone", style: "balanced" };
     aiMocks.generateObject.mockResolvedValueOnce({ object: ollamaPayload });
 
-    const result = await generateRouteObject<SimpleRoute>({
+    const { result, provider_used } = await generateRouteObject<SimpleRoute>({
       ...baseOpts,
       apiKey: undefined,
     });
 
     expect(result).toEqual(ollamaPayload);
+    expect(provider_used).toBe("ollama");
     expect(aiMocks.generateObject).toHaveBeenCalledTimes(1);
     expect(aiMocks.generateObject.mock.calls[0][0].model).toEqual(ollamaModel);
   });
@@ -126,12 +128,13 @@ describe("generateRouteObject — Ollama configurato come provider primario", ()
     aiMocks.generateObject.mockResolvedValueOnce({ object: geminiPayload });
     process.env.GEMINI_API_KEY = "test-gemini-key";
 
-    const result = await generateRouteObject<SimpleRoute>({
+    const { result, provider_used } = await generateRouteObject<SimpleRoute>({
       ...baseOpts,
       apiKey: process.env.GEMINI_API_KEY,
     });
 
     expect(result).toEqual(geminiPayload);
+    expect(provider_used).toBe("gemini");
 
     // generateObject chiamato due volte: prima Ollama (fallisce), poi Gemini
     expect(aiMocks.generateObject).toHaveBeenCalledTimes(2);
@@ -145,12 +148,13 @@ describe("generateRouteObject — Ollama configurato come provider primario", ()
     aiMocks.generateObject.mockResolvedValueOnce({ object: geminiPayload });
     process.env.GEMINI_API_KEY = "test-gemini-key";
 
-    const result = await generateRouteObject<SimpleRoute>({
+    const { result, provider_used } = await generateRouteObject<SimpleRoute>({
       ...baseOpts,
       apiKey: process.env.GEMINI_API_KEY,
     });
 
     expect(result).toEqual(geminiPayload);
+    expect(provider_used).toBe("gemini");
     expect(aiMocks.generateObject).toHaveBeenCalledTimes(2);
     expect(aiMocks.generateObject.mock.calls[1][0].model).toEqual(geminiModel);
   });
@@ -161,13 +165,14 @@ describe("generateRouteObject — Ollama configurato come provider primario", ()
     aiMocks.generateObject.mockResolvedValueOnce({ object: geminiPayload });
     process.env.GEMINI_API_KEY = "test-gemini-key";
 
-    const result = await generateRouteObject<SimpleRoute>({
+    const { result, provider_used } = await generateRouteObject<SimpleRoute>({
       ...baseOpts,
       apiKey: process.env.GEMINI_API_KEY,
     });
 
     expect(result.title).toBe("Toscana via Gemini");
     expect(result.style).toBe("curvy");
+    expect(provider_used).toBe("gemini");
   });
 
   // -------------------------------------------------------------------------

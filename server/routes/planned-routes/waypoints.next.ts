@@ -54,8 +54,9 @@ function geminiModel(apiKey: string) {
  * Catena di provider configurabile a runtime dall'admin (env ROUTE_AI_PROVIDERS o
  * DB ai_route_provider_chain). Ordine default: Ollama → Groq → Gemini.
  * Se un provider fallisce, passa al successivo nella chain senza errori visibili.
+ * Restituisce anche il provider vincitore come `provider_used`.
  */
-export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<T> {
+export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{ result: T; provider_used: string }> {
   const { prompt, apiKey, system, schema, abortSignal, maxRetries = 2, temperature = 0.1 } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
 
@@ -72,7 +73,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<T
         const { object } = await generateObject({
           model: getOllamaModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
         });
-        return object;
+        return { result: object, provider_used: "ollama" };
       } catch (err) {
         lastErr = err;
         if (isLast) throw err;
@@ -84,7 +85,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<T
         const { object } = await generateObject({
           model: getGroqModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
         });
-        return object;
+        return { result: object, provider_used: "groq" };
       } catch (err) {
         lastErr = err;
         if (isLast) throw err;
@@ -96,7 +97,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<T
         const { object } = await generateObject({
           model: geminiModel(apiKey), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
         });
-        return object;
+        return { result: object, provider_used: "gemini" };
       } catch (err) {
         lastErr = err;
         if (isLast) throw err;
@@ -120,6 +121,12 @@ export interface StreamRouteOptions extends Omit<RouteAiOptions<unknown>, "schem
    * stato emesso) e — se disponibile — si ricade in modo pulito su Gemini.
    */
   validate?: (fullText: string) => boolean;
+  /**
+   * Callback invocata non appena il provider vincitore è stato selezionato
+   * (dopo bufferizzazione + validazione, prima di emettere i chunk).
+   * Utile per tracciare quale provider ha effettivamente risposto.
+   */
+  onProviderSelected?: (provider: string) => void;
 }
 
 /**
@@ -176,7 +183,7 @@ async function bufferAndValidateStream(
 }
 
 export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator<string> {
-  const { prompt, apiKey, system, abortSignal, maxRetries = 2, temperature = 0.1, validate } = opts;
+  const { prompt, apiKey, system, abortSignal, maxRetries = 2, temperature = 0.1, validate, onProviderSelected } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
   const streamOpts = { maxRetries, temperature, abortSignal, validate };
 
@@ -191,6 +198,7 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
       try {
         const buffered = await bufferAndValidateStream(getOllamaModel(), fullPrompt, streamOpts);
         if (buffered) {
+          onProviderSelected?.("ollama");
           for (const chunk of buffered) yield chunk;
           return;
         }
@@ -207,6 +215,7 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
       try {
         const buffered = await bufferAndValidateStream(getGroqModel(), fullPrompt, streamOpts);
         if (buffered) {
+          onProviderSelected?.("groq");
           for (const chunk of buffered) yield chunk;
           return;
         }
@@ -226,6 +235,7 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
       if (!geminiBuffer) {
         throw new Error("Gemini ha prodotto una risposta non valida: nessun provider disponibile ha restituito output utilizzabile.");
       }
+      onProviderSelected?.("gemini");
       for (const chunk of geminiBuffer) yield chunk;
       return;
     }

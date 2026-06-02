@@ -140,9 +140,10 @@ describe("generateRouteObject — Groq fallback (Task #2930)", () => {
     });
     process.env.GEMINI_API_KEY = "test-gemini-key";
 
-    const result = await generateRouteObject<SimpleRoute>({ ...baseOpts, apiKey: process.env.GEMINI_API_KEY });
+    const { result, provider_used } = await generateRouteObject<SimpleRoute>({ ...baseOpts, apiKey: process.env.GEMINI_API_KEY });
 
     expect(result).toEqual({ title: "Via Groq", style: "fast" });
+    expect(provider_used).toBe("groq");
     const providers = aiMocks.generateObject.mock.calls.map((c) => c[0].model.__provider);
     expect(providers).toEqual(["ollama", "groq"]);
     expect(providers).not.toContain("google");
@@ -156,9 +157,10 @@ describe("generateRouteObject — Groq fallback (Task #2930)", () => {
     });
     process.env.GEMINI_API_KEY = "test-gemini-key";
 
-    const result = await generateRouteObject<SimpleRoute>({ ...baseOpts, apiKey: process.env.GEMINI_API_KEY });
+    const { result, provider_used } = await generateRouteObject<SimpleRoute>({ ...baseOpts, apiKey: process.env.GEMINI_API_KEY });
 
     expect(result).toEqual({ title: "Via Gemini", style: "balanced" });
+    expect(provider_used).toBe("gemini");
     const providers = aiMocks.generateObject.mock.calls.map((c) => c[0].model.__provider);
     expect(providers).toEqual(["ollama", "groq", "google"]);
   });
@@ -170,9 +172,10 @@ describe("generateRouteObject — Groq fallback (Task #2930)", () => {
       throw new Error("Gemini non disponibile");
     });
 
-    const result = await generateRouteObject<SimpleRoute>({ ...baseOpts, apiKey: undefined });
+    const { result, provider_used } = await generateRouteObject<SimpleRoute>({ ...baseOpts, apiKey: undefined });
 
     expect(result).toEqual({ title: "Groq standalone", style: "curvy" });
+    expect(provider_used).toBe("groq");
     const providers = aiMocks.generateObject.mock.calls.map((c) => c[0].model.__provider);
     expect(providers).toEqual(["ollama", "groq"]);
   });
