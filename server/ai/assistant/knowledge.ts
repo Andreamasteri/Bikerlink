@@ -61,6 +61,8 @@ export function buildSystemPrompt(opts: {
   platform: "android" | "ios" | "web";
   customFaqs?: KnowledgeEntry[];
   allowedActions: string[];
+  /** Task #3017 — Contesto RAG iniettato dalla similarity search sulla knowledge base. */
+  ragContext?: string;
 }): string {
   const faqs = [...ASSISTANT_KNOWLEDGE, ...(opts.customFaqs ?? [])]
     .map((k) => `Q: ${k.question}\nA: ${k.answer}`)
@@ -69,6 +71,10 @@ export function buildSystemPrompt(opts: {
   const allowedActionsList = opts.allowedActions.length > 0
     ? opts.allowedActions.map((id) => `- ${id}`).join("\n")
     : "(nessuna azione abilitata su questa piattaforma)";
+
+  const ragSection = opts.ragContext
+    ? `\n\n${opts.ragContext}`
+    : "";
 
   return `Sei l'AI Assistant di BikerLink, un'app per motociclisti. Rispondi SOLO a domande sull'app e le sue funzioni.
 
@@ -89,5 +95,5 @@ AZIONI ABILITATE DALL'ADMIN PER QUESTA PIATTAFORMA:
 ${allowedActionsList}
 
 KNOWLEDGE BASE FAQ (usa queste informazioni per rispondere):
-${faqs}`;
+${faqs}${ragSection}`;
 }

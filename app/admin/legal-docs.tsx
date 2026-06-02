@@ -7,8 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
-  Image,
-  TextInput,
 } from "react-native";
 import { styles } from "./legal-docs.styles";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -21,7 +19,6 @@ import Colors from "@/constants/colors";
 import { SlidesPanel } from "@/components/admin/SlidesPanel";
 
 type DocType = "eula" | "privacy" | "manual";
-type SlidePreview = { title: string; imageUrl: string };
 
 interface DocInfo {
   label: string;
@@ -76,13 +73,6 @@ export default function LegalDocsAdmin() {
 
   const { data: info, refetch } = useQuery<DocsInfoResponse>({
     queryKey: ["/api/admin/legal/docs-info"],
-  });
-
-  const { data: currentSlidesData, refetch: refetchCurrentSlides } = useQuery<{
-    ok: boolean;
-    slides: { id: string; title: string; imageUrl: string; isActive: boolean }[];
-  }>({
-    queryKey: ["/api/admin/legal/current-slides"],
   });
 
   const handleGenerate = async (docType: DocType) => {
@@ -247,4 +237,3 @@ export default function LegalDocsAdmin() {
     </ScrollView>
   );
 }
-

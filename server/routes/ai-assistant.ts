@@ -2,6 +2,8 @@
 // - GET  /api/ai/assistant/config?platform=ios|android — config piattaforma
 // - POST /api/ai/assistant/message — SSE streaming risposta dell'agente
 // - POST /api/ai/assistant/action/:id — esegue azione whitelisted (validazione)
+// - GET  /api/ai/assistant/history — turni memoria conversazionale (Task #3017)
+// - DELETE /api/ai/assistant/history — cancella memoria conversazionale (Task #3017)
 // - GET  /api/users/me/assistant-prefs — prefs utente
 // - PATCH /api/users/me/assistant-prefs — aggiorna prefs utente
 import { Router, type Request, type Response } from "express";
@@ -266,6 +268,46 @@ router.patch("/users/me/assistant-prefs", requireUser, async (req: Request, res:
     payload: parsed.data,
   });
   res.json({ prefs: next });
+});
+
+// ── GET /api/ai/assistant/history — ultimi N turni della memoria conversazionale ──
+router.get("/ai/assistant/history", requireUser, async (req: Request, res: Response) => {
+  const userId = (req as Request & { sessionUser?: { id: string } }).sessionUser!.id;
+  const limitRaw = parseInt(String(req.query.limit ?? "20"), 10);
+  const limit = Math.min(Math.max(isNaN(limitRaw) ? 20 : limitRaw, 1), 100);
+  try {
+    const { db } = await import("../db");
+    const { aiConversationTurns } = await import("@shared/db");
+    const { eq, desc } = await import("drizzle-orm");
+    const rows = await db
+      .select({
+        id: aiConversationTurns.id,
+        role: aiConversationTurns.role,
+        content: aiConversationTurns.content,
+        createdAt: aiConversationTurns.createdAt,
+      })
+      .from(aiConversationTurns)
+      .where(eq(aiConversationTurns.userId, userId))
+      .orderBy(desc(aiConversationTurns.createdAt))
+      .limit(limit);
+    return res.json({ turns: rows.reverse(), total: rows.length });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
+});
+
+// ── DELETE /api/ai/assistant/history — cancella tutta la memoria conversazionale ──
+router.delete("/ai/assistant/history", requireUser, async (req: Request, res: Response) => {
+  const userId = (req as Request & { sessionUser?: { id: string } }).sessionUser!.id;
+  try {
+    const { db } = await import("../db");
+    const { aiConversationTurns } = await import("@shared/db");
+    const { eq } = await import("drizzle-orm");
+    await db.delete(aiConversationTurns).where(eq(aiConversationTurns.userId, userId));
+    return res.json({ ok: true, deleted: true });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
 });
 
 // ── Client telemetry beacon (tip_shown/dismissed, onboarding, ecc.) ──────

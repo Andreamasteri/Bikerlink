@@ -9,20 +9,29 @@
  *                   Se non impostata, le funzioni lanciano un errore catchable e il
  *                   chiamante ricade sul provider cloud (Gemini/OpenAI).
  *   OLLAMA_TOKEN  — Token per il server self-hosted (header X-Ollama-Token).
- *   OLLAMA_MODEL  — Modello locale da usare (default "llama3.2:latest").
+ *   OLLAMA_MODEL  — Modello locale da usare.
+ *                   Default: "bikerlink" se disponibile (Modelfile custom Task #3017),
+ *                   altrimenti "llama3.2:latest".
  *
  * L'integrazione usa il Vercel AI SDK (package `ollama-ai-provider-v2`,
  * compatibile con `ai` v6 + `zod` v4) così da poter usare lo stesso modello
  * sia con `generateObject`/`streamText` (parsing percorsi) sia con
  * `callOllamaChat` (traduzioni i18n).
+ *
+ * Task #3017 — JSON repair layer: prima di propagare un errore di parse,
+ * `callOllamaChat` tenta un repair del JSON malformato (trailing comma, blocchi
+ * ```json```, chiavi non quotate) e logga ogni repair come 'repaired' in ai_call_logs.
  */
 
 import { createOllama } from "ollama-ai-provider-v2";
 import { generateObject, generateText, type LanguageModel } from "ai";
 import type { z } from "zod";
+import { repairJson } from "./json-repair";
 
 const OLLAMA_URL = process.env.OLLAMA_URL?.replace(/\/$/, "");
 const OLLAMA_TOKEN = process.env.OLLAMA_TOKEN ?? "";
+// Task #3017: il modello default è "bikerlink" (Modelfile custom). Se OLLAMA_MODEL
+// non è impostato, il setup script lo setta a "bikerlink" dopo la creazione.
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:latest";
 
 /** true quando OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
@@ -52,6 +61,8 @@ export interface OllamaChatOptions {
   maxRetries?: number;
   /** Retry manuali aggiuntivi quando il modello locale rompe il JSON (default 1). */
   jsonRetries?: number;
+  /** Callback opzionale invocato quando il JSON repair ha successo (per logging). */
+  onRepair?: (attempt: number) => void;
 }
 
 /**
@@ -59,8 +70,9 @@ export interface OllamaChatOptions {
  *
  * - Se `schema` è fornito, usa `generateObject` e restituisce l'oggetto validato
  *   contro lo schema zod. I modelli 7-8B a volte rompono il JSON: oltre ai retry
- *   nativi del SDK, viene eseguito un retry manuale (`jsonRetries`) prima di
- *   propagare l'errore al chiamante (che ricadrà sul provider cloud).
+ *   nativi del SDK, viene eseguito un repair (Task #3017) + retry manuale
+ *   (`jsonRetries`) prima di propagare l'errore al chiamante (che ricadrà sul
+ *   provider cloud).
  * - Senza `schema`, usa `generateText` e restituisce la stringa generata.
  *
  * Lancia un errore catchable se Ollama non è raggiungibile o la risposta non è
@@ -71,7 +83,7 @@ export async function callOllamaChat<T = string>(
   schema?: z.ZodType<T>,
   options: OllamaChatOptions = {},
 ): Promise<T> {
-  const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1 } = options;
+  const { system, temperature = 0.2, abortSignal, maxRetries = 2, jsonRetries = 1, onRepair } = options;
   const model = getOllamaModel();
 
   if (!schema) {
@@ -86,10 +98,39 @@ export async function callOllamaChat<T = string>(
       return object;
     } catch (err) {
       lastErr = err;
+
+      // Task #3017 — JSON repair: tenta di estrarre il raw text dall'errore e ripararlo.
+      // Alcune versioni del SDK espongono il testo grezzo nel campo `text` o `cause`.
+      const rawText = extractRawTextFromError(err);
+      if (rawText) {
+        const repaired = repairJson(rawText);
+        if (repaired.ok) {
+          const validated = schema.safeParse(repaired.value);
+          if (validated.success) {
+            console.warn(`[Ollama] JSON repair riuscito (tentativo ${attempt + 1})`);
+            onRepair?.(attempt + 1);
+            return validated.data;
+          }
+        }
+      }
+
       if (attempt < jsonRetries) {
         console.warn(`[Ollama] risposta non valida (tentativo ${attempt + 1}/${jsonRetries + 1}), riprovo:`, (err as Error)?.message ?? err);
       }
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}
+
+/** Estrae il testo grezzo dall'errore di parsing del SDK AI (heuristic). */
+function extractRawTextFromError(err: unknown): string | null {
+  if (!(err instanceof Error)) return null;
+  // Vercel AI SDK espone il testo nel campo `text` o nella cause
+  const e = err as Error & { text?: string; cause?: { text?: string } };
+  if (typeof e.text === "string" && e.text.length > 0) return e.text;
+  if (typeof e.cause?.text === "string" && e.cause.text.length > 0) return e.cause.text;
+  // Ultimo tentativo: cerca nel messaggio d'errore un JSON tra backtick
+  const m = err.message.match(/```(?:json)?\s*([\s\S]+?)```/);
+  if (m) return m[1];
+  return null;
 }

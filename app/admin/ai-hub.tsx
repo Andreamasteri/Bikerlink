@@ -241,6 +241,138 @@ const ollamaStyles = StyleSheet.create({
   replyText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.success, flex: 1 },
 });
 
+// ── AI Metrics Card (Task #3017) ─────────────────────────────────────────────
+
+interface AiMetrics24h {
+  calls: number;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  degradedRate: number;
+  repairRate: number;
+  latencyP50Ms: number;
+  latencyP95Ms: number;
+}
+interface AiMetricsResponse {
+  summary24h: AiMetrics24h;
+  perProvider24h: Array<{ provider: string; calls: number; costUsd: number; degradedCount: number }>;
+}
+
+function AiMetricsCard() {
+  const { data, isLoading } = useQuery<AiMetricsResponse>({
+    queryKey: ["/api/admin/ai/metrics"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/ai/metrics")).json(),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
+  });
+
+  const s = data?.summary24h;
+
+  return (
+    <View style={metricsStyles.card}>
+      <View style={metricsStyles.header}>
+        <MaterialCommunityIcons name="chart-timeline-variant" size={18} color="#6366F1" />
+        <Text style={metricsStyles.title}>AI Call Metrics — 24h</Text>
+        {isLoading && <ActivityIndicator size="small" color={Colors.textSecondary} style={{ marginLeft: "auto" }} />}
+      </View>
+      {s ? (
+        <View style={metricsStyles.body}>
+          <View style={metricsStyles.row}>
+            <Text style={metricsStyles.label}>Chiamate</Text>
+            <Text style={metricsStyles.value}>{s.calls.toLocaleString("it-IT")}</Text>
+          </View>
+          <View style={metricsStyles.row}>
+            <Text style={metricsStyles.label}>Costo stimato</Text>
+            <Text style={metricsStyles.value}>${s.costUsd.toFixed(4)}</Text>
+          </View>
+          <View style={metricsStyles.row}>
+            <Text style={metricsStyles.label}>Token (in / out)</Text>
+            <Text style={metricsStyles.value}>
+              {s.tokensIn.toLocaleString("it-IT")} / {s.tokensOut.toLocaleString("it-IT")}
+            </Text>
+          </View>
+          <View style={metricsStyles.row}>
+            <Text style={metricsStyles.label}>Latenza p50 / p95</Text>
+            <Text style={metricsStyles.value}>{s.latencyP50Ms}ms / {s.latencyP95Ms}ms</Text>
+          </View>
+          {s.degradedRate > 0 && (
+            <View style={metricsStyles.row}>
+              <Text style={metricsStyles.label}>Tasso degraded</Text>
+              <Text style={[metricsStyles.value, { color: Colors.error }]}>{s.degradedRate}%</Text>
+            </View>
+          )}
+          {s.repairRate > 0 && (
+            <View style={metricsStyles.row}>
+              <Text style={metricsStyles.label}>JSON repaired</Text>
+              <Text style={[metricsStyles.value, { color: Colors.warning }]}>{s.repairRate}%</Text>
+            </View>
+          )}
+          {(data?.perProvider24h ?? []).length > 0 && (
+            <View style={metricsStyles.providers}>
+              {(data?.perProvider24h ?? []).slice(0, 4).map((p) => (
+                <View key={p.provider} style={metricsStyles.providerChip}>
+                  <Text style={metricsStyles.providerText}>{p.provider}</Text>
+                  <Text style={metricsStyles.providerCount}>{p.calls}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+      ) : !isLoading ? (
+        <Text style={metricsStyles.hint}>Nessuna chiamata AI nelle ultime 24h.</Text>
+      ) : null}
+    </View>
+  );
+}
+
+const metricsStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 16,
+    overflow: "hidden",
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 14,
+  },
+  title: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  body: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    padding: 14,
+    gap: 8,
+  },
+  row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  label: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary },
+  value: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, flexShrink: 1, textAlign: "right" },
+  hint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    paddingHorizontal: 14,
+    paddingBottom: 12,
+  },
+  providers: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 4 },
+  providerChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#6366F115",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: "#6366F130",
+  },
+  providerText: { fontFamily: "Inter_500Medium", fontSize: 11, color: "#6366F1" },
+  providerCount: { fontFamily: "Inter_700Bold", fontSize: 11, color: Colors.text },
+});
+
 interface AiHubCardData {
   state: "ok" | "warn" | "frozen";
   budgetPct: number;
@@ -411,6 +543,7 @@ export default function AiHubScreen() {
         </TouchableOpacity>
       ) : null}
       <OllamaStatusCard />
+      <AiMetricsCard />
       <View style={styles.grid}>
         {cards.map((card) => (
           <TouchableOpacity

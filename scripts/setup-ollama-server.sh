@@ -180,6 +180,25 @@ else
   echo ""
   log "Modelli installati:"
   ollama list || true
+
+  # ── Task #3017 — Crea il modello custom "bikerlink" dal Modelfile ────────
+  MODELFILE_DIR="$(cd "$(dirname "$0")/ollama-modelfile" 2>/dev/null && pwd || true)"
+  MODELFILE_PATH="${MODELFILE_DIR}/BikerLink.Modelfile"
+  if [[ -f "$MODELFILE_PATH" ]]; then
+    log "  → Creazione modello custom bikerlink da BikerLink.Modelfile..."
+    # Il Modelfile usa FROM llama3.2:latest (già scaricato sopra)
+    if ollama create bikerlink -f "$MODELFILE_PATH"; then
+      ok "  Modello custom 'bikerlink' creato con successo."
+      # Imposta OLLAMA_MODEL=bikerlink su Replit solo se non già configurato
+      if [[ "${OLLAMA_MODEL:-}" == "" || "${OLLAMA_MODEL:-}" == "llama3.2:latest" ]]; then
+        warn "  Ricordati di impostare OLLAMA_MODEL=bikerlink nelle variabili Replit."
+      fi
+    else
+      warn "  Creazione modello bikerlink fallita — usando '${CHAT_MODEL}' come fallback."
+    fi
+  else
+    warn "  BikerLink.Modelfile non trovato in ${MODELFILE_DIR} — salto creazione modello custom."
+  fi
 fi
 echo ""
 
