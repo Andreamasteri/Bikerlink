@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { View, Pressable, StyleSheet } from "react-native";
+import { View, Pressable, StyleSheet, findNodeHandle } from "react-native";
 import Colors from "@/constants/colors";
 
 interface CardLayout {
@@ -19,12 +19,15 @@ export const HomeMapSection: React.FC<HomeMapSectionProps> = ({ onCardLayout, ro
 
   const handleLayout = () => {
     if (!cardRef.current || !rootRef.current) return;
+    const rootNode = findNodeHandle(rootRef.current);
+    if (!rootNode) return;
     cardRef.current.measureLayout(
-      rootRef.current as unknown as number,
+      rootNode,
       (x, y, width, height) => {
         onCardLayout({ top: y, left: x, width, height });
       },
       () => {
+        if (__DEV__) console.warn("[HomeMapSection] measureLayout failed, falling back to measure()");
         cardRef.current?.measure((_x, _y, width, height, pageX, pageY) => {
           onCardLayout({ top: pageY, left: pageX, width, height });
         });
