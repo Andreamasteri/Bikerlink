@@ -12,6 +12,11 @@
 
 set -euo pipefail
 
+# ── Timing (allineato a publish-ota-full.sh per logs/ota-timing.log uniforme) ──
+T_TOTAL_START=$(date +%s)
+T_EXPORT=0; T_UPLOAD=0; T_PUBLISH=0; T_DB=0; T_GIT=0
+DIST_DIR="dist-ota"
+
 # ── Colori output ──
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -124,23 +129,54 @@ else
   log_warn "${BUILD_INFO} non trovato — APPLIED_OTA_NUMBER non aggiornato"
 fi
 
-# ── Pubblica su staging ──
-log_info "Pubblicazione su canale staging..."
-EAS_OUTPUT=$(EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" eas update \
+# ── Metro export (bundle Android) — separato per misurare il tempo reale ──
+log_info "Fase 1/2 — Metro export (bundle Android, attendi 2-5 minuti)..."
+rm -rf "$DIST_DIR"
+_T0=$(date +%s)
+EXPO_TOKEN="${EAS_TOKEN}" npx expo export \
+  --platform android \
+  --output-dir "$DIST_DIR" \
+  2>&1 || {
+  log_error "expo export fallito"
+  exit 1
+}
+T_EXPORT=$(( $(date +%s) - _T0 ))
+log_success "⏱ Metro export completato in ${T_EXPORT}s"
+
+# ── Pubblica su staging (usa il bundle pre-compilato) ──
+# T_UPLOAD misura il trasferimento CDN; il record EAS è incluso (T_PUBLISH=0).
+log_info "Fase 2/2 — EAS upload bundle su CDN (canale staging)..."
+_T0=$(date +%s)
+EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" eas update \
   --channel staging \
   --message "${MESSAGE}" \
   --environment production \
+  --input-dir "$DIST_DIR" \
+  --skip-bundler \
   --non-interactive \
   2>&1) || {
   log_error "eas update fallito:"
   echo "$EAS_OUTPUT" >&2
   exit 1
 }
+T_UPLOAD=$(( $(date +%s) - _T0 ))
+T_PUBLISH=0
+log_success "⏱ EAS upload CDN completato in ${T_UPLOAD}s (record EAS: ${T_PUBLISH}s, incluso)"
 
 UPDATE_ID=$(echo "$EAS_OUTPUT" | grep -oE 'Update ID: [a-zA-Z0-9_-]+' | head -1 | sed 's/Update ID: //' || echo "")
 if [[ -z "$UPDATE_ID" ]]; then
   UPDATE_ID=$(echo "$EAS_OUTPUT" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1 || echo "")
 fi
+
+# ── Riepilogo timing + scrittura ota-timing.log (formato identico a publish-ota-full.sh) ──
+T_TOTAL=$(( $(date +%s) - T_TOTAL_START ))
+log_success "⏱ Timing riepilogo: export=${T_EXPORT}s | upload=${T_UPLOAD}s | publish=${T_PUBLISH}s | db=${T_DB}s | git=${T_GIT}s | TOTALE=${T_TOTAL}s"
+
+mkdir -p logs
+TIMING_LOG="logs/ota-timing.log"
+TIMING_LINE="[$(date -u '+%Y-%m-%dT%H:%M:%SZ')] OTA v${VERSION} | export: ${T_EXPORT}s | upload: ${T_UPLOAD}s | publish: ${T_PUBLISH}s | db: ${T_DB}s | git: ${T_GIT}s | TOTALE: ${T_TOTAL}s"
+echo "$TIMING_LINE" >> "$TIMING_LOG"
+log_success "Timing appeso a ${TIMING_LOG}"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
