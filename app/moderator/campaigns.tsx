@@ -19,7 +19,7 @@ import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, appendFileToForm } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
@@ -238,8 +238,7 @@ export default function ModeratorCampaigns() {
       const filename = formImageUri.split("/").pop() ?? "image.jpg";
       const match = /\.(\w+)$/.exec(filename);
       const mimeType = match ? `image/${match[1]}` : "image/jpeg";
-      const blob = await uriToBlob(formImageUri, mimeType);
-      formData.append("image", blob, filename);
+      await appendFileToForm(formData, "image", formImageUri, mimeType, filename);
     }
     return formData;
   }

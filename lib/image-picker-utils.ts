@@ -1,3 +1,25 @@
+/**
+ * CORRECT PATTERN FOR UPLOADING FILES VIA FORMDATA ON EXPO (native + web)
+ * =========================================================================
+ * ❌ WRONG — crashes on Expo's WinterCG fetch (convertFormData.ts):
+ *
+ *   formData.append("image", { uri, name: filename, type: mimeType } as any);
+ *
+ *   The `{uri, name, type}` object literal is not a real Blob. TypeScript
+ *   accepts it with `as any`, but at runtime Expo's fetch serialiser rejects
+ *   it and throws.
+ *
+ * ✅ CORRECT — use appendFileToForm() exported from this module:
+ *
+ *   await appendFileToForm(formData, "image", uri, "image/jpeg", filename);
+ *
+ *   Internally it calls uriToBlob(), which returns:
+ *     • native → expo-file-system File (satisfies the `bytes` branch)
+ *     • web    → standard Blob via fetch().blob()
+ *
+ * Never bypass this helper. Never use `{uri, name, type} as any`.
+ */
+
 import * as ImagePicker from "expo-image-picker";
 import { Alert, Platform, ActionSheetIOS } from "react-native";
 import { File as EFSFile } from "expo-file-system";
@@ -28,6 +50,24 @@ export async function uriToBlob(uri: string, _mimeType: string): Promise<Blob> {
   // expo-file-system File implements Blob with .bytes() — satisfies the
   // `'bytes' in entry` branch in Expo's WinterCG convertFormData.ts
   return new EFSFile(uri) as unknown as Blob;
+}
+
+/**
+ * Safely append a file (image, PDF, etc.) to a FormData instance.
+ *
+ * Always use this instead of `formData.append(key, {uri, name, type} as any)`.
+ * The object-literal pattern is not a real Blob and crashes on Expo's
+ * WinterCG fetch serialiser at runtime even though TypeScript accepts it.
+ */
+export async function appendFileToForm(
+  formData: FormData,
+  key: string,
+  uri: string,
+  mimeType: string,
+  filename: string
+): Promise<void> {
+  const blob = await uriToBlob(uri, mimeType);
+  formData.append(key, blob, filename);
 }
 
 export async function pickMultipleImages(

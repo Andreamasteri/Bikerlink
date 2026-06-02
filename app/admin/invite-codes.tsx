@@ -13,7 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
-import { uriToBlob } from "@/lib/image-picker-utils";
+import { appendFileToForm } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
@@ -74,7 +74,7 @@ export default function InviteCodesScreen() {
       const baseUrl = getApiUrl();
       const url = new URL(`/api/admin/invitation-codes/${codeId}/image`, baseUrl);
       const formData = new FormData();
-      formData.append("image", await uriToBlob(img.uri, img.type), img.name);
+      await appendFileToForm(formData, "image", img.uri, img.type, img.name);
       const res = await globalThis.fetch(url.toString(), {
         method: "POST",
         body: formData,

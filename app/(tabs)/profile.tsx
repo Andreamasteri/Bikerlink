@@ -9,7 +9,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, appendFileToForm } from "@/lib/image-picker-utils";
 import Colors from "@/constants/colors";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
@@ -143,7 +143,7 @@ export default function ProfileScreen() {
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
 
-      formData.append("photo", await uriToBlob(uri, mimeType), filename);
+      await appendFileToForm(formData, "photo", uri, mimeType, filename);
       const baseUrl = getApiUrl();
       const url = new URL("/api/users/me/photos", baseUrl);
       const res = await globalThis.fetch(url.toString(), {

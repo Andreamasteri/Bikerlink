@@ -21,7 +21,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { apiRequest, getApiUrl, queryClient } from "@/lib/query-client";
 import { findCountryByRegion } from "@/lib/countries-regions";
-import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, appendFileToForm } from "@/lib/image-picker-utils";
 import { useT } from "@/lib/language-context";
 import { updateUserSchema } from "@shared/validators";
 
@@ -170,7 +170,7 @@ export default function EditProfileScreen() {
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
 
-      formData.append("photo", await uriToBlob(uri, mimeType), filename);
+      await appendFileToForm(formData, "photo", uri, mimeType, filename);
 
       const baseUrl = getApiUrl();
       const url = new URL("/api/users/me/photos", baseUrl);

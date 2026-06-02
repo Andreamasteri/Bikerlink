@@ -3,7 +3,7 @@ import { Alert } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import * as DocumentPicker from "expo-document-picker";
 import { queryClient, apiRequest } from "@/lib/query-client";
-import { uriToBlob } from "@/lib/image-picker-utils";
+import { appendFileToForm } from "@/lib/image-picker-utils";
 
 export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => string) {
   const { data: syncStatus, refetch: refetchSyncStatus } = useQuery<{
@@ -95,7 +95,7 @@ export function useAdminSettingsMaintenance(isAdmin: boolean, t: (k: string) => 
       if (result.canceled) return;
       const file = result.assets[0];
       const formData = new FormData();
-      formData.append("file", await uriToBlob(file.uri, "application/pdf"), file.name);
+      await appendFileToForm(formData, "file", file.uri, "application/pdf", file.name);
       await apiRequest("POST", "/api/admin/upload-eula", formData);
       Alert.alert("Successo", "Documento EULA caricato correttamente");
     } catch (e: unknown) {

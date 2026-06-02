@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
-import { uriToBlob } from "@/lib/image-picker-utils";
+import { appendFileToForm } from "@/lib/image-picker-utils";
 import { useQuery } from "@tanstack/react-query";
 
 const manualStyles = StyleSheet.create({
@@ -99,7 +99,7 @@ export function PdfDocumentAdminSection({
       setUploading(true);
       const file = result.assets[0];
       const formData = new FormData();
-      formData.append("file", await uriToBlob(file.uri, "application/pdf"), file.name || "document.pdf");
+      await appendFileToForm(formData, "file", file.uri, "application/pdf", file.name || "document.pdf");
 
       const res = await fetch(new URL(uploadEndpoint, getApiUrl()).toString(), {
         method: "POST",

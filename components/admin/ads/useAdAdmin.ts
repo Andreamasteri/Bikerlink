@@ -3,7 +3,7 @@ import { Alert, BackHandler, Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useT } from "@/lib/language-context";
-import { showImagePickerMenu, pickMultipleImages, BulkImageAsset, uriToBlob } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, pickMultipleImages, BulkImageAsset, appendFileToForm } from "@/lib/image-picker-utils";
 import { Campaign } from "./AdCard";
 import { ListItem } from "./AdGroupList";
 
@@ -380,8 +380,7 @@ export function useAdAdmin() {
         const normalised = ["image/jpg", "image/jpe", "image/jfif"].includes(rawMime)
           ? "image/jpeg"
           : rawMime;
-        const blob = await uriToBlob(img.uri, normalised);
-        formData.append("images", blob, filename);
+        await appendFileToForm(formData, "images", img.uri, normalised, filename);
       }
       try {
         const res = await globalThis.fetch(bulkUrl, {
@@ -469,8 +468,7 @@ export function useAdAdmin() {
       const filename = formImageUri.split("/").pop() || "image.jpg";
       const match = /\.(\w+)$/.exec(filename);
       const mimeType = match ? `image/${match[1]}` : "image/jpeg";
-      const blob = await uriToBlob(formImageUri, mimeType);
-      formData.append("image", blob, filename);
+      await appendFileToForm(formData, "image", formImageUri, mimeType, filename);
     }
     createMutation.mutate(formData);
   };
