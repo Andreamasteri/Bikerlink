@@ -23,6 +23,11 @@ const eulaUpload = multer({
   },
 });
 
+const apkUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
+
 router.get("/", async (_req: Request, res: Response) => {
   try {
     const settings = await storage.getAllAppSettings();
@@ -350,7 +355,7 @@ router.put("/native-version", async (req: Request, res: Response) => {
 
 router.get("/apk-url", async (_req: Request, res: Response) => {
   try {
-    const setting = await storage.getAppSetting("apk_url");
+    const setting = await storage.getAppSetting("apk_download_url");
     return res.json({ url: setting?.value || "" });
   } catch (_error) {
     return sendError(res, 500, "Errore lettura APK URL");
@@ -361,10 +366,51 @@ router.put("/apk-url", async (req: Request, res: Response) => {
   try {
     const parsed = urlSettingSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("apk_url", parsed.data.url);
+    const setting = await storage.upsertAppSetting("apk_download_url", parsed.data.url);
     return res.json(setting);
   } catch (_error) {
     return sendError(res, 500, "Errore salvataggio APK URL");
+  }
+});
+
+router.get("/apk-info", async (_req: Request, res: Response) => {
+  try {
+    const urlSetting = await storage.getAppSetting("apk_download_url");
+    const metaSetting = await storage.getAppSetting("apk_upload_meta");
+    const url = urlSetting?.value || "";
+    const meta = (metaSetting?.valueJson as { size?: number; uploadedAt?: string } | null) || null;
+    return res.json({ url, size: meta?.size ?? null, uploadedAt: meta?.uploadedAt ?? null });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura info APK");
+  }
+});
+
+router.post("/apk-upload", apkUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) return sendError(res, 400, "Nessun file caricato");
+    const originalName = req.file.originalname || "";
+    if (!originalName.toLowerCase().endsWith(".apk")) {
+      return sendError(res, 400, "Il file deve avere estensione .apk");
+    }
+    const { uploadBuffer, getPublicUrl } = await import("../../objectStorage");
+    const objectPath = "public/releases/bikerlink-latest.apk";
+    await uploadBuffer(objectPath, req.file.buffer, "application/vnd.android.package-archive");
+    const url = await getPublicUrl(objectPath);
+    const uploadedAt = new Date().toISOString();
+    const size = req.file.size;
+    await storage.upsertAppSetting("apk_download_url", url);
+    await storage.upsertAppSetting("apk_upload_meta", undefined, { size, uploadedAt });
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "upload_apk",
+      targetType: "app_setting",
+      targetId: "apk_download_url",
+      details: `APK caricato: ${originalName} (${(size / 1024 / 1024).toFixed(1)} MB)`,
+    });
+    return res.json({ url, size, uploadedAt });
+  } catch (_error) {
+    console.error("[admin] APK upload error:", _error);
+    return sendError(res, 500, "Errore caricamento APK");
   }
 });
 

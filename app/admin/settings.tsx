@@ -15,6 +15,7 @@ import { MusicSystemSection } from "@/components/admin/settings/MusicSystemSecti
 import { BackgroundLocationSection } from "@/components/admin/settings/BackgroundLocationSection";
 import { AppSettingsSection } from "@/components/admin/settings/AppSettingsSection";
 import { ManualAdminSection } from "@/components/admin/settings/ManualAdminSection";
+import { ApkSection } from "@/components/admin/settings/ApkSection";
 import { ThemeSection } from "@/components/admin/settings/ThemeSection";
 import { AppFeaturesSection } from "@/components/admin/settings/AppFeaturesSection";
 import { RegistrationSection } from "@/components/admin/settings/RegistrationSection";
@@ -198,6 +199,7 @@ export default function AdminSettings() {
           isUploadingEula={state.isUploadingEula}
         />
         <ManualAdminSection />
+        <ApkSection />
 
         {/* ── 7. STRUMENTI SVILUPPO ── */}
         <SectionHeader icon="construct-outline" label="Strumenti Sviluppo" />
