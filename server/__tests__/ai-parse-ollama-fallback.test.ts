@@ -35,6 +35,13 @@ vi.mock("../lib/ollama-client", () => ({
   getOllamaModel: ollamaMocks.getOllamaModel,
 }));
 
+// Groq disabilitato qui: la catena è Ollama → Gemini (vedi ai-groq-fallback.test.ts
+// per i test con Groq abilitato come tier intermedio).
+vi.mock("../lib/groq-client", () => ({
+  isGroqConfigured: false,
+  getGroqModel: vi.fn(() => { throw new Error("Groq non configurato (mock)"); }),
+}));
+
 // ---------------------------------------------------------------------------
 // Import under test — after mocks
 // ---------------------------------------------------------------------------

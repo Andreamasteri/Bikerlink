@@ -28,6 +28,7 @@ const weatherWaypointsSchema = z.object({
 });
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
+import { getGroqModel, isGroqConfigured } from "../../lib/groq-client";
 
 interface RouteAiOptions<T> {
   prompt: string;
@@ -41,7 +42,7 @@ interface RouteAiOptions<T> {
 }
 
 const NO_PROVIDER_MSG =
-  "Nessun provider AI disponibile: Ollama non raggiungibile e GEMINI_API_KEY mancante.";
+  "Nessun provider AI disponibile: Ollama non raggiungibile, GROQ_API_KEY e GEMINI_API_KEY mancanti.";
 
 function geminiModel(apiKey: string) {
   return createGoogleGenerativeAI({ apiKey })("gemini-1.5-flash");
@@ -49,13 +50,17 @@ function geminiModel(apiKey: string) {
 
 /**
  * /ai-parse — genera l'oggetto route strutturato.
- * Prova Ollama (se configurato); se non raggiungibile o la risposta non è JSON
- * valido, ricade automaticamente su Gemini senza errori visibili all'utente.
- * Se Ollama è configurato e risponde, GEMINI_API_KEY non è necessaria.
+ * Catena di provider: Ollama (locale) → Groq (cloud veloce) → Gemini (cloud
+ * finale). Prova Ollama (se configurato); se non raggiungibile o la risposta non
+ * è JSON valido, ricade su Groq (se GROQ_API_KEY presente) e infine su Gemini,
+ * senza errori visibili all'utente. Se almeno un provider risponde, GEMINI_API_KEY
+ * non è strettamente necessaria.
  */
 export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<T> {
   const { prompt, apiKey, system, schema, abortSignal, maxRetries = 2, temperature = 0.1 } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
+  // È disponibile un fallback cloud se Groq è configurato oppure se c'è la chiave Gemini.
+  const hasCloudFallback = isGroqConfigured || Boolean(apiKey);
 
   if (isOllamaConfigured) {
     try {
@@ -64,8 +69,21 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<T
       });
       return object;
     } catch (err) {
-      if (!apiKey) throw err; // niente fallback cloud possibile → propaga l'errore Ollama
-      console.warn("[AI parse] Ollama non disponibile/risposta non valida, fallback Gemini:", (err as Error)?.message ?? err);
+      if (!hasCloudFallback) throw err; // niente fallback cloud possibile → propaga l'errore Ollama
+      console.warn("[AI parse] Ollama non disponibile/risposta non valida, fallback cloud:", (err as Error)?.message ?? err);
+    }
+  }
+
+  // Groq: fallback cloud veloce, prima di Gemini.
+  if (isGroqConfigured) {
+    try {
+      const { object } = await generateObject({
+        model: getGroqModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
+      });
+      return object;
+    } catch (err) {
+      if (!apiKey) throw err; // niente Gemini disponibile → propaga l'errore Groq
+      console.warn("[AI parse] Groq non disponibile/risposta non valida, fallback Gemini:", (err as Error)?.message ?? err);
     }
   }
 
@@ -96,52 +114,93 @@ export interface StreamRouteOptions extends Omit<RouteAiOptions<unknown>, "schem
  * malformato a metà stream, i chunk già emessi non sono ritrasmettibili e
  * l'utente riceverebbe una risposta corrotta, senza possibilità di fallback.
  *
- * Strategia:
- *   1. Ollama (provider primario): il suo output viene BUFFERIZZATO interamente
- *      lato server — NESSUN chunk viene emesso al client durante la generazione.
- *      A stream concluso, il testo completo viene validato (`validate`). Solo se
- *      valido i chunk bufferizzati vengono emessi (UX a blocchi, non corrotta).
- *      Se la validazione fallisce, o se lo stream si interrompe con errore, il
- *      buffer viene scartato e si passa a Gemini (nulla è ancora stato emesso,
- *      quindi non si mescolano provider né si corrompe l'output).
- *   2. Gemini (fallback cloud): anch'esso viene BUFFERIZZATO interamente lato
- *      server prima di emettere qualsiasi chunk al client (Task #2862). Il testo
- *      completo viene validato con la stessa funzione `validate`; se non supera la
- *      validazione, viene lanciato un errore che il route handler cattura e converte
- *      in un evento SSE `error` pulito — nessun testo corrotto raggiunge mai il client.
+ * Strategia (catena: Ollama → Groq → Gemini):
+ *   1. Ollama (provider primario, locale): il suo output viene BUFFERIZZATO
+ *      interamente lato server — NESSUN chunk viene emesso al client durante la
+ *      generazione. A stream concluso, il testo completo viene validato
+ *      (`validate`). Solo se valido i chunk bufferizzati vengono emessi (UX a
+ *      blocchi, non corrotta). Se la validazione fallisce, o se lo stream si
+ *      interrompe con errore, il buffer viene scartato e si passa al cloud
+ *      (nulla è ancora stato emesso, quindi non si mescolano provider né si
+ *      corrompe l'output).
+ *   2. Groq (fallback cloud veloce): se GROQ_API_KEY è presente, viene tentato
+ *      prima di Gemini con la stessa logica di buffering completo + validazione.
+ *      Se non valido (o non configurato) si passa a Gemini.
+ *   3. Gemini (fallback cloud finale): anch'esso viene BUFFERIZZATO interamente
+ *      lato server prima di emettere qualsiasi chunk al client (Task #2862). Il
+ *      testo completo viene validato con la stessa funzione `validate`; se non
+ *      supera la validazione, viene lanciato un errore che il route handler
+ *      cattura e converte in un evento SSE `error` pulito — nessun testo corrotto
+ *      raggiunge mai il client.
  *
- * Se Ollama produce output invalido e non c'è una GEMINI_API_KEY per il
- * fallback, viene lanciato un errore catchable invece di emettere testo rotto.
- * Se Ollama è configurato e risponde correttamente, GEMINI_API_KEY non serve.
+ * Se Ollama produce output invalido e non c'è alcun provider cloud (né Groq né
+ * GEMINI_API_KEY), viene lanciato un errore catchable invece di emettere testo
+ * rotto. Se almeno un provider risponde correttamente, gli altri non servono.
  */
+
+/**
+ * Bufferizza interamente lo stream di un provider cloud e lo valida prima di
+ * restituire i chunk. Restituisce i chunk se il testo completo è valido, oppure
+ * `null` se l'output è corrotto/incompleto (così il chiamante può passare al
+ * provider successivo senza aver emesso nulla al client).
+ */
+async function bufferAndValidateStream(
+  model: Parameters<typeof streamText>[0]["model"],
+  fullPrompt: string,
+  opts: { maxRetries: number; temperature: number; abortSignal?: AbortSignal; validate?: (t: string) => boolean },
+): Promise<string[] | null> {
+  const { maxRetries, temperature, abortSignal, validate } = opts;
+  const result = streamText({ model, prompt: fullPrompt, maxRetries, temperature, abortSignal });
+  const buffered: string[] = [];
+  for await (const chunk of result.textStream) {
+    if (chunk) buffered.push(chunk);
+  }
+  const fullText = buffered.join("");
+  const isValid = validate ? validate(fullText) : fullText.trim().length > 0;
+  return isValid ? buffered : null;
+}
+
 export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator<string> {
   const { prompt, apiKey, system, abortSignal, maxRetries = 2, temperature = 0.1, validate } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
+  const streamOpts = { maxRetries, temperature, abortSignal, validate };
+  // È disponibile un fallback cloud se Groq è configurato oppure se c'è la chiave Gemini.
+  const hasCloudFallback = isGroqConfigured || Boolean(apiKey);
 
   if (isOllamaConfigured) {
     try {
-      const result = streamText({ model: getOllamaModel(), prompt: fullPrompt, maxRetries, temperature, abortSignal });
-      // Buffer completo: niente viene emesso finché Ollama non ha finito E il testo
-      // non è stato validato. Così un JSON rotto a metà stream non raggiunge mai il client.
-      const buffered: string[] = [];
-      for await (const chunk of result.textStream) {
-        if (chunk) buffered.push(chunk);
-      }
-      const fullText = buffered.join("");
-      const isValid = validate ? validate(fullText) : fullText.trim().length > 0;
-      if (isValid) {
+      const buffered = await bufferAndValidateStream(getOllamaModel(), fullPrompt, streamOpts);
+      if (buffered) {
         for (const chunk of buffered) yield chunk;
         return;
       }
       // Output Ollama corrotto/incompleto: scarta il buffer e ricadi sul cloud.
-      if (!apiKey) {
+      if (!hasCloudFallback) {
         throw new Error("Ollama ha prodotto una risposta non valida e nessun provider cloud è disponibile per il fallback.");
       }
-      console.warn("[AI stream] Ollama ha prodotto output non valido, fallback Gemini (non-streaming sorgente).");
+      console.warn("[AI stream] Ollama ha prodotto output non valido, fallback cloud (non-streaming sorgente).");
     } catch (err) {
       // Errore di connessione/stream o nessun fallback possibile → propaga.
+      if (!hasCloudFallback) throw err;
+      console.warn("[AI stream] Ollama non disponibile/risposta non valida, fallback cloud:", (err as Error)?.message ?? err);
+    }
+  }
+
+  // Groq: fallback cloud veloce, bufferizzato + validato come Gemini, prima di Gemini.
+  if (isGroqConfigured) {
+    try {
+      const buffered = await bufferAndValidateStream(getGroqModel(), fullPrompt, streamOpts);
+      if (buffered) {
+        for (const chunk of buffered) yield chunk;
+        return;
+      }
+      if (!apiKey) {
+        throw new Error("Groq ha prodotto una risposta non valida e nessun provider cloud è disponibile per il fallback.");
+      }
+      console.warn("[AI stream] Groq ha prodotto output non valido, fallback Gemini.");
+    } catch (err) {
       if (!apiKey) throw err;
-      console.warn("[AI stream] Ollama non disponibile/risposta non valida, fallback Gemini:", (err as Error)?.message ?? err);
+      console.warn("[AI stream] Groq non disponibile/risposta non valida, fallback Gemini:", (err as Error)?.message ?? err);
     }
   }
 
@@ -149,14 +208,8 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
   // Anche il ramo Gemini viene bufferizzato e validato prima di emettere al client
   // (Task #2862). Se Gemini produce JSON malformato, lanciamo un errore pulito invece
   // di emettere testo rotto: il route handler lo cattura e invia un evento SSE error.
-  const result = streamText({ model: geminiModel(apiKey), prompt: fullPrompt, maxRetries, temperature, abortSignal });
-  const geminiBuffer: string[] = [];
-  for await (const chunk of result.textStream) {
-    if (chunk) geminiBuffer.push(chunk);
-  }
-  const geminiText = geminiBuffer.join("");
-  const isGeminiValid = validate ? validate(geminiText) : geminiText.trim().length > 0;
-  if (!isGeminiValid) {
+  const geminiBuffer = await bufferAndValidateStream(geminiModel(apiKey), fullPrompt, streamOpts);
+  if (!geminiBuffer) {
     throw new Error("Gemini ha prodotto una risposta non valida: nessun provider disponibile ha restituito output utilizzabile.");
   }
   for (const chunk of geminiBuffer) yield chunk;

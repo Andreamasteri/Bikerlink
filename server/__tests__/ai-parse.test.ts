@@ -49,6 +49,12 @@ vi.mock("../lib/ollama-client", () => ({
   getOllamaModel: vi.fn(() => { throw new Error("Ollama non configurato (mock)"); }),
 }));
 
+// Groq disabilitato in questi test: il flusso resta Gemini-only e deterministico.
+vi.mock("../lib/groq-client", () => ({
+  isGroqConfigured: false,
+  getGroqModel: vi.fn(() => { throw new Error("Groq non configurato (mock)"); }),
+}));
+
 // ---------------------------------------------------------------------------
 // Import router and the exported utility after mocks are in place
 // ---------------------------------------------------------------------------

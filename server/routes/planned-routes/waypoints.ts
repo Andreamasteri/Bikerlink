@@ -7,6 +7,7 @@ import { aiPromptSchema, calculateRouteRequestSchema } from "@shared/validators"
 import { z } from "zod";
 import { generateRouteObject, streamRouteText } from "./waypoints.next";
 import { isOllamaConfigured } from "../../lib/ollama-client";
+import { isGroqConfigured } from "../../lib/groq-client";
 import { haversineKm } from "../../geo";
 const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
@@ -192,7 +193,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   const { prompt } = parsedAi.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey && !isOllamaConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama o GEMINI_API_KEY)");
+  if (!apiKey && !isOllamaConfigured && !isGroqConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama, Groq o GEMINI_API_KEY)");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
@@ -230,7 +231,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   const { prompt } = parsedAiStream.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey && !isOllamaConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama o GEMINI_API_KEY)");
+  if (!apiKey && !isOllamaConfigured && !isGroqConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama, Groq o GEMINI_API_KEY)");
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
