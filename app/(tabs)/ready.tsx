@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, ScrollView, ActivityIndicator, Alert, useWindowDimensions } from "react-native";
+import { View, StyleSheet, ScrollView, ActivityIndicator, Alert } from "react-native";
 import Colors from "@/constants/colors";
 import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
@@ -24,7 +24,6 @@ import { useReadyState } from "@/hooks/useReadyState";
 export default function ReadyToRideScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = useWindowDimensions();
   const sosEnabled = useSetting("sosEnabled");
 
   const {
@@ -191,60 +190,53 @@ export default function ReadyToRideScreen() {
             privacyMutation={privacyMutation as any}
           />
 
-          <View style={[
-            styles.accordionRow,
-            screenWidth < 360 && styles.accordionRowNarrow,
-          ]}>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <PrivacyPositionSettings
-                t={t}
-                colors={colors}
-                privacyExpanded={privacyExpanded}
-                setPrivacyExpanded={setPrivacyExpanded}
-                positionFuzz={positionFuzz}
-                setPositionFuzz={setPositionFuzz}
-                positionFuzzKm={positionFuzzKm}
-                setPositionFuzzKm={setPositionFuzzKm}
-                fakeHomeEnabled={fakeHomeEnabled}
-                setFakeHomeEnabled={setFakeHomeEnabled}
-                homeLatitude={homeLatitude}
-                homeLongitude={homeLongitude}
-                fakeHomeLatitude={fakeHomeLatitude}
-                fakeHomeLongitude={fakeHomeLongitude}
-                fakeHomeRadius={fakeHomeRadius}
-                setFakeHomeRadius={setFakeHomeRadius}
-                fakeWorkEnabled={fakeWorkEnabled}
-                setFakeWorkEnabled={setFakeWorkEnabled}
-                workLatitude={workLatitude}
-                workLongitude={workLongitude}
-                fakeWorkLatitude={fakeWorkLatitude}
-                fakeWorkLongitude={fakeWorkLongitude}
-                fakeWorkRadius={fakeWorkRadius}
-                setFakeWorkRadius={setFakeWorkRadius}
-                fakeWhateverEnabled={fakeWhateverEnabled}
-                setFakeWhateverEnabled={setFakeWhateverEnabled}
-                whateverLatitude={whateverLatitude}
-                whateverLongitude={whateverLongitude}
-                fakeWhateverLatitude={fakeWhateverLatitude}
-                fakeWhateverLongitude={fakeWhateverLongitude}
-                fakeWhateverRadius={fakeWhateverRadius}
-                setFakeWhateverRadius={setFakeWhateverRadius}
-                privacyMutation={privacyMutation}
-                pickFromGPS={pickFromGPS}
-                openMapPicker={openMapPicker}
-              />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <GpsPrecisionSettings
-                colors={colors}
-                gpsPrecisionExpanded={gpsPrecisionExpanded}
-                setGpsPrecisionExpanded={setGpsPrecisionExpanded}
-                gpsOptions={gpsOptions}
-                gpsPrecision={gpsPrecision}
-                setGpsPrecision={setGpsPrecision}
-                privacyMutation={privacyMutation}
-              />
-            </View>
+          <View style={styles.accordionColumn}>
+            <PrivacyPositionSettings
+              t={t}
+              colors={colors}
+              privacyExpanded={privacyExpanded}
+              setPrivacyExpanded={setPrivacyExpanded}
+              positionFuzz={positionFuzz}
+              setPositionFuzz={setPositionFuzz}
+              positionFuzzKm={positionFuzzKm}
+              setPositionFuzzKm={setPositionFuzzKm}
+              fakeHomeEnabled={fakeHomeEnabled}
+              setFakeHomeEnabled={setFakeHomeEnabled}
+              homeLatitude={homeLatitude}
+              homeLongitude={homeLongitude}
+              fakeHomeLatitude={fakeHomeLatitude}
+              fakeHomeLongitude={fakeHomeLongitude}
+              fakeHomeRadius={fakeHomeRadius}
+              setFakeHomeRadius={setFakeHomeRadius}
+              fakeWorkEnabled={fakeWorkEnabled}
+              setFakeWorkEnabled={setFakeWorkEnabled}
+              workLatitude={workLatitude}
+              workLongitude={workLongitude}
+              fakeWorkLatitude={fakeWorkLatitude}
+              fakeWorkLongitude={fakeWorkLongitude}
+              fakeWorkRadius={fakeWorkRadius}
+              setFakeWorkRadius={setFakeWorkRadius}
+              fakeWhateverEnabled={fakeWhateverEnabled}
+              setFakeWhateverEnabled={setFakeWhateverEnabled}
+              whateverLatitude={whateverLatitude}
+              whateverLongitude={whateverLongitude}
+              fakeWhateverLatitude={fakeWhateverLatitude}
+              fakeWhateverLongitude={fakeWhateverLongitude}
+              fakeWhateverRadius={fakeWhateverRadius}
+              setFakeWhateverRadius={setFakeWhateverRadius}
+              privacyMutation={privacyMutation}
+              pickFromGPS={pickFromGPS}
+              openMapPicker={openMapPicker}
+            />
+            <GpsPrecisionSettings
+              colors={colors}
+              gpsPrecisionExpanded={gpsPrecisionExpanded}
+              setGpsPrecisionExpanded={setGpsPrecisionExpanded}
+              gpsOptions={gpsOptions}
+              gpsPrecision={gpsPrecision}
+              setGpsPrecision={setGpsPrecision}
+              privacyMutation={privacyMutation}
+            />
           </View>
         </View>
 
@@ -309,13 +301,9 @@ const styles = StyleSheet.create({
     gap: 8,
     alignItems: "center",
   },
-  accordionRow: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "flex-start",
-    alignSelf: "stretch",
-  },
-  accordionRowNarrow: {
+  accordionColumn: {
     flexDirection: "column",
+    gap: 8,
+    alignSelf: "stretch",
   },
 });
