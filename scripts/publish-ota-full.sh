@@ -71,7 +71,13 @@ log_info "Build: ${BUILD_NUM} | NEXT_OTA: ${NEXT_OTA} | Versione: ${VERSION}"
 EAS_MESSAGE="[OTA:${VERSION}] ${MESSAGE}"
 log_info "Messaggio EAS: ${EAS_MESSAGE}"
 
-# ── 4a. Metro export (atomico: se fallisce, niente buildInfo/git) ────────────
+# ── 3b. Aggiorna APPLIED_OTA_NUMBER PRIMA del bundle (così è incluso nel bundle) ──
+BUILD_INFO="constants/buildInfo.ts"
+OLD_OTA_NUMBER=$(grep -oP 'APPLIED_OTA_NUMBER: number \| null = \K[0-9]+' "$BUILD_INFO" 2>/dev/null || echo "null")
+sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${NEXT_OTA};/" "$BUILD_INFO"
+log_ok "APPLIED_OTA_NUMBER pre-impostato → ${NEXT_OTA} (sarà incluso nel bundle; rollback a ${OLD_OTA_NUMBER} se EAS fallisce)"
+
+# ── 4a. Metro export (atomico: se fallisce, ripristina buildInfo) ────────────
 log_info "Fase 1/2 — Metro export (bundle Android, attendi 2-5 minuti)..."
 
 rm -rf "$DIST_DIR"
@@ -80,7 +86,8 @@ EXPO_TOKEN="${EAS_TOKEN}" npx expo export \
   --platform android \
   --output-dir "$DIST_DIR" \
   2>&1 || {
-  log_error "expo export fallito — buildInfo NON modificato, git NON aggiornato"
+  sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${OLD_OTA_NUMBER};/" "$BUILD_INFO"
+  log_error "expo export fallito — buildInfo ripristinato a ${OLD_OTA_NUMBER}, git NON aggiornato"
   exit 1
 }
 T_EXPORT=$(( $(date +%s) - _T0 ))
@@ -100,7 +107,8 @@ EAS_OUTPUT=$(EAS_NO_VCS=1 EAS_SKIP_AUTO_FINGERPRINT=1 EXPO_TOKEN="${EAS_TOKEN}" 
     --input-dir "$DIST_DIR" \
     --skip-bundler \
     --non-interactive 2>&1) || {
-  log_error "eas update fallito — buildInfo NON modificato, git NON aggiornato:"
+  sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${OLD_OTA_NUMBER};/" "$BUILD_INFO"
+  log_error "eas update fallito — buildInfo ripristinato a ${OLD_OTA_NUMBER}, git NON aggiornato:"
   echo "$EAS_OUTPUT"
   exit 1
 }
@@ -161,12 +169,7 @@ psql "$DATABASE_URL" -c "
   exit 1
 }
 
-# ── 6. Aggiorna APPLIED_OTA_NUMBER in buildInfo.ts (SOLO dopo successo EAS + DB) ──
-BUILD_INFO="constants/buildInfo.ts"
-sed -i "s/^export const APPLIED_OTA_NUMBER:.*$/export const APPLIED_OTA_NUMBER: number | null = ${NEXT_OTA};/" "$BUILD_INFO"
-log_ok "APPLIED_OTA_NUMBER aggiornato → ${NEXT_OTA}"
-
-# ── 7. Svuota .ota-message dopo pubblicazione riuscita ───────────────────────
+# ── 6. Svuota .ota-message dopo pubblicazione riuscita ───────────────────────
 echo "" > "$MSG_FILE"
 log_ok ".ota-message svuotato (pronto per il prossimo OTA)"
 
