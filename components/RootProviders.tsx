@@ -1,6 +1,7 @@
 import React from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/lib/theme-context";
 import { LanguageProvider } from "@/lib/language-context";
@@ -47,7 +48,9 @@ export function RootProviders({
                         <PlayerProvider>
                           <FloatingWidgetProvider>
                             <GestureHandlerRootView style={{ flex: 1 }}>
-                              {children}
+                              <KeyboardProvider>
+                                {children}
+                              </KeyboardProvider>
                             </GestureHandlerRootView>
                           </FloatingWidgetProvider>
                         </PlayerProvider>

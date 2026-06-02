@@ -4,9 +4,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, Platform,
-  useWindowDimensions, ScrollView, KeyboardAvoidingView,
+  useWindowDimensions, ScrollView,
 } from "react-native";
-import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams } from "expo-router";
@@ -212,18 +212,13 @@ interface ChatPaneProps {
 
 function ChatPane({ streamState, messages, loading, input, onChangeInput, onSend, colors, bottomPad, scrollToMessageId }: ChatPaneProps) {
   const disabled = streamState.streaming || !input.trim();
-  // On Android the outer KeyboardAvoidingView doesn't reliably resize the
-  // layout (adjustPan vs adjustResize window mode). Track keyboard height
-  // manually and apply it as extra bottom padding so the input stays visible.
-  const kbHeight = useKeyboardHeight();
-  const androidExtraPad = Platform.OS === "android" ? kbHeight : 0;
   return (
     <View style={{ flex: 1 }}>
       <MessageList messages={messages} streamState={streamState} loading={loading} scrollToMessageId={scrollToMessageId} />
       <View
         style={[
           styles.inputBar,
-          { borderColor: colors.border, backgroundColor: colors.surface, paddingBottom: Math.max(bottomPad, 8) + androidExtraPad },
+          { borderColor: colors.border, backgroundColor: colors.surface, paddingBottom: Math.max(bottomPad, 8) },
         ]}
       >
         <TextInput
