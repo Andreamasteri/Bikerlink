@@ -6,17 +6,25 @@
 
 -- Step 1: rimuovi utenti fake importati da dev
 -- (eccezione: BikerLink_Official è marcato is_fake=true ma è un account di sistema)
+-- NOTA (Task #2976): la DELETE su '%@bikerlink.test' è stata rimossa su richiesta
+-- dell'owner — in produzione esiste un account smoke@bikerlink.test da preservare.
 DELETE FROM users WHERE is_fake = true AND email NOT LIKE '%@bikerlink.internal';
-DELETE FROM users WHERE email LIKE '%@bikerlink.test';
 
--- Step 2: azzera tutte le tabelle OTA (i record dev non devono stare in prod)
-DELETE FROM ota_watchdog_reports;
-DELETE FROM ota_assistant_runs;
-DELETE FROM ota_boot_events;
-DELETE FROM ota_releases;
+-- Step 2: (RIMOSSO, Task #2976) le DELETE sulle tabelle OTA sono state eliminate
+-- su richiesta dell'owner: la produzione contiene release OTA reali da NON toccare.
+-- Questo script ripristina SOLO gli utenti reali, profili e la route.
 
 -- Step 3: rimuovi utenti dev non presenti in prod (user1@bikerlink.it)
 DELETE FROM users WHERE id = '5b6d4efa-ed3f-4384-b3b7-90213979a770';
+
+-- Step 3b (Task #2976): "Replace" mendo. In produzione esiste già mendo
+-- (andreagranara@gmail.com) con un id diverso e ruolo admin. L'owner ha scelto di
+-- sostituirlo con l'account originale dal backup. Rimuoviamo la riga esistente
+-- (il CASCADE elimina anche il suo user_profiles) così l'INSERT successivo non
+-- viola il vincolo UNIQUE su email. Idempotente: non tocca la riga del backup.
+DELETE FROM users
+  WHERE email = 'andreagranara@gmail.com'
+    AND id <> '62c2024e-0e87-4a53-a118-21952146e395';
 
 -- Step 4: ripristina utenti reali di produzione
 INSERT INTO users (
