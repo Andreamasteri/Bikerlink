@@ -117,20 +117,21 @@ echo "════════════════════════�
 
 GITHUB_REPO_URL="https://github.com/Andreamasteri/Bikerlink.git"
 
-if [ -n "$GITHUB_PAT" ]; then
+GH_TOKEN="${GITHUB_TOKEN:-${GITHUB_PAT:-}}"
+if [ -n "$GH_TOKEN" ]; then
   CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
   echo "→ Push branch '${CURRENT_BRANCH}' su GitHub..."
   GIT_PUSH_EXIT=0
-  git -c "credential.helper=!f() { echo username=x; echo password=${GITHUB_PAT}; }; f" \
-    push --force "${GITHUB_REPO_URL}" "HEAD:${CURRENT_BRANCH}" 2>&1 || GIT_PUSH_EXIT=$?
+  git push "https://${GH_TOKEN}:x-oauth-basic@github.com/Andreamasteri/Bikerlink.git" \
+    "HEAD:${CURRENT_BRANCH}" 2>&1 || GIT_PUSH_EXIT=$?
   if [ "$GIT_PUSH_EXIT" -eq 0 ]; then
     echo "✅ GitHub sincronizzato correttamente (branch: ${CURRENT_BRANCH})."
   else
-    echo "❌ Push GitHub fallito (exit ${GIT_PUSH_EXIT}) — verificare il GITHUB_PAT e la connettività."
+    echo "❌ Push GitHub fallito (exit ${GIT_PUSH_EXIT}) — verificare il token e la connettività."
   fi
 else
-  echo "⚠️  GITHUB_PAT non impostato — sincronizzazione GitHub saltata."
-  echo "   Imposta il secret GITHUB_PAT nelle variabili d'ambiente Replit."
+  echo "⚠️  GITHUB_TOKEN non impostato — sincronizzazione GitHub saltata."
+  echo "   Imposta il secret GITHUB_TOKEN nelle variabili d'ambiente Replit."
 fi
 
 echo "════════════════════════════════════════"

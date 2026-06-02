@@ -8,14 +8,29 @@
  *   --since=YYYY-MM-DD      Filter records with created_at >= date
  *   --tables=t1,t2,...      Export only the specified tables
  *   --no-compress           Write .jsonl/.csv instead of .jsonl.gz/.csv.gz
- *   --format=csv            Write CSV files instead of JSONL (header row included;
- *                           nested/JSON values are serialised as JSON strings)
+ *   --format=csv            Write CSV files instead of JSONL
+ *
+ * Query builders and row iterators: scripts/export-data-queries.ts
  */
 
 import fs from "fs";
 import path from "path";
 import zlib from "zlib";
 import { Pool } from "pg";
+import {
+  ALL_TABLES,
+  TABLE_COLUMNS,
+  type TableName,
+  buildUsersQuery,
+  buildUserProfilesQuery,
+  buildUserMotorcyclesQuery,
+  buildRoutesQuery,
+  buildRoutePointsQuery,
+  buildPlannedRoutesQuery,
+  buildSprintResultsQuery,
+  simpleQuery,
+  chunkedQuery,
+} from "./export-data-queries.js";
 
 // ─── CLI Flags ────────────────────────────────────────────────────────────────
 
@@ -39,30 +54,9 @@ const requestedTables: Set<string> | null = tablesArg
   ? new Set(tablesArg.split("=")[1].split(",").map((t) => t.trim()))
   : null;
 
-const ALL_TABLES = [
-  "users",
-  "user_profiles",
-  "user_motorcycles",
-  "routes",
-  "route_points",
-  "planned_routes",
-  "sprint_results",
-] as const;
-type TableName = (typeof ALL_TABLES)[number];
-
 const tablesToExport: TableName[] = requestedTables
   ? ALL_TABLES.filter((t) => requestedTables.has(t))
   : [...ALL_TABLES];
-
-const TABLE_COLUMNS: Record<TableName, string[]> = {
-  users:            ["id","nickname","email","password","role","status","isFake","country","region","birthYear","createdAt","lastLoginAt"],
-  user_profiles:    ["userId","bio","totalKm","totalRides","latitude","longitude","isAvailable"],
-  user_motorcycles: ["userId","brand","model","year","displacement","motorcycleType","ridingStyle","createdAt"],
-  routes:           ["id","userId","title","status","totalDistanceKm","maxSpeedKmh","avgSpeedKmh","maxAltitude","durationSeconds","idleTimeSeconds","maxTiltDeg","maxAccelerationG","maxDecelerationG","maxLateralG","isSprint","sprint0to100Ms","gpsBlackoutCount","gpsBlackoutSeconds","likes","startedAt","stoppedAt","createdAt"],
-  route_points:     ["routeId","lat","lng","altitude","speedKmh","accelG","tiltDeg","timestamp"],
-  planned_routes:   ["id","userId","title","distanceKm","style","bikerScore","curvatureScore","waypoints","createdAt"],
-  sprint_results:   ["userId","routeId","sprint0to100Ms","maxAccelerationG","maxTiltDeg","createdAt"],
-};
 
 if (tablesToExport.length === 0) {
   console.error("[export] No valid tables selected. Valid tables:", ALL_TABLES.join(", "));
@@ -76,10 +70,7 @@ if (!process.env.DATABASE_URL) {
   process.exit(1);
 }
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  connectionTimeoutMillis: 10000,
-});
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, connectionTimeoutMillis: 10000 });
 
 // ─── Output Directory ─────────────────────────────────────────────────────────
 
@@ -100,13 +91,6 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-/**
- * Serialise a single cell value for CSV output (RFC 4180).
- * - null/undefined  → empty string
- * - objects/arrays  → JSON string (then quoted)
- * - strings         → quoted if they contain comma, double-quote, or newline
- * - everything else → plain string representation
- */
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
   let str: string;
@@ -121,31 +105,19 @@ function csvCell(value: unknown): string {
   return str;
 }
 
-async function writeCsv(
-  outputPath: string,
-  compress: boolean,
-  headers: string[],
-  rowIterator: AsyncIterable<Record<string, unknown>>,
-): Promise<number> {
+async function writeCsv(outputPath: string, compress: boolean, headers: string[], rowIterator: AsyncIterable<Record<string, unknown>>): Promise<number> {
   let count = 0;
-
   await new Promise<void>((resolve, reject) => {
     const fileStream = fs.createWriteStream(outputPath);
     let gz: zlib.Gzip | null = null;
     const target: fs.WriteStream | zlib.Gzip = compress
-      ? (() => {
-          gz = zlib.createGzip({ level: 6 });
-          gz.pipe(fileStream);
-          return gz;
-        })()
+      ? (() => { gz = zlib.createGzip({ level: 6 }); gz.pipe(fileStream); return gz; })()
       : fileStream;
-
     (async () => {
       try {
         const headerLine = headers.map(csvCell).join(",") + "\n";
         const headerOk = target.write(headerLine);
         if (!headerOk) await new Promise<void>((r) => target.once("drain", r));
-
         for await (const row of rowIterator) {
           const line = headers.map((h) => csvCell(row[h])).join(",") + "\n";
           const ok = target.write(line);
@@ -153,406 +125,65 @@ async function writeCsv(
           count++;
         }
         target.end();
-      } catch (err) {
-        reject(err);
-        fileStream.destroy();
-      }
+      } catch (err) { reject(err); fileStream.destroy(); }
     })();
-
     fileStream.on("finish", resolve);
     fileStream.on("error", reject);
     if (gz) gz.on("error", reject);
   });
-
   return count;
 }
 
-async function writeJsonl(
-  outputPath: string,
-  compress: boolean,
-  rowIterator: AsyncIterable<Record<string, unknown>>,
-): Promise<number> {
+async function writeJsonl(outputPath: string, compress: boolean, rowIterator: AsyncIterable<Record<string, unknown>>): Promise<number> {
   let count = 0;
-
   await new Promise<void>((resolve, reject) => {
     const fileStream = fs.createWriteStream(outputPath);
     let gz: zlib.Gzip | null = null;
     const target: fs.WriteStream | zlib.Gzip = compress
-      ? (() => {
-          gz = zlib.createGzip({ level: 6 });
-          gz.pipe(fileStream);
-          return gz;
-        })()
+      ? (() => { gz = zlib.createGzip({ level: 6 }); gz.pipe(fileStream); return gz; })()
       : fileStream;
-
     (async () => {
       try {
         for await (const row of rowIterator) {
           const line = JSON.stringify(row) + "\n";
           const ok = target.write(line);
-          if (!ok) {
-            await new Promise<void>((r) => target.once("drain", r));
-          }
+          if (!ok) await new Promise<void>((r) => target.once("drain", r));
           count++;
         }
         target.end();
-      } catch (err) {
-        reject(err);
-        fileStream.destroy();
-      }
+      } catch (err) { reject(err); fileStream.destroy(); }
     })();
-
     fileStream.on("finish", resolve);
     fileStream.on("error", reject);
-    if (gz) {
-      gz.on("error", reject);
-    }
+    if (gz) gz.on("error", reject);
   });
-
   return count;
-}
-
-// ─── Row Iterators ────────────────────────────────────────────────────────────
-
-/**
- * Async generator for tables that can be fetched in a single query.
- */
-async function* simpleQuery(
-  sql: string,
-  params: unknown[],
-): AsyncIterable<Record<string, unknown>> {
-  const client = await pool.connect();
-  try {
-    const result = await client.query(sql, params);
-    for (const row of result.rows) {
-      yield row as Record<string, unknown>;
-    }
-  } finally {
-    client.release();
-  }
-}
-
-/**
- * Async generator for large tables using LIMIT/OFFSET pagination.
- */
-async function* chunkedQuery(
-  sql: string,
-  params: unknown[],
-  chunkSize = 10_000,
-): AsyncIterable<Record<string, unknown>> {
-  const client = await pool.connect();
-  try {
-    let offset = 0;
-    while (true) {
-      const result = await client.query(`${sql} LIMIT $${params.length + 1} OFFSET $${params.length + 2}`, [
-        ...params,
-        chunkSize,
-        offset,
-      ]);
-      for (const row of result.rows) {
-        yield row as Record<string, unknown>;
-      }
-      if (result.rows.length < chunkSize) break;
-      offset += chunkSize;
-    }
-  } finally {
-    client.release();
-  }
-}
-
-// ─── Table Query Builders ─────────────────────────────────────────────────────
-
-// --since semantics per table:
-//   users, user_motorcycles, routes, planned_routes, sprint_results → created_at
-//   user_profiles → updated_at (no created_at column in schema)
-//   route_points  → timestamp  (no created_at column; this is the GPS point time)
-
-const FAKE_USER_SUBQUERY = "SELECT id FROM users WHERE is_fake = true";
-
-function buildUsersQuery(): { sql: string; params: unknown[] } {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (excludeFake) conditions.push("is_fake = false");
-  if (since) {
-    params.push(since);
-    conditions.push(`created_at >= $${params.length}::date`);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  return {
-    sql: `SELECT
-      id,
-      nickname,
-      email,
-      password,
-      role,
-      status,
-      is_fake        AS "isFake",
-      country,
-      region,
-      birth_year     AS "birthYear",
-      created_at     AS "createdAt",
-      last_login_at  AS "lastLoginAt"
-    FROM users ${where} ORDER BY created_at`,
-    params,
-  };
-}
-
-function buildUserProfilesQuery(): { sql: string; params: unknown[] } {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (excludeFake) {
-    conditions.push(`user_id NOT IN (${FAKE_USER_SUBQUERY})`);
-  }
-  if (since) {
-    params.push(since);
-    conditions.push(`updated_at >= $${params.length}::date`);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  return {
-    sql: `SELECT
-      user_id      AS "userId",
-      bio,
-      total_km     AS "totalKm",
-      total_rides  AS "totalRides",
-      latitude,
-      longitude,
-      is_available AS "isAvailable"
-    FROM user_profiles ${where} ORDER BY user_id`,
-    params,
-  };
-}
-
-function buildUserMotorcyclesQuery(): { sql: string; params: unknown[] } {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (excludeFake) {
-    conditions.push(`user_id NOT IN (${FAKE_USER_SUBQUERY})`);
-  }
-  if (since) {
-    params.push(since);
-    conditions.push(`created_at >= $${params.length}::date`);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  return {
-    sql: `SELECT
-      user_id          AS "userId",
-      brand,
-      model,
-      year,
-      displacement,
-      motorcycle_type  AS "motorcycleType",
-      riding_style     AS "ridingStyle",
-      created_at       AS "createdAt"
-    FROM user_motorcycles ${where} ORDER BY created_at`,
-    params,
-  };
-}
-
-function buildRoutesQuery(): { sql: string; params: unknown[] } {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (excludeFake) {
-    conditions.push(`user_id NOT IN (${FAKE_USER_SUBQUERY})`);
-  }
-  if (since) {
-    params.push(since);
-    conditions.push(`created_at >= $${params.length}::date`);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  return {
-    sql: `SELECT
-      id,
-      user_id               AS "userId",
-      title,
-      status,
-      total_distance_km     AS "totalDistanceKm",
-      max_speed_kmh         AS "maxSpeedKmh",
-      avg_speed_kmh         AS "avgSpeedKmh",
-      max_altitude          AS "maxAltitude",
-      duration_seconds      AS "durationSeconds",
-      idle_time_seconds     AS "idleTimeSeconds",
-      max_tilt_deg          AS "maxTiltDeg",
-      max_acceleration_g    AS "maxAccelerationG",
-      max_deceleration_g    AS "maxDecelerationG",
-      max_lateral_g         AS "maxLateralG",
-      is_sprint             AS "isSprint",
-      sprint_0to100_ms      AS "sprint0to100Ms",
-      gps_blackout_count    AS "gpsBlackoutCount",
-      gps_blackout_seconds  AS "gpsBlackoutSeconds",
-      likes,
-      started_at            AS "startedAt",
-      stopped_at            AS "stoppedAt",
-      created_at            AS "createdAt"
-    FROM routes ${where} ORDER BY created_at`,
-    params,
-  };
-}
-
-function buildRoutePointsQuery(): { sql: string; params: unknown[] } {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (excludeFake) {
-    conditions.push(`route_id IN (SELECT id FROM routes WHERE user_id NOT IN (${FAKE_USER_SUBQUERY}))`);
-  }
-  if (since) {
-    params.push(since);
-    conditions.push(`timestamp >= $${params.length}::date`);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  return {
-    sql: `SELECT
-      route_id  AS "routeId",
-      latitude  AS "lat",
-      longitude AS "lng",
-      altitude,
-      speed_kmh AS "speedKmh",
-      accel_g   AS "accelG",
-      tilt_deg  AS "tiltDeg",
-      timestamp
-    FROM route_points ${where} ORDER BY route_id, timestamp`,
-    params,
-  };
-}
-
-function buildPlannedRoutesQuery(): { sql: string; params: unknown[] } {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (excludeFake) {
-    conditions.push(`user_id NOT IN (${FAKE_USER_SUBQUERY})`);
-  }
-  if (since) {
-    params.push(since);
-    conditions.push(`created_at >= $${params.length}::date`);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  return {
-    sql: `SELECT
-      id,
-      user_id               AS "userId",
-      title,
-      distance_km           AS "distanceKm",
-      style,
-      biker_score           AS "bikerScore",
-      real_curvature_score  AS "curvatureScore",
-      waypoints,
-      created_at            AS "createdAt"
-    FROM planned_routes ${where} ORDER BY created_at`,
-    params,
-  };
-}
-
-function buildSprintResultsQuery(): { sql: string; params: unknown[] } {
-  const conditions: string[] = [];
-  const params: unknown[] = [];
-
-  if (excludeFake) {
-    conditions.push(`user_id NOT IN (${FAKE_USER_SUBQUERY})`);
-  }
-  if (since) {
-    params.push(since);
-    conditions.push(`created_at >= $${params.length}::date`);
-  }
-
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-  return {
-    sql: `SELECT
-      user_id           AS "userId",
-      route_id          AS "routeId",
-      sprint_0to100_ms  AS "sprint0to100Ms",
-      max_acceleration_g AS "maxAccelerationG",
-      max_tilt_deg      AS "maxTiltDeg",
-      created_at        AS "createdAt"
-    FROM sprint_results ${where} ORDER BY created_at`,
-    params,
-  };
 }
 
 // ─── Export Table ─────────────────────────────────────────────────────────────
 
-interface ExportResult {
-  table: string;
-  rows: number;
-  bytes: number;
-  file: string;
-}
+interface ExportResult { table: string; rows: number; bytes: number; file: string }
 
-async function exportTable(
-  tableName: TableName,
-  outputDir: string,
-): Promise<ExportResult> {
+async function exportTable(tableName: TableName, outputDir: string): Promise<ExportResult> {
   const isCsv = outputFormat === "csv";
   const compress = !noCompress;
   const baseExt = isCsv ? ".csv" : ".jsonl";
   const ext = compress ? `${baseExt}.gz` : baseExt;
-  const fileName = `${tableName}${ext}`;
-  const outputPath = path.join(outputDir, fileName);
+  const outputPath = path.join(outputDir, `${tableName}${ext}`);
 
-  let iterator: AsyncIterable<Record<string, unknown>>;
+  const queryBuilders: Record<TableName, () => { sql: string; params: unknown[] }> = {
+    users:            () => buildUsersQuery(excludeFake, since),
+    user_profiles:    () => buildUserProfilesQuery(excludeFake, since),
+    user_motorcycles: () => buildUserMotorcyclesQuery(excludeFake, since),
+    routes:           () => buildRoutesQuery(excludeFake, since),
+    route_points:     () => buildRoutePointsQuery(excludeFake, since),
+    planned_routes:   () => buildPlannedRoutesQuery(excludeFake, since),
+    sprint_results:   () => buildSprintResultsQuery(excludeFake, since),
+  };
+
+  const { sql, params } = queryBuilders[tableName]();
   const isChunked = tableName === "route_points";
-
-  let querySql: string;
-  let queryParams: unknown[];
-
-  switch (tableName) {
-    case "users": {
-      const q = buildUsersQuery();
-      querySql = q.sql;
-      queryParams = q.params;
-      break;
-    }
-    case "user_profiles": {
-      const q = buildUserProfilesQuery();
-      querySql = q.sql;
-      queryParams = q.params;
-      break;
-    }
-    case "user_motorcycles": {
-      const q = buildUserMotorcyclesQuery();
-      querySql = q.sql;
-      queryParams = q.params;
-      break;
-    }
-    case "routes": {
-      const q = buildRoutesQuery();
-      querySql = q.sql;
-      queryParams = q.params;
-      break;
-    }
-    case "route_points": {
-      const q = buildRoutePointsQuery();
-      querySql = q.sql;
-      queryParams = q.params;
-      break;
-    }
-    case "planned_routes": {
-      const q = buildPlannedRoutesQuery();
-      querySql = q.sql;
-      queryParams = q.params;
-      break;
-    }
-    case "sprint_results": {
-      const q = buildSprintResultsQuery();
-      querySql = q.sql;
-      queryParams = q.params;
-      break;
-    }
-  }
-
-  iterator = isChunked
-    ? chunkedQuery(querySql, queryParams)
-    : simpleQuery(querySql, queryParams);
+  const iterator = isChunked ? chunkedQuery(pool, sql, params) : simpleQuery(pool, sql, params);
 
   process.stdout.write(`  Exporting ${tableName}... `);
   const rows = isCsv
@@ -570,26 +201,22 @@ async function main() {
   console.log("\n╔══════════════════════════════════════╗");
   console.log("║   BikerLink — Data Export Script     ║");
   console.log("╚══════════════════════════════════════╝\n");
-
-  console.log("Options:");
   console.log(`  --exclude-fake : ${excludeFake}`);
   console.log(`  --since        : ${since ?? "(none)"}`);
   console.log(`  --tables       : ${tablesToExport.join(", ")}`);
   console.log(`  --no-compress  : ${noCompress}`);
-  console.log(`  --format       : ${outputFormat.toUpperCase()}`);
-  console.log();
+  console.log(`  --format       : ${outputFormat.toUpperCase()}\n`);
 
   const outputDir = getOutputDir();
   console.log(`Output directory: ${outputDir}\n`);
 
   const startTime = Date.now();
   const results: ExportResult[] = [];
-
   let hasFailures = false;
+
   for (const table of tablesToExport) {
     try {
-      const result = await exportTable(table, outputDir);
-      results.push(result);
+      results.push(await exportTable(table, outputDir));
     } catch (err) {
       console.error(`  ERROR exporting ${table}:`, err instanceof Error ? err.message : err);
       results.push({ table, rows: -1, bytes: 0, file: "" });
@@ -597,73 +224,39 @@ async function main() {
     }
   }
 
-  // ── Manifest ────────────────────────────────────────────────────────────────
-
   const manifestPath = path.join(outputDir, "export-manifest.json");
-  const manifest = {
+  fs.writeFileSync(manifestPath, JSON.stringify({
     scriptVersion: "1.0.0",
     exportedAt: new Date().toISOString(),
     durationMs: Date.now() - startTime,
-    filters: {
-      excludeFake,
-      since: since ?? null,
-      tables: tablesToExport,
-      noCompress,
-      format: outputFormat,
-    },
-    tables: results.map((r) => ({
-      table: r.table,
-      rows: r.rows,
-      bytes: r.bytes,
-      file: path.basename(r.file),
-    })),
-  };
-  fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
-
-  // ── Summary Table ────────────────────────────────────────────────────────────
+    filters: { excludeFake, since: since ?? null, tables: tablesToExport, noCompress, format: outputFormat },
+    tables: results.map((r) => ({ table: r.table, rows: r.rows, bytes: r.bytes, file: path.basename(r.file) })),
+  }, null, 2));
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   const colTable = Math.max(14, ...results.map((r) => r.table.length));
-  const colRows = 12;
-  const colSize = 10;
-  const colFmt = 6;
-  const totalWidth = colTable + colRows + colSize + colFmt + 16;
-
-  console.log();
-  console.log("─".repeat(totalWidth));
-  console.log(
-    `${"Table".padEnd(colTable)}  ${"Rows".padStart(colRows)}  ${"Size".padStart(colSize)}  ${"Format".padEnd(colFmt)}  Path`,
-  );
+  const totalWidth = colTable + 12 + 10 + 6 + 16;
+  console.log("\n" + "─".repeat(totalWidth));
+  console.log(`${"Table".padEnd(colTable)}  ${"Rows".padStart(12)}  ${"Size".padStart(10)}  ${"Format".padEnd(6)}  Path`);
   console.log("─".repeat(totalWidth));
 
-  let totalRows = 0;
-  let totalBytes = 0;
+  let totalRows = 0; let totalBytes = 0;
   for (const r of results) {
     const rows = r.rows >= 0 ? r.rows.toLocaleString() : "ERROR";
     const size = r.bytes > 0 ? formatBytes(r.bytes) : "—";
-    const fmt = outputFormat.toUpperCase();
     const shortPath = r.file ? path.relative(process.cwd(), r.file) : "(failed)";
-    console.log(
-      `${r.table.padEnd(colTable)}  ${rows.padStart(colRows)}  ${size.padStart(colSize)}  ${fmt.padEnd(colFmt)}  ${shortPath}`,
-    );
+    console.log(`${r.table.padEnd(colTable)}  ${rows.padStart(12)}  ${size.padStart(10)}  ${outputFormat.toUpperCase().padEnd(6)}  ${shortPath}`);
     if (r.rows > 0) totalRows += r.rows;
     totalBytes += r.bytes;
   }
-
   console.log("─".repeat(totalWidth));
-  console.log(
-    `${"TOTAL".padEnd(colTable)}  ${totalRows.toLocaleString().padStart(colRows)}  ${formatBytes(totalBytes).padStart(colSize)}`,
-  );
-  console.log();
-  if (hasFailures) {
-    console.error(`\n⚠  One or more table exports failed — see errors above.`);
-  }
-  console.log(`Completed in ${elapsed}s`);
-  console.log(`Manifest: ${path.relative(process.cwd(), manifestPath)}`);
-  console.log();
+  console.log(`${"TOTAL".padEnd(colTable)}  ${totalRows.toLocaleString().padStart(12)}  ${formatBytes(totalBytes).padStart(10)}`);
+  console.log(`\nCompleted in ${elapsed}s`);
+  console.log(`Manifest: ${path.relative(process.cwd(), manifestPath)}\n`);
+
+  if (hasFailures) { console.error("⚠  One or more table exports failed — see errors above."); }
 
   await pool.end();
-
   if (hasFailures) process.exit(1);
 }
 
