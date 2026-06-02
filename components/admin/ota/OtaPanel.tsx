@@ -3,7 +3,7 @@
 // Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
 //         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -92,10 +92,21 @@ export default function OtaPanel() {
   const [forcingUpdate, setForcingUpdate] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [expandedAutoId, setExpandedAutoId] = useState<string | null>(null);
+  const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
+  const historyInitialized = useRef(false);
 
   const { data: releases, isLoading, refetch, isFetching } = useQuery<OtaRelease[]>({
     queryKey: ["/api/admin/ota/releases"],
   });
+
+  useEffect(() => {
+    if (historyInitialized.current || !releases?.length) return;
+    historyInitialized.current = true;
+    const first = releases
+      .filter((r) => r.status !== "pending" && !(r.status === "rejected" && r.rejectedBy === null))
+      .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())[0];
+    if (first) setExpandedHistoryId(first.id);
+  }, [releases]);
 
   const handleSync = useCallback(async () => {
     Alert.alert(
@@ -321,7 +332,9 @@ export default function OtaPanel() {
   });
 
   const pending = (releases ?? []).filter((r) => r.status === "pending");
-  const history = (releases ?? []).filter((r) => r.status !== "pending");
+  const history = (releases ?? [])
+    .filter((r) => r.status !== "pending")
+    .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
 
   const renderCounters = (release: OtaRelease) => {
     const rate = bootSuccessRate(release);
@@ -591,9 +604,14 @@ export default function OtaPanel() {
               );
             }
 
+            const isExpanded = expandedHistoryId === release.id;
             return (
               <View key={release.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={styles.cardHeader}>
+                <TouchableOpacity
+                  style={styles.cardHeader}
+                  onPress={() => setExpandedHistoryId(isExpanded ? null : release.id)}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.badgeRow}>
                     <View style={[styles.numBadge, { backgroundColor: colors.accent }]}>
                       <Text style={styles.numBadgeText}>OTA {otaNum}</Text>
@@ -604,41 +622,48 @@ export default function OtaPanel() {
                       </Text>
                     </View>
                   </View>
-                  <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
-                </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={[styles.dateText, { color: colors.textSecondary }]}>{formatDate(release.publishedAt)}</Text>
+                    <Text style={{ color: colors.textSecondary, fontSize: 12 }}>{isExpanded ? "▲" : "▼"}</Text>
+                  </View>
+                </TouchableOpacity>
 
-                <Text style={[styles.versionText, { color: colors.text }]}>
-                  {release.otaVersion ?? "—"}
-                </Text>
+                {isExpanded && (
+                  <>
+                    <Text style={[styles.versionText, { color: colors.text }]}>
+                      {release.otaVersion ?? "—"}
+                    </Text>
 
-                {release.message && (
-                  <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
-                )}
+                    {release.message && (
+                      <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
+                    )}
 
-                {release.approvedAt && (
-                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                    Approvata: {formatDate(release.approvedAt)}
-                  </Text>
-                )}
-                {release.rejectedAt && (
-                  <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                    Rifiutata: {formatDate(release.rejectedAt)}
-                  </Text>
-                )}
+                    {release.approvedAt && (
+                      <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                        Approvata: {formatDate(release.approvedAt)}
+                      </Text>
+                    )}
+                    {release.rejectedAt && (
+                      <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                        Rifiutata: {formatDate(release.rejectedAt)}
+                      </Text>
+                    )}
 
-                {renderCounters(release)}
-                {release.status === "approved" && renderAutoRollback(release)}
+                    {renderCounters(release)}
+                    {release.status === "approved" && renderAutoRollback(release)}
 
-                {release.status === "approved" && (
-                  <TouchableOpacity
-                    style={[styles.rollbackBtn, { borderColor: colors.accent }]}
-                    onPress={() => handleRollback(release)}
-                    disabled={rollingBackId === release.id}
-                  >
-                    {rollingBackId === release.id
-                      ? <ActivityIndicator size="small" color={colors.accent} />
-                      : <Text style={[styles.rollbackBtnText, { color: colors.accent }]}>↩ Rollback (eas update --republish)</Text>}
-                  </TouchableOpacity>
+                    {release.status === "approved" && (
+                      <TouchableOpacity
+                        style={[styles.rollbackBtn, { borderColor: colors.accent }]}
+                        onPress={() => handleRollback(release)}
+                        disabled={rollingBackId === release.id}
+                      >
+                        {rollingBackId === release.id
+                          ? <ActivityIndicator size="small" color={colors.accent} />
+                          : <Text style={[styles.rollbackBtnText, { color: colors.accent }]}>↩ Rollback (eas update --republish)</Text>}
+                      </TouchableOpacity>
+                    )}
+                  </>
                 )}
               </View>
             );
