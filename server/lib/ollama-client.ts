@@ -37,6 +37,52 @@ const OLLAMA_MODEL = process.env.OLLAMA_MODEL ?? "llama3.2:latest";
 /** true quando OLLAMA_URL è impostato (Ollama abilitato come provider primario). */
 export const isOllamaConfigured = Boolean(OLLAMA_URL);
 
+// ─── Circuit breaker — probe con cache 60s ────────────────────────────────────
+
+const PROBE_TIMEOUT_MS = 2500;
+const PROBE_CACHE_TTL_MS = 60_000;
+
+let _probeResult: boolean | null = null;
+let _probeTs = 0;
+
+/**
+ * Verifica se il server Ollama è raggiungibile con un probe leggero (timeout 2.5s).
+ * Il risultato è messo in cache per 60 secondi per non aggiungere latenza ad ogni
+ * chiamata AI. Se il probe fallisce con ECONNREFUSED o timeout, ritorna false
+ * immediatamente così il chiamante salta Ollama senza aspettare AI_TIMEOUT_MS.
+ */
+export async function isOllamaReachable(): Promise<boolean> {
+  if (!OLLAMA_URL) return false;
+
+  const now = Date.now();
+  if (_probeResult !== null && now - _probeTs < PROBE_CACHE_TTL_MS) {
+    return _probeResult;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+    const headers: Record<string, string> = OLLAMA_TOKEN
+      ? { "X-Ollama-Token": OLLAMA_TOKEN }
+      : {};
+    const res = await fetch(`${OLLAMA_URL}/`, { method: "HEAD", headers, signal: controller.signal });
+    clearTimeout(timer);
+    _probeResult = res.ok || res.status < 500;
+    _probeTs = Date.now();
+    return _probeResult;
+  } catch {
+    _probeResult = false;
+    _probeTs = Date.now();
+    return false;
+  }
+}
+
+/** Invalida la cache del probe (es. dopo un cambio di configurazione). */
+export function resetOllamaProbeCache(): void {
+  _probeResult = null;
+  _probeTs = 0;
+}
+
 /**
  * Restituisce un LanguageModel del Vercel AI SDK puntato sul server Ollama.
  * Lancia subito un errore catchable se OLLAMA_URL non è impostato — così il

@@ -1,4 +1,4 @@
-// LARGE-FILE-LOCKED — limite: 820 righe (attuali: ~816)
+// LARGE-FILE-LOCKED — limite: 816 righe (attuali: ~816)
 // Aggiungi nuove funzionalità in: components/admin/ota/OtaPanelExtra.tsx
 // Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
 //         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".

@@ -27,7 +27,7 @@ const weatherWaypointsSchema = z.object({
   avgSpeedKmh: z.number().optional(),
 });
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
+import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
 import { getGroqModel, isGroqConfigured } from "../../lib/groq-client";
 import { getEffectiveRouteChain } from "../../ai/route-provider-config";
 
@@ -69,6 +69,10 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
 
     if (providerId === "ollama") {
       if (!isOllamaConfigured) continue;
+      if (!(await isOllamaReachable())) {
+        console.info("[AI parse] Ollama probe fallito (offline/irraggiungibile), skip a provider successivo.");
+        continue;
+      }
       try {
         const { object } = await generateObject({
           model: getOllamaModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
@@ -195,6 +199,10 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
 
     if (providerId === "ollama") {
       if (!isOllamaConfigured) continue;
+      if (!(await isOllamaReachable())) {
+        console.info("[AI stream] Ollama probe fallito (offline/irraggiungibile), skip a provider successivo.");
+        continue;
+      }
       try {
         const buffered = await bufferAndValidateStream(getOllamaModel(), fullPrompt, streamOpts);
         if (buffered) {

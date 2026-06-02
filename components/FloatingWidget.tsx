@@ -22,7 +22,7 @@ const POSITION_KEY = "floating_widget_position";
 const TAP_THRESHOLD = 5;
 
 export default function FloatingWidget() {
-  const { isVisible, unreadChat, unreadNotifications } = useFloatingWidget();
+  const { isVisible, unreadChat, unreadNotifications, refetchBadges } = useFloatingWidget();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -34,6 +34,12 @@ export default function FloatingWidget() {
   const positionRef = useRef({ x: defaultX, y: defaultY });
   const [positionLoaded, setPositionLoaded] = useState(false);
   const pan = useRef(new Animated.ValueXY({ x: defaultX, y: defaultY })).current;
+
+  const insetsRef = useRef(insets);
+  React.useEffect(() => { insetsRef.current = insets; }, [insets]);
+
+  const refetchBadgesRef = useRef(refetchBadges);
+  React.useEffect(() => { refetchBadgesRef.current = refetchBadges; }, [refetchBadges]);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const menuOpenRef = useRef(false);
@@ -54,7 +60,7 @@ export default function FloatingWidget() {
         try {
           const { x, y } = JSON.parse(val);
           const clampedX = Math.max(0, Math.min(x, width - WIDGET_SIZE));
-          const clampedY = Math.max(insets.top + 8, Math.min(y, height - WIDGET_SIZE - 8));
+          const clampedY = Math.max(insets.top + 8, Math.min(y, height - WIDGET_SIZE - 8 - insets.bottom));
           positionRef.current = { x: clampedX, y: clampedY };
           pan.setValue({ x: clampedX, y: clampedY });
         } catch {
@@ -95,7 +101,7 @@ export default function FloatingWidget() {
         const rawY = positionRef.current.y + gestureState.dy;
 
         const clampedX = Math.max(0, Math.min(rawX, screenWidth - WIDGET_SIZE));
-        const clampedY = Math.max(insets.top + 8, Math.min(rawY, screenHeight - WIDGET_SIZE - 8));
+        const clampedY = Math.max(insetsRef.current.top + 8, Math.min(rawY, screenHeight - WIDGET_SIZE - 8 - insetsRef.current.bottom));
 
         positionRef.current = { x: clampedX, y: clampedY };
         pan.setValue({ x: clampedX, y: clampedY });
@@ -109,6 +115,7 @@ export default function FloatingWidget() {
               setMenuOpen(false);
             });
           } else {
+            refetchBadgesRef.current();
             menuOpenRef.current = true;
             setMenuOpen(true);
             Animated.timing(menuOpacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();

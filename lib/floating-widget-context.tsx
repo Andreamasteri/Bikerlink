@@ -75,6 +75,7 @@ interface FloatingWidgetContextType {
   unreadChat: number;
   unreadNotifications: number;
   suppressWidget: (suppress: boolean) => void;
+  refetchBadges: () => void;
 }
 
 const FloatingWidgetContext = createContext<FloatingWidgetContextType>({
@@ -82,6 +83,7 @@ const FloatingWidgetContext = createContext<FloatingWidgetContextType>({
   unreadChat: 0,
   unreadNotifications: 0,
   suppressWidget: () => {},
+  refetchBadges: () => {},
 });
 
 export function useFloatingWidget() {
@@ -103,17 +105,22 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
 
   const isVisible = isLoggedIn && userEnabled && adminEnabled && !suppressed;
 
-  const { data: unreadChatData } = useQuery<{ count: number }>({
+  const { data: unreadChatData, refetch: refetchChat } = useQuery<{ count: number }>({
     queryKey: ["/api/chat/conversations/unread-total"],
     enabled: isVisible,
-    refetchInterval: isVisible ? 15_000 : false,
+    refetchInterval: isVisible ? 5_000 : false,
   });
 
-  const { data: notificationsData } = useQuery<Array<{ isRead: boolean }>>({
+  const { data: notificationsData, refetch: refetchNotif } = useQuery<Array<{ isRead: boolean }>>({
     queryKey: ["/api/notifications"],
     enabled: isVisible,
-    refetchInterval: isVisible ? 15_000 : false,
+    refetchInterval: isVisible ? 5_000 : false,
   });
+
+  const refetchBadges = useCallback(() => {
+    void refetchChat();
+    void refetchNotif();
+  }, [refetchChat, refetchNotif]);
 
   const unreadChat = unreadChatData?.count ?? 0;
   const unreadNotifications = useMemo(() => {
@@ -197,6 +204,7 @@ export function FloatingWidgetProvider({ children }: { children: React.ReactNode
       unreadChat,
       unreadNotifications,
       suppressWidget,
+      refetchBadges,
     }}>
       {children}
     </FloatingWidgetContext.Provider>
