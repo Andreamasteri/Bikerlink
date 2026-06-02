@@ -16,7 +16,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
-import { showImagePickerMenu } from "@/lib/image-picker-utils";
+import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
 import { useChatSSE } from "@/hooks/useChatSSE";
 import { useT } from "@/lib/language-context";
 
@@ -298,8 +298,8 @@ export default function ChatConversationScreen() {
       const filename = uri.split("/").pop() ?? "photo.jpg";
       const ext = filename.split(".").pop()?.toLowerCase() ?? "jpg";
       const mimeType = ext === "png" ? "image/png" : ext === "gif" ? "image/gif" : "image/jpeg";
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- FormData.append with RN file object
-      (formData as any).append("image", { uri, name: filename, type: mimeType } as any);
+      const blob = await uriToBlob(uri, mimeType);
+      formData.append("image", blob, filename);
 
       const uploadUrl = new URL(`/api/chat/conversations/${id}/images`, getApiUrl()).toString();
       const resp = await fetch(uploadUrl, {
