@@ -84,7 +84,6 @@ export async function routeMessage(opts: RouteOpts): Promise<{
           schema: RouterDecisionSchema,
           system: SYSTEM,
           prompt,
-          ...(m.objectMode ? { mode: m.objectMode } : {}),
         });
         modelId = m.modelId;
         providerName = m.providerName;

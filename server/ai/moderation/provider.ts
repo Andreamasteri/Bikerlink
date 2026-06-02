@@ -20,9 +20,6 @@ interface ResolvedModel {
   modelId: string;
   model: LanguageModelV2;
   scheduler: <T>(fn: () => Promise<T>) => Promise<T>;
-  // Forza JSON mode in generateObject (invece di json_schema) per provider che
-  // non supportano structured outputs nativi (es. Llama 3.3 70B su Groq).
-  objectMode?: "json";
 }
 
 // Prezzi $ per 1k token (Maggio 2026, vedi _ai-stack-decision.md). Aggiornati a mano.
@@ -36,6 +33,8 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "gpt-4o-mini": { in: 0.00015, out: 0.0006 },
   // Groq free tier: costo zero (limitato da RPM/RPD, vedi DAILY_CAPS).
   "llama-3.3-70b-versatile": { in: 0, out: 0 },
+  "llama-3.1-8b-instant": { in: 0, out: 0 },
+  "meta-llama/llama-4-scout-17b-16e-instruct": { in: 0, out: 0 },
 };
 
 export function estimateCostUsd(modelId: string, tokensIn: number, tokensOut: number): number {
@@ -257,14 +256,13 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
       // Limiti free gestiti da limiters.groq (RPM 30) + DAILY_CAPS.groq (RPD 1000).
       const key = process.env.GROQ_API_KEY;
       if (!key) return null;
-      const modelId = forcedModelId ?? "llama-3.3-70b-versatile";
+      // meta-llama/llama-4-scout-17b-16e-instruct supporta response_format: json_schema
+      // (structured outputs, best-effort mode). llama-3.x-* non supportano json_schema su Groq.
+      const modelId = forcedModelId ?? "meta-llama/llama-4-scout-17b-16e-instruct";
       const client = createOpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
       return {
         id, providerName: "groq", modelId,
         model: client(modelId) as unknown as LanguageModelV2,
-        // Llama 3.3 70B su Groq non supporta json_schema response_format.
-        // I consumer devono passare mode:"json" a generateObject quando objectMode è impostato.
-        objectMode: "json" as const,
         scheduler: <T>(fn: () => Promise<T>) => limiters.groq.schedule(fn),
       };
     }
