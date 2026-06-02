@@ -2,13 +2,13 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   Alert,
   Platform,
 } from "react-native";
+import { styles } from "./legal-docs.styles";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as DocumentPicker from "expo-document-picker";
@@ -236,127 +236,3 @@ export default function LegalDocsAdmin() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  content: {
-    padding: 16,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  warningBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#2D1F00",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#F59E0B",
-  },
-  warningText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "#F59E0B",
-    flex: 1,
-  },
-  card: {
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  cardHeader: {
-    marginBottom: 10,
-  },
-  cardHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: Colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cardTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
-    color: Colors.text,
-  },
-  cardMeta: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  preview: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 19,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 12,
-  },
-  emptyPreview: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    fontStyle: "italic",
-    marginBottom: 12,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  btn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    minHeight: 36,
-  },
-  btnPrimary: {
-    backgroundColor: "#FF6B35",
-  },
-  btnSecondary: {
-    backgroundColor: Colors.accent,
-  },
-  btnOutline: {
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    backgroundColor: "transparent",
-  },
-  btnDisabled: {
-    opacity: 0.5,
-  },
-  btnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: "#fff",
-  },
-});

@@ -48,9 +48,11 @@ export class MapStorage extends PlannedRoutesStorage {
               AND et.tag_id IN (${sql.join(motoTagIds.map((id) => sql`${id}`), sql`, `)})
           )`);
         }
-        const distanceExpr = sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance");
+        const viewerGeog = sql`ST_MakePoint(${lng}, ${lat})::geography`;
+        const distanceExpr = sql<number>`ST_Distance(${userProfiles.geom}, ${viewerGeog}) / 1000.0`.as("distance");
+        conditions.push(sql`${userProfiles.geom} IS NOT NULL`);
         if (!isWorld) {
-          conditions.push(sql`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude})))) <= ${radiusKm}`);
+          conditions.push(sql`ST_DWithin(${userProfiles.geom}, ${viewerGeog}, ${radiusKm * 1000})`);
         }
         const results = await db
           .select({

@@ -1,10 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { motoClubMembers } from "@shared/db";
-import { and, eq } from "drizzle-orm";
+import { motoClubMembers, proposalParticipants, users, userMotorcycles, type UserMotorcycle } from "@shared/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { triggerProposalCreatedMatching } from "../../matching-engine";
-import { allLimited } from "../../lib/concurrency";
 
 import { requireAuth } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";
@@ -16,6 +15,8 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
     const status = (req.query.status as string) || undefined;
     const proposalType = req.query.type as string | undefined;
     const filter = req.query.filter as string | undefined;
+    const limit = Math.min(parseInt((req.query.limit as string) || "50", 10), 100);
+    const page = Math.max(parseInt((req.query.page as string) || "1", 10), 1);
 
     const userId = req.session.userId!;
     let allProposals = await storage.getProposals(status ? { status } : undefined);
@@ -47,30 +48,58 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
       }
     }
 
-    const results = await allLimited(
-      allProposals.map((proposal) => async () => {
-        const participants = await storage.getProposalParticipants(proposal.id);
-        const creator = await storage.getUser(proposal.userId);
-        const creatorName = creator?.nickname ?? "Sconosciuto";
+    const total = allProposals.length;
+    const offset = (page - 1) * limit;
+    const paginated = allProposals.slice(offset, offset + limit);
 
-        let motoInfo = null;
-        if (proposal.motorcycleId) {
-          const motos = await storage.getUserMotorcycles(proposal.userId);
-          const moto = motos.find(m => m.id === proposal.motorcycleId);
-          if (moto) motoInfo = { brand: moto.brand, model: moto.model, motorcycleType: moto.motorcycleType, ridingStyle: moto.ridingStyle };
-        }
+    const proposalIds = paginated.map(p => p.id);
+    const uniqueUserIds = [...new Set(paginated.map(p => p.userId))];
+    const motoUserIds = [...new Set(paginated.filter(p => p.motorcycleId).map(p => p.userId))];
 
-        return {
-          ...proposal,
-          creatorNickname: creatorName,
-          creatorUserType: creator?.userType,
-          participantCount: participants.length,
-          motoInfo,
-        };
-      })
-    );
+    const [participantCountRows, creatorRows, motorcycleRows] = await Promise.all([
+      proposalIds.length > 0
+        ? db.select({
+            proposalId: proposalParticipants.proposalId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(proposalParticipants)
+          .where(inArray(proposalParticipants.proposalId, proposalIds))
+          .groupBy(proposalParticipants.proposalId)
+        : Promise.resolve([] as { proposalId: string; count: number }[]),
+      uniqueUserIds.length > 0
+        ? db.select().from(users).where(inArray(users.id, uniqueUserIds))
+        : Promise.resolve([] as (typeof users.$inferSelect)[]),
+      motoUserIds.length > 0
+        ? db.select().from(userMotorcycles).where(inArray(userMotorcycles.userId, motoUserIds))
+        : Promise.resolve([] as UserMotorcycle[]),
+    ]);
 
-    return res.json(results);
+    const participantCountMap = new Map(participantCountRows.map(r => [r.proposalId, r.count]));
+    const creatorMap = new Map(creatorRows.map(u => [u.id, u]));
+    const motorcyclesByUser = new Map<string, UserMotorcycle[]>();
+    for (const moto of motorcycleRows) {
+      if (!motorcyclesByUser.has(moto.userId)) motorcyclesByUser.set(moto.userId, []);
+      motorcyclesByUser.get(moto.userId)!.push(moto);
+    }
+
+    const results = paginated.map((proposal) => {
+      const creator = creatorMap.get(proposal.userId);
+      let motoInfo = null;
+      if (proposal.motorcycleId) {
+        const userMotos = motorcyclesByUser.get(proposal.userId) ?? [];
+        const moto = userMotos.find(m => m.id === proposal.motorcycleId);
+        if (moto) motoInfo = { brand: moto.brand, model: moto.model, motorcycleType: moto.motorcycleType, ridingStyle: moto.ridingStyle };
+      }
+      return {
+        ...proposal,
+        creatorNickname: creator?.nickname ?? "Sconosciuto",
+        creatorUserType: creator?.userType,
+        participantCount: participantCountMap.get(proposal.id) ?? 0,
+        motoInfo,
+      };
+    });
+
+    return res.json({ data: results, total, page, limit });
   } catch (error) {
     console.error("Get proposals error:", error);
     return sendError(res, 500, "Errore interno del server");

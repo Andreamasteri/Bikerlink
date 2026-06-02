@@ -60,6 +60,7 @@ export interface IStorage {
   deleteUserPhoto(id: string): Promise<void>;
   getUserPhotoCount(userId: string): Promise<number>;
   getUserMotorcycles(userId: string): Promise<UserMotorcycle[]>;
+  getUserMotorcyclesBatch(userIds: string[]): Promise<UserMotorcycle[]>;
   createUserMotorcycle(moto: InsertUserMotorcycle): Promise<UserMotorcycle>;
   updateUserMotorcycle(id: string, data: Partial<InsertUserMotorcycle>): Promise<UserMotorcycle | undefined>;
   deleteUserMotorcycle(id: string): Promise<void>;

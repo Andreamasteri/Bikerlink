@@ -171,11 +171,12 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
         console.warn("[online-list] offline users query skipped:", (offlineErr as Error)?.message);
       }
     }
+    const allUserIds = [...new Set(allResults.map(item => item.user.id))];
+    const allMotoBatch = await storage.getUserMotorcyclesBatch(allUserIds);
     const motorcyclesMap: Record<string, import("@shared/db").UserMotorcycle[]> = {};
-    for (const item of allResults) {
-      if (!motorcyclesMap[item.user.id]) {
-        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
-      }
+    for (const moto of allMotoBatch) {
+      if (!motorcyclesMap[moto.userId]) motorcyclesMap[moto.userId] = [];
+      motorcyclesMap[moto.userId].push(moto);
     }
     const mapped = allResults
       .map((item) => {
@@ -234,11 +235,12 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
       if (mapVisibilityFilter === "online_only") return onlineIdSet!.has(r.user.id);
       return true;
     });
+    const availableUserIds = [...new Set(results.map(item => item.user.id))];
+    const availableMotoBatch = await storage.getUserMotorcyclesBatch(availableUserIds);
     const motorcyclesMap: Record<string, import("@shared/db").UserMotorcycle[]> = {};
-    for (const item of results) {
-      if (!motorcyclesMap[item.user.id]) {
-        motorcyclesMap[item.user.id] = await storage.getUserMotorcycles(item.user.id);
-      }
+    for (const moto of availableMotoBatch) {
+      if (!motorcyclesMap[moto.userId]) motorcyclesMap[moto.userId] = [];
+      motorcyclesMap[moto.userId].push(moto);
     }
     const mapped = results
       .map((item) => {

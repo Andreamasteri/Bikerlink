@@ -115,6 +115,11 @@ export class UsersStorage {
     return db.select().from(userMotorcycles).where(eq(userMotorcycles.userId, userId));
   }
 
+  async getUserMotorcyclesBatch(userIds: string[]): Promise<UserMotorcycle[]> {
+    if (userIds.length === 0) return [];
+    return db.select().from(userMotorcycles).where(inArray(userMotorcycles.userId, userIds));
+  }
+
   async createUserMotorcycle(data: InsertUserMotorcycle): Promise<UserMotorcycle> {
     const [moto] = await db.insert(userMotorcycles).values(data).returning();
     return moto;
