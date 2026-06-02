@@ -713,11 +713,7 @@ const styles = StyleSheet.create({
   warningText: { fontSize: 12, lineHeight: 17 },
   emptyBox: { borderRadius: 8, padding: 20, alignItems: "center", borderWidth: 1, marginBottom: 12 },
   emptyText: { fontSize: 14, fontWeight: "600", marginBottom: 4 },
-  emptySubtext: {
-    fontSize: 11,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-    textAlign: "center",
-  },
+  emptySubtext: { fontSize: 11, fontFamily: Platform.OS === "ios" ? "Courier" : "monospace", textAlign: "center" },
   card: { borderRadius: 8, padding: 16, marginBottom: 12, borderWidth: 1 },
   cardHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   badge: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
@@ -757,21 +753,14 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     minHeight: 46,
   },
-  forceUpdateText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700" as const,
-  },
+  forceUpdateText: { color: "#fff", fontSize: 14, fontWeight: "700" as const },
   infoBanner: {
     borderRadius: 8,
     borderWidth: 1,
     padding: 12,
     marginBottom: 12,
   },
-  infoBannerText: {
-    fontSize: 12,
-    lineHeight: 17,
-  },
+  infoBannerText: { fontSize: 12, lineHeight: 17 },
   countersRow: {
     flexDirection: "row",
     flexWrap: "wrap",

@@ -169,10 +169,10 @@ export class MatchingStorage extends ContestStorage {
       INNER JOIN users mu ON mu.id = m.user_id
       WHERE wu.status = 'active' AND wu.is_fake = false AND wu.role <> 'admin'
         AND wu.ghost_mode = false
-        AND wu.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
+        AND wu.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)})
         AND mu.status = 'active' AND mu.is_fake = false AND mu.role <> 'admin'
         AND mu.ghost_mode = false
-        AND mu.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
+        AND mu.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)})
         AND (mu.user_type = 'biker' OR mu.user_type = 'coppia')
         AND wl.user_id <> m.user_id
         ${countryFilter}

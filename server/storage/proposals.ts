@@ -89,8 +89,8 @@ export class ProposalsStorage extends ConversationsStorage {
         AND u1.is_fake = false AND u2.is_fake = false
         AND u1.ghost_mode = false AND u2.ghost_mode = false
         AND u1.role <> 'admin' AND u2.role <> 'admin'
-        AND u1.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
-        AND u2.nickname <> ALL(${PROTECTED_NICKNAMES}::text[])
+        AND u1.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)})
+        AND u2.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)})
         AND p1.departure_geom IS NOT NULL
         AND p2.departure_geom IS NOT NULL
         AND p1.search_type IS NOT NULL AND p2.search_type IS NOT NULL
