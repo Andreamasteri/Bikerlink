@@ -21,6 +21,7 @@ import { bioAffinityMatches } from "@shared/db";
 import { findSimilar, EMBEDDING_MODEL_TAG } from "../embeddings";
 import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
 import { haversineKm } from "../geo";
+import { PROTECTED_NICKNAMES } from "../constants";
 
 const TOP_K = 10;
 const SIM_THRESHOLD = Number(process.env.BIO_AFFINITY_THRESHOLD ?? 0.78);
@@ -67,6 +68,7 @@ export async function runBioAffinityMatching(): Promise<number> {
       WHERE e.entity_type = 'user'
         AND e.field = 'bio'
         AND u.is_fake = false
+        AND u.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)})
     `);
     const rows = (rowsRes.rows ?? rowsRes) as BioRow[];
     if (rows.length < 2) {

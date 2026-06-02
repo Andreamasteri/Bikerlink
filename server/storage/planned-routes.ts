@@ -7,6 +7,7 @@ import {
   type RouteWeatherCache, type InsertRouteWeatherCache,
 } from "@shared/db";
 import { SystemStorage } from "./system";
+import { PROTECTED_NICKNAMES } from "../constants";
 
 export class PlannedRoutesStorage extends SystemStorage {
   async saveCoordinateHistory(userId: string, latitude: number, longitude: number): Promise<CoordinateHistory | null> {
@@ -43,7 +44,7 @@ export class PlannedRoutesStorage extends SystemStorage {
   }
 
   async getCoordinateHistoryUsers(): Promise<Array<{ userId: string; nickname: string; recordCount: number; lastRecord: string }>> {
-    const result = await db.execute(sql`SELECT ch.user_id, u.nickname, COUNT(*)::int as record_count, MAX(ch.created_at)::text as last_record FROM coordinate_history ch JOIN users u ON u.id = ch.user_id GROUP BY ch.user_id, u.nickname ORDER BY last_record DESC`);
+    const result = await db.execute(sql`SELECT ch.user_id, u.nickname, COUNT(*)::int as record_count, MAX(ch.created_at)::text as last_record FROM coordinate_history ch JOIN users u ON u.id = ch.user_id WHERE u.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)}) GROUP BY ch.user_id, u.nickname ORDER BY last_record DESC`);
     return result.rows.map((r) => {
       const row = r as { user_id: string; nickname: string; record_count: number; last_record: string };
       return { userId: row.user_id, nickname: row.nickname, recordCount: row.record_count, lastRecord: row.last_record };

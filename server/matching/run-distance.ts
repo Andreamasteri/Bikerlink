@@ -5,6 +5,7 @@ import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
 import { routeProfileOf } from "./scoring";
 import { classifyMatch } from "./notifications/classify";
 import { dispatchMatchNotification } from "./notifications/dispatcher";
+import { PROTECTED_NICKNAMES } from "../constants";
 
 /**
  * Task #2510: i centroidi degli utenti (media lat/lng dei route_points) sono
@@ -38,6 +39,7 @@ async function fetchCentroidPairs(radiusKm: number): Promise<CentroidPairRow[]> 
       INNER JOIN route_points rp ON rp.route_id = r.id
       INNER JOIN users u ON u.id = r.user_id
       WHERE u.is_fake = false
+        AND u.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)})
       GROUP BY r.user_id, u.user_type
       HAVING AVG(rp.latitude) IS NOT NULL AND AVG(rp.longitude) IS NOT NULL
     )
@@ -153,6 +155,7 @@ export async function runRouteTypeZoneMatching(): Promise<number> {
         INNER JOIN route_points rp ON rp.route_id = r.id
         INNER JOIN users u ON u.id = r.user_id
         WHERE u.is_fake = false AND r.avg_speed_kmh IS NOT NULL
+          AND u.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)})
         GROUP BY r.user_id, u.user_type
         HAVING AVG(rp.latitude) IS NOT NULL AND AVG(rp.longitude) IS NOT NULL
       )

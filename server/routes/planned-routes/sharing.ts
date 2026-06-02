@@ -7,6 +7,7 @@ import { requireAuth, decodePolyline, escapeXml } from "./utils";
 import { plannedGpxImportSchema } from "@shared/validators";
 import { haversineKm } from "../../geo";
 import type { InsertPlannedRoute } from "@shared/db";
+import { PROTECTED_NICKNAMES } from "../../constants";
 
 const router = Router();
 
@@ -51,6 +52,7 @@ router.get("/compatible-bikers/:id", async (req: Request, res: Response) => {
       WHERE up.latitude IS NOT NULL AND up.longitude IS NOT NULL
         AND u.status = 'active' AND u.id != ${userId}
         AND up.hide_from_map IS NOT TRUE
+        AND u.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)})
         AND (u.last_login_at IS NULL OR u.last_login_at > NOW() - INTERVAL '30 days')
         AND (
           6371 * acos(
