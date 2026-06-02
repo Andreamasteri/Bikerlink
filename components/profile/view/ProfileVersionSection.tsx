@@ -91,7 +91,7 @@ export const ProfileVersionSection: React.FC = () => {
         <View style={styles.item}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
           <Text style={[styles.value, { color: colors.textSecondary }]}>
-            V{apk}.{runtime}.{otaBundledStr}
+            V{apk}.{runtime}.{appliedOta ?? otaBundledStr}
           </Text>
         </View>
         <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
