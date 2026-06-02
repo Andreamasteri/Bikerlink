@@ -22,6 +22,7 @@ import { streamAssistantMessage } from "@/lib/ai-assistant/sse-client";
 import { isAiKeyMissingResponse, isAiKeyMissingError, AI_KEY_MISSING_MESSAGE } from "@/lib/ai-errors";
 import { currentAssistantPlatform } from "@/hooks/useAssistantConfig";
 import { executeClientAction } from "@/lib/ai-assistant/client-actions";
+import { useKeyboardHeight } from "@/hooks/useKeyboardHeight";
 import AssistantActionConfirmSheet from "./AssistantActionConfirmSheet";
 import type { AssistantChatMessage, AssistantProposedAction } from "@/lib/ai-assistant/types";
 
@@ -45,6 +46,11 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
   const [streaming, setStreaming] = useState(false);
   const [pendingAction, setPendingAction] = useState<AssistantProposedAction | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  // On iOS formSheet the OS handles keyboard avoidance natively.
+  // On Android (no native formSheet) we shift content manually.
+  const keyboardHeight = useKeyboardHeight();
+  const androidKbPad = Platform.OS === "android" ? keyboardHeight : 0;
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -130,7 +136,18 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: colors.background,
+            paddingTop: insets.top,
+            // On Android, shift entire content above the keyboard.
+            // On iOS the native formSheet already handles this.
+            paddingBottom: androidKbPad,
+          },
+        ]}
+      >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Ionicons name="sparkles" size={20} color={colors.primary} />
           <Text style={[styles.title, { color: colors.text }]}>{t("aiAssistant.title") || "AI Assistant"}</Text>
@@ -146,6 +163,7 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
             keyExtractor={(m) => m.id}
             contentContainerStyle={{ padding: 12 }}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
             renderItem={({ item }) => (
               <View style={[
                 styles.bubble,
@@ -181,7 +199,20 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
           </View>
         )}
 
-        <View style={[styles.inputRow, { borderTopColor: colors.border, paddingBottom: insets.bottom + 8 }]}>
+        <View
+          style={[
+            styles.inputRow,
+            {
+              borderTopColor: colors.border,
+              // When keyboard is open on Android the androidKbPad moves the
+              // whole container up, so we only need a small fixed bottom gap.
+              // On iOS the OS handles insets; keep original bottom padding.
+              paddingBottom: Platform.OS === "android" && keyboardHeight > 0
+                ? 8
+                : insets.bottom + 8,
+            },
+          ]}
+        >
           <TextInput
             testID="assistant-chat-input"
             value={input}
