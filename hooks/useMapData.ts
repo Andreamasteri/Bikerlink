@@ -225,6 +225,8 @@ export function useMapData({
     queryKey: ["/api/proposals?status=active"],
     staleTime: 60000,
     enabled: isAuthenticated && nearbyLoaded,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    select: (d: any) => Array.isArray(d) ? d : (Array.isArray(d?.data) ? d.data : []),
   });
 
   const clubPinsQuery = useQuery<ClubMapPin[]>({

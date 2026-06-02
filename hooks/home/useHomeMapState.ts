@@ -303,12 +303,12 @@ export function useHomeMapState() {
   const fakeMeMarker = fakeHomeEnabled && fakeHomeLat != null && fakeHomeLng != null
     ? { latitude: Number(fakeHomeLat), longitude: Number(fakeHomeLng) } : null;
 
-  const myAds = useMemo(() => mapData.myAdsQuery.data || [], [mapData.myAdsQuery.data]);
+  const myAds = useMemo(() => Array.isArray(mapData.myAdsQuery.data) ? mapData.myAdsQuery.data : [], [mapData.myAdsQuery.data]);
   const onlineCount = mapData.onlineCountQuery.data?.count ?? 0;
   const bikerCount = mapData.bikerCountQuery.data?.count ?? 0;
   const zavCount = mapData.zavCountQuery.data?.count ?? 0;
 
-  const nearbyUsers = useMemo(() => (mapData.nearbyUsersQuery.data as MapUser[]) || [], [mapData.nearbyUsersQuery.data]);
+  const nearbyUsers = useMemo(() => Array.isArray(mapData.nearbyUsersQuery.data) ? mapData.nearbyUsersQuery.data as MapUser[] : [], [mapData.nearbyUsersQuery.data]);
 
   const usersWithSelf = useMemo(() => {
     const rawList: MapUser[] = Array.isArray(nearbyUsers) ? nearbyUsers : [];
@@ -348,7 +348,8 @@ export function useHomeMapState() {
   }, [filterBiker, filterZavorrina, usersWithSelf, user?.id, profileQData]);
 
   const mySearchRadius = useMemo(() => {
-    const myActive = ((mapData.myProposalsQuery.data as ProposalItem[]) || []).filter(
+    const proposals = Array.isArray(mapData.myProposalsQuery.data) ? mapData.myProposalsQuery.data as ProposalItem[] : [];
+    const myActive = proposals.filter(
       (p) => p.userId === user?.id && p.status === "active" && p.searchRadius
     );
     if (myActive.length === 0) return 0;
