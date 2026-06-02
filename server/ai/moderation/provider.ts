@@ -60,11 +60,23 @@ const health: Record<AiProviderId, AiProviderHealth & { cooldownUntil: number; q
 // gratuite. Quando un provider raggiunge il cap, isAvailable() lo salta fino al
 // reset di mezzanotte UTC (la chain passa al provider successivo / Ollama).
 // Override con *_RPD_LIMIT se passi a un piano a pagamento. Infinity = nessun cap.
+// Parse difensivo: un *_RPD_LIMIT non numerico o <= 0 NON deve disattivare il cap
+// (sarebbe un "sforo" silenzioso). In quel caso si ricade sul default sicuro.
+function parseCap(raw: string | undefined, fallback: number): number {
+  if (raw === undefined) return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) {
+    console.warn(`[ai] *_RPD_LIMIT non valido ("${raw}") → uso default ${fallback}`);
+    return fallback;
+  }
+  return n;
+}
+
 const DAILY_CAPS: Record<AiProviderId, number> = {
-  groq: Number(process.env.GROQ_RPD_LIMIT ?? 1000),
-  google: Number(process.env.GEMINI_RPD_LIMIT ?? 1500),
-  openai: Number(process.env.OPENAI_RPD_LIMIT ?? Infinity),
-  anthropic: Number(process.env.ANTHROPIC_RPD_LIMIT ?? Infinity),
+  groq: parseCap(process.env.GROQ_RPD_LIMIT, 1000),
+  google: parseCap(process.env.GEMINI_RPD_LIMIT, 1500),
+  openai: parseCap(process.env.OPENAI_RPD_LIMIT, Infinity),
+  anthropic: parseCap(process.env.ANTHROPIC_RPD_LIMIT, Infinity),
 };
 
 const dailyUsage: Record<AiProviderId, { day: string; count: number }> = {

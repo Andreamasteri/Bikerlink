@@ -48,6 +48,10 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
   let provider = "ollama";
   let modelId = OLLAMA_FALLBACK_MODEL_ID;
   let degraded = false;
+  // True non appena il PRIMO delta è stato inviato al client. Se un provider muore
+  // a metà stream non possiamo ripartire da un altro provider senza corrompere la
+  // risposta (output mescolati): in quel caso teniamo il parziale e segnaliamo degraded.
+  let emittedAny = false;
 
   // Streaming helper riusabile per qualunque modello (Ollama o cloud).
   const streamWith = async (model: Parameters<typeof streamText>[0]["model"]) => {
@@ -60,6 +64,7 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     });
     for await (const delta of result.textStream) {
       finalText += delta;
+      emittedAny = true;
       opts.onTextDelta?.(delta);
     }
     const usage = await result.usage;
@@ -71,20 +76,29 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
 
   // 1) Cloud primario (chain "router": Groq Llama 3.3 70B → Gemini Flash → OpenAI →
   //    Anthropic). Qualità nettamente superiore al modello locale; free tier protetto
-  //    da RPM/RPD: quando i cap si esauriscono la chain prosegue e poi cade su Ollama.
+  //    da RPM (m.scheduler/Bottleneck) + RPD (DAILY_CAPS): quando i cap si esauriscono
+  //    la chain prosegue e poi cade su Ollama. CRITICO: lo stream DEVE passare dallo
+  //    scheduler del provider, altrimenti i limiti per-minuto verrebbero bypassati.
   try {
     const { model } = await runWithFallback(
       { role: "router" },
       async (m: ResolvedModel) => {
-        await streamWith(m.model);
+        await m.scheduler(() => streamWith(m.model));
       },
     );
     provider = model.providerName;
     modelId = model.modelId;
     done = true;
   } catch (cloudErr) {
-    console.warn("[assistant] cloud non disponibile, fallback Ollama:", (cloudErr as Error).message);
-    finalText = "";
+    if (emittedAny) {
+      // Stream già parzialmente inviato: NON ripartire da un altro provider.
+      console.warn("[assistant] cloud fallito a metà stream, mantengo il parziale:", (cloudErr as Error).message);
+      degraded = true;
+      done = true;
+    } else {
+      console.warn("[assistant] cloud non disponibile, fallback Ollama:", (cloudErr as Error).message);
+      finalText = "";
+    }
   }
 
   // 2) Ollama self-hosted come rete finale illimitata (ThinkCentre acceso).
