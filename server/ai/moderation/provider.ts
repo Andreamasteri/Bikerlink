@@ -260,16 +260,16 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
       const key = process.env.GROQ_API_KEY;
       if (!key) return null;
       // openai/gpt-oss-20b è l'unico modello Groq free-tier con strict mode (constrained
-      // decoding): garantisce 100% schema adherence senza errori JSON. Confermato free tier
-      // nelle Groq rate-limits (30 RPM / 1K RPD). strictJsonSchema: true → strict: true
-      // nell'API Groq → mai output invalido né 400 da schema validation.
+      // decoding). Confermato free tier nelle Groq rate-limits (30 RPM / 1K RPD).
+      // Per abilitare strict mode (strict: true in Groq API), passare strictJsonSchema:true
+      // via providerOptions nei singoli generateObject call site.
       // llama-3.x-* non supportano json_schema su Groq → richiedono mode:"json" se forzati.
       const modelId = forcedModelId ?? "openai/gpt-oss-20b";
       const client = createOpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
       const needsJsonMode = /^(llama-3\.|meta-llama\/llama-3)/.test(modelId);
       return {
         id, providerName: "groq", modelId,
-        model: client(modelId, { strictJsonSchema: true }) as unknown as LanguageModelV2,
+        model: client(modelId) as unknown as LanguageModelV2,
         scheduler: <T>(fn: () => Promise<T>) => limiters.groq.schedule(fn),
         ...(needsJsonMode ? { objectMode: "json" as const } : {}),
       };
