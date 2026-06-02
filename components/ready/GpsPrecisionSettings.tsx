@@ -86,6 +86,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    alignSelf: "stretch",
   },
   accordionHeader: {
     flexDirection: "row",

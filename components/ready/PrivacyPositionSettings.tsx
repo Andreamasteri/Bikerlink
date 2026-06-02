@@ -290,6 +290,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 4,
+    alignSelf: "stretch",
   },
   privacyRow: {
     flexDirection: "row",

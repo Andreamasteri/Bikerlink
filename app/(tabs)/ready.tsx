@@ -190,54 +190,52 @@ export default function ReadyToRideScreen() {
             privacyMutation={privacyMutation as any}
           />
 
-          <View style={styles.accordionColumn}>
-            <PrivacyPositionSettings
-              t={t}
-              colors={colors}
-              privacyExpanded={privacyExpanded}
-              setPrivacyExpanded={setPrivacyExpanded}
-              positionFuzz={positionFuzz}
-              setPositionFuzz={setPositionFuzz}
-              positionFuzzKm={positionFuzzKm}
-              setPositionFuzzKm={setPositionFuzzKm}
-              fakeHomeEnabled={fakeHomeEnabled}
-              setFakeHomeEnabled={setFakeHomeEnabled}
-              homeLatitude={homeLatitude}
-              homeLongitude={homeLongitude}
-              fakeHomeLatitude={fakeHomeLatitude}
-              fakeHomeLongitude={fakeHomeLongitude}
-              fakeHomeRadius={fakeHomeRadius}
-              setFakeHomeRadius={setFakeHomeRadius}
-              fakeWorkEnabled={fakeWorkEnabled}
-              setFakeWorkEnabled={setFakeWorkEnabled}
-              workLatitude={workLatitude}
-              workLongitude={workLongitude}
-              fakeWorkLatitude={fakeWorkLatitude}
-              fakeWorkLongitude={fakeWorkLongitude}
-              fakeWorkRadius={fakeWorkRadius}
-              setFakeWorkRadius={setFakeWorkRadius}
-              fakeWhateverEnabled={fakeWhateverEnabled}
-              setFakeWhateverEnabled={setFakeWhateverEnabled}
-              whateverLatitude={whateverLatitude}
-              whateverLongitude={whateverLongitude}
-              fakeWhateverLatitude={fakeWhateverLatitude}
-              fakeWhateverLongitude={fakeWhateverLongitude}
-              fakeWhateverRadius={fakeWhateverRadius}
-              setFakeWhateverRadius={setFakeWhateverRadius}
-              privacyMutation={privacyMutation}
-              pickFromGPS={pickFromGPS}
-              openMapPicker={openMapPicker}
-            />
-            <GpsPrecisionSettings
-              colors={colors}
-              gpsPrecisionExpanded={gpsPrecisionExpanded}
-              setGpsPrecisionExpanded={setGpsPrecisionExpanded}
-              gpsOptions={gpsOptions}
-              gpsPrecision={gpsPrecision}
-              setGpsPrecision={setGpsPrecision}
-              privacyMutation={privacyMutation}
-            />
-          </View>
+          <PrivacyPositionSettings
+            t={t}
+            colors={colors}
+            privacyExpanded={privacyExpanded}
+            setPrivacyExpanded={setPrivacyExpanded}
+            positionFuzz={positionFuzz}
+            setPositionFuzz={setPositionFuzz}
+            positionFuzzKm={positionFuzzKm}
+            setPositionFuzzKm={setPositionFuzzKm}
+            fakeHomeEnabled={fakeHomeEnabled}
+            setFakeHomeEnabled={setFakeHomeEnabled}
+            homeLatitude={homeLatitude}
+            homeLongitude={homeLongitude}
+            fakeHomeLatitude={fakeHomeLatitude}
+            fakeHomeLongitude={fakeHomeLongitude}
+            fakeHomeRadius={fakeHomeRadius}
+            setFakeHomeRadius={setFakeHomeRadius}
+            fakeWorkEnabled={fakeWorkEnabled}
+            setFakeWorkEnabled={setFakeWorkEnabled}
+            workLatitude={workLatitude}
+            workLongitude={workLongitude}
+            fakeWorkLatitude={fakeWorkLatitude}
+            fakeWorkLongitude={fakeWorkLongitude}
+            fakeWorkRadius={fakeWorkRadius}
+            setFakeWorkRadius={setFakeWorkRadius}
+            fakeWhateverEnabled={fakeWhateverEnabled}
+            setFakeWhateverEnabled={setFakeWhateverEnabled}
+            whateverLatitude={whateverLatitude}
+            whateverLongitude={whateverLongitude}
+            fakeWhateverLatitude={fakeWhateverLatitude}
+            fakeWhateverLongitude={fakeWhateverLongitude}
+            fakeWhateverRadius={fakeWhateverRadius}
+            setFakeWhateverRadius={setFakeWhateverRadius}
+            privacyMutation={privacyMutation}
+            pickFromGPS={pickFromGPS}
+            openMapPicker={openMapPicker}
+          />
+          <GpsPrecisionSettings
+            colors={colors}
+            gpsPrecisionExpanded={gpsPrecisionExpanded}
+            setGpsPrecisionExpanded={setGpsPrecisionExpanded}
+            gpsOptions={gpsOptions}
+            gpsPrecision={gpsPrecision}
+            setGpsPrecision={setGpsPrecision}
+            privacyMutation={privacyMutation}
+          />
         </View>
 
         {sosEnabled && (
@@ -300,10 +298,5 @@ const styles = StyleSheet.create({
     padding: 24,
     gap: 8,
     alignItems: "center",
-  },
-  accordionColumn: {
-    flexDirection: "column",
-    gap: 8,
-    alignSelf: "stretch",
   },
 });
