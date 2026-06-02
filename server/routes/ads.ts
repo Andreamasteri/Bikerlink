@@ -40,7 +40,12 @@ export async function warmupAdImageCache(): Promise<void> {
         downloaded++;
         console.log(`[ADS WARMUP] Cached: ${filename}`);
       } catch (err) {
-        console.warn(`[ADS WARMUP] Failed to cache ${filename}:`, err);
+        console.error(
+          `[ADS WARMUP] IMMAGINE ROTTA — campagna "${campaign.name}" (id=${campaign.id}): ` +
+          `il file ${filename} non esiste su Object Storage. ` +
+          `Vai su /admin/ads → modifica la campagna → ricarica l'immagine.`,
+          err,
+        );
       }
     }
 

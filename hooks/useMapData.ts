@@ -4,6 +4,7 @@ import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { queryClient, apiRequest, getApiUrl } from "@/lib/query-client";
 import type { ClubMapPin } from "@/components/InteractiveMap";
+import type { AdCampaign } from "@/shared/db/ads";
 
 type Coords = { latitude: number; longitude: number };
 
@@ -134,8 +135,7 @@ export function useMapData({
   });
   const adsGloballyEnabled = adsEnabledData?.enabled !== false;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const myAdsQuery = useQuery<any[]>({
+  const myAdsQuery = useQuery<AdCampaign[]>({
     queryKey: ["/api/ads/my-ads"],
     staleTime: 60000,
     refetchInterval: 5 * 60 * 1000,

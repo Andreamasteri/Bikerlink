@@ -122,6 +122,13 @@ export default function MapScreen() {
 
   const [compactLayout, setCompactLayout] = useState<CardLayout | null>(null);
   const firstLayoutDoneRef = useRef(false);
+  const [brokenAdIds, setBrokenAdIds] = useState<Set<string>>(new Set());
+
+  const validAds = myAds.filter((ad) => !brokenAdIds.has(ad.id));
+
+  const handleAdImageFailed = (id: string) => {
+    setBrokenAdIds((prev) => new Set([...prev, id]));
+  };
 
   const animTop = useRef(new Animated.Value(0)).current;
   const animLeft = useRef(new Animated.Value(0)).current;
@@ -173,7 +180,7 @@ export default function MapScreen() {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ad shape from API
-  const currentAd = myAds[adIndex % myAds.length] as any;
+  const currentAd = validAds.length > 0 ? validAds[adIndex % validAds.length] as any : null;
 
   const filteredUsers = usersWithSelf.filter(
     (u) => u.latitude != null && u.longitude != null && !isNaN(u.latitude as number) && !isNaN(u.longitude as number)
@@ -237,8 +244,8 @@ export default function MapScreen() {
           t={t}
         />
 
-        {mapData.adsGloballyEnabled && myAds.length > 0 && currentAd && (
-          <AdBanner key={currentAd.id} ad={currentAd} onPress={handleAdClick} />
+        {mapData.adsGloballyEnabled && validAds.length > 0 && currentAd && (
+          <AdBanner key={currentAd.id} ad={currentAd} onPress={handleAdClick} onImagePermanentlyFailed={handleAdImageFailed} />
         )}
 
         <InlineMiniPlayer />

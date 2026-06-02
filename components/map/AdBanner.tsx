@@ -19,9 +19,10 @@ type Ad = {
 type Props = {
   ad: Ad;
   onPress: (ad: Ad) => void;
+  onImagePermanentlyFailed?: (id: string) => void;
 };
 
-export default function AdBanner({ ad, onPress }: Props) {
+export default function AdBanner({ ad, onPress, onImagePermanentlyFailed }: Props) {
   const [imageError, setImageError] = useState(false);
   const [retried, setRetried] = useState(false);
 
@@ -46,13 +47,13 @@ export default function AdBanner({ ad, onPress }: Props) {
             contentFit="cover"
             cachePolicy="disk"
             onError={() => {
-              setImageError(true);
               if (!retried) {
-                setTimeout(() => {
-                  setRetried(true);
-                  setImageError(false);
-                }, 3000);
+                setRetried(true);
+                setTimeout(() => setImageError(false), 3000);
+              } else {
+                onImagePermanentlyFailed?.(ad.id);
               }
+              setImageError(true);
             }}
           />
         ) : (
