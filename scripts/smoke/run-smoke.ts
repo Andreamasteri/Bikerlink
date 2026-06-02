@@ -24,6 +24,9 @@
 import { cleanupOrphanSmokeUsers } from "./cleanup-orphans-runtime.js";
 type Severity = "BLOCKER" | "MAJOR" | "MINOR";
 type Outcome = "PASS" | "FAIL" | "SKIP";
+// Smoke test JSON responses are dynamically shaped — intentional any for raw HTTP body.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type JsonBody = any;
 
 interface CheckResult {
   id: string;
@@ -81,7 +84,7 @@ async function http(
   path: string,
   body?: unknown,
   opts: { accept?: string; raw?: boolean } = {},
-): Promise<{ status: number; json: any; text: string; res: Response }> {
+): Promise<{ status: number; json: JsonBody; text: string; res: Response }> {
   const url = path.startsWith("http") ? path : `${BASE_URL}${path}`;
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -101,7 +104,7 @@ async function http(
     });
     captureCookies(res);
     const text = await res.text();
-    let json: any = null;
+    let json: JsonBody = null;
     if (!opts.raw) {
       try { json = text ? JSON.parse(text) : null; } catch { json = null; }
     }
@@ -136,8 +139,8 @@ async function run(
     status = r.status;
     note = r.note;
     outcome = r.skip ? "SKIP" : r.ok ? "PASS" : "FAIL";
-  } catch (e: any) {
-    note = e?.message ?? String(e);
+  } catch (e: unknown) {
+    note = e instanceof Error ? e.message : String(e);
     outcome = "FAIL";
   }
   const result: CheckResult = { id, area, name, severity, outcome, status, durationMs: Date.now() - t0, note };
@@ -177,7 +180,7 @@ async function cleanupSmokeUser(
   if (!SMOKE_EMAIL_PATTERN.test(email)) {
     return { ok: true, note: `skip: email '${email}' non corrisponde al pattern smoke+*@bikerlink.test` };
   }
-  let pg: any;
+  let pg: typeof import("pg");
   try { pg = await import("pg"); } catch { return { ok: false, note: "pacchetto pg non disponibile" }; }
   const client = new pg.Client({ connectionString: DATABASE_URL });
   try {
@@ -208,8 +211,8 @@ async function cleanupSmokeUser(
     // Tutte le altre dipendenze hanno ON DELETE CASCADE (vedi shared/db/*.ts).
     const del = await client.query("DELETE FROM users WHERE id = $1", [userId]);
     return { ok: true, note: `userId=${userId} deleted=${del.rowCount}` };
-  } catch (e: any) {
-    return { ok: false, note: `pg error: ${e?.message ?? String(e)}` };
+  } catch (e: unknown) {
+    return { ok: false, note: `pg error: ${e instanceof Error ? e.message : String(e)}` };
   } finally {
     try { await client.end(); } catch { /* ignore */ }
   }
@@ -217,7 +220,7 @@ async function cleanupSmokeUser(
 
 async function autoVerifyEmail(email: string): Promise<{ ok: boolean; note: string }> {
   if (!DATABASE_URL) return { ok: false, note: "DATABASE_URL non disponibile" };
-  let pg: any;
+  let pg: typeof import("pg");
   try { pg = await import("pg"); } catch { return { ok: false, note: "pacchetto pg non disponibile" }; }
   const client = new pg.Client({ connectionString: DATABASE_URL });
   try {
@@ -228,8 +231,8 @@ async function autoVerifyEmail(email: string): Promise<{ ok: boolean; note: stri
     await client.query("UPDATE users SET email_verified = true WHERE id = $1", [userId]);
     await client.query("DELETE FROM email_verification_tokens WHERE user_id = $1", [userId]);
     return { ok: true, note: `userId=${userId}` };
-  } catch (e: any) {
-    return { ok: false, note: `pg error: ${e?.message ?? String(e)}` };
+  } catch (e: unknown) {
+    return { ok: false, note: `pg error: ${e instanceof Error ? e.message : String(e)}` };
   } finally {
     try { await client.end(); } catch { /* ignore */ }
   }
@@ -464,8 +467,9 @@ async function main(): Promise<number> {
         status: res.status,
         note: received ? "stream attivo" : (isSse ? "connessione SSE stabilita (no eventi in 5s)" : "content-type non SSE"),
       };
-    } catch (e: any) {
-      return { ok: false, note: e?.name === "AbortError" ? "timeout connessione" : (e?.message ?? String(e)) };
+    } catch (e: unknown) {
+      const err = e instanceof Error ? e : null;
+      return { ok: false, note: err?.name === "AbortError" ? "timeout connessione" : (err?.message ?? String(e)) };
     } finally {
       clearTimeout(hard);
     }
@@ -533,7 +537,7 @@ async function main(): Promise<number> {
   // 10.5 Tracking — chiusura sessione
   await run("10.5", "tracking", "PUT /api/routes/:id/stop", "MAJOR", async () => {
     if (!sessionId) return { ok: true, skip: true, note: "nessuna sessione" };
-    const r = await http("PUT" as any, `/api/routes/${sessionId}/stop`, {
+    const r = await http("PUT", `/api/routes/${sessionId}/stop`, {
       totalDistanceKm: 0.1, maxSpeedKmh: 25, avgSpeedKmh: 15, maxAltitude: 122, durationSeconds: 2, idleTimeSeconds: 1,
     });
     return { ok: r.status === 200 || r.status === 204, status: r.status, note: r.status >= 400 ? (r.json?.message ?? r.text?.slice(0, 120)) : undefined };
@@ -584,11 +588,11 @@ async function runWithCleanup(): Promise<void> {
     try {
       const c = await cleanupSmokeUser(EMAIL, createdUserId, registeredThisRun);
       console.log(`[smoke] cleanup ${EMAIL}: ${c.ok ? "OK" : "FAIL"} — ${c.note}`);
-    } catch (e: any) {
-      console.log(`[smoke] cleanup ${EMAIL}: FAIL — ${e?.message ?? String(e)}`);
+    } catch (e: unknown) {
+      console.log(`[smoke] cleanup ${EMAIL}: FAIL — ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  if (fatal) console.error("[smoke] errore fatale:", (fatal as any)?.message ?? fatal);
+  if (fatal) console.error("[smoke] errore fatale:", fatal instanceof Error ? fatal.message : fatal);
   process.exit(exitCode);
 }
 

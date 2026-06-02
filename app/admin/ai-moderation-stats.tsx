@@ -3,7 +3,7 @@
  * coda triage, accettazione draft, anomalie recenti.
  */
 import React, { useEffect, useRef, useState } from "react";
-import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from "react-native";
+import { ScrollView, View, Text, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity, type StyleProp, type TextStyle } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -146,7 +146,7 @@ export default function AiModerationStatsScreen() {
   );
 }
 
-function CooldownTimer({ initialMs, style }: { initialMs: number; style?: any }) {
+function CooldownTimer({ initialMs, style }: { initialMs: number; style?: StyleProp<TextStyle> }) {
   const fetchedAt = useRef(Date.now());
   const [remaining, setRemaining] = useState(initialMs);
 

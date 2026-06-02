@@ -50,8 +50,8 @@ async function main(): Promise<void> {
     const ids = sel.rows.map(r => r.id);
     try {
       await client.query("DELETE FROM email_verification_tokens WHERE user_id = ANY($1::text[])", [ids]);
-    } catch (e: any) {
-      console.log(`[cleanup-orphans] nota: delete email_verification_tokens: ${e?.message ?? e}`);
+    } catch (e: unknown) {
+      console.log(`[cleanup-orphans] nota: delete email_verification_tokens: ${e instanceof Error ? e.message : String(e)}`);
     }
     const del = await client.query("DELETE FROM users WHERE id = ANY($1::text[])", [ids]);
     console.log(`[cleanup-orphans] cancellati ${del.rowCount} utenti smoke`);

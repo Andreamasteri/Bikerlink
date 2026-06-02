@@ -30,15 +30,15 @@ export function MapFilterBar({
   filterBiker,
   filterZavorrina,
   filterClubs,
-  filterEvents,
-  showEventPins,
+  filterEvents: _filterEvents,
+  showEventPins: _showEventPins,
   topOffset,
   motoTags,
   onChangeMotoTags,
   onToggleFilterBiker,
   onToggleFilterZavorrina,
   onToggleFilterClubs,
-  onToggleFilterEvents,
+  onToggleFilterEvents: _onToggleFilterEvents,
 }: MapFilterBarProps) {
   const [showMotoTagModal, setShowMotoTagModal] = useState(false);
   const selectedMotoTags = useMemo(() => motoTags ?? [], [motoTags]);
