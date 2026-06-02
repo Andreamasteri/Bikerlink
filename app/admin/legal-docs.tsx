@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Image,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -59,7 +60,9 @@ export default function LegalDocsAdmin() {
   const insets = useSafeAreaInsets();
   const [generating, setGenerating] = useState<DocType | "slides" | null>(null);
   const [uploading, setUploading] = useState<DocType | null>(null);
-  const [slidesResult, setSlidesResult] = useState<{ created: number; slides: string[] } | null>(null);
+  const [publishing, setPublishing] = useState(false);
+  const [slidesPreview, setSlidesPreview] = useState<{ title: string; imageUrl: string }[] | null>(null);
+  const [publishedCount, setPublishedCount] = useState<number | null>(null);
 
   const { data: info, refetch } = useQuery<DocsInfoResponse>({
     queryKey: ["/api/admin/legal/docs-info"],
@@ -125,27 +128,57 @@ export default function LegalDocsAdmin() {
     }
     Alert.alert(
       "Genera slide con Ollama",
-      "Verranno create 6 slide PNG (1080×600) e pubblicate come campagne nella sezione home. Continuare?",
+      "Verranno create 6 slide PNG (1080×600). Potrai visualizzarle in anteprima prima di pubblicarle come campagne. Continuare?",
       [
         { text: "Annulla", style: "cancel" },
         {
           text: "Genera",
           onPress: async () => {
             setGenerating("slides");
-            setSlidesResult(null);
+            setSlidesPreview(null);
+            setPublishedCount(null);
             try {
               const slidesRes = await apiRequest(
                 "POST",
                 "/api/admin/legal/generate-slides",
                 {}
               );
-              const result = await slidesRes.json() as { created: number; slides: string[] };
-              setSlidesResult(result);
-              queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+              const result = await slidesRes.json() as { ok: boolean; slides: { title: string; imageUrl: string }[] };
+              setSlidesPreview(result.slides ?? []);
             } catch (e: unknown) {
               Alert.alert("Errore", (e as Error).message || "Errore generazione slide");
             } finally {
               setGenerating(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handlePublishSlides = async () => {
+    if (!slidesPreview || slidesPreview.length === 0) return;
+    Alert.alert(
+      "Pubblica slide",
+      `Pubblicare ${slidesPreview.length} slide come campagne attive nella home?`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Pubblica",
+          onPress: async () => {
+            setPublishing(true);
+            try {
+              const res = await apiRequest("POST", "/api/admin/legal/publish-slides", {
+                slides: slidesPreview,
+              });
+              const result = await res.json() as { created: number };
+              setPublishedCount(result.created);
+              setSlidesPreview(null);
+              queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+            } catch (e: unknown) {
+              Alert.alert("Errore", (e as Error).message || "Errore pubblicazione slide");
+            } finally {
+              setPublishing(false);
             }
           },
         },
@@ -278,23 +311,58 @@ export default function LegalDocsAdmin() {
 
         <Text style={styles.slideDescription}>
           Ollama genera 6 slide con titolo e descrizione delle funzioni chiave dell'app (matching, giri, motoclub, SOS…),
-          le renderizza come immagini PNG e le pubblica direttamente come campagne pubblicitarie nella sezione home.
+          le renderizza come immagini PNG. Puoi visualizzarle in anteprima prima di pubblicarle come campagne nella home.
         </Text>
 
-        {slidesResult && (
+        {publishedCount !== null && (
           <View style={styles.successBanner}>
             <Ionicons name="checkmark-circle" size={18} color="#22C55E" />
             <Text style={styles.successText}>
-              {slidesResult.created} slide create e pubblicate come campagne
+              {publishedCount} slide pubblicate come campagne attive
             </Text>
           </View>
         )}
 
-        {slidesResult?.slides && slidesResult.slides.length > 0 && (
-          <View style={styles.slidesList}>
-            {slidesResult.slides.map((title, i) => (
-              <Text key={i} style={styles.slideItem}>· {title}</Text>
-            ))}
+        {slidesPreview && slidesPreview.length > 0 && (
+          <View style={styles.previewSection}>
+            <Text style={styles.previewLabel}>Anteprima — {slidesPreview.length} slide generate</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.previewScroll}
+              contentContainerStyle={styles.previewScrollContent}
+            >
+              {slidesPreview.map((slide, i) => {
+                const imageUri = new URL(slide.imageUrl, getApiUrl()).toString();
+                return (
+                  <View key={i} style={styles.previewCard}>
+                    <Image
+                      source={{ uri: imageUri }}
+                      style={styles.previewImage}
+                      resizeMode="cover"
+                    />
+                    <Text style={styles.previewCardTitle} numberOfLines={2}>{slide.title}</Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity
+              style={[styles.btn, styles.btnPublish, publishing && styles.btnDisabled]}
+              onPress={handlePublishSlides}
+              disabled={publishing}
+            >
+              {publishing ? (
+                <>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.btnText}>Pubblicazione…</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="rocket-outline" size={16} color="#fff" />
+                  <Text style={styles.btnText}>Pubblica come campagna</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         )}
 
@@ -315,7 +383,7 @@ export default function LegalDocsAdmin() {
           ) : (
             <>
               <MaterialCommunityIcons name="auto-fix" size={16} color="#fff" />
-              <Text style={styles.btnText}>Genera slide con Ollama</Text>
+              <Text style={styles.btnText}>{slidesPreview ? "Rigenera slide" : "Genera slide con Ollama"}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -487,5 +555,45 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
     color: "#fff",
+  },
+  btnPublish: {
+    backgroundColor: "#16A34A",
+    marginTop: 12,
+    alignSelf: "flex-start",
+  },
+  previewSection: {
+    marginBottom: 12,
+  },
+  previewLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.text,
+    marginBottom: 10,
+  },
+  previewScroll: {
+    marginHorizontal: -16,
+  },
+  previewScrollContent: {
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  previewCard: {
+    width: 240,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  previewImage: {
+    width: 240,
+    height: 134,
+  },
+  previewCardTitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.text,
+    padding: 8,
+    lineHeight: 17,
   },
 });

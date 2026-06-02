@@ -313,20 +313,55 @@ Restituisci SOLO un array JSON valido, senza markdown, senza commenti, esempio:
     }
 
     const sharp = (await import("sharp")).default;
-    const created: string[] = [];
+    const generated: { title: string; imageUrl: string }[] = [];
+    const ts = Date.now();
 
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
       try {
         const svg = buildSlidesSvg(slide, i, slides.length);
         const pngBuffer = await sharp(Buffer.from(svg)).png().toBuffer();
-        const filename = `slide-bikerlink-${Date.now()}-${i}.png`;
+        const filename = `slide-bikerlink-${ts}-${i}.png`;
         const objectPath = `public/ads/${filename}`;
         await uploadBuffer(objectPath, pngBuffer, "image/png");
         const imageUrl = `/api/ads/images/${filename}`;
+        generated.push({ title: slide.title, imageUrl });
+      } catch (slideErr) {
+        console.warn(`[legal/slides] Slide ${i} failed:`, slideErr);
+      }
+    }
 
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "generate_slides_preview",
+      targetType: "campaign",
+      targetId: "bulk",
+      details: `Generate ${generated.length} slide esplicative BikerLink (anteprima, non ancora pubblicate)`,
+    });
+
+    return res.json({ ok: true, slides: generated });
+  } catch (err) {
+    console.error("[legal/slides] error:", err);
+    return sendError(res, 500, `Errore generazione slide: ${(err as Error).message}`);
+  }
+});
+
+const publishSlidesSchema = z.object({
+  slides: z.array(z.object({ title: z.string(), imageUrl: z.string() })).min(1).max(20),
+});
+
+router.post("/publish-slides", async (req: Request, res: Response) => {
+  try {
+    const parsed = publishSlidesSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const { slides } = parsed.data;
+
+    const created: string[] = [];
+    for (let i = 0; i < slides.length; i++) {
+      const { title, imageUrl } = slides[i];
+      try {
         await storage.createAdCampaign({
-          name: slide.title,
+          name: title,
           sponsor: "BikerLink",
           imageUrl,
           linkUrl: null,
@@ -340,25 +375,24 @@ Restituisci SOLO un array JSON valido, senza markdown, senza commenti, esempio:
           placement: "home",
           isActive: true,
         });
-
-        created.push(slide.title);
+        created.push(title);
       } catch (slideErr) {
-        console.warn(`[legal/slides] Slide ${i} failed:`, slideErr);
+        console.warn(`[legal/publish-slides] Slide ${i} failed:`, slideErr);
       }
     }
 
     await storage.createModeratorLog({
       moderatorId: req.session.userId!,
-      action: "generate_slides",
+      action: "publish_slides",
       targetType: "campaign",
       targetId: "bulk",
-      details: `Generate ${created.length} slide esplicative BikerLink e pubblicate come campagne`,
+      details: `Pubblicate ${created.length} slide esplicative BikerLink come campagne`,
     });
 
     return res.json({ ok: true, created: created.length, slides: created });
   } catch (err) {
-    console.error("[legal/slides] error:", err);
-    return sendError(res, 500, `Errore generazione slide: ${(err as Error).message}`);
+    console.error("[legal/publish-slides] error:", err);
+    return sendError(res, 500, `Errore pubblicazione slide: ${(err as Error).message}`);
   }
 });
 
