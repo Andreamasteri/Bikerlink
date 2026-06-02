@@ -73,11 +73,11 @@ export async function routeMessage(opts: RouteOpts): Promise<{
     : `Messaggio admin:\n${opts.message}`;
 
   let costUsd = 0;
-  let modelId = "gemini-2.5-flash-lite";
-  let providerName = "google";
+  let modelId = "llama-3.3-70b-versatile";
+  let providerName = "groq";
   try {
     const { value, model } = await runWithFallback(
-      { role: "router", forcedModelId: "gemini-2.5-flash-lite" },
+      { role: "router" },
       async (m) => {
         const r = await generateObject({
           model: m.model,

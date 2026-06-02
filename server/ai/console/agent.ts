@@ -16,7 +16,6 @@ REGOLE INDEROGABILI:
 6. Quando l'admin chiede azioni concrete (ban/rollback/fix), spiega cosa farebbe il sistema e indirizza al pannello dedicato — NON proporre tu l'azione.
 7. Se i dati sono insufficienti, dichiaralo esplicitamente: "non ho dati per questa finestra".`;
 
-const DEFAULT_BRAIN_MODEL = "claude-sonnet-4-6";
 
 export interface AgentRunOpts {
   message: string;
@@ -58,12 +57,12 @@ export async function runAgent(opts: AgentRunOpts): Promise<AgentRunResult> {
   let finalText = "";
   let tokensIn = 0;
   let tokensOut = 0;
-  let provider = "anthropic";
-  let modelId = DEFAULT_BRAIN_MODEL;
+  let provider = "groq";
+  let modelId = "llama-3.3-70b-versatile";
 
   try {
     const { model } = await runWithFallback(
-      { role: "brain", forcedModelId: DEFAULT_BRAIN_MODEL },
+      { role: "brain", ollamaBackstop: true },
       async (m: ResolvedModel) => {
         const result = streamText({
           model: m.model,
@@ -103,8 +102,12 @@ export async function runAgent(opts: AgentRunOpts): Promise<AgentRunResult> {
     modelId = model.modelId;
   } catch (err) {
     degraded = true;
-    finalText = finalText
-      || `⚠️ Tutti i provider AI non sono disponibili al momento (${(err as Error).message.slice(0, 120)}). Riprova tra qualche istante o consulta direttamente i pannelli admin specifici.`;
+    const rawMsg = (err as Error).message ?? "";
+    const isCooldown = rawMsg.includes("AI_PROVIDER_UNAVAILABLE");
+    const friendlyMsg = isCooldown
+      ? "⚠️ Tutti i provider AI sono momentaneamente in cooldown. Riprova tra qualche istante o consulta direttamente i pannelli admin specifici."
+      : `⚠️ Errore AI: ${rawMsg.slice(0, 120)}. Riprova tra qualche istante.`;
+    finalText = finalText || friendlyMsg;
     opts.onTextDelta?.(finalText);
   }
 
