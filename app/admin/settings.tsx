@@ -14,7 +14,6 @@ import { SosBikerSection } from "@/components/admin/settings/SosBikerSection";
 import { MusicSystemSection } from "@/components/admin/settings/MusicSystemSection";
 import { BackgroundLocationSection } from "@/components/admin/settings/BackgroundLocationSection";
 import { AppSettingsSection } from "@/components/admin/settings/AppSettingsSection";
-import { ManualAdminSection } from "@/components/admin/settings/ManualAdminSection";
 import { ApkSection } from "@/components/admin/settings/ApkSection";
 import { ThemeSection } from "@/components/admin/settings/ThemeSection";
 import { AppFeaturesSection } from "@/components/admin/settings/AppFeaturesSection";
@@ -198,7 +197,6 @@ export default function AdminSettings() {
           handleUploadEula={state.handleUploadEula}
           isUploadingEula={state.isUploadingEula}
         />
-        <ManualAdminSection />
         <ApkSection />
 
         {/* ── 7. STRUMENTI SVILUPPO ── */}
