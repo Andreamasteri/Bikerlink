@@ -28,7 +28,8 @@ import { otaAssistantRuns, otaWatchdogReports } from "@shared/db";
 import { eq, desc, and, gte, sql, or, like } from "drizzle-orm";
 import { sendError } from "../../lib/api-response";
 import { generateText, tool } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { runWithFallback, hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../../ai/moderation/provider";
+import type { AiProviderId } from "../../ai/moderation/types";
 import { z } from "zod";
 import {
   LOG_DIR,
@@ -46,7 +47,19 @@ import { systemPrompt } from "./ota-assistant/prompts";
 
 const router = Router();
 
-const MODEL_NAME = process.env.OTA_ASSISTANT_MODEL ?? "gpt-4o-mini";
+// Task #2966 — Provider preferito opzionale per l'OTA Assistant. OTA_ASSISTANT_MODEL
+// è ora interpretato come override del *provider* (groq/google/gemini/openai/anthropic):
+// se valido, viene messo in testa alla chain a cascata; altrimenti (vuoto o valore
+// legacy tipo "gpt-4o-mini") si usa la chain completa con primo provider disponibile.
+const VALID_PROVIDERS: AiProviderId[] = ["groq", "google", "openai", "anthropic"];
+function parseOtaPreferred(raw: string | undefined): AiProviderId | "auto" {
+  if (!raw) return "auto";
+  const v = raw.trim().toLowerCase();
+  if (v === "gemini") return "google";
+  if (VALID_PROVIDERS.includes(v as AiProviderId)) return v as AiProviderId;
+  return "auto";
+}
+const PREFERRED_PROVIDER = parseOtaPreferred(process.env.OTA_ASSISTANT_MODEL);
 const TEMPERATURE = Number(process.env.OTA_ASSISTANT_TEMPERATURE ?? "0.2");
 
 // ── Endpoint ──────────────────────────────────────────────────────────────────
@@ -60,12 +73,11 @@ router.post("/", async (req: Request, res: Response) => {
   const parsed = promptSchema.safeParse(req.body);
   if (!parsed.success) return sendError(res, 400, "prompt obbligatorio");
 
-  if (!process.env.OPENAI_API_KEY) {
-    return sendError(res, 500, "OPENAI_API_KEY non configurata sul server");
+  if (!hasAnyAiProvider()) {
+    return sendError(res, 503, AI_NO_PROVIDER_MESSAGE);
   }
 
   const startedAt = new Date();
-  const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
   const tools = {
     queryReleases: tool({
@@ -132,14 +144,23 @@ router.post("/", async (req: Request, res: Response) => {
   } as const;
 
   try {
-    const result = await generateText({
-      model: openai(MODEL_NAME),
-      temperature: TEMPERATURE,
-      system: systemPrompt,
-      prompt: parsed.data.prompt,
-      tools,
-      stopWhen: ({ steps }) => steps.length >= 5,
-    });
+    // Task #2966 — Cascade su tutti i provider (Groq→Gemini→OpenAI→Anthropic) con
+    // Ollama self-hosted come rete finale: l'assistente risponde anche se OpenAI è
+    // esaurito. Il provider che ha risposto è tracciato in log e nella response.
+    const { value: result, model: usedModel } = await runWithFallback(
+      { role: "brain", preferredProvider: PREFERRED_PROVIDER, ollamaBackstop: true },
+      (m) => m.scheduler(() => generateText({
+        model: m.model,
+        temperature: TEMPERATURE,
+        system: systemPrompt,
+        prompt: parsed.data.prompt,
+        tools: tools as never,
+        stopWhen: ({ steps }) => steps.length >= 5,
+      })),
+    );
+    const provider = usedModel.providerName;
+    const modelId = usedModel.modelId;
+    console.log(`[ota-assistant] risposta generata da ${provider}/${modelId}`);
 
     // Estrai eventuali proposte di mutazione dai tool results
     const pendingMutations: Array<{ tool: string; args: Record<string, unknown>; summary: string }> = [];
@@ -173,6 +194,8 @@ router.post("/", async (req: Request, res: Response) => {
       response: result.text,
       toolCalls: toolCallsLog,
       pendingMutations,
+      provider,
+      model: modelId,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "errore LLM";

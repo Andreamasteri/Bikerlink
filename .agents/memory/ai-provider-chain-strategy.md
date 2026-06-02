@@ -10,12 +10,18 @@ in `server/ai/moderation/provider.ts`. Cambiare la chain lì si propaga ovunque.
 
 ## Ordine chain (decisione utente)
 Cloud-first per qualità: **Groq (Llama 3.3 70B, free) → Gemini 2.5 Flash (free) →
-OpenAI → Anthropic**, e per l'assistente **Ollama self-hosted come rete finale
-illimitata** (gestita esplicitamente in `agent.ts`, NON nella chain).
+OpenAI → Anthropic**, con **Ollama self-hosted come rete finale illimitata**.
 
 **Why:** l'utente vuole massima qualità a costo zero; Groq/Gemini free battono il
 modello Ollama locale leggero. Ollama resta come backstop illimitato quando i free
 tier sono esauriti o le chiavi mancano.
+
+**Ollama backstop integrato in `runWithFallback`:** opzione `ollamaBackstop: true` in
+`ResolveOpts`. Dopo aver esaurito la catena cloud, prova `tryBuildOllama()` (id
+`"ollama"`, scheduler pass-through, fuori da cooldown/cap perché self-hosted). I
+chiamatori che devono SEMPRE rispondere (OTA assistant, integrity/explain, console
+agent) passano `ollamaBackstop: true`. Senza il flag la catena resta solo-cloud e
+propaga l'errore. Non serve più gestire Ollama "a mano" fuori dalla chain.
 
 **Eccezione:** parsing/geocoding/traduzioni ad alto volume (es. `waypoints.next.ts`)
 restano **Ollama-diretti** — NON spostarli su cloud, sfonderebbero i cap free.

@@ -7,12 +7,15 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { LanguageModelV2 } from "@ai-sdk/provider";
 import { limiters } from "../../lib/throttle";
 import { storage } from "../../storage";
+import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
 import type { AiProviderHealth, AiProviderId } from "./types";
 
 export type ModelRole = "brain" | "router";
 
 interface ResolvedModel {
-  id: AiProviderId;
+  // "ollama" è la rete finale self-hosted: non è un AiProviderId perché vive
+  // fuori dai cooldown/cap dei provider cloud (illimitato, locale).
+  id: AiProviderId | "ollama";
   providerName: string;
   modelId: string;
   model: LanguageModelV2;
@@ -265,6 +268,26 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
   return null;
 }
 
+// Task #2966 — Rete finale self-hosted: Ollama (ThinkCentre). Illimitato e locale,
+// quindi fuori dai cooldown/cap dei provider cloud. Lo scheduler è pass-through
+// (nessun limiter Bottleneck). Ritorna null se OLLAMA_URL non è configurato.
+function tryBuildOllama(): ResolvedModel | null {
+  if (!isOllamaConfigured) return null;
+  try {
+    const modelId = process.env.OLLAMA_MODEL ?? "llama3.2:latest";
+    const model = getOllamaModel(modelId) as unknown as LanguageModelV2;
+    return {
+      id: "ollama",
+      providerName: "ollama",
+      modelId,
+      model,
+      scheduler: <T>(fn: () => Promise<T>) => fn(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // Ordine di preferenza: vedi _ai-stack-decision.md.
 // Groq primario (free, Llama 3.3 70B) → Gemini (free, Flash) → OpenAI → Anthropic.
 // Quando i free tier esauriscono il cap giornaliero, la chain prosegue; per
@@ -276,6 +299,9 @@ export interface ResolveOpts {
   role?: ModelRole;
   preferredProvider?: AiProviderId | "auto";
   forcedModelId?: string;
+  // Task #2966 — Se true, dopo aver esaurito la chain cloud (Groq→Gemini→OpenAI→
+  // Anthropic) prova Ollama self-hosted come rete finale illimitata.
+  ollamaBackstop?: boolean;
 }
 
 function buildChain(role: ModelRole, preferred?: AiProviderId | "auto"): AiProviderId[] {
@@ -319,15 +345,32 @@ export async function runWithFallback<T>(
   for (const id of chain) {
     const m = tryBuild(id, role, opts.forcedModelId);
     if (!m) continue;
-    incrDailyCount(m.id); // conteggio proattivo per il cap giornaliero free tier
+    incrDailyCount(id); // conteggio proattivo per il cap giornaliero free tier
     try {
       const value = await fn(m);
-      markProviderOk(m.id);
+      markProviderOk(id);
+      console.log(`[ai-provider] risposta da ${m.providerName}/${m.modelId}`);
       return { value, model: m };
     } catch (err) {
-      markProviderError(m.id, err);
+      markProviderError(id, err);
       lastErr = err;
       console.warn(`[ai-provider] ${m.providerName}/${m.modelId} fallito, provo fallback:`, (err as Error).message);
+    }
+  }
+  // Task #2966 — Ollama backstop: rete finale locale illimitata (ThinkCentre).
+  // Attiva solo con opts.ollamaBackstop. Non tocca health/cooldown/cap dei
+  // provider cloud (Ollama è self-hosted, fuori dai limiti free tier).
+  if (opts.ollamaBackstop) {
+    const om = tryBuildOllama();
+    if (om) {
+      try {
+        const value = await om.scheduler(() => fn(om));
+        console.log(`[ai-provider] risposta da ${om.providerName}/${om.modelId} (backstop)`);
+        return { value, model: om };
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[ai-provider] ollama backstop fallito:`, (err as Error).message);
+      }
     }
   }
   if (lastErr) throw lastErr;

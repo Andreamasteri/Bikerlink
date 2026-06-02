@@ -27,6 +27,8 @@ interface ChatTurn {
   toolCalls?: Array<{ tool: string; args: unknown; result?: unknown }>;
   pendingMutations?: PendingMutation[];
   publishRunId?: string;
+  provider?: string;
+  model?: string;
 }
 
 interface AssistantResponse {
@@ -34,6 +36,8 @@ interface AssistantResponse {
   response: string;
   toolCalls: Array<{ tool: string; args: unknown; result?: unknown }>;
   pendingMutations: PendingMutation[];
+  provider?: string;
+  model?: string;
 }
 
 const SUGGESTIONS = [
@@ -73,6 +77,8 @@ export default function OtaAssistantChat() {
           text: data.response || "(nessun testo)",
           toolCalls: data.toolCalls,
           pendingMutations: data.pendingMutations,
+          provider: data.provider,
+          model: data.model,
         },
       ]);
     } catch (err) {
@@ -169,6 +175,11 @@ export default function OtaAssistantChat() {
               borderColor: colors.border,
             }]}>
               <Text style={[styles.bubbleText, { color: colors.text }]}>{t.text}</Text>
+              {t.role === "assistant" && t.provider && (
+                <Text style={[styles.providerTag, { color: colors.textSecondary }]}>
+                  Risposto da: {t.provider}{t.model ? ` (${t.model})` : ""}
+                </Text>
+              )}
               {t.toolCalls && t.toolCalls.length > 0 && (
                 <View style={styles.toolCallsBox}>
                   {t.toolCalls.filter((tc) => tc.tool !== "proposeMutation").map((tc, i) => (
@@ -273,6 +284,7 @@ const styles = StyleSheet.create({
   roleLabel: { fontSize: 11, fontWeight: "700" as const, marginBottom: 4, letterSpacing: 0.5 },
   bubble: { borderWidth: 1, borderRadius: 10, padding: 10 },
   bubbleText: { fontSize: 13, lineHeight: 18 },
+  providerTag: { fontSize: 10, marginTop: 6, fontStyle: "italic" as const },
   toolCallsBox: { marginTop: 8, gap: 4 },
   toolCallChip: { borderWidth: 1, borderRadius: 6, padding: 6 },
   toolCallTool: { fontSize: 11, fontWeight: "600" as const },
