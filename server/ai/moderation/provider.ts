@@ -20,6 +20,9 @@ interface ResolvedModel {
   modelId: string;
   model: LanguageModelV2;
   scheduler: <T>(fn: () => Promise<T>) => Promise<T>;
+  // Presente solo per modelli che non supportano json_schema mode (es. Llama 3.x su Groq).
+  // Quando impostato, generateObject DEVE ricevere mode:"json" altrimenti fallisce.
+  objectMode?: "json";
 }
 
 // Prezzi $ per 1k token (Maggio 2026, vedi _ai-stack-decision.md). Aggiornati a mano.
@@ -260,12 +263,15 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
       // decoding): garantisce 100% schema adherence senza errori JSON. Confermato free tier
       // nelle Groq rate-limits (30 RPM / 1K RPD). strictJsonSchema: true → strict: true
       // nell'API Groq → mai output invalido né 400 da schema validation.
+      // llama-3.x-* non supportano json_schema su Groq → richiedono mode:"json" se forzati.
       const modelId = forcedModelId ?? "openai/gpt-oss-20b";
       const client = createOpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
+      const needsJsonMode = /^(llama-3\.|meta-llama\/llama-3)/.test(modelId);
       return {
         id, providerName: "groq", modelId,
         model: client(modelId, { strictJsonSchema: true }) as unknown as LanguageModelV2,
         scheduler: <T>(fn: () => Promise<T>) => limiters.groq.schedule(fn),
+        ...(needsJsonMode ? { objectMode: "json" as const } : {}),
       };
     }
   } catch (err) {

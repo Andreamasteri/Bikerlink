@@ -59,6 +59,7 @@ export async function runProposer(snap: HealthSnapshot): Promise<ProposerResult 
       const { value: result, model: m } = await runWithFallback({ role: "brain" }, (mm) =>
         mm.scheduler(() => generateObject({
           model: mm.model, schema: proposalsSchema, system: SYSTEM, prompt, temperature: 0.2,
+          ...(mm.objectMode === "json" ? { mode: "json" as const } : {}),
         })),
       );
       const tokensIn = result.usage?.inputTokens ?? Math.ceil(prompt.length / 4);
