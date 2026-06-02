@@ -341,6 +341,14 @@ export default function AiHubScreen() {
       color: "#10B981",
     },
     {
+      key: "ai-route-providers",
+      label: "Route AI",
+      subtitle: "Provider percorsi: Ollama/Groq/Gemini",
+      icon: "map-marker-path",
+      route: "/admin/ai-route-providers",
+      color: "#F59E0B",
+    },
+    {
       key: "ai-moderation-digest",
       label: "Co-Pilot — Digest",
       subtitle: "Brief mattutino moderatori",

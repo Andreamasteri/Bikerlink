@@ -279,6 +279,8 @@ import aiAssistantAdminRouter from './admin/ai-assistant';
 import backupPreviewRouter from './admin/backup-preview';
 // Task #2852 — Test stato server Ollama (provider AI primario).
 import aiTestOllamaRouter from './admin/ai/test-ollama';
+// Task #2932 — Configurazione provider AI resolver percorsi (Ollama/Groq/Gemini).
+import aiRouteProvidersRouter from './admin/ai/route-providers';
 // Salute unificata servizi self-hosted ThinkCentre (GraphHopper/Ollama/Whisper/Nominatim).
 import thinkcentreHealthRouter from './admin/thinkcentre-health';
 
@@ -370,6 +372,7 @@ router.use('/ota', _requireAdmin, otaRouter);
 router.use('/ota', _requireAdmin, otaNextRouter);
 router.use('/maps', _requireAdmin, mapsAdminRouter);
 router.use('/ai', _requireAdmin, aiTestOllamaRouter);
+router.use('/ai', _requireAdmin, aiRouteProvidersRouter);
 router.use('/', _requireAdmin, thinkcentreHealthRouter);
 router.use('/routing', _requireAdmin, routingAdminRouter);
 router.use('/', _requireAdmin, dbAdminRouter);

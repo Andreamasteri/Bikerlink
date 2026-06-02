@@ -29,6 +29,7 @@ const weatherWaypointsSchema = z.object({
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getOllamaModel, isOllamaConfigured } from "../../lib/ollama-client";
 import { getGroqModel, isGroqConfigured } from "../../lib/groq-client";
+import { getEffectiveRouteChain } from "../../ai/route-provider-config";
 
 interface RouteAiOptions<T> {
   prompt: string;
@@ -50,48 +51,62 @@ function geminiModel(apiKey: string) {
 
 /**
  * /ai-parse — genera l'oggetto route strutturato.
- * Catena di provider: Ollama (locale) → Groq (cloud veloce) → Gemini (cloud
- * finale). Prova Ollama (se configurato); se non raggiungibile o la risposta non
- * è JSON valido, ricade su Groq (se GROQ_API_KEY presente) e infine su Gemini,
- * senza errori visibili all'utente. Se almeno un provider risponde, GEMINI_API_KEY
- * non è strettamente necessaria.
+ * Catena di provider configurabile a runtime dall'admin (env ROUTE_AI_PROVIDERS o
+ * DB ai_route_provider_chain). Ordine default: Ollama → Groq → Gemini.
+ * Se un provider fallisce, passa al successivo nella chain senza errori visibili.
  */
 export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<T> {
   const { prompt, apiKey, system, schema, abortSignal, maxRetries = 2, temperature = 0.1 } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
-  // È disponibile un fallback cloud se Groq è configurato oppure se c'è la chiave Gemini.
-  const hasCloudFallback = isGroqConfigured || Boolean(apiKey);
 
-  if (isOllamaConfigured) {
-    try {
-      const { object } = await generateObject({
-        model: getOllamaModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
-      });
-      return object;
-    } catch (err) {
-      if (!hasCloudFallback) throw err; // niente fallback cloud possibile → propaga l'errore Ollama
-      console.warn("[AI parse] Ollama non disponibile/risposta non valida, fallback cloud:", (err as Error)?.message ?? err);
+  const chain = await getEffectiveRouteChain();
+  let lastErr: unknown = null;
+
+  for (let i = 0; i < chain.length; i++) {
+    const providerId = chain[i];
+    const isLast = i === chain.length - 1;
+
+    if (providerId === "ollama") {
+      if (!isOllamaConfigured) continue;
+      try {
+        const { object } = await generateObject({
+          model: getOllamaModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
+        });
+        return object;
+      } catch (err) {
+        lastErr = err;
+        if (isLast) throw err;
+        console.warn("[AI parse] Ollama non disponibile/risposta non valida, fallback provider successivo:", (err as Error)?.message ?? err);
+      }
+    } else if (providerId === "groq") {
+      if (!isGroqConfigured) continue;
+      try {
+        const { object } = await generateObject({
+          model: getGroqModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
+        });
+        return object;
+      } catch (err) {
+        lastErr = err;
+        if (isLast) throw err;
+        console.warn("[AI parse] Groq non disponibile/risposta non valida, fallback provider successivo:", (err as Error)?.message ?? err);
+      }
+    } else if (providerId === "gemini") {
+      if (!apiKey) continue;
+      try {
+        const { object } = await generateObject({
+          model: geminiModel(apiKey), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
+        });
+        return object;
+      } catch (err) {
+        lastErr = err;
+        if (isLast) throw err;
+        console.warn("[AI parse] Gemini non disponibile/risposta non valida:", (err as Error)?.message ?? err);
+      }
     }
   }
 
-  // Groq: fallback cloud veloce, prima di Gemini.
-  if (isGroqConfigured) {
-    try {
-      const { object } = await generateObject({
-        model: getGroqModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
-      });
-      return object;
-    } catch (err) {
-      if (!apiKey) throw err; // niente Gemini disponibile → propaga l'errore Groq
-      console.warn("[AI parse] Groq non disponibile/risposta non valida, fallback Gemini:", (err as Error)?.message ?? err);
-    }
-  }
-
-  if (!apiKey) throw new Error(NO_PROVIDER_MSG);
-  const { object } = await generateObject({
-    model: geminiModel(apiKey), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
-  });
-  return object;
+  if (lastErr) throw lastErr;
+  throw new Error(NO_PROVIDER_MSG);
 }
 
 export interface StreamRouteOptions extends Omit<RouteAiOptions<unknown>, "schema"> {
@@ -164,55 +179,59 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
   const { prompt, apiKey, system, abortSignal, maxRetries = 2, temperature = 0.1, validate } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
   const streamOpts = { maxRetries, temperature, abortSignal, validate };
-  // È disponibile un fallback cloud se Groq è configurato oppure se c'è la chiave Gemini.
-  const hasCloudFallback = isGroqConfigured || Boolean(apiKey);
 
-  if (isOllamaConfigured) {
-    try {
-      const buffered = await bufferAndValidateStream(getOllamaModel(), fullPrompt, streamOpts);
-      if (buffered) {
-        for (const chunk of buffered) yield chunk;
-        return;
+  const chain = await getEffectiveRouteChain();
+
+  for (let i = 0; i < chain.length; i++) {
+    const providerId = chain[i];
+    const isLast = i === chain.length - 1;
+
+    if (providerId === "ollama") {
+      if (!isOllamaConfigured) continue;
+      try {
+        const buffered = await bufferAndValidateStream(getOllamaModel(), fullPrompt, streamOpts);
+        if (buffered) {
+          for (const chunk of buffered) yield chunk;
+          return;
+        }
+        if (isLast) {
+          throw new Error("Ollama ha prodotto una risposta non valida e nessun provider successivo è disponibile.");
+        }
+        console.warn("[AI stream] Ollama output non valido, fallback provider successivo.");
+      } catch (err) {
+        if (isLast) throw err;
+        console.warn("[AI stream] Ollama non disponibile/risposta non valida, fallback:", (err as Error)?.message ?? err);
       }
-      // Output Ollama corrotto/incompleto: scarta il buffer e ricadi sul cloud.
-      if (!hasCloudFallback) {
-        throw new Error("Ollama ha prodotto una risposta non valida e nessun provider cloud è disponibile per il fallback.");
+    } else if (providerId === "groq") {
+      if (!isGroqConfigured) continue;
+      try {
+        const buffered = await bufferAndValidateStream(getGroqModel(), fullPrompt, streamOpts);
+        if (buffered) {
+          for (const chunk of buffered) yield chunk;
+          return;
+        }
+        if (isLast) {
+          throw new Error("Groq ha prodotto una risposta non valida e nessun provider successivo è disponibile.");
+        }
+        console.warn("[AI stream] Groq output non valido, fallback provider successivo.");
+      } catch (err) {
+        if (isLast) throw err;
+        console.warn("[AI stream] Groq non disponibile/risposta non valida, fallback:", (err as Error)?.message ?? err);
       }
-      console.warn("[AI stream] Ollama ha prodotto output non valido, fallback cloud (non-streaming sorgente).");
-    } catch (err) {
-      // Errore di connessione/stream o nessun fallback possibile → propaga.
-      if (!hasCloudFallback) throw err;
-      console.warn("[AI stream] Ollama non disponibile/risposta non valida, fallback cloud:", (err as Error)?.message ?? err);
+    } else if (providerId === "gemini") {
+      if (!apiKey) continue;
+      // Gemini bufferizzato + validato (Task #2862): se produce JSON malformato,
+      // lanciamo un errore pulito invece di emettere testo rotto.
+      const geminiBuffer = await bufferAndValidateStream(geminiModel(apiKey), fullPrompt, streamOpts);
+      if (!geminiBuffer) {
+        throw new Error("Gemini ha prodotto una risposta non valida: nessun provider disponibile ha restituito output utilizzabile.");
+      }
+      for (const chunk of geminiBuffer) yield chunk;
+      return;
     }
   }
 
-  // Groq: fallback cloud veloce, bufferizzato + validato come Gemini, prima di Gemini.
-  if (isGroqConfigured) {
-    try {
-      const buffered = await bufferAndValidateStream(getGroqModel(), fullPrompt, streamOpts);
-      if (buffered) {
-        for (const chunk of buffered) yield chunk;
-        return;
-      }
-      if (!apiKey) {
-        throw new Error("Groq ha prodotto una risposta non valida e nessun provider cloud è disponibile per il fallback.");
-      }
-      console.warn("[AI stream] Groq ha prodotto output non valido, fallback Gemini.");
-    } catch (err) {
-      if (!apiKey) throw err;
-      console.warn("[AI stream] Groq non disponibile/risposta non valida, fallback Gemini:", (err as Error)?.message ?? err);
-    }
-  }
-
-  if (!apiKey) throw new Error(NO_PROVIDER_MSG);
-  // Anche il ramo Gemini viene bufferizzato e validato prima di emettere al client
-  // (Task #2862). Se Gemini produce JSON malformato, lanciamo un errore pulito invece
-  // di emettere testo rotto: il route handler lo cattura e invia un evento SSE error.
-  const geminiBuffer = await bufferAndValidateStream(geminiModel(apiKey), fullPrompt, streamOpts);
-  if (!geminiBuffer) {
-    throw new Error("Gemini ha prodotto una risposta non valida: nessun provider disponibile ha restituito output utilizzabile.");
-  }
-  for (const chunk of geminiBuffer) yield chunk;
+  throw new Error(NO_PROVIDER_MSG);
 }
 
 // ─── Reverse Geocoding route ───────────────────────────────────────────────────
