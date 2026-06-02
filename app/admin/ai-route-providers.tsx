@@ -1,11 +1,14 @@
 /**
  * Task #2932 — Pannello admin: selezione provider AI resolver percorsi.
+ * Task #2946 — Live ping test per provider AI dalla schermata admin.
  *
  * Mostra stato di ciascun provider (Ollama/Groq/Gemini: configurato?) e
  * permette di scegliere l'ordine della chain a runtime, persistendola nel DB.
  * L'env override ROUTE_AI_PROVIDERS ha priorità assoluta (mostrato come banner).
+ * Ogni provider card ha un pulsante "Test" che esegue un live ping e mostra
+ * latenza e badge di stato (ok / errore).
  */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   ScrollView, View, Text, StyleSheet, TouchableOpacity,
   Alert, ActivityIndicator, Platform,
@@ -31,6 +34,21 @@ interface StatusResp {
   statuses: ProviderStatus[];
   chain: RouteProviderId[];
   envOverride: string | null;
+}
+
+interface PingResult {
+  ok: boolean;
+  latency_ms: number;
+  error?: string;
+  reply?: string | null;
+}
+
+type PingState = "idle" | "loading" | "ok" | "error";
+
+interface ProviderPing {
+  state: PingState;
+  latency_ms?: number;
+  error?: string;
 }
 
 const PROVIDER_ICONS: Record<RouteProviderId, keyof typeof MaterialCommunityIcons.glyphMap> = {
@@ -63,6 +81,7 @@ export default function AiRouteProvidersScreen() {
   });
 
   const [chain, setChain] = useState<RouteProviderId[]>(["ollama", "groq", "gemini"]);
+  const [pings, setPings] = useState<Partial<Record<RouteProviderId, ProviderPing>>>({});
 
   useEffect(() => {
     if (data?.chain) setChain(data.chain);
@@ -78,6 +97,22 @@ export default function AiRouteProvidersScreen() {
     },
     onError: (err) => Alert.alert("Errore", err instanceof Error ? err.message : "Salvataggio fallito"),
   });
+
+  const pingProvider = useCallback(async (id: RouteProviderId) => {
+    setPings((prev) => ({ ...prev, [id]: { state: "loading" } }));
+    try {
+      const resp = await apiRequest("POST", "/api/admin/ai/route-providers/test", { provider: id });
+      const result: PingResult = await resp.json();
+      if (result.ok) {
+        setPings((prev) => ({ ...prev, [id]: { state: "ok", latency_ms: result.latency_ms } }));
+      } else {
+        setPings((prev) => ({ ...prev, [id]: { state: "error", latency_ms: result.latency_ms, error: result.error } }));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Errore di rete";
+      setPings((prev) => ({ ...prev, [id]: { state: "error", error: msg } }));
+    }
+  }, []);
 
   function toggleProvider(id: RouteProviderId) {
     if (chain.includes(id)) {
@@ -156,6 +191,8 @@ export default function AiRouteProvidersScreen() {
         const color = PROVIDER_COLORS[id];
         const isFirst = position === 0;
         const isLast = position === chain.length - 1;
+        const ping = pings[id];
+        const isTestLoading = ping?.state === "loading";
 
         return (
           <View key={id} style={[styles.providerCard, isInChain && { borderColor: color + "55" }]}>
@@ -198,6 +235,46 @@ export default function AiRouteProvidersScreen() {
             </View>
 
             <Text style={styles.providerDesc}>{PROVIDER_DESC[id]}</Text>
+
+            {/* ── Test / ping row ── */}
+            <View style={styles.testRow}>
+              <TouchableOpacity
+                style={[styles.testBtn, { borderColor: color + "88" }]}
+                onPress={() => pingProvider(id)}
+                disabled={isTestLoading}
+                activeOpacity={0.7}
+              >
+                {isTestLoading ? (
+                  <ActivityIndicator size="small" color={color} />
+                ) : (
+                  <MaterialCommunityIcons name="access-point-network" size={13} color={color} />
+                )}
+                <Text style={[styles.testBtnText, { color }]}>
+                  {isTestLoading ? "Testing…" : "Test"}
+                </Text>
+              </TouchableOpacity>
+
+              {ping && ping.state !== "loading" && (
+                <View style={[
+                  styles.pingBadge,
+                  ping.state === "ok" ? styles.pingBadgeOk : styles.pingBadgeErr,
+                ]}>
+                  <MaterialCommunityIcons
+                    name={ping.state === "ok" ? "check-circle" : "alert-circle"}
+                    size={12}
+                    color={ping.state === "ok" ? Colors.success : Colors.error}
+                  />
+                  <Text style={[
+                    styles.pingBadgeText,
+                    { color: ping.state === "ok" ? Colors.success : Colors.error },
+                  ]}>
+                    {ping.state === "ok"
+                      ? `OK · ${ping.latency_ms}ms`
+                      : (ping.error ?? "Errore")}
+                  </Text>
+                </View>
+              )}
+            </View>
 
             {isInChain && (
               <View style={styles.reorderRow}>
@@ -359,7 +436,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     lineHeight: 17,
+    marginBottom: 8,
+  },
+  testRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     marginBottom: 4,
+  },
+  testBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: Colors.background,
+  },
+  testBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  pingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    flexShrink: 1,
+  },
+  pingBadgeOk: { backgroundColor: Colors.success + "18" },
+  pingBadgeErr: { backgroundColor: Colors.error + "18" },
+  pingBadgeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    flexShrink: 1,
   },
   reorderRow: {
     flexDirection: "row",
