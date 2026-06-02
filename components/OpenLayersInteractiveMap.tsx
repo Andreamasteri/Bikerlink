@@ -6,6 +6,7 @@ import type { WebViewMessageEvent } from "react-native-webview";
 import { getApiUrl } from "@/lib/query-client";
 import { buildOLInteractiveHtml } from "@/lib/openlayers/map-builder";
 import { parseMessage } from "@/lib/openlayers/bridge-events";
+import { readTileCacheAsBase64, saveTileToCache, getMimeForUrl } from "@/lib/maps/tile-cache";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { useMapConfig } from "@/lib/map-context";
 import { getTileConfig } from "@/lib/map-tiles";
@@ -71,6 +72,27 @@ const OpenLayersInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMap
     const handleMessage = useCallback((event: WebViewMessageEvent) => {
       const msg = parseMessage(event.nativeEvent.data);
       if (!msg) return;
+      const raw = msg as unknown as Record<string, unknown>;
+      if (raw.type === "tileCheck" && typeof raw.reqId === "string" && typeof raw.url === "string") {
+        const url = raw.url;
+        const reqId = raw.reqId;
+        readTileCacheAsBase64(url).then((b64) => {
+          const wv = webViewRef.current;
+          if (!wv) return;
+          if (b64) {
+            const mime = getMimeForUrl(url);
+            const dataUri = `data:${mime};base64,${b64}`;
+            wv.injectJavaScript(`window.__tileCache && window.__tileCache.respond(${JSON.stringify(reqId)}, ${JSON.stringify(dataUri)});true;`);
+          } else {
+            wv.injectJavaScript(`window.__tileCache && window.__tileCache.respond(${JSON.stringify(reqId)}, null);true;`);
+          }
+        });
+        return;
+      }
+      if (raw.type === "tileSave" && typeof raw.url === "string" && typeof raw.dataB64 === "string") {
+        saveTileToCache(raw.url, raw.dataB64);
+        return;
+      }
       if (msg.type === "ready") { setMapReady(true); onReady?.(); }
       else if (msg.type === "userPress" && msg.userId) { const u = users.find((x) => x.id === msg.userId); if (u) onUserPress?.(u); }
       else if (msg.type === "easterEggPress" && msg.eggId) { const e = easterEggs.find((x) => x.id === msg.eggId); if (e) onEasterEggPress?.(e); }

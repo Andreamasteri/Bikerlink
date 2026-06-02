@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { View, Image, Pressable, Text, StyleSheet } from "react-native";
+import { View, Pressable, Text, StyleSheet } from "react-native";
+import { Image } from "expo-image";
 import { MaterialIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { getApiUrl } from "@/lib/query-client";
@@ -24,9 +25,12 @@ export default function AdBanner({ ad, onPress }: Props) {
   const [imageError, setImageError] = useState(false);
   const [retried, setRetried] = useState(false);
 
-  const baseUrl = getApiUrl();
   const imageUri = (() => {
-    if (!ad.imageUrl?.startsWith("/api/ads/images/")) return "";
+    if (!ad.imageUrl) return "";
+    if (ad.imageUrl.startsWith("http://") || ad.imageUrl.startsWith("https://")) {
+      return ad.imageUrl;
+    }
+    const baseUrl = getApiUrl();
     const base = `${baseUrl.replace(/\/$/, "")}${ad.imageUrl}`;
     const v = ad.imageVersion ?? 0;
     return `${base}${base.includes("?") ? "&" : "?"}v=${v}`;
@@ -39,7 +43,8 @@ export default function AdBanner({ ad, onPress }: Props) {
           <Image
             source={{ uri: imageUri }}
             style={styles.image}
-            resizeMode="cover"
+            contentFit="cover"
+            cachePolicy="disk"
             onError={() => {
               setImageError(true);
               if (!retried) {

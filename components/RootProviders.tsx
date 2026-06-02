@@ -1,5 +1,7 @@
 import React from "react";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -15,6 +17,12 @@ import { PlayerProvider } from "@/lib/player-context";
 import { FloatingWidgetProvider } from "@/lib/floating-widget-context";
 import { queryClient } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
+
+const _persister = createAsyncStoragePersister({
+  storage: AsyncStorage,
+  key: "@bikerlink/rq-cache-v1",
+  throttleTime: 3000,
+});
 
 function ChatSseGate({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -38,7 +46,27 @@ export function RootProviders({
     <ErrorBoundary onError={reportClientError}>
       <ThemeProvider>
         <LanguageProvider>
-          <QueryClientProvider client={queryClient}>
+          <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={{
+              persister: _persister,
+              maxAge: 24 * 60 * 60 * 1000,
+              buster: "v2",
+              dehydrateOptions: {
+                shouldDehydrateQuery: (query) => {
+                  const key = query.queryKey[0];
+                  if (typeof key !== "string") return false;
+                  return (
+                    key.startsWith("/api/settings/") ||
+                    key.startsWith("/api/ads/") ||
+                    key === "/api/settings/ads-enabled" ||
+                    key === "/api/settings/home-message" ||
+                    key === "/api/workshops"
+                  );
+                },
+              },
+            }}
+          >
             <AuthProvider>
               <ChatSseGate>
                 <MapSettingsProvider>
@@ -60,7 +88,7 @@ export function RootProviders({
                 </MapSettingsProvider>
               </ChatSseGate>
             </AuthProvider>
-          </QueryClientProvider>
+          </PersistQueryClientProvider>
         </LanguageProvider>
       </ThemeProvider>
     </ErrorBoundary>

@@ -7,6 +7,8 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Image,
+  TextInput,
 } from "react-native";
 import { styles } from "./legal-docs.styles";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -62,6 +64,16 @@ export default function LegalDocsAdmin() {
   const insets = useSafeAreaInsets();
   const [generating, setGenerating] = useState<DocType | null>(null);
   const [uploading, setUploading] = useState<DocType | null>(null);
+  const [uploadingSlide, setUploadingSlide] = useState(false);
+  const [publishing, setPublishing] = useState<"generated" | "uploaded" | null>(null);
+  const [slidesGenerated, setSlidesGenerated] = useState<SlidePreview[] | null>(null);
+  const [slidesUploaded, setSlidesUploaded] = useState<SlidePreview[] | null>(null);
+  const [showGenPreview, setShowGenPreview] = useState(false);
+  const [showUploadPreview, setShowUploadPreview] = useState(false);
+  const [showCurrentPreview, setShowCurrentPreview] = useState(false);
+  const [publishedMsg, setPublishedMsg] = useState<string | null>(null);
+  const [slidePrompt, setSlidePrompt] = useState("");
+  const [numSlides, setNumSlides] = useState("6");
 
   const { data: info, refetch } = useQuery<DocsInfoResponse>({
     queryKey: ["/api/admin/legal/docs-info"],

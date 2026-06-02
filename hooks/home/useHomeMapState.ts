@@ -161,7 +161,7 @@ export function useHomeMapState() {
 
   useEffect(() => {
     if (mapReady) return;
-    const timer = setTimeout(() => setMapReady(true), 5000);
+    const timer = setTimeout(() => setMapReady(true), 2000);
     return () => clearTimeout(timer);
   }, [mapReady]);
 

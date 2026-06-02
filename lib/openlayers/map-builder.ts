@@ -1,4 +1,5 @@
 import { OL_BRIDGE_RECEIVE_SCRIPT, OL_BRIDGE_SEND_LISTENER } from "./bridge-events";
+import { TILE_CACHE_BRIDGE_SCRIPT } from "@/lib/maps/tile-cache";
 
 export const OL_CDN_JS = "https://cdn.jsdelivr.net/npm/ol@10.4.0/dist/ol.js";
 export const OL_CDN_CSS = "https://cdn.jsdelivr.net/npm/ol@10.4.0/ol.css";
@@ -36,9 +37,28 @@ export function buildOLInteractiveHtml(
 (function() {
   ${OL_BRIDGE_RECEIVE_SCRIPT}
   ${OL_BRIDGE_SEND_LISTENER}
+  ${TILE_CACHE_BRIDGE_SCRIPT}
+  var _tileUrl = ${JSON.stringify(tileUrl)};
+  var tileSource = new ol.source.XYZ({
+    url: _tileUrl,
+    crossOrigin: "anonymous",
+    tileLoadFunction: function(imageTile, src) {
+      window.__tileCache.fetchWithCache(src)
+        .then(function(buf) {
+          if (!buf) { imageTile.getImage().src = src; return; }
+          var blob = new Blob([buf], { type: 'image/png' });
+          var objUrl = URL.createObjectURL(blob);
+          var img = imageTile.getImage();
+          img.onload = function() { URL.revokeObjectURL(objUrl); };
+          img.onerror = function() { URL.revokeObjectURL(objUrl); img.src = src; };
+          img.src = objUrl;
+        })
+        .catch(function() { imageTile.getImage().src = src; });
+    }
+  });
   var map = new ol.Map({
     target: "map",
-    layers: [new ol.layer.Tile({ source: new ol.source.XYZ({ url: ${JSON.stringify(tileUrl)}, crossOrigin: "anonymous" }) })],
+    layers: [new ol.layer.Tile({ source: tileSource })],
     view: new ol.View({ center: ol.proj.fromLonLat([${centerLng}, ${centerLat}]), zoom: ${zoom} }),
     controls: []
   });

@@ -463,4 +463,5 @@ router.get("/current-slides", async (_req: Request, res: Response) => {
     return sendError(res, 500, "Errore lettura campagne slide");
   }
 });
+
 export default router;

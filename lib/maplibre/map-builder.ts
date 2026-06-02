@@ -1,4 +1,5 @@
 import { BRIDGE_RECEIVE_SCRIPT, BRIDGE_SEND_LISTENER } from "./bridge-events";
+import { TILE_CACHE_BRIDGE_SCRIPT, MAPLIBRE_TILE_CACHE_PROTOCOL_SCRIPT } from "@/lib/maps/tile-cache";
 
 export const CDN_URL = "https://unpkg.com/maplibre-gl@5.24.0/dist";
 
@@ -9,6 +10,24 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
 .maplibregl-ctrl-bottom-right { display: none !important; }
 .maplibregl-ctrl-top-left,
 .maplibregl-ctrl-top-right { display: none !important; }
+`;
+
+// Apply rncache:// to a style object's raster tile sources (WebView-side).
+const APPLY_RN_CACHE_FN = `
+function _applyRnCache(style) {
+  if (!style || typeof style !== 'object') return style;
+  var s = JSON.parse(JSON.stringify(style));
+  if (s.sources) {
+    Object.keys(s.sources).forEach(function(k) {
+      var src = s.sources[k];
+      if (src && Array.isArray(src.tiles)) {
+        src.tiles = src.tiles.map(function(t) { return t.replace(/^https:\\/\\//, 'rncache://'); });
+      }
+    });
+  }
+  return s;
+}
+window._applyRnCache = _applyRnCache;
 `;
 
 export function htmlHead(extraStyles: string = ""): string {
@@ -32,9 +51,14 @@ export function mapScriptWrap(
 (function() {
   ${BRIDGE_RECEIVE_SCRIPT}
   ${BRIDGE_SEND_LISTENER}
+  ${TILE_CACHE_BRIDGE_SCRIPT}
+  ${MAPLIBRE_TILE_CACHE_PROTOCOL_SCRIPT}
+  ${APPLY_RN_CACHE_FN}
+  var _rawStyle = ${styleVar};
+  var _style = (typeof _rawStyle === 'object' && _rawStyle !== null) ? _applyRnCache(_rawStyle) : _rawStyle;
   var map = new maplibregl.Map(Object.assign({
     container: "map",
-    style: ${styleVar},
+    style: _style,
     zoom: 6,
     center: [10.5, 45.5],
     pitch: 0,
@@ -128,7 +152,8 @@ ${mapScriptWrap(styleVar, options, `
       setStyle: function(payload) {
         var style;
         try { style = typeof payload === "string" ? JSON.parse(payload) : payload; } catch(e) { return; }
-        map.setStyle(style);
+        var cachedStyle = (typeof style === "object" && style !== null) ? _applyRnCache(style) : style;
+        map.setStyle(cachedStyle);
       },
       setZoom: function(payload) {
         var level = typeof payload === "object" && payload !== null ? payload.zoom : Number(payload);

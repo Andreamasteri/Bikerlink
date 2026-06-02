@@ -6,6 +6,7 @@ import { getApiUrl } from "@/lib/query-client";
 import { buildMapLibreInteractiveHtml } from "@/lib/maplibre/map-builder";
 import { getMapLibreStyleExpr, buildMapLibreStyle } from "@/lib/maplibre/tile-config";
 import { parseMessage } from "@/lib/maplibre/bridge-events";
+import { readTileCacheAsBase64, saveTileToCache, getMimeForUrl } from "@/lib/maps/tile-cache";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { MapControls } from "@/components/map/MapControls";
 import { MapZoomSlider } from "@/components/map/MapZoomSlider";
@@ -95,6 +96,27 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
     const handleMessage = useCallback((event: WebViewMessageEvent) => {
       const msg = parseMessage(event.nativeEvent.data);
       if (!msg) return;
+      const raw = msg as unknown as Record<string, unknown>;
+      if (raw.type === "tileCheck" && typeof raw.reqId === "string" && typeof raw.url === "string") {
+        const url = raw.url;
+        const reqId = raw.reqId;
+        readTileCacheAsBase64(url).then((b64) => {
+          const wv = webViewRef.current;
+          if (!wv) return;
+          if (b64) {
+            const mime = getMimeForUrl(url);
+            const dataUri = `data:${mime};base64,${b64}`;
+            wv.injectJavaScript(`window.__tileCache && window.__tileCache.respond(${JSON.stringify(reqId)}, ${JSON.stringify(dataUri)});true;`);
+          } else {
+            wv.injectJavaScript(`window.__tileCache && window.__tileCache.respond(${JSON.stringify(reqId)}, null);true;`);
+          }
+        });
+        return;
+      }
+      if (raw.type === "tileSave" && typeof raw.url === "string" && typeof raw.dataB64 === "string") {
+        saveTileToCache(raw.url, raw.dataB64);
+        return;
+      }
       if (msg.type === "ready") {
         setMapReady(true);
         onReady?.();

@@ -130,7 +130,7 @@ export function useMapData({
   const { data: adsEnabledData } = useQuery<{ enabled: boolean }>({
     queryKey: ["/api/settings/ads-enabled"],
     staleTime: 30000,
-    enabled: isAuthenticated && mapReady,
+    enabled: isAuthenticated,
   });
   const adsGloballyEnabled = adsEnabledData?.enabled !== false;
 
@@ -139,7 +139,7 @@ export function useMapData({
     queryKey: ["/api/ads/my-ads"],
     staleTime: 60000,
     refetchInterval: 5 * 60 * 1000,
-    enabled: isAuthenticated && adsGloballyEnabled && mapReady,
+    enabled: isAuthenticated && adsGloballyEnabled,
   });
 
   const homeMessageQuery = useQuery<{ enabled: boolean; text: string }>({
