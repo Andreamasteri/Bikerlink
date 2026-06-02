@@ -134,7 +134,6 @@ export default function AssistantChatSheet({ visible, onClose }: Props) {
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top }]}
         behavior="padding"
-        enabled={Platform.OS === "android"}
       >
         <View style={[styles.header, { borderBottomColor: colors.border }]}>
           <Ionicons name="sparkles" size={20} color={colors.primary} />

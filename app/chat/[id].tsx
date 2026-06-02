@@ -8,9 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
-  Platform,
-  KeyboardAvoidingView,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -358,8 +357,8 @@ export default function ChatConversationScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      behavior="padding"
+      keyboardVerticalOffset={0}
     >
       <ChatHeader
         title={getTitle()}

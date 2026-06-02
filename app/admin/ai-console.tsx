@@ -133,8 +133,8 @@ export default function AiConsoleScreen() {
     <View style={[styles.root, { backgroundColor: colors.background, paddingTop: webTop, paddingBottom: webBottom }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "padding"}
-        keyboardVerticalOffset={0}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === "ios" ? insets.top + 44 : 0}
       >
         {isDesktop ? (
           <View style={styles.row}>
