@@ -630,28 +630,14 @@ export default function OtaPanel() {
 
                 {isExpanded && (
                   <>
-                    <Text style={[styles.versionText, { color: colors.text }]}>
-                      {release.otaVersion ?? "—"}
-                    </Text>
-
+                    <Text style={[styles.versionText, { color: colors.text }]}>{release.otaVersion ?? "—"}</Text>
                     {release.message && (
                       <Text style={[styles.messageText, { color: colors.text }]}>{release.message}</Text>
                     )}
-
-                    {release.approvedAt && (
-                      <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                        Approvata: {formatDate(release.approvedAt)}
-                      </Text>
-                    )}
-                    {release.rejectedAt && (
-                      <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                        Rifiutata: {formatDate(release.rejectedAt)}
-                      </Text>
-                    )}
-
+                    {release.approvedAt && <Text style={[styles.metaText, { color: colors.textSecondary }]}>Approvata: {formatDate(release.approvedAt)}</Text>}
+                    {release.rejectedAt && <Text style={[styles.metaText, { color: colors.textSecondary }]}>Rifiutata: {formatDate(release.rejectedAt)}</Text>}
                     {renderCounters(release)}
                     {release.status === "approved" && renderAutoRollback(release)}
-
                     {release.status === "approved" && (
                       <TouchableOpacity
                         style={[styles.rollbackBtn, { borderColor: colors.accent }]}
