@@ -77,6 +77,31 @@ const checks: IntegrityCheck[] = [
         `SELECT id, nickname, status FROM users WHERE status NOT IN ('active','suspended','deleted','pending') LIMIT 10`,
       );
     },
+    autofix: {
+      kind: "normalize-enum", safe: true,
+      operation: "update", targetTables: ["users"],
+      async run({ dryRun }) {
+        if (!(await tableExists("users"))) return { applied: false, affected: 0, summary: "no users table" };
+        const mapping: Array<[string, string]> = [
+          ["ACTIVE", "active"], ["Active", "active"],
+          ["SUSPENDED", "suspended"], ["Suspended", "suspended"],
+          ["DELETED", "deleted"], ["Deleted", "deleted"],
+          ["PENDING", "pending"], ["Pending", "pending"],
+        ];
+        if (dryRun) {
+          const inList = mapping.map(([k]) => `'${k.replace(/'/g, "''")}'`).join(",");
+          const r = await db.execute(sql.raw(`SELECT COUNT(*)::int AS c FROM users WHERE status IN (${inList})`));
+          const n = Number((r.rows?.[0] as { c?: number } | undefined)?.c ?? 0);
+          return { applied: false, affected: n, summary: `[dry-run] ${n} status da normalizzare` };
+        }
+        let total = 0;
+        for (const [from, to] of mapping) {
+          const r = await db.execute(sql`UPDATE users SET status = ${to} WHERE status = ${from}`);
+          total += r.rowCount ?? 0;
+        }
+        return { applied: total > 0, affected: total, summary: `normalizzati ${total} valori users.status` };
+      },
+    },
   },
   {
     id: "invalid-states/shadowban-scaduto-attivo",

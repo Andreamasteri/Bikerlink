@@ -36,7 +36,7 @@ async function orphanCheck(child: string, fk: string, parent: string, parentPk =
   };
 }
 
-async function deleteOrphans(child: string, fk: string, parent: string, parentPk = "id", dryRun = false) {
+export async function deleteOrphans(child: string, fk: string, parent: string, parentPk = "id", dryRun = false) {
   if (!(await tableExists(child)) || !(await tableExists(parent))) return { applied: false, affected: 0, summary: "tabella mancante" };
   const safeChild = child.replace(/[^a-z_]/g, "");
   const safeFk = fk.replace(/[^a-z_]/g, "");
@@ -115,6 +115,7 @@ const checks: IntegrityCheck[] = [
     category: "orphans", severity: "high", cost: "cheap",
     description: "Match BZ con biker_id verso utente cancellato.",
     query: () => orphanCheck("biker_zavorrina_matches", "biker_id", "users"),
+    autofix: { kind: "delete-orphan-log", safe: true, operation: "delete", targetTables: ["biker_zavorrina_matches"], run: ({ dryRun }) => deleteOrphans("biker_zavorrina_matches", "biker_id", "users", "id", dryRun) },
   },
   {
     id: "orphans/bz-matches-zavorrina",
@@ -122,6 +123,7 @@ const checks: IntegrityCheck[] = [
     category: "orphans", severity: "high", cost: "cheap",
     description: "Match BZ con zavorrina_id verso utente cancellato.",
     query: () => orphanCheck("biker_zavorrina_matches", "zavorrina_id", "users"),
+    autofix: { kind: "delete-orphan-log", safe: true, operation: "delete", targetTables: ["biker_zavorrina_matches"], run: ({ dryRun }) => deleteOrphans("biker_zavorrina_matches", "zavorrina_id", "users", "id", dryRun) },
   },
   {
     id: "orphans/bb-matches-b1",
@@ -129,6 +131,7 @@ const checks: IntegrityCheck[] = [
     category: "orphans", severity: "high", cost: "cheap",
     description: "Match BB con biker1_id verso utente cancellato.",
     query: () => orphanCheck("biker_biker_matches", "biker1_id", "users"),
+    autofix: { kind: "delete-orphan-log", safe: true, operation: "delete", targetTables: ["biker_biker_matches"], run: ({ dryRun }) => deleteOrphans("biker_biker_matches", "biker1_id", "users", "id", dryRun) },
   },
   {
     id: "orphans/bb-matches-b2",
@@ -136,6 +139,7 @@ const checks: IntegrityCheck[] = [
     category: "orphans", severity: "high", cost: "cheap",
     description: "Match BB con biker2_id verso utente cancellato.",
     query: () => orphanCheck("biker_biker_matches", "biker2_id", "users"),
+    autofix: { kind: "delete-orphan-log", safe: true, operation: "delete", targetTables: ["biker_biker_matches"], run: ({ dryRun }) => deleteOrphans("biker_biker_matches", "biker2_id", "users", "id", dryRun) },
   },
   {
     id: "orphans/reports-reporter",
