@@ -62,7 +62,8 @@ NEXT_OTA=$(( PENDING_PLUS_APPROVED_COUNT + 1 ))
 BUILD_NUM=$(node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode || 53)" 2>/dev/null || echo "53")
 RUNTIME_FULL=$(node -e "const a=require('./app.json'); console.log(a.expo.runtimeVersion||'10.0.0')" 2>/dev/null || echo "10.0.0")
 RUNTIME_VER=$(echo "$RUNTIME_FULL" | cut -d. -f1)
-VERSION="${BUILD_NUM}.${RUNTIME_VER}.${NEXT_OTA}"
+# Formato versione OTA canonico: <build>.<updateNumber>.<ciclo_ota> (vedi .agents/skills/bikerlink-versioning)
+VERSION="${BUILD_NUM}.${NEXT_OTA}.${RUNTIME_VER}"
 
 log_info "Build: ${BUILD_NUM} | NEXT_OTA: ${NEXT_OTA} | Versione: ${VERSION}"
 
