@@ -20,6 +20,9 @@ interface ResolvedModel {
   modelId: string;
   model: LanguageModelV2;
   scheduler: <T>(fn: () => Promise<T>) => Promise<T>;
+  // Forza JSON mode in generateObject (invece di json_schema) per provider che
+  // non supportano structured outputs nativi (es. Llama 3.3 70B su Groq).
+  objectMode?: "json";
 }
 
 // Prezzi $ per 1k token (Maggio 2026, vedi _ai-stack-decision.md). Aggiornati a mano.
@@ -259,6 +262,9 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
       return {
         id, providerName: "groq", modelId,
         model: client(modelId) as unknown as LanguageModelV2,
+        // Llama 3.3 70B su Groq non supporta json_schema response_format.
+        // I consumer devono passare mode:"json" a generateObject quando objectMode è impostato.
+        objectMode: "json" as const,
         scheduler: <T>(fn: () => Promise<T>) => limiters.groq.schedule(fn),
       };
     }

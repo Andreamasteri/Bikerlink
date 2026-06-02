@@ -97,6 +97,7 @@ export async function runWeeklyReport(_now = new Date()): Promise<string | null>
       const { value: result, model: m } = await runWithFallback({ role: "brain" }, (mm) =>
         mm.scheduler(() => generateObject({
           model: mm.model, schema: weeklyReportSchema, system: SYSTEM, prompt, temperature: 0.3,
+          ...(mm.objectMode ? { mode: mm.objectMode } : {}),
         })),
       );
       const tokensIn = result.usage?.inputTokens ?? Math.ceil(prompt.length / 4);

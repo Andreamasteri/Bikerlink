@@ -155,6 +155,7 @@ export async function runTriage(input: TriageInput): Promise<TriageOutput | null
             system: SYSTEM_PROMPT,
             prompt,
             temperature: 0.2,
+            ...(mm.objectMode ? { mode: mm.objectMode } : {}),
           })),
           { retries: 2, minTimeout: 500, maxTimeout: 2000 },
         ),

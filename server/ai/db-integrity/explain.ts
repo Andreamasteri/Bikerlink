@@ -36,6 +36,7 @@ export async function explainViolation(params: {
           schema: aiExplainSchema as unknown as z.ZodTypeAny,
           prompt,
           temperature: 0.2,
+          ...(m.objectMode ? { mode: m.objectMode } : {}),
         });
         // Cost tracking.
         const tokensIn = result.usage?.inputTokens ?? Math.ceil(prompt.length / 4);
