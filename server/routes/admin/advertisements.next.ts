@@ -39,11 +39,15 @@ export async function runAdImageHealthCheck(): Promise<void> {
       if (!match) continue;
       const filename = match[1];
       if (!filename || filename.includes("..") || filename.includes("/")) continue;
-      const localPath = path.join(adsDir, filename);
-      if (fs.existsSync(localPath)) continue;
       try {
         const exists = await objectExists(`public/ads/${filename}`);
-        if (!exists) broken.push(campaign.id);
+        if (!exists) {
+          broken.push(campaign.id);
+          const localPath = path.join(adsDir, filename);
+          if (fs.existsSync(localPath)) {
+            try { fs.unlinkSync(localPath); } catch { /* non-fatal */ }
+          }
+        }
       } catch {
         broken.push(campaign.id);
       }
