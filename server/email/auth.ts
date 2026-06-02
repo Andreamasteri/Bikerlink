@@ -14,7 +14,7 @@ export async function sendVerificationEmail(to: string, nickname: string, token:
     </div>
 
     <p style="color: #999; font-size: 13px; line-height: 1.5;">
-      Il codice scade tra 30 minuti.<br/>
+      Il codice scade tra 30 minuti ed è <strong>monouso</strong>: si invalida automaticamente dopo il primo utilizzo.<br/>
       Se non hai richiesto questa verifica, ignora questa email.
     </p>
   `;
