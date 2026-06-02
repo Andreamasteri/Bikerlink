@@ -71,6 +71,9 @@ export default function VerifyEmailScreen() {
     if (/troppi tentativi/i.test(raw)) {
       return translate("auth.tooManyCodeRequests");
     }
+    if (/già utilizzato/i.test(raw)) {
+      return translate("auth.codeAlreadyUsed");
+    }
     if (/codice scaduto/i.test(raw)) {
       return translate("auth.codeExpired");
     }

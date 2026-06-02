@@ -652,6 +652,7 @@ const tr: Record<string, string> = {
   "auth.emailVerifyTitle": "E-postayı Doğrula",
   "auth.tooManyCodeRequests": "Kısa sürede çok fazla kod istedin. Birkaç dakika sonra tekrar dene veya yöneticiyle iletişime geç.",
   "auth.codeInvalid": "Geçersiz kod. Doğru girdiğini kontrol et veya yeni bir tane iste.",
+  "auth.codeAlreadyUsed": "Kod zaten kullanıldı — yeni bir doğrulama kodu iste.",
   "auth.codeEnterPrompt": "Doğrulama kodunu gir",
   "auth.codeLength": "Kod 8 karakter olmalıdır",
   "auth.sendError": "Gönderme hatası",

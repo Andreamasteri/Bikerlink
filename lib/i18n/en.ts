@@ -724,6 +724,7 @@ const en: Record<string, string> = {
   "auth.emailVerifyTitle": "Email Verification",
   "auth.tooManyCodeRequests": "You have requested too many codes in a short time. Try again in a few minutes or contact the administrator.",
   "auth.codeInvalid": "Invalid code. Check that you typed it correctly or request a new one.",
+  "auth.codeAlreadyUsed": "Code already used — request a new verification code.",
   "auth.codeEnterPrompt": "Enter the verification code",
   "auth.codeLength": "The code must be 8 characters long",
   "auth.sendError": "Error during sending",

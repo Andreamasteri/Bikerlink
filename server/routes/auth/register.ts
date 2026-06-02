@@ -301,6 +301,10 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
       return sendError(res, 400, "Codice non valido");
     }
 
+    if (user.emailVerified) {
+      return sendError(res, 409, "Codice già utilizzato. Hai già verificato la tua email.");
+    }
+
     if (isVerifyLockedOut(user.id)) {
       await storage.deleteEmailVerificationTokens(user.id).catch(() => {});
       return sendError(res, 429, "Troppi tentativi. Richiedi un nuovo codice.");

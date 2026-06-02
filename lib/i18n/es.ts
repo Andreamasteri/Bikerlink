@@ -661,6 +661,7 @@ const es: Record<string, string> = {
   "auth.emailVerifyTitle": "Verificar correo",
   "auth.tooManyCodeRequests": "Has solicitado demasiados códigos en poco tiempo. Inténtalo en unos minutos o contacta al administrador.",
   "auth.codeInvalid": "Código no válido. Comprueba que lo has escrito correctamente o solicita uno nuevo.",
+  "auth.codeAlreadyUsed": "Código ya utilizado — solicita un nuevo código de verificación.",
   "auth.codeEnterPrompt": "Introduce el código de verificación",
   "auth.codeLength": "El código debe tener 8 caracteres",
   "auth.sendError": "Error al enviar",
