@@ -52,7 +52,7 @@ export const proposalSchema = z.object({
       "rerun_job", "rebuild_index", "rotate_secret", "manual_only",
     ]),
     target: z.string().max(120).optional(),
-    params: z.object({}).catchall(z.union([z.string(), z.number(), z.boolean()])).optional(),
+    params: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
   }),
   affectedComponents: z.array(z.string().max(80)).max(10),
   rollbackHint: z.string().max(300).optional(),
