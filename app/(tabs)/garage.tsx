@@ -212,7 +212,6 @@ function GarageContent() {
         <>
           <GarageHeader 
             motorcyclesCount={motorcycles.length} 
-            onAddPress={openAdd}
           />
           <FlatList
             data={motorcycles}
@@ -235,23 +234,17 @@ function GarageContent() {
                 <MaterialCommunityIcons name="motorbike" size={72} color={Colors.accent} />
                 <Text style={styles.emptyText}>{t("garage.noMotoInGarage")}</Text>
                 <Text style={styles.emptyDesc}>{t("garage.garageDesc")}</Text>
-                <View style={styles.emptyCtaHint}>
-                  <Text style={styles.emptyCtaLabel}>{t("garage.addFirstMoto")}</Text>
-                  <Ionicons name="chevron-down" size={26} color={Colors.accent} />
-                </View>
               </View>
             }
           />
 
-          {motorcycles.length > 0 && (
-            <Pressable 
-              style={[styles.addBtn, { bottom: insets.bottom + 16 }]} 
-              onPress={openAdd}
-            >
-              <Ionicons name="add" size={24} color={Colors.background} />
-              <Text style={styles.addBtnText}>{t("garage.addMoto")}</Text>
-            </Pressable>
-          )}
+          <Pressable 
+            style={[styles.addBtn, { bottom: insets.bottom + 16 }]} 
+            onPress={openAdd}
+          >
+            <Ionicons name="add" size={24} color={Colors.background} />
+            <Text style={styles.addBtnText}>{t("garage.addMoto")}</Text>
+          </Pressable>
 
           <AddMotoForm
             visible={showForm}
@@ -279,8 +272,6 @@ const styles = StyleSheet.create({
   empty: { alignItems: "center", paddingTop: 80, paddingHorizontal: 32, gap: 14 },
   emptyText: { fontSize: 20, fontFamily: "Inter_600SemiBold", color: Colors.text, textAlign: "center" },
   emptyDesc: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", lineHeight: 20 },
-  emptyCtaHint: { alignItems: "center", gap: 2, marginTop: 8 },
-  emptyCtaLabel: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.accent },
   addBtn: {
     position: "absolute",
     alignSelf: "center",

@@ -1368,7 +1368,7 @@ const it: Record<string, string> = {
   "tracking.exportError": "__TODO__:tracking.exportError",
   "tracking.deleteConfirm": "__TODO__:tracking.deleteConfirm",
   "tracking.deleteError": "__TODO__:tracking.deleteError",
-  "top": "__TODO__:top",
-  "bottom": "__TODO__:bottom",
+  "top": "Alto",
+  "bottom": "Basso",
 };
 export default it;

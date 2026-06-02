@@ -1157,6 +1157,8 @@ const de: Record<string, string> = {
   "tracking.sensors": "Sensoren",
   "tracking.history": "Verlauf",
   "tracking.save": "Speichern",
+  "top": "Oben",
+  "bottom": "Unten",
 };
 
 export default de;

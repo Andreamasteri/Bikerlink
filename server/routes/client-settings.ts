@@ -186,10 +186,10 @@ export function registerClientSettingsRoutes(app: Express) {
   app.get("/api/settings/marketplace-enabled", async (_req, res) => {
     try {
       const setting = await storage.getAppSetting("marketplace_enabled");
-      res.json({ enabled: setting?.value === "true" });
+      res.json({ enabled: setting === null || setting === undefined ? true : setting.value === "true" });
     } catch (err) {
-      console.warn("[client-settings] Failed to fetch setting (false default):", err);
-      res.json({ enabled: false });
+      console.warn("[client-settings] Failed to fetch setting (true default):", err);
+      res.json({ enabled: true });
     }
   });
 

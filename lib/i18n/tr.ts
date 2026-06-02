@@ -1148,6 +1148,8 @@ const tr: Record<string, string> = {
   "tracking.sensors": "Sensörler",
   "tracking.history": "Geçmiş",
   "tracking.save": "Kaydet",
+  "top": "Üst",
+  "bottom": "Alt",
 };
 
 export default tr;

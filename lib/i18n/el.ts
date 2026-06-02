@@ -1148,6 +1148,8 @@ const el: Record<string, string> = {
   "tracking.sensors": "Αισθητήρες",
   "tracking.history": "Ιστορικό",
   "tracking.save": "Αποθήκευση",
+  "top": "Πάνω",
+  "bottom": "Κάτω",
 };
 
 export default el;
