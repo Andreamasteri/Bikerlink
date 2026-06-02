@@ -279,6 +279,7 @@ import aiAssistantAdminRouter from './admin/ai-assistant';
 import backupPreviewRouter from './admin/backup-preview';
 import exportsRouter from './admin/exports';
 import legalRouter from './admin/legal';
+import legalNextRouter from './admin/legal.next';
 // Task #2852 — Test stato server Ollama (provider AI primario).
 import aiTestOllamaRouter from './admin/ai/test-ollama';
 // Task #2932 — Configurazione provider AI resolver percorsi (Ollama/Groq/Gemini).
@@ -404,5 +405,6 @@ router.use('/', _requireAdmin, aiAssistantAdminRouter);
 router.use('/', _requireAdmin, backupPreviewRouter);
 router.use('/', _requireAdmin, exportsRouter);
 router.use('/legal', _requireAdmin, legalRouter);
+router.use('/legal', _requireAdmin, legalNextRouter);
 
 export default router;
