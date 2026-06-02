@@ -36,6 +36,7 @@ export default function AdminLayout() {
         <Stack.Screen name="motoclubs" options={{ title: "Clubs" }} />
         <Stack.Screen name="invite-codes" options={{ title: "Codici Invito" }} />
         <Stack.Screen name="backup" options={{ title: "Backup automatici" }} />
+        <Stack.Screen name="exports" options={{ title: "Export Dati" }} />
         <Stack.Screen name="system" options={{ title: "System Monitor" }} />
         <Stack.Screen name="eventi" options={{ title: "Raduni — Moderazione" }} />
         <Stack.Screen name="traduzioni" options={{ title: "Sistema Traduzioni" }} />

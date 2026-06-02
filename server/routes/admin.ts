@@ -277,6 +277,7 @@ import metricsRouter from './admin/metrics';
 // Task #2698 — AI Assistant per utenti normali (admin config/telemetria).
 import aiAssistantAdminRouter from './admin/ai-assistant';
 import backupPreviewRouter from './admin/backup-preview';
+import exportsRouter from './admin/exports';
 // Task #2852 — Test stato server Ollama (provider AI primario).
 import aiTestOllamaRouter from './admin/ai/test-ollama';
 // Task #2932 — Configurazione provider AI resolver percorsi (Ollama/Groq/Gemini).
@@ -400,5 +401,6 @@ router.use('/', _requireAdmin, metricsRouter);
 // Task #2698 — config + telemetria AI Assistant utente (admin only).
 router.use('/', _requireAdmin, aiAssistantAdminRouter);
 router.use('/', _requireAdmin, backupPreviewRouter);
+router.use('/', _requireAdmin, exportsRouter);
 
 export default router;
