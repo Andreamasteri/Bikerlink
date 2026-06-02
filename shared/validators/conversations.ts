@@ -9,7 +9,7 @@ export const createConversationSchema = z.object({
 export type CreateConversationInput = z.infer<typeof createConversationSchema>;
 
 export const sendMessageSchema = z.object({
-  conversationId: z.string().min(1, "ID conversazione obbligatorio"),
+  conversationId: z.string().min(1, "ID conversazione obbligatorio").optional(),
   messageType: z.enum(["text", "image", "location", "audio", "video", "system", "playlist"]).default("text"),
   content: z.string().max(10000).optional().nullable(),
   imageUrl: z.string().optional().nullable(),

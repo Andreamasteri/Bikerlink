@@ -1340,7 +1340,7 @@ const it: Record<string, string> = {
   "aiAssistant.prefs.disableProactiveHint": "L'assistente non suggerirà consigli automaticamente",
   "aiAssistant.prefs.disableOnboarding": "Disabilita guida introduttiva",
   "tracking.mountCalib.calibrated": "Calibrato",
-  "tracking.mountCalib.configure": "Configura",
+  "tracking.mountCalib.configure": "Configura montaggio",
   "tracking.gpsStartError": "Errore avvio GPS",
   "tracking.permReq": "Permesso richiesto",
   "tracking.permDenied": "Permesso negato",
