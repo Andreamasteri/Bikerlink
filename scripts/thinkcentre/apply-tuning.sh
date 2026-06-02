@@ -11,7 +11,7 @@
 #
 # SICUREZZA:
 #   - Idempotente: ri-eseguire non causa danni
-#   - Non tocca GraphHopper (richiede riavvio manuale — vedi doc)
+#   - La sezione GraphHopper chiede conferma prima di installare la unit
 #   - Rollback: vedi docs/thinkcentre-tuning.md
 # =============================================================================
 
@@ -25,11 +25,27 @@ BLUE='\033[0;34m'
 BOLD='\033[1m'
 NC='\033[0m'
 
-ok()   { echo -e "${GREEN}✓${NC} $*"; }
-info() { echo -e "${BLUE}→${NC} $*"; }
-warn() { echo -e "${YELLOW}⚠${NC} $*"; }
-fail() { echo -e "${RED}✗${NC} $*"; exit 1; }
+ok()      { echo -e "${GREEN}✓${NC} $*"; }
+info()    { echo -e "${BLUE}→${NC} $*"; }
+warn()    { echo -e "${YELLOW}⚠${NC} $*"; }
+fail()    { echo -e "${RED}✗${NC} $*"; exit 1; }
 section() { echo -e "\n${BOLD}══ $* ══${NC}"; }
+ask_yn()  {
+  # Chiede una domanda sì/no. Restituisce 0 (sì) o 1 (no).
+  # In contesti non-interattivi (stdin non è un terminale) default = No.
+  local prompt="$1"
+  local answer
+  if [[ ! -t 0 ]]; then
+    warn "Stdin non interattivo — risposta 'N' predefinita per: $prompt"
+    return 1
+  fi
+  echo -e -n "${YELLOW}?${NC} ${prompt} [y/N] "
+  read -r answer || { echo ""; return 1; }
+  case "$answer" in
+    [yY]|[yY][eE][sS]) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 # ── Prerequisiti ──────────────────────────────────────────────────────────────
 if [[ $EUID -ne 0 ]]; then
@@ -39,7 +55,7 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── 1. CPU Governor ───────────────────────────────────────────────────────────
-section "1/3 — CPU Governor (performance)"
+section "1/4 — CPU Governor (performance)"
 
 # Applica subito (senza riavvio)
 info "Impostando governor a 'performance' su tutti i core..."
@@ -73,7 +89,7 @@ systemctl enable --now cpu-performance.service
 ok "cpu-performance.service installato e abilitato al boot."
 
 # ── 2. Sysctl kernel tuning ───────────────────────────────────────────────────
-section "2/3 — Sysctl kernel tuning"
+section "2/4 — Sysctl kernel tuning"
 
 SYSCTL_SRC="${SCRIPT_DIR}/sysctl-bikerlink.conf"
 SYSCTL_DST="/etc/sysctl.d/99-bikerlink.conf"
@@ -109,7 +125,7 @@ else
 fi
 
 # ── 3. Ollama systemd drop-in ─────────────────────────────────────────────────
-section "3/3 — Ollama systemd drop-in"
+section "3/4 — Ollama systemd drop-in"
 
 OLLAMA_SRC="${SCRIPT_DIR}/ollama-override.conf"
 OLLAMA_DROPIN_DIR="/etc/systemd/system/ollama.service.d"
@@ -135,6 +151,64 @@ if systemctl is-active --quiet ollama 2>/dev/null; then
 else
   warn "Il servizio ollama non è in esecuzione. Le variabili saranno applicate al prossimo avvio."
   warn "Avvia con: sudo systemctl start ollama"
+fi
+
+# ── 4. GraphHopper systemd unit (opzionale) ───────────────────────────────────
+section "4/4 — GraphHopper systemd unit (opzionale)"
+
+GH_SERVICE_SRC="${SCRIPT_DIR}/graphhopper.service"
+GH_SERVICE_DST="/etc/systemd/system/graphhopper.service"
+GH_INSTALLED=false
+
+if [[ ! -f "$GH_SERVICE_SRC" ]]; then
+  warn "File non trovato: $GH_SERVICE_SRC — sezione saltata."
+else
+  echo ""
+  echo -e "  Questo passaggio installa ${BOLD}graphhopper.service${NC} in systemd."
+  echo -e "  GraphHopper partirà automaticamente al boot del ThinkCentre."
+  echo ""
+  echo -e "  ${YELLOW}ATTENZIONE:${NC} Prima di procedere verificare che in ${BOLD}$GH_SERVICE_SRC${NC}"
+  echo -e "  siano corretti:"
+  echo -e "    - Il path del JAR  (graphhopper-web-<VERSION>.jar)"
+  echo -e "    - Il path del config  (/opt/graphhopper/config.yml)"
+  echo -e "    - L'utente di sistema  (User=graphhopper)"
+  echo ""
+
+  if ask_yn "Installare graphhopper.service? (richiede personalizzazione preventiva del file)"; then
+    # Guard: rifiuta se il placeholder <VERSION> non è stato sostituito
+    if grep -q '<VERSION>' "$GH_SERVICE_SRC"; then
+      fail "Il file $GH_SERVICE_SRC contiene ancora il placeholder '<VERSION>'.\
+Sostituirlo con la versione reale del JAR prima di procedere.\
+Es.: sed -i 's/<VERSION>/9.1/g' $GH_SERVICE_SRC"
+    fi
+
+    info "Copiando graphhopper.service in ${GH_SERVICE_DST}..."
+    cp "$GH_SERVICE_SRC" "$GH_SERVICE_DST"
+    chmod 644 "$GH_SERVICE_DST"
+
+    systemctl daemon-reload
+    systemctl enable graphhopper
+    GH_INSTALLED=true
+    ok "graphhopper.service installato e abilitato al boot."
+
+    if systemctl is-active --quiet graphhopper 2>/dev/null; then
+      info "graphhopper.service è già in esecuzione — nessun riavvio automatico."
+      warn "Se hai aggiornato i flag JVM, riavvia manualmente: sudo systemctl restart graphhopper"
+    else
+      echo ""
+      if ask_yn "Avviare graphhopper.service adesso?"; then
+        info "Avviando graphhopper.service..."
+        systemctl start graphhopper
+        ok "graphhopper.service avviato."
+        info "Segui i log con: journalctl -u graphhopper -f"
+      else
+        warn "graphhopper.service abilitato ma non avviato. Avvialo con: sudo systemctl start graphhopper"
+      fi
+    fi
+  else
+    warn "Installazione di graphhopper.service saltata."
+    warn "Per installarlo manualmente vedi docs/thinkcentre-tuning.md"
+  fi
 fi
 
 # ── Riepilogo e verifica ──────────────────────────────────────────────────────
@@ -166,13 +240,14 @@ echo -e "    systemctl show ollama | grep -i 'OLLAMA_NUM_PARALLEL\|OLLAMA_NUM_TH
 echo -e "    Atteso: vedere le variabili dell'override"
 echo ""
 
+if [[ "$GH_INSTALLED" == "true" ]]; then
+  echo -e "  ${BLUE}GraphHopper systemd unit:${NC}"
+  echo -e "    systemctl is-enabled graphhopper   # Atteso: enabled"
+  echo -e "    systemctl status graphhopper        # Atteso: active (running)"
+  echo -e "    journalctl -u graphhopper -n 20     # ultimi log JVM / GC"
+  echo ""
+fi
+
 echo -e "  ${BLUE}Memoria disponibile:${NC}"
 echo -e "    free -h"
-echo ""
-
-echo -e "  ${BLUE}GraphHopper (riavvio MANUALE richiesto):${NC}"
-echo -e "    Vedere docs/thinkcentre-tuning.md per il comando di avvio con i flag JVM ottimizzati."
-echo ""
-echo -e "${YELLOW}⚠  GraphHopper NON è stato riavviato automaticamente.${NC}"
-echo -e "${YELLOW}   Riavviare manualmente il processo con i flag JVM di graphhopper-jvm.conf.${NC}"
 echo ""

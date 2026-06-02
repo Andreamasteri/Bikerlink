@@ -1,0 +1,70 @@
+# BikerLink — GraphHopper systemd unit
+#
+# INSTALLAZIONE:
+#   sudo cp graphhopper.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now graphhopper
+#
+# Oppure usa: sudo bash apply-tuning.sh  (installa tutto in una volta)
+#
+# PERSONALIZZAZIONE OBBLIGATORIA prima di installare:
+#   1. Aggiornare ExecStart con la versione corretta del JAR (es. 9.1)
+#   2. Verificare i path: /opt/graphhopper/ deve contenere il JAR e config.yml
+#   3. Verificare che l'utente 'graphhopper' esista (o cambiare User= con l'utente corretto)
+#      Per creare l'utente: sudo useradd --system --no-create-home --shell /usr/sbin/nologin graphhopper
+#
+# FLAG JVM — vedere graphhopper-jvm.conf per la spiegazione di ogni flag.
+# THREAD — NON configurabili via JVM. Vanno in config.yml (prepare.threads, routing.threads).
+
+[Unit]
+Description=GraphHopper Routing Engine (BikerLink)
+Documentation=https://github.com/graphhopper/graphhopper
+After=network.target
+# Assicura che GraphHopper parta dopo Ollama (entrambi usano RAM — Ollama deve allocare prima)
+After=ollama.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=graphhopper
+Group=graphhopper
+
+# ── Path ──────────────────────────────────────────────────────────────────────
+# Aggiornare <VERSION> con la versione del JAR installato (es. 9.1)
+WorkingDirectory=/opt/graphhopper
+ExecStart=/usr/bin/java \
+    -Xms8g \
+    -Xmx12g \
+    -XX:+UseZGC \
+    -XX:+ZGenerational \
+    -XX:+AlwaysPreTouch \
+    -XX:+UseNUMA \
+    -XX:+UseTransparentHugePages \
+    -XX:+UnlockExperimentalVMOptions \
+    -jar /opt/graphhopper/graphhopper-web-<VERSION>.jar \
+    server /opt/graphhopper/config.yml
+
+# ── Restart policy ────────────────────────────────────────────────────────────
+# Riavvio automatico in caso di crash (non riavvia se fermato con systemctl stop)
+Restart=on-failure
+RestartSec=10s
+
+# ── Limiti di sistema ─────────────────────────────────────────────────────────
+# Necessari per l'heap JVM da 12 GB + memoria off-heap
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# ── Output log ────────────────────────────────────────────────────────────────
+# I log sono leggibili con: journalctl -u graphhopper -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=graphhopper
+
+# ── Timeout ───────────────────────────────────────────────────────────────────
+# GraphHopper impiega tipicamente 60–120 s per caricare i grafi a caldo.
+# AlwaysPreTouch allunga ulteriormente il tempo di avvio la prima volta.
+TimeoutStartSec=300
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

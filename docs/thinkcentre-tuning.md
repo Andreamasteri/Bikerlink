@@ -27,7 +27,8 @@ Servizi ottimizzati: **GraphHopper** + **Ollama**
 | `apply-tuning.sh` | Eseguire con `sudo` | Script all-in-one idempotente |
 | `cpu-performance.service` | `/etc/systemd/system/` | Mantiene governor CPU a `performance` al boot |
 | `sysctl-bikerlink.conf` | `/etc/sysctl.d/99-bikerlink.conf` | Tuning kernel (swap, dirty pages, THP, TCP) |
-| `graphhopper-jvm.conf` | Riferimento manuale | Flag JVM ottimizzati per GraphHopper |
+| `graphhopper-jvm.conf` | Riferimento / documentazione | Flag JVM ottimizzati (sorgente dei valori in `graphhopper.service`) |
+| `graphhopper.service` | `/etc/systemd/system/` | Unit systemd che avvia GraphHopper con i flag JVM al boot |
 | `ollama-override.conf` | `/etc/systemd/system/ollama.service.d/bikerlink.conf` | Variabili env Ollama (concorrenza, threading) |
 
 ---
@@ -94,11 +95,87 @@ cat /sys/kernel/mm/transparent_hugepage/enabled
 
 ---
 
-### 3. GraphHopper JVM flags — `graphhopper-jvm.conf`
+### 3. GraphHopper systemd unit — `graphhopper.service`
 
-> **GraphHopper richiede riavvio manuale.** Lo script `apply-tuning.sh` non tocca  
-> il processo GraphHopper perché potrebbe essere gestito in modi diversi  
-> (systemd unit, screen/tmux, script custom). Usare il comando sotto.
+A partire da questa versione del tuning, GraphHopper è gestito da una **unit systemd dedicata**  
+che incorpora direttamente i flag JVM ottimizzati. Questo garantisce:
+
+- Auto-start al boot del ThinkCentre (nessun intervento manuale dopo un riavvio)
+- Restart automatico in caso di crash (`Restart=on-failure`)
+- Log centralizzati in journald (`journalctl -u graphhopper`)
+- Separazione netta dall'utente interattivo (processo isolato sotto `User=graphhopper`)
+
+#### Pre-requisiti prima di installare
+
+1. **Personalizzare il file `scripts/thinkcentre/graphhopper.service`** — i placeholder `<VERSION>` e i path devono rispecchiare l'installazione locale:
+
+```bash
+# Verificare la versione del JAR installato:
+ls /opt/graphhopper/graphhopper-web-*.jar
+# es. graphhopper-web-9.1.jar → usare 9.1
+
+# Il file di configurazione:
+ls /opt/graphhopper/config.yml
+```
+
+2. **Creare l'utente di sistema** (se non esiste già):
+
+```bash
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin graphhopper
+sudo chown -R graphhopper:graphhopper /opt/graphhopper
+```
+
+3. **Configurare i thread nel `config.yml`** (l'unico modo — i flag JVM `-D...` non hanno effetto):
+
+```yaml
+graphhopper:
+  prepare:
+    threads: 3   # usati solo nella fase offline di prepare
+  routing:
+    threads: 4   # thread di routing concorrenti (tutti i core fisici)
+```
+
+#### Installazione manuale
+
+```bash
+# Personalizzare prima il file (vedere sopra), poi:
+sudo cp scripts/thinkcentre/graphhopper.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now graphhopper
+```
+
+#### Installazione via apply-tuning.sh
+
+Lo script `apply-tuning.sh` include una **sezione 4 opzionale** con prompt di conferma:
+
+```bash
+cd scripts/thinkcentre
+sudo bash apply-tuning.sh
+# → rispondere 'y' alla domanda sull'installazione di graphhopper.service
+```
+
+#### Verifica
+
+```bash
+# Stato del servizio
+systemctl status graphhopper
+# Atteso: active (running)
+
+# Abilitato al boot
+systemctl is-enabled graphhopper
+# Atteso: enabled
+
+# Log in tempo reale (utile per verificare avvio JVM e ZGC)
+journalctl -u graphhopper -f
+
+# Conferma che ZGC sia attivo (nel log di avvio):
+journalctl -u graphhopper --no-pager | grep -i "Z Garbage Collector"
+# Atteso: Using The Z Garbage Collector
+
+# Oppure a runtime:
+jcmd $(pgrep -f graphhopper) VM.flags | grep -i zgc
+# Atteso: -XX:+UseZGC
+```
 
 **Ripartizione memoria:**
 
@@ -110,43 +187,8 @@ cat /sys/kernel/mm/transparent_hugepage/enabled
 └── Buffer libero:    ~8 GB
 ```
 
-**Comando di avvio ottimizzato:**
-
-```bash
-java \
-  -Xms8g -Xmx12g \
-  -XX:+UseZGC -XX:+ZGenerational \
-  -XX:+AlwaysPreTouch \
-  -XX:+UseNUMA \
-  -XX:+UseTransparentHugePages \
-  -XX:+UnlockExperimentalVMOptions \
-  -jar /opt/graphhopper/graphhopper-web-<VERSION>.jar \
-  server /opt/graphhopper/config.yml
-```
-
-> **Importante:** GraphHopper **non** legge i thread da proprietà JVM (`-D...`).  
-> Il numero di thread va configurato **esclusivamente nel `config.yml`**:
-
-```yaml
-graphhopper:
-  prepare:
-    threads: 3   # usati solo nella fase offline di prepare (non impatta il routing live)
-  routing:
-    threads: 4   # thread di routing concorrenti a regime (tutti i core fisici)
-```
-
-Aggiungere queste sezioni al proprio `config.yml` esistente prima di (ri)avviare GraphHopper.
-
-**Verifica GC attivo:**
-
-```bash
-# L'output di avvio deve contenere:
-# [info][gc] Using The Z Garbage Collector
-
-# Oppure a runtime:
-jcmd $(pgrep -f graphhopper) VM.flags | grep -i zgc
-# Atteso: -XX:+UseZGC
-```
+> **Nota:** Il file `graphhopper-jvm.conf` rimane come riferimento documentale dei flag  
+> e della motivazione di ciascuno. I valori effettivi usati dal servizio sono in `graphhopper.service`.
 
 ---
 
@@ -228,9 +270,14 @@ sudo systemctl daemon-reload
 sudo systemctl restart ollama
 ```
 
-### GraphHopper JVM
-Ripristinare il comando di avvio originale (senza i flag `-Xms8g -Xmx12g -XX:+UseZGC ...`).  
-GraphHopper funziona normalmente con i default JVM — il rollback è immediato al riavvio del processo.
+### GraphHopper systemd unit
+```bash
+sudo systemctl disable --now graphhopper
+sudo rm /etc/systemd/system/graphhopper.service
+sudo systemctl daemon-reload
+```
+GraphHopper non si avvierà più automaticamente al boot. Riavviarlo manualmente se necessario  
+con il comando precedente (senza flag JVM ottimizzati) o con una propria soluzione di avvio.
 
 ---
 
@@ -252,7 +299,39 @@ journalctl -u ollama -n 50
 ```
 
 **GraphHopper OutOfMemoryError:**  
-Ridurre `-Xmx12g` a `-Xmx10g` se Ollama carica modelli più grandi di 7B.
+Ridurre `-Xmx12g` a `-Xmx10g` se Ollama carica modelli più grandi di 7B.  
+Modificare il valore in `/etc/systemd/system/graphhopper.service`, poi:
+```bash
+sudo systemctl daemon-reload && sudo systemctl restart graphhopper
+```
 
 **ZGenerational non disponibile (Java 17):**  
-Rimuovere `-XX:+ZGenerational` dal comando di avvio. ZGC base funziona con Java 17+.
+Rimuovere `-XX:+ZGenerational` dalla riga `ExecStart` in `/etc/systemd/system/graphhopper.service`.  
+ZGC base funziona con Java 17+.
+
+**graphhopper.service non parte (placeholder `<VERSION>` non sostituito):**  
+```bash
+journalctl -u graphhopper -n 30
+# Cercare: "Unable to access jarfile /opt/graphhopper/graphhopper-web-<VERSION>.jar"
+# Fix: modificare ExecStart con la versione corretta del JAR
+sudo systemctl edit --full graphhopper   # oppure modificare direttamente il file
+sudo systemctl daemon-reload && sudo systemctl restart graphhopper
+```
+
+**graphhopper.service non parte (permessi `/opt/graphhopper`):**  
+```bash
+ls -la /opt/graphhopper/
+# Se i file non appartengono a 'graphhopper':
+sudo chown -R graphhopper:graphhopper /opt/graphhopper
+sudo systemctl restart graphhopper
+```
+
+**Timeout avvio (TimeoutStartSec=300 scaduto):**  
+Con `AlwaysPreTouch` il primo avvio su 12 GB di heap può richiedere più di 5 minuti.  
+Aumentare `TimeoutStartSec` nella unit se il warm-up iniziale è particolarmente lento:
+```bash
+sudo systemctl edit graphhopper
+# Aggiungere: [Service]
+#              TimeoutStartSec=600
+sudo systemctl daemon-reload && sudo systemctl restart graphhopper
+```
