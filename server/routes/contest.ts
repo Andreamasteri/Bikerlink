@@ -166,33 +166,31 @@ router.post("/entries/:id/vote", async (req: Request, res: Response) => {
     const userId = requireUserId(req, res);
     if (!userId) return;
 
-    const { id } = req.params;
+    const entryId = req.params.id as string;
 
-    const _entries = await storage.getPhotoContestEntries(0, 0);
-    let entry = null;
-    const allEntries = await storage.getPhotoContestEntries(
-      getWeekNumber(new Date()),
-      new Date().getFullYear()
-    );
-    entry = allEntries.find((e) => e.id === id);
+    const entry = await storage.getPhotoContestEntry(entryId);
 
-    if (!entry) {
-      const now = new Date();
-      const prevWeek = getWeekNumber(new Date(now.getTime() - 7 * 86400000));
-      const prevYear = new Date(now.getTime() - 7 * 86400000).getFullYear();
-      const prevEntries = await storage.getPhotoContestEntries(prevWeek, prevYear);
-      entry = prevEntries.find((e) => e.id === id);
+    if (!entry || !entry.isApproved) {
+      return sendError(res, 404, "Foto non trovata");
     }
 
-    if (!entry) {
+    // Only allow voting on entries from the current week or the immediately preceding week
+    const now = new Date();
+    const currentWeek = getWeekNumber(now);
+    const currentYear = now.getFullYear();
+    const prevWeekDate = new Date(now.getTime() - 7 * 86400000);
+    const prevWeek = getWeekNumber(prevWeekDate);
+    const prevYear = prevWeekDate.getFullYear();
+    const inCurrentWindow =
+      (entry.weekNumber === currentWeek && entry.year === currentYear) ||
+      (entry.weekNumber === prevWeek && entry.year === prevYear);
+    if (!inCurrentWindow) {
       return sendError(res, 404, "Foto non trovata");
     }
 
     if (entry.userId === userId) {
       return sendError(res, 400, "Non puoi votare la tua foto");
     }
-
-    const entryId = Array.isArray(id) ? id[0] : id;
     const existingVote = await storage.getPhotoVote(entryId, userId);
     if (existingVote) {
       return sendError(res, 400, "Hai già votato questa foto");

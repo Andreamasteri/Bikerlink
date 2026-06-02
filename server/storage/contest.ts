@@ -11,7 +11,7 @@ import { MapStorage } from "./map";
 
 export class ContestStorage extends MapStorage {
   async getPhotoContestEntries(weekNumber: number, year: number): Promise<PhotoContestEntry[]> {
-    return db.select().from(photoContestEntries).where(and(eq(photoContestEntries.weekNumber, weekNumber), eq(photoContestEntries.year, year))).orderBy(desc(photoContestEntries.votesCount));
+    return db.select().from(photoContestEntries).where(and(eq(photoContestEntries.weekNumber, weekNumber), eq(photoContestEntries.year, year), eq(photoContestEntries.isApproved, true))).orderBy(desc(photoContestEntries.votesCount));
   }
 
   async createPhotoContestEntry(data: InsertPhotoContestEntry): Promise<PhotoContestEntry> {
