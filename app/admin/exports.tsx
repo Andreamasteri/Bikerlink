@@ -41,6 +41,36 @@ interface ExportStatus {
   historyCount: number;
 }
 
+type ProgressPhase = "idle" | "querying" | "archiving" | "uploading" | "done" | "error";
+
+interface ExportProgressTable {
+  table: string;
+  rows: number;
+  status: "pending" | "running" | "done";
+}
+
+interface ExportProgress {
+  active: boolean;
+  startedAt: string | null;
+  currentTable: string | null;
+  currentTableIndex: number;
+  totalTables: number;
+  rowsInCurrentTable: number;
+  totalRowsSoFar: number;
+  tables: ExportProgressTable[];
+  phase: ProgressPhase;
+  error: string | null;
+}
+
+const PHASE_LABELS: Record<ProgressPhase, string> = {
+  idle: "In attesa",
+  querying: "Lettura tabelle",
+  archiving: "Compressione archivio",
+  uploading: "Caricamento su storage",
+  done: "Completato",
+  error: "Errore",
+};
+
 interface ExportHistory {
   history: ExportMeta[];
 }
@@ -151,6 +181,17 @@ export default function ExportsScreen() {
   const isRunning = runMutation.isPending || !!status?.isExporting;
   const currentSchedule = status?.schedule ?? "off";
 
+  const { data: progress } = useQuery<ExportProgress>({
+    queryKey: ["/api/admin/exports/progress"],
+    refetchInterval: isRunning ? 1000 : false,
+    enabled: isRunning,
+  });
+
+  const completedTables = progress?.tables.filter((t) => t.status === "done").length ?? 0;
+  const progressPct = progress && progress.totalTables > 0
+    ? Math.round((completedTables / progress.totalTables) * 100)
+    : 0;
+
   return (
     <ScrollView
       style={styles.container}
@@ -234,6 +275,70 @@ export default function ExportsScreen() {
       {runMutation.isError && (
         <View style={styles.errorBanner}>
           <Text style={styles.errorText}>{(runMutation.error as Error).message}</Text>
+        </View>
+      )}
+
+      {isRunning && (
+        <View style={styles.card}>
+          <View style={styles.cardHeaderRow}>
+            <ActivityIndicator size="small" color={Colors.accent} />
+            <Text style={styles.cardTitle}>Export in corso</Text>
+            <Text style={styles.progressPctText}>{progressPct}%</Text>
+          </View>
+
+          <View style={styles.progressBarTrack}>
+            <View style={[styles.progressBarFill, { width: `${progressPct}%` }]} />
+          </View>
+
+          <Text style={styles.progressPhaseText}>
+            {PHASE_LABELS[progress?.phase ?? "querying"]}
+            {progress && progress.totalTables > 0
+              ? ` · ${completedTables}/${progress.totalTables} tabelle`
+              : ""}
+          </Text>
+
+          {progress?.tables.map((t) => (
+            <View key={t.table} style={styles.progressTableRow}>
+              <MaterialCommunityIcons
+                name={
+                  t.status === "done"
+                    ? "check-circle"
+                    : t.status === "running"
+                      ? "progress-clock"
+                      : "circle-outline"
+                }
+                size={18}
+                color={
+                  t.status === "done"
+                    ? "#22c55e"
+                    : t.status === "running"
+                      ? Colors.accent
+                      : Colors.textSecondary
+                }
+              />
+              <Text
+                style={[
+                  styles.progressTableName,
+                  t.status === "running" && styles.progressTableNameActive,
+                ]}
+              >
+                {t.table}
+              </Text>
+              <Text style={styles.progressTableRows}>
+                {t.status === "running"
+                  ? `${(progress?.rowsInCurrentTable ?? 0).toLocaleString()} righe…`
+                  : t.status === "done"
+                    ? `${t.rows.toLocaleString()} righe`
+                    : "—"}
+              </Text>
+            </View>
+          ))}
+
+          {progress && progress.totalRowsSoFar > 0 && (
+            <Text style={styles.progressTotalText}>
+              {progress.totalRowsSoFar.toLocaleString()} righe scritte finora
+            </Text>
+          )}
         </View>
       )}
 
@@ -379,6 +484,23 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.error + "40",
   },
   errorText: { color: Colors.error, fontSize: 13, fontFamily: "Inter_400Regular" },
+  progressPctText: { fontFamily: "Inter_700Bold", fontSize: 16, color: Colors.accent },
+  progressBarTrack: {
+    height: 8, borderRadius: 4, backgroundColor: Colors.border,
+    overflow: "hidden", marginBottom: 10,
+  },
+  progressBarFill: { height: 8, borderRadius: 4, backgroundColor: Colors.accent },
+  progressPhaseText: {
+    fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.textSecondary, marginBottom: 12,
+  },
+  progressTableRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 6 },
+  progressTableName: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.text },
+  progressTableNameActive: { color: Colors.accent, fontFamily: "Inter_600SemiBold" },
+  progressTableRows: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
+  progressTotalText: {
+    fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.text,
+    marginTop: 10, textAlign: "center",
+  },
   metaGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12, marginBottom: 14 },
   metaItem: { width: "45%" },
   metaLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginBottom: 2 },

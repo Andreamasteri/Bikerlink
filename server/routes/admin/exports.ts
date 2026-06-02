@@ -3,6 +3,7 @@ import { sendError } from "../../lib/api-response";
 import {
   runExport,
   getExportStatus,
+  getExportProgress,
   getExportHistory,
   listExportFiles,
   downloadExport,
@@ -21,6 +22,15 @@ router.get("/exports/status", async (_req: Request, res: Response) => {
   } catch (err) {
     console.error("[admin/exports] status error:", err);
     return sendError(res, 500, "Errore stato export");
+  }
+});
+
+router.get("/exports/progress", (_req: Request, res: Response) => {
+  try {
+    return res.json(getExportProgress());
+  } catch (err) {
+    console.error("[admin/exports] progress error:", err);
+    return sendError(res, 500, "Errore progresso export");
   }
 });
 

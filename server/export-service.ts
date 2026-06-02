@@ -35,6 +35,57 @@ let schedulerTimer: NodeJS.Timeout | null = null;
 let nextAt: Date | null = null;
 let isExporting = false;
 
+export interface ExportProgressTable {
+  table: string;
+  rows: number;
+  status: "pending" | "running" | "done";
+}
+
+export interface ExportProgress {
+  active: boolean;
+  startedAt: string | null;
+  currentTable: string | null;
+  currentTableIndex: number;
+  totalTables: number;
+  rowsInCurrentTable: number;
+  totalRowsSoFar: number;
+  tables: ExportProgressTable[];
+  phase: "idle" | "querying" | "archiving" | "uploading" | "done" | "error";
+  error: string | null;
+}
+
+let exportProgress: ExportProgress = {
+  active: false,
+  startedAt: null,
+  currentTable: null,
+  currentTableIndex: 0,
+  totalTables: 0,
+  rowsInCurrentTable: 0,
+  totalRowsSoFar: 0,
+  tables: [],
+  phase: "idle",
+  error: null,
+};
+
+function resetProgress(tables: string[], startedAt: Date) {
+  exportProgress = {
+    active: true,
+    startedAt: startedAt.toISOString(),
+    currentTable: null,
+    currentTableIndex: 0,
+    totalTables: tables.length,
+    rowsInCurrentTable: 0,
+    totalRowsSoFar: 0,
+    tables: tables.map((table) => ({ table, rows: 0, status: "pending" })),
+    phase: "querying",
+    error: null,
+  };
+}
+
+export function getExportProgress(): ExportProgress {
+  return exportProgress;
+}
+
 const ALL_TABLES = [
   "users",
   "user_profiles",
@@ -182,6 +233,7 @@ async function* chunkedQuery(
 async function writeJsonlGz(
   outputPath: string,
   rowIterator: AsyncIterable<Record<string, unknown>>,
+  onProgress?: (rows: number) => void,
 ): Promise<number> {
   let count = 0;
   await new Promise<void>((resolve, reject) => {
@@ -195,7 +247,9 @@ async function writeJsonlGz(
           const ok = gz.write(line);
           if (!ok) await new Promise<void>((r) => gz.once("drain", r));
           count++;
+          if (onProgress && count % 1000 === 0) onProgress(count);
         }
+        if (onProgress) onProgress(count);
         gz.end();
       } catch (err) {
         reject(err);
@@ -276,8 +330,14 @@ export async function runExport(options: Partial<ExportOptions> = {}): Promise<E
   const tmpDir = path.join(os.tmpdir(), exportId);
   const tmpZip = path.join(os.tmpdir(), `${exportId}.zip`);
 
+  const tablesToExport = ALL_TABLES.filter((t) => opts.tables.includes(t));
+  resetProgress([...tablesToExport], startedAt);
+
   if (!process.env.DATABASE_URL) {
     isExporting = false;
+    exportProgress.active = false;
+    exportProgress.phase = "error";
+    exportProgress.error = "DATABASE_URL non configurato";
     throw new Error("DATABASE_URL non configurato");
   }
 
@@ -292,9 +352,8 @@ export async function runExport(options: Partial<ExportOptions> = {}): Promise<E
     const tableResults: { table: string; rows: number; bytes: number }[] = [];
     let totalRows = 0;
 
-    const tablesToExport = ALL_TABLES.filter((t) => opts.tables.includes(t));
-
-    for (const table of tablesToExport) {
+    for (let i = 0; i < tablesToExport.length; i++) {
+      const table = tablesToExport[i];
       const filePath = path.join(tmpDir, `${table}.jsonl.gz`);
       const { sql, params } = buildQuery(table, opts.excludeFake);
       const isChunked = table === "route_points";
@@ -302,13 +361,28 @@ export async function runExport(options: Partial<ExportOptions> = {}): Promise<E
         ? chunkedQuery(pool, sql, params)
         : simpleQuery(pool, sql, params);
 
+      exportProgress.phase = "querying";
+      exportProgress.currentTable = table;
+      exportProgress.currentTableIndex = i;
+      exportProgress.rowsInCurrentTable = 0;
+      exportProgress.tables[i].status = "running";
+
       console.log(`[export-service] Esportando ${table}...`);
-      const rows = await writeJsonlGz(filePath, iterator);
+      const rows = await writeJsonlGz(filePath, iterator, (written) => {
+        exportProgress.rowsInCurrentTable = written;
+        exportProgress.totalRowsSoFar = totalRows + written;
+      });
       const bytes = fs.statSync(filePath).size;
       tableResults.push({ table, rows, bytes });
       totalRows += rows;
+      exportProgress.tables[i].rows = rows;
+      exportProgress.tables[i].status = "done";
+      exportProgress.totalRowsSoFar = totalRows;
       console.log(`[export-service]   ${table}: ${rows.toLocaleString()} righe → ${formatBytes(bytes)}`);
     }
+
+    exportProgress.currentTable = null;
+    exportProgress.phase = "archiving";
 
     const manifest = {
       exportId,
@@ -330,6 +404,7 @@ export async function runExport(options: Partial<ExportOptions> = {}): Promise<E
 
     const fileName = `bikerlink_export_${ts}.zip`;
     const objectPath = `${EXPORT_OBJECT_PREFIX}/${fileName}`;
+    exportProgress.phase = "uploading";
     await uploadBuffer(objectPath, zipBuffer, "application/zip");
 
     const completedAt = new Date();
@@ -347,10 +422,17 @@ export async function runExport(options: Partial<ExportOptions> = {}): Promise<E
     };
 
     await appendToHistory(meta);
+    exportProgress.phase = "done";
     console.log(`[export-service] Export completato: ${objectPath} (${formatBytes(zipBuffer.length)})`);
     return meta;
+  } catch (err) {
+    exportProgress.phase = "error";
+    exportProgress.error = err instanceof Error ? err.message : "Errore export";
+    throw err;
   } finally {
     isExporting = false;
+    exportProgress.active = false;
+    exportProgress.currentTable = null;
     await pool.end();
     try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* no-op */ }
     try { fs.unlinkSync(tmpZip); } catch { /* no-op */ }
