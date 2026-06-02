@@ -264,17 +264,21 @@ export function useHomeMapState() {
   }, []);
 
   const areaLabel = useMemo(() => {
-    if (selectedCountries.length === 0) return "🌍 Tutto il mondo";
-    for (const continent of CONTINENT_MAP) {
-      const allInContinent = continent.countryCodes.every((c) => selectedCountries.includes(c));
-      const onlyContinent = selectedCountries.every((c) => continent.countryCodes.includes(c));
-      if (allInContinent && onlyContinent && selectedCountries.length === continent.countryCodes.length) return `${continent.label}`;
+    if (!Array.isArray(selectedCountries) || selectedCountries.length === 0) return "🌍 Tutto il mondo";
+    try {
+      for (const continent of CONTINENT_MAP) {
+        const allInContinent = continent.countryCodes.every((c) => selectedCountries.includes(c));
+        const onlyContinent = selectedCountries.every((c) => continent.countryCodes.includes(c));
+        if (allInContinent && onlyContinent && selectedCountries.length === continent.countryCodes.length) return `${continent.label}`;
+      }
+      if (selectedCountries.length === 1) {
+        const country = typeof getCountryByCode === "function" ? getCountryByCode(selectedCountries[0]) : undefined;
+        return country ? `${country.flag} ${country.name}` : selectedCountries[0];
+      }
+      return `${selectedCountries.length} paesi`;
+    } catch {
+      return `${selectedCountries.length} ${selectedCountries.length === 1 ? "paese" : "paesi"}`;
     }
-    if (selectedCountries.length === 1) {
-      const country = getCountryByCode(selectedCountries[0]);
-      return country ? `${country.flag} ${country.name}` : selectedCountries[0];
-    }
-    return `${selectedCountries.length} paesi`;
   }, [selectedCountries]);
 
   const startOfflineTimer = useCallback(() => { setOfflineCountdown({ online: 30 }); }, []);
