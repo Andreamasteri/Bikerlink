@@ -25,14 +25,27 @@ T_TOTAL_START=$(date +%s)
 T_EXPORT=0; T_UPLOAD=0; T_PUBLISH=0; T_DB=0; T_GIT=0
 DIST_DIR="dist-ota"
 
-# ── 1. Leggi messaggio da .ota-message ──────────────────────────────────────
+# ── 1. Leggi messaggio da .ota-message (con fallback DB per restart Replit) ─
 MSG_FILE=".ota-message"
+
+# Crea il file se non esiste (env restart può averlo eliminato)
 if [[ ! -f "$MSG_FILE" ]]; then
-  log_error "File .ota-message non trovato. Crea il file con il messaggio dell'aggiornamento."
-  exit 1
+  touch "$MSG_FILE"
 fi
 
 MESSAGE=$(grep -v '^\s*#' "$MSG_FILE" | tr -d '\r' | sed '/^[[:space:]]*$/d' | head -1)
+
+# Fallback DB: se .ota-message è vuoto, controlla app_settings (resiliente ai restart Replit)
+if [[ -z "$MESSAGE" ]] && [[ -n "${DATABASE_URL:-}" ]]; then
+  DB_MSG=$(psql "$DATABASE_URL" -tAc \
+    "SELECT value FROM app_settings WHERE key='pending_ota_message' LIMIT 1" \
+    2>/dev/null | tr -d '\r\n' | xargs)
+  if [[ -n "$DB_MSG" ]]; then
+    MESSAGE="$DB_MSG"
+    echo "$MESSAGE" > "$MSG_FILE"
+    log_info "Messaggio recuperato dal DB (fallback — .ota-message era vuoto per restart env)"
+  fi
+fi
 
 if [[ -z "$MESSAGE" ]]; then
   echo "[OTA] Nessun messaggio in .ota-message — pubblicazione saltata."
@@ -169,9 +182,12 @@ psql "$DATABASE_URL" -c "
   exit 1
 }
 
-# ── 6. Svuota .ota-message dopo pubblicazione riuscita ───────────────────────
+# ── 6. Svuota .ota-message e chiave DB dopo pubblicazione riuscita ──────────
 echo "" > "$MSG_FILE"
-log_ok ".ota-message svuotato (pronto per il prossimo OTA)"
+psql "$DATABASE_URL" -c \
+  "DELETE FROM app_settings WHERE key='pending_ota_message'" \
+  2>/dev/null || true
+log_ok ".ota-message e DB svuotati (pronto per il prossimo OTA)"
 
 # ── 8. Push su GitHub ─────────────────────────────────────────────────────────
 GH_TOKEN="${GITHUB_TOKEN:-${GITHUB_PAT:-}}"
