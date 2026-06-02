@@ -33,6 +33,7 @@ interface AdCardProps {
   groupAllActive?: boolean;
   groupSomeActive?: boolean;
   isBroken?: boolean;
+  onReupload?: (item: Campaign) => void;
 }
 
 export function AdCard({
@@ -45,6 +46,7 @@ export function AdCard({
   groupAllActive,
   groupSomeActive,
   isBroken,
+  onReupload,
 }: AdCardProps) {
   const [imageError, setImageError] = useState(false);
 
@@ -132,6 +134,11 @@ export function AdCard({
           ) : (
             <TouchableOpacity onPress={() => onToggle(item.id, true)} style={styles.actionBtn}>
               <MaterialIcons name="play-circle-filled" size={28} color={Colors.success} />
+            </TouchableOpacity>
+          )}
+          {isBroken && onReupload && (
+            <TouchableOpacity onPress={() => onReupload(item)} style={styles.actionBtn} accessibilityLabel="Ricarica immagine">
+              <MaterialIcons name="add-photo-alternate" size={22} color={Colors.warning} />
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => onEdit(item)} style={styles.actionBtn}>

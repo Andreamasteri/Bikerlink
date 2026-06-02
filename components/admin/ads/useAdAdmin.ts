@@ -86,6 +86,46 @@ export function useAdAdmin() {
   const campaigns = activeTab === "tutti" ? allCampaigns : allCampaigns.filter((c) => c.targetUserType === activeTab);
   const brokenIdSet = new Set<string>(imageHealth?.brokenIds ?? []);
   const brokenInView = campaigns.filter((c) => brokenIdSet.has(c.id));
+
+  const reuploadMutation = useMutation({
+    mutationFn: async ({ id, imageUri, mimeType, filename }: { id: string; imageUri: string; mimeType: string; filename: string }) => {
+      const formData = new FormData();
+      await appendFileToForm(formData, "image", imageUri, mimeType, filename);
+      const baseUrl = getApiUrl();
+      const url = new URL(`/api/admin/advertisements/${id}/reupload-image`, baseUrl);
+      const res = await globalThis.fetch(url.toString(), {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`${res.status}: ${text}`);
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements/image-health"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/active"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ads/my-ads"] });
+    },
+    onError: (err: Error) => Alert.alert("Errore re-upload", err.message),
+  });
+
+  const handleReuploadImage = useCallback((campaign: Campaign) => {
+    showImagePickerMenu(
+      (uri) => {
+        const filename = uri.split("/").pop() || "image.jpg";
+        const match = /\.(\w+)$/.exec(filename);
+        const rawMime = match ? `image/${match[1].toLowerCase()}` : "image/jpeg";
+        const mimeType = ["image/jpg", "image/jpe"].includes(rawMime) ? "image/jpeg" : rawMime;
+        reuploadMutation.mutate({ id: campaign.id, imageUri: uri, mimeType, filename });
+      },
+      { quality: 0.8, aspect: [16, 11] }
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   const groupMeta = useMemo(() => {
@@ -535,6 +575,7 @@ export function useAdAdmin() {
     cacheStats,
     healthBannerDismissed, setHealthBannerDismissed,
     brokenInView,
+    brokenIdSet,
     collapsedGroups,
     listItems,
     toggleGroupCollapse,
@@ -558,5 +599,7 @@ export function useAdAdmin() {
     toggleMutation,
     resetForm,
     pickImage,
+    handleReuploadImage,
+    reuploadMutation,
   };
 }

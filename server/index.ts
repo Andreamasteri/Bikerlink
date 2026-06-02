@@ -351,6 +351,15 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       setInterval(cleanupOrphanedAdImages, 24 * 60 * 60 * 1000);
     }, 5 * 60 * 1000);
 
+    setImmediate(async () => {
+      try {
+        const { runAdImageHealthCheck } = await import("./routes/admin/advertisements.next");
+        await runAdImageHealthCheck();
+      } catch (e) {
+        console.warn("[INIT][BG] runAdImageHealthCheck error:", e);
+      }
+    });
+
     const { scheduleNightlyVacuum } = await import("./vacuum-service");
     scheduleNightlyVacuum();
 

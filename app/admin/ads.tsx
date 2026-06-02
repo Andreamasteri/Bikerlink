@@ -120,6 +120,8 @@ function AdminAdsInner() {
     toggleMutation,
     resetForm,
     pickImage,
+    handleReuploadImage,
+    brokenIdSet,
   } = useAdAdmin();
 
   const currentTab = TABS.find((t) => t.key === activeTab)!;
@@ -314,6 +316,8 @@ function AdminAdsInner() {
         onDeleteCampaign={handleDelete}
         onRefresh={() => queryClient.invalidateQueries({ queryKey: ["/api/admin/advertisements"] })}
         isRefreshing={isLoading}
+        brokenIdSet={brokenIdSet}
+        onReupload={handleReuploadImage}
       />
 
       <TouchableOpacity

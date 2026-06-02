@@ -23,6 +23,8 @@ interface AdGroupListProps {
   onDeleteCampaign: (campaign: Campaign) => void;
   onRefresh: () => void;
   isRefreshing: boolean;
+  brokenIdSet?: Set<string>;
+  onReupload?: (campaign: Campaign) => void;
 }
 
 export function AdGroupList({
@@ -38,6 +40,8 @@ export function AdGroupList({
   onDeleteCampaign,
   onRefresh,
   isRefreshing,
+  brokenIdSet,
+  onReupload,
 }: AdGroupListProps) {
   const t = useT();
 
@@ -63,6 +67,8 @@ export function AdGroupList({
         onToggle={() => onToggleCampaign(campaign.id, !campaign.isActive)}
         onDelete={() => onDeleteCampaign(campaign)}
         onEdit={() => onEditCampaign(campaign)}
+        isBroken={brokenIdSet?.has(campaign.id) ?? false}
+        onReupload={onReupload}
       />
     );
   };
