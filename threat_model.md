@@ -48,6 +48,7 @@ Production assumptions for this scan:
 - Treat any production startup seeding or reviewer/demo-account provisioning as a first-class auth risk; default or resettable credentials are in scope even when introduced as operational convenience.
 - Treat platform-created fake or synthetic users as real production principals if they can log in or interact with ordinary users; shared credentials on those accounts are in scope.
 - Treat email-verification and password-recovery codes as authentication factors: short codes, missing attempt limits, or flows that automatically create a session on success are in scope as account-takeover risks.
+- Treat session-issuing auth endpoints as CSRF candidates even when the app uses `SameSite=Lax`; cross-site navigations can still create or swap a browser session if login/register/recovery POSTs lack origin or token validation.
 - Treat exact user coordinates, club rosters/proposals, profile photos, garage photos, chat attachments, and wishlist preference objects as sensitive data that require server-side audience checks, not just frontend hiding or unguessable URLs.
 - Treat any proxy/fetch endpoint that accepts attacker-controlled destinations as SSRF-prone unless it validates resolved IPs, redirect targets, and response-handling boundaries.
 - Re-check current account status on authenticated requests; blocking or suspension is not an effective control if long-lived sessions remain usable after the status change.
@@ -60,6 +61,8 @@ Production assumptions for this scan:
 - Treat public or low-friction telemetry and reporting endpoints that trigger email or durable storage as abuse surfaces: they should rely on trusted proxy-derived client identity (`req.ip`/Express proxy handling), and authenticated reporting still needs quotas and body caps.
 - Treat admin-authored OTA metadata and moderator-authored client-rendered URLs as untrusted inputs that cross into public endpoints or end-user devices; privileged content pipelines still need server-side source restrictions.
 - Treat match-linked object identifiers as sensitive capability references; if a route leaks another user's object ID, every downstream mutation path must still verify ownership server-side.
+- Treat every `/api/admin/*` subrouter mount as suspect until it is explicitly wrapped in a server-side admin guard; being nested under the admin prefix alone is not an authorization control.
+- Treat moderation approval flags as enforcement controls across every list, detail, vote, and media path that references moderated content, not only on the final file-serving route.
 
 ## Threat Categories
 
