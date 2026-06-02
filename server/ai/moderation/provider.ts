@@ -35,6 +35,7 @@ const PRICING: Record<string, { in: number; out: number }> = {
   "llama-3.3-70b-versatile": { in: 0, out: 0 },
   "llama-3.1-8b-instant": { in: 0, out: 0 },
   "meta-llama/llama-4-scout-17b-16e-instruct": { in: 0, out: 0 },
+  "openai/gpt-oss-20b": { in: 0, out: 0 },
 };
 
 export function estimateCostUsd(modelId: string, tokensIn: number, tokensOut: number): number {
@@ -252,17 +253,18 @@ function tryBuild(id: AiProviderId, role: ModelRole, forcedModelId?: string): Re
     }
     if (id === "groq") {
       // Groq è OpenAI-compatibile → riusa createOpenAI con baseURL Groq. Free tier
-      // (nessuna carta): Llama 3.3 70B, qualità nettamente superiore a Ollama locale.
-      // Limiti free gestiti da limiters.groq (RPM 30) + DAILY_CAPS.groq (RPD 1000).
+      // (nessuna carta): limiti free gestiti da limiters.groq (RPM 30) + DAILY_CAPS.groq (RPD 1000).
       const key = process.env.GROQ_API_KEY;
       if (!key) return null;
-      // meta-llama/llama-4-scout-17b-16e-instruct supporta response_format: json_schema
-      // (structured outputs, best-effort mode). llama-3.x-* non supportano json_schema su Groq.
-      const modelId = forcedModelId ?? "meta-llama/llama-4-scout-17b-16e-instruct";
+      // openai/gpt-oss-20b è l'unico modello Groq free-tier con strict mode (constrained
+      // decoding): garantisce 100% schema adherence senza errori JSON. Confermato free tier
+      // nelle Groq rate-limits (30 RPM / 1K RPD). strictJsonSchema: true → strict: true
+      // nell'API Groq → mai output invalido né 400 da schema validation.
+      const modelId = forcedModelId ?? "openai/gpt-oss-20b";
       const client = createOpenAI({ apiKey: key, baseURL: "https://api.groq.com/openai/v1" });
       return {
         id, providerName: "groq", modelId,
-        model: client(modelId) as unknown as LanguageModelV2,
+        model: client(modelId, { strictJsonSchema: true }) as unknown as LanguageModelV2,
         scheduler: <T>(fn: () => Promise<T>) => limiters.groq.schedule(fn),
       };
     }
