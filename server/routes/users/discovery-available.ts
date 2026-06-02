@@ -3,6 +3,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { onlineTracker } from "../../online-tracker";
 import { isPositionFuzzed, fuzzedCoordsForViewer, systemAccountConditions } from "../users";
+import { isSystemAccount } from "../../lib/system-account-filter";
 import { requireAuth } from "../../lib/auth-middleware";
 
 const router = Router();
@@ -27,7 +28,7 @@ router.get("/biker-available-list", requireAuth, async (req: Request, res: Respo
     const onlineResultsRaw = trackerBikerIds.length > 0
       ? await storage.getAvailableBikersList(lat, lng, countriesParam, trackerBikerIds)
       : [];
-    const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
+    const onlineResults = onlineResultsRaw.filter((r) => !isSystemAccount(r.user) && !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline && mapVisibilityFilter !== "online_only" && mapVisibilityFilter !== "available_only") {
       const { db } = await import("../../db");
@@ -123,7 +124,7 @@ router.get("/zavorrine-available-list", requireAuth, async (req: Request, res: R
     const onlineResultsRaw = trackerZavIds.length > 0
       ? await storage.getAvailableZavorrinaList(lat, lng, countriesParam, trackerZavIds)
       : [];
-    const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
+    const onlineResults = onlineResultsRaw.filter((r) => !isSystemAccount(r.user) && !blockedIds.has(r.user.id));
     let allResults = onlineResults;
     if (includeOffline && mapVisibilityFilter !== "online_only" && mapVisibilityFilter !== "available_only") {
       const { db } = await import("../../db");

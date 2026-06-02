@@ -13,10 +13,12 @@ vi.mock("../storage", () => ({
     getAllUsers: vi.fn().mockResolvedValue([]),
     searchUsers: vi.fn().mockResolvedValue([]),
     getNearbyUsers: vi.fn().mockResolvedValue([]),
+    getOnlineUsersList: vi.fn().mockResolvedValue([]),
     getAvailableUsersList: vi.fn().mockResolvedValue([]),
     getAvailableBikersList: vi.fn().mockResolvedValue([]),
     getAvailableZavorrinaList: vi.fn().mockResolvedValue([]),
     getUserMotorcycles: vi.fn().mockResolvedValue([]),
+    getUserMotorcyclesBatch: vi.fn().mockResolvedValue([]),
   },
 }));
 

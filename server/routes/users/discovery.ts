@@ -3,6 +3,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { onlineTracker } from "../../online-tracker";
 import { isPositionFuzzed, fuzzedCoordsForViewer, systemAccountConditions } from "../users";
+import { isSystemAccount } from "../../lib/system-account-filter";
 
 import { requireAuth } from "../../lib/auth-middleware";
 import availableRouter from "./discovery-available";
@@ -129,7 +130,7 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
     const onlineResultsRaw = trackerAvailableIds.length > 0
       ? await storage.getOnlineUsersList(since, lat, lng, countriesParam, trackerAvailableIds as string[])
       : [];
-    const onlineResults = onlineResultsRaw.filter((r) => !blockedIds.has(r.user.id));
+    const onlineResults = onlineResultsRaw.filter((r) => !isSystemAccount(r.user) && !blockedIds.has(r.user.id));
     type OnlineRow = typeof onlineResults[number];
     let allResults: OnlineRow[] = onlineResults;
 
@@ -231,6 +232,7 @@ router.get("/available-list", requireAuth, async (req: Request, res: Response) =
 
     const allItems = await storage.getAvailableUsersList(lat, lng);
     const results = allItems.filter((r) => {
+      if (isSystemAccount(r.user)) return false;
       if (blockedIds.has(r.user.id)) return false;
       if (mapVisibilityFilter === "online_only") return onlineIdSet!.has(r.user.id);
       return true;
@@ -319,6 +321,7 @@ router.get("/nearby", requireAuth, async (req: Request, res: Response) => {
     const nearbyUsers = await storage.getNearbyUsers(lat, lng, radius, countriesParam, motoTagsParam);
     const fifteenMinutesAgoNearby = new Date(Date.now() - 15 * 60 * 1000);
     const results = nearbyUsers
+      .filter((item) => !isSystemAccount(item.user))
       .filter((item) => !blockedIds.has(item.user.id))
       .filter((item) => !item.profile?.hideFromMap)
       .map((item) => {
