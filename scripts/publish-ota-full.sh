@@ -171,11 +171,12 @@ echo "" > "$MSG_FILE"
 log_ok ".ota-message svuotato (pronto per il prossimo OTA)"
 
 # ── 8. Push su GitHub ─────────────────────────────────────────────────────────
-if [[ -n "${GITHUB_PAT:-}" ]]; then
+GH_TOKEN="${GITHUB_TOKEN:-${GITHUB_PAT:-}}"
+if [[ -n "$GH_TOKEN" ]]; then
   log_info "Push su GitHub..."
   _T0=$(date +%s)
-  git -c "credential.helper=!f() { echo username=x; echo password=${GITHUB_PAT}; }; f" \
-    push "https://github.com/Andreamasteri/Bikerlink.git" "HEAD:main" 2>&1 && {
+  git push "https://${GH_TOKEN}:x-oauth-basic@github.com/Andreamasteri/Bikerlink.git" \
+    "HEAD:main" 2>&1 && {
     T_GIT=$(( $(date +%s) - _T0 ))
     log_ok "GitHub aggiornato"
     log_ok "⏱ Git push completato in ${T_GIT}s"
@@ -184,7 +185,7 @@ if [[ -n "${GITHUB_PAT:-}" ]]; then
     log_warn "Push GitHub fallito — esegui manualmente (${T_GIT}s)"
   }
 else
-  log_warn "GITHUB_PAT non impostato — push GitHub saltato"
+  log_warn "GITHUB_TOKEN non impostato — push GitHub saltato"
 fi
 
 # ── Riepilogo timing + scrittura ota-timing.log ───────────────────────────────
