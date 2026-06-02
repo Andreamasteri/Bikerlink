@@ -58,6 +58,20 @@ async function resetQuota(): Promise<void> {
   console.log("[TomTom] Quota giornaliera azzerata (reset cron)");
 }
 
+/**
+ * setTimeout sicuro per delay > 2^31-1 ms (limite Node.js 32-bit int).
+ * Per il reset giornaliero non è necessario, ma offre difesa in profondità.
+ */
+const MAX_SAFE_TIMEOUT_MS = 2_000_000_000;
+
+function safeSetTimeout(callback: () => void, delayMs: number): void {
+  if (delayMs > MAX_SAFE_TIMEOUT_MS) {
+    setTimeout(() => safeSetTimeout(callback, delayMs - MAX_SAFE_TIMEOUT_MS), MAX_SAFE_TIMEOUT_MS);
+  } else {
+    setTimeout(callback, Math.max(0, delayMs));
+  }
+}
+
 export function scheduleDailyReset(): void {
   function msUntilNextReset(): number {
     return Math.max(0, new Date(nextDailyReset()).getTime() - Date.now());
@@ -68,7 +82,7 @@ export function scheduleDailyReset(): void {
     const hours = Math.round(delay / 3_600_000);
     console.log(`[TomTom] Quota reset schedulato tra ~${hours}h (${nextDailyReset()})`);
 
-    setTimeout(async () => {
+    safeSetTimeout(async () => {
       await resetQuota().catch((e) => console.error("[TomTom] Errore reset quota:", e));
       scheduleNext();
     }, delay);

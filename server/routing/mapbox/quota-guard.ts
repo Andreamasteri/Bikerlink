@@ -101,6 +101,20 @@ async function resetQuota(): Promise<void> {
 }
 
 /**
+ * setTimeout sicuro per delay > 2^31-1 ms (limite Node.js 32-bit int).
+ * Suddivide il delay in chunk da MAX_SAFE_TIMEOUT_MS per evitare overflow.
+ */
+const MAX_SAFE_TIMEOUT_MS = 2_000_000_000; // ~23 giorni, sotto il limite 32-bit
+
+function safeSetTimeout(callback: () => void, delayMs: number): void {
+  if (delayMs > MAX_SAFE_TIMEOUT_MS) {
+    setTimeout(() => safeSetTimeout(callback, delayMs - MAX_SAFE_TIMEOUT_MS), MAX_SAFE_TIMEOUT_MS);
+  } else {
+    setTimeout(callback, Math.max(0, delayMs));
+  }
+}
+
+/**
  * Schedula il reset automatico del contatore il 1° di ogni mese alle 00:01 Europe/Rome.
  * Deve essere chiamato da server/index.ts all'avvio.
  */
@@ -114,7 +128,7 @@ export function scheduleMonthlyReset(): void {
     const days = Math.round(delay / 86_400_000);
     console.log(`[Mapbox] Quota reset schedulato tra ~${days} giorni (${nextResetDate()})`);
 
-    setTimeout(async () => {
+    safeSetTimeout(async () => {
       await resetQuota().catch((e) => console.error("[Mapbox] Errore reset quota:", e));
       scheduleNext();
     }, delay);
