@@ -55,15 +55,15 @@ fi
 log_info "EAS_TOKEN: ${#EAS_TOKEN} chars — OK"
 
 # ── 3. Calcola numero OTA (informativo) ─────────────────────────────────────
-PENDING_PLUS_APPROVED_COUNT=$(psql "$DATABASE_URL" -tAc "
-  SELECT COUNT(*) FROM ota_releases WHERE status IN ('approved','pending')
+TOTAL_OTA_COUNT=$(psql "$DATABASE_URL" -tAc "
+  SELECT COUNT(*) FROM ota_releases
 " 2>/dev/null || echo "0")
-NEXT_OTA=$(( PENDING_PLUS_APPROVED_COUNT + 1 ))
+NEXT_OTA=$(( TOTAL_OTA_COUNT + 1 ))
 BUILD_NUM=$(node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode || 53)" 2>/dev/null || echo "53")
 RUNTIME_FULL=$(node -e "const a=require('./app.json'); console.log(a.expo.runtimeVersion||'10.0.0')" 2>/dev/null || echo "10.0.0")
 RUNTIME_VER=$(echo "$RUNTIME_FULL" | cut -d. -f1)
-# Formato versione OTA canonico: <build>.<updateNumber>.<ciclo_ota> (vedi .agents/skills/bikerlink-versioning)
-VERSION="${BUILD_NUM}.${NEXT_OTA}.${RUNTIME_VER}"
+# Formato versione OTA canonico: V<build>.<runtime>.<otaNumber> — es. V54.10.36
+VERSION="${BUILD_NUM}.${RUNTIME_VER}.${NEXT_OTA}"
 
 log_info "Build: ${BUILD_NUM} | NEXT_OTA: ${NEXT_OTA} | Versione: ${VERSION}"
 

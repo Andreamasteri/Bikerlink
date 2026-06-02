@@ -7,13 +7,16 @@ import { useAuth } from "@/lib/auth-context";
 import { APPLIED_OTA_NUMBER } from "@/constants/buildInfo";
 import { loadAppliedOtaNumber, saveAppliedOtaNumber } from "@/lib/otaStorage";
 
-function parseAppVersion(): { releaseNumber: string; otaBundled: string } {
+function parseAppVersion(): { apk: string; runtime: string; ota: string } {
   const version = Constants.expoConfig?.version ?? "";
   const parts = version.split(".");
-  if (parts.length >= 2) {
-    return { releaseNumber: parts[0], otaBundled: parts[1] };
+  if (parts.length >= 3) {
+    return { apk: parts[0], runtime: parts[1], ota: parts[2] };
   }
-  return { releaseNumber: "—", otaBundled: "—" };
+  if (parts.length === 2) {
+    return { apk: parts[0], runtime: parts[1], ota: "—" };
+  }
+  return { apk: "—", runtime: "—", ota: "—" };
 }
 
 interface OtaReleaseSummary {
@@ -70,7 +73,7 @@ export const ProfileVersionSection: React.FC = () => {
     return null;
   }, [releases]);
 
-  const { releaseNumber, otaBundled } = parseAppVersion();
+  const { apk, runtime, ota: otaBundledStr } = parseAppVersion();
 
   // Riga 1: per admin mostra l'OTA distribuita a tutti; per utenti normali mostra quella corrente
   const displayOta = isAdmin && lastApprovedOtaNum !== null ? lastApprovedOtaNum : appliedOta;
@@ -88,7 +91,7 @@ export const ProfileVersionSection: React.FC = () => {
         <View style={styles.item}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>Build</Text>
           <Text style={[styles.value, { color: colors.textSecondary }]}>
-            V{releaseNumber}.{otaBundled}
+            V{apk}.{runtime}.{otaBundledStr}
           </Text>
         </View>
         <Text style={[styles.dot, { color: colors.textSecondary }]}>·</Text>
