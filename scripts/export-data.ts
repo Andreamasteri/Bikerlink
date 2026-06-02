@@ -7,7 +7,9 @@
  *   --exclude-fake          Exclude users with is_fake=true and all their data
  *   --since=YYYY-MM-DD      Filter records with created_at >= date
  *   --tables=t1,t2,...      Export only the specified tables
- *   --no-compress           Write .jsonl instead of .jsonl.gz
+ *   --no-compress           Write .jsonl/.csv instead of .jsonl.gz/.csv.gz
+ *   --format=csv            Write CSV files instead of JSONL (header row included;
+ *                           nested/JSON values are serialised as JSON strings)
  */
 
 import fs from "fs";
@@ -21,6 +23,9 @@ const args = process.argv.slice(2);
 
 const excludeFake = args.includes("--exclude-fake");
 const noCompress = args.includes("--no-compress");
+
+const formatArg = args.find((a) => a.startsWith("--format="));
+const outputFormat: "jsonl" | "csv" = formatArg?.split("=")[1] === "csv" ? "csv" : "jsonl";
 
 const sinceArg = args.find((a) => a.startsWith("--since="));
 const since: string | null = sinceArg ? sinceArg.split("=")[1] : null;
@@ -48,6 +53,16 @@ type TableName = (typeof ALL_TABLES)[number];
 const tablesToExport: TableName[] = requestedTables
   ? ALL_TABLES.filter((t) => requestedTables.has(t))
   : [...ALL_TABLES];
+
+const TABLE_COLUMNS: Record<TableName, string[]> = {
+  users:            ["id","nickname","email","password","role","status","isFake","country","region","birthYear","createdAt","lastLoginAt"],
+  user_profiles:    ["userId","bio","totalKm","totalRides","latitude","longitude","isAvailable"],
+  user_motorcycles: ["userId","brand","model","year","displacement","motorcycleType","ridingStyle","createdAt"],
+  routes:           ["id","userId","title","status","totalDistanceKm","maxSpeedKmh","avgSpeedKmh","maxAltitude","durationSeconds","idleTimeSeconds","maxTiltDeg","maxAccelerationG","maxDecelerationG","maxLateralG","isSprint","sprint0to100Ms","gpsBlackoutCount","gpsBlackoutSeconds","likes","startedAt","stoppedAt","createdAt"],
+  route_points:     ["routeId","lat","lng","altitude","speedKmh","accelG","tiltDeg","timestamp"],
+  planned_routes:   ["id","userId","title","distanceKm","style","bikerScore","curvatureScore","waypoints","createdAt"],
+  sprint_results:   ["userId","routeId","sprint0to100Ms","maxAccelerationG","maxTiltDeg","createdAt"],
+};
 
 if (tablesToExport.length === 0) {
   console.error("[export] No valid tables selected. Valid tables:", ALL_TABLES.join(", "));
@@ -83,6 +98,73 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+/**
+ * Serialise a single cell value for CSV output (RFC 4180).
+ * - null/undefined  → empty string
+ * - objects/arrays  → JSON string (then quoted)
+ * - strings         → quoted if they contain comma, double-quote, or newline
+ * - everything else → plain string representation
+ */
+function csvCell(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  let str: string;
+  if (typeof value === "object") {
+    str = JSON.stringify(value);
+  } else {
+    str = String(value);
+  }
+  if (str.includes('"') || str.includes(",") || str.includes("\n") || str.includes("\r")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+async function writeCsv(
+  outputPath: string,
+  compress: boolean,
+  headers: string[],
+  rowIterator: AsyncIterable<Record<string, unknown>>,
+): Promise<number> {
+  let count = 0;
+
+  await new Promise<void>((resolve, reject) => {
+    const fileStream = fs.createWriteStream(outputPath);
+    let gz: zlib.Gzip | null = null;
+    const target: fs.WriteStream | zlib.Gzip = compress
+      ? (() => {
+          gz = zlib.createGzip({ level: 6 });
+          gz.pipe(fileStream);
+          return gz;
+        })()
+      : fileStream;
+
+    (async () => {
+      try {
+        const headerLine = headers.map(csvCell).join(",") + "\n";
+        const headerOk = target.write(headerLine);
+        if (!headerOk) await new Promise<void>((r) => target.once("drain", r));
+
+        for await (const row of rowIterator) {
+          const line = headers.map((h) => csvCell(row[h])).join(",") + "\n";
+          const ok = target.write(line);
+          if (!ok) await new Promise<void>((r) => target.once("drain", r));
+          count++;
+        }
+        target.end();
+      } catch (err) {
+        reject(err);
+        fileStream.destroy();
+      }
+    })();
+
+    fileStream.on("finish", resolve);
+    fileStream.on("error", reject);
+    if (gz) gz.on("error", reject);
+  });
+
+  return count;
 }
 
 async function writeJsonl(
@@ -410,7 +492,10 @@ async function exportTable(
   tableName: TableName,
   outputDir: string,
 ): Promise<ExportResult> {
-  const ext = noCompress ? ".jsonl" : ".jsonl.gz";
+  const isCsv = outputFormat === "csv";
+  const compress = !noCompress;
+  const baseExt = isCsv ? ".csv" : ".jsonl";
+  const ext = compress ? `${baseExt}.gz` : baseExt;
   const fileName = `${tableName}${ext}`;
   const outputPath = path.join(outputDir, fileName);
 
@@ -470,7 +555,9 @@ async function exportTable(
     : simpleQuery(querySql, queryParams);
 
   process.stdout.write(`  Exporting ${tableName}... `);
-  const rows = await writeJsonl(outputPath, !noCompress, iterator);
+  const rows = isCsv
+    ? await writeCsv(outputPath, compress, TABLE_COLUMNS[tableName], iterator)
+    : await writeJsonl(outputPath, compress, iterator);
   const bytes = fs.statSync(outputPath).size;
   console.log(`${rows.toLocaleString()} rows → ${formatBytes(bytes)}`);
 
@@ -489,6 +576,7 @@ async function main() {
   console.log(`  --since        : ${since ?? "(none)"}`);
   console.log(`  --tables       : ${tablesToExport.join(", ")}`);
   console.log(`  --no-compress  : ${noCompress}`);
+  console.log(`  --format       : ${outputFormat.toUpperCase()}`);
   console.log();
 
   const outputDir = getOutputDir();
@@ -521,6 +609,7 @@ async function main() {
       since: since ?? null,
       tables: tablesToExport,
       noCompress,
+      format: outputFormat,
     },
     tables: results.map((r) => ({
       table: r.table,
@@ -537,28 +626,31 @@ async function main() {
   const colTable = Math.max(14, ...results.map((r) => r.table.length));
   const colRows = 12;
   const colSize = 10;
+  const colFmt = 6;
+  const totalWidth = colTable + colRows + colSize + colFmt + 16;
 
   console.log();
-  console.log("─".repeat(colTable + colRows + colSize + 12));
+  console.log("─".repeat(totalWidth));
   console.log(
-    `${"Table".padEnd(colTable)}  ${"Rows".padStart(colRows)}  ${"Size".padStart(colSize)}  Path`,
+    `${"Table".padEnd(colTable)}  ${"Rows".padStart(colRows)}  ${"Size".padStart(colSize)}  ${"Format".padEnd(colFmt)}  Path`,
   );
-  console.log("─".repeat(colTable + colRows + colSize + 12));
+  console.log("─".repeat(totalWidth));
 
   let totalRows = 0;
   let totalBytes = 0;
   for (const r of results) {
     const rows = r.rows >= 0 ? r.rows.toLocaleString() : "ERROR";
     const size = r.bytes > 0 ? formatBytes(r.bytes) : "—";
+    const fmt = outputFormat.toUpperCase();
     const shortPath = r.file ? path.relative(process.cwd(), r.file) : "(failed)";
     console.log(
-      `${r.table.padEnd(colTable)}  ${rows.padStart(colRows)}  ${size.padStart(colSize)}  ${shortPath}`,
+      `${r.table.padEnd(colTable)}  ${rows.padStart(colRows)}  ${size.padStart(colSize)}  ${fmt.padEnd(colFmt)}  ${shortPath}`,
     );
     if (r.rows > 0) totalRows += r.rows;
     totalBytes += r.bytes;
   }
 
-  console.log("─".repeat(colTable + colRows + colSize + 12));
+  console.log("─".repeat(totalWidth));
   console.log(
     `${"TOTAL".padEnd(colTable)}  ${totalRows.toLocaleString().padStart(colRows)}  ${formatBytes(totalBytes).padStart(colSize)}`,
   );
