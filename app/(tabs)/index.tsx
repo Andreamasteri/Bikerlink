@@ -120,6 +120,7 @@ export default function MapScreen() {
     myAds,
   } = useHomeMapState();
 
+  const rootViewRef = useRef<View>(null);
   const [compactLayout, setCompactLayout] = useState<CardLayout | null>(null);
   const firstLayoutDoneRef = useRef(false);
   const [brokenAdIds, setBrokenAdIds] = useState<Set<string>>(new Set());
@@ -203,7 +204,7 @@ export default function MapScreen() {
   ) as any;
 
   return (
-    <View style={[styles.root, { backgroundColor: Colors.background }]}>
+    <View ref={rootViewRef} style={[styles.root, { backgroundColor: Colors.background }]}>
       {/* Scrollable content */}
       <ScrollView
         style={[mapScreenStyles.container, { backgroundColor: Colors.background }]}
@@ -232,7 +233,7 @@ export default function MapScreen() {
         />
 
         {/* Map placeholder — reserves layout space; actual map rendered below */}
-        <HomeMapSection onCardLayout={handleCardLayout} />
+        <HomeMapSection onCardLayout={handleCardLayout} rootRef={rootViewRef} />
 
         <HomeStatsRow
           onlineCount={onlineCount}

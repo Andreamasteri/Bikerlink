@@ -11,15 +11,25 @@ interface CardLayout {
 
 interface HomeMapSectionProps {
   onCardLayout: (layout: CardLayout) => void;
+  rootRef: React.RefObject<View | null>;
 }
 
-export const HomeMapSection: React.FC<HomeMapSectionProps> = ({ onCardLayout }) => {
+export const HomeMapSection: React.FC<HomeMapSectionProps> = ({ onCardLayout, rootRef }) => {
   const cardRef = useRef<View>(null);
 
   const handleLayout = () => {
-    cardRef.current?.measure((_x, _y, width, height, pageX, pageY) => {
-      onCardLayout({ top: pageY, left: pageX, width, height });
-    });
+    if (!cardRef.current || !rootRef.current) return;
+    cardRef.current.measureLayout(
+      rootRef.current as unknown as number,
+      (x, y, width, height) => {
+        onCardLayout({ top: y, left: x, width, height });
+      },
+      () => {
+        cardRef.current?.measure((_x, _y, width, height, pageX, pageY) => {
+          onCardLayout({ top: pageY, left: pageX, width, height });
+        });
+      },
+    );
   };
 
   return (
