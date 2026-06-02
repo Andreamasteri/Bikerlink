@@ -20,6 +20,48 @@ declare module "http" {
   }
 }
 
+function getAllowedOrigins(): Set<string> {
+  const origins = new Set<string>();
+  if (process.env.REPLIT_DEV_DOMAIN) {
+    origins.add(`https://${process.env.REPLIT_DEV_DOMAIN}`);
+  }
+  if (process.env.REPLIT_DOMAINS) {
+    process.env.REPLIT_DOMAINS.split(",").forEach((d) => {
+      origins.add(`https://${d.trim()}`);
+    });
+  }
+  return origins;
+}
+
+/**
+ * Login-CSRF protection for session-issuing auth endpoints.
+ *
+ * A cross-site HTML form POST (the classic login-CSRF vector) always causes the
+ * browser to include an `Origin` header that reflects the *attacker* site, not
+ * ours.  We reject any request whose Origin is set to a value outside our known
+ * domain list.  Requests with no Origin header (mobile API clients, server-to-
+ * server calls) are allowed through unchanged — they cannot receive or store a
+ * browser session cookie anyway.
+ */
+export function enforceOrigin(req: Request, res: Response, next: NextFunction): void {
+  const origin = req.header("origin");
+
+  if (!origin) {
+    return next();
+  }
+
+  const allowed = getAllowedOrigins();
+  const isLocalhost =
+    origin.startsWith("http://localhost:") ||
+    origin.startsWith("http://127.0.0.1:");
+
+  if (allowed.has(origin) || isLocalhost) {
+    return next();
+  }
+
+  res.status(403).json({ message: "Richiesta non autorizzata" });
+}
+
 export function setupMiddleware(app: express.Application) {
   app.set("trust proxy", 1);
 

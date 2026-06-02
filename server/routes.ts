@@ -13,6 +13,7 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 import { pool } from "./db";
 import { storage } from "./storage";
+import { enforceOrigin } from "./middleware";
 import internalRouter from "./routes/_internal";
 import authRoutes from "./routes/auth";
 import userRoutes from "./routes/users";
@@ -194,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/match-preferences", matchPreferencesRoutes);
   app.use("/api/match-negative-preferences", matchNegativePreferencesRoutes);
   app.use("/api/recap", recapRoutes);
-  app.use("/api/auth", authRoutes);
+  app.use("/api/auth", enforceOrigin, authRoutes);
   app.use("/api/users", userRoutes);
   app.use("/api/tags", (await import("./routes/tags")).default);
   // Task #2503 — endpoint pubblici OTA (gating manifest + telemetria boot)
