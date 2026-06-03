@@ -185,6 +185,7 @@ export function useGiriCreateState(language?: string) {
       });
     } catch (err: unknown) {
       console.warn("[AI parse] fallback attivato:", (err instanceof Error ? err.message : null));
+      setAiProviderUsed(null);
       const fallback = clientFallbackAiParse(aiPrompt);
       setTitle(fallback.title);
       setStyle(fallback.style as Style);
