@@ -51,6 +51,11 @@ interface ProviderPing {
   error?: string;
 }
 
+interface ProviderStat {
+  provider: string;
+  count: number;
+}
+
 const PROVIDER_ICONS: Record<RouteProviderId, keyof typeof MaterialCommunityIcons.glyphMap> = {
   ollama: "brain",
   groq: "lightning-bolt",
@@ -78,6 +83,12 @@ export default function AiRouteProvidersScreen() {
     queryKey: ["/api/admin/ai/route-providers"],
     queryFn: async () => (await apiRequest("GET", "/api/admin/ai/route-providers")).json(),
     staleTime: 15_000,
+  });
+
+  const { data: statsData } = useQuery<{ stats: ProviderStat[] }>({
+    queryKey: ["/api/admin/ai/route-providers/stats"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/ai/route-providers/stats")).json(),
+    staleTime: 30_000,
   });
 
   const [chain, setChain] = useState<RouteProviderId[]>(["ollama", "groq", "gemini"]);
@@ -181,6 +192,29 @@ export default function AiRouteProvidersScreen() {
           Provider non configurati (API key assente) vengono saltati automaticamente.
         </Text>
       </View>
+
+      {statsData && statsData.stats.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Percorsi salvati per provider</Text>
+          {statsData.stats.map((row) => {
+            const color = PROVIDER_COLORS[row.provider as RouteProviderId] ?? Colors.textSecondary;
+            const icon = PROVIDER_ICONS[row.provider as RouteProviderId] ?? "chart-bar";
+            const total = statsData.stats.reduce((s, r) => s + r.count, 0);
+            const pct = total > 0 ? Math.round((row.count / total) * 100) : 0;
+            return (
+              <View key={row.provider} style={styles.statRow}>
+                <MaterialCommunityIcons name={icon} size={14} color={color} />
+                <Text style={[styles.statLabel, { color }]}>{row.provider}</Text>
+                <View style={styles.statBarWrap}>
+                  <View style={[styles.statBar, { width: `${pct}%` as unknown as number, backgroundColor: color + "55" }]} />
+                </View>
+                <Text style={styles.statCount}>{row.count}</Text>
+                <Text style={styles.statPct}>{pct}%</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       <Text style={styles.sectionLabel}>Provider disponibili</Text>
 
@@ -527,4 +561,41 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   code: { fontFamily: "Inter_600SemiBold", color: Colors.text },
+  statRow: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    gap: 6,
+    marginTop: 8,
+  },
+  statLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    width: 56,
+    textTransform: "capitalize" as const,
+  },
+  statBarWrap: {
+    flex: 1,
+    height: 6,
+    backgroundColor: Colors.border,
+    borderRadius: 3,
+    overflow: "hidden" as const,
+  },
+  statBar: {
+    height: 6,
+    borderRadius: 3,
+  },
+  statCount: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.text,
+    width: 34,
+    textAlign: "right" as const,
+  },
+  statPct: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    width: 34,
+    textAlign: "right" as const,
+  },
 });

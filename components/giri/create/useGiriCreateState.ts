@@ -25,6 +25,7 @@ export function useGiriCreateState(language?: string) {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
+  const [aiProviderUsed, setAiProviderUsed] = useState<string | null>(null);
   const [aiFallbackBanner, setAiFallbackBanner] = useState(false);
   const [aiBannerReason, setAiBannerReason] = useState<"key_missing" | "generic">("generic");
   const [aiSuccessBanner, setAiSuccessBanner] = useState(false);
@@ -151,6 +152,7 @@ export function useGiriCreateState(language?: string) {
         avoidHighways: result.avoidHighways ?? false,
         items: initialItems
       };
+      if (result.provider_used) setAiProviderUsed(result.provider_used);
       setAiPreview(preview);
       setMode("ai-preview");
       if (aiSuccessTimer.current) clearTimeout(aiSuccessTimer.current);
@@ -395,7 +397,8 @@ export function useGiriCreateState(language?: string) {
       metadata: {
         avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, daysCount, maxHoursPerDay,
         isRoundTrip, roundTripHours, headingDeg,
-        motorcycleId: selectedMotoId, fuelStopsNeeded
+        motorcycleId: selectedMotoId, fuelStopsNeeded,
+        ...(aiProviderUsed ? { provider_used: aiProviderUsed } : {}),
       }
     });
   };
@@ -449,6 +452,6 @@ export function useGiriCreateState(language?: string) {
     updatePreviewItemName, regeocodePillItem, handleConfirmPreview,
     handleWpInput, selectSuggestion, addWaypoint, removeWaypoint,
     handleCalculate, handleSave, saveMutationPending: saveMutation.isPending,
-    handleMapTap
+    handleMapTap, aiProviderUsed
   };
 }
