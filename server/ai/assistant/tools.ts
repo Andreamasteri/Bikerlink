@@ -18,8 +18,8 @@
 import { tool } from "ai";
 import { z } from "zod";
 import { db } from "../../db";
-import { routes, events } from "@shared/db";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { routes, events, plannedRoutes } from "@shared/db";
+import { eq, and, gte, desc, sql } from "drizzle-orm";
 
 const PROBE_TIMEOUT_MS = 5_000;
 
@@ -230,6 +230,60 @@ function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): nu
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ── Tool: getUserPlannedRoutes ─────────────────────────────────────────────────
+
+const plannedRoutesSchema = z.object({
+  userId: z.string().describe("ID dell'utente BikerLink"),
+  limit: z.number().min(1).max(10).default(5).describe("Numero massimo di percorsi da restituire (default 5)"),
+});
+type PlannedRoutesInput = z.infer<typeof plannedRoutesSchema>;
+
+export const getUserPlannedRoutesTool = tool<PlannedRoutesInput, Record<string, unknown>>({
+  description: "Restituisce i percorsi moto pianificati recenti dell'utente. Utile per rispondere a domande su giri pianificati, soste, destinazioni o per aggiungere una tappa a un percorso esistente.",
+  inputSchema: plannedRoutesSchema,
+  execute: async (input: PlannedRoutesInput) => {
+    const { userId, limit } = input;
+    try {
+      const rows = await db
+        .select({
+          id: plannedRoutes.id,
+          title: plannedRoutes.title,
+          description: plannedRoutes.description,
+          style: plannedRoutes.style,
+          distanceKm: plannedRoutes.distanceKm,
+          durationMinutes: plannedRoutes.durationMinutes,
+          waypoints: plannedRoutes.waypoints,
+          visibility: plannedRoutes.visibility,
+          createdAt: plannedRoutes.createdAt,
+        })
+        .from(plannedRoutes)
+        .where(eq(plannedRoutes.userId, userId))
+        .orderBy(desc(plannedRoutes.createdAt))
+        .limit(limit);
+
+      return {
+        routes: rows.map((r) => ({
+          id: r.id,
+          title: r.title,
+          description: r.description ?? null,
+          style: r.style,
+          distanceKm: r.distanceKm ?? 0,
+          durationMinutes: r.durationMinutes ?? 0,
+          waypointCount: Array.isArray(r.waypoints) ? r.waypoints.length : 0,
+          firstWaypoint: Array.isArray(r.waypoints) && r.waypoints.length > 0 ? r.waypoints[0] : null,
+          lastWaypoint: Array.isArray(r.waypoints) && r.waypoints.length > 1
+            ? r.waypoints[r.waypoints.length - 1] : null,
+          visibility: r.visibility,
+          createdAt: (r.createdAt as Date | null)?.toISOString().slice(0, 10) ?? null,
+        })),
+        total: rows.length,
+      };
+    } catch (err) {
+      return { error: (err as Error).message, routes: [], total: 0 };
+    }
+  },
+});
+
 // ── Exported tool set ─────────────────────────────────────────────────────────
 
 export const OLLAMA_TOOLS = {
@@ -237,4 +291,5 @@ export const OLLAMA_TOOLS = {
   getBikerStats: getBikerStatsTool,
   getThinkCentreStatus: getThinkCentreStatusTool,
   getNearbyEvents: getNearbyEventsTool,
+  getUserPlannedRoutes: getUserPlannedRoutesTool,
 } as const;

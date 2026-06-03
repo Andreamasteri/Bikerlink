@@ -3,15 +3,14 @@ import {
   View,
   Text,
   StyleSheet,
-  Platform,
   TouchableOpacity,
   ScrollView,
   Alert,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
   Pressable,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -320,7 +319,7 @@ export default function EditProfileScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior="padding"
       keyboardVerticalOffset={0}
     >
       <View

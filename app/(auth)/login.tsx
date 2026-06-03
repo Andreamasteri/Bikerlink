@@ -6,10 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
 } from "react-native";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -63,20 +61,15 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    <KeyboardAwareScrollViewCompat
+      contentContainerStyle={[
+        styles.container,
+        {
+          paddingTop: insets.top + 40,
+          paddingBottom: insets.bottom + 20,
+        },
+      ]}
     >
-      <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          {
-            paddingTop: insets.top + 40,
-            paddingBottom: insets.bottom + 20,
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-      >
         <View style={styles.logoContainer}>
           <Ionicons name="bicycle" size={64} color={Colors.accent} />
           <Text style={styles.appName}>{t("app.name")}</Text>
@@ -163,8 +156,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollViewCompat>
   );
 }
 
