@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
+  View,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   Alert,
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -255,8 +255,8 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior="padding">
-      <ScrollView
+    <View style={styles.flex}>
+      <KeyboardAwareScrollViewCompat
         contentContainerStyle={[
           styles.container,
           {
@@ -265,6 +265,7 @@ export default function RegisterScreen() {
           },
         ]}
         keyboardShouldPersistTaps="handled"
+        bottomOffset={24}
       >
         <TouchableOpacity onPress={handleBack} style={styles.backButton} testID="register-back">
           <Ionicons name="arrow-back" size={24} color={Colors.text} />
@@ -352,7 +353,7 @@ export default function RegisterScreen() {
         {step === 1 && (
           <LoginPrompt onPress={() => router.back()} />
         )}
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
 
       <PrivacyNoticeModal
         visible={showPrivacyModal}
@@ -375,7 +376,7 @@ export default function RegisterScreen() {
         code={giftModalCode}
         onClose={handleGiftModalClose}
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

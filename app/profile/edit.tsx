@@ -4,13 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   Alert,
   ActivityIndicator,
   Modal,
   Pressable,
 } from "react-native";
-import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -317,11 +316,7 @@ export default function EditProfileScreen() {
   const photos = profile?.photos ?? [];
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior="padding"
-      keyboardVerticalOffset={0}
-    >
+    <View style={styles.container}>
       <View
         style={[
           styles.headerBar,
@@ -348,10 +343,11 @@ export default function EditProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView
+      <KeyboardAwareScrollViewCompat
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        bottomOffset={24}
       >
         <EditBasicInfo
           nickname={nickname}
@@ -421,7 +417,7 @@ export default function EditProfileScreen() {
         <EditAssistantPrefs />
 
         <View style={{ height: 40 }} />
-      </ScrollView>
+      </KeyboardAwareScrollViewCompat>
 
       <Modal
         visible={showRevokeConsentModal}
@@ -466,7 +462,7 @@ export default function EditProfileScreen() {
           </View>
         </Pressable>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
