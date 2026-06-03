@@ -43,19 +43,26 @@ export async function pruneUserMemory(userId: string): Promise<boolean> {
 
   const ids = oldest.map((t) => t.id);
   const firstId = ids[0];
+  // Use the oldest turn's timestamp so the summary sorts correctly in the
+  // chronological window loaded by loadMemoryTurns() (ORDER BY created_at ASC).
+  const summaryCreatedAt = oldest[0].createdAt;
 
   const summaryContent = `[RIASSUNTO CONVERSAZIONE PRECEDENTE]\n${oldest
     .map((t) => `${t.role === "user" ? "Utente" : "Assistente"}: ${t.content.slice(0, 200)}`)
     .join("\n")}`;
 
-  await db.insert(aiConversationTurns).values({
-    userId,
-    role: "assistant",
-    content: summaryContent.slice(0, 4000),
-    summaryOf: firstId,
+  // Atomic: insert summary then delete originals in a single transaction.
+  // A failure between insert and delete would leave orphaned summary rows.
+  await db.transaction(async (tx) => {
+    await tx.insert(aiConversationTurns).values({
+      userId,
+      role: "assistant",
+      content: summaryContent.slice(0, 4000),
+      summaryOf: firstId,
+      createdAt: summaryCreatedAt,
+    });
+    await tx.delete(aiConversationTurns).where(inArray(aiConversationTurns.id, ids));
   });
-
-  await db.delete(aiConversationTurns).where(inArray(aiConversationTurns.id, ids));
 
   return true;
 }
