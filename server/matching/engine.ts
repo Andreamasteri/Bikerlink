@@ -11,3 +11,4 @@ export * from "./filters";
 export * from "./scoring";
 export * from "./types";
 export * from "./time-profile";
+export * from "./protection-filter";

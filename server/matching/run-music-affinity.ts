@@ -11,7 +11,7 @@ import {
 import { findSimilar } from "../embeddings";
 import { loadMatchPreferencesMap, bothPrefsEnabled } from "./filters";
 import { tagOverlap, loadMatchThresholds } from "./scoring";
-import { PROTECTED_NICKNAMES } from "../constants";
+import { protectedNicknamesSqlArray } from "./protection-filter";
 
 /**
  * Task #2516 — Matcher per affinità musicale combinata.
@@ -71,7 +71,7 @@ async function loadEmbeddingsForUsers(): Promise<UserMusicEmbedding[]> {
       AND e.field = 'music_taste'
       AND u.is_fake = false
       AND u.status = 'active'
-      AND u.nickname <> ALL(${sql.raw(`ARRAY['${PROTECTED_NICKNAMES.join("','")}']`)})
+      AND u.nickname <> ALL(${sql.raw(protectedNicknamesSqlArray())})
   `);
   const rows = (result.rows ?? result) as Array<{ entity_id: string; vec: string }>;
   return rows.map((r) => ({

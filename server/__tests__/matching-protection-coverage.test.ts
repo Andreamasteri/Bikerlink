@@ -205,3 +205,60 @@ describe("Canary — PROTECTED_NICKNAMES constant", () => {
     expect(PROTECTED_NICKNAMES).toContain(PROTECTED_NICKNAME);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. Static import guard — all run-*.ts files must use protection-filter
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// This test reads source files from disk and enforces that:
+//   (a) no run-*.ts file imports PROTECTED_NICKNAMES directly from ../constants
+//   (b) any run-*.ts file that references PROTECTED_NICKNAMES imports it from
+//       ./protection-filter instead
+//
+// This catches new matching pipelines that bypass the shared utility.
+
+import { readFileSync, readdirSync } from "node:fs";
+import { resolve, join } from "node:path";
+
+describe("Static import guard — protection-filter usage in run-*.ts", () => {
+  const matchingDir = resolve(__dirname, "../matching");
+  const runFiles = readdirSync(matchingDir).filter(
+    (f) => f.startsWith("run-") && f.endsWith(".ts"),
+  );
+
+  it("finds at least one run-*.ts file to audit", () => {
+    expect(runFiles.length).toBeGreaterThan(0);
+  });
+
+  it("no run-*.ts file imports PROTECTED_NICKNAMES from ../constants directly", () => {
+    const violations: string[] = [];
+    for (const file of runFiles) {
+      const content = readFileSync(join(matchingDir, file), "utf-8");
+      const usesConstant = content.includes("PROTECTED_NICKNAMES");
+      const importsFromConstants = /from\s+['"]\.\.\/constants['"]/.test(content);
+      if (usesConstant && importsFromConstants) {
+        violations.push(file);
+      }
+    }
+    expect(
+      violations,
+      `Run files importing PROTECTED_NICKNAMES from ../constants (must use ./protection-filter): ${violations.join(", ")}`,
+    ).toHaveLength(0);
+  });
+
+  it("all run-*.ts files that use PROTECTED_NICKNAMES import from ./protection-filter", () => {
+    const missing: string[] = [];
+    for (const file of runFiles) {
+      const content = readFileSync(join(matchingDir, file), "utf-8");
+      const usesProtected = content.includes("PROTECTED_NICKNAMES") || content.includes("protectedNicknamesSqlArray");
+      const importsFilter = content.includes("./protection-filter");
+      if (usesProtected && !importsFilter) {
+        missing.push(file);
+      }
+    }
+    expect(
+      missing,
+      `Run files using protection logic without importing from ./protection-filter: ${missing.join(", ")}`,
+    ).toHaveLength(0);
+  });
+});
