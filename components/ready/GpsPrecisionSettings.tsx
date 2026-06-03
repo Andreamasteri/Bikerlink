@@ -23,7 +23,7 @@ export function GpsPrecisionSettings({
   const { width } = useWindowDimensions();
   const isTablet = width > 768;
   return (
-    <View style={[styles.settingCard, { backgroundColor: colors.surface }, isTablet && { maxWidth: 600, alignSelf: "center" }]}>
+    <View style={[styles.settingCard, { backgroundColor: colors.surface }, isTablet && { maxWidth: 600, alignSelf: "center", width: "100%" }]}>
       <Pressable style={styles.accordionHeader} onPress={() => setGpsPrecisionExpanded(v => !v)}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Ionicons name="navigate-outline" size={18} color={Colors.accent} />
