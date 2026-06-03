@@ -52,6 +52,8 @@ export function TileProviderRow({ item, onSelect, isPending }: Props) {
     >
       <TileThumbnail
         providerId={item.id}
+        category={item.category}
+        label={item.label}
         keyRequired={item.keyRequired}
         keyAvailable={item.keyAvailable}
       />

@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest, queryClient, getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import type { MapsRollout, MapsRendererId, MapsTileId, RoutingEngineId, RoutingProfileId } from "@shared/maps-config";
+import { RENDERER_OPTIONS, TILE_OPTIONS, ROUTING_OPTIONS } from "@shared/maps-config";
 import { RolloutCard } from "./RolloutCard";
 import { RendererCard } from "./RendererCard";
 import { RoutingCard } from "./RoutingCard";
@@ -25,6 +26,7 @@ interface AdminMapsConfig {
   tile_source_status?: "maptiler" | "demo";
   dem_source?: "custom" | "aws-free";
   osm_last_updated_at: string | null;
+  tester_can_customize?: boolean;
   mapbox_quota?: {
     used: number;
     limit: number;
@@ -33,6 +35,21 @@ interface AdminMapsConfig {
     warning_threshold: number;
   };
   nominatim?: NominatimHealth;
+}
+
+const ROLLOUT_LABELS: Record<MapsRollout, string> = {
+  disabled: "Disabilitato",
+  tester: "Solo Tester",
+  all: "Tutti",
+};
+
+function ConfigPill({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.pill}>
+      <Text style={styles.pillLabel}>{label}</Text>
+      <Text style={styles.pillValue}>{value}</Text>
+    </View>
+  );
 }
 
 export default function AdminMapsPage() {
@@ -83,6 +100,15 @@ export default function AdminMapsPage() {
     onError: () => Alert.alert("Errore", "Impossibile aggiornare il routing engine"),
   });
 
+  const testerCustomizeMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("PUT", "/api/admin/maps/tester-customize", { enabled });
+      return res.json();
+    },
+    onSuccess: invalidateMapsQueries,
+    onError: () => Alert.alert("Errore", "Impossibile aggiornare la personalizzazione tester"),
+  });
+
   if (isLoading) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -116,10 +142,23 @@ export default function AdminMapsPage() {
         <MaterialCommunityIcons name="chevron-right" size={18} color={Colors.textSecondary} />
       </TouchableOpacity>
 
+      <View style={styles.configBar}>
+        <Text style={styles.configBarTitle}>Configurazione attiva</Text>
+        <View style={styles.configPills}>
+          <ConfigPill label="Renderer" value={RENDERER_OPTIONS.find((r) => r.id === data.renderer)?.label ?? data.renderer} />
+          <ConfigPill label="Tile" value={TILE_OPTIONS.find((t) => t.id === data.tile)?.label ?? data.tile} />
+          <ConfigPill label="Routing" value={ROUTING_OPTIONS.find((r) => r.id === data.routing)?.label ?? data.routing} />
+          <ConfigPill label="Rollout" value={ROLLOUT_LABELS[data.rollout] ?? data.rollout} />
+        </View>
+      </View>
+
       <RolloutCard
         rollout={data.rollout}
         isPending={rolloutMutation.isPending}
         onRolloutChange={(rollout) => rolloutMutation.mutate(rollout)}
+        testerCanCustomize={data.tester_can_customize ?? false}
+        isTesterTogglePending={testerCustomizeMutation.isPending}
+        onTesterCustomizeChange={(enabled) => testerCustomizeMutation.mutate(enabled)}
       />
 
       <RendererCard
@@ -192,6 +231,33 @@ const styles = StyleSheet.create({
     borderRadius: 10, padding: 12, marginBottom: 12,
   },
   healthLinkText: { flex: 1, color: Colors.text, fontSize: 14, fontFamily: "Inter_600SemiBold" },
+  configBar: {
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  configBarTitle: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+  },
+  configPills: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  pill: {
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  pillLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  pillValue: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.accent, marginTop: 1 },
   osmBox: {
     backgroundColor: Colors.surface,
     borderRadius: 8,

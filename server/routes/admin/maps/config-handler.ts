@@ -23,7 +23,7 @@ function isMapboxAvailable(): boolean {
 
 router.get("/config", async (_req: Request, res: Response) => {
   try {
-    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting, osmSetting, matchingIntegrationSetting, nominatimHealth] =
+    const [rolloutSetting, rendererSetting, tileSetting, engineSetting, profileSetting, osmSetting, matchingIntegrationSetting, testerCustomizeSetting, nominatimHealth] =
       await Promise.all([
         storage.getAppSetting("maps_rollout"),
         storage.getAppSetting("maps_renderer"),
@@ -32,6 +32,7 @@ router.get("/config", async (_req: Request, res: Response) => {
         storage.getAppSetting("maps_routing_profile"),
         storage.getAppSetting("osm_last_updated_at"),
         storage.getAppSetting("matching_integration"),
+        storage.getAppSetting("maps_tester_can_customize"),
         getNominatimHealthSnapshot(),
       ]);
 
@@ -83,6 +84,8 @@ router.get("/config", async (_req: Request, res: Response) => {
       available_profiles: AVAILABLE_PROFILES,
       // Task #2528 — toggle integrazione matching ↔ planned routes
       matching_integration: matchingIntegrationSetting?.value !== "false",
+      // Consenti ai tester di personalizzare renderer/tile dal proprio profilo (default OFF)
+      tester_can_customize: testerCustomizeSetting?.value === "true",
       nominatim: nominatimHealth,
     };
 
@@ -170,6 +173,24 @@ router.put("/matching-integration", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[admin/maps/config] PUT matching-integration error:", err);
     return sendError(res, 500, "Errore aggiornamento integrazione matching");
+  }
+});
+
+/**
+ * PUT /admin/maps/tester-customize — abilita/disabilita la personalizzazione
+ * renderer/tile da parte dei tester (rollout=tester). Persiste in app_settings.
+ */
+router.put("/tester-customize", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body as { enabled?: unknown };
+    if (typeof enabled !== "boolean") {
+      return sendError(res, 400, "enabled (boolean) obbligatorio");
+    }
+    await storage.upsertAppSetting("maps_tester_can_customize", enabled ? "true" : "false");
+    return res.json({ ok: true, enabled });
+  } catch (err) {
+    console.error("[admin/maps/config] PUT tester-customize error:", err);
+    return sendError(res, 500, "Errore aggiornamento personalizzazione tester");
   }
 });
 

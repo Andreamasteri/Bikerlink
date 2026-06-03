@@ -38,6 +38,7 @@ import { ProfileFooter } from "@/components/profile/view/ProfileFooter";
 import { ProfileSearchSection } from "@/components/profile/view/ProfileSearchSection";
 import { ProfileDonationSection } from "@/components/profile/view/ProfileDonationSection";
 import { ProfileVersionSection } from "@/components/profile/view/ProfileVersionSection";
+import { ProfileMapsBetaSection } from "@/components/profile/view/ProfileMapsBetaSection";
 import { ProfileDeletionBanner } from "@/components/profile/view/ProfileDeletionBanner";
 import { ProfileLogoutModal } from "@/components/profile/view/ProfileLogoutModal";
 
@@ -341,6 +342,8 @@ export default function ProfileScreen() {
           onConfirm={doLogout}
           t={t}
         />
+
+        <ProfileMapsBetaSection />
 
         <ProfileVersionSection />
 

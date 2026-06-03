@@ -8,6 +8,9 @@ interface RolloutCardProps {
   rollout: MapsRollout;
   isPending: boolean;
   onRolloutChange: (rollout: MapsRollout) => void;
+  testerCanCustomize: boolean;
+  isTesterTogglePending: boolean;
+  onTesterCustomizeChange: (enabled: boolean) => void;
 }
 
 const OPTIONS: Array<{ value: MapsRollout; label: string; description: string; icon: React.ComponentProps<typeof Ionicons>["name"] }> = [
@@ -16,7 +19,7 @@ const OPTIONS: Array<{ value: MapsRollout; label: string; description: string; i
   { value: "all", label: "Tutti", description: "Tutti gli utenti autenticati", icon: "globe-outline" },
 ];
 
-export function RolloutCard({ rollout, isPending, onRolloutChange }: RolloutCardProps) {
+export function RolloutCard({ rollout, isPending, onRolloutChange, testerCanCustomize, isTesterTogglePending, onTesterCustomizeChange }: RolloutCardProps) {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -51,6 +54,40 @@ export function RolloutCard({ rollout, isPending, onRolloutChange }: RolloutCard
           </TouchableOpacity>
         );
       })}
+
+      {rollout === "tester" && (
+        <TouchableOpacity
+          style={[styles.toggleRow, testerCanCustomize && styles.toggleRowOn]}
+          onPress={() => !isTesterTogglePending && onTesterCustomizeChange(!testerCanCustomize)}
+          activeOpacity={0.7}
+          disabled={isTesterTogglePending}
+        >
+          <View style={styles.toggleLeft}>
+            <Ionicons
+              name="construct-outline"
+              size={18}
+              color={testerCanCustomize ? Colors.accent : Colors.textSecondary}
+            />
+            <View style={styles.toggleText}>
+              <Text style={[styles.toggleLabel, testerCanCustomize && styles.toggleLabelOn]}>
+                Tester possono personalizzare
+              </Text>
+              <Text style={styles.toggleDesc}>
+                Mostra renderer e tile selezionabili nel profilo dei Map Tester.
+              </Text>
+            </View>
+          </View>
+          {isTesterTogglePending ? (
+            <ActivityIndicator size="small" color={Colors.accent} />
+          ) : (
+            <Ionicons
+              name={testerCanCustomize ? "toggle" : "toggle-outline"}
+              size={28}
+              color={testerCanCustomize ? Colors.accent : Colors.textSecondary}
+            />
+          )}
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -90,4 +127,21 @@ const styles = StyleSheet.create({
   optionLabel: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.text },
   optionLabelSelected: { color: Colors.accent },
   optionDesc: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: 4,
+    backgroundColor: Colors.background,
+  },
+  toggleRowOn: { borderColor: Colors.accent, backgroundColor: Colors.accent + "11" },
+  toggleLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  toggleText: { flex: 1 },
+  toggleLabel: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.text },
+  toggleLabelOn: { color: Colors.accent },
+  toggleDesc: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
 });

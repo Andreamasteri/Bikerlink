@@ -470,19 +470,21 @@ export function registerClientSettingsRoutes(app: Express) {
 
   app.get("/api/settings/maps-rollout", async (_req, res) => {
     try {
-      const [rolloutSetting, rendererSetting, engineSetting] = await Promise.all([
+      const [rolloutSetting, rendererSetting, engineSetting, testerCustomizeSetting] = await Promise.all([
         storage.getAppSetting("maps_rollout"),
         storage.getAppSetting("maps_renderer"),
         storage.getAppSetting("maps_routing_engine"),
+        storage.getAppSetting("maps_tester_can_customize"),
       ]);
       res.json({
         rollout: rolloutSetting?.value ?? "disabled",
         renderer: rendererSetting?.value ?? "leaflet",
         engine: engineSetting?.value ?? "graphhopper",
+        testerCanCustomize: testerCustomizeSetting?.value === "true",
       });
     } catch (err) {
       console.warn("[client-settings] Failed to fetch maps-rollout settings:", err);
-      res.json({ rollout: "disabled", renderer: "leaflet", engine: "graphhopper" });
+      res.json({ rollout: "disabled", renderer: "leaflet", engine: "graphhopper", testerCanCustomize: false });
     }
   });
 

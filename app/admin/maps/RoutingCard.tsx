@@ -76,11 +76,13 @@ function OptionRow<T extends string>({
   isSelected,
   onPress,
   disabled,
+  dotColor,
 }: {
   opt: MapsOption<T>;
   isSelected: boolean;
   onPress: () => void;
   disabled: boolean;
+  dotColor: string;
 }) {
   return (
     <TouchableOpacity
@@ -89,6 +91,7 @@ function OptionRow<T extends string>({
       activeOpacity={0.7}
       disabled={disabled}
     >
+      <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
       <View style={styles.optionLeft}>
         <View style={styles.optionText}>
           <View style={styles.labelRow}>
@@ -103,11 +106,25 @@ function OptionRow<T extends string>({
   );
 }
 
+const SELF_HOSTED_ENGINES: RoutingEngineId[] = ["graphhopper", "valhalla"];
+
 export function RoutingCard({ engine, profile, routingNotes, mapboxQuota, isPending, onRoutingChange }: RoutingCardProps) {
   const [expanded, setExpanded] = React.useState(false);
   const [localProfile, setLocalProfile] = React.useState<RoutingProfileId>(profile);
 
   React.useEffect(() => { setLocalProfile(profile); }, [profile]);
+
+  const { data: health } = useQuery<RoutingHealth>({
+    queryKey: ["/api/admin/maps/routing-health"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/maps/routing-health")).json(),
+    refetchInterval: 30_000,
+  });
+
+  const engineDotColor = (opt: MapsOption<RoutingEngineId>): string => {
+    if (!opt.implemented) return Colors.textSecondary;
+    if (SELF_HOSTED_ENGINES.includes(opt.id) && health?.degraded) return "#f59e0b";
+    return Colors.success;
+  };
 
   const handleEngineSelect = (e: RoutingEngineId) => {
     const opt = ROUTING_OPTIONS.find((r) => r.id === e);
@@ -171,6 +188,7 @@ export function RoutingCard({ engine, profile, routingNotes, mapboxQuota, isPend
               isSelected={engine === opt.id}
               onPress={() => handleEngineSelect(opt.id)}
               disabled={isPending || !opt.implemented}
+              dotColor={engineDotColor(opt)}
             />
           ))}
 
@@ -182,6 +200,7 @@ export function RoutingCard({ engine, profile, routingNotes, mapboxQuota, isPend
               isSelected={localProfile === opt.id}
               onPress={() => handleProfileSelect(opt.id)}
               disabled={isPending}
+              dotColor={opt.implemented ? Colors.success : Colors.textSecondary}
             />
           ))}
         </>
@@ -234,6 +253,7 @@ const styles = StyleSheet.create({
   },
   optionSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "11" },
   optionDimmed: { opacity: 0.6 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
   optionLeft: { flex: 1 },
   optionText: { flex: 1 },
   labelRow: { flexDirection: "row", alignItems: "center", gap: 6 },

@@ -28,11 +28,13 @@ function OptionRow<T extends string>({
   isSelected,
   onPress,
   disabled,
+  dotColor,
 }: {
   opt: MapsOption<T>;
   isSelected: boolean;
   onPress: () => void;
   disabled: boolean;
+  dotColor: string;
 }) {
   return (
     <TouchableOpacity
@@ -41,6 +43,7 @@ function OptionRow<T extends string>({
       activeOpacity={0.7}
       disabled={disabled}
     >
+      <View style={[styles.statusDot, { backgroundColor: dotColor }]} />
       <View style={styles.optionLeft}>
         <View style={styles.optionText}>
           <View style={styles.labelRow}>
@@ -109,6 +112,7 @@ export function RendererCard({ renderer, tile, rendererNotes, isPending, tileSou
               isSelected={renderer === opt.id}
               onPress={() => handleRendererSelect(opt.id)}
               disabled={isPending}
+              dotColor={opt.implemented ? Colors.success : Colors.textSecondary}
             />
           ))}
           <Text style={styles.sectionLabel}>Tile Provider</Text>
@@ -166,6 +170,7 @@ const styles = StyleSheet.create({
   },
   optionSelected: { borderColor: Colors.accent, backgroundColor: Colors.accent + "11" },
   optionDimmed: { opacity: 0.6 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
   optionLeft: { flex: 1 },
   optionText: { flex: 1 },
   labelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
