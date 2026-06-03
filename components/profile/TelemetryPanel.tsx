@@ -79,6 +79,20 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
   return (
     <View style={styles.section}>
       <View style={styles.telemetryCard}>
+        <View style={[styles.settingRow, styles.settingRowTop]}>
+          <View style={styles.settingTextCol}>
+            <Text style={styles.settingTitle}>Telemetria sempre attiva</Text>
+            <Text style={styles.settingSubtitle}>
+              Raccoglie senza interruzioni, ignorando i blocchi.
+            </Text>
+          </View>
+          <Switch
+            value={alwaysActive}
+            onValueChange={toggleAlwaysActive}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor="#fff"
+          />
+        </View>
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={() => setTelemetryExpanded((v) => !v)}
@@ -138,21 +152,6 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
         )}
         {telemetryExpanded && (
           <View style={styles.telemetryExpanded}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingTextCol}>
-                <Text style={styles.settingTitle}>Telemetria sempre attiva</Text>
-                <Text style={styles.settingSubtitle}>
-                  Raccoglie senza interruzioni, ignorando i blocchi.
-                </Text>
-              </View>
-              <Switch
-                value={alwaysActive}
-                onValueChange={toggleAlwaysActive}
-                trackColor={{ false: Colors.border, true: Colors.accent }}
-                thumbColor="#fff"
-              />
-            </View>
-
             <TouchableOpacity
               style={styles.settingRow}
               activeOpacity={0.7}
@@ -397,6 +396,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
+  },
+  settingRowTop: {
+    borderTopWidth: 0,
+    paddingTop: 0,
+    marginBottom: 4,
   },
   settingTextCol: {
     flex: 1,
