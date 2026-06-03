@@ -18,7 +18,7 @@ import {
 } from "@shared/db";
 import { routeMessage } from "../../ai/console/router";
 import { runAgent } from "../../ai/console/agent";
-import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE, getProviderHealth, markProviderOk } from "../../ai/moderation/provider";
+import { hasAnyAiProvider, AI_NO_PROVIDER_MESSAGE } from "../../ai/moderation/provider";
 import { buildSystemContext, loadMemory, updateMemory } from "../../ai/console/memory";
 import { type Scope } from "../../ai/console/tools";
 
@@ -416,44 +416,6 @@ function countBy<T extends Record<string, unknown>>(arr: T[], key: keyof T): Rec
   }
   return out;
 }
-
-// ─── Provider health + reset cooldown ─────────────────────────────────────────
-// Health: admin | moderator | superadmin (requireConsoleRole già applicato).
-// Reset: admin | superadmin only (guard inline).
-router.get("/ai/providers/health", (_req: Request, res: Response) => {
-  return res.json({ providers: getProviderHealth() });
-});
-
-const resetProviderSchema = z.object({
-  providerId: z.enum(["anthropic", "openai", "google", "groq"]).optional(),
-});
-
-type ConsoleReq = Request & { consoleUser?: { id: string; role: string } };
-
-router.post("/ai/providers/reset", async (req: ConsoleReq, res: Response) => {
-  const role = (req.consoleUser?.role ?? "").toLowerCase();
-  if (role !== "admin" && role !== "superadmin") {
-    return sendError(res, 403, "Richiesto ruolo admin o superadmin");
-  }
-  const parsed = resetProviderSchema.safeParse(req.body ?? {});
-  if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-  const modId = (req.session as { userId?: string }).userId;
-  if (!modId) return sendError(res, 401, "Sessione scaduta");
-  try {
-    const allIds = ["anthropic", "openai", "google", "groq"] as const;
-    const targets = parsed.data.providerId ? [parsed.data.providerId] : allIds;
-    for (const id of targets) markProviderOk(id);
-    await storage.createModeratorLog({
-      moderatorId: modId, action: "ai_provider_cooldown_reset",
-      targetType: "system", targetId: parsed.data.providerId ?? "all",
-      details: `reset cooldown: ${targets.join(", ")}`,
-    }).catch(() => {});
-    return res.json({ ok: true, reset: targets, providers: getProviderHealth() });
-  } catch (err) {
-    console.error("[ai/providers/reset] error:", err);
-    return sendError(res, 500, "Errore reset cooldown provider");
-  }
-});
 
 // keep `lte` referenced (unused-helper safeguard).
 void lte;

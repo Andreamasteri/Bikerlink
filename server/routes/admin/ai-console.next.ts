@@ -7,6 +7,8 @@
  *   - GET /ai/console/budget — stato budget reale AI
  *   - GET /ai/console/admin-prefs — preferenze admin
  *   - PATCH /ai/console/admin-prefs — aggiornamento preferenze admin
+ *   - GET /ai/providers/health — stato salute provider AI
+ *   - POST /ai/providers/reset — reset cooldown provider AI
  */
 
 import { Router, type Request, type Response } from "express";
@@ -18,6 +20,8 @@ import { users as usersTable } from "@shared/db";
 import { SCOPES } from "../../ai/console/tools";
 import { getBudgetStatus } from "../../ai/moderation/budget";
 import { requireConsoleRole } from "./ai-console";
+import { getProviderHealth, markProviderOk } from "../../ai/moderation/provider";
+import { storage } from "../../storage";
 import { z } from "zod";
 
 const router = Router();
@@ -97,6 +101,44 @@ router.patch("/ai/console/admin-prefs", async (req: Request, res: Response) => {
   await db.update(usersTable).set({ adminPrefs: next, updatedAt: new Date() })
     .where(eq(usersTable.id, userId));
   res.json({ prefs: next });
+});
+
+// ─── Provider health + reset cooldown ─────────────────────────────────────────
+// Health: admin | moderator | superadmin (requireConsoleRole già applicato).
+// Reset: admin | superadmin only (guard inline).
+router.get("/ai/providers/health", (_req: Request, res: Response) => {
+  return res.json({ providers: getProviderHealth() });
+});
+
+const resetProviderSchema = z.object({
+  providerId: z.enum(["anthropic", "openai", "google", "groq"]).optional(),
+});
+
+type ConsoleReq = Request & { consoleUser?: { id: string; role: string } };
+
+router.post("/ai/providers/reset", async (req: ConsoleReq, res: Response) => {
+  const role = (req.consoleUser?.role ?? "").toLowerCase();
+  if (role !== "admin" && role !== "superadmin") {
+    return sendError(res, 403, "Richiesto ruolo admin o superadmin");
+  }
+  const parsed = resetProviderSchema.safeParse(req.body ?? {});
+  if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+  const modId = (req.session as { userId?: string }).userId;
+  if (!modId) return sendError(res, 401, "Sessione scaduta");
+  try {
+    const allIds = ["anthropic", "openai", "google", "groq"] as const;
+    const targets = parsed.data.providerId ? [parsed.data.providerId] : allIds;
+    for (const id of targets) markProviderOk(id);
+    await storage.createModeratorLog({
+      moderatorId: modId, action: "ai_provider_cooldown_reset",
+      targetType: "system", targetId: parsed.data.providerId ?? "all",
+      details: `reset cooldown: ${targets.join(", ")}`,
+    }).catch(() => {});
+    return res.json({ ok: true, reset: targets, providers: getProviderHealth() });
+  } catch (err) {
+    console.error("[ai/providers/reset] error:", err);
+    return sendError(res, 500, "Errore reset cooldown provider");
+  }
 });
 
 export default router;

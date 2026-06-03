@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
 import bcrypt from "bcryptjs";
-import { emailConfigSchema, disableFeatureSchema, toggleProtectedSchema, mapsProviderSchema, themeDefaultSchema, matchingCountriesSchema, coordinatesMaxAgeSchema, genericSettingSchema, maintenanceSettingsSchema, nativeVersionSchema, urlSettingSchema } from "@shared/validators";
+import { emailConfigSchema, disableFeatureSchema, toggleProtectedSchema, mapsProviderSchema, themeDefaultSchema, matchingCountriesSchema, coordinatesMaxAgeSchema, genericSettingSchema, nativeVersionSchema, urlSettingSchema } from "@shared/validators";
 import { sql } from "drizzle-orm";
 import multer from "multer";
 import path from "path";
@@ -431,46 +431,6 @@ router.put("/play-store-url", async (req: Request, res: Response) => {
     return res.json(setting);
   } catch (_error) {
     return sendError(res, 500, "Errore salvataggio Play Store URL");
-  }
-});
-
-router.get("/website-url", async (_req: Request, res: Response) => {
-  try {
-    const setting = await storage.getAppSetting("website_url");
-    return res.json({ url: setting?.value || "" });
-  } catch (_error) {
-    return sendError(res, 500, "Errore lettura Website URL");
-  }
-});
-
-router.put("/website-url", async (req: Request, res: Response) => {
-  try {
-    const parsed = urlSettingSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("website_url", parsed.data.url);
-    return res.json(setting);
-  } catch (_error) {
-    return sendError(res, 500, "Errore salvataggio Website URL");
-  }
-});
-
-router.get("/maintenance", async (_req: Request, res: Response) => {
-  try {
-    const setting = await storage.getAppSetting("maintenance_settings");
-    return res.json(setting?.value || { enabled: false, message: "" });
-  } catch (_error) {
-    return sendError(res, 500, "Errore lettura maintenance mode");
-  }
-});
-
-router.put("/maintenance", async (req: Request, res: Response) => {
-  try {
-    const parsed = maintenanceSettingsSchema.safeParse(req.body);
-    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
-    const setting = await storage.upsertAppSetting("maintenance_settings", undefined, parsed.data);
-    return res.json(setting);
-  } catch (_error) {
-    return sendError(res, 500, "Errore salvataggio maintenance mode");
   }
 });
 

@@ -4,12 +4,17 @@
  * Contenuto:
  *   - GET /landing-images — lettura immagini landing page
  *   - POST /landing-images — salvataggio immagini landing page
+ *   - GET /website-url — lettura URL sito web
+ *   - PUT /website-url — salvataggio URL sito web
+ *   - GET /maintenance — lettura modalità manutenzione
+ *   - PUT /maintenance — salvataggio modalità manutenzione
  */
 
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { bustLandingImagesCache } from "../../site/routes";
 import { sendError } from "../../lib/api-response";
+import { urlSettingSchema, maintenanceSettingsSchema } from "@shared/validators";
 
 const router = Router();
 
@@ -31,6 +36,46 @@ router.post("/landing-images", async (req: Request, res: Response) => {
     return res.json(setting);
   } catch (_error) {
     return sendError(res, 500, "Errore salvataggio landing images");
+  }
+});
+
+router.get("/website-url", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("website_url");
+    return res.json({ url: setting?.value || "" });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura Website URL");
+  }
+});
+
+router.put("/website-url", async (req: Request, res: Response) => {
+  try {
+    const parsed = urlSettingSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const setting = await storage.upsertAppSetting("website_url", parsed.data.url);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio Website URL");
+  }
+});
+
+router.get("/maintenance", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("maintenance_settings");
+    return res.json(setting?.value || { enabled: false, message: "" });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura maintenance mode");
+  }
+});
+
+router.put("/maintenance", async (req: Request, res: Response) => {
+  try {
+    const parsed = maintenanceSettingsSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const setting = await storage.upsertAppSetting("maintenance_settings", undefined, parsed.data);
+    return res.json(setting);
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio maintenance mode");
   }
 });
 
