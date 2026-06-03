@@ -665,3 +665,9 @@ id = "CP9JLeXfCJwGj-GGkA-rr"
 uri = "file://support-ticket-spatial-ref-sys.md"
 type = "text"
 title = "Richiesta Support Replit — spatial_ref_sys deploy block (EN)"
+
+[[outputs]]
+id = "FC9uItNjF0RjdqQXFMDmx"
+uri = "file://tabella-comparativa-bikerlink.pdf"
+type = "pdf"
+title = "Tabella Comparativa Pianificazione Route — BikerLink vs Concorrenti"
