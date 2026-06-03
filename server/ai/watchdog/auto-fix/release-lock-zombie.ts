@@ -15,11 +15,14 @@ export const releaseLockZombie: AutoFixRule = {
     }
     try {
       const row = await storage.getAppSetting("matching_scheduler_state");
-      const parsed = (row?.valueJson ?? {}) as Record<string, unknown>;
+      const parsed = { ...(row?.valueJson as Record<string, unknown> ?? {}) };
       delete parsed.lockedAt;
-      await storage.upsertAppSetting("matching_scheduler_state",
-        JSON.stringify({ ...parsed, lockReleasedByWatchdogAt: new Date().toISOString() }),
-      );
+      // Usa valueJson (3° arg) — non value (2° arg stringa) — perché il
+      // scheduler-collector legge row.valueJson, non row.value.
+      await storage.upsertAppSetting("matching_scheduler_state", undefined, {
+        ...parsed,
+        lockReleasedByWatchdogAt: new Date().toISOString(),
+      });
       return {
         applied: true,
         summary: `Lock matching rilasciato (era attivo da ${Math.round(lockAge)} min)`,

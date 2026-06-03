@@ -25,11 +25,13 @@ function isInternalMatchingRequest(req: Request): boolean {
   return false;
 }
 
-// Admin matching endpoints — 30/min per admin user (or IP fallback).
+// Admin matching endpoints — 120/min per admin user (or IP fallback).
+// Multiple matching admin screens poll simultaneously (lock-state 5s, metrics 15s,
+// stats 30s, etc.) and can collectively exceed a lower limit when open together.
 // Internal server-side calls (watchdog, self-check probes) are exempted via skip().
 export const adminMatchingRateLimiter = rateLimit({
   windowMs: 60 * 1000,
-  limit: 30,
+  limit: 120,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   keyGenerator: userOrIpKey,

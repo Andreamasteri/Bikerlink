@@ -199,6 +199,20 @@ export function triggerMatchingRun(): { started: boolean; reason?: string } {
         bikerBikerMatchesNew: bikerBikerMatchCount,
       };
 
+      // Persiste lastRunAt sul DB così il watchdog collector può leggerlo.
+      // Leggiamo prima lo stato esistente per preservare eventuali altri campi
+      // (es. lockedAt) senza sovrascriverli.
+      storage.getAppSetting("matching_scheduler_state")
+        .then((existing) => {
+          const prev = (existing?.valueJson as Record<string, unknown>) ?? {};
+          return storage.upsertAppSetting("matching_scheduler_state", undefined, {
+            ...prev,
+            lastRunAt: cycleMetric.completedAt,
+            lastRunDurationMs: cycleMetric.durationMs,
+          });
+        })
+        .catch((err) => schedulerLogger.warn({ err }, "matching_scheduler_state persist failed (non-blocking)"));
+
       schedulerLogger.info(
         { duration: prettyMs(cycleMetric.durationMs), totalMatches, rss: memoryRssPretty() },
         "Ciclo on-demand completato"
