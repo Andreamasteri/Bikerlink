@@ -355,4 +355,27 @@ export const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 4,
   },
+
+  /* PDF draft preview in Col 2 */
+  pdfDraftCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#052E16",
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: "#16A34A",
+  },
+  pdfDraftName: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: "#4ADE80",
+  },
+  pdfDraftMeta: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "#10B981",
+    marginTop: 1,
+  },
 });

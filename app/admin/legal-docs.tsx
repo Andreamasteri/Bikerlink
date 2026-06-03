@@ -73,6 +73,11 @@ export default function LegalDocsAdmin() {
   const [viewModal, setViewModal] = useState<DocType | null>(null);
   const [fullText, setFullText] = useState<Partial<Record<DocType, string | null>>>({});
   const [loadingText, setLoadingText] = useState<DocType | null>(null);
+  const [pdfDraft, setPdfDraft] = useState<{
+    asset: DocumentPicker.DocumentPickerAsset;
+    fileName: string;
+    fileSize: number;
+  } | null>(null);
 
   const { data: info, refetch } = useQuery<DocsInfoResponse>({
     queryKey: ["/api/admin/legal/docs-info"],
@@ -125,25 +130,55 @@ export default function LegalDocsAdmin() {
       const mimeType = acceptsPdf ? "application/pdf" : "text/plain";
       const result = await DocumentPicker.getDocumentAsync({ type: mimeType });
       if (result.canceled || !result.assets?.[0]) return;
-      setUploading(prev => ({ ...prev, [key]: true }));
       const file = result.assets[0];
+
+      if (acceptsPdf) {
+        setPdfDraft({
+          asset: file,
+          fileName: file.name || "manuale.pdf",
+          fileSize: file.size ?? 0,
+        });
+        return;
+      }
+
+      setUploading(prev => ({ ...prev, [key]: true }));
+      try {
+        const formData = new FormData();
+        await appendFileToForm(formData, "file", file.uri, "text/plain", file.name || "document.txt");
+        const res = await fetch(
+          new URL(`/api/admin/legal/upload/${key}`, getApiUrl()).toString(),
+          { method: "POST", body: formData, credentials: "include" }
+        );
+        const data = await res.json() as { ok?: boolean; text?: string; message?: string };
+        if (res.ok) {
+          setDraft(key, data.text ?? "", "file");
+        } else {
+          Alert.alert("Errore", data.message || "Errore upload");
+        }
+      } finally {
+        setUploading(prev => ({ ...prev, [key]: false }));
+      }
+    } catch (e: unknown) {
+      Alert.alert("Errore", (e as Error).message || "Errore upload");
+    }
+  };
+
+  const handlePdfActivate = async (key: DocType) => {
+    if (!pdfDraft) return;
+    setUploading(prev => ({ ...prev, [key]: true }));
+    try {
       const formData = new FormData();
-      const fileMime = acceptsPdf ? "application/pdf" : "text/plain";
-      const fileExt = acceptsPdf ? "pdf" : "txt";
-      await appendFileToForm(formData, "file", file.uri, fileMime, file.name || `document.${fileExt}`);
+      await appendFileToForm(formData, "file", pdfDraft.asset.uri, "application/pdf", pdfDraft.fileName);
       const res = await fetch(
         new URL(`/api/admin/legal/upload/${key}`, getApiUrl()).toString(),
         { method: "POST", body: formData, credentials: "include" }
       );
-      const data = await res.json() as { ok?: boolean; text?: string; message?: string };
+      const data = await res.json() as { ok?: boolean; message?: string };
       if (res.ok) {
-        if (acceptsPdf) {
-          setFullText(prev => { const n = { ...prev }; delete n[key]; return n; });
-          await refetch();
-          Alert.alert("Successo", "Manuale PDF caricato e attivato");
-        } else {
-          setDraft(key, data.text ?? "", "file");
-        }
+        setPdfDraft(null);
+        setFullText(prev => { const n = { ...prev }; delete n[key]; return n; });
+        await refetch();
+        Alert.alert("Successo", "Manuale PDF caricato e attivato");
       } else {
         Alert.alert("Errore", data.message || "Errore upload");
       }
@@ -276,25 +311,55 @@ export default function LegalDocsAdmin() {
               {/* Col 2 — File */}
               <View style={styles.col}>
                 <Text style={styles.colLabel}>📂 FILE</Text>
-                <TouchableOpacity
-                  style={[styles.btn, styles.btnSecondary, isUp && styles.btnDisabled]}
-                  onPress={() => handleUpload(key, acceptsPdf)}
-                  disabled={isUp}
-                >
-                  {isUp
-                    ? <ActivityIndicator size="small" color="#fff" />
-                    : <><Ionicons name="cloud-upload-outline" size={13} color="#fff" /><Text style={styles.btnText}>{acceptsPdf ? "PDF" : ".txt"}</Text></>}
-                </TouchableOpacity>
-                {draft && src === "file" && (
-                  <TouchableOpacity
-                    style={[styles.btn, styles.btnActivate, isAct && styles.btnDisabled]}
-                    onPress={() => handleActivate(key)}
-                    disabled={isAct}
-                  >
-                    {isAct
-                      ? <ActivityIndicator size="small" color="#fff" />
-                      : <><Ionicons name="checkmark-circle-outline" size={13} color="#fff" /><Text style={styles.btnText}>Attiva</Text></>}
-                  </TouchableOpacity>
+                {acceptsPdf && pdfDraft ? (
+                  <>
+                    <View style={styles.pdfDraftCard}>
+                      <Ionicons name="document-outline" size={14} color="#4ADE80" />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.pdfDraftName} numberOfLines={1}>{pdfDraft.fileName}</Text>
+                        <Text style={styles.pdfDraftMeta}>{formatSize(pdfDraft.fileSize)}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnActivate, isUp && styles.btnDisabled]}
+                      onPress={() => handlePdfActivate(key)}
+                      disabled={isUp}
+                    >
+                      {isUp
+                        ? <ActivityIndicator size="small" color="#fff" />
+                        : <><Ionicons name="checkmark-circle-outline" size={13} color="#fff" /><Text style={styles.btnText}>Attiva PDF</Text></>}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnOutline]}
+                      onPress={() => setPdfDraft(null)}
+                    >
+                      <Ionicons name="trash-outline" size={13} color={Colors.accent} />
+                      <Text style={[styles.btnText, { color: Colors.accent }]}>Rimuovi</Text>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.btn, styles.btnSecondary, isUp && styles.btnDisabled]}
+                      onPress={() => handleUpload(key, acceptsPdf)}
+                      disabled={isUp}
+                    >
+                      {isUp
+                        ? <ActivityIndicator size="small" color="#fff" />
+                        : <><Ionicons name="cloud-upload-outline" size={13} color="#fff" /><Text style={styles.btnText}>{acceptsPdf ? "PDF" : ".txt"}</Text></>}
+                    </TouchableOpacity>
+                    {draft && src === "file" && (
+                      <TouchableOpacity
+                        style={[styles.btn, styles.btnActivate, isAct && styles.btnDisabled]}
+                        onPress={() => handleActivate(key)}
+                        disabled={isAct}
+                      >
+                        {isAct
+                          ? <ActivityIndicator size="small" color="#fff" />
+                          : <><Ionicons name="checkmark-circle-outline" size={13} color="#fff" /><Text style={styles.btnText}>Attiva</Text></>}
+                      </TouchableOpacity>
+                    )}
+                  </>
                 )}
               </View>
 
