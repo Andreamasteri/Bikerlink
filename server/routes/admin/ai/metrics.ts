@@ -1,10 +1,11 @@
 /**
- * Admin AI Metrics — Task #3017
+ * Admin AI Metrics — Task #3017 / #3098
  *
- * GET /api/admin/ai/metrics
- * Ritorna metriche aggregate delle chiamate AI dalle ultime 24h/7gg:
- * - chiamate per provider, latenza mediana/p95, token totali, costo stimato
- * - tasso degraded, tasso repair, ultime 20 chiamate con errore/degraded
+ * GET /api/admin/ai/metrics?range=24h|7d|30d  (default 7d)
+ * Ritorna metriche aggregate delle chiamate AI per il range selezionato:
+ * - summary (calls, tokens, cost, degradedRate, latency p50/p95)
+ * - chiamate per provider (calls, tokens, cost, errorRate)
+ * - ultime 20 chiamate con errore/degraded
  */
 
 import { Router, type Request, type Response } from "express";
@@ -20,134 +21,114 @@ function percentile(sorted: number[], p: number): number {
   return sorted[Math.max(0, idx)];
 }
 
-router.get("/ai/metrics", async (_req: Request, res: Response) => {
+function rangeMs(range: string): number {
+  switch (range) {
+    case "24h": return 24 * 60 * 60 * 1000;
+    case "30d": return 30 * 24 * 60 * 60 * 1000;
+    default:    return 7 * 24 * 60 * 60 * 1000;
+  }
+}
+
+router.get("/ai/metrics", async (req: Request, res: Response) => {
   try {
-    const now = Date.now();
-    const since24h = new Date(now - 24 * 60 * 60 * 1000);
-    const since7d = new Date(now - 7 * 24 * 60 * 60 * 1000);
+    const rawRange = String(req.query.range ?? "7d");
+    const range = ["24h", "7d", "30d"].includes(rawRange) ? rawRange : "7d";
+    const since = new Date(Date.now() - rangeMs(range));
 
-    // Aggregati per provider (ultime 24h)
-    const perProvider24h = await db
-      .select({
-        provider: aiCallLogs.provider,
-        calls: sql<number>`count(*)::int`,
-        tokensIn: sql<number>`sum(tokens_in)::int`,
-        tokensOut: sql<number>`sum(tokens_out)::int`,
-        costUsd: sql<number>`sum(cost_usd)::float`,
-        degraded: sql<number>`sum(case when degraded then 1 else 0 end)::int`,
-        repairs: sql<number>`sum(case when error = 'repaired' then 1 else 0 end)::int`,
-      })
-      .from(aiCallLogs)
-      .where(gte(aiCallLogs.createdAt, since24h))
-      .groupBy(aiCallLogs.provider)
-      .orderBy(sql`count(*) desc`);
+    const [perProvider, totalsRow, latencies, recentIssues] = await Promise.all([
+      db.select({
+          provider: aiCallLogs.provider,
+          calls: sql<number>`count(*)::int`,
+          tokensIn: sql<number>`coalesce(sum(tokens_in),0)::int`,
+          tokensOut: sql<number>`coalesce(sum(tokens_out),0)::int`,
+          costUsd: sql<number>`coalesce(sum(cost_usd),0)::float`,
+          degradedCount: sql<number>`sum(case when degraded then 1 else 0 end)::int`,
+          errorCount: sql<number>`sum(case when error is not null and error <> 'repaired' then 1 else 0 end)::int`,
+        })
+        .from(aiCallLogs)
+        .where(gte(aiCallLogs.createdAt, since))
+        .groupBy(aiCallLogs.provider)
+        .orderBy(sql`count(*) desc`),
 
-    // Aggregati per provider (ultimi 7gg)
-    const perProvider7d = await db
-      .select({
-        provider: aiCallLogs.provider,
-        calls: sql<number>`count(*)::int`,
-        tokensIn: sql<number>`sum(tokens_in)::int`,
-        tokensOut: sql<number>`sum(tokens_out)::int`,
-        costUsd: sql<number>`sum(cost_usd)::float`,
-        degraded: sql<number>`sum(case when degraded then 1 else 0 end)::int`,
-        repairs: sql<number>`sum(case when error = 'repaired' then 1 else 0 end)::int`,
-      })
-      .from(aiCallLogs)
-      .where(gte(aiCallLogs.createdAt, since7d))
-      .groupBy(aiCallLogs.provider)
-      .orderBy(sql`count(*) desc`);
+      db.select({
+          calls: sql<number>`count(*)::int`,
+          tokensIn: sql<number>`coalesce(sum(tokens_in),0)::int`,
+          tokensOut: sql<number>`coalesce(sum(tokens_out),0)::int`,
+          costUsd: sql<number>`coalesce(sum(cost_usd),0)::float`,
+          degradedCount: sql<number>`sum(case when degraded then 1 else 0 end)::int`,
+          errorCount: sql<number>`sum(case when error is not null and error <> 'repaired' then 1 else 0 end)::int`,
+        })
+        .from(aiCallLogs)
+        .where(gte(aiCallLogs.createdAt, since)),
 
-    // Latenze per calcolo mediana/p95 (ultime 24h, max 1000 righe)
-    const latencies = await db
-      .select({ latencyMs: aiCallLogs.latencyMs })
-      .from(aiCallLogs)
-      .where(and(
-        gte(aiCallLogs.createdAt, since24h),
-        sql`latency_ms is not null`,
-      ))
-      .limit(1000);
+      db.select({ latencyMs: aiCallLogs.latencyMs })
+        .from(aiCallLogs)
+        .where(and(
+          gte(aiCallLogs.createdAt, since),
+          sql`latency_ms is not null`,
+        ))
+        .limit(2000),
 
+      db.select({
+          id: aiCallLogs.id,
+          provider: aiCallLogs.provider,
+          modelId: aiCallLogs.modelId,
+          latencyMs: aiCallLogs.latencyMs,
+          tokensIn: aiCallLogs.tokensIn,
+          tokensOut: aiCallLogs.tokensOut,
+          costUsd: aiCallLogs.costUsd,
+          degraded: aiCallLogs.degraded,
+          error: aiCallLogs.error,
+          createdAt: aiCallLogs.createdAt,
+        })
+        .from(aiCallLogs)
+        .where(and(
+          gte(aiCallLogs.createdAt, since),
+          sql`(degraded = true or (error is not null and error <> 'repaired'))`,
+        ))
+        .orderBy(desc(aiCallLogs.createdAt))
+        .limit(20),
+    ]);
+
+    const totals = totalsRow[0];
     const sorted = latencies
       .map((r) => r.latencyMs ?? 0)
       .filter((v) => v > 0)
       .sort((a, b) => a - b);
 
-    const latencyP50 = percentile(sorted, 50);
-    const latencyP95 = percentile(sorted, 95);
-
-    // Ultime 20 chiamate con errore o degraded
-    const recentIssues = await db
-      .select({
-        id: aiCallLogs.id,
-        provider: aiCallLogs.provider,
-        modelId: aiCallLogs.modelId,
-        latencyMs: aiCallLogs.latencyMs,
-        tokensIn: aiCallLogs.tokensIn,
-        tokensOut: aiCallLogs.tokensOut,
-        costUsd: aiCallLogs.costUsd,
-        degraded: aiCallLogs.degraded,
-        error: aiCallLogs.error,
-        createdAt: aiCallLogs.createdAt,
-      })
-      .from(aiCallLogs)
-      .where(sql`(degraded = true or error is not null)`)
-      .orderBy(desc(aiCallLogs.createdAt))
-      .limit(20);
-
-    // Totali 24h per summary
-    const [totals24h] = await db
-      .select({
-        calls: sql<number>`count(*)::int`,
-        tokensIn: sql<number>`sum(tokens_in)::int`,
-        tokensOut: sql<number>`sum(tokens_out)::int`,
-        costUsd: sql<number>`sum(cost_usd)::float`,
-        degradedCount: sql<number>`sum(case when degraded then 1 else 0 end)::int`,
-        repairedCount: sql<number>`sum(case when error = 'repaired' then 1 else 0 end)::int`,
-      })
-      .from(aiCallLogs)
-      .where(gte(aiCallLogs.createdAt, since24h));
-
     return res.json({
-      summary24h: {
-        calls: totals24h?.calls ?? 0,
-        tokensIn: totals24h?.tokensIn ?? 0,
-        tokensOut: totals24h?.tokensOut ?? 0,
-        costUsd: Number((totals24h?.costUsd ?? 0).toFixed(6)),
-        degradedRate: totals24h?.calls
-          ? Number((((totals24h?.degradedCount ?? 0) / totals24h.calls) * 100).toFixed(1))
+      range,
+      summary: {
+        calls: totals?.calls ?? 0,
+        tokensIn: totals?.tokensIn ?? 0,
+        tokensOut: totals?.tokensOut ?? 0,
+        costUsd: Number((totals?.costUsd ?? 0).toFixed(6)),
+        degradedRate: totals?.calls
+          ? Number((((totals.degradedCount ?? 0) / totals.calls) * 100).toFixed(1))
           : 0,
-        repairRate: totals24h?.calls
-          ? Number((((totals24h?.repairedCount ?? 0) / totals24h.calls) * 100).toFixed(1))
+        errorRate: totals?.calls
+          ? Number((((totals.errorCount ?? 0) / totals.calls) * 100).toFixed(1))
           : 0,
-        latencyP50Ms: latencyP50,
-        latencyP95Ms: latencyP95,
+        latencyP50Ms: percentile(sorted, 50),
+        latencyP95Ms: percentile(sorted, 95),
       },
-      perProvider24h: perProvider24h.map((r) => ({
+      perProvider: perProvider.map((r) => ({
         provider: r.provider,
         calls: r.calls,
-        tokensIn: r.tokensIn ?? 0,
-        tokensOut: r.tokensOut ?? 0,
+        tokensIn: r.tokensIn,
+        tokensOut: r.tokensOut,
         costUsd: Number((r.costUsd ?? 0).toFixed(6)),
-        degradedCount: r.degraded ?? 0,
-        repairCount: r.repairs ?? 0,
-      })),
-      perProvider7d: perProvider7d.map((r) => ({
-        provider: r.provider,
-        calls: r.calls,
-        tokensIn: r.tokensIn ?? 0,
-        tokensOut: r.tokensOut ?? 0,
-        costUsd: Number((r.costUsd ?? 0).toFixed(6)),
-        degradedCount: r.degraded ?? 0,
-        repairCount: r.repairs ?? 0,
+        degradedCount: r.degradedCount ?? 0,
+        errorCount: r.errorCount ?? 0,
+        errorRate: r.calls
+          ? Number((((r.errorCount ?? 0) / r.calls) * 100).toFixed(1))
+          : 0,
       })),
       recentIssues: recentIssues.map((r) => ({
         id: r.id,
         provider: r.provider,
         modelId: r.modelId,
         latencyMs: r.latencyMs,
-        tokensIn: r.tokensIn,
-        tokensOut: r.tokensOut,
         costUsd: Number((r.costUsd ?? 0).toFixed(6)),
         degraded: r.degraded,
         error: r.error,

@@ -16,6 +16,7 @@ import MessageList from "@/components/admin/ai-console/MessageList";
 import ContextPanel from "@/components/admin/ai-console/ContextPanel";
 import ActionQueuePanel from "@/components/admin/ai-console/ActionQueuePanel";
 import BudgetIndicator from "@/components/admin/ai-console/BudgetIndicator";
+import AiMetricsCard from "@/components/admin/ai-console/AiMetricsCard";
 import OnboardingTour from "@/components/admin/ai-console/OnboardingTour";
 import { useAiConsole } from "@/hooks/admin/ai-console/useAiConsole";
 import { useAiConversationMessages } from "@/hooks/admin/ai-console/useAiConversation";
@@ -157,6 +158,7 @@ export default function AiConsoleScreen() {
             <View style={[styles.colCtx, { borderColor: colors.border }]}>
               <ScrollView contentContainerStyle={{ padding: 10, gap: 10 }}>
                 <BudgetIndicator />
+                <AiMetricsCard />
                 <ContextPanel messages={thread?.messages ?? []} streamState={state} />
                 <ActionQueuePanel />
               </ScrollView>
@@ -186,6 +188,7 @@ export default function AiConsoleScreen() {
             ) : (
               <ScrollView contentContainerStyle={{ padding: 10, gap: 10 }}>
                 <BudgetIndicator />
+                <AiMetricsCard />
                 <ContextPanel messages={thread?.messages ?? []} streamState={state} />
                 <ActionQueuePanel />
               </ScrollView>
