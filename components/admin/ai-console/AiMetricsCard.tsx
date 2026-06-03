@@ -7,7 +7,7 @@ import { getApiUrl } from "@/lib/query-client";
 
 type Range = "24h" | "7d" | "30d";
 
-interface ProviderRow {
+interface ProviderData {
   provider: string;
   calls: number;
   costUsd: number;
@@ -38,7 +38,7 @@ interface RecentIssue {
 interface MetricsResponse {
   range: string;
   summary: Summary;
-  perProvider: ProviderRow[];
+  perProvider: ProviderData[];
   recentIssues: RecentIssue[];
 }
 
@@ -58,8 +58,8 @@ function useAiMetrics(range: Range) {
 
 const RANGES: { label: string; value: Range }[] = [
   { label: "24h", value: "24h" },
-  { label: "7g",  value: "7d" },
-  { label: "30g", value: "30d" },
+  { label: "7d",  value: "7d" },
+  { label: "30d", value: "30d" },
 ];
 
 const PROVIDER_COLORS: Record<string, string> = {
@@ -183,7 +183,7 @@ function StatCell({
 function ProviderRow({
   row, colors,
 }: {
-  row: ProviderRow;
+  row: ProviderData;
   colors: ReturnType<typeof useColors>;
 }) {
   const dot = PROVIDER_COLORS[row.provider.toLowerCase()] ?? colors.accent;

@@ -230,30 +230,34 @@ const ollamaStyles = StyleSheet.create({
 
 // ── AiMetricsCard ─────────────────────────────────────────────────────────────
 
-interface AiMetrics24h {
+interface AiMetricsSummary {
   calls: number;
   tokensIn: number;
   tokensOut: number;
   costUsd: number;
   degradedRate: number;
-  repairRate: number;
+  errorRate: number;
   latencyP50Ms: number;
   latencyP95Ms: number;
 }
 interface AiMetricsResponse {
-  summary24h: AiMetrics24h;
-  perProvider24h: Array<{ provider: string; calls: number; costUsd: number; degradedCount: number }>;
+  range: string;
+  summary: AiMetricsSummary;
+  perProvider: Array<{ provider: string; calls: number; costUsd: number; degradedCount: number }>;
 }
 
 export function AiMetricsCard() {
   const { data, isLoading } = useQuery<AiMetricsResponse>({
-    queryKey: ["/api/admin/ai/metrics"],
-    queryFn: async () => (await apiRequest("GET", "/api/admin/ai/metrics")).json(),
+    queryKey: ["/api/admin/ai/metrics", "24h"],
+    queryFn: async () => {
+      const url = new URL("/api/admin/ai/metrics?range=24h", getApiUrl()).toString();
+      return (await fetch(url, { credentials: "include" })).json() as Promise<AiMetricsResponse>;
+    },
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
 
-  const s = data?.summary24h;
+  const s = data?.summary;
 
   return (
     <View style={metricsStyles.card}>
@@ -288,15 +292,15 @@ export function AiMetricsCard() {
               <Text style={[metricsStyles.value, { color: Colors.error }]}>{s.degradedRate}%</Text>
             </View>
           )}
-          {s.repairRate > 0 && (
+          {s.errorRate > 0 && (
             <View style={metricsStyles.row}>
-              <Text style={metricsStyles.label}>JSON repaired</Text>
-              <Text style={[metricsStyles.value, { color: Colors.warning }]}>{s.repairRate}%</Text>
+              <Text style={metricsStyles.label}>Tasso errori</Text>
+              <Text style={[metricsStyles.value, { color: Colors.warning }]}>{s.errorRate}%</Text>
             </View>
           )}
-          {(data?.perProvider24h ?? []).length > 0 && (
+          {(data?.perProvider ?? []).length > 0 && (
             <View style={metricsStyles.providers}>
-              {(data?.perProvider24h ?? []).slice(0, 4).map((p) => (
+              {(data?.perProvider ?? []).slice(0, 4).map((p) => (
                 <View key={p.provider} style={metricsStyles.providerChip}>
                   <Text style={metricsStyles.providerText}>{p.provider}</Text>
                   <Text style={metricsStyles.providerCount}>{p.calls}</Text>
