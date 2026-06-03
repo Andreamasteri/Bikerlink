@@ -41,15 +41,31 @@ vi.mock("../ai/watchdog/log", () => ({
   writeWatchdogLog: vi.fn().mockResolvedValue("log-id-test"),
 }));
 
+vi.mock("../ai/console/tools", () => ({
+  SCOPES: ["moderation", "watchdog", "ota", "db-integrity", "app-integrity"] as const,
+  buildToolsForScopes: vi.fn().mockReturnValue([]),
+}));
+
+vi.mock("../cache/redis", () => ({
+  getRedis: vi.fn().mockReturnValue(null),
+}));
+
+vi.mock("../ai/coordinator/integrations/console", () => ({
+  emitConsoleQuery: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports under test — after mocks
 // ---------------------------------------------------------------------------
 
 import { runProposer } from "../ai/watchdog/proposer";
 import { runWithFallback } from "../ai/moderation/provider";
-import { proposalSchema } from "../ai/watchdog/types";
+import { proposalSchema, weeklyReportSchema } from "../ai/watchdog/types";
 import type { HealthSnapshot } from "../ai/watchdog/types";
 import type { ResolvedModel } from "../ai/moderation/provider";
+import { RouterDecisionSchema } from "../ai/console/router";
+import { triageOutputSchema } from "../ai/moderation/types";
+import { aiExplainSchema } from "../ai/db-integrity/types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -171,4 +187,30 @@ describe("proposalSchema — JSON Schema senza propertyNames né tipi unknown (c
     const result = proposalSchema.safeParse(example);
     expect(result.success).toBe(true);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Test Suite 3 — Tutti gli altri schemi usati con generateObject
+// Regressione preventiva: nessuno deve contenere propertyNames o unknown
+// ---------------------------------------------------------------------------
+
+describe("Schemi AI aggiuntivi — nessun propertyNames né unknown (compatibilità OpenAI)", () => {
+  const schemasUnderTest = [
+    { name: "triageOutputSchema", schema: triageOutputSchema },
+    { name: "RouterDecisionSchema", schema: RouterDecisionSchema },
+    { name: "weeklyReportSchema", schema: weeklyReportSchema },
+    { name: "aiExplainSchema", schema: aiExplainSchema },
+  ];
+
+  for (const { name, schema } of schemasUnderTest) {
+    it(`${name}: non contiene 'propertyNames' (rifiutato da OpenAI response_format)`, () => {
+      const serialized = JSON.stringify(z.toJSONSchema(schema));
+      expect(serialized).not.toContain("propertyNames");
+    });
+
+    it(`${name}: non contiene il tipo 'unknown' (rifiutato da OpenAI response_format)`, () => {
+      const serialized = JSON.stringify(z.toJSONSchema(schema));
+      expect(serialized).not.toMatch(/"type"\s*:\s*"unknown"/);
+    });
+  }
 });

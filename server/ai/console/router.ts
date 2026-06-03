@@ -12,7 +12,7 @@ import { emitConsoleQuery } from "../coordinator/integrations/console";
 
 const CACHE_TTL_S = 60;
 
-const RouterDecisionSchema = z.object({
+export const RouterDecisionSchema = z.object({
   scopes: z.array(z.enum(SCOPES)).min(1).max(SCOPES.length),
   reasoning: z.string().max(400),
 });
