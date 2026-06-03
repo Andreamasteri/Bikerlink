@@ -139,18 +139,7 @@ router.post("/generate", async (req: Request, res: Response) => {
     const prompt = buildPrompt(docType);
     const text = await callOllamaChat(prompt, undefined, { temperature: 0.3, maxRetries: 1 });
 
-    const settingKey = DOC_KEYS[docType];
-    await storage.upsertAppSetting(settingKey, text);
-
-    await storage.createModeratorLog({
-      moderatorId: req.session.userId!,
-      action: "generate_legal_doc",
-      targetType: "app_setting",
-      targetId: settingKey,
-      details: `${DOC_LABELS[docType]} generato con Ollama (${text.length} caratteri)`,
-    });
-
-    return res.json({ ok: true, docType, length: text.length });
+    return res.json({ ok: true, docType, text });
   } catch (err) {
     console.error("[legal] generate error:", err);
     return sendError(res, 500, `Errore generazione documento: ${(err as Error).message}`);
@@ -195,20 +184,39 @@ router.post("/upload/:docType", (req: Request, res: Response, next) => {
     } else {
       const content = fs.readFileSync(req.file.path, "utf-8");
       fs.unlinkSync(req.file.path);
-      await storage.upsertAppSetting(settingKey, content);
-      await storage.createModeratorLog({
-        moderatorId: req.session.userId!,
-        action: "upload_legal_doc",
-        targetType: "app_setting",
-        targetId: settingKey,
-        details: `${DOC_LABELS[docType]} caricato da file .txt`,
-      });
-      return sendSuccess(res, { length: content.length }, `${DOC_LABELS[docType]} caricato con successo`);
+      return sendSuccess(res, { text: content }, `${DOC_LABELS[docType]} caricato`);
     }
   } catch (err) {
     if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
     console.error("[legal] upload error:", err);
     return sendError(res, 500, "Errore upload documento");
+  }
+});
+
+const saveDocSchema = z.object({
+  text: z.string().min(1).max(500_000),
+});
+
+router.post("/save/:docType", async (req: Request, res: Response) => {
+  try {
+    const docType = req.params.docType as string;
+    if (!DOC_KEYS[docType]) return sendError(res, 400, "Tipo documento non valido");
+    const parsed = saveDocSchema.safeParse(req.body);
+    if (!parsed.success) return sendError(res, 400, parsed.error.issues[0].message);
+    const settingKey = DOC_KEYS[docType];
+    await storage.upsertAppSetting(settingKey, parsed.data.text);
+    await storage.createModeratorLog({
+      moderatorId: req.session.userId!,
+      action: "save_legal_doc",
+      targetType: "app_setting",
+      targetId: settingKey,
+      details: `${DOC_LABELS[docType]} attivato nell'app (${parsed.data.text.length} caratteri)`,
+    });
+    const updated = await storage.getAppSetting(settingKey);
+    return res.json({ ok: true, updatedAt: updated?.updatedAt ?? new Date() });
+  } catch (err) {
+    console.error("[legal] save error:", err);
+    return sendError(res, 500, "Errore salvataggio documento");
   }
 });
 

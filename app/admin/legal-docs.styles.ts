@@ -91,6 +91,112 @@ export const styles = StyleSheet.create({
     fontStyle: "italic",
     marginBottom: 12,
   },
+
+  /* Bozza pronta */
+  draftBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "#0D1B2E",
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: "#3B82F6",
+  },
+  draftBannerText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "#93C5FD",
+    flex: 1,
+    lineHeight: 17,
+  },
+
+  /* 3-colonne */
+  colGrid: {
+    flexDirection: "row",
+    gap: 0,
+    marginTop: 4,
+  },
+  col: {
+    flex: 1,
+    gap: 6,
+  },
+  colLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 2,
+  },
+  colDivider: {
+    width: 1,
+    backgroundColor: Colors.border,
+    marginHorizontal: 8,
+    marginVertical: 4,
+  },
+
+  /* Bottoni */
+  actions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  btn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minHeight: 34,
+  },
+  btnPrimary: {
+    backgroundColor: "#FF6B35",
+  },
+  btnSecondary: {
+    backgroundColor: Colors.accent,
+  },
+  btnOutline: {
+    borderWidth: 1,
+    borderColor: Colors.accent,
+    backgroundColor: "transparent",
+  },
+  btnSlides: {
+    backgroundColor: "#2563EB",
+  },
+  btnActivate: {
+    backgroundColor: "#16A34A",
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
+  btnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: "#fff",
+  },
+  btnPublish: {
+    backgroundColor: "#16A34A",
+  },
+
+  /* Sezioni slides */
+  subSection: {
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+    marginBottom: 14,
+    paddingBottom: 14,
+  },
+  subSectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginBottom: 8,
+  },
   slideDescription: {
     fontFamily: "Inter_400Regular",
     fontSize: 13,
@@ -123,59 +229,6 @@ export const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     marginBottom: 4,
-  },
-  actions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  btn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    minHeight: 36,
-  },
-  btnPrimary: {
-    backgroundColor: "#FF6B35",
-  },
-  btnSecondary: {
-    backgroundColor: Colors.accent,
-  },
-  btnOutline: {
-    borderWidth: 1,
-    borderColor: Colors.accent,
-    backgroundColor: "transparent",
-  },
-  btnSlides: {
-    backgroundColor: "#2563EB",
-  },
-  btnDisabled: {
-    opacity: 0.5,
-  },
-  btnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: "#fff",
-  },
-  btnPublish: {
-    backgroundColor: "#16A34A",
-  },
-  subSection: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-    marginBottom: 14,
-    paddingBottom: 14,
-  },
-  subSectionTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginBottom: 8,
   },
   promptInput: {
     backgroundColor: Colors.background,
@@ -248,5 +301,58 @@ export const styles = StyleSheet.create({
     color: Colors.text,
     padding: 8,
     lineHeight: 17,
+  },
+
+  /* Modal — visualizza documento attivo */
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.72)",
+    justifyContent: "center",
+    padding: 16,
+  },
+  modalCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    maxHeight: "80%",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    paddingBottom: 4,
+  },
+  modalTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    color: Colors.text,
+  },
+  modalMeta: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  modalBody: {
+    paddingHorizontal: 16,
+    maxHeight: 300,
+  },
+  modalText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 21,
+  },
+  modalTruncNote: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+    marginTop: 10,
+    marginBottom: 4,
   },
 });
