@@ -125,6 +125,12 @@ export default function AiRouteProvidersScreen() {
     }
   }, []);
 
+  const testAll = useCallback(() => {
+    Promise.all(ALL_PROVIDERS.map((id) => pingProvider(id)));
+  }, [pingProvider]);
+
+  const isTestingAny = ALL_PROVIDERS.some((id) => pings[id]?.state === "loading");
+
   function toggleProvider(id: RouteProviderId) {
     if (chain.includes(id)) {
       if (chain.length <= 1) {
@@ -192,6 +198,22 @@ export default function AiRouteProvidersScreen() {
           Provider non configurati (API key assente) vengono saltati automaticamente.
         </Text>
       </View>
+
+      <TouchableOpacity
+        style={[styles.testAllBtn, isTestingAny && styles.testAllBtnLoading]}
+        onPress={testAll}
+        disabled={isTestingAny}
+        activeOpacity={0.75}
+      >
+        {isTestingAny ? (
+          <ActivityIndicator size="small" color={Colors.accent} />
+        ) : (
+          <MaterialCommunityIcons name="access-point-network" size={16} color={Colors.accent} />
+        )}
+        <Text style={styles.testAllBtnText}>
+          {isTestingAny ? "Test in corso…" : "Test tutti i provider"}
+        </Text>
+      </TouchableOpacity>
 
       {statsData && statsData.stats.length > 0 && (
         <View style={styles.card}>
@@ -597,5 +619,26 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     width: 34,
     textAlign: "right" as const,
+  },
+  testAllBtn: {
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
+    justifyContent: "center" as const,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: Colors.accent + "88",
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 16,
+    marginBottom: 14,
+    backgroundColor: Colors.accent + "10",
+  },
+  testAllBtnLoading: {
+    opacity: 0.6,
+  },
+  testAllBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.accent,
   },
 });
