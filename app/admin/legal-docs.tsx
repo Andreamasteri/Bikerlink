@@ -72,7 +72,7 @@ export default function LegalDocsAdmin() {
   const [activating, setActivating] = useState<BoolMap>(mkBool());
   const [viewModal, setViewModal] = useState<DocType | null>(null);
   const [fullText, setFullText] = useState<Partial<Record<DocType, string | null>>>({});
-  const [loadingText, setLoadingText] = useState(false);
+  const [loadingText, setLoadingText] = useState<DocType | null>(null);
 
   const { data: info, refetch } = useQuery<DocsInfoResponse>({
     queryKey: ["/api/admin/legal/docs-info"],
@@ -81,17 +81,21 @@ export default function LegalDocsAdmin() {
   useEffect(() => {
     if (!viewModal) return;
     if (fullText[viewModal] !== undefined) return;
-    setLoadingText(true);
-    fetch(new URL(`/api/admin/legal/text/${viewModal}`, getApiUrl()).toString(), { credentials: "include" })
-      .then(r => r.json())
-      .then((data: { ok: boolean; text?: string | null; isPdf?: boolean }) => {
+    const key = viewModal;
+    setLoadingText(key);
+    fetch(new URL(`/api/admin/legal/text/${key}`, getApiUrl()).toString(), { credentials: "include" })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json() as Promise<{ ok: boolean; text?: string | null; isPdf?: boolean }>;
+      })
+      .then(data => {
         setFullText(prev => ({
           ...prev,
-          [viewModal]: data.isPdf ? "__PDF__" : (data.text ?? ""),
+          [key]: data.isPdf ? "__PDF__" : (data.text ?? ""),
         }));
       })
-      .catch(() => setFullText(prev => ({ ...prev, [viewModal]: "" })))
-      .finally(() => setLoadingText(false));
+      .catch(() => setFullText(prev => ({ ...prev, [key]: "__ERROR__" })))
+      .finally(() => setLoadingText(null));
   }, [viewModal]);
 
   const setDraft = (key: DocType, text: string | null, src: "ai" | "file" | null) => {
@@ -134,6 +138,7 @@ export default function LegalDocsAdmin() {
       const data = await res.json() as { ok?: boolean; text?: string; message?: string };
       if (res.ok) {
         if (acceptsPdf) {
+          setFullText(prev => { const n = { ...prev }; delete n[key]; return n; });
           await refetch();
           Alert.alert("Successo", "Manuale PDF caricato e attivato");
         } else {
@@ -156,6 +161,7 @@ export default function LegalDocsAdmin() {
     try {
       await apiRequest("POST", `/api/admin/legal/save/${key}`, { text });
       setDraft(key, null, null);
+      setFullText(prev => { const n = { ...prev }; delete n[key]; return n; });
       await refetch();
       Alert.alert("Attivato", "Documento attivato nell'app");
     } catch (e: unknown) {
@@ -346,11 +352,15 @@ export default function LegalDocsAdmin() {
               Aggiornato: {formatDate(viewDocInfo?.updatedAt)}
             </Text>
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator>
-              {loadingText ? (
+              {loadingText === viewModal ? (
                 <ActivityIndicator color={Colors.accent} style={{ marginVertical: 24 }} />
               ) : fullText[viewModal!] === "__PDF__" ? (
                 <Text style={[styles.modalText, { fontStyle: "italic" }]}>
                   Documento in formato PDF — usa "Scarica" per visualizzarlo.
+                </Text>
+              ) : fullText[viewModal!] === "__ERROR__" ? (
+                <Text style={[styles.modalText, { fontStyle: "italic", color: "#F87171" }]}>
+                  Errore nel caricamento del documento. Riprova più tardi.
                 </Text>
               ) : fullText[viewModal!] ? (
                 <Text style={styles.modalText}>{fullText[viewModal!]}</Text>
