@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Switch, TextInput, Pressable, StyleSheet } from "react-native";
+import { View, Text, Switch, TextInput, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors, { ThemeColors } from "@/constants/colors";
 import { FakeZoneCoordPanel, MapTarget } from "./FakeZoneCoordPanel";
@@ -76,8 +76,10 @@ export function PrivacyPositionSettings({
   pickFromGPS: (target: MapTarget) => void;
   openMapPicker: (target: MapTarget, lat?: number | null, lng?: number | null) => void;
 }) {
+  const { width } = useWindowDimensions();
+  const isTablet = width > 768;
   return (
-    <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+    <View style={[styles.settingCard, { backgroundColor: colors.surface }, isTablet && { maxWidth: 600, alignSelf: "center" }]}>
       <Pressable style={styles.accordionHeader} onPress={() => setPrivacyExpanded((v) => !v)}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Ionicons name="shield-outline" size={18} color={Colors.accent} />

@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Switch, StyleSheet } from "react-native";
+import { View, Text, Switch, StyleSheet, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors, { ThemeColors } from "@/constants/colors";
 import { UseMutationResult } from "@tanstack/react-query";
@@ -25,8 +25,10 @@ export function PrivacySettingsGroup({
   offlineRandomize,
   privacyMutation,
 }: PrivacySettingsGroupProps) {
+  const { width } = useWindowDimensions();
+  const isTablet = width > 768;
   return (
-    <View style={styles.settingsGroup}>
+    <View style={[styles.settingsGroup, isTablet && { maxWidth: 600, alignSelf: "center" }]}>
       <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
         <View style={[styles.privacyRow, !ghostModeFeatureEnabled && { opacity: 0.5 }]}>
           <Ionicons

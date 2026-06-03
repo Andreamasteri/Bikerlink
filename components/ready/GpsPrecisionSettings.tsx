@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, Pressable, StyleSheet } from "react-native";
+import { View, Text, Pressable, StyleSheet, useWindowDimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors, { ThemeColors } from "@/constants/colors";
 
@@ -20,8 +20,10 @@ export function GpsPrecisionSettings({
   setGpsPrecision: (v: string) => void;
   privacyMutation: { mutate: (data: Record<string, unknown>) => void };
 }) {
+  const { width } = useWindowDimensions();
+  const isTablet = width > 768;
   return (
-    <View style={[styles.settingCard, { backgroundColor: colors.surface }]}>
+    <View style={[styles.settingCard, { backgroundColor: colors.surface }, isTablet && { maxWidth: 600, alignSelf: "center" }]}>
       <Pressable style={styles.accordionHeader} onPress={() => setGpsPrecisionExpanded(v => !v)}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <Ionicons name="navigate-outline" size={18} color={Colors.accent} />
