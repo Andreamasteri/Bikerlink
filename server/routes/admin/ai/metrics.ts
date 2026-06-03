@@ -29,7 +29,7 @@ function rangeMs(range: string): number {
   }
 }
 
-router.get("/ai/metrics", async (req: Request, res: Response) => {
+router.get("/metrics", async (req: Request, res: Response) => {
   try {
     const rawRange = String(req.query.range ?? "7d");
     const range = ["24h", "7d", "30d"].includes(rawRange) ? rawRange : "7d";
