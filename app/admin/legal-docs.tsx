@@ -77,6 +77,7 @@ export default function LegalDocsAdmin() {
     asset: DocumentPicker.DocumentPickerAsset;
     fileName: string;
     fileSize: number;
+    uploadedAt: string;
   } | null>(null);
 
   const { data: info, refetch } = useQuery<DocsInfoResponse>({
@@ -137,6 +138,7 @@ export default function LegalDocsAdmin() {
           asset: file,
           fileName: file.name || "manuale.pdf",
           fileSize: file.size ?? 0,
+          uploadedAt: new Date().toISOString(),
         });
         return;
       }
@@ -317,7 +319,9 @@ export default function LegalDocsAdmin() {
                       <Ionicons name="document-outline" size={14} color="#4ADE80" />
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <Text style={styles.pdfDraftName} numberOfLines={1}>{pdfDraft.fileName}</Text>
-                        <Text style={styles.pdfDraftMeta}>{formatSize(pdfDraft.fileSize)}</Text>
+                        <Text style={styles.pdfDraftMeta}>
+                          {formatSize(pdfDraft.fileSize)} · {formatDate(pdfDraft.uploadedAt)}
+                        </Text>
                       </View>
                     </View>
                     <TouchableOpacity
@@ -334,7 +338,7 @@ export default function LegalDocsAdmin() {
                       onPress={() => setPdfDraft(null)}
                     >
                       <Ionicons name="trash-outline" size={13} color={Colors.accent} />
-                      <Text style={[styles.btnText, { color: Colors.accent }]}>Rimuovi</Text>
+                      <Text style={[styles.btnText, { color: Colors.accent }]}>Rimuovi bozza</Text>
                     </TouchableOpacity>
                   </>
                 ) : (
