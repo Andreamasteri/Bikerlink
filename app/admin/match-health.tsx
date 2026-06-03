@@ -19,7 +19,8 @@ interface MatchCount {
   key: string;
   label: string;
   count: number;
-  status: "OK" | "WARN";
+  sourceCount?: number;
+  status: "OK" | "WARN" | "NO_DATA" | "INACTIVE";
 }
 
 interface SchemaCheck {
@@ -60,6 +61,9 @@ interface MatchHealthResponse {
   summary: {
     totalMatchTypes: number;
     typesWithZeroResults: number;
+    typesAnomalous?: number;
+    typesNoData?: number;
+    typesInactive?: number;
     schemaStatus: string;
     prefsStatus: string;
     distanceStatus: string;
@@ -203,17 +207,17 @@ export default function MatchHealthScreen() {
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
-              <Text style={[styles.summaryValue, data.summary.typesWithZeroResults > 0 ? { color: Colors.warning } : {}]}>
-                {data.summary.typesWithZeroResults}
+              <Text style={[styles.summaryValue, (data.summary.typesAnomalous ?? 0) > 0 ? { color: Colors.warning } : { color: Colors.success }]}>
+                {data.summary.typesAnomalous ?? data.summary.typesWithZeroResults}
               </Text>
-              <Text style={styles.summaryKey}>A zero</Text>
+              <Text style={styles.summaryKey}>Anomalie</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>
-              <Text style={[styles.summaryValue, { color: statusColor(data.summary.schemaStatus) }]}>
-                {data.summary.schemaStatus}
+              <Text style={[styles.summaryValue, { color: Colors.textSecondary }]}>
+                {(data.summary.typesNoData ?? 0) + (data.summary.typesInactive ?? 0)}
               </Text>
-              <Text style={styles.summaryKey}>Schema</Text>
+              <Text style={styles.summaryKey}>Senza dati</Text>
             </View>
             <View style={styles.summaryDivider} />
             <View style={styles.summaryItem}>

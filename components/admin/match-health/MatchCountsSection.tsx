@@ -8,11 +8,31 @@ interface MatchCount {
   key: string;
   label: string;
   count: number;
-  status: "OK" | "WARN";
+  sourceCount?: number;
+  status: "OK" | "WARN" | "NO_DATA" | "INACTIVE";
 }
 
 interface Props {
   matchCounts: MatchCount[];
+}
+
+function statusIcon(status: MatchCount["status"]) {
+  if (status === "WARN") {
+    return <MaterialCommunityIcons name="alert" size={14} color={Colors.warning} style={{ marginRight: 6 }} />;
+  }
+  if (status === "NO_DATA") {
+    return <MaterialCommunityIcons name="database-off-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />;
+  }
+  if (status === "INACTIVE") {
+    return <MaterialCommunityIcons name="minus-circle-outline" size={14} color={Colors.textSecondary} style={{ marginRight: 6 }} />;
+  }
+  return <MaterialCommunityIcons name="check-circle" size={14} color={Colors.success} style={{ marginRight: 6 }} />;
+}
+
+function countColor(status: MatchCount["status"]): string {
+  if (status === "WARN") return Colors.warning;
+  if (status === "NO_DATA" || status === "INACTIVE") return Colors.textSecondary;
+  return Colors.success;
 }
 
 export const MatchCountsSection = ({ matchCounts }: Props) => {
@@ -21,17 +41,30 @@ export const MatchCountsSection = ({ matchCounts }: Props) => {
       {matchCounts.map((mc) => (
         <View key={mc.key} style={styles.matchRow}>
           <View style={styles.matchRowLeft}>
-            {mc.status === "WARN" ? (
-              <MaterialCommunityIcons name="alert" size={14} color={Colors.warning} style={{ marginRight: 6 }} />
-            ) : (
-              <MaterialCommunityIcons name="check-circle" size={14} color={Colors.success} style={{ marginRight: 6 }} />
-            )}
-            <Text style={styles.matchLabel} numberOfLines={1}>
-              <Text style={styles.matchId}>{mc.id}. </Text>
-              {mc.label}
-            </Text>
+            {statusIcon(mc.status)}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.matchLabel} numberOfLines={1}>
+                <Text style={styles.matchId}>{mc.id}. </Text>
+                {mc.label}
+              </Text>
+              {mc.status === "NO_DATA" && (
+                <Text style={styles.matchHint} numberOfLines={1}>
+                  nessun dato sorgente
+                </Text>
+              )}
+              {mc.status === "INACTIVE" && (
+                <Text style={styles.matchHint} numberOfLines={1}>
+                  matcher non attivo
+                </Text>
+              )}
+              {mc.status === "WARN" && (
+                <Text style={styles.matchHintWarn} numberOfLines={1}>
+                  {(mc.sourceCount ?? 0)} sorgenti idonee, 0 match
+                </Text>
+              )}
+            </View>
           </View>
-          <Text style={[styles.matchCount, mc.count === 0 ? { color: Colors.warning } : { color: Colors.success }]}>
+          <Text style={[styles.matchCount, { color: countColor(mc.status) }]}>
             {mc.count.toLocaleString("it-IT")}
           </Text>
         </View>
@@ -64,6 +97,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.text,
     flex: 1,
+  },
+  matchHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  matchHintWarn: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.warning,
+    marginTop: 1,
   },
   matchCount: {
     fontFamily: "Inter_700Bold",
