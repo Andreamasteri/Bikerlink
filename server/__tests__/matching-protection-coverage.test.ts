@@ -100,7 +100,7 @@ vi.mock("../objectStorage", () => ({
 
 import { db } from "../db";
 import { runBioAffinityMatching } from "../matching/run-bio-affinity";
-import { runDistanceMatching } from "../matching/run-distance";
+import { runDistanceMatching, runRouteTypeZoneMatching } from "../matching/run-distance";
 
 // ── Shared assertion helpers ──────────────────────────────────────────────────
 
@@ -170,7 +170,31 @@ describe("runDistanceMatching — protected account exclusion", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 3. Canary — constants integrity
+// 3. Route Type Zone Matching — runRouteTypeZoneMatching
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe("runRouteTypeZoneMatching — protected account exclusion", () => {
+  it("emits SQL containing the PROTECTED_NICKNAMES exclusion clause", async () => {
+    await runRouteTypeZoneMatching();
+    expect(anyCallHasProtectedFilter()).toBe(true);
+  });
+
+  it("SQL contains BikerLink_Official in every db.execute call", async () => {
+    await runRouteTypeZoneMatching();
+    const calls = vi.mocked(db.execute).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    const allSql = calls.map((c) => sqlToJson(c[0])).join("\n");
+    expect(allSql).toContain(PROTECTED_NICKNAME);
+  });
+
+  it("completes without throwing when db returns no route stats", async () => {
+    mockExecute.mockResolvedValue(fakeQueryResult([]));
+    await expect(runRouteTypeZoneMatching()).resolves.toBe(0);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. Canary — constants integrity
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe("Canary — PROTECTED_NICKNAMES constant", () => {
