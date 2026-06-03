@@ -226,11 +226,28 @@ describe("Static import guard — protection-filter usage in run-*.ts", () => {
     (f) => f.startsWith("run-") && f.endsWith(".ts"),
   );
 
+  // Files reviewed and confirmed to not require user-nickname protection because
+  // they delegate to storage methods that already exclude fake/inactive users
+  // without direct SQL queries on `users.nickname`, or they match on non-user
+  // entities (proposals, routes, clubs). Adding a new file here requires a code
+  // review to confirm it does not expose protected accounts.
+  const REVIEWED_EXEMPT = new Set([
+    "run-biker.ts",                  // storage.getAllBikerMotorcyclesWithUsers — storage-level guard
+    "run-clubs.ts",                  // club brand matching, no user-nickname SQL
+    "run-extra.ts",                  // GPS/event/music via storage methods
+    "run-matching.ts",               // proposal matching via storage.getActiveProposals
+    "run-planned-route-affinity.ts", // queries userCurvyProfile, not users.nickname
+    "run-profile.ts",                // proposal-to-profile via storage
+    "run-proposals.ts",              // proposal CRUD via storage
+    "run-route-similarity.ts",       // route-cell fingerprint matching
+    "run-user.ts",                   // user triggers via storage
+  ]);
+
   it("finds at least one run-*.ts file to audit", () => {
     expect(runFiles.length).toBeGreaterThan(0);
   });
 
-  it("no run-*.ts file imports PROTECTED_NICKNAMES from ../constants directly", () => {
+  it("no run-*.ts file imports PROTECTED_NICKNAMES from ../constants directly (must use ./protection-filter)", () => {
     const violations: string[] = [];
     for (const file of runFiles) {
       const content = readFileSync(join(matchingDir, file), "utf-8");
@@ -246,11 +263,31 @@ describe("Static import guard — protection-filter usage in run-*.ts", () => {
     ).toHaveLength(0);
   });
 
-  it("all run-*.ts files that use PROTECTED_NICKNAMES import from ./protection-filter", () => {
+  it("every run-*.ts file either imports ./protection-filter or is in the reviewed-exempt allowlist", () => {
+    // NEW files are NOT auto-exempt: they must either import protection-filter or
+    // be explicitly added to REVIEWED_EXEMPT above (with a justification comment).
+    const unguarded: string[] = [];
+    for (const file of runFiles) {
+      if (REVIEWED_EXEMPT.has(file)) continue;
+      const content = readFileSync(join(matchingDir, file), "utf-8");
+      if (!content.includes("./protection-filter")) {
+        unguarded.push(file);
+      }
+    }
+    expect(
+      unguarded,
+      `New run-*.ts files not in REVIEWED_EXEMPT and lacking ./protection-filter import: ${unguarded.join(", ")}. ` +
+        "Either import protection-filter or add the file to the REVIEWED_EXEMPT allowlist with a justification.",
+    ).toHaveLength(0);
+  });
+
+  it("all run-*.ts files that use PROTECTED_NICKNAMES or protectedNicknamesSqlArray import from ./protection-filter", () => {
     const missing: string[] = [];
     for (const file of runFiles) {
       const content = readFileSync(join(matchingDir, file), "utf-8");
-      const usesProtected = content.includes("PROTECTED_NICKNAMES") || content.includes("protectedNicknamesSqlArray");
+      const usesProtected =
+        content.includes("PROTECTED_NICKNAMES") ||
+        content.includes("protectedNicknamesSqlArray");
       const importsFilter = content.includes("./protection-filter");
       if (usesProtected && !importsFilter) {
         missing.push(file);
