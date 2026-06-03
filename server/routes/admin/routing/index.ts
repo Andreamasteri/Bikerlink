@@ -4,7 +4,7 @@
  * Endpoint admin per il sistema di routing (separato da "Sistema Mappe"):
  *   GET  /api/admin/routing/status       → kill-switch + health engine + metriche
  *   PUT  /api/admin/routing/kill-switch  → abilita/disabilita routing (soft toggle DB)
- *   POST /api/admin/routing/test         → esegue una route di prova (Milano→Como)
+ *   POST /api/admin/routing/test         → esegue una route di prova (Mira→Belluno)
  *
  * Riusa gli snapshot di salute esistenti (graphhopper-client, valhalla-client),
  * i contatori runtime (routing-metrics) e il selettore engine (router-selector).
