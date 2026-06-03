@@ -14,6 +14,7 @@ export interface AdminUser {
   createdAt: string;
   lastLoginAt?: string | null;
   lastAppVersion?: string | null;
+  lastOtaVersion?: string | null;
   lastPlatform?: string | null;
   lastDeviceModel?: string | null;
   isFake?: boolean;
@@ -98,15 +99,25 @@ export const UserCard: React.FC<UserCardProps> = ({
         </Text>
         {(() => {
           const hasVer = !!item.lastAppVersion && item.lastAppVersion !== "unknown";
+          const hasOta = !!item.lastOtaVersion && item.lastOtaVersion !== "unknown";
+          const otaText = hasOta ? `OTA ${item.lastOtaVersion}` : null;
           if (!hasVer) {
-            return <Text style={styles.versionMissing}>v—</Text>;
+            return (
+              <View style={styles.versionRow}>
+                <Text style={styles.versionMissing}>v—</Text>
+                {otaText && <Text style={styles.otaBadge}>{otaText}</Text>}
+              </View>
+            );
           }
           const verOk = item.lastAppVersion === currentAppVersion;
           const color = verOk ? Colors.success : Colors.error;
           return (
-            <Text style={[styles.versionBadge, { color, textDecorationLine: verOk ? "none" : "underline" as const }]}>
-              {`v${item.lastAppVersion}`}
-            </Text>
+            <View style={styles.versionRow}>
+              <Text style={[styles.versionBadge, { color, textDecorationLine: verOk ? "none" : "underline" as const }]}>
+                {`v${item.lastAppVersion}`}
+              </Text>
+              {otaText && <Text style={styles.otaBadge}>{otaText}</Text>}
+            </View>
           );
         })()}
         {(item.lastDeviceModel || item.lastPlatform) && (
@@ -180,8 +191,10 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   badgeText: { fontFamily: "Inter_500Medium", fontSize: 11 },
   lastLogin: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 6 },
-  versionBadge: { fontFamily: "Inter_500Medium", fontSize: 11, marginTop: 3 },
-  versionMissing: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 3 },
+  versionRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3, flexWrap: "wrap" },
+  versionBadge: { fontFamily: "Inter_500Medium", fontSize: 17 },
+  versionMissing: { fontFamily: "Inter_400Regular", fontSize: 17, color: Colors.textSecondary },
+  otaBadge: { fontFamily: "Inter_500Medium", fontSize: 17, color: Colors.accent },
   deviceModel: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
   actions: { flexDirection: "column", gap: 10 },
   actionBtn: { padding: 4 },

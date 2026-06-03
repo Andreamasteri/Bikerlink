@@ -6,9 +6,9 @@
 import { Router, type Request, type Response } from "express";
 import { storage } from "../../storage";
 import { db } from "../../db";
-import { users, userLastfmSessions, userMusicTracks } from "@shared/db";
+import { users, userLastfmSessions, userMusicTracks, otaBootEvents, otaReleases } from "@shared/db";
 import { userStatusSchema, userRoleSchema, userEmailAdminSchema, adminSetPasswordSchema, primalSchema } from "@shared/validators";
-import { eq, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, sql, inArray, desc } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { isProtectedUser } from "../../constants";
 import { closeSseClient } from "../../chat-sse";
@@ -28,9 +28,36 @@ router.get("/", async (_req: Request, res: Response) => {
       ...sessionsRows.map((r) => r.userId),
       ...tracksRows.map((r) => r.userId),
     ]);
+
+    const userIds = usersList.map((u) => u.id);
+    const otaByUserId: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const latestBootRows = await db
+        .selectDistinctOn([otaBootEvents.userId], {
+          userId: otaBootEvents.userId,
+          otaVersion: otaReleases.otaVersion,
+        })
+        .from(otaBootEvents)
+        .innerJoin(otaReleases, eq(otaBootEvents.releaseId, otaReleases.id))
+        .where(
+          and(
+            inArray(otaBootEvents.userId, userIds),
+            eq(otaBootEvents.eventType, "boot_success"),
+          ),
+        )
+        .orderBy(otaBootEvents.userId, desc(otaBootEvents.createdAt), desc(otaBootEvents.id));
+
+      for (const row of latestBootRows) {
+        if (row.userId && row.otaVersion) {
+          otaByUserId[row.userId] = row.otaVersion;
+        }
+      }
+    }
+
     const safeUsers = usersList.map(({ password: _password, ...u }) => ({
       ...u,
       hasLastfmData: lastfmUserIds.has(u.id),
+      lastOtaVersion: otaByUserId[u.id] ?? null,
     }));
     return res.json(safeUsers);
   } catch (_error) {
