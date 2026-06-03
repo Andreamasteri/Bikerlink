@@ -143,6 +143,8 @@ export async function runAssistantAgent(opts: AssistantAgentOpts): Promise<Assis
     customFaqs: opts.customFaqs,
     allowedActions: opts.allowedActions,
     ragContext,
+    // Task #3090 — passa userId così Ollama lo usa nei tool call (getUserPlannedRoutes, getBikerStats)
+    userId: opts.userId,
   });
 
   // Task #3017 — Memoria: carica turni precedenti dal DB se userId è disponibile

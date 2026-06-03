@@ -63,6 +63,9 @@ export function buildSystemPrompt(opts: {
   allowedActions: string[];
   /** Task #3017 — Contesto RAG iniettato dalla similarity search sulla knowledge base. */
   ragContext?: string;
+  /** Task #3090 — ID utente corrente: necessario affinché Ollama possa passarlo ai tool
+   *  (getUserPlannedRoutes, getBikerStats) che richiedono userId come parametro. */
+  userId?: string | null;
 }): string {
   const faqs = [...ASSISTANT_KNOWLEDGE, ...(opts.customFaqs ?? [])]
     .map((k) => `Q: ${k.question}\nA: ${k.answer}`)
@@ -76,7 +79,13 @@ export function buildSystemPrompt(opts: {
     ? `\n\n${opts.ragContext}`
     : "";
 
-  return `Sei l'AI Assistant di BikerLink, un'app per motociclisti. Rispondi SOLO a domande sull'app e le sue funzioni.
+  // Task #3090 — Includi userId nel prompt così Ollama può passarlo ai tool call
+  // (getUserPlannedRoutes, getBikerStats) che richiedono il campo userId.
+  const userIdSection = opts.userId
+    ? `\nID utente corrente (usa questo valore come parametro "userId" nei tool call): ${opts.userId}`
+    : "";
+
+  return `Sei l'AI Assistant di BikerLink, un'app per motociclisti. Rispondi SOLO a domande sull'app e le sue funzioni.${userIdSection}
 
 REGOLE INDEROGABILI:
 1. Rispondi SEMPRE in italiano, conciso (max 3-4 frasi), tono amichevole ma professionale.
