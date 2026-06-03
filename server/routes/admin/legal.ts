@@ -220,6 +220,31 @@ router.post("/save/:docType", async (req: Request, res: Response) => {
   }
 });
 
+router.get("/text/:docType", async (req: Request, res: Response) => {
+  try {
+    const docType = req.params.docType as string;
+    if (!DOC_KEYS[docType]) return sendError(res, 400, "Tipo documento non valido");
+
+    if (docType === "manual") {
+      const [manualText, manualUrl] = await Promise.all([
+        storage.getAppSetting("manual_text"),
+        storage.getAppSetting("manual_file_url"),
+      ]);
+      if (manualText?.value) return res.json({ ok: true, text: manualText.value, isPdf: false });
+      if (manualUrl?.value) return res.json({ ok: true, text: null, isPdf: true });
+      return sendError(res, 404, "Manuale non disponibile");
+    }
+
+    const settingKey = DOC_KEYS[docType];
+    const setting = await storage.getAppSetting(settingKey);
+    if (!setting?.value) return sendError(res, 404, "Documento non disponibile");
+    return res.json({ ok: true, text: setting.value, isPdf: false });
+  } catch (err) {
+    console.error("[legal] text error:", err);
+    return sendError(res, 500, "Errore lettura documento");
+  }
+});
+
 router.get("/download/:docType", async (req: Request, res: Response) => {
   try {
     const docType = req.params.docType as string;

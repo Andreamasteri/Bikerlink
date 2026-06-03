@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -71,10 +71,28 @@ export default function LegalDocsAdmin() {
   const [uploading, setUploading] = useState<BoolMap>(mkBool());
   const [activating, setActivating] = useState<BoolMap>(mkBool());
   const [viewModal, setViewModal] = useState<DocType | null>(null);
+  const [fullText, setFullText] = useState<Partial<Record<DocType, string | null>>>({});
+  const [loadingText, setLoadingText] = useState(false);
 
   const { data: info, refetch } = useQuery<DocsInfoResponse>({
     queryKey: ["/api/admin/legal/docs-info"],
   });
+
+  useEffect(() => {
+    if (!viewModal) return;
+    if (fullText[viewModal] !== undefined) return;
+    setLoadingText(true);
+    fetch(new URL(`/api/admin/legal/text/${viewModal}`, getApiUrl()).toString(), { credentials: "include" })
+      .then(r => r.json())
+      .then((data: { ok: boolean; text?: string | null; isPdf?: boolean }) => {
+        setFullText(prev => ({
+          ...prev,
+          [viewModal]: data.isPdf ? "__PDF__" : (data.text ?? ""),
+        }));
+      })
+      .catch(() => setFullText(prev => ({ ...prev, [viewModal]: "" })))
+      .finally(() => setLoadingText(false));
+  }, [viewModal]);
 
   const setDraft = (key: DocType, text: string | null, src: "ai" | "file" | null) => {
     setDraftText(prev => ({ ...prev, [key]: text }));
@@ -328,14 +346,17 @@ export default function LegalDocsAdmin() {
               Aggiornato: {formatDate(viewDocInfo?.updatedAt)}
             </Text>
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator>
-              {viewDocInfo?.preview ? (
-                <Text style={styles.modalText}>{viewDocInfo.preview}</Text>
+              {loadingText ? (
+                <ActivityIndicator color={Colors.accent} style={{ marginVertical: 24 }} />
+              ) : fullText[viewModal!] === "__PDF__" ? (
+                <Text style={[styles.modalText, { fontStyle: "italic" }]}>
+                  Documento in formato PDF — usa "Scarica" per visualizzarlo.
+                </Text>
+              ) : fullText[viewModal!] ? (
+                <Text style={styles.modalText}>{fullText[viewModal!]}</Text>
               ) : (
                 <Text style={[styles.modalText, { fontStyle: "italic" }]}>Nessun contenuto.</Text>
               )}
-              <Text style={styles.modalTruncNote}>
-                — Anteprima (primi 200 caratteri). Usa "Scarica" per il testo completo.
-              </Text>
             </ScrollView>
             <TouchableOpacity
               style={[styles.btn, styles.btnOutline, { margin: 14, marginTop: 4 }]}
