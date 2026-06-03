@@ -22,8 +22,9 @@ import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-ti
 
 const router = Router();
 
-const MILANO: [number, number] = [9.19, 45.4642];
-const COMO: [number, number] = [9.0852, 45.808];
+// Coordinate di prova: Mira (VE) → Belluno (BL) (~70 km, copertura Nord-Est).
+const MIRA: [number, number] = [12.128, 45.43];
+const BELLUNO: [number, number] = [12.216, 46.1411];
 
 function maskUrl(url: string): string {
   try {
@@ -129,7 +130,7 @@ router.get("/test-routing", async (req: Request, res: Response) => {
   const engine = (engineSetting?.value ?? "graphhopper") as RoutingEngineId;
 
   const routeReq: RouteRequest = {
-    points: [MILANO, COMO],
+    points: [MIRA, BELLUNO],
     profile: "motorcycle",
     instructions: false,
     calc_points: true,

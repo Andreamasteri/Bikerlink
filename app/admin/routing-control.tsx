@@ -2,7 +2,7 @@
  * Task #2824 — Controllo Sistema Routing.
  *
  * Pannello operativo: kill-switch (soft toggle DB), test routing on-demand
- * (Milano→Como con engine selezionabile) e metriche live degli engine.
+ * (Mira→Belluno con engine selezionabile) e metriche live degli engine.
  */
 import React, { useState } from "react";
 import {
@@ -123,7 +123,7 @@ export default function RoutingControlScreen() {
 
       {/* Test routing */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Test Routing (Milano → Como)</Text>
+        <Text style={styles.sectionTitle}>Test Routing (Mira → Belluno)</Text>
         <View style={styles.engineRow}>
           <TouchableOpacity
             style={[styles.engineChip, testEngine === null && styles.engineChipActive]}
