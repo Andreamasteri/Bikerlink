@@ -5,11 +5,12 @@
  * Usati SOLO quando il provider è Ollama (con stopWhen: stepCountIs(3)).
  * I provider cloud non ricevono questi tool.
  *
- * Tool disponibili:
- *   - getWeather         — meteo corrente da OpenMeteo (free, no key)
- *   - getBikerStats      — statistiche aggregate del biker dal DB
+ * Tool disponibili (5):
+ *   - getWeather           — meteo corrente da OpenMeteo (free, no key)
+ *   - getBikerStats        — statistiche aggregate del biker dal DB
  *   - getThinkCentreStatus — stato dei servizi self-hosted (Ollama, GH, Nominatim)
- *   - getNearbyEvents    — eventi/raduni attivi nel DB entro un raggio
+ *   - getNearbyEvents      — eventi/raduni attivi nel DB entro un raggio
+ *   - getUserPlannedRoutes — percorsi moto pianificati dell'utente (Task #3090)
  *
  * NOTA: usa `inputSchema` + type parameter espliciti su tool<INPUT,OUTPUT>()
  * per risolvere correttamente gli overload del SDK (ai v6).
