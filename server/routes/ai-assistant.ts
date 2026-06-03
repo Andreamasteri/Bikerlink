@@ -198,6 +198,66 @@ router.post("/ai/assistant/message", requireUser, messageLimiter, async (req: Re
   }
 });
 
+// ── Task #3097 — Esecutore azioni server-side ────────────────────────────────
+
+type ServerActionResult =
+  | { ok: true; data: unknown }
+  | { ok: false; httpStatus: number; error: string };
+
+async function executeServerAction(
+  id: AssistantActionId,
+  userId: string,
+  params: unknown,
+): Promise<ServerActionResult> {
+  if (id === "add-waypoint-to-route") {
+    const p = params as { routeId: string; waypointName: string; lat?: number; lng?: number };
+
+    const route = await storage.getPlannedRoute(p.routeId);
+    if (!route) return { ok: false, httpStatus: 404, error: "Percorso non trovato" };
+    if (route.userId !== userId) return { ok: false, httpStatus: 403, error: "Non autorizzato" };
+
+    let lat = p.lat;
+    let lng = p.lng;
+
+    if (lat == null || lng == null || !isFinite(lat) || !isFinite(lng)) {
+      try {
+        const { geocode } = await import("../lib/nominatim-client");
+        const results = await geocode(p.waypointName);
+        if (!results.length) {
+          return { ok: false, httpStatus: 404, error: `Luogo non trovato: ${p.waypointName}` };
+        }
+        lat = results[0].lat;
+        lng = results[0].lng;
+      } catch {
+        return { ok: false, httpStatus: 502, error: "Geocoding non disponibile, riprova tra poco" };
+      }
+    }
+
+    const existing = Array.isArray(route.waypoints) ? route.waypoints : [];
+    const newWaypoints = [
+      ...existing,
+      { lat, lng, name: p.waypointName } as { lat: number; lng: number; name?: string },
+    ];
+
+    const updated = await storage.updatePlannedRoute(p.routeId, { waypoints: newWaypoints });
+    if (!updated) return { ok: false, httpStatus: 500, error: "Errore salvataggio waypoint" };
+
+    console.info(`[ai-action] add-waypoint-to-route: route=${p.routeId} waypoint="${p.waypointName}" (${lat},${lng}) user=${userId}`);
+    return {
+      ok: true,
+      data: {
+        routeId: p.routeId,
+        waypointName: p.waypointName,
+        lat,
+        lng,
+        updatedWaypointsCount: newWaypoints.length,
+      },
+    };
+  }
+
+  return { ok: false, httpStatus: 400, error: "Azione server non implementata" };
+}
+
 // ── POST /action/:id — valida + logga (esecuzione client-side) ────────────
 const ActionBody = z.object({
   params: z.unknown().optional(),
@@ -231,6 +291,18 @@ router.post("/ai/assistant/action/:id", requireUser, actionLimiter, async (req: 
     userId: user.id,
     payload: { actionId: id, params: v.params },
   });
+
+  // Task #3097 — azioni server-side: il server esegue la modifica, il client riceve il risultato.
+  const def = ASSISTANT_ACTIONS[id as AssistantActionId];
+  if (def.kind === "server") {
+    const result = await executeServerAction(id as AssistantActionId, user.id, v.params);
+    if (!result.ok) {
+      sendError(res, result.httpStatus, result.error);
+      return;
+    }
+    res.json({ ok: true, actionId: id, params: v.params, result: result.data });
+    return;
+  }
 
   res.json({ ok: true, actionId: id, params: v.params });
 });

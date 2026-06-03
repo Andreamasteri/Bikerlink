@@ -60,6 +60,11 @@ export async function executeClientAction(
     case "start-onboarding-tour":
       await AsyncStorage.removeItem(ONBOARDING_FLAG_KEY);
       return { ok: true };
+    // Task #3097 — azione server-side: il DB è già aggiornato dal server.
+    // Il client naviga alla tab giri così l'utente vede il percorso aggiornato.
+    case "add-waypoint-to-route":
+      try { ctx.router.push("/(tabs)/giri" as never); return { ok: true }; }
+      catch { return { ok: true }; }
     default:
       return { ok: false, message: "azione non supportata sul client" };
   }

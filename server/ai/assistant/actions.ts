@@ -83,6 +83,19 @@ export const ASSISTANT_ACTIONS = {
     description: "Apre la modifica del profilo utente.",
     paramsSchema: z.object({}).optional().default({}),
   },
+  // Task #3097 — Aggiunta sosta a percorso pianificato dal chat AI.
+  "add-waypoint-to-route": {
+    id: "add-waypoint-to-route",
+    kind: "server" as const,
+    confirmKey: "aiAssistant.action.addWaypointToRoute.confirm",
+    description: "Aggiunge una sosta/tappa a un percorso moto pianificato esistente dell'utente. Params: routeId (stringa, ID del percorso), waypointName (stringa, nome del luogo es. 'Bologna'), lat (numero, latitudine opzionale), lng (numero, longitudine opzionale). Usa lo strumento getUserPlannedRoutes per trovare il routeId corretto.",
+    paramsSchema: z.object({
+      routeId: z.string().min(1, "routeId obbligatorio"),
+      waypointName: z.string().min(1, "waypointName obbligatorio").max(200),
+      lat: z.number().finite().optional(),
+      lng: z.number().finite().optional(),
+    }),
+  },
 } as const satisfies Record<string, AssistantActionDef>;
 
 export type AssistantActionId = keyof typeof ASSISTANT_ACTIONS;

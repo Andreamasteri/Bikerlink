@@ -15,6 +15,7 @@ const aiAssistantIt: Record<string, string> = {
   "aiAssistant.confirm.dismissTips": "Nascondere tutti i suggerimenti futuri?",
   "aiAssistant.confirm.startTour": "Riavviare il tour di benvenuto?",
   "aiAssistant.confirm.openProfileEdit": "Aprire la modifica profilo?",
+  "aiAssistant.action.addWaypointToRoute.confirm": "Aggiungere questa sosta al percorso? La modifica verrà salvata subito.",
   "aiAssistant.tip.cta": "Apri",
   "aiAssistant.tip.dismiss": "OK",
   "aiAssistant.tip.never": "Non mostrare più",
