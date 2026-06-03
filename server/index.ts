@@ -334,8 +334,10 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
           saved++;
         }
         console.log(`[SNAPSHOT] Playlist snapshot saved for ${saved} users`);
-      } catch (e) { console.warn("[SNAPSHOT] runPlaylistSnapshot error:", e); throw e; }
+      } catch (e) { console.warn("[SNAPSHOT] runPlaylistSnapshot error:", e); }
     };
+    const safeRunPlaylistSnapshot = () =>
+      runPlaylistSnapshot().catch((e) => console.warn("[SNAPSHOT] runPlaylistSnapshot (interval) error:", e));
     // runPlaylistSnapshot iterates every user's tracks — non-essential at boot, fire-and-forget
     setImmediate(() => {
       console.log("[INIT][BG] Starting runPlaylistSnapshot...");
@@ -343,7 +345,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
         .then(() => console.log("[INIT][BG] runPlaylistSnapshot — done"))
         .catch((e) => console.warn("[INIT][BG] runPlaylistSnapshot error:", e));
     });
-    setInterval(runPlaylistSnapshot, SIX_HOURS_MS);
+    setInterval(safeRunPlaylistSnapshot, SIX_HOURS_MS);
 
     const { cleanupOrphanedAdImages } = await import("./routes/ads");
     setTimeout(async () => {
