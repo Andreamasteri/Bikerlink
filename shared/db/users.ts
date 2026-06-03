@@ -156,7 +156,7 @@ export const userProfiles = pgTable("user_profiles", {
   easterEggsCollected: integer("easter_eggs_collected").notNull().default(0),
   searchPreference: varchar("search_preference", { length: 20 }).notNull().default("both"),
   preferredMapStyle: varchar("preferred_map_style", { length: 20 }),
-  emailChatNotifications: boolean("email_chat_notifications").notNull().default(false),
+  emailChatNotifications: boolean("email_chat_notifications").notNull().default(true),
   notificationPreferences: jsonb("notification_preferences")
     .$type<{ matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean }>()
     .notNull()

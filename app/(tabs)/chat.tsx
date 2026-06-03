@@ -111,7 +111,7 @@ export default function ChatScreen() {
     queryKey: ["/api/users/profile"],
   });
 
-  const emailNotifEnabled = myProfile?.emailChatNotifications ?? false;
+  const emailNotifEnabled = myProfile?.emailChatNotifications ?? true;
 
   const toggleEmailNotifMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
