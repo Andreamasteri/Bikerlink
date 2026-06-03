@@ -8,6 +8,7 @@ import Colors from "@/constants/colors";
 import { TelemetryCard, GraphHopperCard } from "@/components/admin/AdminStatsCards";
 import { ServerEfficiencyCard } from "@/components/admin/ServerEfficiencyCard";
 import { ThinkCentreCard } from "@/components/admin/ThinkCentreCard";
+import { ThinkCentreEfficiencyCard } from "@/components/admin/ThinkCentreEfficiencyCard";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -289,6 +290,7 @@ export default function AdminDashboard() {
       {!isSearching && (
         <>
           <ServerEfficiencyCard />
+          <ThinkCentreEfficiencyCard />
           <ThinkCentreCard />
           <GraphHopperCard />
           <TelemetryCard />

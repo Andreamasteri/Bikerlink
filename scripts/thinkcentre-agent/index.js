@@ -1,0 +1,65 @@
+#!/usr/bin/env node
+/**
+ * ThinkCentre Metrics Agent
+ * Leggero server HTTP (~30 righe) da eseguire sul ThinkCentre.
+ * Espone GET /sys-metrics con CPU, RAM e uptime del mini-PC.
+ *
+ * Avvio:  node index.js
+ * Porta:  9101  (override: PORT=xxxx node index.js)
+ *
+ * Requisiti: Node.js >= 16, Linux (/proc filesystem).
+ */
+
+const http = require("http");
+const fs   = require("fs");
+
+const PORT = parseInt(process.env.PORT || "9101", 10);
+
+function readProc(path) {
+  try { return fs.readFileSync(path, "utf8"); } catch { return ""; }
+}
+
+function getMetrics() {
+  const loadAvg  = readProc("/proc/loadavg").trim().split(" ");
+  const uptime   = parseFloat(readProc("/proc/uptime").split(" ")[0] || "0");
+  const cores    = (readProc("/proc/cpuinfo").match(/^processor\s*:/gm) || []).length || 1;
+
+  const memLines = Object.fromEntries(
+    readProc("/proc/meminfo").split("\n")
+      .filter(Boolean)
+      .map(l => { const [k, v] = l.split(":"); return [k.trim(), parseInt(v) * 1024]; })
+  );
+  const totalMb  = Math.round((memLines["MemTotal"]  || 0) / 1048576);
+  const freeMem  = (memLines["MemFree"] || 0) + (memLines["Buffers"] || 0) + (memLines["Cached"] || 0);
+  const usedMb   = Math.round((memLines["MemTotal"] - freeMem) / 1048576);
+
+  return {
+    cpu: {
+      loadAvg1:  parseFloat(loadAvg[0] || "0"),
+      loadAvg5:  parseFloat(loadAvg[1] || "0"),
+      loadAvg15: parseFloat(loadAvg[2] || "0"),
+      cores,
+    },
+    memory: {
+      totalMb,
+      usedMb,
+      usedPercent: totalMb > 0 ? Math.round((usedMb / totalMb) * 100) : 0,
+    },
+    uptimeSec: Math.floor(uptime),
+  };
+}
+
+http.createServer((req, res) => {
+  if (req.url !== "/sys-metrics") {
+    res.writeHead(404); res.end("Not found"); return;
+  }
+  try {
+    const body = JSON.stringify(getMetrics());
+    res.writeHead(200, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) });
+    res.end(body);
+  } catch (err) {
+    res.writeHead(500); res.end(String(err));
+  }
+}).listen(PORT, "0.0.0.0", () => {
+  console.log(`[thinkcentre-agent] in ascolto su http://0.0.0.0:${PORT}/sys-metrics`);
+});
