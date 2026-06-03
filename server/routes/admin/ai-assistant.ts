@@ -11,6 +11,7 @@ import {
 } from "../../ai/assistant/config";
 import { ASSISTANT_ACTIONS } from "../../ai/assistant/actions";
 import { getTelemetrySummary } from "../../ai/assistant/telemetry";
+import { getMemoryStats, runMemoryPruner } from "../../ai/assistant/memory-pruner";
 
 const router = Router();
 
@@ -89,6 +90,28 @@ router.get("/ai/assistant/telemetry", async (req: Request, res: Response) => {
   } catch (e) {
     console.error("[admin/ai-assistant/telemetry]", e);
     sendError(res, 500, "Errore lettura telemetria");
+  }
+});
+
+// Task #3099 — Conversation memory stats + manual prune trigger.
+
+router.get("/ai/assistant/memory/stats", async (_req: Request, res: Response) => {
+  try {
+    const stats = await getMemoryStats();
+    res.json(stats);
+  } catch (e) {
+    console.error("[admin/ai-assistant/memory/stats]", e);
+    sendError(res, 500, "Errore lettura statistiche memoria");
+  }
+});
+
+router.post("/ai/assistant/memory/prune", async (_req: Request, res: Response) => {
+  try {
+    const result = await runMemoryPruner();
+    res.json({ ok: true, ...result });
+  } catch (e) {
+    console.error("[admin/ai-assistant/memory/prune]", e);
+    sendError(res, 500, "Errore pruning memoria");
   }
 });
 

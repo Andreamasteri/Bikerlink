@@ -16,14 +16,10 @@ import { OLLAMA_TOOLS } from "./tools";
 import { logAiCall } from "../../lib/ai-logger";
 import { db } from "../../db";
 import { aiConversationTurns } from "@shared/db";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
+import { pruneUserMemory, MEMORY_TURNS_LIMIT } from "./memory-pruner";
 
 const OLLAMA_FALLBACK_MODEL_ID = process.env.OLLAMA_MODEL ?? "llama3.2:latest";
-
-// Numero di turni da caricare dalla memoria (max per richiesta)
-const MEMORY_TURNS_LIMIT = 12;
-// Threshold oltre il quale fare summarization (tot turni per user)
-const MEMORY_SUMMARIZE_THRESHOLD = 30;
 
 export interface AssistantAgentOpts {
   message: string;
@@ -83,42 +79,7 @@ async function saveTurns(userId: string, userMsg: string, assistantMsg: string):
 
 async function maybeSummarize(userId: string): Promise<void> {
   try {
-    const [{ count }] = await db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(aiConversationTurns)
-      .where(eq(aiConversationTurns.userId, userId));
-    if (Number(count) <= MEMORY_SUMMARIZE_THRESHOLD) return;
-
-    // Prendi i primi MEMORY_SUMMARIZE_THRESHOLD/2 turni (i più vecchi)
-    const oldest = await db
-      .select()
-      .from(aiConversationTurns)
-      .where(eq(aiConversationTurns.userId, userId))
-      .orderBy(aiConversationTurns.createdAt)
-      .limit(Math.floor(MEMORY_SUMMARIZE_THRESHOLD / 2));
-
-    if (oldest.length < 4) return;
-
-    // Crea un riassunto compresso come singolo turno "assistant" con summaryOf = id del primo
-    const summaryContent = `[RIASSUNTO CONVERSAZIONE PRECEDENTE]\n${oldest
-      .map((t) => `${t.role === "user" ? "Utente" : "Assistente"}: ${t.content.slice(0, 200)}`)
-      .join("\n")}`;
-
-    const firstId = oldest[0].id as unknown as string;
-    const ids = oldest.map((t) => t.id as unknown as string);
-
-    await db.insert(aiConversationTurns).values({
-      userId,
-      role: "assistant",
-      content: summaryContent.slice(0, 4000),
-      summaryOf: firstId,
-    });
-
-    // Rimuovi i turni compressi
-    for (const id of ids) {
-      await db.delete(aiConversationTurns)
-        .where(eq(aiConversationTurns.id, id as unknown as typeof aiConversationTurns.id));
-    }
+    await pruneUserMemory(userId);
   } catch {
     /* best-effort */
   }

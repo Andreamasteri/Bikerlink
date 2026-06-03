@@ -456,6 +456,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] Campagne self-check scheduler failed (non-fatal):", e);
     }
 
+    // Task #3099 — AI conversation memory pruner (03:30 nightly).
+    try {
+      const { scheduleMemoryPruner } = await import("./ai/assistant/memory-pruner");
+      scheduleMemoryPruner();
+    } catch (e) {
+      console.warn("[INIT] Memory pruner scheduler failed (non-fatal):", e);
+    }
+
     // Task #2649 — AI Coordinator retention cleanup (04:30 nightly).
     try {
       const { startCoordinatorCleanupScheduler } = await import("./ai/coordinator/cleanup");
