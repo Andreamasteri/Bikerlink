@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   Alert,
+  Switch,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +13,17 @@ import Colors from "@/constants/colors";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import IdealLapSlot from "./IdealLapSlot";
 import type { IdealLap } from "./types";
+import {
+  getTelemetryAlwaysActive,
+  loadTelemetryAlwaysActive,
+  setTelemetryAlwaysActive,
+} from "@/lib/telemetry-prefs";
+import {
+  MountCalibWizard,
+  loadMountCalibration,
+} from "@/components/MountCalibWizard";
+
+const LAP_TARGETS_KM = [10, 30, 50, 100];
 
 type TelemetryStats = {
   km_collected: number;
@@ -31,6 +43,32 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
   const [idealLapResetKey, setIdealLapResetKey] = useState(0);
   const [compareMode, setCompareMode] = useState(false);
   const [selectedLaps, setSelectedLaps] = useState<string[]>([]);
+  const [alwaysActive, setAlwaysActive] = useState(getTelemetryAlwaysActive());
+  const [isCalibrated, setIsCalibrated] = useState<boolean | null>(null);
+  const [showCalibWizard, setShowCalibWizard] = useState(false);
+
+  useEffect(() => {
+    loadTelemetryAlwaysActive().then(setAlwaysActive).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadMountCalibration()
+      .then((c) => {
+        if (!cancelled) setIsCalibrated(!!c);
+      })
+      .catch(() => {
+        if (!cancelled) setIsCalibrated(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showCalibWizard]);
+
+  const toggleAlwaysActive = async (value: boolean) => {
+    setAlwaysActive(value);
+    await setTelemetryAlwaysActive(value);
+  };
 
   const { data: idealLapsData } = useQuery<{ laps: IdealLap[] }>({
     queryKey: ["/api/telemetry/ideal-laps"],
@@ -100,6 +138,51 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
         )}
         {telemetryExpanded && (
           <View style={styles.telemetryExpanded}>
+            <View style={styles.settingRow}>
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingTitle}>Telemetria sempre attiva</Text>
+                <Text style={styles.settingSubtitle}>
+                  Raccoglie senza interruzioni, ignorando i blocchi.
+                </Text>
+              </View>
+              <Switch
+                value={alwaysActive}
+                onValueChange={toggleAlwaysActive}
+                trackColor={{ false: Colors.border, true: Colors.accent }}
+                thumbColor="#fff"
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.settingRow}
+              activeOpacity={0.7}
+              onPress={() => setShowCalibWizard(true)}
+            >
+              <View style={styles.settingTextCol}>
+                <Text style={styles.settingTitle}>Calibrazione supporto</Text>
+                <View style={styles.calibBadgeRow}>
+                  <Ionicons
+                    name={isCalibrated ? "checkmark-circle" : "alert-circle-outline"}
+                    size={13}
+                    color={isCalibrated ? "#27ae60" : "#e67e22"}
+                  />
+                  <Text
+                    style={[
+                      styles.calibBadgeText,
+                      { color: isCalibrated ? "#27ae60" : "#e67e22" },
+                    ]}
+                  >
+                    {isCalibrated === null
+                      ? "Verifica…"
+                      : isCalibrated
+                      ? "Calibrato"
+                      : "Non calibrato"}
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
+            </TouchableOpacity>
+
             <View style={styles.telemetryExpandedHeader}>
               <Text style={styles.telemetryExpandedTitle}>Giri Ideali</Text>
               <TouchableOpacity
@@ -135,6 +218,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
               <IdealLapSlot
                 key={`${idealLapResetKey}-${i}`}
                 index={i}
+                targetKm={LAP_TARGETS_KM[i]}
                 onSaved={() => {
                   queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
                   queryClient.invalidateQueries({ queryKey: ["/api/telemetry/ideal-laps"] });
@@ -189,9 +273,9 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
                   return (
                     <View style={styles.comparePanel}>
                       <View style={styles.compareHeaderRow}>
-                        <Text style={styles.compareHeaderCell}>Giro {lapA.lapNumber}</Text>
+                        <Text style={styles.compareHeaderCell} numberOfLines={1}>{lapA.lapName ?? `Giro ${lapA.lapNumber}`}</Text>
                         <Text style={styles.compareHeaderMid}>VS</Text>
-                        <Text style={[styles.compareHeaderCell, styles.compareHeaderRight]}>Giro {lapB.lapNumber}</Text>
+                        <Text style={[styles.compareHeaderCell, styles.compareHeaderRight]} numberOfLines={1}>{lapB.lapName ?? `Giro ${lapB.lapNumber}`}</Text>
                       </View>
                       {statRow("Vel. max", lapA.maxSpeedKmh != null ? `${lapA.maxSpeedKmh} km/h` : "—", lapB.maxSpeedKmh != null ? `${lapB.maxSpeedKmh} km/h` : "—", speedWinner)}
                       {statRow("Piega max", lapA.maxLeanDeg != null ? `${lapA.maxLeanDeg}°` : "—", lapB.maxLeanDeg != null ? `${lapB.maxLeanDeg}°` : "—", leanWinner)}
@@ -226,7 +310,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
                       } : undefined}
                       onLongPress={!compareMode ? () => {
                         Alert.alert(
-                          `Elimina Giro ${lap.lapNumber}`,
+                          `Elimina ${lap.lapName ?? `Giro ${lap.lapNumber}`}`,
                           "Vuoi eliminare questo giro ideale salvato?",
                           [
                             { text: "Annulla", style: "cancel" },
@@ -253,7 +337,7 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
                           </View>
                         )}
                         <View>
-                          <Text style={styles.savedLapNum}>Giro {lap.lapNumber}</Text>
+                          <Text style={styles.savedLapNum} numberOfLines={1}>{lap.lapName ?? `Giro ${lap.lapNumber}`}</Text>
                           <Text style={styles.savedLapDate}>{dateStr} {timeStr}</Text>
                         </View>
                       </View>
@@ -287,6 +371,15 @@ export default function TelemetryPanel({ telemetryStats }: Props) {
           </View>
         )}
       </View>
+      {showCalibWizard && (
+        <MountCalibWizard
+          onComplete={() => {
+            setIsCalibrated(true);
+            setShowCalibWizard(false);
+          }}
+          onDismiss={() => setShowCalibWizard(false)}
+        />
+      )}
     </View>
   );
 }
@@ -295,6 +388,38 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: 16,
     marginTop: 4,
+  },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  settingTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  settingTitle: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.text,
+  },
+  settingSubtitle: {
+    fontSize: 10,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
+  calibBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  calibBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
   },
   telemetryCard: {
     backgroundColor: Colors.surface,

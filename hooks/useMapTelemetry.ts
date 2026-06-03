@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getApiUrl } from "@/lib/query-client";
+import { getTelemetryAlwaysActive } from "@/lib/telemetry-prefs";
 import Constants from "expo-constants";
 
 export type MapsEvent =
@@ -165,7 +166,9 @@ async function refreshClientFlag(): Promise<void> {
 
 export function emitMapsTelemetry(payload: MapsTelemetryPayload): void {
   void refreshClientFlag();
-  if (!telemetryEnabled) return;
+  // Task #3115 — override "Telemetria sempre attiva": quando ON (default), ignora
+  // il kill-switch server e continua a raccogliere senza interruzioni.
+  if (!telemetryEnabled && !getTelemetryAlwaysActive()) return;
   ensureStarted();
   buffer.push({
     ...payload,

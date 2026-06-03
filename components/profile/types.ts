@@ -78,4 +78,5 @@ export type IdealLap = {
   maxLeanDeg: number | null;
   maxGforce: number | null;
   lapNumber: number;
+  lapName: string | null;
 };

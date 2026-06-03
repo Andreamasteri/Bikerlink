@@ -21,6 +21,7 @@ import { useTheme } from "@/lib/theme-context";
 import FloatingWidget from "@/components/FloatingWidget";
 import UptimeWidget from "@/components/UptimeWidget";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
+import { loadTelemetryAlwaysActive } from "@/lib/telemetry-prefs";
 import {
   stopBackgroundLocationTask,
 } from "@/lib/background-location-task";
@@ -103,6 +104,9 @@ function MapReadyGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     sendStartupBeacon("map_ready_gate_enter", { hasUser: !!user, mapLoading: isLoading });
+    // Idrata la preferenza "Telemetria sempre attiva" al bootstrap così che il
+    // kill-switch venga rispettato/ignorato in modo coerente già dai primi eventi.
+    void loadTelemetryAlwaysActive();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

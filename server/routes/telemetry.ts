@@ -14,10 +14,11 @@ router.post("/batch", async (req: Request, res: Response) => {
   if (!userId) return;
 
   try {
-    const { session_id, session_type, samples } = req.body as {
+    const { session_id, session_type, samples, lap_name } = req.body as {
       session_id?: string;
       session_type?: string;
       samples?: unknown[];
+      lap_name?: string;
     };
 
     if (!session_id || typeof session_id !== "string") {
@@ -29,6 +30,31 @@ router.post("/batch", async (req: Request, res: Response) => {
 
     if (!Array.isArray(samples) || samples.length === 0) {
       return sendError(res, 400, "samples[] obbligatorio e non vuoto");
+    }
+
+    // Task #3115 — nome custom per i giri secondari (solo ideal_lap).
+    // Se il nome è già usato dall'utente per un altro giro, appende la data per
+    // distinguere i file (es. "casa-lavoro 03/06/2026").
+    let resolvedLapName: string | null = null;
+    if (resolvedType === "ideal_lap" && typeof lap_name === "string" && lap_name.trim()) {
+      const base = lap_name.trim().slice(0, 40);
+      const dup = await db.execute(sql`
+        SELECT 1 FROM ride_telemetry
+        WHERE user_id = ${userId}
+          AND session_type = 'ideal_lap'
+          AND lap_name = ${base}
+          AND session_id <> ${session_id}
+        LIMIT 1
+      `);
+      if (dup.rows.length > 0) {
+        const d = new Date();
+        const dd = String(d.getDate()).padStart(2, "0");
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const yyyy = d.getFullYear();
+        resolvedLapName = `${base} ${dd}/${mm}/${yyyy}`.slice(0, 60);
+      } else {
+        resolvedLapName = base;
+      }
     }
 
     type RawSample = {
@@ -56,6 +82,7 @@ router.post("/batch", async (req: Request, res: Response) => {
         userId,
         sessionId: session_id,
         sessionType: resolvedType,
+        lapName: resolvedLapName,
         ts,
         lat,
         lon,
@@ -194,6 +221,7 @@ router.get("/ideal-laps", async (req: Request, res: Response) => {
     const result = await db.execute(sql`
       SELECT
         session_id,
+        MAX(lap_name) AS lap_name,
         MIN(ts) AS started_at_ms,
         COUNT(*) AS sample_count,
         MAX(speed_kmh) AS max_speed_kmh,
@@ -214,6 +242,7 @@ router.get("/ideal-laps", async (req: Request, res: Response) => {
 
     type LapRow = {
       session_id: string;
+      lap_name: string | null;
       started_at_ms: string;
       sample_count: string;
       max_speed_kmh: string | null;
@@ -223,6 +252,7 @@ router.get("/ideal-laps", async (req: Request, res: Response) => {
 
     const laps = (result.rows as LapRow[]).map((r, idx) => ({
       sessionId: r.session_id,
+      lapName: r.lap_name ?? null,
       startedAt: new Date(Number(r.started_at_ms)).toISOString(),
       sampleCount: parseInt(r.sample_count, 10),
       maxSpeedKmh: r.max_speed_kmh != null ? Math.round(parseFloat(r.max_speed_kmh) * 10) / 10 : null,

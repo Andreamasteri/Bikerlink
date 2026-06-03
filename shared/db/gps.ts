@@ -96,6 +96,7 @@ export const rideTelemetry = pgTable("ride_telemetry", {
     .references(() => users.id, { onDelete: "cascade" }),
   sessionId: varchar("session_id", { length: 36 }).notNull(),
   sessionType: varchar("session_type", { length: 10 }).notNull().default("ride"),
+  lapName: varchar("lap_name", { length: 60 }),
   ts: bigint("ts", { mode: "number" }).notNull(),
   lat: doublePrecision("lat").notNull(),
   lon: doublePrecision("lon").notNull(),

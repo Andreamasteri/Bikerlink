@@ -13,7 +13,7 @@
 #   7. Stampa i 2 secret da impostare su Replit (NOMINATIM_URL / NOMINATIM_TOKEN).
 #
 # Prerequisiti sul server:
-#   - Ubuntu 26.04 LTS, nginx già installato e configurato con Tailscale Funnel.
+#   - Ubuntu 26.04 LTS, nginx già installato e configurato con Tailscalli avra  una cazzo di fognae Funnel.
 #   - Permessi sudo (lo script richiede root per apt, systemd e nginx).
 #   - ~60 GB liberi su disco (dati OSM Italia ~3 GB PBF → ~30 GB PostgreSQL).
 #   - Connessione internet (Geofabrik + GitHub releases).
