@@ -26,7 +26,13 @@ const DEFAULT_SLIDE_PROMPT =
   `Restituisci SOLO un array JSON valido, senza markdown, senza commenti, esempio:\n` +
   `[{"title":"Trova il tuo biker","body":"Descrizione..."},...]`;
 
-function SlidesScrollPreview({ slides }: { slides: SlidePreview[] }) {
+function SlidesScrollPreview({
+  slides,
+  onRemove,
+}: {
+  slides: SlidePreview[];
+  onRemove?: (index: number) => void;
+}) {
   return (
     <ScrollView
       horizontal
@@ -40,6 +46,15 @@ function SlidesScrollPreview({ slides }: { slides: SlidePreview[] }) {
           <View key={i} style={styles.previewCard}>
             <Image source={{ uri: imageUri }} style={styles.previewImage} resizeMode="cover" />
             <Text style={styles.previewCardTitle} numberOfLines={2}>{slide.title}</Text>
+            {onRemove && (
+              <TouchableOpacity
+                style={styles.removeBtn}
+                onPress={() => onRemove(i)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              >
+                <Ionicons name="close" size={14} color="#fff" />
+              </TouchableOpacity>
+            )}
           </View>
         );
       })}
@@ -155,6 +170,24 @@ export function SlidesPanel({ isOllamaConfigured }: SlidesPanelProps) {
     }
   };
 
+  const handleRemoveGenerated = (index: number) => {
+    setSlidesGenerated((prev) => {
+      if (!prev) return prev;
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) setShowGenPreview(false);
+      return next.length > 0 ? next : null;
+    });
+  };
+
+  const handleRemoveUploaded = (index: number) => {
+    setSlidesUploaded((prev) => {
+      if (!prev) return prev;
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) setShowUploadPreview(false);
+      return next.length > 0 ? next : null;
+    });
+  };
+
   const handleDownloadCurrentSlides = () => {
     const { Linking } = require("react-native");
     const slides = currentSlidesData?.slides ?? [];
@@ -254,7 +287,9 @@ export function SlidesPanel({ isOllamaConfigured }: SlidesPanelProps) {
               </TouchableOpacity>
             )}
           </View>
-          {showGenPreview && slidesGenerated && <SlidesScrollPreview slides={slidesGenerated} />}
+          {showGenPreview && slidesGenerated && (
+            <SlidesScrollPreview slides={slidesGenerated} onRemove={handleRemoveGenerated} />
+          )}
         </View>
 
         {/* ── CARICA FILE PNG ── */}
@@ -292,7 +327,9 @@ export function SlidesPanel({ isOllamaConfigured }: SlidesPanelProps) {
               </TouchableOpacity>
             )}
           </View>
-          {showUploadPreview && slidesUploaded && <SlidesScrollPreview slides={slidesUploaded} />}
+          {showUploadPreview && slidesUploaded && (
+            <SlidesScrollPreview slides={slidesUploaded} onRemove={handleRemoveUploaded} />
+          )}
         </View>
 
         {/* ── CAMPAGNA ATTUALE ── */}
@@ -502,6 +539,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderWidth: 1,
     borderColor: Colors.border,
+    position: "relative",
+  },
+  removeBtn: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10,
   },
   previewImage: {
     width: 240,
