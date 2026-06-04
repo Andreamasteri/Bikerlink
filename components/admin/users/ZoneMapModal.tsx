@@ -1,27 +1,26 @@
-import React from "react";
-import { View, Text, StyleSheet, Modal, TouchableOpacity } from "react-native";
+import React, { useState } from "react";
+import { View, Text, StyleSheet, Modal, TouchableOpacity, LayoutChangeEvent } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import LeafletMiniMap from "@/components/LeafletMiniMap";
 import { GeoZone } from "./UserDetailModal";
 
-// Note: MapView and MapMarker should be passed from the parent because of the conditional import logic.
 interface ZoneMapModalProps {
   zone: GeoZone | null;
   onClose: () => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
-  MapView: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
-  MapMarker: any;
   insets: { top: number; bottom: number };
 }
 
 export const ZoneMapModal: React.FC<ZoneMapModalProps> = ({
   zone,
   onClose,
-  MapView,
-  MapMarker,
   insets,
 }) => {
+  const [mapHeight, setMapHeight] = useState(0);
+  const onMapLayout = (e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    if (h > 0 && h !== mapHeight) setMapHeight(h);
+  };
   return (
     <Modal visible={!!zone} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
@@ -34,27 +33,12 @@ export const ZoneMapModal: React.FC<ZoneMapModalProps> = ({
               <Ionicons name="close" size={24} color={Colors.text} />
             </TouchableOpacity>
           </View>
-          <View style={{ flex: 1 }}>
-            {zone && MapView ? (
-              <MapView
-                style={{ flex: 1 }}
-                googleMapsApiKey={process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY}
-                initialRegion={{
-                  latitude: zone.lat,
-                  longitude: zone.lng,
-                  latitudeDelta: 0.012,
-                  longitudeDelta: 0.012,
-                }}
-              >
-                {MapMarker && (
-                  <MapMarker
-                    coordinate={{ latitude: zone.lat, longitude: zone.lng }}
-                  />
-                )}
-              </MapView>
+          <View style={{ flex: 1 }} onLayout={onMapLayout}>
+            {zone && mapHeight > 0 ? (
+              <LeafletMiniMap latitude={zone.lat} longitude={zone.lng} height={mapHeight} />
             ) : (
               <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                <Text style={styles.note}>Mappa non disponibile</Text>
+                <Text style={styles.note}>Caricamento mappa…</Text>
               </View>
             )}
           </View>

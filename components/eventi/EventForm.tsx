@@ -21,18 +21,6 @@ import { EventLocationFields } from "./EventLocationFields";
 import { EventPhotosSection } from "./EventPhotosSection";
 import { EventParticipantSettings } from "./EventParticipantSettings";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
-let MapView: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-maps lazy import
-let Marker: any = null;
-try {
-  const maps = require("react-native-maps");
-  MapView = maps.default;
-  Marker = maps.Marker;
-} catch {
-  // no-op: react-native-maps is optional or handled via fallback
-}
-
 interface EventFormProps {
   visible: boolean;
   onClose: () => void;
@@ -110,7 +98,6 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
   const [submitted, setSubmitted] = useState(false);
   const [showTypePicker, setShowTypePicker] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
-  const [mapRegion, setMapRegion] = useState(ITALY_CENTER);
   const [tempCoords, setTempCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [inviteClubsEnabled, setInviteClubsEnabled] = useState(false);
   const [selectedClubIds, setSelectedClubIds] = useState<string[]>([]);
@@ -338,14 +325,10 @@ export default function EventForm({ visible, onClose, editingEvent }: EventFormP
             set={set}
             showMapPicker={showMapPicker}
             setShowMapPicker={setShowMapPicker}
-            mapRegion={mapRegion}
-            setMapRegion={setMapRegion}
             tempCoords={tempCoords}
             setTempCoords={setTempCoords}
             confirmMapCoords={confirmMapCoords}
             coordLabel={coordLabel}
-            MapView={MapView}
-            Marker={Marker}
             insets={insets}
             italyCenter={ITALY_CENTER}
           />

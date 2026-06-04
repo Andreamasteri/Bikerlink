@@ -19,17 +19,6 @@ import AiCopilotDrawer from "@/components/admin/ai/AiCopilotDrawer";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { TouchableOpacity } from "react-native";
 
-let MapView: React.ComponentType<Record<string, unknown>> | null = null;
-let MapMarker: React.ComponentType<Record<string, unknown>> | null = null;
-try {
-  const maps = require("react-native-maps");
-  MapView = maps.default as React.ComponentType<Record<string, unknown>>;
-  MapMarker = maps.Marker as React.ComponentType<Record<string, unknown>>;
-} catch {
-  MapView = null;
-  MapMarker = null;
-}
-
 const CURRENT_APP_VERSION = "1.0.0"; // Should be imported if available elsewhere
 
 function formatDateIT(dateStr: string | null): string {
@@ -502,8 +491,6 @@ export default function AdminUsers() {
         <ZoneMapModal
           zone={fzMapZone}
           onClose={() => setFzMapZone(null)}
-          MapView={MapView}
-          MapMarker={MapMarker}
           insets={insets}
         />
       </ErrorBoundary>
