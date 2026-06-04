@@ -19,7 +19,7 @@ const router = Router();
 
 const PROBE_TIMEOUT_MS = 5_000;
 
-type ServiceKey = "graphhopper" | "ollama" | "whisper" | "nominatim";
+type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim";
 
 interface ServiceHealth {
   key: ServiceKey;
@@ -29,6 +29,8 @@ interface ServiceHealth {
   latencyMs: number | null;
   url: string | null;
   error?: string;
+  /** Versione del tileset Valhalla (versione engine + data tile), se disponibile. */
+  tileVersion?: string;
 }
 
 /** Maschera un URL mostrando solo protocollo + hostname (mai path/query/credenziali). */
@@ -49,6 +51,7 @@ function sanitizeError(msg: string): string {
     process.env.WHISPER_TOKEN,
     process.env.GRAPHHOPPER_TOKEN,
     process.env.NOMINATIM_TOKEN,
+    process.env.VALHALLA_API_KEY,
   ]) {
     if (tok) out = out.split(tok).join("***");
   }
@@ -155,6 +158,55 @@ async function probeGraphHopper(): Promise<ServiceHealth> {
   };
 }
 
+/**
+ * Probe Valhalla via GET /status.
+ * Oltre a ok/latency, estrae version + data del tileset per mostrare la
+ * "tile version" inline nella card admin. Se VALHALLA_URL non è impostato,
+ * la card mostra "Non configurato" senza errori.
+ */
+async function probeValhalla(): Promise<ServiceHealth> {
+  const base = process.env.VALHALLA_URL?.replace(/\/$/, "");
+  const apiKey = process.env.VALHALLA_API_KEY;
+  if (!base) {
+    return { key: "valhalla", label: "Valhalla", configured: false, ok: false, latencyMs: null, url: null };
+  }
+  const headers: Record<string, string> = {};
+  if (apiKey) headers["X-Valhalla-Key"] = apiKey;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  const t0 = Date.now();
+  try {
+    const res = await fetch(`${base}/status`, { method: "GET", headers, signal: controller.signal });
+    const latencyMs = Date.now() - t0;
+    if (res.status < 200 || res.status >= 300) {
+      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error: `HTTP ${res.status}` };
+    }
+    const data = (await res.json().catch(() => ({}))) as {
+      version?: string;
+      tileset_last_modified?: number;
+    };
+    const datePart = data.tileset_last_modified
+      ? new Date(data.tileset_last_modified * 1000).toISOString().split("T")[0]
+      : undefined;
+    const tileVersion = [data.version, datePart].filter(Boolean).join(" · ") || undefined;
+    return {
+      key: "valhalla",
+      label: "Valhalla",
+      configured: true,
+      ok: true,
+      latencyMs,
+      url: maskUrl(base),
+      tileVersion,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error: sanitizeError(msg) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function probeOllama(): Promise<ServiceHealth> {
   const base = process.env.OLLAMA_URL?.replace(/\/$/, "");
   const token = process.env.OLLAMA_TOKEN;
@@ -197,6 +249,7 @@ router.get("/thinkcentre-health", async (_req: Request, res: Response) => {
   try {
     const services = await Promise.all([
       probeGraphHopper(),
+      probeValhalla(),
       probeOllama(),
       probeWhisper(),
       probeNominatim(),

@@ -11,7 +11,8 @@
 #   3. Builda il NUOVO grafo GraphHopper in una cartella separata (graph-cache-new)
 #      mentre il container vecchio continua a servire le richieste.
 #   4. Swap atomico del volume del grafo + restart rapido di GraphHopper.
-#   5. Rebuild dei tile Valhalla in background (force_rebuild una tantum).
+#   5. Rebuild dei tile Valhalla (force_rebuild una tantum, attesa sincrona di
+#      /status fino a timeout; exit 1 se non torna online).
 #   6. (Opzionale) notifica al backend la data di aggiornamento.
 #
 # Uso:
@@ -50,6 +51,7 @@ COMPOSE="$DOCKER compose"
 # ── Prerequisiti ──────────────────────────────────────────────────────────────
 command -v osmium >/dev/null 2>&1 || die "osmium non installato (sudo apt install -y osmium-tool)"
 command -v wget   >/dev/null 2>&1 || die "wget non installato (sudo apt install -y wget)"
+command -v curl   >/dev/null 2>&1 || die "curl non installato (sudo apt install -y curl) — serve a sondare /status di Valhalla."
 command -v pyosmium-up-to-date >/dev/null 2>&1 || \
   die "pyosmium-up-to-date non installato. Installa con: sudo apt install -y python3-pyosmium  (oppure: pipx install osmium)"
 [[ -f "$EUROPE_PBF" ]] || die "PBF Europa non trovato: ${EUROPE_PBF}. Esegui prima download-osm.sh."
@@ -101,11 +103,44 @@ log "[GraphHopper] nuovo grafo pronto — riavvio il servizio per caricarlo..."
 $COMPOSE restart graphhopper
 log "[GraphHopper] riavviato con il grafo aggiornato ✓"
 
-# ── 5. Rebuild tile Valhalla (in background) ─────────────────────────────────
-log "[Valhalla] avvio rebuild tile in background (force_rebuild)..."
-$DOCKER exec bikerlink-valhalla sh -lc 'touch /custom_files/.force_rebuild' 2>/dev/null || true
-$COMPOSE up -d --force-recreate valhalla
-log "[Valhalla] rebuild tile avviato — monitora con: $COMPOSE logs -f valhalla"
+# ── 5. Rebuild tile Valhalla (solo se in esecuzione) ─────────────────────────
+# Rigenera i tile Valhalla dal PBF appena aggiornato. Lo facciamo solo se il
+# container è attivo: se Valhalla non è in uso (VALHALLA_URL non configurato),
+# saltiamo per non avviarlo inutilmente.
+if [[ -n "$($DOCKER ps -q -f name=bikerlink-valhalla)" ]]; then
+  log "[Valhalla] container attivo — avvio rebuild tile (force_rebuild=True)..."
+  VALHALLA_FORCE_REBUILD=True $COMPOSE up -d --force-recreate valhalla
+
+  log "[Valhalla] attendo che /status torni online dopo il rebuild dei tile..."
+  VALHALLA_STATUS_URL="http://localhost:${VALHALLA_PORT:-8002}/status"
+  # Il rebuild dei tile Europa può richiedere fino a 3h.
+  VALHALLA_TIMEOUT_SECS="${VALHALLA_TIMEOUT_SECS:-10800}"
+  elapsed=0
+  valhalla_ok=false
+  while (( elapsed < VALHALLA_TIMEOUT_SECS )); do
+    if curl -fsS --max-time 10 "$VALHALLA_STATUS_URL" >/dev/null 2>&1; then
+      valhalla_ok=true
+      break
+    fi
+    sleep 30
+    elapsed=$((elapsed + 30))
+  done
+
+  if [[ "$valhalla_ok" == "true" ]]; then
+    # Ripristina force_rebuild=False così i prossimi riavvii servono i tile senza ribuildare.
+    log "[Valhalla] tile ricostruiti ✓ — ripristino force_rebuild=False (serve tile)..."
+    $COMPOSE up -d --force-recreate valhalla
+    log "[Valhalla] online ✓"
+  else
+    # GraphHopper è già aggiornato; segnaliamo comunque il fallimento Valhalla.
+    # Lo registriamo per uscire con errore alla fine (dopo la notifica backend),
+    # così cron/monitoring vede chiaramente il problema.
+    log "[Valhalla] ATTENZIONE: /status non ha risposto entro $((VALHALLA_TIMEOUT_SECS / 3600))h — controlla: $COMPOSE logs -f valhalla"
+    VALHALLA_REBUILD_FAILED=1
+  fi
+else
+  log "[Valhalla] container non in esecuzione — rebuild tile saltato."
+fi
 
 # ── 6. Notifica backend (opzionale) ──────────────────────────────────────────
 if [[ -n "$BACKEND_URL" && -n "$OSM_UPDATE_SECRET" ]]; then
@@ -116,6 +151,11 @@ if [[ -n "$BACKEND_URL" && -n "$OSM_UPDATE_SECRET" ]]; then
     -H "X-OSM-Update-Secret: ${OSM_UPDATE_SECRET}" \
     -d "{\"updatedAt\":\"${TS}\"}" || true)"
   log "[Backend] POST /api/admin/maps/osm-updated → HTTP ${code}"
+fi
+
+if [[ "${VALHALLA_REBUILD_FAILED:-0}" == "1" ]]; then
+  log "=== Aggiornamento OSM completato CON ERRORI (rebuild Valhalla fallito) ==="
+  exit 1
 fi
 
 log "=== Aggiornamento OSM completato ==="

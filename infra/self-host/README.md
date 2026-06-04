@@ -137,6 +137,73 @@ CRON_TZ=Europe/Rome
 
 ---
 
+## Attivazione Valhalla
+
+Valhalla è il secondo routing engine (motorcycle nativo, fallback robusto). È già
+definito nel `docker-compose.yml` e il client TypeScript è pronto: per attivarlo
+servono solo i tile e il collegamento `VALHALLA_URL`.
+
+### 1. Builda i tile
+
+```bash
+cd infra/self-host
+chmod +x build-valhalla-tiles.sh
+./build-valhalla-tiles.sh
+```
+
+Lo script verifica i prerequisiti (Docker, curl, osmium), avvia il container in
+modalità build (`force_rebuild=True`), mostra i log in tempo reale e attende che
+`GET http://localhost:8002/status` risponda (timeout 3h). Al termine ripristina
+`force_rebuild=False` e riavvia in modalità serve, poi stampa version + data tile.
+Se `/status` non torna online dopo il riavvio, lo script esce con errore.
+
+> Se il PBF unificato `data/europe-ecuador-merged.osm.pbf` manca, lo script lancia
+> automaticamente `./download-osm.sh` (download Europa + Ecuador + merge, ~2h).
+
+### 2. Imposta il Secret `VALHALLA_URL`
+
+Nel pannello **Secrets di Replit** aggiungi:
+
+```
+VALHALLA_URL=http://<IP-ThinkCentre>:8002
+```
+
+Sostituisci `<IP-ThinkCentre>` con l'IP del server di casa (o l'URL del tunnel/reverse
+proxy se esposto pubblicamente). Solo dopo aver impostato questa variabile il routing
+Valhalla diventa attivabile dall'admin.
+
+### 3. (Opzionale) `VALHALLA_API_KEY`
+
+Se Valhalla è dietro un reverse proxy nginx che richiede autenticazione, imposta anche:
+
+```
+VALHALLA_API_KEY=<chiave>
+```
+
+Il client la invia come header `X-Valhalla-Key`.
+
+### 4. Verifica dal pannello Admin
+
+- **Admin → Mappe → Test routing**: esegue una richiesta di prova sull'engine attivo.
+- La card **"Server di casa (ThinkCentre)"** mostra ora Valhalla accanto a
+  GraphHopper/Ollama/Whisper/Nominatim, con latenza e versione dei tile. Se
+  `VALHALLA_URL` non è impostato, la riga mostra "Non configurato" senza errori.
+
+### Avvio automatico al boot (ThinkCentre)
+
+Per far ripartire Valhalla automaticamente al boot, installa la unit systemd
+`scripts/thinkcentre/valhalla.service` (analoga a `graphhopper.service`):
+
+```bash
+# Personalizza WorkingDirectory nel file (path della cartella infra/self-host), poi:
+sudo cp scripts/thinkcentre/valhalla.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now valhalla
+journalctl -u valhalla -f
+```
+
+---
+
 ## FAQ / Troubleshooting
 
 **Come verifico che i servizi siano attivi?**
@@ -255,7 +322,8 @@ automaticamente `SESSION_SECRET` e `OSM_UPDATE_SECRET` nel `.env.local`:
 | `setup.sh` | Setup end-to-end (prerequisiti, download, avvio, health check). |
 | `setup-missing.sh` | Setup parziale: installa solo postgres, redis, valhalla, pgadmin (GraphHopper già attivo). |
 | `download-osm.sh` | Scarica Europa + Ecuador, verifica MD5, merge in un unico PBF. |
-| `update-osm.sh` | Aggiornamento incrementale dati OSM (diff) + rebuild a caldo. |
+| `update-osm.sh` | Aggiornamento incrementale dati OSM (diff) + rebuild a caldo (incl. tile Valhalla). |
+| `build-valhalla-tiles.sh` | Builda/ricostruisce i tile Valhalla dal PBF, segue i log, verifica `/status`. |
 | `docker-compose.yml` | Definizione dei 5 servizi e dei volumi persistenti. |
 | `graphhopper/config.yml` | Config GraphHopper (profilo moto curvy, PBF unificato). |
 | `.env.local.template` | Template variabili app con URL locali precompilati. |

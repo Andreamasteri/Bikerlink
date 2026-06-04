@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
-type ServiceKey = "graphhopper" | "ollama" | "whisper" | "nominatim";
+type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim";
 
 interface ServiceHealth {
   key: ServiceKey;
@@ -15,6 +15,7 @@ interface ServiceHealth {
   latencyMs: number | null;
   url: string | null;
   error?: string;
+  tileVersion?: string;
 }
 
 interface ThinkCentreHealth {
@@ -27,6 +28,7 @@ interface ThinkCentreHealth {
 
 const SERVICE_ICONS: Record<ServiceKey, keyof typeof MaterialCommunityIcons.glyphMap> = {
   graphhopper: "map-marker-path",
+  valhalla: "routes",
   ollama: "robot-outline",
   whisper: "microphone-outline",
   nominatim: "map-search-outline",
@@ -56,7 +58,10 @@ function serviceColor(s: ServiceHealth): string {
 
 function serviceStatusLabel(s: ServiceHealth): string {
   if (!s.configured) return "Non configurato";
-  if (s.ok) return s.latencyMs != null ? `Online · ${s.latencyMs} ms` : "Online";
+  if (s.ok) {
+    const base = s.latencyMs != null ? `Online · ${s.latencyMs} ms` : "Online";
+    return s.tileVersion ? `${base} · tile ${s.tileVersion}` : base;
+  }
   return s.error ? `Offline · ${s.error}` : "Offline";
 }
 

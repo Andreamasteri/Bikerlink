@@ -115,7 +115,9 @@ services:
       build_admins: "True"
       build_time_zones: "True"
       build_elevation: "False"
-      force_rebuild: "False"
+      # Default False (serve i tile esistenti). build-valhalla-tiles.sh e
+      # update-osm.sh impostano VALHALLA_FORCE_REBUILD=True per rigenerare i tile.
+      force_rebuild: "${VALHALLA_FORCE_REBUILD:-False}"
     volumes:
       # custom_files contiene i .pbf da cui Valhalla builda i tile.
       - ./data:/custom_files

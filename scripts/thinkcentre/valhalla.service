@@ -1,0 +1,64 @@
+# BikerLink — Valhalla systemd unit
+#
+# Avvia il container Docker `bikerlink-valhalla` come servizio systemd, così
+# Valhalla riparte automaticamente al boot del ThinkCentre (analogo a
+# graphhopper.service). Il container è definito in infra/self-host/docker-compose.yml.
+#
+# INSTALLAZIONE:
+#   sudo cp valhalla.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now valhalla
+#
+# PERSONALIZZAZIONE OBBLIGATORIA prima di installare:
+#   1. WorkingDirectory deve puntare alla cartella infra/self-host del repo
+#      (dove si trova docker-compose.yml). Default: /opt/bikerlink/infra/self-host
+#   2. Verificare che l'utente esista e sia nel gruppo 'docker' (o usare root).
+#   3. I tile devono essere già stati buildati con build-valhalla-tiles.sh,
+#      altrimenti al primo avvio Valhalla risponderà ma senza percorsi.
+#
+# Questa unit NON builda i tile: avvia/ferma il container già configurato.
+# Per (ri)costruire i tile usa: infra/self-host/build-valhalla-tiles.sh
+
+[Unit]
+Description=Valhalla Routing Engine (BikerLink) — Docker container
+Documentation=https://github.com/valhalla/valhalla
+# Docker deve essere attivo; GraphHopper parte prima (entrambi usano RAM/disco).
+After=docker.service graphhopper.service
+Requires=docker.service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+
+# ── Path ──────────────────────────────────────────────────────────────────────
+# Cartella che contiene docker-compose.yml (lo stack self-host).
+WorkingDirectory=/opt/bikerlink/infra/self-host
+
+# Avvio: porta su il solo servizio valhalla (i tile devono già esistere).
+# --no-build evita rebuild dell'immagine; i tile si costruiscono a parte.
+ExecStartPre=-/usr/bin/docker compose --env-file .env up -d --no-recreate postgres redis
+ExecStart=/usr/bin/docker compose --env-file .env up valhalla
+
+# Allo stop, ferma in modo pulito il container senza rimuovere i volumi (tile).
+ExecStop=/usr/bin/docker compose --env-file .env stop valhalla
+
+# ── Restart policy ────────────────────────────────────────────────────────────
+# Riavvio automatico in caso di crash (non riavvia se fermato con systemctl stop).
+Restart=on-failure
+RestartSec=15s
+
+# ── Output log ────────────────────────────────────────────────────────────────
+# I log sono leggibili con: journalctl -u valhalla -f
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=valhalla
+
+# ── Timeout ───────────────────────────────────────────────────────────────────
+# Il container parte in pochi secondi se i tile esistono già; se deve buildare
+# (force_rebuild) può richiedere ore — meglio usare build-valhalla-tiles.sh.
+TimeoutStartSec=600
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target
