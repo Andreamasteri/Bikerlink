@@ -6,6 +6,7 @@ import { startMatchingEngine, stopMatchingEngine } from "./matching-engine";
 import { autoSeedEssentialUsers, autoSeedFakeUsers, seedAppleReviewerAccount, seedGooglePlayReviewerAccount, ensureBikerLinkOfficialOnBoot } from "./auto-seed";
 import { seedTranslationKeys } from "./routes/admin/translations";
 import { seedTagsAtStartup } from "./seed-tags-runtime";
+import { seedMotoclubs, seedClubMembershipsOnBoot } from "./routes/motoclubs/seed";
 import { db, pool } from "./db";
 import { sql } from "drizzle-orm";
 import { initUptimeTracking, startMetroMonitor, stopMetroMonitor } from "./uptime";
@@ -281,6 +282,8 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     // Task #2713 — Idempotent tag seed: garantisce che categorie + tag canonici
     // siano sempre presenti in qualsiasi nuovo deployment / DB reset.
     await withPhaseTimeout("seedTagsAtStartup", seedTagsAtStartup());
+    await withPhaseTimeout("seedMotoclubs", seedMotoclubs(), 60_000);
+    await withPhaseTimeout("seedClubMembershipsOnBoot", seedClubMembershipsOnBoot(), 60_000);
     startMatchingEngine();
     try {
       const { startNotificationJobs } = await import("./matching/notifications/digest-job");
@@ -546,6 +549,8 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
   console.log(`[INIT][SUMMARY]     seedAppleReviewerAccount : ran`);
   console.log(`[INIT][SUMMARY]     seedGooglePlayReviewerAccount : ran`);
   console.log(`[INIT][SUMMARY]     ensureBikerLinkOfficialOnBoot : ran`);
+  console.log(`[INIT][SUMMARY]     seedMotoclubs            : ran`);
+  console.log(`[INIT][SUMMARY]     seedClubMembershipsOnBoot: ran`);
   console.log(`[INIT][SUMMARY]     startMatchingEngine      : ran`);
   console.log(`[INIT][SUMMARY]     scheduleNightlyVacuum    : scheduled`);
   console.log(`[INIT][SUMMARY]     scheduleNightlyMapMatching : scheduled`);

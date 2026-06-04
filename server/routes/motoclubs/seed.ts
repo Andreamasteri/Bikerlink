@@ -1,6 +1,6 @@
 import { db } from "../../db";
-import { motoClubs } from "@shared/db";
-import { eq, and, ilike, sql } from "drizzle-orm";
+import { motoClubs, conversations, motoClubMembers, conversationParticipants, users } from "@shared/db";
+import { eq, and, ilike, sql, isNull, inArray } from "drizzle-orm";
 
 const SEED_BRANDS = [
   { name: "Ducati", brandName: "Ducati", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6e/Ducati_red_logo.svg/200px-Ducati_red_logo.svg.png" },
@@ -48,6 +48,22 @@ const SEED_REGIONS = [
   { region: "Sardegna", logoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Coat_of_arms_of_Sardinia.svg/150px-Coat_of_arms_of_Sardinia.svg.png" },
 ];
 
+async function ensureClubConversation(clubId: string, clubName: string): Promise<string | null> {
+  try {
+    const [conv] = await db.insert(conversations).values({
+      conversationType: "motoclub",
+      title: `Club ${clubName}`,
+    }).returning();
+    await db.update(motoClubs)
+      .set({ conversationId: conv.id, updatedAt: new Date() })
+      .where(eq(motoClubs.id, clubId));
+    return conv.id;
+  } catch (e) {
+    console.error("[Motoclub] ensureClubConversation error for", clubName, e);
+    return null;
+  }
+}
+
 export async function seedMotoclubs() {
   try {
     const [{ brandCount }] = await db
@@ -61,14 +77,17 @@ export async function seedMotoclubs() {
 
     if (Number(brandCount) === 0) {
       for (const b of SEED_BRANDS) {
-        await db.insert(motoClubs).values({
+        const [inserted] = await db.insert(motoClubs).values({
           name: b.name,
           clubType: "brand",
           brandName: b.brandName,
           logoUrl: b.logoUrl ?? null,
           isApproved: true,
           activityScore: 0,
-        });
+        }).returning({ id: motoClubs.id });
+        if (inserted?.id) {
+          await ensureClubConversation(inserted.id, b.name);
+        }
       }
       console.log("[Motoclub] Seed brand:", SEED_BRANDS.length, "club");
     } else {
@@ -79,14 +98,17 @@ export async function seedMotoclubs() {
           .where(and(eq(motoClubs.clubType, "brand"), ilike(motoClubs.brandName!, b.brandName)))
           .limit(1);
         if (existing.length === 0) {
-          await db.insert(motoClubs).values({
+          const [inserted] = await db.insert(motoClubs).values({
             name: b.name,
             clubType: "brand",
             brandName: b.brandName,
             logoUrl: b.logoUrl ?? null,
             isApproved: true,
             activityScore: 0,
-          });
+          }).returning({ id: motoClubs.id });
+          if (inserted?.id) {
+            await ensureClubConversation(inserted.id, b.name);
+          }
           repaired++;
           console.log("[Motoclub] Repair: aggiunto club brand mancante:", b.name);
         }
@@ -96,7 +118,7 @@ export async function seedMotoclubs() {
 
     if (Number(regionCount) === 0) {
       for (const r of SEED_REGIONS) {
-        await db.insert(motoClubs).values({
+        const [inserted] = await db.insert(motoClubs).values({
           name: `Motoclub ${r.region}`,
           clubType: "region",
           region: r.region,
@@ -104,7 +126,10 @@ export async function seedMotoclubs() {
           logoUrl: r.logoUrl,
           isApproved: true,
           activityScore: 0,
-        });
+        }).returning({ id: motoClubs.id });
+        if (inserted?.id) {
+          await ensureClubConversation(inserted.id, `Motoclub ${r.region}`);
+        }
       }
       console.log("[Motoclub] Seed regionali:", SEED_REGIONS.length, "club");
     } else {
@@ -115,7 +140,7 @@ export async function seedMotoclubs() {
           .where(and(eq(motoClubs.clubType, "region"), ilike(motoClubs.region!, r.region)))
           .limit(1);
         if (existing.length === 0) {
-          await db.insert(motoClubs).values({
+          const [inserted] = await db.insert(motoClubs).values({
             name: `Motoclub ${r.region}`,
             clubType: "region",
             region: r.region,
@@ -123,14 +148,125 @@ export async function seedMotoclubs() {
             logoUrl: r.logoUrl,
             isApproved: true,
             activityScore: 0,
-          });
+          }).returning({ id: motoClubs.id });
+          if (inserted?.id) {
+            await ensureClubConversation(inserted.id, `Motoclub ${r.region}`);
+          }
           repaired++;
           console.log("[Motoclub] Repair: aggiunto club regionale mancante:", r.region);
         }
       }
       if (repaired > 0) console.log("[Motoclub] Repair regionali completato:", repaired, "club aggiunti");
     }
+
+    // Repair: clubs that already existed but have no conversationId
+    await repairMissingConversations();
   } catch (e) {
     console.error("[Motoclub seed error]", e);
+  }
+}
+
+async function repairMissingConversations() {
+  try {
+    const clubsWithoutConv = await db
+      .select({ id: motoClubs.id, name: motoClubs.name })
+      .from(motoClubs)
+      .where(and(eq(motoClubs.isApproved, true), isNull(motoClubs.conversationId)));
+
+    if (clubsWithoutConv.length === 0) return;
+
+    let repaired = 0;
+    for (const club of clubsWithoutConv) {
+      const created = await ensureClubConversation(club.id, club.name);
+      if (created) repaired++;
+    }
+    if (repaired > 0) console.log("[Motoclub] Repair conversations:", repaired, "club aggiornati");
+  } catch (e) {
+    console.error("[Motoclub] repairMissingConversations error:", e);
+  }
+}
+
+export async function seedClubMembershipsOnBoot(): Promise<void> {
+  try {
+    const approvedBrandClubs = await db
+      .select({ id: motoClubs.id, conversationId: motoClubs.conversationId })
+      .from(motoClubs)
+      .where(and(eq(motoClubs.isApproved, true), eq(motoClubs.clubType, "brand")));
+
+    const approvedRegionalClubs = await db
+      .select({ id: motoClubs.id, conversationId: motoClubs.conversationId, region: motoClubs.region })
+      .from(motoClubs)
+      .where(and(eq(motoClubs.isApproved, true), eq(motoClubs.clubType, "region")));
+
+    if (approvedBrandClubs.length === 0 && approvedRegionalClubs.length === 0) return;
+
+    const regionalByRegion = new Map(approvedRegionalClubs.map(c => [c.region, c]));
+
+    const fakeUsers = await db
+      .select({ id: users.id, region: users.region, country: users.country })
+      .from(users)
+      .where(eq(users.isFake, true));
+
+    if (fakeUsers.length === 0) {
+      console.log("[Motoclub] seedClubMembershipsOnBoot: nessun utente fake, skip");
+      return;
+    }
+
+    const fakeUserIds = fakeUsers.map(u => u.id);
+
+    const profileByUserId = new Map(fakeUsers.map(u => [u.id, u]));
+
+    const existingMemberships = await db
+      .select({ clubId: motoClubMembers.clubId, userId: motoClubMembers.userId })
+      .from(motoClubMembers)
+      .where(inArray(motoClubMembers.userId, fakeUserIds));
+
+    const membershipSet = new Set(existingMemberships.map(m => `${m.clubId}:${m.userId}`));
+
+    const clubMemberRows: { clubId: string; userId: string; role: string; status: string }[] = [];
+    const convParticipantRows: { conversationId: string; userId: string }[] = [];
+
+    for (const user of fakeUsers) {
+      if (approvedBrandClubs.length > 0) {
+        const count = 1 + Math.floor(Math.random() * 2);
+        const shuffled = [...approvedBrandClubs].sort(() => Math.random() - 0.5).slice(0, count);
+        for (const club of shuffled) {
+          const key = `${club.id}:${user.id}`;
+          if (!membershipSet.has(key)) {
+            membershipSet.add(key);
+            clubMemberRows.push({ clubId: club.id, userId: user.id, role: "member", status: "active" });
+            if (club.conversationId) {
+              convParticipantRows.push({ conversationId: club.conversationId, userId: user.id });
+            }
+          }
+        }
+      }
+
+      const profile = profileByUserId.get(user.id);
+      if (profile?.region && profile.country === "IT") {
+        const regionalClub = regionalByRegion.get(profile.region);
+        if (regionalClub) {
+          const key = `${regionalClub.id}:${user.id}`;
+          if (!membershipSet.has(key)) {
+            membershipSet.add(key);
+            clubMemberRows.push({ clubId: regionalClub.id, userId: user.id, role: "member", status: "active" });
+            if (regionalClub.conversationId) {
+              convParticipantRows.push({ conversationId: regionalClub.conversationId, userId: user.id });
+            }
+          }
+        }
+      }
+    }
+
+    if (clubMemberRows.length > 0) {
+      await db.insert(motoClubMembers).values(clubMemberRows).onConflictDoNothing();
+    }
+    if (convParticipantRows.length > 0) {
+      await db.insert(conversationParticipants).values(convParticipantRows).onConflictDoNothing();
+    }
+
+    console.log(`[Motoclub] seedClubMembershipsOnBoot: ${clubMemberRows.length} iscrizioni, ${convParticipantRows.length} partecipanti chat`);
+  } catch (e) {
+    console.error("[Motoclub] seedClubMembershipsOnBoot error:", e);
   }
 }
