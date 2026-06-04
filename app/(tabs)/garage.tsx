@@ -102,17 +102,10 @@ function GarageContent() {
       }
       return res.json();
     },
-    onSuccess: async (responseData: { matches?: Array<{ zavarrinaNickname?: string; brand: string; model: string }> }) => {
+    onSuccess: async () => {
       await queryClient.refetchQueries({ queryKey: ["/api/motorcycles"] });
       setShowForm(false);
       resetForm();
-
-      if (responseData?.matches && responseData.matches.length > 0) {
-        const matchInfo = responseData.matches
-          .map((m) => `${m.zavarrinaNickname || "Zavorrina"} ${t("garage.lookingFor")} ${m.brand} ${m.model}`)
-          .join("\n");
-        Alert.alert("Here Comes Your Chance!!", matchInfo);
-      }
     },
     onError: (err: Error) => {
       Alert.alert(t("common.error"), err.message || t("garage.saveError"));

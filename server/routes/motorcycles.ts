@@ -35,6 +35,58 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
   }
 });
 
+async function runMatchingInBackground(
+  userId: string,
+  motorcycleId: string,
+  brand: string | null | undefined,
+  model: string | null | undefined,
+  ridingStyle: string | null | undefined,
+  motorcycleType: string | null | undefined,
+): Promise<void> {
+  if (!ridingStyle) return;
+  const wishlistMotos = await storage.findMatchingWishlistMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
+  for (const wm of wishlistMotos) {
+    if (wm.userId === userId) continue;
+    if (!wm.userId) continue;
+    try {
+      const createdMatch = await storage.createMatch({
+        bikerId: userId,
+        zavarrinaId: wm.userId,
+        bikerMotorcycleId: motorcycleId,
+        wishlistMotoId: wm.id,
+        status: "new",
+      });
+      if (createdMatch) {
+        const zavarrinaUser = await storage.getUser(wm.userId);
+        await storage.createNotification({
+          userId,
+          title: "Here Comes Your Chance!!",
+          body: `Una zavorrina cerca proprio la tua moto: ${brand} ${model}! (${zavarrinaUser?.nickname || "Zavorrina"})`,
+          notificationType: "match",
+          referenceType: "user",
+          referenceId: wm.userId,
+        });
+        await storage.createNotification({
+          userId: wm.userId,
+          title: "Here Comes Your Chance!!",
+          body: `Un biker ha la moto che cerchi: ${brand} ${model}!`,
+          notificationType: "match",
+          referenceType: "user",
+          referenceId: userId,
+        });
+        await dispatchMatchNotification({
+          table: "biker_zavorrina_matches",
+          matchId: createdMatch.id,
+          userIds: [userId, wm.userId],
+          priority: classifyMatch({}),
+        });
+      }
+    } catch (e) {
+      console.warn("[matching] errore su wishlist item", wm.id, e);
+    }
+  }
+}
+
 router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const userId = req.session.userId!;
@@ -78,53 +130,14 @@ router.post("/", requireAuth, async (req: Request, res: Response) => {
         .where(and(eq(userMotorcycles.userId, userId), ne(userMotorcycles.id, motorcycle.id)));
     }
 
-    const matches: Array<{ zavarrinaNickname: string | undefined; brand: string; model: string; ridingStyle: string }> = [];
-    if (ridingStyle) {
-      const wishlistMotos = await storage.findMatchingWishlistMotos(brand || "", model || "", ridingStyle, motorcycleType || "");
-      for (const wm of wishlistMotos) {
-        if (wm.userId === userId) continue;
-        if (!wm.userId) continue;
-        const createdMatch = await storage.createMatch({
-          bikerId: userId,
-          zavarrinaId: wm.userId,
-          bikerMotorcycleId: motorcycle.id,
-          wishlistMotoId: wm.id,
-          status: "new",
-        });
-        const zavarrinaUser = await storage.getUser(wm.userId);
-        await storage.createNotification({
-          userId,
-          title: "Here Comes Your Chance!!",
-          body: `Una zavorrina cerca proprio la tua moto: ${brand} ${model}! (${zavarrinaUser?.nickname || "Zavorrina"})`,
-          notificationType: "match",
-          referenceType: "user",
-          referenceId: wm.userId,
-        });
-        await storage.createNotification({
-          userId: wm.userId,
-          title: "Here Comes Your Chance!!",
-          body: `Un biker ha la moto che cerchi: ${brand} ${model}!`,
-          notificationType: "match",
-          referenceType: "user",
-          referenceId: userId,
-        });
-        if (createdMatch) {
-          await dispatchMatchNotification({
-            table: "biker_zavorrina_matches",
-            matchId: createdMatch.id,
-            userIds: [userId, wm.userId],
-            priority: classifyMatch({}),
-          });
-        }
-        matches.push({ zavarrinaNickname: zavarrinaUser?.nickname, brand, model, ridingStyle });
-      }
-    }
+    res.status(201).json({ motorcycle });
 
+    runMatchingInBackground(userId, motorcycle.id, brand, model, ridingStyle, motorcycleType).catch((e) =>
+      console.error("[matching background error]", e),
+    );
     if (brand) {
       createClubInvitesForMoto(userId, brand, model || "").catch((e) => console.error("[auto-join brand error]", e));
     }
-
-    return res.status(201).json({ motorcycle, matches });
   } catch (error) {
     console.error("Create motorcycle error:", error);
     return sendError(res, 500, "Errore interno del server");
