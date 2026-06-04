@@ -23,7 +23,19 @@ ${LIVE_MAP_STYLES}
   </div>
 </div>
 <script>${LEAFLET_JS}</script>
-<script>${LEAFLET_ROTATE_JS}</script>
+<script>
+/* leaflet-rotate — caricato in try/catch: se il plugin lancia un errore la
+   WebView non si blocca e la mappa rimane funzionante (senza rotazione).
+   _leafletRotateReady viene letto dal blocco di init per abilitare le opzioni
+   rotate/touchRotate solo quando il plugin è disponibile. */
+var _leafletRotateReady = false;
+try {
+${LEAFLET_ROTATE_JS}
+_leafletRotateReady = true;
+} catch(e) {
+  console.warn('[BikerLink] leaflet-rotate init error:', e && e.message);
+}
+</script>
 <script>
 /* OverlappingMarkerSpiderfier-Leaflet — embedded inline (Task #1077).
    Source: npm package overlapping-marker-spiderfier-leaflet@0.2.7 (dist/oms.min.js).
@@ -52,11 +64,13 @@ ${LIVE_MAP_STYLES}
     zoomControl: false,
     attributionControl: true,
     /* Rotazione mappa a due dita (Task #3124) — plugin leaflet-rotate.
-       rotate: abilita la rotazione; touchRotate: gesto a due dita;
+       rotate/touchRotate abilitati solo se il plugin si è caricato senza errori
+       (_leafletRotateReady=true); in caso di crash del bundle la mappa resta
+       funzionante senza rotazione invece di rimanere nera.
        rotateControl: false → nessun controllo nativo (usiamo la bussola RN);
        touchZoom resta attivo, così pinch-to-zoom e rotate convivono. */
-    rotate: true,
-    touchRotate: true,
+    rotate: _leafletRotateReady,
+    touchRotate: _leafletRotateReady,
     rotateControl: false,
     bearing: 0
   });

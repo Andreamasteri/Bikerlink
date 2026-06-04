@@ -129,6 +129,16 @@ export function ThinkCentreCard() {
               <View style={[styles.healthDot, { backgroundColor: serviceColor(s) }]} />
             </View>
           ))}
+          {data && data.configuredCount > 0 && data.onlineCount === 0 && (
+            <View style={styles.note}>
+              <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
+              <Text style={styles.noteText}>
+                Il server di casa è raggiungibile solo se acceso e con tunnel attivo. Se tutti i
+                servizi risultano offline, verifica che il ThinkCentre sia acceso e il tunnel
+                configurato (anche da cloud il probe passa solo via tunnel).
+              </Text>
+            </View>
+          )}
         </View>
       )}
     </View>
@@ -201,5 +211,21 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: "#ef4444",
+  },
+  note: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 4,
+  },
+  noteText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    flex: 1,
+    lineHeight: 16,
   },
 });

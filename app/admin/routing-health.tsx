@@ -133,8 +133,16 @@ export default function RoutingHealthScreen() {
           <EngineCard
             title="GraphHopper (self-hosted)"
             icon="server"
-            color={statusColor(gh?.ok ?? null, gh?.down ?? false)}
-            statusLabel={gh?.down ? "DOWN" : gh?.ok ? "OK" : "—"}
+            color={
+              gh?.down && cloud?.active
+                ? Colors.warning
+                : statusColor(gh?.ok ?? null, gh?.down ?? false)
+            }
+            statusLabel={
+              gh?.down && cloud?.active
+                ? "DOWN → CLOUD"
+                : gh?.down ? "DOWN" : gh?.ok ? "OK" : "—"
+            }
             rows={[
               { label: "URL", value: gh?.url || "—" },
               { label: "Self-hosted", value: gh?.selfHosted ? "Sì" : "No" },
@@ -142,6 +150,9 @@ export default function RoutingHealthScreen() {
               { label: "Latenza", value: gh?.latencyMs != null ? `${gh.latencyMs} ms` : "—" },
               { label: "Ultimo check", value: formatDate(gh?.lastCheckAt ?? null) },
               { label: "Fallimenti consec.", value: String(gh?.consecutiveFailures ?? 0) },
+              ...(gh?.down && cloud?.active
+                ? [{ label: "Copertura", value: "Cloud fallback attivo (profilo car)" }]
+                : []),
               ...(gh?.error ? [{ label: "Errore", value: gh.error }] : []),
             ]}
           />
