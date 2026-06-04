@@ -139,13 +139,22 @@ async function probeGraphHopper(): Promise<ServiceHealth> {
   if (token) headers["X-GH-Token"] = token;
 
   // 1) Tentativo veloce: endpoint /health dedicato.
-  const health = await httpProbe(`${base}/health`, headers);
+  //    Accettiamo anche 401/403: significano che GraphHopper HA risposto
+  //    (processo attivo) ma richiede autenticazione per questo endpoint.
+  //    Solo errori di rete/timeout o 5xx indicano servizio irraggiungibile.
+  const health = await httpProbe(
+    `${base}/health`,
+    headers,
+    // 2xx = OK; 401/403 = GraphHopper risponde (auth richiesta ma processo attivo).
+    // Gli altri 4xx (404, 429…) e i 5xx restano "non sano" → cade sul fallback /route.
+    (status) => (status >= 200 && status < 300) || status === 401 || status === 403,
+  );
   if (health.ok) {
     return { key: "graphhopper", label: "GraphHopper", configured: true, ok: true, latencyMs: health.latencyMs, url: maskUrl(base) };
   }
 
-  // 2) Fallback: alcuni deploy dietro tunnel non espongono /health pur
-  //    instradando /route. Una vera richiesta di routing conferma lo stato.
+  // 2) Fallback: alcuni deploy dietro tunnel restituiscono 5xx su /health ma
+  //    instradano /route correttamente. Una vera richiesta di routing conferma.
   const route = await graphHopperRouteProbe(base, token);
   return {
     key: "graphhopper",

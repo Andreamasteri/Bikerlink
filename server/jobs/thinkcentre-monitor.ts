@@ -102,8 +102,9 @@ async function probeGraphHopperOk(): Promise<boolean | null> {
   const token = process.env.GRAPHHOPPER_TOKEN;
   if (token) headers["X-GH-Token"] = token;
 
-  // 1) /health endpoint
-  if (await httpProbe(`${base}/health`, headers)) return true;
+  // 1) /health endpoint — 2xx o 401/403 = GraphHopper attivo (auth richiesta).
+  //    Altri 4xx (404, 429…) e 5xx restano "giù" → fallback /route.
+  if (await httpProbe(`${base}/health`, headers, (s) => (s >= 200 && s < 300) || s === 401 || s === 403)) return true;
 
   // 2) Fallback: route probe minimale (Milano→Como)
   const controller = new AbortController();
