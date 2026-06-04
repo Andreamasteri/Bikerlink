@@ -8,6 +8,7 @@ import { workshopSchema, easterEggSchema, reportResolveSchema } from "@shared/va
 import { eq } from "drizzle-orm";
 import { massSeedFakeUsers, getMassSeedStatus } from "../../mass-seed";
 import { setMotionEnabled, getMotionStatus } from "../../motion-simulator";
+import { getServerInfo, isSelfHosted, ACTIVE_PROFILE, GH_BASE_URL, isRoutingEnabled } from "../../graphhopper-client";
 
 const router = Router();
 
@@ -271,9 +272,42 @@ router.get("/mass-seed-status", async (_req: Request, res: Response) => {
   }
 });
 
-// GraphHopper status (stub — non configurato)
-router.get("/graphhopper-status", (_req: Request, res: Response) => {
-  return sendSuccess(res, { mode: "disabled", healthy: false, profile: null, reason: "Server GraphHopper non configurato" });
+// GraphHopper status — stato reale del motore di routing.
+// mode: disabled (kill-switch off) | self-hosted | cloud. healthy riflette un
+// probe robusto (/health, con fallback a una vera /route) così il routing
+// funzionante non viene segnalato come "Errore".
+function maskGhHost(u: string): string {
+  try {
+    const p = new URL(u);
+    return `${p.protocol}//${p.hostname}`;
+  } catch {
+    return "—";
+  }
+}
+
+router.get("/graphhopper-status", async (_req: Request, res: Response) => {
+  try {
+    const routingEnabled = await isRoutingEnabled();
+    if (!routingEnabled) {
+      return sendSuccess(res, {
+        mode: "disabled",
+        profile: ACTIVE_PROFILE,
+        healthy: false,
+        url: maskGhHost(GH_BASE_URL),
+        reason: "Routing disabilitato via kill-switch",
+      });
+    }
+    const info = await getServerInfo();
+    const healthy = info.status !== "error" && info.status !== "disabled";
+    return sendSuccess(res, {
+      mode: isSelfHosted ? "self-hosted" : "cloud",
+      profile: ACTIVE_PROFILE,
+      healthy,
+      url: maskGhHost(GH_BASE_URL),
+    });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura stato GraphHopper");
+  }
 });
 
 // Cache cleanup (stub — svuota cache in-memory future)

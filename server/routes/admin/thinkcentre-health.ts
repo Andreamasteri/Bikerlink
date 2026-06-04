@@ -87,6 +87,44 @@ async function httpProbe(
   }
 }
 
+/**
+ * Probe di routing reale: POST /route minimale (Milano→Como).
+ * È la prova del nove quando /health non è esposto dal deploy self-hosted ma il
+ * motore instrada regolarmente: 2xx = GraphHopper su e funzionante.
+ */
+async function graphHopperRouteProbe(
+  base: string,
+  token: string | undefined,
+): Promise<{ ok: boolean; latencyMs: number | null; error?: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
+  const t0 = Date.now();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["X-GH-Token"] = token;
+  try {
+    const res = await fetch(`${base}/route`, {
+      method: "POST",
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify({
+        points: [[9.19, 45.46], [9.08, 45.81]],
+        profile: "motorcycle",
+        points_encoded: true,
+        instructions: false,
+        calc_points: false,
+      }),
+    });
+    const latencyMs = Date.now() - t0;
+    if (res.status >= 200 && res.status < 300) return { ok: true, latencyMs };
+    return { ok: false, latencyMs, error: `HTTP ${res.status}` };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { ok: false, latencyMs: null, error: sanitizeError(msg) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function probeGraphHopper(): Promise<ServiceHealth> {
   const base = process.env.GRAPHHOPPER_URL?.replace(/\/$/, "");
   const token = process.env.GRAPHHOPPER_TOKEN;
@@ -95,8 +133,25 @@ async function probeGraphHopper(): Promise<ServiceHealth> {
   }
   const headers: Record<string, string> = {};
   if (token) headers["X-GH-Token"] = token;
-  const r = await httpProbe(`${base}/health`, headers);
-  return { key: "graphhopper", label: "GraphHopper", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error: r.error };
+
+  // 1) Tentativo veloce: endpoint /health dedicato.
+  const health = await httpProbe(`${base}/health`, headers);
+  if (health.ok) {
+    return { key: "graphhopper", label: "GraphHopper", configured: true, ok: true, latencyMs: health.latencyMs, url: maskUrl(base) };
+  }
+
+  // 2) Fallback: alcuni deploy dietro tunnel non espongono /health pur
+  //    instradando /route. Una vera richiesta di routing conferma lo stato.
+  const route = await graphHopperRouteProbe(base, token);
+  return {
+    key: "graphhopper",
+    label: "GraphHopper",
+    configured: true,
+    ok: route.ok,
+    latencyMs: route.latencyMs,
+    url: maskUrl(base),
+    error: route.ok ? undefined : (route.error ?? health.error),
+  };
 }
 
 async function probeOllama(): Promise<ServiceHealth> {

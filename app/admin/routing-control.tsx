@@ -16,7 +16,7 @@ import {
   Alert,
 } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { apiRequest } from "@/lib/query-client";
@@ -70,7 +70,6 @@ export default function RoutingControlScreen() {
   });
 
   const enabled = data?.killSwitch.enabled ?? false;
-  const hasOverride = data?.killSwitch.hasHardOverride ?? false;
   const m = data?.metrics;
 
   return (
@@ -93,9 +92,7 @@ export default function RoutingControlScreen() {
                 {enabled ? "Routing attivo" : "Routing disabilitato"}
               </Text>
               <Text style={styles.toggleSubtext}>
-                {hasOverride
-                  ? "Override env attivo: toggle ignorato"
-                  : enabled
+                {enabled
                   ? "Tutte le chiamate di routing sono permesse"
                   : "Tutte le chiamate di routing sono bloccate"}
               </Text>
@@ -106,19 +103,9 @@ export default function RoutingControlScreen() {
             onValueChange={(val) => killSwitchMutation.mutate(val)}
             trackColor={{ false: Colors.border, true: Colors.success + "88" }}
             thumbColor={enabled ? Colors.success : Colors.textSecondary}
-            disabled={killSwitchMutation.isPending || hasOverride || isLoading}
+            disabled={killSwitchMutation.isPending || isLoading}
           />
         </View>
-        {hasOverride && (
-          <View style={styles.warnCard}>
-            <Ionicons name="information-circle" size={16} color={Colors.warning} />
-            <Text style={styles.warnText}>
-              Variabile env ROUTING_DISABLED impostata
-              {data?.killSwitch.envOverride === "forced-on" ? ' a "0" (forza ON)' : " (forza OFF)"}.
-              Rimuoverla per usare il toggle soft.
-            </Text>
-          </View>
-        )}
       </View>
 
       {/* Test routing */}
@@ -241,11 +228,6 @@ const styles = StyleSheet.create({
   toggleTextWrap: { flex: 1 },
   toggleLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
   toggleSubtext: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
-  warnCard: {
-    flexDirection: "row", alignItems: "center", gap: 8, padding: 10, marginTop: 8,
-    backgroundColor: Colors.warning + "18", borderRadius: 10, borderWidth: 1, borderColor: Colors.warning,
-  },
-  warnText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.text, flex: 1 },
   engineRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 12 },
   engineChip: {
     paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20,

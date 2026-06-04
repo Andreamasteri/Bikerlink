@@ -383,7 +383,32 @@ export async function getServerInfo(): Promise<GHServerInfo> {
     return info;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (isSelfHosted) recordSelfHostFailure(msg, false);
+    // Molti deploy self-hosted dietro tunnel/Nginx NON espongono /health (404 o
+    // connessione rifiutata) pur instradando regolarmente /route. In quel caso
+    // una vera richiesta /route minima è la prova del nove che il motore è su:
+    // evita falsi "offline/errore" nel pannello admin quando il routing funziona.
+    if (isSelfHosted) {
+      try {
+        const t0 = Date.now();
+        const probe = await ghFetch("/route", {
+          method: "POST",
+          body: JSON.stringify({
+            points: [[9.19, 45.46], [9.08, 45.81]],
+            profile: ACTIVE_PROFILE,
+            points_encoded: true,
+            instructions: false,
+            calc_points: false,
+          }),
+        });
+        if (probe.ok) {
+          recordSelfHostSuccess(Date.now() - t0);
+          return { status: "ok", graph_loaded: true };
+        }
+      } catch {
+        // ricade nel record di fallimento sottostante
+      }
+      recordSelfHostFailure(msg, false);
+    }
     return { status: "error", graph_loaded: false, version: msg };
   }
 }
