@@ -83,3 +83,4 @@ exports/
 
 # Runtime upload assets (transient, not tracked)
 uploads/ads/
+logs/ota-timing.log
