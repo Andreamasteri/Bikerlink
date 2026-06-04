@@ -53,6 +53,7 @@ export function useGiriCreateState(language?: string) {
   const [wpInputs, setWpInputs] = useState<string[]>(["", ""]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocoding suggestion results from API
   const [wpSuggestions, setWpSuggestions] = useState<{ index: number; results: any[] } | null>(null);
+  const [wpLoading, setWpLoading] = useState(false);
 
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [calculating, setCalculating] = useState(false);
@@ -297,16 +298,25 @@ export function useGiriCreateState(language?: string) {
     setRouteResult(null);
     if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
     if (text.length >= 3) {
+      setWpLoading(true);
+      setWpSuggestions(null);
       suggestionTimeout.current = setTimeout(async () => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
-        const results = await logFetch<any[]>(
-          "/api/planned-routes/geocode", "GET",
-          () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", text); return fetch(url.toString(), { credentials: "include" }); },
-          async (resp) => { if (!resp.ok) return []; return resp.json(); }
-        );
-        setWpSuggestions({ index, results });
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
+          const results = await logFetch<any[]>(
+            "/api/planned-routes/geocode", "GET",
+            () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", text); return fetch(url.toString(), { credentials: "include" }); },
+            async (resp) => { if (!resp.ok) return []; return resp.json(); }
+          );
+          setWpSuggestions({ index, results });
+        } finally {
+          setWpLoading(false);
+        }
       }, 600);
-    } else { setWpSuggestions(null); }
+    } else {
+      setWpLoading(false);
+      setWpSuggestions(null);
+    }
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geo suggestion from geocode API
@@ -447,7 +457,7 @@ export function useGiriCreateState(language?: string) {
     avoidWeather, setAvoidWeather,
     visibility, setVisibility, selectedMotoId, setSelectedMotoId,
     fuelLevel, setFuelLevel, waypoints, setWaypoints,
-    wpInputs, setWpInputs, wpSuggestions, setWpSuggestions,
+    wpInputs, setWpInputs, wpSuggestions, setWpSuggestions, wpLoading,
     routeResult, setRouteResult, calculating, setCalculating,
     dismissedWarnings, setDismissedWarnings,
     weatherPreview, setWeatherPreview, weatherLoading, setWeatherLoading,

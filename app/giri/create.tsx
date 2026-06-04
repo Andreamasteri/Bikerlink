@@ -61,7 +61,7 @@ export default function GiriCreateScreen() {
     avoidWeather, setAvoidWeather,
     visibility, setVisibility, selectedMotoId, setSelectedMotoId,
     fuelLevel, setFuelLevel, waypoints,
-    wpInputs, wpSuggestions,
+    wpInputs, wpSuggestions, wpLoading,
     routeResult, setRouteResult, calculating, setCalculating,
     dismissedWarnings, setDismissedWarnings,
     weatherPreview, weatherLoading,
@@ -195,16 +195,15 @@ export default function GiriCreateScreen() {
             <RouteTitleSection title={title} setTitle={setTitle} />
             <RouteStyleSection style={style} setStyle={setStyle} STYLE_LEVELS={STYLE_LEVELS} />
             <DrivingProfileSection drivingProfile={drivingProfile} setDrivingProfile={setDrivingProfile} myStyleProfile={myStyleProfile} />
+            <WaypointsSection
+              waypoints={waypoints} wpInputs={wpInputs} wpSuggestions={wpSuggestions}
+              wpLoading={wpLoading} isImportingGpx={isImportingGpx} onWpInputChange={handleWpInput}
+              onSelectSuggestion={selectSuggestion} onRemoveWaypoint={removeWaypoint}
+              onAddWaypoint={addWaypoint} onImportGpx={handleImportGpx}
+            />
             <RouteMapSection plannerMapHtml={plannerMapHtml} webviewRef={webviewRef} onMapTap={handleMapTap} isApproxRoute={isApproxRoute} calculating={calculating} renderer={renderer} waypoints3D={waypoints.map((w: { lat: number; lng: number }) => ({ lat: w.lat, lng: w.lng }))} />
           </>
         )}
-
-        <WaypointsSection
-          waypoints={waypoints} wpInputs={wpInputs} wpSuggestions={wpSuggestions}
-          isImportingGpx={isImportingGpx} onWpInputChange={handleWpInput}
-          onSelectSuggestion={selectSuggestion} onRemoveWaypoint={removeWaypoint}
-          onAddWaypoint={addWaypoint} onImportGpx={handleImportGpx}
-        />
 
         <RouteOptionsSection
           isRoundTrip={isRoundTrip} setIsRoundTrip={setIsRoundTrip}
