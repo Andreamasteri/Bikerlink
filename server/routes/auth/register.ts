@@ -1,6 +1,8 @@
 import { sendError } from "../../lib/api-response";
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
+import { db } from "../../db";
+import { matchPreferences } from "@shared/db";
 import rateLimit, { MemoryStore } from "express-rate-limit";
 import { registerSchema } from "@shared/validators";
 import { storage } from "../../storage";
@@ -173,6 +175,15 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
     });
 
     await storage.createUserProfile({ userId: user.id });
+
+    // Crea subito la riga match_preferences con i valori di default: il motore
+    // di matching vede il nuovo utente senza aspettare che salvi manualmente le
+    // preferenze (altrimenti la riga veniva inserita solo al primo PUT, rendendo
+    // l'utente invisibile al motore per tutta la fase iniziale di utilizzo).
+    db.insert(matchPreferences)
+      .values({ userId: user.id })
+      .onConflictDoNothing()
+      .catch((e) => console.warn("[REGISTER] match_preferences insert fallito (non bloccante):", e));
 
     storage.getUserByNickname("admin").then(async (adminUser) => {
       if (!adminUser) return;

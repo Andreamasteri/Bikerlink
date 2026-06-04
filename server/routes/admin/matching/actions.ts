@@ -8,6 +8,35 @@ import { sql } from "drizzle-orm";
 import { triggerMatchingRun } from "../../../matching-engine";
 import { forceUnlockMatching, getMatchingLockState } from "../../../matching/scheduler";
 
+// Centroidi delle regioni italiane (lat/lon) come ultimo fallback per coordinate mancanti.
+// Usati SOLO quando non ci sono fonti reali (first_login, GPS storico).
+const ITALIAN_REGION_CENTROIDS: Record<string, [number, number]> = {
+  "Abruzzo": [42.35, 13.40],
+  "Basilicata": [40.53, 15.87],
+  "Calabria": [38.91, 16.59],
+  "Campania": [40.84, 14.25],
+  "Emilia-Romagna": [44.50, 11.34],
+  "Friuli-Venezia Giulia": [45.65, 13.78],
+  "Lazio": [41.89, 12.48],
+  "Liguria": [44.40, 8.95],
+  "Lombardia": [45.47, 9.19],
+  "Marche": [43.61, 13.51],
+  "Molise": [41.56, 14.66],
+  "Piemonte": [45.07, 7.68],
+  "Puglia": [41.12, 16.87],
+  "Sardegna": [39.22, 9.12],
+  "Sicilia": [37.60, 14.01],
+  "Toscana": [43.77, 11.26],
+  "Trentino-Alto Adige": [46.07, 11.12],
+  "Umbria": [43.11, 12.39],
+  "Valle d'Aosta": [45.73, 7.43],
+  "Veneto": [45.44, 12.35],
+  // Ecuador (utenti registrati in Ecuador)
+  "Pichincha": [-0.18, -78.47],
+  "Guayas": [-2.17, -79.92],
+  "Azuay": [-2.90, -78.98],
+};
+
 const router = Router();
 
 router.post("/match-settings/reset-all", async (_req: Request, res: Response) => {
@@ -101,6 +130,131 @@ router.post("/matching/force-unlock", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("[admin/matching/force-unlock] error:", error);
     return sendError(res, 500, "Errore force-unlock matching");
+  }
+});
+
+/**
+ * POST /api/admin/matching/backfill-real-users
+ *
+ * Popola le tabelle richieste dal motore di matching per gli utenti reali
+ * esistenti. Sicuro da eseguire più volte (idempotente via ON CONFLICT).
+ *
+ * Azioni:
+ *  A) Inserisce match_preferences (valori di default) per ogni utente reale
+ *     attivo non di servizio che ne è privo.
+ *  B) Recupera le coordinate mancanti in user_profiles dalla catena di
+ *     fallback: (1) first_login_lat/lng, (2) ultima posizione GPS in
+ *     route_points, (3) centroide della regione. NON sovrascrive mai
+ *     coordinate già presenti. NON inventa coordinate se nessuna fonte è
+ *     disponibile.
+ *
+ * In produzione: deployare il server e chiamare questo endpoint DALL'ADMIN
+ * dopo il publish. Non eseguire mai script di migrazione dati direttamente
+ * sul DB di produzione.
+ */
+router.post("/matching/backfill-real-users", async (_req: Request, res: Response) => {
+  const client = await pool.connect();
+  try {
+    // --- A: match_preferences backfill ---
+    const prefsResult = await client.query<{ user_id: string }>(`
+      INSERT INTO match_preferences (user_id)
+      SELECT u.id
+      FROM users u
+      LEFT JOIN match_preferences mp ON mp.user_id = u.id
+      WHERE u.is_fake = false
+        AND u.status = 'active'
+        AND u.is_system = false
+        AND u.role <> 'admin'
+        AND mp.id IS NULL
+      ON CONFLICT (user_id) DO NOTHING
+      RETURNING user_id
+    `);
+    const prefsInserted = prefsResult.rowCount ?? 0;
+    console.log(`[backfill] match_preferences inserite: ${prefsInserted}`);
+
+    // --- B1: coordinate da first_login_lat/lng ---
+    const coordsFromLogin = await client.query(`
+      UPDATE user_profiles up
+      SET latitude = u.first_login_lat,
+          longitude = u.first_login_lng
+      FROM users u
+      WHERE up.user_id = u.id
+        AND up.latitude IS NULL
+        AND up.longitude IS NULL
+        AND u.first_login_lat IS NOT NULL
+        AND u.first_login_lng IS NOT NULL
+        AND u.is_fake = false
+        AND u.is_system = false
+        AND u.role <> 'admin'
+    `);
+    const coordsFromLoginCount = coordsFromLogin.rowCount ?? 0;
+    console.log(`[backfill] coordinate da first_login: ${coordsFromLoginCount}`);
+
+    // --- B2: coordinate da ultima posizione GPS in route_points ---
+    const coordsFromGps = await client.query(`
+      UPDATE user_profiles up
+      SET latitude = latest.latitude,
+          longitude = latest.longitude
+      FROM (
+        SELECT DISTINCT ON (r.user_id) r.user_id, rp.latitude, rp.longitude
+        FROM route_points rp
+        INNER JOIN routes r ON r.id = rp.route_id
+        INNER JOIN users u ON u.id = r.user_id
+        WHERE u.is_fake = false
+          AND u.is_system = false
+          AND u.role <> 'admin'
+        ORDER BY r.user_id, rp.created_at DESC
+      ) latest
+      WHERE up.user_id = latest.user_id
+        AND up.latitude IS NULL
+        AND up.longitude IS NULL
+    `);
+    const coordsFromGpsCount = coordsFromGps.rowCount ?? 0;
+    console.log(`[backfill] coordinate da route_points GPS: ${coordsFromGpsCount}`);
+
+    // --- B3: coordinate da centroide regione (ultimo fallback) ---
+    // Recupera gli utenti ancora senza coordinate e con regione nota.
+    const stillMissingCoords = await client.query<{ user_id: string; region: string | null }>(`
+      SELECT up.user_id, u.region
+      FROM user_profiles up
+      INNER JOIN users u ON u.id = up.user_id
+      WHERE up.latitude IS NULL
+        AND up.longitude IS NULL
+        AND u.is_fake = false
+        AND u.is_system = false
+        AND u.status = 'active'
+        AND u.role <> 'admin'
+    `);
+    let coordsFromRegion = 0;
+    for (const row of stillMissingCoords.rows) {
+      const region = row.region ?? "";
+      const centroid = ITALIAN_REGION_CENTROIDS[region];
+      if (!centroid) continue;
+      await client.query(
+        `UPDATE user_profiles SET latitude = $1, longitude = $2 WHERE user_id = $3 AND latitude IS NULL`,
+        [centroid[0], centroid[1], row.user_id]
+      );
+      coordsFromRegion++;
+    }
+    console.log(`[backfill] coordinate da centroide regione: ${coordsFromRegion}`);
+
+    return res.json({
+      success: true,
+      stats: {
+        prefsInserted,
+        coordsFromLogin: coordsFromLoginCount,
+        coordsFromGps: coordsFromGpsCount,
+        coordsFromRegion,
+        usersStillWithoutCoords: stillMissingCoords.rowCount
+          ? stillMissingCoords.rows.filter((r) => !ITALIAN_REGION_CENTROIDS[r.region ?? ""]).length
+          : 0,
+      },
+    });
+  } catch (error) {
+    console.error("[backfill-real-users] error:", error);
+    return sendError(res, 500, "Errore backfill utenti reali");
+  } finally {
+    client.release();
   }
 });
 
