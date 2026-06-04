@@ -29,48 +29,107 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
 
     const whisperUrl = process.env.WHISPER_URL;
     const whisperToken = process.env.WHISPER_TOKEN;
+    const openaiKey = process.env.OPENAI_API_KEY;
 
-    if (!whisperUrl) {
-      return sendError(res, 503, "Servizio di trascrizione non configurato (WHISPER_URL mancante)");
+    if (!whisperUrl && !openaiKey) {
+      return sendError(
+        res,
+        503,
+        "Servizio di trascrizione non configurato (WHISPER_URL e OPENAI_API_KEY mancanti)"
+      );
     }
 
-    const transcribeEndpoint = whisperUrl.replace(/\/$/, "") + "/inference";
-
-    const formData = new FormData();
     const filename = req.file.originalname || "audio.m4a";
+    const mimetype = req.file.mimetype;
     const arrayBuf = req.file.buffer.buffer.slice(
       req.file.buffer.byteOffset,
       req.file.buffer.byteOffset + req.file.buffer.byteLength
     ) as ArrayBuffer;
-    const blob = new Blob([arrayBuf], { type: req.file.mimetype });
-    formData.append("file", blob, filename);
-    formData.append("response_format", "json");
 
-    const headers: Record<string, string> = {};
-    if (whisperToken) {
-      headers["X-Whisper-Token"] = whisperToken;
+    // 1) Tentativo sul server di casa (Whisper self-hosted su ThinkCentre).
+    if (whisperUrl) {
+      try {
+        const transcribeEndpoint = whisperUrl.replace(/\/$/, "") + "/inference";
+
+        const formData = new FormData();
+        const blob = new Blob([arrayBuf], { type: mimetype });
+        formData.append("file", blob, filename);
+        formData.append("response_format", "json");
+
+        const headers: Record<string, string> = {};
+        if (whisperToken) {
+          headers["X-Whisper-Token"] = whisperToken;
+        }
+
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        let whisperRes: Awaited<ReturnType<typeof fetch>>;
+        try {
+          whisperRes = await fetch(transcribeEndpoint, {
+            method: "POST",
+            headers,
+            body: formData,
+            signal: controller.signal,
+          });
+        } finally {
+          clearTimeout(timeout);
+        }
+
+        if (!whisperRes.ok) {
+          const errText = await whisperRes.text().catch(() => "");
+          throw new Error(`Server di casa error ${whisperRes.status}: ${errText}`);
+        }
+
+        const data = (await whisperRes.json()) as { text?: string; error?: string };
+
+        if (!data.text) {
+          throw new Error("Risposta Whisper di casa non valida (nessun testo)");
+        }
+
+        return res.json({ text: data.text.trim(), source: "home" });
+      } catch (homeErr) {
+        const msg = homeErr instanceof Error ? homeErr.message : String(homeErr);
+        console.warn(`[Whisper] Server di casa non disponibile, fallback cloud: ${msg}`);
+        // prosegue verso il fallback OpenAI
+      }
     }
 
-    const whisperRes = await fetch(transcribeEndpoint, {
-      method: "POST",
-      headers,
-      body: formData,
-    });
-
-    if (!whisperRes.ok) {
-      const errText = await whisperRes.text().catch(() => "");
-      console.error(`[Whisper] Server error ${whisperRes.status}: ${errText}`);
-      return sendError(res, 502, `Errore dal server Whisper: ${whisperRes.status}`);
+    // 2) Fallback su OpenAI Whisper API (cloud).
+    if (!openaiKey) {
+      return sendError(res, 502, "Server di casa non raggiungibile e fallback cloud non configurato");
     }
 
-    const data = await whisperRes.json() as { text?: string; error?: string };
+    try {
+      const formData = new FormData();
+      const blob = new Blob([arrayBuf], { type: mimetype });
+      formData.append("file", blob, filename);
+      formData.append("model", "whisper-1");
+      formData.append("response_format", "json");
 
-    if (!data.text) {
-      console.error("[Whisper] Risposta senza testo:", data);
-      return sendError(res, 502, "Risposta Whisper non valida (nessun testo)");
+      const openaiRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${openaiKey}` },
+        body: formData,
+      });
+
+      if (!openaiRes.ok) {
+        const errText = await openaiRes.text().catch(() => "");
+        console.error(`[Whisper] OpenAI error ${openaiRes.status}: ${errText}`);
+        return sendError(res, 502, `Errore dal servizio cloud: ${openaiRes.status}`);
+      }
+
+      const data = (await openaiRes.json()) as { text?: string };
+
+      if (!data.text) {
+        console.error("[Whisper] Risposta OpenAI senza testo:", data);
+        return sendError(res, 502, "Risposta cloud non valida (nessun testo)");
+      }
+
+      return res.json({ text: data.text.trim(), source: "cloud" });
+    } catch (cloudErr) {
+      console.error("[Whisper] Fallback cloud error:", cloudErr);
+      return sendError(res, 503, "Servizio di trascrizione non raggiungibile");
     }
-
-    return res.json({ text: data.text.trim() });
   } catch (error) {
     console.error("[Whisper] transcribe error:", error);
     return sendError(res, 503, "Servizio Whisper non raggiungibile");

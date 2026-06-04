@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -31,6 +31,8 @@ export const AiInputSection: React.FC<AiInputSectionProps> = ({
   const s = styles(colors);
   const whisper = useWhisperRecorder();
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showSource, setShowSource] = useState<"home" | "cloud" | null>(null);
+  const sourceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!whisper.error) return;
@@ -42,6 +44,22 @@ export const AiInputSection: React.FC<AiInputSectionProps> = ({
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
     };
   }, [whisper.error]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (whisper.recording) setShowSource(null);
+  }, [whisper.recording]);
+
+  useEffect(() => {
+    if (!whisper.lastSource) return;
+    setShowSource(whisper.lastSource);
+    if (sourceTimerRef.current) clearTimeout(sourceTimerRef.current);
+    sourceTimerRef.current = setTimeout(() => {
+      setShowSource(null);
+    }, 4000);
+    return () => {
+      if (sourceTimerRef.current) clearTimeout(sourceTimerRef.current);
+    };
+  }, [whisper.lastSource]);
 
   const handleMicPress = async () => {
     if (whisper.error) whisper.reset();
@@ -109,6 +127,12 @@ export const AiInputSection: React.FC<AiInputSectionProps> = ({
 
       {!!whisper.error && (
         <Text style={s.errorHint}>{whisper.error}</Text>
+      )}
+
+      {!whisper.recording && !whisper.transcribing && !!showSource && (
+        <Text style={s.sourceHint}>
+          {showSource === "home" ? "🏠 Trascritto in locale" : "☁️ Trascritto via cloud"}
+        </Text>
       )}
 
       <Pressable
@@ -205,6 +229,12 @@ const styles = (colors: ThemeColors) =>
       fontFamily: "Inter_400Regular",
       fontSize: 12,
       color: "#ef4444",
+      marginBottom: 8,
+    },
+    sourceHint: {
+      fontFamily: "Inter_400Regular",
+      fontSize: 12,
+      color: colors.textSecondary,
       marginBottom: 8,
     },
   });

@@ -1,6 +1,7 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import {
   View,
+  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -39,6 +40,24 @@ export function ChatInput({
   const whisper = useWhisperRecorder();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const [showSource, setShowSource] = useState<"home" | "cloud" | null>(null);
+  const sourceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (whisper.recording) setShowSource(null);
+  }, [whisper.recording]);
+
+  useEffect(() => {
+    if (!whisper.lastSource) return;
+    setShowSource(whisper.lastSource);
+    if (sourceTimerRef.current) clearTimeout(sourceTimerRef.current);
+    sourceTimerRef.current = setTimeout(() => {
+      setShowSource(null);
+    }, 4000);
+    return () => {
+      if (sourceTimerRef.current) clearTimeout(sourceTimerRef.current);
+    };
+  }, [whisper.lastSource]);
 
   const startPulse = () => {
     pulseLoopRef.current = Animated.loop(
@@ -78,6 +97,11 @@ export function ChatInput({
 
   return (
     <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
+      {!whisper.recording && !whisper.transcribing && !!showSource && (
+        <Text style={styles.sourceHint}>
+          {showSource === "home" ? "🏠 Trascritto in locale" : "☁️ Trascritto via cloud"}
+        </Text>
+      )}
       <View style={styles.inputRow}>
         <TouchableOpacity
           onPress={onSendPhoto}
@@ -151,6 +175,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderTopWidth: 0.5,
     borderTopColor: Colors.border,
+  },
+  sourceHint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: 8,
+    marginLeft: 4,
   },
   inputRow: {
     flexDirection: "row",

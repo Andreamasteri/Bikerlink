@@ -3,11 +3,14 @@ import { Platform } from "react-native";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import type { AudioRecorder } from "expo-audio";
 
+export type WhisperSource = "home" | "cloud";
+
 export type WhisperRecorderState = {
   recording: boolean;
   transcribing: boolean;
   transcript: string | null;
   error: string | null;
+  lastSource: WhisperSource | null;
 };
 
 export type UseWhisperRecorderReturn = WhisperRecorderState & {
@@ -21,6 +24,7 @@ export function useWhisperRecorder(): UseWhisperRecorderReturn {
   const [transcribing, setTranscribing] = useState(false);
   const [transcript, setTranscript] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [lastSource, setLastSource] = useState<WhisperSource | null>(null);
 
   const recorderRef = useRef<AudioRecorder | null>(null);
 
@@ -29,11 +33,13 @@ export function useWhisperRecorder(): UseWhisperRecorderReturn {
     setError(null);
     setRecording(false);
     setTranscribing(false);
+    setLastSource(null);
   }, []);
 
   const startRecording = useCallback(async () => {
     setError(null);
     setTranscript(null);
+    setLastSource(null);
 
     if (Platform.OS === "web") {
       setError("Registrazione non supportata su web");
@@ -117,9 +123,10 @@ export function useWhisperRecorder(): UseWhisperRecorderReturn {
         return null;
       }
 
-      const data = JSON.parse(response.body) as { text: string };
+      const data = JSON.parse(response.body) as { text: string; source?: WhisperSource };
       const text = data.text;
       setTranscript(text);
+      setLastSource(data.source === "cloud" || data.source === "home" ? data.source : null);
       setTranscribing(false);
       return text;
     } catch (e) {
@@ -135,6 +142,7 @@ export function useWhisperRecorder(): UseWhisperRecorderReturn {
     transcribing,
     transcript,
     error,
+    lastSource,
     startRecording,
     stopAndTranscribe,
     reset,
