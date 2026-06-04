@@ -60,8 +60,25 @@ router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
       return sendError(res, 404, "Utente non trovato");
     }
 
+    // Sostituzione in un'unica operazione: il client invia replacePhotoId
+    // invece di fare una DELETE separata seguita da una POST (doppio round-trip).
+    const replacePhotoId =
+      typeof req.body?.replacePhotoId === "string" && req.body.replacePhotoId
+        ? req.body.replacePhotoId
+        : null;
+
+    const oldPhoto = replacePhotoId
+      ? await storage.getUserPhoto(replacePhotoId)
+      : null;
+    if (replacePhotoId) {
+      if (!oldPhoto || oldPhoto.userId !== userId) {
+        return sendError(res, 404, "Foto da sostituire non trovata");
+      }
+    }
+
     const count = await storage.getUserPhotoCount(userId);
-    if (count >= 3) {
+    // In sostituzione il conteggio resta invariato (cancella una, aggiunge una).
+    if (!replacePhotoId && count >= 3) {
       return sendError(res, 400, "Massimo 3 foto consentite");
     }
 
@@ -77,7 +94,8 @@ router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
     await uploadBuffer(objectPath, webpBuffer, "image/webp");
 
     const photoUrl = `/api/users/photos/${filename}`;
-    const sortOrder = await storage.getUserPhotoCount(userId);
+    // Mantiene lo stesso slot in sostituzione; altrimenti accoda in fondo.
+    const sortOrder = oldPhoto ? oldPhoto.sortOrder : count;
 
     const photo = await storage.createUserPhoto({
       userId,
@@ -85,6 +103,27 @@ router.post("/me/photos", requireAuth, async (req: Request, res: Response) => {
       sortOrder,
       isApproved: true,
     });
+
+    // Rimuove la vecchia foto (oggetto + record) dopo aver salvato la nuova.
+    if (oldPhoto) {
+      const oldUrl = oldPhoto.photoUrl;
+      if (oldUrl.startsWith("/api/users/photos/")) {
+        const oldFilename = oldUrl.replace("/api/users/photos/", "");
+        try {
+          await deleteObject(`public/photos/${oldFilename}`);
+        } catch (err) {
+          console.warn(`[users] Failed to delete replaced photo object public/photos/${oldFilename}:`, err);
+        }
+      } else if (oldUrl.startsWith("/uploads/photos/")) {
+        try {
+          const filePath = path.join(process.cwd(), oldUrl);
+          if (fs.existsSync(filePath)) { fs.unlinkSync(filePath); }
+        } catch (err) {
+          console.warn(`[users] Failed to delete replaced local photo file ${oldUrl}:`, err);
+        }
+      }
+      await storage.deleteUserPhoto(replacePhotoId);
+    }
 
     return res.status(201).json(photo);
   } catch (error) {

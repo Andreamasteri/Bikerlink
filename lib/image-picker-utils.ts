@@ -21,6 +21,7 @@
  */
 
 import * as ImagePicker from "expo-image-picker";
+import * as ImageManipulator from "expo-image-manipulator";
 import { Alert, Platform, ActionSheetIOS } from "react-native";
 import { File as EFSFile } from "expo-file-system";
 
@@ -68,6 +69,34 @@ export async function appendFileToForm(
 ): Promise<void> {
   const blob = await uriToBlob(uri, mimeType);
   formData.append(key, blob, filename);
+}
+
+/**
+ * Ridimensiona e ricomprime un'immagine SUL DEVICE prima dell'upload.
+ *
+ * Porta il payload da ~4 MB a ~100–200 KB: max 800px sul lato più lungo,
+ * JPEG quality 0.6. Riduce drasticamente il tempo di upload percepito.
+ *
+ * Funziona su native e web (expo-image-manipulator ha supporto web).
+ * In caso di errore restituisce l'URI originale come fallback.
+ */
+export async function optimizeImageForUpload(
+  uri: string,
+  dimensions?: { width?: number; height?: number }
+): Promise<string> {
+  try {
+    const w = dimensions?.width ?? 0;
+    const h = dimensions?.height ?? 0;
+    const resize = h > w && h > 0 ? { height: 800 } : { width: 800 };
+    const result = await ImageManipulator.manipulateAsync(
+      uri,
+      [{ resize }],
+      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    return result.uri;
+  } catch {
+    return uri;
+  }
 }
 
 export async function pickMultipleImages(
@@ -133,7 +162,7 @@ export function showImagePickerMenu(
   onResult: (uri: string) => void,
   options: PickImageOptions = {}
 ) {
-  const { aspect, quality = 0.8, allowsEditing = true } = options;
+  const { aspect, quality = 0.5, allowsEditing = true } = options;
 
   const launchGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -141,9 +170,15 @@ export function showImagePickerMenu(
       allowsEditing,
       ...(aspect ? { aspect } : {}),
       quality,
+      base64: false,
     });
     if (!result.canceled && result.assets[0]) {
-      onResult(result.assets[0].uri);
+      const asset = result.assets[0];
+      const optimized = await optimizeImageForUpload(asset.uri, {
+        width: asset.width,
+        height: asset.height,
+      });
+      onResult(optimized);
     }
   };
 
@@ -155,9 +190,15 @@ export function showImagePickerMenu(
       allowsEditing,
       ...(aspect ? { aspect } : {}),
       quality,
+      base64: false,
     });
     if (!result.canceled && result.assets[0]) {
-      onResult(result.assets[0].uri);
+      const asset = result.assets[0];
+      const optimized = await optimizeImageForUpload(asset.uri, {
+        width: asset.width,
+        height: asset.height,
+      });
+      onResult(optimized);
     }
   };
 

@@ -22,7 +22,13 @@ interface EditBasicInfoProps {
   bio: string;
   setBio: (bio: string) => void;
   photos: { id: string; photoUrl?: string | null; isApproved?: boolean }[];
-  uploadPhotoMutation: { mutate: (uri: string, options?: { onSettled?: () => void }) => void; isPending?: boolean };
+  uploadPhotoMutation: {
+    mutate: (
+      vars: { uri: string; replacePhotoId?: string },
+      options?: { onSettled?: () => void }
+    ) => void;
+    isPending?: boolean;
+  };
   pickImageForSlot: (existingPhotoId?: string) => void;
   handleDeletePhoto: (photoId: string) => void;
   failedPhotos: Set<string>;
@@ -103,10 +109,13 @@ export function EditBasicInfo({
           {[0, 1, 2].map((slotIndex) => {
             const photo = photos[slotIndex];
             const isUploading = uploadPhotoMutation.isPending && !photo;
-            const isReplacing = photo && replacingSlot === photo.id;
+            const isOptimistic = photo?.id === "__optimistic__";
+            const isReplacing = photo && (replacingSlot === photo.id || isOptimistic);
             if (photo) {
               const rawUrl = photo.photoUrl ?? "";
-              const photoUri = rawUrl.startsWith("http") ? rawUrl : `${getApiUrl()}${rawUrl}`;
+              // URL relativi del server iniziano con "/"; URI locali (file://,
+              // content://, data:, blob:) e http vanno usati così come sono.
+              const photoUri = rawUrl.startsWith("/") ? `${getApiUrl()}${rawUrl}` : rawUrl;
               return (
                 <View key={photo.id} style={styles.photoItem}>
                   {failedPhotos.has(photo.id) ? (
@@ -130,12 +139,14 @@ export function EditBasicInfo({
                     <TouchableOpacity
                       style={styles.photoActionBtn}
                       onPress={() => pickImageForSlot(photo.id)}
+                      disabled={uploadPhotoMutation.isPending}
                     >
                       <Ionicons name="swap-horizontal" size={14} color="#FFFFFF" />
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.photoActionBtn, { backgroundColor: "rgba(220,50,50,0.8)" }]}
                       onPress={() => handleDeletePhoto(photo.id)}
+                      disabled={uploadPhotoMutation.isPending}
                     >
                       <Ionicons name="trash" size={14} color="#FFFFFF" />
                     </TouchableOpacity>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -103,6 +103,11 @@ export default function EditProfileScreen() {
   const [showRevokeConsentModal, setShowRevokeConsentModal] = useState(false);
 
   const [replacingSlot, setReplacingSlot] = useState<string | null>(null);
+  const [optimisticPhoto, setOptimisticPhoto] = useState<{
+    uri: string;
+    replaceId: string | null;
+  } | null>(null);
+  const uploadTokenRef = useRef(0);
 
   useEffect(() => {
     if (profile) {
@@ -162,13 +167,16 @@ export default function EditProfileScreen() {
   });
 
   const uploadPhotoMutation = useMutation({
-    mutationFn: async (uri: string) => {
+    mutationFn: async ({ uri, replacePhotoId }: { uri: string; replacePhotoId?: string }) => {
       const formData = new FormData();
       const filename = uri.split("/").pop() || "photo.jpg";
       const ext = /\.(\w+)$/.exec(filename);
       const mimeType = ext ? `image/${ext[1]}` : "image/jpeg";
 
       await appendFileToForm(formData, "photo", uri, mimeType, filename);
+      if (replacePhotoId) {
+        formData.append("replacePhotoId", replacePhotoId);
+      }
 
       const baseUrl = getApiUrl();
       const url = new URL("/api/users/me/photos", baseUrl);
@@ -238,20 +246,29 @@ export default function EditProfileScreen() {
 
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
     showImagePickerMenu(
-      async (uri) => {
+      (uri) => {
+        // Token per-richiesta: solo l'upload più recente azzera lo stato
+        // ottimistico, così un upload precedente che si conclude non nasconde
+        // la preview di uno ancora in corso.
+        const token = ++uploadTokenRef.current;
+        // Preview ottimistica: mostra subito la foto locale (già compressa).
+        setOptimisticPhoto({ uri, replaceId: existingPhotoId ?? null });
         if (existingPhotoId) {
           setReplacingSlot(existingPhotoId);
-          try {
-            await apiRequest("DELETE", `/api/users/me/photos/${existingPhotoId}`);
-          } catch {
-            // no-op: proceeding with replacement even if delete fails
-          }
         }
-        uploadPhotoMutation.mutate(uri, {
-          onSettled: () => setReplacingSlot(null),
-        });
+        // Sostituzione in un solo round-trip: il server cancella la vecchia.
+        uploadPhotoMutation.mutate(
+          { uri, replacePhotoId: existingPhotoId },
+          {
+            onSettled: () => {
+              if (uploadTokenRef.current !== token) return;
+              setReplacingSlot(null);
+              setOptimisticPhoto(null);
+            },
+          }
+        );
       },
-      { aspect: [1, 1], quality: 0.8 }
+      { aspect: [1, 1], quality: 0.5 }
     );
   }, [uploadPhotoMutation]);
 
@@ -313,7 +330,28 @@ export default function EditProfileScreen() {
     (profile?.userType ?? user?.userType) === "biker" ||
     (profile?.userType ?? user?.userType) === "coppia";
 
-  const photos = profile?.photos ?? [];
+  const photos = useMemo(() => profile?.photos ?? [], [profile?.photos]);
+
+  const OPTIMISTIC_PHOTO_ID = "__optimistic__";
+  const displayPhotos = useMemo(() => {
+    if (!optimisticPhoto) return photos;
+    if (optimisticPhoto.replaceId) {
+      return photos.map((p) =>
+        p.id === optimisticPhoto.replaceId
+          ? { ...p, photoUrl: optimisticPhoto.uri, isApproved: true }
+          : p
+      );
+    }
+    return [
+      ...photos,
+      {
+        id: OPTIMISTIC_PHOTO_ID,
+        photoUrl: optimisticPhoto.uri,
+        sortOrder: photos.length,
+        isApproved: true,
+      },
+    ];
+  }, [photos, optimisticPhoto]);
 
   return (
     <View style={styles.container}>
@@ -356,7 +394,7 @@ export default function EditProfileScreen() {
           setBirthYear={setBirthYear}
           bio={bio}
           setBio={setBio}
-          photos={photos}
+          photos={displayPhotos}
           uploadPhotoMutation={uploadPhotoMutation}
           pickImageForSlot={pickImageForSlot}
           handleDeletePhoto={handleDeletePhoto}
