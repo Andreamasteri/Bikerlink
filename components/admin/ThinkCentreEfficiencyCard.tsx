@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -41,10 +41,16 @@ function formatUptime(sec: number): string {
   return `${m}m`;
 }
 
-export function ThinkCentreEfficiencyCard() {
-  const [collapsed, setCollapsed] = useState(true);
+interface ThinkCentreEfficiencyCardProps {
+  enabled?: boolean;
+  onSettled?: () => void;
+}
 
-  const { data, isLoading, error } = useQuery<MetricsResponse>({
+export function ThinkCentreEfficiencyCard({ enabled = true, onSettled }: ThinkCentreEfficiencyCardProps) {
+  const [collapsed, setCollapsed] = useState(true);
+  const settledRef = useRef(false);
+
+  const { data, isLoading, error, isSuccess, isError, fetchStatus } = useQuery<MetricsResponse>({
     queryKey: ["/api/admin/thinkcentre-metrics"],
     queryFn: async () => {
       const res = await fetch(
@@ -54,9 +60,17 @@ export function ThinkCentreEfficiencyCard() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
-    refetchInterval: 10_000,
+    enabled,
+    refetchInterval: enabled ? 10_000 : false,
     staleTime: 8_000,
   });
+
+  useEffect(() => {
+    if (!settledRef.current && fetchStatus === "idle" && (isSuccess || isError)) {
+      settledRef.current = true;
+      onSettled?.();
+    }
+  }, [isSuccess, isError, fetchStatus, onSettled]);
 
   const online = data?.online === true;
   const metrics = online ? (data as ThinkCentreMetrics) : null;
@@ -91,11 +105,12 @@ export function ThinkCentreEfficiencyCard() {
         <MaterialCommunityIcons name="home-assistant" size={18} color={headerColor} />
         <Text style={styles.cardTitle}>Efficienza ThinkCentre (Casa)</Text>
         <View style={styles.headerRight}>
-          {isLoading && <ActivityIndicator size="small" color={headerColor} />}
-          {error && !isLoading && (
+          {!enabled && <ActivityIndicator size="small" color="#6b7280" />}
+          {enabled && isLoading && <ActivityIndicator size="small" color={headerColor} />}
+          {enabled && error && !isLoading && (
             <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
           )}
-          {!isLoading && !error && data && (
+          {enabled && !isLoading && !error && data && (
             <View style={[styles.healthDot, { backgroundColor: headerColor }]} />
           )}
           <CollapseChevron collapsed={collapsed} />

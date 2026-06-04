@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -31,8 +31,15 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-export function GraphHopperCard() {
-  const { data, isLoading, error } = useQuery<GHStatus>({
+interface GraphHopperCardProps {
+  enabled?: boolean;
+  onSettled?: () => void;
+}
+
+export function GraphHopperCard({ enabled = true, onSettled }: GraphHopperCardProps) {
+  const settledRef = useRef(false);
+
+  const { data, isLoading, error, isSuccess, isError, fetchStatus } = useQuery<GHStatus>({
     queryKey: ["/api/admin/graphhopper-status"],
     queryFn: async () => {
       const res = await fetch(new URL("/api/admin/graphhopper-status", getApiUrl()).toString(), {
@@ -42,8 +49,16 @@ export function GraphHopperCard() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
+    enabled,
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    if (!settledRef.current && fetchStatus === "idle" && (isSuccess || isError)) {
+      settledRef.current = true;
+      onSettled?.();
+    }
+  }, [isSuccess, isError, fetchStatus, onSettled]);
 
   const modeLabel: Record<string, string> = {
     "self-hosted": "Self-Hosted",
@@ -70,11 +85,12 @@ export function GraphHopperCard() {
         <MaterialCommunityIcons name="map-marker-path" size={18} color={color} />
         <Text style={ghStyles.cardTitle}>GraphHopper</Text>
         <View style={ghStyles.headerRight}>
-          {isLoading && <ActivityIndicator size="small" color={color} />}
-          {error && !isLoading && (
+          {!enabled && <ActivityIndicator size="small" color="#6b7280" />}
+          {enabled && isLoading && <ActivityIndicator size="small" color={color} />}
+          {enabled && error && !isLoading && (
             <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
           )}
-          {!isLoading && !error && data && (
+          {enabled && !isLoading && !error && data && (
             <View style={[ghStyles.healthDot, { backgroundColor: data.healthy ? "#22c55e" : "#ef4444" }]} />
           )}
           <CollapseChevron collapsed={collapsed} />
@@ -112,8 +128,15 @@ export function GraphHopperCard() {
   );
 }
 
-export function TelemetryCard() {
-  const { data, isLoading, error } = useQuery<TelemetryStats>({
+interface TelemetryCardProps {
+  enabled?: boolean;
+  onSettled?: () => void;
+}
+
+export function TelemetryCard({ enabled = true, onSettled }: TelemetryCardProps) {
+  const settledRef = useRef(false);
+
+  const { data, isLoading, error, isSuccess, isError, fetchStatus } = useQuery<TelemetryStats>({
     queryKey: ["/api/admin/telemetry/stats"],
     queryFn: async () => {
       const res = await fetch(new URL("/api/admin/telemetry/stats", getApiUrl()).toString(), {
@@ -123,8 +146,16 @@ export function TelemetryCard() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
+    enabled,
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    if (!settledRef.current && fetchStatus === "idle" && (isSuccess || isError)) {
+      settledRef.current = true;
+      onSettled?.();
+    }
+  }, [isSuccess, isError, fetchStatus, onSettled]);
 
   function formatDate(iso: string | null): string {
     if (!iso) return "—";
@@ -153,9 +184,10 @@ export function TelemetryCard() {
         <MaterialCommunityIcons name="chart-line" size={18} color="#22c55e" />
         <Text style={telStyles.cardTitle}>Telemetria</Text>
         <View style={telStyles.headerRight}>
-          {isLoading && <ActivityIndicator size="small" color="#22c55e" />}
-          {error && !isLoading && <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />}
-          {!isLoading && !error && isStale && (
+          {!enabled && <ActivityIndicator size="small" color="#6b7280" />}
+          {enabled && isLoading && <ActivityIndicator size="small" color="#22c55e" />}
+          {enabled && error && !isLoading && <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />}
+          {enabled && !isLoading && !error && isStale && (
             <MaterialCommunityIcons name="alert" size={16} color="#f59e0b" />
           )}
           <CollapseChevron collapsed={collapsed} />
