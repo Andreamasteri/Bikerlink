@@ -41,3 +41,18 @@ già fix più recenti approvati (55.10.6x) con ~0 download. "Continuo a vedere n
 spesso = non ha ancora scaricato il fix, NON che il fix non funziona. Verifica
 sempre l'`app_version` reale del device nella telemetria prima di ri-pubblicare.
 Conferma del fix = ricomparsa di `map_init`/`map_ready` per il ramo 55.x.
+
+## Blindatura (per non riperderci 12h)
+Guard statico in CI: `scripts/check-leaflet-map-guard.sh`, agganciato a
+`scripts/typecheck.sh`. Vieta di reintrodurre nel **path Leaflet HOME**
+(InteractiveMap.tsx, lib/leaflet-*-html.ts, components/map/createMapMessageHandler.ts)
+i simboli che hanno causato il crash di render: `leaflet-rotate`, `MapNorthCompass`,
+`bearing` (word-boundary), `resetBearing`, `getMapBearing`, `rotateend`.
+**Why:** il crash era a monte del try/catch Leaflet → nessun errore loggato; un
+typecheck verde non lo prendeva. Il guard lo blocca alla fonte.
+**How to apply:** se serve rotazione/bussola va nel renderer **MapLibre 3D**
+(components/MapLibre*.tsx, lib/maplibre/*), che usa MapNorthCompass per design ed è
+SEPARATO — NON aggiungere file MapLibre alla lista `PROTECTED` del guard.
+Triage rapido futuro: 1) query map_init/map_ready per app_version; 2) se 0 su un
+ramo mentre il GPS gira → componente non monta, NON è WebView/tile; 3) `git log`
+sui file del path mappa per trovare la feature che ha rotto il render.

@@ -147,6 +147,18 @@ if [ $CLIENT_UNDEFINED_EXIT -ne 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Run Leaflet map guard (blindatura anti "mappa nera" — vieta la
+# reintroduzione di rotate/compass/bearing nel path mappa Leaflet home)
+# ---------------------------------------------------------------------------
+echo ""
+echo "Running Leaflet map guard..."
+bash "$(dirname "$0")/check-leaflet-map-guard.sh"
+LEAFLET_MAP_GUARD_EXIT=$?
+if [ $LEAFLET_MAP_GUARD_EXIT -ne 0 ]; then
+  exit $LEAFLET_MAP_GUARD_EXIT
+fi
+
+# ---------------------------------------------------------------------------
 # Run Sistema A — Version Alignment Check (controllo-incrociato protocol)
 # ---------------------------------------------------------------------------
 echo ""
