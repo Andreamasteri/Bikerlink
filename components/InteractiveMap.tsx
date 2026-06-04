@@ -291,7 +291,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           onResetBearing={handleResetBearing}
           topOffset={filterBarTopOffset + 44}
           leftOffset={15}
-          disabled
         />
       )}
       {showHazardReportButton && hazardsEnabled && (
