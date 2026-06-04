@@ -21,12 +21,13 @@ import { MapMatchingSection } from "@/components/admin/telemetry/MapMatchingSect
 import { CurvyScoreSection } from "@/components/admin/telemetry/CurvyScoreSection";
 
 interface TelemetryAdminStats {
-  users_with_telemetry: number;
-  total_rides: number;
-  total_samples: number;
-  total_km: number;
-  avg_km_per_user: number;
-  target_km: number;
+  activeUsers: number;
+  totalRides: number;
+  totalSamples: number;
+  kmCollected: number;
+  avgKmPerUser: number;
+  targetKm: number;
+  latestSample?: string | null;
 }
 
 interface MapMatchingStats {
@@ -177,7 +178,7 @@ export default function AdminTelemetryScreen() {
     queryKey: ["/api/admin/telemetry-stats"],
     queryFn: async () => {
       const d = await adminFetch("/api/admin/telemetry-stats").then((r) => r.json());
-      if (!targetInput) setTargetInput(String(d.target_km));
+      if (!targetInput) setTargetInput(String(d.targetKm));
       return d;
     },
     staleTime: 30_000,
@@ -281,7 +282,7 @@ export default function AdminTelemetryScreen() {
   };
 
   const progressPct = stats
-    ? Math.min(100, Math.round((stats.total_km / stats.target_km) * 100))
+    ? Math.min(100, Math.round((stats.kmCollected / stats.targetKm) * 100))
     : 0;
 
   const formatLastRun = (iso: string | null | undefined): string => {
@@ -329,7 +330,7 @@ export default function AdminTelemetryScreen() {
           <Text style={styles.errorText}>Errore nel caricamento stats</Text>
         )}
 
-        {stats && stats.total_rides === 0 && !isLoading && (
+        {stats && stats.totalRides === 0 && !isLoading && (
           <View style={styles.emptyBanner}>
             <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#f59e0b" />
             <Text style={styles.emptyBannerText}>
@@ -345,7 +346,7 @@ export default function AdminTelemetryScreen() {
           <>
             <TelemetryStats stats={stats} />
             <TelemetryFilters
-              target_km={stats.target_km}
+              targetKm={stats.targetKm}
               targetInput={targetInput}
               setTargetInput={setTargetInput}
               onSaveTarget={handleSaveTarget}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, Pressable } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
@@ -137,9 +137,9 @@ export function TelemetryCard({ enabled = true, onSettled }: TelemetryCardProps)
   const settledRef = useRef(false);
 
   const { data, isLoading, error, isSuccess, isError, fetchStatus } = useQuery<TelemetryStats>({
-    queryKey: ["/api/admin/telemetry/stats"],
+    queryKey: ["/api/admin/telemetry-stats"],
     queryFn: async () => {
-      const res = await fetch(new URL("/api/admin/telemetry/stats", getApiUrl()).toString(), {
+      const res = await fetch(new URL("/api/admin/telemetry-stats", getApiUrl()).toString(), {
         headers: { ...(await authFetchHeaders()) },
         credentials: "include",
       });
@@ -172,9 +172,47 @@ export function TelemetryCard({ enabled = true, onSettled }: TelemetryCardProps)
     : false;
 
   const [collapsed, setCollapsed] = useState(true);
+  const [infoVisible, setInfoVisible] = useState(false);
 
   return (
     <View style={telStyles.card}>
+      <Modal
+        visible={infoVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInfoVisible(false)}
+      >
+        <Pressable style={telStyles.modalOverlay} onPress={() => setInfoVisible(false)}>
+          <Pressable style={telStyles.modalBox} onPress={() => {}}>
+            <Text style={telStyles.modalTitle}>Metriche Telemetria</Text>
+            <View style={telStyles.modalRow}>
+              <MaterialCommunityIcons name="crosshairs-gps" size={16} color="#22c55e" style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={telStyles.modalMetricName}>Campioni</Text>
+                <Text style={telStyles.modalMetricDesc}>Punti GPS inviati dall'app durante le sessioni di guida.</Text>
+              </View>
+            </View>
+            <View style={telStyles.modalRow}>
+              <MaterialCommunityIcons name="account-multiple" size={16} color="#22c55e" style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={telStyles.modalMetricName}>Utenti attivi</Text>
+                <Text style={telStyles.modalMetricDesc}>Riders che hanno guidato e trasmesso dati nelle ultime 24h.</Text>
+              </View>
+            </View>
+            <View style={telStyles.modalRow}>
+              <MaterialCommunityIcons name="map-marker-distance" size={16} color="#22c55e" style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={telStyles.modalMetricName}>Km stimati</Text>
+                <Text style={telStyles.modalMetricDesc}>Distanza totale percorsa da tutti gli utenti, calcolata dai tracciati GPS (formula Haversine).</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={telStyles.modalClose} onPress={() => setInfoVisible(false)}>
+              <Text style={telStyles.modalCloseText}>Chiudi</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <TouchableOpacity
         style={telStyles.cardHeader}
         onPress={() => setCollapsed((c) => !c)}
@@ -183,6 +221,13 @@ export function TelemetryCard({ enabled = true, onSettled }: TelemetryCardProps)
       >
         <MaterialCommunityIcons name="chart-line" size={18} color="#22c55e" />
         <Text style={telStyles.cardTitle}>Telemetria</Text>
+        <TouchableOpacity
+          onPress={(e) => { e.stopPropagation(); setInfoVisible(true); }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          testID="telemetry-info-btn"
+        >
+          <MaterialCommunityIcons name="information-outline" size={16} color={Colors.textSecondary} />
+        </TouchableOpacity>
         <View style={telStyles.headerRight}>
           {!enabled && <ActivityIndicator size="small" color="#6b7280" />}
           {enabled && isLoading && <ActivityIndicator size="small" color="#22c55e" />}
@@ -379,5 +424,57 @@ const telStyles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: Colors.textSecondary,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  modalBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  modalTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: Colors.text,
+    marginBottom: 16,
+  },
+  modalRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginBottom: 12,
+  },
+  modalMetricName: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  modalMetricDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  modalClose: {
+    marginTop: 8,
+    alignSelf: "flex-end",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: "#22c55e",
+    borderRadius: 8,
+  },
+  modalCloseText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#fff",
   },
 });

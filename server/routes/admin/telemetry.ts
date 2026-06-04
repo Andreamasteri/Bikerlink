@@ -35,13 +35,17 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
       getTargetKm(),
       db.execute<{
         users_with_telemetry: string;
+        active_users_24h: string;
         total_rides: string;
         total_samples: string;
+        latest_sample: string | null;
       }>(sql`
         SELECT
           COUNT(DISTINCT user_id)::text AS users_with_telemetry,
+          COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL '24 hours' THEN user_id END)::text AS active_users_24h,
           COUNT(DISTINCT session_id)::text AS total_rides,
-          COUNT(*)::text AS total_samples
+          COUNT(*)::text AS total_samples,
+          MAX(created_at)::text AS latest_sample
         FROM ride_telemetry
         WHERE session_type NOT IN ('ideal_lap')
       `),
@@ -74,21 +78,24 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
     ]);
 
     const countRow = countResult.rows[0];
-    const usersWithTelemetry = parseInt(countRow?.users_with_telemetry ?? "0", 10);
+    const activeUsers = parseInt(countRow?.active_users_24h ?? "0", 10);
+    const totalUsersWithTelemetry = parseInt(countRow?.users_with_telemetry ?? "0", 10);
     const totalRides = parseInt(countRow?.total_rides ?? "0", 10);
     const totalSamples = parseInt(countRow?.total_samples ?? "0", 10);
-    const totalKm = Math.round(parseFloat(kmResult.rows[0]?.total_km ?? "0") * 10) / 10;
-    const avgKmPerUser = usersWithTelemetry > 0
-      ? Math.round((totalKm / usersWithTelemetry) * 10) / 10
+    const latestSample = countRow?.latest_sample ?? null;
+    const kmCollected = Math.round(parseFloat(kmResult.rows[0]?.total_km ?? "0") * 10) / 10;
+    const avgKmPerUser = totalUsersWithTelemetry > 0
+      ? Math.round((kmCollected / totalUsersWithTelemetry) * 10) / 10
       : 0;
 
     return res.json({
-      users_with_telemetry: usersWithTelemetry,
-      total_rides: totalRides,
-      total_samples: totalSamples,
-      total_km: totalKm,
-      avg_km_per_user: avgKmPerUser,
-      target_km: targetKm,
+      totalSamples,
+      activeUsers,
+      kmCollected,
+      latestSample,
+      totalRides,
+      avgKmPerUser,
+      targetKm,
     });
   } catch (err) {
     console.error("[admin/telemetry-stats] error:", err);

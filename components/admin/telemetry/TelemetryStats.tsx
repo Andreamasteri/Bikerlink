@@ -3,12 +3,13 @@ import { View, Text, StyleSheet } from "react-native";
 import { StatCard } from "./StatCard";
 
 interface TelemetryAdminStats {
-  users_with_telemetry: number;
-  total_rides: number;
-  total_samples: number;
-  total_km: number;
-  avg_km_per_user: number;
-  target_km: number;
+  activeUsers: number;
+  totalRides: number;
+  totalSamples: number;
+  kmCollected: number;
+  avgKmPerUser: number;
+  targetKm: number;
+  latestSample?: string | null;
 }
 
 interface TelemetryStatsProps {
@@ -22,31 +23,31 @@ export function TelemetryStats({ stats }: TelemetryStatsProps) {
       <View style={styles.statsGrid}>
         <StatCard
           label="Utenti con dati"
-          value={stats.users_with_telemetry}
+          value={stats.activeUsers}
           icon="account-group"
           color="#3b82f6"
         />
         <StatCard
           label="Giri registrati"
-          value={stats.total_rides}
+          value={stats.totalRides}
           icon="map-marker-path"
           color="#8b5cf6"
         />
         <StatCard
           label="Campioni totali"
-          value={stats.total_samples.toLocaleString("it-IT")}
+          value={stats.totalSamples.toLocaleString("it-IT")}
           icon="crosshairs-gps"
           color="#f59e0b"
         />
         <StatCard
           label="Km totali raccolti"
-          value={`${stats.total_km.toLocaleString("it-IT", { maximumFractionDigits: 0 })} km`}
+          value={`${stats.kmCollected.toLocaleString("it-IT", { maximumFractionDigits: 0 })} km`}
           icon="road-variant"
           color="#22c55e"
         />
         <StatCard
           label="Media km / utente"
-          value={`${stats.avg_km_per_user.toFixed(1)} km`}
+          value={`${stats.avgKmPerUser.toFixed(1)} km`}
           icon="account-arrow-right"
           color="#06b6d4"
         />

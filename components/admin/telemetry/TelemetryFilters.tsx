@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
 interface TelemetryFiltersProps {
-  target_km: number;
+  targetKm: number;
   targetInput: string;
   setTargetInput: (val: string) => void;
   onSaveTarget: () => void;
@@ -13,7 +13,7 @@ interface TelemetryFiltersProps {
 }
 
 export function TelemetryFilters({
-  target_km,
+  targetKm,
   targetInput,
   setTargetInput,
   onSaveTarget,
@@ -25,7 +25,7 @@ export function TelemetryFilters({
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Progresso collettivo</Text>
         <Text style={styles.progressNote}>
-          {progressPct}% dell'obiettivo di {target_km} km raggiunto a livello globale
+          {progressPct}% dell'obiettivo di {targetKm} km raggiunto a livello globale
         </Text>
         <View style={styles.progressBg}>
           <View
@@ -45,7 +45,7 @@ export function TelemetryFilters({
         <Text style={styles.settingDesc}>
           Km necessari per sbloccare i percorsi personalizzati (attualmente:{" "}
           <Text style={{ color: Colors.accent, fontFamily: "Inter_700Bold" }}>
-            {target_km} km
+            {targetKm} km
           </Text>
           ).
         </Text>
