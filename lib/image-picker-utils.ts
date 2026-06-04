@@ -24,6 +24,7 @@ import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
 import { Alert, Platform, ActionSheetIOS } from "react-native";
 import { File as EFSFile } from "expo-file-system";
+import { sendStartupBeacon } from "@/lib/startup-beacon";
 
 export interface BulkImageAsset {
   uri: string;
@@ -88,13 +89,16 @@ export async function optimizeImageForUpload(
     const w = dimensions?.width ?? 0;
     const h = dimensions?.height ?? 0;
     const resize = h > w && h > 0 ? { height: 800 } : { width: 800 };
+    sendStartupBeacon("img_manipulate_start", { w, h });
     const result = await ImageManipulator.manipulateAsync(
       uri,
       [{ resize }],
       { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG }
     );
+    sendStartupBeacon("img_manipulate_done");
     return result.uri;
-  } catch {
+  } catch (e) {
+    sendStartupBeacon("img_manipulate_error", { error: String(e).slice(0, 200) });
     return uri;
   }
 }
@@ -103,12 +107,17 @@ export async function pickMultipleImages(
   options: { quality?: number; selectionLimit?: number } = {}
 ): Promise<{ assets: BulkImageAsset[]; skipped: number }> {
   const { quality = 0.8, selectionLimit = 50 } = options;
+  sendStartupBeacon("img_multi_picker_launch");
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
     allowsMultipleSelection: true,
     allowsEditing: false,
     quality,
     selectionLimit,
+  });
+  sendStartupBeacon("img_multi_picker_returned", {
+    canceled: result.canceled,
+    count: result.assets?.length ?? 0,
   });
   if (!result.canceled && result.assets.length > 0) {
     const all = result.assets.map((a, i) => ({
@@ -163,8 +172,10 @@ export function showImagePickerMenu(
   options: PickImageOptions = {}
 ) {
   const { aspect, quality = 0.5, allowsEditing = true } = options;
+  sendStartupBeacon("img_picker_menu_open", { platform: Platform.OS });
 
   const launchGallery = async () => {
+    sendStartupBeacon("img_gallery_launch");
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing,
@@ -172,6 +183,7 @@ export function showImagePickerMenu(
       quality,
       base64: false,
     });
+    sendStartupBeacon("img_gallery_returned", { canceled: result.canceled });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       const optimized = await optimizeImageForUpload(asset.uri, {
@@ -186,12 +198,14 @@ export function showImagePickerMenu(
     const hasPermission = await ensureCameraPermission();
     if (!hasPermission) return;
 
+    sendStartupBeacon("img_camera_launch");
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing,
       ...(aspect ? { aspect } : {}),
       quality,
       base64: false,
     });
+    sendStartupBeacon("img_camera_returned", { canceled: result.canceled });
     if (!result.canceled && result.assets[0]) {
       const asset = result.assets[0];
       const optimized = await optimizeImageForUpload(asset.uri, {
