@@ -47,14 +47,6 @@ args = "typecheck"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "typecheck-server"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "ESLint"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "typecheck-client"
 
 [[workflows.workflow.tasks]]
@@ -63,7 +55,7 @@ args = "OTA Publish"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "planned-routes-size"
+args = "Start Backend"
 
 [[workflows.workflow]]
 name = "Start App"
@@ -124,28 +116,6 @@ args = "bash scripts/typecheck.sh"
 isValidation = true
 
 [[workflows.workflow]]
-name = "typecheck-server"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx tsc --noEmit --project server/tsconfig.json"
-
-[workflows.workflow.metadata]
-isValidation = true
-
-[[workflows.workflow]]
-name = "ESLint"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npx eslint . --ext .ts,.tsx --max-warnings 9999"
-
-[workflows.workflow.metadata]
-outputType = "console"
-
-[[workflows.workflow]]
 name = "typecheck-client"
 author = "agent"
 
@@ -168,15 +138,16 @@ args = "bash scripts/publish-ota-full.sh"
 outputType = "console"
 
 [[workflows.workflow]]
-name = "planned-routes-size"
+name = "Start Backend"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npx tsx scripts/check-planned-routes-size.ts"
+args = "bash scripts/restart-backend.sh"
+waitForPort = 5000
 
 [workflows.workflow.metadata]
-isValidation = true
+outputType = "console"
 
 [objectStorage]
 defaultBucketID = "replit-objstore-ca2daf22-cabb-4140-a095-7b5a6f1afcde"

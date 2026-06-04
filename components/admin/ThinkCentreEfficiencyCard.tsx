@@ -8,8 +8,10 @@ import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 interface ThinkCentreMetrics {
   online: true;
   cpu: { loadAvg1: number; loadAvg5: number; loadAvg15: number; cores: number };
-  memory: { totalMb: number; usedMb: number; usedPercent: number };
+  memory: { totalMb: number; usedMb: number; freeMb?: number; usedPercent: number };
+  disk?: { totalGb: number; usedGb: number; freeGb: number; usedPercent: number } | null;
   uptimeSec: number;
+  checkedAt?: number;
 }
 
 interface ThinkCentreOffline {
@@ -144,15 +146,44 @@ export function ThinkCentreEfficiencyCard() {
                 <View style={styles.divider} />
                 <View style={styles.stat}>
                   <Text style={styles.statValue}>{metrics.memory.usedMb} MB</Text>
-                  <Text style={styles.statLabel}>
-                    su {metrics.memory.totalMb} MB
-                  </Text>
+                  <Text style={styles.statLabel}>Occupata</Text>
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.stat}>
-                  <Text style={styles.statValue}>{formatUptime(metrics.uptimeSec)}</Text>
-                  <Text style={styles.statLabel}>Uptime</Text>
+                  <Text style={styles.statValue}>
+                    {metrics.memory.freeMb != null ? `${metrics.memory.freeMb} MB` : `${metrics.memory.totalMb - metrics.memory.usedMb} MB`}
+                  </Text>
+                  <Text style={styles.statLabel}>Libera · {metrics.memory.totalMb} tot</Text>
                 </View>
+              </View>
+
+              {metrics.disk != null && (
+                <>
+                  <Text style={styles.sectionLabel}>Disco</Text>
+                  <View style={styles.statsRow}>
+                    <View style={styles.stat}>
+                      <Text style={[styles.statValue, { color: metrics.disk.usedPercent < 80 ? Colors.text : metrics.disk.usedPercent < 95 ? "#f59e0b" : "#ef4444" }]}>
+                        {metrics.disk.usedPercent}%
+                      </Text>
+                      <Text style={styles.statLabel}>Usato</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.stat}>
+                      <Text style={styles.statValue}>{metrics.disk.usedGb} GB</Text>
+                      <Text style={styles.statLabel}>Occupato</Text>
+                    </View>
+                    <View style={styles.divider} />
+                    <View style={styles.stat}>
+                      <Text style={styles.statValue}>{metrics.disk.freeGb} GB</Text>
+                      <Text style={styles.statLabel}>Libero · {metrics.disk.totalGb} tot</Text>
+                    </View>
+                  </View>
+                </>
+              )}
+
+              <View style={styles.uptimeRow}>
+                <Ionicons name="time-outline" size={13} color={Colors.textSecondary} />
+                <Text style={styles.uptimeText}>Uptime: {formatUptime(metrics.uptimeSec)}</Text>
               </View>
             </>
           )}
@@ -246,5 +277,16 @@ const styles = StyleSheet.create({
     width: 1,
     height: 36,
     backgroundColor: Colors.border,
+  },
+  uptimeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 2,
+  },
+  uptimeText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
 });
