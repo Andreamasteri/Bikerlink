@@ -15,8 +15,16 @@ da parte di questo buffer inutile.
 
 **How to apply:** NON reintrodurre persistenza GPS lato client senza un percorso di lettura/recovery
 reale. Il re-invio dei punti in assenza di rete è già coperto da `pointsBufferRef` + `flushPoints`
-(retry con riaccodamento su errore). Un `useEffect` mount-once in `useTrackingState.ts` svuota i
-segmenti legacy sui device già intasati — tenerlo finché ci sono installazioni vecchie in giro.
+(retry con riaccodamento su errore).
+
+**Lezione: il recovery di uno storage saturo va eseguito al BOOT, mai su una schermata che lo
+stato rotto impedisce di raggiungere.** Lo stesso sintomo (storage SQLITE_FULL) si manifesta come
+triade: mappa nera (home) + immagini campagne nere + upload immagine che congela l'app (la
+manipolazione immagine scrive un temp file che fallisce su storage pieno). Se la mappa nera è sulla
+home, l'utente non raggiunge mai altre tab, quindi un cleanup montato su una tab secondaria non
+gira mai. Il recovery vero gira nel bootstrap dell'app e cancella per PREFISSO di chiave (non per
+range numerico fisso). Rimuovere il codice che scriveva il buffer NON libera lo storage già pieno:
+serve un purge esplicito al boot finché esistono installazioni vecchie intasate.
 
 # Log retention server
 
