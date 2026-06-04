@@ -204,7 +204,13 @@ export default function ProposalsScreen() {
       ? ["/api/proposals"]
       : ["/api/proposals?filter=" + activeFilter];
 
-  const { data: proposals, isLoading, refetch, isRefetching } = useQuery<ProposalItem[]>({ queryKey });
+  const { data: proposals, isLoading, refetch, isRefetching } = useQuery<ProposalItem[]>({
+    queryKey,
+    select: (res) =>
+      Array.isArray(res)
+        ? res
+        : ((res as { data?: ProposalItem[] } | null)?.data ?? []),
+  });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches from API
   const { data: matches } = useQuery<any[]>({
@@ -236,7 +242,7 @@ export default function ProposalsScreen() {
     allData.push({ type: "matchBanner", key: "mb" });
   }
   allData.push({ type: "proposalHeader", key: "ph" });
-  (proposals || []).forEach((p) => allData.push({ type: "proposal", key: `p-${p.id}`, data: p }));
+  (Array.isArray(proposals) ? proposals : []).forEach((p) => allData.push({ type: "proposal", key: `p-${p.id}`, data: p }));
 
   const handleHubPress = (key: "proposte" | "giri" | "percorsi" | "pianificati") => {
     setActiveHub(key);
