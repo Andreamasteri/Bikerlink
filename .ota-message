@@ -1,4 +1,1 @@
 
-# Scrivi qui UNA riga col changelog del prossimo OTA, poi riavvia il workflow "OTA Publish".
-# Lasciare vuoto (solo commenti + 1 riga vuota sopra) salta la pubblicazione SENZA far fallire lo script.
-# NON lasciare messaggi vecchi: un restart dell'env riavvia OTA Publish e ripubblicherebbe questa riga.

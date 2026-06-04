@@ -20,3 +20,15 @@ in app.json né `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (quel secret aveva un valore p
 → causa la "mappa nera"). Per un nuovo picker di coordinate usa `LeafletPickerMap`
 (`onCoordPicked` → {latitude,longitude}); per un display read-only di un punto usa
 `LeafletMiniMap` (passa `height`, es. misurata via onLayout dentro contenitori flex:1).
+
+## leaflet-rotate = mappa nera (NON reintrodurre)
+
+Il plugin **leaflet-rotate** (rotazione mappa a due dita) è stato provato e **rimosso**: nella
+WebView Leaflet della live map corrompe il rendering (riorganizza le pane in
+`rotatePane/norotatePane`) → le tile spariscono e resta solo lo sfondo `#1a1a1a` = "mappa nera".
+**Why:** il plugin NON lancia eccezioni (il guard try/catch + `_leafletRotateReady` non scatta
+mai), quindi degrada in una mappa nera invece di disattivarsi; il problema è sopravvissuto a 3
+tentativi di fix prima della rimozione. **How to apply:** non reintrodurre `leaflet-rotate` né le
+opzioni `rotate/touchRotate/bearing` su `L.map(...)`. La bussola Nord lato RN (`MapNorthCompass`)
+resta come indicatore statico (`getMapBearing()` → 0, `resetBearing()` no-op). Se in futuro serve
+davvero la rotazione, va testata su dispositivo reale PRIMA di spedirla via OTA.
