@@ -42,9 +42,8 @@ export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
 
   const s = styles(colors);
 
-  const fillPct = STYLE_LEVELS.length > 1
-    ? `${(activeIndex / (STYLE_LEVELS.length - 1)) * 100}%`
-    : "0%";
+  const fillFlex = activeIndex;
+  const emptyFlex = Math.max(0, STYLE_LEVELS.length - 1 - activeIndex);
 
   return (
     <View style={s.section}>
@@ -61,8 +60,9 @@ export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
       </View>
 
       <View style={s.trackRow}>
-        <View style={s.trackBg} pointerEvents="none">
-          <View style={[s.trackFill, { width: fillPct }]} />
+        <View style={s.trackBg}>
+          <View style={[s.trackFill, { flex: fillFlex }]} />
+          <View style={{ flex: emptyFlex }} />
         </View>
         {STYLE_LEVELS.map((sl, i) => {
           const isActive = i === activeIndex;
@@ -136,6 +136,7 @@ const styles = (colors: ThemeColors) =>
       height: 3,
       borderRadius: 2,
       backgroundColor: colors.border,
+      flexDirection: "row",
       overflow: "hidden",
     },
     trackFill: {
