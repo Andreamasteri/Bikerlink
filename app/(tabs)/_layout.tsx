@@ -14,6 +14,7 @@ import { useT } from "@/lib/language-context";
 import CustomTabBar, { type TabItem } from "@/components/CustomTabBar";
 type BottomTabBarProps = Parameters<NonNullable<React.ComponentProps<typeof Tabs>["tabBar"]>>[0];
 import { useTabBadges } from "@/hooks/useTabBadges";
+import { useNewMatchAlert } from "@/hooks/useNewMatchAlert";
 import { TabIcon } from "@/components/TabIcons";
 import { GpsBanner } from "@/components/layout/GpsBanner";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
@@ -73,6 +74,7 @@ export default function TabLayout() {
   const { isGpsGateActive, requestPermission } = useLocationGate();
   const { taskbarStyle } = useTaskbarStyle();
   const { unreadCount, hasActiveMatches } = useTabBadges();
+  const { newMatchCount } = useNewMatchAlert();
 
   // ── Global Hands-Off overlay ────────────────────────────────────────────────
   const [globalHandsOffActive, setGlobalHandsOffActive] = useState(false);
@@ -362,7 +364,7 @@ export default function TabLayout() {
           options={{
             title: "Match",
             tabBarIcon: ({ color, size, focused }) => (
-              <TabIcon name="match" color={color} size={size} focused={focused} />
+              <TabIcon name="match" color={color} size={size} focused={focused} newMatchCount={newMatchCount} />
             ),
             headerShown: false,
             href: gpsTabHref,

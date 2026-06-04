@@ -50,6 +50,7 @@ export function useNewMatchAlert() {
 
   const [visible, setVisible] = useState(false);
   const [payload, setPayload] = useState<MatchNotifPayload | null>(null);
+  const [newMatchCount, setNewMatchCount] = useState(0);
   const [seenLoaded, setSeenLoaded] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
   const initializedSources = useRef<Set<string>>(new Set());
@@ -65,6 +66,8 @@ export function useNewMatchAlert() {
     seenRef.current = new Set();
     initializedSources.current = new Set();
     setVisible(false);
+    setPayload(null);
+    setNewMatchCount(0);
     setSeenLoaded(false);
     serverSyncPendingRef.current = false;
     serverSyncedRef.current = false;
@@ -136,13 +139,14 @@ export function useNewMatchAlert() {
     updateServerSeenTimestamp();
   }, []);
 
-  const showAlertOrRefresh = useCallback(() => {
+  const showAlertOrRefresh = useCallback((count: number = 1) => {
     if (isOnMatchTabRef.current) {
       MATCH_QUERIES.forEach((key) => {
         queryClient.invalidateQueries({ queryKey: [key] });
       });
     } else {
       setVisible(true);
+      setNewMatchCount((prev) => prev + count);
     }
   }, [queryClient]);
 
@@ -184,7 +188,7 @@ export function useNewMatchAlert() {
           .filter((id) => !seenRef.current.has(id));
         if (newIds.length > 0) {
           addSeen(newIds);
-          showAlertOrRefresh();
+          showAlertOrRefresh(newIds.length);
           maybeSyncToServer();
         }
       } else {
@@ -197,7 +201,7 @@ export function useNewMatchAlert() {
     const newIds = ids.filter((id) => !seenRef.current.has(id));
     if (newIds.length > 0) {
       addSeen(newIds);
-      showAlertOrRefresh();
+      showAlertOrRefresh(newIds.length);
       maybeSyncToServer();
     }
   }, [seenLoaded, serverLastSeenAt, addSeen, markSourceInitialized, maybeSyncToServer, showAlertOrRefresh]);
@@ -246,8 +250,9 @@ export function useNewMatchAlert() {
   const dismiss = useCallback(() => {
     setVisible(false);
     setPayload(null);
+    setNewMatchCount(0);
     maybeSyncToServer();
   }, [maybeSyncToServer]);
 
-  return { visible, payload, dismiss };
+  return { visible, payload, dismiss, newMatchCount };
 }

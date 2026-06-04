@@ -1,5 +1,5 @@
 import React from "react";
-import { View, type ColorValue } from "react-native";
+import { View, Text, type ColorValue } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 
@@ -9,6 +9,7 @@ interface TabIconProps {
   color: string | ColorValue;
   size: number;
   unreadCount?: number;
+  newMatchCount?: number;
   globalTrackingActive?: boolean;
   globalSprintMeasuring?: boolean;
   hasActiveMatches?: boolean;
@@ -21,6 +22,7 @@ export function TabIcon({
   color,
   size,
   unreadCount = 0,
+  newMatchCount = 0,
   globalTrackingActive = false,
   globalSprintMeasuring = false,
   hasActiveMatches = false,
@@ -62,7 +64,38 @@ export function TabIcon({
       return <Ionicons name="calendar" size={size} color={color} />;
 
     case "match":
-      return <Ionicons name="flash" size={size} color={color} />;
+      return (
+        <View>
+          <Ionicons name="flash" size={size} color={color} />
+          {newMatchCount > 0 && (
+            <View
+              style={{
+                position: "absolute",
+                top: -4,
+                right: -6,
+                minWidth: 16,
+                height: 16,
+                borderRadius: 8,
+                backgroundColor: colors.accent,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingHorizontal: 2,
+              }}
+            >
+              <Text
+                style={{
+                  color: "#fff",
+                  fontSize: 9,
+                  fontFamily: "Inter_700Bold",
+                  lineHeight: 12,
+                }}
+              >
+                {newMatchCount > 99 ? "99+" : String(newMatchCount)}
+              </Text>
+            </View>
+          )}
+        </View>
+      );
 
     case "music":
       return <Ionicons name="musical-notes-outline" size={size} color={color} />;
