@@ -70,7 +70,12 @@ if ! bash "$(dirname "$0")/build-server.sh"; then
   exit 1
 fi
 
-# ── kill_port: SIGTERM → attesa 2s → SIGKILL → verifica porta libera ─────────
+# ── port_is_free: test TCP reale — tenta connessione; se rifiutata la porta è libera ──
+port_is_free() {
+  ! (echo >/dev/tcp/127.0.0.1/$PORT) 2>/dev/null
+}
+
+# ── kill_port: SIGTERM → attesa 2s → SIGKILL → backoff 2s → verifica TCP reale ─────
 kill_port() {
   local pids
   pids=$(lsof -ti:$PORT 2>/dev/null)
@@ -82,25 +87,31 @@ kill_port() {
     if [ -n "$pids" ]; then
       echo "kill_port: SIGKILL a PID(s) $pids (non hanno risposto a SIGTERM)"
       echo "$pids" | xargs kill -9 2>/dev/null || true
+      # Backoff extra dopo SIGKILL: dà al kernel il tempo di rilasciare socket in TIME_WAIT
+      sleep 2
     fi
   fi
 
-  for i in $(seq 1 10); do
-    if ! lsof -ti:$PORT >/dev/null 2>&1; then
-      echo "kill_port: porta $PORT libera dopo ${i}s"
+  # Verifica con test TCP reale (non lsof) — lsof può dare falso-positivo su TIME_WAIT
+  for i in $(seq 1 15); do
+    if port_is_free; then
+      echo "kill_port: porta $PORT libera (test TCP) dopo ${i}s"
       return 0
     fi
     sleep 1
   done
-  echo "kill_port: attenzione — porta $PORT ancora occupata dopo 10s"
+  echo "kill_port: WARN — porta $PORT ancora occupata dopo 15s (possibile TIME_WAIT); il bind potrebbe fallire"
+  return 1
 }
 
 for retry in $(seq 1 $MAX_RETRIES); do
   echo "[$(date '+%Y-%m-%dT%H:%M:%S')] === Tentativo $retry/$MAX_RETRIES ==="
   echo "Pulizia porta $PORT..."
-  kill_port
-
-  echo "Porta $PORT libera, avvio backend..."
+  if kill_port; then
+    echo "Porta $PORT libera, avvio backend..."
+  else
+    echo "WARN: porta $PORT non confermata libera — tentativo di avvio comunque (SO_REUSEADDR)"
+  fi
   if [ ! -f "server_dist/index.js" ]; then
     echo "server_dist/index.js non trovato — build in corso..."
     bash scripts/build-server.sh
