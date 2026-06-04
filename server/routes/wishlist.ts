@@ -146,6 +146,7 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
           wishlistMotoId: moto.id,
           status: "new",
         });
+        if (!createdMatch) continue;
         const bikerUser = await storage.getUser(bikerMoto.userId);
         await storage.createNotification({
           userId: bikerMoto.userId,
@@ -163,14 +164,12 @@ router.post("/motos", requireAuth, async (req: Request, res: Response) => {
           referenceType: "user",
           referenceId: bikerMoto.userId,
         });
-        if (createdMatch) {
-          await dispatchMatchNotification({
-            table: "biker_zavorrina_matches",
-            matchId: createdMatch.id,
-            userIds: [bikerMoto.userId, userId],
-            priority: classifyMatch({}),
-          });
-        }
+        await dispatchMatchNotification({
+          table: "biker_zavorrina_matches",
+          matchId: createdMatch.id,
+          userIds: [bikerMoto.userId, userId],
+          priority: classifyMatch({}),
+        });
         matches.push({ bikerNickname: bikerUser?.nickname, brand: brand ?? null, model: model ?? null, ridingStyle });
       }
     }
