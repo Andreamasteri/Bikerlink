@@ -1,4 +1,9 @@
-type Listener = () => void;
+export interface MatchNotifPayload {
+  matchName?: string;
+  thumbnailUrl?: string;
+}
+
+type Listener = (data?: MatchNotifPayload) => void;
 
 const _listeners = new Set<Listener>();
 
@@ -9,6 +14,6 @@ export function onMatchNotification(fn: Listener): () => void {
   };
 }
 
-export function emitMatchNotification(): void {
-  _listeners.forEach((fn) => fn());
+export function emitMatchNotification(data?: MatchNotifPayload): void {
+  _listeners.forEach((fn) => fn(data));
 }

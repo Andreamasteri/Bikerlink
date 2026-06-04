@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePathname } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/query-client";
-import { onMatchNotification } from "@/lib/match-alert-emitter";
+import { onMatchNotification, type MatchNotifPayload } from "@/lib/match-alert-emitter";
 
 const SEEN_KEY = "bikerlink:seenMatchIds";
 const INIT_KEY_PREFIX = "bikerlink:matchAlertInit:v1:";
@@ -49,6 +49,7 @@ export function useNewMatchAlert() {
   const isOnMatchTab = pathname === "/match" || pathname === "/(tabs)/match";
 
   const [visible, setVisible] = useState(false);
+  const [payload, setPayload] = useState<MatchNotifPayload | null>(null);
   const [seenLoaded, setSeenLoaded] = useState(false);
   const seenRef = useRef<Set<string>>(new Set());
   const initializedSources = useRef<Set<string>>(new Set());
@@ -235,7 +236,8 @@ export function useNewMatchAlert() {
 
   useEffect(() => {
     if (!userId) return;
-    return onMatchNotification(() => {
+    return onMatchNotification((data) => {
+      setPayload(data ?? null);
       showAlertOrRefresh();
       maybeSyncToServer();
     });
@@ -243,8 +245,9 @@ export function useNewMatchAlert() {
 
   const dismiss = useCallback(() => {
     setVisible(false);
+    setPayload(null);
     maybeSyncToServer();
   }, [maybeSyncToServer]);
 
-  return { visible, dismiss };
+  return { visible, payload, dismiss };
 }

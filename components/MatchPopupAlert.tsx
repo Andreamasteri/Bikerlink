@@ -1,8 +1,8 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
+  Image,
   PanResponder,
-
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -17,7 +17,7 @@ import { useNewMatchAlert } from "@/hooks/useNewMatchAlert";
 const MATCH_ROUTE: Href = "/(tabs)/match";
 
 export default function MatchPopupAlert() {
-  const { visible, dismiss } = useNewMatchAlert();
+  const { visible, payload, dismiss } = useNewMatchAlert();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const colors = useColors();
@@ -25,6 +25,7 @@ export default function MatchPopupAlert() {
   const opacityAnim = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [thumbError, setThumbError] = useState(false);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -65,6 +66,7 @@ export default function MatchPopupAlert() {
     }
 
     if (visible) {
+      setThumbError(false);
       translateY.setValue(0);
       Animated.parallel([
         Animated.spring(scaleAnim, {
@@ -111,6 +113,9 @@ export default function MatchPopupAlert() {
 
   const bottomOffset = insets.bottom + 80;
 
+  const showThumbnail = !!(payload?.thumbnailUrl && !thumbError);
+  const matchName = payload?.matchName ?? null;
+
   return (
     <View
       style={StyleSheet.absoluteFill}
@@ -139,10 +144,29 @@ export default function MatchPopupAlert() {
           onPress={handlePress}
           activeOpacity={0.88}
         >
-          <Text style={styles.flame}>🔥</Text>
+          {showThumbnail ? (
+            <Image
+              source={{ uri: payload!.thumbnailUrl }}
+              style={styles.thumbnail}
+              onError={() => setThumbError(true)}
+            />
+          ) : (
+            <Text style={styles.flame}>🔥</Text>
+          )}
           <View style={styles.textWrap}>
-            <Text style={styles.title}>Ehi, hai un match!</Text>
-            <Text style={styles.sub}>Tocca per vedere chi è</Text>
+            {matchName ? (
+              <>
+                <Text style={styles.title} numberOfLines={1}>
+                  {matchName}
+                </Text>
+                <Text style={styles.sub}>Hai un match! Tocca per vedere</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.title}>Ehi, hai un match!</Text>
+                <Text style={styles.sub}>Tocca per vedere chi è</Text>
+              </>
+            )}
           </View>
           <TouchableOpacity
             onPress={dismiss}
@@ -179,6 +203,12 @@ const styles = StyleSheet.create({
   },
   flame: {
     fontSize: 26,
+  },
+  thumbnail: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.2)",
   },
   textWrap: {
     flex: 1,

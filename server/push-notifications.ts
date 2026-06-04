@@ -113,7 +113,10 @@ async function sendExpoMessages(
   }
 }
 
-export async function sendMatchPushNotifications(userIds: string[]): Promise<void> {
+export async function sendMatchPushNotifications(
+  userIds: string[],
+  opts?: { matchName?: string; thumbnailUrl?: string },
+): Promise<void> {
   if (!userIds.length) return;
   try {
     const filteredIds = await filterUserIdsByPreference(userIds, "matches");
@@ -129,12 +132,15 @@ export async function sendMatchPushNotifications(userIds: string[]): Promise<voi
     for (const row of rows) {
       if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
         userIdByToken.set(row.expoPushToken, row.id);
+        const extraData: Record<string, string> = {};
+        if (opts?.matchName) extraData.matchName = opts.matchName;
+        if (opts?.thumbnailUrl) extraData.thumbnailUrl = opts.thumbnailUrl;
         messages.push({
           to: row.expoPushToken,
           title: it["push.match.title"] ?? "Ehi, hai un match! 🔥",
           body: it["push.match.body"] ?? "Tocca per vedere chi è",
           sound: "default" as const,
-          data: { type: "match" },
+          data: { type: "match", ...extraData },
           channelId: "matches",
         });
       }

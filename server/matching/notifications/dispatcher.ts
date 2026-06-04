@@ -18,6 +18,8 @@ export interface DispatchInput {
   priority: NotificationPriority;
   isSupermatch?: boolean;
   distanceKm?: number | null;
+  matchName?: string;
+  thumbnailUrl?: string;
 }
 
 async function loadTopOnlyMap(userIds: string[]): Promise<Map<string, boolean>> {
@@ -100,7 +102,10 @@ export async function dispatchMatchNotification(input: DispatchInput): Promise<v
   }
 
   if (allowedNow.length > 0) {
-    sendMatchPushNotifications(allowedNow);
+    sendMatchPushNotifications(allowedNow, {
+      matchName: input.matchName,
+      thumbnailUrl: input.thumbnailUrl,
+    });
     for (const uid of allowedNow) {
       await recordDelivery(input.table, input.matchId, uid, "push");
     }

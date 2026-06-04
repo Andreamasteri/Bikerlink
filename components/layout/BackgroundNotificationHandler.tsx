@@ -104,9 +104,12 @@ export function BackgroundNotificationHandler() {
       }
       try {
         foregroundSub = Notifications.addNotificationReceivedListener((notification) => {
-          const data = notification.request.content.data as { type?: string } | undefined;
+          const data = notification.request.content.data as { type?: string; matchName?: string; thumbnailUrl?: string } | undefined;
           if (data?.type === "match") {
-            emitMatchNotification();
+            emitMatchNotification({
+              matchName: data.matchName,
+              thumbnailUrl: data.thumbnailUrl,
+            });
           }
         });
       } catch {

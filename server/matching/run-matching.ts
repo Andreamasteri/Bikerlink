@@ -284,12 +284,15 @@ export async function runWishlistMatching(): Promise<number> {
         existingKeys.add(key);
         matchCount++;
         if (inserted) {
+          const motoParts = [moto.brand, moto.model].filter(Boolean);
+          const matchName = motoParts.length > 0 ? motoParts.join(" ") : undefined;
           await dispatchMatchNotification({
             table: "biker_zavorrina_matches",
             matchId: inserted.id,
             userIds: [bikerId, zavarrinaId],
             priority: classifyMatch({ isSupermatch }),
             isSupermatch,
+            matchName,
           });
         }
       }
