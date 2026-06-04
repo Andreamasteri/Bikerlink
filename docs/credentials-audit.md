@@ -44,7 +44,7 @@
 
 | Credenziale | Obbligatoria | Presente | Validazione | Fallback | Note |
 |---|---|---|---|---|---|
-| `GRAPHHOPPER_URL` | No (self-hosted) | ✅ Sì | ❌ DNS ENOTFOUND | Cloud API | `routing.bikerlink.app` non raggiungibile |
+| `GRAPHHOPPER_URL` | No (self-hosted) | ✅ Sì | ❌ DNS ENOTFOUND | Cloud API | `gh.bikerlink.app` non raggiungibile |
 | `GRAPHHOPPER_TOKEN` | No (self-hosted) | ✅ Sì | — | — | Header `X-GH-Token` per self-hosted |
 | `GRAPHHOPPER_API_KEY` | ✅ Sì (cloud fb) | ✅ Sì | ✅ HTTP 200 `/api/1/info` | — | Fallback cloud attivo e funzionante |
 | `VALHALLA_URL` | No | ✅ Sì (vuota) | — | GraphHopper | Stringa vuota = Valhalla disabilitato |
@@ -115,7 +115,7 @@
 | **`GOOGLE_API_KEY`** | Alias ridondante di `GEMINI_API_KEY`; il codice usa `GEMINI_API_KEY ?? GOOGLE_API_KEY` | Non necessario; si può ignorare |
 | **Duplicati env+secret** | `GRAPHHOPPER_URL`, `ROUTING_DISABLED`, `BIKERLINK_ADMIN_EMAIL` esistono sia in `userenv.shared` (.replit) sia come Secrets — i Secrets sovrascrivono silenziosamente gli env var | Scegliere uno dei due canali per ciascuno |
 | **`MAPBOX_ACCESS_TOKEN` invalido** | Token inserito non è nel formato Mapbox (`pk./sk.eyJ1...`) — 401 su ogni chiamata | Sostituire con token valido da account.mapbox.com |
-| **GraphHopper self-hosted offline** | `routing.bikerlink.app` DNS non risolve (ENOTFOUND) | Verificare stato server; il cloud API key copre il fallback |
+| **GraphHopper self-hosted offline** | `gh.bikerlink.app` DNS non risolve (ENOTFOUND) | Verificare stato server; il cloud API key copre il fallback |
 | **Tiles server offline** | `tiles.bikerlink.app` DNS non risolve | Verificare stato server |
 | **Ollama 403** | Server Ollama risponde 403 — `OLLAMA_TOKEN` potrebbe essere scaduto o endpoint cambiato | Verificare configurazione Nginx del server Ollama |
 

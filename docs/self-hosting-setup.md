@@ -965,7 +965,7 @@ chmod +x /opt/backup/scripts/backup-objectstorage.sh
 ## 9. Nginx Reverse Proxy + HTTPS (Let's Encrypt)
 
 > **Prerequisiti:** i tuoi domini DNS devono già puntare all'IP del server prima di procedere.
-> - `routing.bikerlink.app` → IP server
+> - `gh.bikerlink.app` → IP server
 > - `tiles.bikerlink.app` → IP server
 >
 > **Flusso corretto:** prima si creano i vhost HTTP-only, poi si avvia Nginx, poi Certbot ottiene i certificati e modifica automaticamente i vhost aggiungendo il blocco SSL. Non creare mai manualmente i blocchi `listen 443 ssl` prima che Certbot abbia emesso i certificati.
@@ -979,7 +979,7 @@ Crea prima i vhost HTTP-only. Certbot li modificherà in automatico aggiungendo 
 sudo tee /etc/nginx/sites-available/graphhopper.conf > /dev/null << 'EOF'
 server {
     listen 80;
-    server_name routing.bikerlink.app;
+    server_name gh.bikerlink.app;
 
     access_log /var/log/nginx/graphhopper-access.log;
     error_log /var/log/nginx/graphhopper-error.log;
@@ -1046,7 +1046,7 @@ sudo systemctl enable nginx
 sudo systemctl start nginx
 
 # Verifica che risponda su HTTP prima di procedere con HTTPS
-curl -s -o /dev/null -w "%{http_code}" http://routing.bikerlink.app/health
+curl -s -o /dev/null -w "%{http_code}" http://gh.bikerlink.app/health
 # Atteso: 200 (o 502 se GraphHopper non è ancora avviato — entrambi significano che Nginx risponde)
 ```
 
@@ -1057,7 +1057,7 @@ Certbot usa il server HTTP appena attivato per validare il dominio (challenge HT
 ```bash
 # Ottieni certificati per entrambi i domini in un solo comando
 sudo certbot --nginx \
-  -d routing.bikerlink.app \
+  -d gh.bikerlink.app \
   -d tiles.bikerlink.app \
   --email admin@bikerlink.app \
   --agree-tos \
@@ -1066,9 +1066,9 @@ sudo certbot --nginx \
 
 # Output atteso al termine:
 # Congratulations! ...
-# Certificate is saved at: /etc/letsencrypt/live/routing.bikerlink.app/fullchain.pem
+# Certificate is saved at: /etc/letsencrypt/live/gh.bikerlink.app/fullchain.pem
 # ...
-# HTTPS enabled for routing.bikerlink.app
+# HTTPS enabled for gh.bikerlink.app
 # HTTPS enabled for tiles.bikerlink.app
 
 # Verifica rinnovo automatico (Certbot installa un timer systemd di default)
@@ -1087,11 +1087,11 @@ Dopo che Certbot ha aggiunto SSL, aggiungi gli header di sicurezza nel blocco `s
 sudo nginx -t && sudo systemctl reload nginx
 
 # Test HTTPS
-curl -s -o /dev/null -w "%{http_code}" https://routing.bikerlink.app/health
+curl -s -o /dev/null -w "%{http_code}" https://gh.bikerlink.app/health
 # Atteso: 200
 
 # Test redirect HTTP → HTTPS
-curl -s -o /dev/null -w "%{http_code}\n" -L http://routing.bikerlink.app/
+curl -s -o /dev/null -w "%{http_code}\n" -L http://gh.bikerlink.app/
 # Atteso: 200 (dopo redirect 301)
 ```
 
@@ -1252,11 +1252,11 @@ Esegui tutti questi test dopo il setup completo. Un ✅ per ogni voce = server p
 
 ```bash
 # Test 1: Health check base
-curl -s https://routing.bikerlink.app/health
+curl -s https://gh.bikerlink.app/health
 # Atteso: {"status":"UP"}
 
 # Test 2: Route curvy Nord-Est Italia
-curl -s "https://routing.bikerlink.app/route?\
+curl -s "https://gh.bikerlink.app/route?\
 point=45.4374,12.3346&\
 point=46.0661,11.1218&\
 profile=motorcycle_curvy" \
@@ -1264,7 +1264,7 @@ profile=motorcycle_curvy" \
 # Atteso: Distanza: XX.X km (un numero ragionevole)
 
 # Test 3: Round trip circolare
-curl -s "https://routing.bikerlink.app/route?\
+curl -s "https://gh.bikerlink.app/route?\
 point=45.4374,12.3346&\
 profile=motorcycle_curvy&\
 algorithm=round_trip&\
@@ -1273,7 +1273,7 @@ round_trip.seed=1" \
 | python3 -c "import sys,json; r=json.load(sys.stdin); print('Round trip OK:', r['paths'][0]['distance']/1000, 'km')"
 
 # Test 4: Verifica profilo motorcycle_curvy disponibile
-curl -s https://routing.bikerlink.app/info \
+curl -s https://gh.bikerlink.app/info \
 | python3 -c "import sys,json; r=json.load(sys.stdin); print([p['name'] for p in r.get('profiles',[])])"
 # Atteso: ['motorcycle_curvy'] (o simile)
 ```
@@ -1298,15 +1298,15 @@ curl -s https://tiles.bikerlink.app/styles/basic/style.json | python3 -c \
 
 ```bash
 # Test 8: HTTPS funzionante su GraphHopper
-curl -sI https://routing.bikerlink.app/health | head -5
+curl -sI https://gh.bikerlink.app/health | head -5
 # Atteso: HTTP/2 200
 
 # Test 9: Redirect HTTP → HTTPS
-curl -sI http://routing.bikerlink.app/health | grep -i location
-# Atteso: Location: https://routing.bikerlink.app/health
+curl -sI http://gh.bikerlink.app/health | grep -i location
+# Atteso: Location: https://gh.bikerlink.app/health
 
 # Test 10: Certificato valido e non scaduto
-echo | openssl s_client -connect routing.bikerlink.app:443 -servername routing.bikerlink.app 2>/dev/null \
+echo | openssl s_client -connect gh.bikerlink.app:443 -servername gh.bikerlink.app 2>/dev/null \
 | openssl x509 -noout -dates
 # Atteso: notAfter= una data futura di almeno 60 giorni
 
@@ -1363,12 +1363,12 @@ sudo systemctl is-enabled graphhopper tileserver nginx
 
 | # | Test | Comando rapido | Atteso |
 |---|---|---|---|
-| 1 | GraphHopper health | `curl https://routing.bikerlink.app/health` | `{"status":"UP"}` |
-| 2 | Route A→B curvy | `curl "https://routing.bikerlink.app/route?..."` | JSON con `paths[0].distance` |
+| 1 | GraphHopper health | `curl https://gh.bikerlink.app/health` | `{"status":"UP"}` |
+| 2 | Route A→B curvy | `curl "https://gh.bikerlink.app/route?..."` | JSON con `paths[0].distance` |
 | 3 | Round trip | `curl "...algorithm=round_trip..."` | JSON con percorso circolare |
 | 4 | Tile servita | `curl -I "https://tiles.bikerlink.app/data/openmaptiles/10/535/370.pbf"` | HTTP 200 |
-| 5 | HTTPS valido | `openssl s_client -connect routing.bikerlink.app:443` | Cert valido |
-| 6 | Redirect HTTP | `curl -I http://routing.bikerlink.app` | 301 → HTTPS |
+| 5 | HTTPS valido | `openssl s_client -connect gh.bikerlink.app:443` | Cert valido |
+| 6 | Redirect HTTP | `curl -I http://gh.bikerlink.app` | 301 → HTTPS |
 | 7 | Backup locale | `ls /opt/backup/dumps/` | File .dump presente |
 | 8 | Backup remoto | `rclone ls bikerlink-backup:backups/postgres/` | File visibile |
 | 9 | Restore funziona | `pg_restore ...` su DB temporaneo | Nessun errore, tabelle presenti |
