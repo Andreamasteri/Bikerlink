@@ -105,6 +105,7 @@ function gracefulShutdown(signal: string) {
 
   stopMatchingEngine();
   stopMetroMonitor();
+  import("./jobs/thinkcentre-monitor").then(({ stopThinkCentreMonitor }) => stopThinkCentreMonitor()).catch(() => {});
 
   activeConnections.forEach((socket) => socket.destroy());
   activeConnections.clear();
@@ -436,6 +437,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.log("[INIT] Critical reports notifier started");
     } catch (e) {
       console.warn("[INIT] Critical reports notifier failed (non-fatal):", e);
+    }
+
+    // ThinkCentre monitor — push admin quando i servizi self-hosted vanno offline/online.
+    try {
+      const { startThinkCentreMonitor } = await import("./jobs/thinkcentre-monitor");
+      startThinkCentreMonitor();
+    } catch (e) {
+      console.warn("[INIT] ThinkCentre monitor failed (non-fatal):", e);
     }
 
     // Task #2533 — AI System Watchdog scheduler.
