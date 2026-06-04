@@ -49,6 +49,8 @@ async function runMatchingInBackground(
     if (wm.userId === userId) continue;
     if (!wm.userId) continue;
     try {
+      const existing = await storage.findExistingBikerZavarrinaMatch(userId, wm.userId, motorcycleId, wm.id);
+      if (existing) continue;
       const createdMatch = await storage.createMatch({
         bikerId: userId,
         zavarrinaId: wm.userId,

@@ -296,7 +296,8 @@ export class MatchingStorage extends ContestStorage {
     const [match] = await db.select().from(bikerZavarrinaMatches).where(
       and(
         eq(bikerZavarrinaMatches.bikerId, bikerId), eq(bikerZavarrinaMatches.zavarrinaId, zavarrinaId),
-        eq(bikerZavarrinaMatches.bikerMotorcycleId, bikerMotorcycleId), eq(bikerZavarrinaMatches.wishlistMotoId, wishlistMotoId)
+        eq(bikerZavarrinaMatches.bikerMotorcycleId, bikerMotorcycleId), eq(bikerZavarrinaMatches.wishlistMotoId, wishlistMotoId),
+        isNull(bikerZavarrinaMatches.archivedAt),
       )
     ).limit(1);
     return match;
