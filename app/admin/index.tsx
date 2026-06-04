@@ -9,6 +9,7 @@ import { TelemetryCard, GraphHopperCard } from "@/components/admin/AdminStatsCar
 import { ServerEfficiencyCard } from "@/components/admin/ServerEfficiencyCard";
 import { ThinkCentreCard } from "@/components/admin/ThinkCentreCard";
 import { ThinkCentreEfficiencyCard } from "@/components/admin/ThinkCentreEfficiencyCard";
+import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
 
 type MaterialIconName = React.ComponentProps<typeof MaterialIcons>["name"];
 type MaterialCommunityIconName = React.ComponentProps<typeof MaterialCommunityIcons>["name"];
@@ -289,6 +290,7 @@ export default function AdminDashboard() {
 
       {!isSearching && (
         <>
+          <RoutingCloudBanner onPress={() => router.push("/admin/routing-health" as never)} />
           <ServerEfficiencyCard />
           <ThinkCentreEfficiencyCard />
           <ThinkCentreCard />

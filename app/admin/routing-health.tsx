@@ -17,6 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { RoutingCloudBanner } from "@/components/admin/RoutingCloudBanner";
 import type { RoutingStatus } from "./routing-control/types";
 
 function statusColor(ok: boolean | null, down: boolean): string {
@@ -127,6 +128,10 @@ export default function RoutingHealthScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      {data && gh?.down && cloud?.active && (
+        <RoutingCloudBanner />
+      )}
 
       {data && (
         <>
