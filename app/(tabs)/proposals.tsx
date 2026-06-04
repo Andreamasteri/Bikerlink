@@ -214,18 +214,28 @@ export default function ProposalsScreen() {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- matches from API
   const { data: matches } = useQuery<any[]>({
-    queryKey: ["/api/proposals/matches"]
+    queryKey: ["/api/proposals/matches"],
+    select: (res) => {
+      if (Array.isArray(res)) return res;
+      const obj = res as Record<string, unknown>;
+      return Array.isArray(obj?.data) ? obj.data : [];
+    },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- proposal profile matches from API
   const { data: propProfileMatches } = useQuery<any[]>({
-    queryKey: ["/api/proposals/proposal-profile-matches"]
+    queryKey: ["/api/proposals/proposal-profile-matches"],
+    select: (res) => {
+      if (Array.isArray(res)) return res;
+      const obj = res as Record<string, unknown>;
+      return Array.isArray(obj?.data) ? obj.data : [];
+    },
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match item from API
-  const pendingMatchCount = (matches || []).filter((m: any) => m.status === "pending").length;
+  const pendingMatchCount = Array.isArray(matches) ? matches.filter((m: any) => m.status === "pending").length : 0;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- proposal match item from API
-  const pendingPropProfileCount = (propProfileMatches || []).filter((m: any) => m.status === "new").length;
+  const pendingPropProfileCount = Array.isArray(propProfileMatches) ? propProfileMatches.filter((m: any) => m.status === "new").length : 0;
   const totalPendingCount = pendingMatchCount + pendingPropProfileCount;
 
   const handleCreatePress = useCallback(() => {

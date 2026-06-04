@@ -5,9 +5,11 @@ import matchingRouter from "./proposals/matching";
 
 const router = Router();
 
-router.use("/", crudRouter);
-router.use("/", participantsRouter);
+// matchingRouter prima: le sue rotte letterali (/matches, /proposal-profile-matches, …)
+// devono vincere sul param /:id del crudRouter, altrimenti vengono catturate come ID.
 router.use("/", matchingRouter);
+router.use("/", participantsRouter);
+router.use("/", crudRouter);
 
 
 export default router;
