@@ -1,4 +1,5 @@
 import { LEAFLET_JS, LEAFLET_CSS } from './leaflet-bundle';
+import { LEAFLET_ROTATE_JS } from './leaflet/leaflet-rotate-bundle';
 import { LIVE_MAP_STYLES } from './leaflet/live-map-styles';
 
 export const LEAFLET_MAP_HTML = `<!DOCTYPE html>
@@ -22,6 +23,19 @@ ${LIVE_MAP_STYLES}
   </div>
 </div>
 <script>${LEAFLET_JS}</script>
+<script>
+/* leaflet-rotate — caricato in try/catch: se il plugin lancia un errore la
+   WebView non si blocca e la mappa rimane funzionante (senza rotazione).
+   _leafletRotateReady viene letto dal blocco di init per abilitare le opzioni
+   rotate/touchRotate solo quando il plugin è disponibile. */
+var _leafletRotateReady = false;
+try {
+${LEAFLET_ROTATE_JS}
+_leafletRotateReady = true;
+} catch(e) {
+  console.warn('[BikerLink] leaflet-rotate init error:', e && e.message);
+}
+</script>
 <script>
 /* OverlappingMarkerSpiderfier-Leaflet — embedded inline (Task #1077).
    Source: npm package overlapping-marker-spiderfier-leaflet@0.2.7 (dist/oms.min.js).
@@ -55,7 +69,17 @@ ${LIVE_MAP_STYLES}
     center: [41.9028, 12.4964],
     zoom: 6,
     zoomControl: false,
-    attributionControl: true
+    attributionControl: true,
+    /* Rotazione mappa a due dita (Task #3124) — plugin leaflet-rotate.
+       rotate/touchRotate abilitati solo se il plugin si è caricato senza errori
+       (_leafletRotateReady=true); in caso di crash del bundle la mappa resta
+       funzionante senza rotazione invece di rimanere nera.
+       rotateControl: false → nessun controllo nativo (usiamo la bussola RN);
+       touchZoom resta attivo, così pinch-to-zoom e rotate convivono. */
+    rotate: typeof _leafletRotateReady !== 'undefined' && _leafletRotateReady,
+    touchRotate: typeof _leafletRotateReady !== 'undefined' && _leafletRotateReady,
+    rotateControl: false,
+    bearing: 0
   });
 
   var tileLayer = null;
@@ -147,10 +171,11 @@ ${LIVE_MAP_STYLES}
   })();
 
   function getMapBearing() {
-    /* La mappa non ruota (rotazione rimossa per evitare la mappa nera):
-       bearing sempre 0. Mantenuto per compatibilità con postViewState e
-       la bussola Nord lato RN. */
-    return 0;
+    /* leaflet-rotate espone map.getBearing(); fallback 0 se il plugin
+       non fosse disponibile (parità API con MapLibre). */
+    try {
+      return (typeof map.getBearing === "function") ? (map.getBearing() || 0) : 0;
+    } catch(e) { return 0; }
   }
 
   function postViewState() {
@@ -177,6 +202,12 @@ ${LIVE_MAP_STYLES}
     updateLegendVisibility();
     postViewState();
   });
+
+  /* Rotazione live (Task #3124): aggiorna la bussola RN in tempo reale
+     mentre l'utente ruota con due dita. "rotate" scatta in continuo durante
+     il gesto; "rotateend" chiude l'aggiornamento al rilascio. */
+  map.on("rotate", postViewState);
+  map.on("rotateend", postViewState);
 
   /* ── SVG icons ────────────────────────────────────────────────────── */
   var SVG = {
@@ -523,9 +554,16 @@ ${LIVE_MAP_STYLES}
     },
 
     resetBearing: function() {
-      /* No-op: la rotazione è stata rimossa (la mappa è sempre a nord).
-         Mantenuto per compatibilità con il bridge RN della bussola Nord. */
-      postViewState();
+      /* Riporta la mappa a nord con animazione (Task #3124).
+         leaflet-rotate espone map.setBearing(deg); il secondo argomento
+         {animate:true} fa la transizione dolce. Fallback silenzioso se il
+         plugin non fosse disponibile. */
+      try {
+        if (typeof map.setBearing === "function") {
+          map.setBearing(0, { animate: true });
+          postViewState();
+        }
+      } catch(e) {}
     },
 
     updateHazards: function(jsonStr) {
