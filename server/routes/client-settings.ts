@@ -1,4 +1,4 @@
-// LARGE-FILE-LOCKED — limite: 669 righe (attuali: 669)
+// LARGE-FILE-LOCKED — limite: 672
 // Aggiungi nuove funzionalità in: server/routes/client-settings-extra.ts
 // Motivo: file delicato di dimensione media. Splittare ora introduce rischio.
 //         Vedi Task #2584 (regola 600 righe) e Task "Lock dimensione file priorità media".

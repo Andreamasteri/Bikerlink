@@ -1,3 +1,5 @@
+// LARGE-FILE-LOCKED — limite: 647
+// Aggiungi nuove funzionalità in: app/admin/ai-route-providers.next.tsx
 /**
  * Task #2932 — Pannello admin: selezione provider AI resolver percorsi.
  * Task #2946 — Live ping test per provider AI dalla schermata admin.

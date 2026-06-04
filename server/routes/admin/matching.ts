@@ -5,6 +5,7 @@
 import { Router } from "express";
 import { adminMatchingRateLimiter } from "../../lib/rate-limiters";
 import diagnosticsRouter from "./matching/diagnostics";
+import diagnosticsNextRouter from "./matching/diagnostics.next";
 import actionsRouter from "./matching/actions";
 import observabilityRouter from "./matching/observability";
 import debugRouter from "./matching/debug";
@@ -18,6 +19,7 @@ const router = Router();
 router.use(adminMatchingRateLimiter);
 
 router.use(diagnosticsRouter);
+router.use(diagnosticsNextRouter);
 router.use(actionsRouter);
 router.use(observabilityRouter);
 router.use(debugRouter);

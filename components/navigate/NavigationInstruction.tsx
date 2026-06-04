@@ -1,9 +1,11 @@
 import React from "react";
-import { View, Text, StyleSheet, Pressable, Platform } from "react-native";
+import { View, Text, StyleSheet, Pressable, Platform, Linking } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import { useT } from "@/lib/language-context";
 import type { ThemeColors } from "@/constants/colors";
+
+interface Waypoint { lat: number; lng: number; }
 
 interface NavigationInstructionProps {
   step: {
@@ -19,9 +21,35 @@ interface NavigationInstructionProps {
   bottomPad: number;
   signToIcon: (sign: number) => keyof typeof Ionicons.glyphMap;
   formatDistance: (m: number) => string;
-  handleOpenInGoogleMaps: () => void;
-  handleOpenInWaze: () => void;
-  handleOpenInAppleMaps: () => void;
+  waypoints?: Waypoint[];
+}
+
+function openInGoogleMaps(waypoints?: Waypoint[]) {
+  if (!waypoints?.length) return;
+  const wps = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+  if (!wps.length) return;
+  const origin = `${wps[0].lat},${wps[0].lng}`;
+  const dest = `${wps[wps.length - 1].lat},${wps[wps.length - 1].lng}`;
+  const mid = wps.slice(1, -1).map((wp) => `${wp.lat},${wp.lng}`).join("|");
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
+  if (mid) url += `&waypoints=${mid}`;
+  Linking.openURL(url);
+}
+
+function openInWaze(waypoints?: Waypoint[]) {
+  if (!waypoints?.length) return;
+  const wps = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+  if (!wps.length) return;
+  const dest = wps[wps.length - 1];
+  Linking.openURL(`https://waze.com/ul?ll=${dest.lat},${dest.lng}&navigate=yes`);
+}
+
+function openInAppleMaps(waypoints?: Waypoint[]) {
+  if (!waypoints?.length) return;
+  const wps = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+  if (!wps.length) return;
+  const dest = wps[wps.length - 1];
+  Linking.openURL(`maps://maps.apple.com/?daddr=${dest.lat},${dest.lng}&dirflg=d`);
 }
 
 export function NavigationInstruction({
@@ -31,9 +59,7 @@ export function NavigationInstruction({
   bottomPad,
   signToIcon,
   formatDistance,
-  handleOpenInGoogleMaps,
-  handleOpenInWaze,
-  handleOpenInAppleMaps,
+  waypoints,
 }: NavigationInstructionProps) {
   const colors = useColors();
   const t = useT();
@@ -77,16 +103,16 @@ export function NavigationInstruction({
 
       {/* Open in external apps */}
       <View style={s.externalRow}>
-        <Pressable style={s.externalBtn} onPress={handleOpenInGoogleMaps}>
+        <Pressable style={s.externalBtn} onPress={() => openInGoogleMaps(waypoints)}>
           <MaterialCommunityIcons name="google-maps" size={16} color={colors.textSecondary} />
           <Text style={s.externalLabel}>Google Maps</Text>
         </Pressable>
-        <Pressable style={s.externalBtn} onPress={handleOpenInWaze}>
+        <Pressable style={s.externalBtn} onPress={() => openInWaze(waypoints)}>
           <MaterialCommunityIcons name="waze" size={16} color={colors.textSecondary} />
           <Text style={s.externalLabel}>Waze</Text>
         </Pressable>
         {Platform.OS === "ios" && (
-          <Pressable style={s.externalBtn} onPress={handleOpenInAppleMaps}>
+          <Pressable style={s.externalBtn} onPress={() => openInAppleMaps(waypoints)}>
             <Ionicons name="map-outline" size={16} color={colors.textSecondary} />
             <Text style={s.externalLabel}>Apple Maps</Text>
           </Pressable>

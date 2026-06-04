@@ -1,18 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
-  Text,
   Alert,
-  Linking,
   ActivityIndicator,
-  Pressable,
-  TouchableOpacity,
 } from "react-native";
 import WebView from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
-import { Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import * as Speech from "expo-speech";
 import { useColors } from "@/hooks/useColors";
@@ -26,6 +21,7 @@ import { NavigationMap } from "@/components/navigate/NavigationMap";
 import { NavigationInstruction } from "@/components/navigate/NavigationInstruction";
 import { NavigationWeather, type NavWeatherZone } from "@/components/navigate/NavigationWeather";
 import { NavigationFinished } from "@/components/navigate/NavigationFinished";
+import { NavigationOfflineBanners } from "@/components/navigate/NavigationOfflineBanners";
 import type { NavigationStep, PlannedRoute } from "./[id].types";
 import {
   saveRouteToCache,
@@ -492,34 +488,6 @@ export default function NavigateScreen() {
     }
   }, []);
 
-  const handleOpenInGoogleMaps = () => {
-    if (!route?.waypoints?.length) return;
-    const wps = route.waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (!wps.length) return;
-    const origin = `${wps[0].lat},${wps[0].lng}`;
-    const dest = `${wps[wps.length - 1].lat},${wps[wps.length - 1].lng}`;
-    const mid = wps.slice(1, -1).map((wp) => `${wp.lat},${wp.lng}`).join("|");
-    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=driving`;
-    if (mid) url += `&waypoints=${mid}`;
-    Linking.openURL(url);
-  };
-
-  const handleOpenInWaze = () => {
-    if (!route?.waypoints?.length) return;
-    const wps = route.waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (!wps.length) return;
-    const dest = wps[wps.length - 1];
-    Linking.openURL(`https://waze.com/ul?ll=${dest.lat},${dest.lng}&navigate=yes`);
-  };
-
-  const handleOpenInAppleMaps = () => {
-    if (!route?.waypoints?.length) return;
-    const wps = route.waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
-    if (!wps.length) return;
-    const dest = wps[wps.length - 1];
-    Linking.openURL(`maps://maps.apple.com/?daddr=${dest.lat},${dest.lng}&dirflg=d`);
-  };
-
   const [voiceCmdToast, setVoiceCmdToast] = useState<string | null>(null);
 
   const handleVoiceCommand = useCallback(async () => {
@@ -634,106 +602,14 @@ export default function NavigateScreen() {
         <View style={[s.progressFill, { width: `${progressPct}%` as any }]} />
       </View>
 
-      {/* Offline banner */}
-      {isOffline && (
-        <View style={s.offlineBanner}>
-          <Ionicons name="cloud-offline-outline" size={14} color="#fff" />
-          <Text style={s.offlineBannerText}>Modalità offline — percorso in cache</Text>
-        </View>
-      )}
-
-      {/* Download map banner — visible only when tiles are not yet available */}
-      {(offline.status === "none" || offline.status === "error") && (
-        <Pressable style={s.downloadBanner} onPress={offline.startDownload}>
-          <Ionicons name="download-outline" size={15} color="#fff" />
-          <Text style={s.downloadBannerText}>
-            {offline.status === "error" ? t("nav.offline.retry") : t("nav.offline.download")}
-          </Text>
-          {offline.status === "error" && (
-            <Ionicons name="alert-circle-outline" size={16} color="rgba(255,200,100,0.9)" />
-          )}
-        </Pressable>
-      )}
-
-      {/* Offline map available indicator with delete action */}
-      {offline.status === "available" && (
-        <Pressable
-          style={s.offlineAvailableBanner}
-          onPress={() => {
-            Alert.alert(
-              "Rimuovi mappa offline",
-              "Vuoi eliminare le mappe salvate per questo percorso?",
-              [
-                { text: "Annulla", style: "cancel" },
-                {
-                  text: "Rimuovi",
-                  style: "destructive",
-                  onPress: () => offline.deleteOffline(),
-                },
-              ]
-            );
-          }}
-        >
-          <Ionicons name="checkmark-circle-outline" size={15} color="#22c55e" />
-          <Text style={s.offlineAvailableBannerText}>Mappa offline ✓</Text>
-          <Ionicons name="trash-outline" size={15} color="rgba(255,255,255,0.6)" />
-        </Pressable>
-      )}
-
-      {offline.status === "downloading" && (
-        <View style={s.downloadBanner}>
-          <Ionicons name="cloud-download-outline" size={15} color="#fff" />
-          <View style={s.downloadProgressWrap}>
-            <Text style={s.downloadBannerText}>
-              {t("nav.offline.downloading")} {offline.total > 0 ? `${Math.round((offline.progress / offline.total) * 100)}%` : "0%"}
-            </Text>
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any -- percentage width string required by StyleSheet */}
-            <View style={[s.downloadProgressBg]}><View style={[s.downloadProgressFill, { width: (offline.total > 0 ? `${Math.round((offline.progress / offline.total) * 100)}%` : "0%") as any }]} /></View>
-          </View>
-          <Pressable onPress={offline.cancelDownload} hitSlop={8}>
-            <Ionicons name="close-circle-outline" size={18} color="rgba(255,255,255,0.8)" />
-          </Pressable>
-        </View>
-      )}
-
-      {/* Stale offline tiles banner — shown after a reroute when the cached
-          tiles no longer fully cover the new polyline */}
-      {offline.status === "stale" && (
-        <View style={s.staleBanner}>
-          <Ionicons name="map-outline" size={14} color="#fff" />
-          <Text style={s.staleBannerText}>
-            Mappe offline non coprono il percorso ricalcolato
-          </Text>
-        </View>
-      )}
-
-      {/* Voice command button */}
-      <TouchableOpacity
-        style={[
-          s.voiceMicBtn,
-          whisper.recording && s.voiceMicBtnActive,
-        ]}
-        onPressIn={() => whisper.startRecording()}
-        onPressOut={handleVoiceCommand}
-        activeOpacity={0.8}
-      >
-        {whisper.transcribing ? (
-          <ActivityIndicator size="small" color="#fff" />
-        ) : (
-          <Ionicons
-            name={whisper.recording ? "mic" : "mic-outline"}
-            size={22}
-            color="#fff"
-          />
-        )}
-      </TouchableOpacity>
-
-      {/* Voice command toast */}
-      {voiceCmdToast !== null && (
-        <View style={s.voiceToast}>
-          <Text style={s.voiceToastText} numberOfLines={2}>{voiceCmdToast}</Text>
-        </View>
-      )}
+      <NavigationOfflineBanners
+        isOffline={isOffline}
+        offline={offline}
+        whisper={whisper}
+        voiceCmdToast={voiceCmdToast}
+        onVoiceCommandRelease={handleVoiceCommand}
+        styles={s}
+      />
 
       <NavigationWeather
         topPad={topPad}
@@ -751,9 +627,7 @@ export default function NavigateScreen() {
         bottomPad={bottomPad}
         signToIcon={signToIcon}
         formatDistance={formatDistance}
-        handleOpenInGoogleMaps={handleOpenInGoogleMaps}
-        handleOpenInWaze={handleOpenInWaze}
-        handleOpenInAppleMaps={handleOpenInAppleMaps}
+        waypoints={route.waypoints}
       />
     </View>
   );

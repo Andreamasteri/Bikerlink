@@ -1,3 +1,5 @@
+// LARGE-FILE-LOCKED — limite: 608
+// Aggiungi nuove funzionalità in: components/admin/ads/useAdAdmin.next.ts
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { Alert, BackHandler, Platform } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
