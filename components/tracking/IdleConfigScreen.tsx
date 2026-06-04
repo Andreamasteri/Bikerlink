@@ -12,6 +12,67 @@ import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { UpdateProfile, getMeasuredDrainPerHour, getStaticBatteryDrainPerHour, BatteryDrainStats } from "./tracking-utils";
 
+// ─── CalibrationBanner ───────────────────────────────────────────────────────
+
+function CalibrationBanner({
+  isCalibrated,
+  onCalibrate,
+}: {
+  isCalibrated: boolean;
+  onCalibrate: () => void;
+}) {
+  if (isCalibrated) {
+    return (
+      <View style={bannerStyles.successBanner}>
+        <View style={bannerStyles.successLeft} />
+        <View style={bannerStyles.bannerContent}>
+          <View style={bannerStyles.bannerRow}>
+            <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
+            <Text style={bannerStyles.successTitle}>Telefono calibrato</Text>
+          </View>
+          <Text style={bannerStyles.bannerDesc}>
+            Il supporto manubrio è configurato correttamente. Accelerazione,
+            angolo di piega e G-force vengono misurati con precisione.
+          </Text>
+          <TouchableOpacity
+            style={bannerStyles.secondaryBtn}
+            onPress={onCalibrate}
+            activeOpacity={0.75}
+          >
+            <Ionicons name="refresh-outline" size={13} color={Colors.textSecondary} />
+            <Text style={bannerStyles.secondaryBtnText}>Ricalibrare</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={bannerStyles.warningBanner}>
+      <View style={bannerStyles.warningLeft} />
+      <View style={bannerStyles.bannerContent}>
+        <View style={bannerStyles.bannerRow}>
+          <Ionicons name="warning-outline" size={18} color={Colors.warning} />
+          <Text style={bannerStyles.warningTitle}>Calibra la posizione del telefono</Text>
+        </View>
+        <Text style={bannerStyles.bannerDesc}>
+          Monta il telefono sul supporto manubrio prima di partire, poi esegui la
+          calibrazione. Serve a misurare correttamente accelerazione, frenata,
+          angolo di piega e G-force laterale.
+        </Text>
+        <TouchableOpacity
+          style={bannerStyles.primaryBtn}
+          onPress={onCalibrate}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="compass-outline" size={15} color="#fff" />
+          <Text style={bannerStyles.primaryBtnText}>Calibra ora</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 interface IdleConfigScreenProps {
   insets: { bottom: number };
   profile: UpdateProfile;
@@ -67,6 +128,9 @@ export function IdleConfigScreen({
       ]}
       showsVerticalScrollIndicator={false}
     >
+      {/* Calibration banner — always shown at top */}
+      <CalibrationBanner isCalibrated={isCalibrated} onCalibrate={handleOpenMountCalib} />
+
       {/* GPS Profile */}
       <View style={styles.profileSection}>
         <Pressable onPress={handleDebugTap} hitSlop={8}>
@@ -426,5 +490,95 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: Colors.accent,
     textDecorationLine: "underline",
+  },
+});
+
+const bannerStyles = StyleSheet.create({
+  warningBanner: {
+    flexDirection: "row",
+    backgroundColor: Colors.warning + "18",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.warning + "55",
+    overflow: "hidden",
+  },
+  successBanner: {
+    flexDirection: "row",
+    backgroundColor: Colors.success + "14",
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.success + "50",
+    overflow: "hidden",
+  },
+  warningLeft: {
+    width: 4,
+    backgroundColor: Colors.warning,
+  },
+  successLeft: {
+    width: 4,
+    backgroundColor: Colors.success,
+  },
+  bannerContent: {
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    gap: 6,
+  },
+  bannerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+  },
+  warningTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: Colors.warning,
+    flex: 1,
+  },
+  successTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: Colors.success,
+    flex: 1,
+  },
+  bannerDesc: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+  },
+  primaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: Colors.warning,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    alignSelf: "flex-start",
+    marginTop: 2,
+  },
+  primaryBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    color: "#fff",
+  },
+  secondaryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    marginTop: 2,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  secondaryBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
 });
