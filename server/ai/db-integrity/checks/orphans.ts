@@ -15,10 +15,10 @@ async function orphanCheck(child: string, fk: string, parent: string, parentPk =
   if (!(await tableExists(child)) || !(await tableExists(parent))) {
     return { ok: true, count: 0, sample: [], details: { skipped: "missing-table" } };
   }
-  const safeChild = child.replace(/[^a-z_]/g, "");
-  const safeFk = fk.replace(/[^a-z_]/g, "");
-  const safeParent = parent.replace(/[^a-z_]/g, "");
-  const safePk = parentPk.replace(/[^a-z_]/g, "");
+  const safeChild = child.replace(/[^a-z0-9_]/g, "");
+  const safeFk = fk.replace(/[^a-z0-9_]/g, "");
+  const safeParent = parent.replace(/[^a-z0-9_]/g, "");
+  const safePk = parentPk.replace(/[^a-z0-9_]/g, "");
   const countSql = `SELECT COUNT(*)::int AS c FROM "${safeChild}" c LEFT JOIN "${safeParent}" p ON c."${safeFk}" = p."${safePk}" WHERE c."${safeFk}" IS NOT NULL AND p."${safePk}" IS NULL`;
   const sampleSql = `SELECT c.* FROM "${safeChild}" c LEFT JOIN "${safeParent}" p ON c."${safeFk}" = p."${safePk}" WHERE c."${safeFk}" IS NOT NULL AND p."${safePk}" IS NULL LIMIT 10`;
   const cnt = await db.execute(sql.raw(countSql));
@@ -38,10 +38,10 @@ async function orphanCheck(child: string, fk: string, parent: string, parentPk =
 
 export async function deleteOrphans(child: string, fk: string, parent: string, parentPk = "id", dryRun = false) {
   if (!(await tableExists(child)) || !(await tableExists(parent))) return { applied: false, affected: 0, summary: "tabella mancante" };
-  const safeChild = child.replace(/[^a-z_]/g, "");
-  const safeFk = fk.replace(/[^a-z_]/g, "");
-  const safeParent = parent.replace(/[^a-z_]/g, "");
-  const safePk = parentPk.replace(/[^a-z_]/g, "");
+  const safeChild = child.replace(/[^a-z0-9_]/g, "");
+  const safeFk = fk.replace(/[^a-z0-9_]/g, "");
+  const safeParent = parent.replace(/[^a-z0-9_]/g, "");
+  const safePk = parentPk.replace(/[^a-z0-9_]/g, "");
   if (dryRun) {
     const cnt = await db.execute(sql.raw(
       `SELECT COUNT(*)::int AS c FROM "${safeChild}" c LEFT JOIN "${safeParent}" p ON c."${safeFk}" = p."${safePk}" WHERE c."${safeFk}" IS NOT NULL AND p."${safePk}" IS NULL`,
