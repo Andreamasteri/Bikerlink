@@ -69,8 +69,8 @@ _leafletRotateReady = true;
        funzionante senza rotazione invece di rimanere nera.
        rotateControl: false → nessun controllo nativo (usiamo la bussola RN);
        touchZoom resta attivo, così pinch-to-zoom e rotate convivono. */
-    rotate: _leafletRotateReady,
-    touchRotate: _leafletRotateReady,
+    rotate: typeof _leafletRotateReady !== 'undefined' && _leafletRotateReady,
+    touchRotate: typeof _leafletRotateReady !== 'undefined' && _leafletRotateReady,
     rotateControl: false,
     bearing: 0
   });
