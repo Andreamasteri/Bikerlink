@@ -21,6 +21,14 @@ in app.json né `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (quel secret aveva un valore p
 (`onCoordPicked` → {latitude,longitude}); per un display read-only di un punto usa
 `LeafletMiniMap` (passa `height`, es. misurata via onLayout dentro contenitori flex:1).
 
+## ⚠️ leaflet-rotate REINTRODOTTO da commit di ripristino — rimosso di nuovo
+
+Un commit di tipo "Ripristina mappa: riporta leaflet-map-html + leaflet-rotate-bundle allo stato di ieri"
+ha ripristinato il plugin. Ogni volta che si fa un `git revert` o si ripristina leaflet-map-html.ts
+da uno snapshot precedente, controllare che LEAFLET_ROTATE_JS **non** ritorni nell'import.
+Verifica rapida: `grep -n "LEAFLET_ROTATE\|leaflet-rotate-bundle" lib/leaflet-map-html.ts` deve
+restituire 0 risultati (solo commenti eventualmente).
+
 ## leaflet-rotate = mappa nera (NON reintrodurre)
 
 Il plugin **leaflet-rotate** (rotazione mappa a due dita) è stato provato e **rimosso**: nella
