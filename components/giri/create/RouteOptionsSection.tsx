@@ -26,6 +26,8 @@ interface RouteOptionsSectionProps {
   setAvoidFerries: (v: boolean) => void;
   avoidUnpaved: boolean;
   setAvoidUnpaved: (v: boolean) => void;
+  avoidWeather: boolean;
+  setAvoidWeather: (v: boolean) => void;
   visibility: "public" | "private";
   setVisibility: (v: "public" | "private") => void;
   COMPASS_DIRECTIONS: { label: string; deg: number }[];
@@ -52,6 +54,8 @@ export const RouteOptionsSection: React.FC<RouteOptionsSectionProps> = ({
   setAvoidFerries,
   avoidUnpaved,
   setAvoidUnpaved,
+  avoidWeather,
+  setAvoidWeather,
   visibility,
   setVisibility,
   COMPASS_DIRECTIONS,
@@ -156,6 +160,7 @@ export const RouteOptionsSection: React.FC<RouteOptionsSectionProps> = ({
         { key: "avoidTolls" as const, label: "Pedaggi", icon: "cash" as const, value: avoidTolls, set: setAvoidTolls },
         { key: "avoidFerries" as const, label: "Traghetti", icon: "ferry" as const, value: avoidFerries, set: setAvoidFerries },
         { key: "avoidUnpaved" as const, label: "Strade sterrate", icon: "terrain" as const, value: avoidUnpaved, set: setAvoidUnpaved },
+        { key: "avoidWeather" as const, label: "Zone con maltempo", icon: "weather-lightning-rainy" as const, value: avoidWeather, set: setAvoidWeather },
       ].map((opt) => (
         <View key={opt.key} style={s.toggleRow}>
           <View style={s.toggleInfo}>

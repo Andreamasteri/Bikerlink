@@ -44,6 +44,7 @@ export function useGiriCreateState(language?: string) {
   const [avoidTolls, setAvoidTolls] = useState(false);
   const [avoidFerries, setAvoidFerries] = useState(false);
   const [avoidUnpaved, setAvoidUnpaved] = useState(false);
+  const [avoidWeather, setAvoidWeather] = useState(false);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [selectedMotoId, setSelectedMotoId] = useState<string | null>(null);
   const [fuelLevel, setFuelLevel] = useState<number>(100);
@@ -339,7 +340,7 @@ export function useGiriCreateState(language?: string) {
     setCalculating(true);
     setWeatherPreview(null);
     try {
-      const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
+      const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language);
       setRouteResult(result);
       setDismissedWarnings(new Set());
       if (result.durationMinutes > 480 && !isMultiDay) {
@@ -396,7 +397,7 @@ export function useGiriCreateState(language?: string) {
       altitudeMaxM: routeResult?.altitudeMaxM ?? null,
       elevationProfile: routeResult?.elevationProfile ?? null,
       metadata: {
-        avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, daysCount, maxHoursPerDay,
+        avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, daysCount, maxHoursPerDay,
         isRoundTrip, roundTripHours, headingDeg,
         motorcycleId: selectedMotoId, fuelStopsNeeded,
         ...(aiProviderUsed ? { provider_used: aiProviderUsed } : {}),
@@ -443,6 +444,7 @@ export function useGiriCreateState(language?: string) {
     daysCount, setDaysCount, maxHoursPerDay, setMaxHoursPerDay,
     avoidHighways, setAvoidHighways, avoidTolls, setAvoidTolls,
     avoidFerries, setAvoidFerries, avoidUnpaved, setAvoidUnpaved,
+    avoidWeather, setAvoidWeather,
     visibility, setVisibility, selectedMotoId, setSelectedMotoId,
     fuelLevel, setFuelLevel, waypoints, setWaypoints,
     wpInputs, setWpInputs, wpSuggestions, setWpSuggestions,

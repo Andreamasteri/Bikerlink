@@ -122,6 +122,7 @@ export const calculateRouteRequestSchema = z.object({
   avoidTolls: z.boolean().optional(),
   avoidFerries: z.boolean().optional(),
   avoidUnpaved: z.boolean().optional(),
+  avoidWeather: z.boolean().optional(),
   roundTripHours: z.number().positive().optional(),
   isRoundTrip: z.boolean().optional(),
   roundTripDirection: z.string().optional(),

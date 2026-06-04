@@ -58,6 +58,7 @@ export default function GiriCreateScreen() {
     daysCount, setDaysCount, maxHoursPerDay, setMaxHoursPerDay,
     avoidHighways, setAvoidHighways, avoidTolls, setAvoidTolls,
     avoidFerries, setAvoidFerries, avoidUnpaved, setAvoidUnpaved,
+    avoidWeather, setAvoidWeather,
     visibility, setVisibility, selectedMotoId, setSelectedMotoId,
     fuelLevel, setFuelLevel, waypoints,
     wpInputs, wpSuggestions,
@@ -127,7 +128,7 @@ export default function GiriCreateScreen() {
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
       setCalculating(true);
       try {
-        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, roundTripHours, isRoundTrip, headingDeg, language);
+        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language);
         setRouteResult(result);
         setDismissedWarnings(new Set());
       } catch {
@@ -137,7 +138,7 @@ export default function GiriCreateScreen() {
       }
     }, 500);
     return () => { if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current); };
-  }, [waypoints, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, isRoundTrip, roundTripHours, headingDeg, mode, language, setRouteResult, setCalculating, setDismissedWarnings]);
+  }, [waypoints, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, isRoundTrip, roundTripHours, headingDeg, mode, language, setRouteResult, setCalculating, setDismissedWarnings]);
 
   const avgKmPerLiter = 18;
   const tankEstimateL = 15;
@@ -216,6 +217,7 @@ export default function GiriCreateScreen() {
           avoidTolls={avoidTolls} setAvoidTolls={setAvoidTolls}
           avoidFerries={avoidFerries} setAvoidFerries={setAvoidFerries}
           avoidUnpaved={avoidUnpaved} setAvoidUnpaved={setAvoidUnpaved}
+          avoidWeather={avoidWeather} setAvoidWeather={setAvoidWeather}
           visibility={visibility} setVisibility={setVisibility}
           COMPASS_DIRECTIONS={COMPASS_DIRECTIONS}
         />

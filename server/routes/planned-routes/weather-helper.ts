@@ -33,12 +33,29 @@ type HourlyDaily = {
   wind_speed_10m_max?: number[];
 };
 
+export interface WeatherSample {
+  lat: number;
+  lng: number;
+  name: string;
+  etaIso: string;
+  etaOffsetHours: number;
+  tempMax: number | null;
+  tempMin: number | null;
+  tempNow: number | null;
+  precipitation: number;
+  windSpeed: number | null;
+  precipProb: number;
+  weatherCode: number;
+  weatherDesc: string;
+  isSuitable: boolean;
+}
+
 export async function fetchWeatherForWaypoints(
   waypoints: Array<{ lat: number; lng: number; name?: string }>,
   departure: Date,
   avgSpeedKmh: number = 70,
-): Promise<unknown[]> {
-  const results: unknown[] = [];
+): Promise<Array<WeatherSample | null>> {
+  const results: Array<WeatherSample | null> = [];
 
   const cumulativeKm: number[] = [0];
   for (let i = 1; i < waypoints.length; i++) {
@@ -91,4 +108,66 @@ export async function fetchWeatherForWaypoints(
     } catch { results.push(null); }
   }
   return results;
+}
+
+/**
+ * Campiona punti distribuiti uniformemente lungo la geometria di un percorso.
+ * `coords` è una lista di coordinate GeoJSON [lng, lat, (ele)] come restituite
+ * da GraphHopper con points_encoded=false.
+ */
+export function samplePointsAlongPath(
+  coords: number[][] | undefined,
+  maxSamples: number = 8,
+): Array<{ lat: number; lng: number; name?: string }> {
+  if (!coords || coords.length === 0) return [];
+  const n = Math.min(maxSamples, coords.length);
+  if (n <= 1) {
+    const c = coords[0];
+    return [{ lat: c[1], lng: c[0] }];
+  }
+  const step = (coords.length - 1) / (n - 1);
+  const out: Array<{ lat: number; lng: number; name?: string }> = [];
+  for (let i = 0; i < n; i++) {
+    const idx = Math.round(i * step);
+    const c = coords[idx];
+    if (c && typeof c[0] === "number" && typeof c[1] === "number") {
+      out.push({ lat: c[1], lng: c[0] });
+    }
+  }
+  return out;
+}
+
+/**
+ * Costruisce le aree GraphHopper (custom_model) da evitare attorno ai punti con
+ * maltempo, più le regole di priorità che le azzerano. Ogni area è un quadrato
+ * di lato ~2*radiusKm centrato sul punto avverso.
+ */
+export function buildWeatherAvoidAreas(
+  points: Array<{ lat: number; lng: number }>,
+  radiusKm: number = 12,
+): { areas: Record<string, unknown>; priority: Array<{ if: string; multiply_by: number }> } {
+  const features = points.map((p, i) => {
+    const dLat = radiusKm / 111.32;
+    const dLng = radiusKm / (111.32 * Math.max(0.01, Math.cos(p.lat * Math.PI / 180)));
+    return {
+      type: "Feature",
+      id: `storm_${i}`,
+      properties: {},
+      geometry: {
+        type: "Polygon",
+        coordinates: [[
+          [p.lng - dLng, p.lat - dLat],
+          [p.lng + dLng, p.lat - dLat],
+          [p.lng + dLng, p.lat + dLat],
+          [p.lng - dLng, p.lat + dLat],
+          [p.lng - dLng, p.lat - dLat],
+        ]],
+      },
+    };
+  });
+  const priority = points.map((_, i) => ({ if: `in_storm_${i}`, multiply_by: 0.0 }));
+  return {
+    areas: { type: "FeatureCollection", features },
+    priority,
+  };
 }

@@ -24,6 +24,7 @@ import { useLocale, useT } from "@/lib/language-context";
 import { decodePolylineTuples as decodePolyline } from "@/lib/polyline";
 import { NavigationMap } from "@/components/navigate/NavigationMap";
 import { NavigationInstruction } from "@/components/navigate/NavigationInstruction";
+import { NavigationWeather, type NavWeatherZone } from "@/components/navigate/NavigationWeather";
 import { NavigationFinished } from "@/components/navigate/NavigationFinished";
 import type { NavigationStep, PlannedRoute } from "./[id].types";
 import {
@@ -43,6 +44,9 @@ const ANNOUNCE_DISTANCE_FAR = 200;
 const ANNOUNCE_DISTANCE_NEAR = 50;
 const REROUTE_DISTANCE_M = 200;
 const REROUTE_DELAY_MS = 5000;
+const WEATHER_AHEAD_KM = 15;
+const WEATHER_THROTTLE_MS = 10 * 60 * 1000;
+const WEATHER_AHEAD_REFETCH_M = 15000;
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
@@ -83,6 +87,14 @@ export default function NavigateScreen() {
   const [hasPermission, setHasPermission] = useState(false);
   const [isRerouting, setIsRerouting] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
+
+  // Weather during navigation
+  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [currentWeather, setCurrentWeather] = useState<NavWeatherZone | null>(null);
+  const [aheadWeather, setAheadWeather] = useState<NavWeatherZone | null>(null);
+  const lastWeatherFetchRef = useRef<number>(0);
+  const lastWeatherAheadPtRef = useRef<{ lat: number; lng: number } | null>(null);
+  const isFetchingWeatherRef = useRef(false);
 
   const { data: route, isLoading } = useQuery<PlannedRoute>({
     queryKey: ["/api/planned-routes", id],
@@ -282,6 +294,105 @@ export default function NavigateScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route]);
 
+  // ── Live weather sampling (current + ~15km ahead) ────────────────────────────
+  const fetchNavWeather = useCallback(async (lat: number, lng: number, closestIdx: number) => {
+    if (isFetchingWeatherRef.current || polylinePoints.length === 0) return;
+
+    // Punto ~15 km più avanti lungo la polyline.
+    let aheadPt: [number, number] = polylinePoints[polylinePoints.length - 1];
+    let acc = 0;
+    for (let i = closestIdx + 1; i < polylinePoints.length; i++) {
+      acc += haversineM(polylinePoints[i - 1][0], polylinePoints[i - 1][1], polylinePoints[i][0], polylinePoints[i][1]);
+      if (acc >= WEATHER_AHEAD_KM * 1000) { aheadPt = polylinePoints[i]; break; }
+    }
+
+    const now = Date.now();
+    const prevAhead = lastWeatherAheadPtRef.current;
+    const aheadMoved = prevAhead
+      ? haversineM(prevAhead.lat, prevAhead.lng, aheadPt[0], aheadPt[1])
+      : Infinity;
+    if (now - lastWeatherFetchRef.current < WEATHER_THROTTLE_MS && aheadMoved < WEATHER_AHEAD_REFETCH_M) {
+      return;
+    }
+
+    isFetchingWeatherRef.current = true;
+    lastWeatherFetchRef.current = now;
+    lastWeatherAheadPtRef.current = { lat: aheadPt[0], lng: aheadPt[1] };
+    setWeatherLoading(true);
+    try {
+      const resp = await apiRequest("POST", "/api/planned-routes/weather", {
+        waypoints: [
+          { lat, lng, name: "Posizione attuale" },
+          { lat: aheadPt[0], lng: aheadPt[1], name: "Prossima zona" },
+        ],
+        departureIso: new Date().toISOString(),
+      });
+      const data: NavWeatherZone[] = await resp.json();
+      if (Array.isArray(data) && data.length > 0) {
+        setCurrentWeather(data[0] ?? null);
+        setAheadWeather(data[1] ?? null);
+      }
+    } catch (e) {
+      console.warn("[NavWeather] fetch failed:", e);
+    } finally {
+      isFetchingWeatherRef.current = false;
+      setWeatherLoading(false);
+    }
+  }, [polylinePoints]);
+
+  const fetchNavWeatherRef = useRef(fetchNavWeather);
+  useEffect(() => { fetchNavWeatherRef.current = fetchNavWeather; }, [fetchNavWeather]);
+
+  // Ricalcolo on-demand evitando il maltempo (mai automatico).
+  const triggerWeatherReroute = useCallback(async () => {
+    if (isReroutingRef.current || !route) return;
+    const origin = lastKnownPosRef.current;
+    const wps = (route.waypoints ?? []).filter((wp) => wp.lat !== 0 || wp.lng !== 0);
+    const destination = wps.length > 0 ? wps[wps.length - 1] : null;
+    if (!origin || !destination) return;
+
+    isReroutingRef.current = true;
+    offRouteStartRef.current = null;
+    setIsRerouting(true);
+    try {
+      const resp = await apiRequest("POST", "/api/planned-routes/calculate", {
+        waypoints: [{ lat: origin.lat, lng: origin.lng }, { lat: destination.lat, lng: destination.lng }],
+        style: "curvy",
+        avoidWeather: true,
+      });
+      const newRoute = await resp.json();
+
+      let newPts: Array<[number, number]> = [];
+      if (newRoute.polyline) {
+        newPts = decodePolyline(newRoute.polyline);
+      } else if (newRoute.waypoints?.length) {
+        newPts = (newRoute.waypoints as Array<{ lat: number; lng: number }>)
+          .filter((wp) => wp.lat !== 0 || wp.lng !== 0)
+          .map((wp) => [wp.lat, wp.lng]);
+      }
+
+      if (newPts.length > 1) {
+        activeStepsRef.current = newRoute.navigationSteps ?? null;
+        if (newRoute.distanceKm) activeTotalKmRef.current = newRoute.distanceKm;
+        if (newRoute.durationMinutes) activeTotalMinRef.current = newRoute.durationMinutes;
+        announcedFarRef.current.clear();
+        announcedNearRef.current.clear();
+        setCurrentStep(0);
+        setMapReady(false);
+        setPolylinePoints(newPts);
+        // Forza un nuovo campionamento meteo sul nuovo percorso.
+        lastWeatherFetchRef.current = 0;
+        lastWeatherAheadPtRef.current = null;
+        Speech.speak(t("nav.rerouted"), { language: locale });
+      }
+    } catch (e) {
+      console.warn("[WeatherReroute] failed:", e);
+    } finally {
+      isReroutingRef.current = false;
+      setIsRerouting(false);
+    }
+  }, [route, locale, t]);
+
   const handlePositionUpdate = useCallback((lat: number, lng: number, heading: number) => {
     if (polylinePoints.length === 0) return;
     lastKnownPosRef.current = { lat, lng };
@@ -305,6 +416,9 @@ export default function NavigateScreen() {
     // Progress
     const pct = Math.min(100, Math.round((closestIdx / Math.max(1, polylinePoints.length - 1)) * 100));
     setProgressPct(pct);
+
+    // Live weather (throttled inside the helper)
+    fetchNavWeatherRef.current(lat, lng, closestIdx);
 
     // Update WebView map
     if (mapReady && webViewRef.current) {
@@ -620,6 +734,15 @@ export default function NavigateScreen() {
           <Text style={s.voiceToastText} numberOfLines={2}>{voiceCmdToast}</Text>
         </View>
       )}
+
+      <NavigationWeather
+        topPad={topPad}
+        loading={weatherLoading}
+        current={currentWeather}
+        ahead={aheadWeather}
+        rerouting={isRerouting}
+        onAvoidWeather={triggerWeatherReroute}
+      />
 
       <NavigationInstruction
         step={step}

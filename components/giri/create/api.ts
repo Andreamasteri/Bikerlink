@@ -23,6 +23,7 @@ export async function calcRoute(
   avoidTolls: boolean,
   avoidFerries: boolean,
   avoidUnpaved: boolean,
+  avoidWeather: boolean,
   roundTripHours?: number,
   isRoundTrip?: boolean,
   headingDeg?: number | null,
@@ -33,7 +34,7 @@ export async function calcRoute(
     method: "POST", credentials: "include",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      waypoints, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved,
+      waypoints, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather,
       roundTripHours, isRoundTrip, language,
       ...(headingDeg !== null && headingDeg !== undefined ? { headingDeg } : {}),
     }),

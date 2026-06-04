@@ -20,6 +20,12 @@ import {
   normalizeStyle,
   normalizeDrivingProfile,
 } from "../../routing/route-weights";
+import {
+  fetchWeatherForWaypoints,
+  samplePointsAlongPath,
+  buildWeatherAvoidAreas,
+  type WeatherSample,
+} from "./weather-helper";
 
 const router = Router();
 
@@ -313,6 +319,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     avoidTolls = false,
     avoidFerries = false,
     avoidUnpaved = false,
+    avoidWeather = false,
     roundTripHours,
     isRoundTrip,
     roundTripDirection,
@@ -386,13 +393,17 @@ router.post("/calculate", async (req: Request, res: Response) => {
       isMapTester: routeUser?.mapTester ?? false,
     };
 
-    const runRoute = (priorityRules: Array<{ if: string; multiply_by: number }>) => {
+    const runRoute = (
+      priorityRules: Array<{ if: string; multiply_by: number }>,
+      areas?: Record<string, unknown>,
+    ) => {
       // Richiediamo i details osm_way_id per poter valutare la copertura
       // telemetrica sui segmenti effettivi del percorso.
       const reqBody: Record<string, unknown> = { ...body, details: ["osm_way_id"] };
       const customModel: Record<string, unknown> = {};
       if (priorityRules.length > 0) customModel.priority = priorityRules;
       if (geo.distanceInfluence !== undefined) customModel.distance_influence = geo.distanceInfluence;
+      if (areas) customModel.areas = areas;
       if (Object.keys(customModel).length > 0) reqBody.custom_model = customModel;
       return getActiveRouter(reqBody as unknown as RouteRequest, routerOpts, res);
     };
@@ -401,6 +412,10 @@ router.post("/calculate", async (req: Request, res: Response) => {
     // la base su cui valutare la copertura telemetrica del percorso richiesto.
     const baseResult = await runRoute(basePriority);
     let path = baseResult.paths[0];
+    // Insieme di regole di priorità effettivamente applicate al percorso finale
+    // (base + eventuale strato telemetrico). Serve come base per l'eventuale
+    // ricalcolo "evita maltempo" così da non perdere gli altri vincoli.
+    let effectivePriority = basePriority;
 
     // Strato telemetrico opzionale (real / my_style): applicato SOLO se i
     // segmenti effettivi del percorso hanno copertura curvy_score valida.
@@ -412,6 +427,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
         try {
           const boosted = await runRoute([...basePriority, ...telemetry.priority]);
           path = boosted.paths[0];
+          effectivePriority = [...basePriority, ...telemetry.priority];
         } catch (telemetryErr: unknown) {
           // Lo strato telemetrico (regole su osm_way_id) può non essere supportato
           // dal motore di routing: mantieni il geometrico (fallback stabile) e
@@ -424,6 +440,52 @@ router.post("/calculate", async (req: Request, res: Response) => {
       }
     }
 
+    // Strato meteo opzionale ("evita zone con maltempo"): campiona il meteo lungo
+    // il percorso finale e, se trova zone avverse, ricalcola evitandole. Se non è
+    // possibile evitarle (motore senza supporto aree o zone inevitabili) si tiene
+    // il percorso migliore disponibile e si restituisce un warning STRUTTURATO —
+    // mai un fallimento silenzioso.
+    let weatherWarning: string | null = null;
+    if (avoidWeather) {
+      try {
+        const coords = (path.points as { coordinates?: number[][] })?.coordinates;
+        const samples = samplePointsAlongPath(coords, 8);
+        if (samples.length > 0) {
+          const departure = new Date(Date.now() + 3600_000);
+          const weather = await fetchWeatherForWaypoints(samples, departure);
+          const evaluated = weather.filter((w): w is WeatherSample => !!w);
+          const adverse = evaluated.filter((w) => !w.isSuitable);
+          if (evaluated.length === 0) {
+            // Provider meteo degradato: nessun punto valutabile → non possiamo
+            // confermare l'assenza di maltempo. Mai un fallimento silenzioso.
+            weatherWarning = "weather_unavoidable";
+          } else if (adverse.length > 0) {
+            const avoid = buildWeatherAvoidAreas(adverse.map((a) => ({ lat: a.lat, lng: a.lng })));
+            try {
+              const rerouted = await runRoute([...effectivePriority, ...avoid.priority], avoid.areas);
+              const newPath = rerouted.paths[0];
+              const newCoords = (newPath.points as { coordinates?: number[][] })?.coordinates;
+              const newSamples = samplePointsAlongPath(newCoords, 8);
+              const newWeather = await fetchWeatherForWaypoints(newSamples, departure);
+              const stillAdverse = newWeather.filter((w): w is WeatherSample => !!w && !w.isSuitable);
+              // Adottiamo comunque il percorso ricalcolato (best effort), ma se
+              // restano zone avverse segnaliamo che il maltempo non è evitabile.
+              path = newPath;
+              if (stillAdverse.length > 0) weatherWarning = "weather_unavoidable";
+            } catch (avoidErr: unknown) {
+              console.warn("[routing] weather avoidance failed, keep route:", (avoidErr as Error)?.message ?? avoidErr);
+              weatherWarning = "weather_unavoidable";
+            }
+          }
+        }
+      } catch (weatherErr: unknown) {
+        // Campionamento meteo non disponibile: non blocchiamo il calcolo del
+        // percorso, ma non possiamo confermare l'assenza di maltempo.
+        console.warn("[routing] weather sampling failed:", (weatherErr as Error)?.message ?? weatherErr);
+        weatherWarning = "weather_unavoidable";
+      }
+    }
+
     return res.json({
       encoded: path.points,
       distanceKm: Math.round(path.distance / 100) / 10,
@@ -432,6 +494,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
       bikerScore: 0.8,
       elevation: extractElevationProfile(path.points as string, (path as { points_encoded?: boolean; points?: { coordinates?: number[][] } }).points_encoded === false ? (path.points as { coordinates?: number[][] })?.coordinates : undefined),
       warning: myStyleWarning,
+      weatherWarning,
     });
   } catch (err: unknown) {
     console.error("[routing] error:", (err as Error)?.message ?? err);

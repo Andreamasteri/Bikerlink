@@ -13,6 +13,7 @@ interface RouteResult {
   bikerScore: number;
   approximate?: boolean;
   warning?: string | null;
+  weatherWarning?: string | null;
   navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
   elevationProfile?: Array<{ distanceKm: number; altitudeM: number }> | null;
   elevationGainM?: number | null;
@@ -144,19 +145,33 @@ export const RouteResultCard: React.FC<RouteResultCardProps> = ({
           <Text style={s.weatherBannerText}>Caricamento meteo...</Text>
         </View>
       )}
-      {!weatherLoading && weatherPreview && weatherPreview.length > 0 && (
-        <View style={s.weatherBanner}>
-          <Ionicons name={weatherPreview[0].isSuitable ? "partly-sunny-outline" : "rainy-outline"} size={20} color={weatherPreview[0].isSuitable ? colors.accent : colors.accentRed} />
-          <View style={{ flex: 1 }}>
-            <Text style={s.weatherBannerText}>
-              {weatherPreview[0].tempNow !== null ? `${Math.round(weatherPreview[0].tempNow)}°C` : ""}
-              {weatherPreview[0].precipProb > 30 ? ` · 💧 ${weatherPreview[0].precipProb}% pioggia` : ""}
-              {" · "}{weatherPreview[0].weatherDesc}
-            </Text>
-            {!weatherPreview.every((w) => w.isSuitable) && (
-              <Text style={[s.weatherBannerText, { color: colors.accentRed, fontSize: 11 }]}>⚠ Pioggia prevista in alcune tappe</Text>
-            )}
+      {!weatherLoading && weatherPreview && weatherPreview.length > 0 && (() => {
+        const unfavorable = weatherPreview.filter((w) => !w.isSuitable);
+        return (
+          <View style={s.weatherBanner}>
+            <Ionicons name={weatherPreview[0].isSuitable ? "partly-sunny-outline" : "rainy-outline"} size={20} color={weatherPreview[0].isSuitable ? colors.accent : colors.accentRed} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.weatherBannerText}>
+                {weatherPreview[0].tempNow !== null ? `${Math.round(weatherPreview[0].tempNow)}°C` : ""}
+                {weatherPreview[0].precipProb > 30 ? ` · 💧 ${weatherPreview[0].precipProb}% pioggia` : ""}
+                {" · "}{weatherPreview[0].weatherDesc}
+              </Text>
+              {unfavorable.length > 0 && (
+                <Text style={[s.weatherBannerText, { color: colors.accentRed, fontSize: 11, marginTop: 2 }]}>
+                  ⚠ Maltempo previsto: {unfavorable.map((w) => w.name || "tappa").join(", ")}
+                </Text>
+              )}
+            </View>
           </View>
+        );
+      })()}
+
+      {routeResult.weatherWarning === "weather_unavoidable" && (
+        <View style={s.weatherUnavoidableRow}>
+          <MaterialCommunityIcons name="weather-lightning-rainy" size={16} color={colors.accentRed} />
+          <Text style={s.weatherUnavoidableText}>
+            Maltempo non evitabile su questo percorso
+          </Text>
         </View>
       )}
 
@@ -198,6 +213,8 @@ const styles = (colors: ThemeColors) => StyleSheet.create({
   bsBarFill: { height: "100%", borderRadius: 4 },
   weatherBanner: { flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.background, padding: 12, borderRadius: 12, marginTop: 12 },
   weatherBannerText: { fontFamily: "Inter_500Medium", fontSize: 13, color: colors.text },
+  weatherUnavoidableRow: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.accentRed + "22", borderRadius: 8, padding: 10, borderWidth: 1, borderColor: colors.accentRed + "44", marginTop: 8 },
+  weatherUnavoidableText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: colors.accentRed, flex: 1 },
   multiDayPreview: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12, backgroundColor: "#a78bfa15", padding: 10, borderRadius: 10 },
   multiDayPreviewText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#a78bfa" },
   fuelPreview: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 8, backgroundColor: colors.accent + "15", padding: 10, borderRadius: 10 },

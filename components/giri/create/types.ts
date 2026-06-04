@@ -13,6 +13,7 @@ export interface RouteResult {
   bikerScore: number;
   approximate?: boolean;
   warning?: string | null;
+  weatherWarning?: string | null;
   navigationSteps?: Array<{ sign: number; text: string; distance: number; interval: [number, number]; streetName?: string }> | null;
   elevationProfile?: Array<{ distanceKm: number; altitudeM: number }> | null;
   elevationGainM?: number | null;
