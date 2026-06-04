@@ -22,6 +22,8 @@ interface ProposalLocationProps {
   setNewStop: (val: string) => void;
   handleAddStop: () => void;
   handleRemoveStop: (idx: number) => void;
+  onAiPlan?: () => void;
+  onLoadRoute?: () => void;
 }
 
 export const ProposalLocation = ({
@@ -43,6 +45,8 @@ export const ProposalLocation = ({
   setNewStop,
   handleAddStop,
   handleRemoveStop,
+  onAiPlan,
+  onLoadRoute,
 }: ProposalLocationProps) => {
   return (
     <View>
@@ -97,6 +101,23 @@ export const ProposalLocation = ({
           <Text style={styles.gpsButtonText}>DALLA MAPPA</Text>
         </TouchableOpacity>
       </View>
+
+      {(onAiPlan || onLoadRoute) && (
+        <View style={styles.routeRow}>
+          {onAiPlan && (
+            <TouchableOpacity style={styles.routeButton} onPress={onAiPlan}>
+              <MaterialCommunityIcons name="robot" size={18} color={Colors.accent} />
+              <Text style={styles.routeButtonText}>Pianifica AI</Text>
+            </TouchableOpacity>
+          )}
+          {onLoadRoute && (
+            <TouchableOpacity style={styles.routeButton} onPress={onLoadRoute}>
+              <MaterialCommunityIcons name="map-marker-path" size={18} color={Colors.accent} />
+              <Text style={styles.routeButtonText}>Carica percorso</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {needsDestination && (
         <>
@@ -205,6 +226,30 @@ const styles = StyleSheet.create({
   gpsButtonText: {
     color: "#000",
     fontSize: 16,
+    fontWeight: "600",
+  },
+  routeRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  routeButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.surface,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: Colors.accent + "60",
+  },
+  routeButtonText: {
+    color: Colors.accent,
+    fontSize: 14,
     fontWeight: "600",
   },
   stopInputRow: {

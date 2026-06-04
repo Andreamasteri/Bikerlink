@@ -14,7 +14,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
 import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
 import MapPickerContent from "@/components/MapPickerModal";
@@ -34,6 +34,8 @@ import { ProposalBasicInfo } from "@/components/proposals/create/ProposalBasicIn
 import { ProposalLocation } from "@/components/proposals/create/ProposalLocation";
 import { ProposalVehicle } from "@/components/proposals/create/ProposalVehicle";
 import { ProposalPreferences } from "@/components/proposals/create/ProposalPreferences";
+import { AiPlanModal, type AiRouteResult } from "@/components/proposals/create/AiPlanModal";
+import { LoadRouteModal, type LoadedRouteResult } from "@/components/proposals/create/LoadRouteModal";
 
 const BIKER_SEARCH_TYPES = [
   { key: "find_a_friend", label: "FindAFriend", subtitleKey: "proposals.sub.findFriend", icon: "account-group", color: Colors.maleIcon },
@@ -53,6 +55,31 @@ const TARGET_USER_TYPE_OPTIONS = [
   { key: "hitchhiker", labelKey: "proposal.targetHitchhiker", icon: "thumb-up", color: Colors.success },
   { key: "hotcher", labelKey: "proposal.targetHotcher", icon: "account-arrow-right", color: Colors.accent },
 ];
+
+/** Geocodifica via proxy server (evita chiamate dirette Nominatim con timeout infinito) */
+async function geocodeDeparture(address: string): Promise<{ lat: number; lng: number } | null> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    const url = new URL("/api/planned-routes/geocode", getApiUrl());
+    url.searchParams.set("q", address);
+    const res = await fetch(url.toString(), {
+      credentials: "include",
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return null;
+    const first = data[0];
+    const lat = parseFloat(first.lat);
+    const lng = parseFloat(first.lng ?? first.lon);
+    if (isNaN(lat) || isNaN(lng)) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
 
 export default function CreateProposalScreen() {
   const router = useRouter();
@@ -84,6 +111,8 @@ export default function CreateProposalScreen() {
   const [gpsLoading, setGpsLoading] = useState(false);
   const [showMapPicker, setShowMapPicker] = useState(false);
   const [mapPickerMode, setMapPickerMode] = useState<"departure" | "destination">("departure");
+  const [showAiPlanModal, setShowAiPlanModal] = useState(false);
+  const [showLoadRouteModal, setShowLoadRouteModal] = useState(false);
 
   const [extendToDestination, setExtendToDestination] = useState(false);
   const [destinationExtRadius, setDestinationExtRadius] = useState("50");
@@ -129,6 +158,29 @@ export default function CreateProposalScreen() {
       setGpsLoading(false);
     }
   }, [t]);
+
+  /** Popola partenza, tappe e destinazione dal risultato AI o dal percorso caricato */
+  const applyRouteToForm = useCallback(
+    (result: AiRouteResult | LoadedRouteResult) => {
+      setDepartureLat(result.departure.lat);
+      setDepartureLng(result.departure.lng);
+      setDepartureAddress(result.departure.name);
+      setGpsSource("map");
+      if (result.stops.length > 0) {
+        setStops(result.stops);
+      }
+      if (result.destination) {
+        setDestinationAddress(result.destination.name);
+      }
+      Alert.alert(
+        "Percorso caricato",
+        `Partenza: ${result.departure.name}` +
+          (result.stops.length > 0 ? `\n${result.stops.length} tappa/e intermedie` : "") +
+          (result.destination ? `\nDestinazione: ${result.destination.name}` : "")
+      );
+    },
+    []
+  );
 
   const isBikerOrCoppia = user?.userType === "biker" || user?.userType === "coppia";
   const isZavorrina = user?.userType === "zavorrina";
@@ -207,6 +259,12 @@ export default function CreateProposalScreen() {
   const createMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
       const res = await apiRequest("POST", "/api/proposals", data);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          (body as { message?: string }).message || `Errore ${res.status}`
+        );
+      }
       return await res.json();
     },
     onSuccess: () => {
@@ -214,7 +272,7 @@ export default function CreateProposalScreen() {
       router.back();
     },
     onError: (error: Error) => {
-      Alert.alert(t("common.error"), (error as Error).message);
+      Alert.alert(t("common.error"), error.message);
     },
   });
 
@@ -304,30 +362,29 @@ export default function CreateProposalScreen() {
 
     let finalLat = departureLat;
     let finalLng = departureLng;
+
     if (!finalLat || !finalLng) {
       if (departureAddress.trim()) {
-        try {
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(departureAddress.trim())}&format=json&limit=1`,
-            { headers: { "User-Agent": "BikerLink/1.0" } }
+        // Geocodifica via proxy server (timeout 10s, evita blocco Nominatim)
+        const geo = await geocodeDeparture(departureAddress.trim());
+        if (geo) {
+          finalLat = geo.lat;
+          finalLng = geo.lng;
+          setDepartureLat(finalLat);
+          setDepartureLng(finalLng);
+          setGpsSource("profile");
+        } else {
+          Alert.alert(
+            "Indirizzo non trovato",
+            "Non è stato possibile localizzare l'indirizzo inserito. Usa GPS o seleziona dalla mappa."
           );
-          const geoData = await geoRes.json();
-          if (geoData && geoData.length > 0) {
-            finalLat = parseFloat(geoData[0].lat);
-            finalLng = parseFloat(geoData[0].lon);
-            setDepartureLat(finalLat);
-            setDepartureLng(finalLng);
-            setGpsSource("profile");
-          } else {
-            Alert.alert(t("proposals.create.addressNotFound"), t("proposals.create.addressNotFoundDesc"));
-            return;
-          }
-        } catch {
-          Alert.alert(t("proposals.create.geocodingError"), t("proposals.create.geocodingErrorDesc"));
           return;
         }
       } else {
-        Alert.alert(t("proposals.create.missingLocation"), t("proposals.create.missingLocationDesc"));
+        Alert.alert(
+          "Posizione mancante",
+          "Inserisci un indirizzo di partenza o usa il GPS / seleziona dalla mappa."
+        );
         return;
       }
     }
@@ -496,6 +553,8 @@ export default function CreateProposalScreen() {
               setNewStop={setNewStop}
               handleAddStop={handleAddStop}
               handleRemoveStop={handleRemoveStop}
+              onAiPlan={() => setShowAiPlanModal(true)}
+              onLoadRoute={() => setShowLoadRouteModal(true)}
             />
 
             <ProposalPreferences
@@ -560,6 +619,18 @@ export default function CreateProposalScreen() {
           }
         />
       )}
+
+      <AiPlanModal
+        visible={showAiPlanModal}
+        onClose={() => setShowAiPlanModal(false)}
+        onRouteReady={applyRouteToForm}
+      />
+
+      <LoadRouteModal
+        visible={showLoadRouteModal}
+        onClose={() => setShowLoadRouteModal(false)}
+        onRouteSelected={applyRouteToForm}
+      />
     </>
   );
 }
