@@ -186,6 +186,12 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
       onReady, onRegionChangeComplete, setMapReady,
       onMapReadyEpoch: () => setMapReadyEpoch((n) => n + 1),
       onViewStateChange: (s) => setViewState(s),
+      onMapInitError: (error) => {
+        tlm.emit("map_init_failed", {
+          errorMessage: error,
+          details: { source: "leaflet_init_block" },
+        });
+      },
     }),
     [users, clubPins, easterEggs, onUserPress, onClubPress, onEventPress, onEasterEggPress, onReady, onRegionChangeComplete],
   );

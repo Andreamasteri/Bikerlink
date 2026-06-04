@@ -23,6 +23,7 @@ interface MapMessageHandlerOptions {
   }) => void;
   setMapReady: (ready: boolean) => void;
   onMapReadyEpoch?: () => void;
+  onMapInitError?: (error: string) => void;
 }
 
 export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
@@ -52,6 +53,10 @@ export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
           lat: msg.lat ?? 0,
           lng: msg.lng ?? 0,
         });
+      } else if (msg.type === "mapInitError") {
+        const errMsg = typeof msg.error === "string" ? msg.error : "unknown";
+        console.warn("[InteractiveMap] mapInitError:", errMsg);
+        opts.onMapInitError?.(errMsg);
       } else if (msg.type === "omsStatus") {
         console.log("[InteractiveMap] omsStatus", {
           omsReady: msg.omsReady,

@@ -58,6 +58,13 @@ _leafletRotateReady = true;
     } catch(e) {}
   }
 
+  /* Task #3132 — Telemetria mappa nera: qualunque errore non gestito nel blocco
+     di init (L.map, layerGroup, OMS, bridge) viene catturato e segnalato via
+     postMsg("mapInitError") al lato RN, che lo emette come evento telemetria
+     "map_init_failed". Questo rende rilevabile automaticamente la mappa nera
+     senza dover leggere i log del dispositivo. */
+  try {
+
   var map = L.map("map", {
     center: [41.9028, 12.4964],
     zoom: 6,
@@ -604,6 +611,16 @@ _leafletRotateReady = true;
 
   postMsg({ type: "mapReady" });
   postViewState();
+
+  } catch(e) {
+    /* Blocco init Leaflet fallito → mappa nera. Segnala l'errore al lato RN
+       per la telemetria (map_init_failed) e per il panel admin. */
+    postMsg({
+      type: "mapInitError",
+      error: (e && e.message) ? String(e.message).slice(0, 300) : String(e).slice(0, 300)
+    });
+  }
+
 })();
 </script>
 </body>
