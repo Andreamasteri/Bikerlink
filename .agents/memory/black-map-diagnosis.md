@@ -1,0 +1,43 @@
+---
+name: Black map diagnosis via maps_telemetry_events
+description: How to diagnose the "mappa nera" using prod telemetry; what the data actually proves about the cause.
+---
+
+# Mappa nera — diagnosi data-driven
+
+La causa NON si vede come `map_init_failed` o `webview_crash`: in tutto il DB prod
+`maps_telemetry_events` quei due eventi sono **sempre 0**. La mappa nera è un errore
+di **render React** del componente mappa (InteractiveMap), intercettato
+dall'ErrorBoundary, quindi **a monte** del try/catch di init di Leaflet → nessun
+evento d'errore viene loggato. Per questo è "nera" e non "errore mappa".
+
+## Segnale decisivo (tecnica di diagnosi)
+Conta `map_init` / `map_ready` per `app_version` (e per `user_id`) in prod:
+```sql
+SELECT app_version, event, COUNT(*) FROM maps_telemetry_events
+WHERE event IN ('map_init','map_ready') GROUP BY 1,2 ORDER BY 1 DESC;
+```
+- Sui build dove il componente monta, `map_init ≈ map_ready` (la mappa funziona).
+- Lo **stesso device** che apriva la mappa decine di volte su un build vecchio (es.
+  54.10.36: map_init=map_ready=34) dopo l'update a un OTA del ramo 55.x emette
+  **0 map_init** pur continuando a mandare eventi GPS (stessa pipeline telemetria,
+  quindi non è "telemetria persa": è la mappa che **non si inizializza**).
+
+`map_init` è emesso al **mount** di InteractiveMap (useEffect), prima della WebView:
+se non parte mai, il componente mappa crasha in render / non monta su quel ramo.
+
+**Why:** distingue nettamente "WebView/tile rotti" (init OK, paint KO) da
+"componente che non monta" (0 map_init). Nel caso BikerLink era il secondo.
+
+## Cosa è (e non è) la causa
+- La WebView NON era stata toccata; leaflet-rotate era **codice morto** (bundle non
+  importato) — rimuoverlo da solo non basta se il crash è nel **render** (es. la
+  bussola `MapNorthCompass` aggiunta a InteractiveMap dalla feature rotazione
+  due-dita). Rimuovere anche il compass dal render è la parte che conta.
+
+## Trappola operativa adozione OTA
+Un device può restare bloccato su un OTA **vecchio** (es. 55.10.10) mentre esistono
+già fix più recenti approvati (55.10.6x) con ~0 download. "Continuo a vedere nero"
+spesso = non ha ancora scaricato il fix, NON che il fix non funziona. Verifica
+sempre l'`app_version` reale del device nella telemetria prima di ri-pubblicare.
+Conferma del fix = ricomparsa di `map_init`/`map_ready` per il ramo 55.x.
