@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { View, Pressable, StyleSheet, findNodeHandle } from "react-native";
+import { View, Pressable, StyleSheet, findNodeHandle, type LayoutChangeEvent } from "react-native";
 import Colors from "@/constants/colors";
 
 interface CardLayout {
@@ -16,23 +16,48 @@ interface HomeMapSectionProps {
 
 export const HomeMapSection: React.FC<HomeMapSectionProps> = ({ onCardLayout, rootRef }) => {
   const cardRef = useRef<View>(null);
+  const reportedRef = useRef(false);
 
-  const handleLayout = () => {
-    if (!cardRef.current || !rootRef.current) return;
-    const rootNode = findNodeHandle(rootRef.current);
+  // Pixel-accurate refinement: measure the placeholder relative to the root
+  // view so the absolutely-positioned map overlay lands exactly on top of it
+  // (corrects any Android status-bar offset). This is best-effort: under the
+  // New Architecture (Fabric) measureLayout's native callbacks can silently
+  // never fire, so we never DEPEND on it for the map to mount.
+  const refineRootRelative = () => {
+    const card = cardRef.current;
+    const root = rootRef.current;
+    if (!card || !root) return;
+    const rootNode = findNodeHandle(root);
     if (!rootNode) return;
-    cardRef.current.measureLayout(
+    card.measureLayout(
       rootNode,
       (x, y, width, height) => {
-        onCardLayout({ top: y, left: x, width, height });
+        if (width > 0 && height > 0) {
+          reportedRef.current = true;
+          onCardLayout({ top: y, left: x, width, height });
+        }
       },
       () => {
-        if (__DEV__) console.warn("[HomeMapSection] measureLayout failed, falling back to measure()");
-        cardRef.current?.measure((_x, _y, width, height, pageX, pageY) => {
-          onCardLayout({ top: pageY, left: pageX, width, height });
-        });
+        // measureLayout failed — the onLayout fallback below already mounted
+        // the map, so there is nothing more to do here.
       },
     );
+  };
+
+  const handleLayout = (e: LayoutChangeEvent) => {
+    // GUARANTEED mount path. onLayout always fires when the placeholder is laid
+    // out with a real size, on BOTH the old and new (Fabric) architectures.
+    // At scroll offset 0 its coordinates already match the placeholder's
+    // root-relative position, so we can mount the map immediately from them.
+    // Relying solely on measureLayout (whose callbacks silently never fire on
+    // Fabric) previously left compactLayout null forever -> InteractiveMap was
+    // never mounted -> permanently black map on EAS/OTA builds.
+    const { x, y, width, height } = e.nativeEvent.layout;
+    if (!reportedRef.current && width > 0 && height > 0) {
+      reportedRef.current = true;
+      onCardLayout({ top: y, left: x, width, height });
+    }
+    refineRootRelative();
   };
 
   return (

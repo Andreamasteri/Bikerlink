@@ -35,6 +35,27 @@ se non parte mai, il componente mappa crasha in render / non monta su quel ramo.
   bussola `MapNorthCompass` aggiunta a InteractiveMap dalla feature rotazione
   due-dita). Rimuovere anche il compass dal render è la parte che conta.
 
+## CAUSA CONFERMATA (Fabric/New Arch) — measureLayout non monta la mappa
+Il `map_init=0` NON era un crash di render: InteractiveMap nella home è gated da
+`{compactLayout && <InteractiveMap/>}` in `app/(tabs)/index.tsx`. `compactLayout`
+viene valorizzato SOLO dal callback `onCardLayout` di `HomeMapSection`, che
+nell'implementazione fragile chiamava **solo** `cardRef.measureLayout(findNodeHandle(root), success, error)`.
+**Sotto New Architecture (Fabric) `measureLayout` può non chiamare NÉ success NÉ
+error** → `onCardLayout` mai → `compactLayout` resta `null` → mappa mai montata →
+si vede solo il placeholder scuro = "mappa nera", con GPS attivo e zero crash.
+Per questo la **vecchia APK (old arch) funziona** ma il **nuovo build EAS / OTA
+(Fabric) no** = "EAS ha usato file sbagliati".
+**Fix:** in `HomeMapSection.handleLayout` usare direttamente
+`e.nativeEvent.layout` dell'evento `onLayout` (scatta sempre, su entrambe le
+architetture; a scroll offset 0 le coords sono già root-relative) per chiamare
+`onCardLayout` e garantire il mount; `measureLayout(root)` resta solo come
+raffinamento. In `index.tsx` `handleCardLayout` deve risincronizzare i valori
+`anim*` ad OGNI report compatto (non solo il primo) o il refine viene ignorato →
+"mappa fuori posto".
+**Why:** `measure`/`measureLayout` basati su node handle sono inaffidabili su
+Fabric; `onLayout` no. Non far MAI dipendere il mount di un componente solo da una
+callback di `measureLayout`/`measure`.
+
 ## Trappola operativa adozione OTA
 Un device può restare bloccato su un OTA **vecchio** (es. 55.10.10) mentre esistono
 già fix più recenti approvati (55.10.6x) con ~0 download. "Continuo a vedere nero"

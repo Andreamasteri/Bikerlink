@@ -139,8 +139,15 @@ export default function MapScreen() {
 
   const handleCardLayout = (layout: CardLayout) => {
     setCompactLayout(layout);
-    if (!firstLayoutDoneRef.current) {
-      firstLayoutDoneRef.current = true;
+    firstLayoutDoneRef.current = true;
+    // Keep the compact (non-fullscreen) overlay glued to the latest measured
+    // placeholder position. HomeMapSection may report twice: first from the
+    // guaranteed onLayout event, then a refined measureLayout(root) value.
+    // Syncing the animated values on every compact report (not just the first)
+    // ensures the refinement actually repositions the overlay instead of being
+    // ignored — otherwise an approximate first value could leave the map
+    // visually misaligned ("mappa fuori posto").
+    if (!mapFullscreen) {
       animTop.setValue(layout.top);
       animLeft.setValue(layout.left);
       animWidth.setValue(layout.width);
