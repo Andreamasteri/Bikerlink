@@ -17,7 +17,6 @@ interface MapMessageHandlerOptions {
     zoom: number;
     minZoom: number;
     maxZoom: number;
-    bearing: number;
     lat: number;
     lng: number;
   }) => void;
@@ -36,7 +35,6 @@ export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
         zoom?: number;
         minZoom?: number;
         maxZoom?: number;
-        bearing?: number;
         markerType?: string;
         id?: string;
         omsReady?: boolean;
@@ -49,7 +47,6 @@ export function createMapMessageHandler(opts: MapMessageHandlerOptions) {
           zoom: msg.zoom,
           minZoom: msg.minZoom ?? 0,
           maxZoom: msg.maxZoom ?? 19,
-          bearing: msg.bearing ?? 0,
           lat: msg.lat ?? 0,
           lng: msg.lng ?? 0,
         });
