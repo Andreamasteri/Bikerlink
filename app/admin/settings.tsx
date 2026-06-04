@@ -20,6 +20,7 @@ import { AppFeaturesSection } from "@/components/admin/settings/AppFeaturesSecti
 import { RegistrationSection } from "@/components/admin/settings/RegistrationSection";
 import { UptimeSection } from "@/components/admin/settings/UptimeSection";
 import { HomeMessageSection } from "@/components/admin/settings/HomeMessageSection";
+import { SplashMessagesSection } from "@/components/admin/settings/SplashMessagesSection";
 import { SyncSection } from "@/components/admin/settings/SyncSection";
 import { MapStyleSection } from "@/components/admin/settings/MapStyleSection";
 import { useAdminSettingsState } from "@/components/admin/settings/useAdminSettingsState";
@@ -61,6 +62,12 @@ export default function AdminSettings() {
           setHomeMessageText={state.setHomeMessageText}
           onSaveHomeMessageText={state.handleSaveHomeMessageText}
           isSavingHomeMessage={state.isSavingHomeMessage}
+        />
+        <SplashMessagesSection
+          splashMode={state.splashMode}
+          handleSaveSplashMode={state.handleSaveSplashMode}
+          splashMessagesList={state.splashMessagesList}
+          handleSaveSplashList={state.handleSaveSplashList}
         />
 
         {/* ── 2. ACCESSO & REGISTRAZIONE ── */}
