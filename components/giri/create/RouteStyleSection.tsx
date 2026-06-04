@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import { View, Text, Pressable, StyleSheet, Animated } from "react-native";
+import { View, Text, StyleSheet, Animated, PanResponder } from "react-native";
 import { useColors } from "@/hooks/useColors";
 import type { ThemeColors } from "@/constants/colors";
 
@@ -12,7 +12,7 @@ interface RouteStyleSectionProps {
 }
 
 const NOTCH = 18;
-const TRACK_H = 40;
+const TRACK_H = 44;
 
 export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
   style,
@@ -20,9 +20,11 @@ export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
   STYLE_LEVELS,
 }) => {
   const colors = useColors();
+  const n = STYLE_LEVELS.length;
+
   const activeIndex = Math.max(
     0,
-    Math.min(STYLE_LEVELS.length - 1, STYLE_LEVELS.findIndex((sl) => sl.key === style))
+    Math.min(n - 1, STYLE_LEVELS.findIndex((sl) => sl.key === style))
   );
 
   const scaleAnims = useRef(
@@ -40,10 +42,42 @@ export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
     });
   }, [activeIndex, scaleAnims]);
 
-  const s = styles(colors);
+  const trackWidthRef = useRef(0);
+  const lastIdxRef = useRef(activeIndex);
 
+  const resolveIndex = (x: number) =>
+    Math.round(Math.max(0, Math.min(n - 1, (x / Math.max(trackWidthRef.current, 1)) * (n - 1))));
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        const idx = resolveIndex(evt.nativeEvent.locationX);
+        lastIdxRef.current = idx;
+        setStyle(STYLE_LEVELS[idx].key);
+      },
+      onPanResponderMove: (evt) => {
+        const idx = resolveIndex(evt.nativeEvent.locationX);
+        if (idx !== lastIdxRef.current) {
+          lastIdxRef.current = idx;
+          setStyle(STYLE_LEVELS[idx].key);
+        }
+      },
+    })
+  ).current;
+
+  const s = styles(colors);
   const fillFlex = activeIndex;
-  const emptyFlex = Math.max(0, STYLE_LEVELS.length - 1 - activeIndex);
+  const emptyFlex = Math.max(0, n - 1 - activeIndex);
+
+  const descMap: Record<Style, string> = {
+    direct: "Percorso più breve possibile, predilige grandi arterie",
+    fast: "Percorso veloce, rettilineo con poche deviazioni",
+    balanced: "Buon mix di curve e rettilineo",
+    curvy: "Strade curve e panoramiche — ideale per i bikers",
+    extra_curvy: "Massimizza le curve: strade secondarie e tortuose",
+  };
 
   return (
     <View style={s.section}>
@@ -59,30 +93,26 @@ export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
         ))}
       </View>
 
-      <View style={s.trackRow}>
+      <View
+        style={s.trackRow}
+        onLayout={(e) => { trackWidthRef.current = e.nativeEvent.layout.width; }}
+        {...panResponder.panHandlers}
+      >
         <View style={s.trackBg}>
-          <View style={[s.trackFill, { flex: fillFlex }]} />
-          <View style={{ flex: emptyFlex }} />
+          {fillFlex > 0 && <View style={[s.trackFill, { flex: fillFlex }]} />}
+          {emptyFlex > 0 && <View style={{ flex: emptyFlex }} />}
         </View>
-        {STYLE_LEVELS.map((sl, i) => {
-          const isActive = i === activeIndex;
-          return (
-            <Pressable
-              key={sl.key}
-              style={s.cell}
-              onPress={() => setStyle(sl.key)}
-              hitSlop={{ top: 10, bottom: 10, left: 4, right: 4 }}
-            >
-              <Animated.View
-                style={[
-                  s.notchDot,
-                  isActive ? s.notchActive : s.notchInactive,
-                  { transform: [{ scale: scaleAnims[i] }] },
-                ]}
-              />
-            </Pressable>
-          );
-        })}
+        {STYLE_LEVELS.map((sl, i) => (
+          <View key={sl.key} style={s.cell}>
+            <Animated.View
+              style={[
+                s.notchDot,
+                i === activeIndex ? s.notchActive : s.notchInactive,
+                { transform: [{ scale: scaleAnims[i] }] },
+              ]}
+            />
+          </View>
+        ))}
       </View>
 
       <View style={s.labelRow}>
@@ -98,13 +128,7 @@ export const RouteStyleSection: React.FC<RouteStyleSectionProps> = ({
         ))}
       </View>
 
-      <Text style={s.curvinessDesc}>
-        {style === "direct" && "Percorso più breve possibile, predilige grandi arterie"}
-        {style === "fast" && "Percorso veloce, rettilineo con poche deviazioni"}
-        {style === "balanced" && "Buon mix di curve e rettilineo"}
-        {style === "curvy" && "Strade curve e panoramiche — ideale per i bikers"}
-        {style === "extra_curvy" && "Massimizza le curve: strade secondarie e tortuose"}
-      </Text>
+      <Text style={s.curvinessDesc}>{descMap[style]}</Text>
     </View>
   );
 };
