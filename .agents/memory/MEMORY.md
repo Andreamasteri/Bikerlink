@@ -1,3 +1,4 @@
+- [GitHub sync force-push](github-sync-force-push.md) — origin/github sono mirror force-push del Replit; lock stale .git/refs/remotes/origin/main.lock NON fa fallire il push (rc=0 + "forced update"); usa --force se --force-with-lease dà "stale info".
 - [Repl Layer Size Limit](repl-layer-size.md) — .local/state/replit/ cresce nel tempo (transcript agente + log-query.db) → supera limite Cloud Run 2 GB → deploy silenziosamente fallisce senza log.
 - [Expo (tabs) route pollution](expo-tabs-route-pollution.md) — file helper (es. *.styles.ts) dentro app/(tabs)/ diventano tab-icona rotte; la custom tab bar renderizza ogni state.route. Tenerli in components/.
 - [spatial_ref_sys deploy failure](spatial-ref-sys-deploy.md) — publish fallisce su copy-OFF con ALTER TABLE spatial_ref_sys ADD PRIMARY KEY; è migrazione interna di Replit, non fixabile lato nostro (filtri drizzle.config.ts ignorati). Copy ON cancella i dati prod. Da supporto Replit.
