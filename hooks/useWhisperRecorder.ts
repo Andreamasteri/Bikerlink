@@ -89,32 +89,35 @@ export function useWhisperRecorder(): UseWhisperRecorderReturn {
         return null;
       }
 
-      const formData = new FormData();
-      const filename = "recording.m4a";
-      type RNFileEntry = { uri: string; name: string; type: string };
-      (formData as unknown as { append(name: string, value: RNFileEntry): void }).append("file", {
-        uri,
-        name: filename,
-        type: "audio/m4a",
-      });
-
       const transcribeUrl = new URL("/api/whisper/transcribe", getApiUrl()).toString();
-      const response = await fetch(transcribeUrl, {
-        method: "POST",
-        body: formData,
+
+      // L'upload via FormData + fetch globale fallisce su native con
+      // "unsupported FormDataPart implementation". Usiamo l'upload multipart
+      // nativo di expo-file-system (legacy), che serializza correttamente il
+      // file e imposta da sé il Content-Type multipart con boundary.
+      const { uploadAsync, FileSystemUploadType } = await import("expo-file-system/legacy");
+      const response = await uploadAsync(transcribeUrl, uri, {
+        httpMethod: "POST",
+        uploadType: FileSystemUploadType.MULTIPART,
+        fieldName: "file",
+        mimeType: "audio/m4a",
         headers: authFetchHeaders(),
-        credentials: "include",
       });
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({ message: "Errore trascrizione" }));
-        const errMsg = (errData as { message?: string }).message ?? "Errore trascrizione";
+      if (response.status < 200 || response.status >= 300) {
+        let errMsg = "Errore trascrizione";
+        try {
+          const errData = JSON.parse(response.body) as { message?: string };
+          errMsg = errData.message ?? errMsg;
+        } catch {
+          // body non JSON: manteniamo il messaggio di default
+        }
         setError(errMsg);
         setTranscribing(false);
         return null;
       }
 
-      const data = await response.json() as { text: string };
+      const data = JSON.parse(response.body) as { text: string };
       const text = data.text;
       setTranscript(text);
       setTranscribing(false);
