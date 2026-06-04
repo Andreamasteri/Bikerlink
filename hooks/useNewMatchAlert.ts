@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/query-client";
+import { onMatchNotification } from "@/lib/match-alert-emitter";
 
 const SEEN_KEY = "bikerlink:seenMatchIds";
 const INIT_KEY_PREFIX = "bikerlink:matchAlertInit:v1:";
@@ -208,6 +209,14 @@ export function useNewMatchAlert() {
   useEffect(() => {
     processSource("proposals", proposalData);
   }, [proposalData, processSource]);
+
+  useEffect(() => {
+    if (!userId) return;
+    return onMatchNotification(() => {
+      setVisible(true);
+      maybeSyncToServer();
+    });
+  }, [userId, maybeSyncToServer]);
 
   const dismiss = useCallback(() => {
     setVisible(false);

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Linking } from "react-native";
 import { useRouter, useRootNavigationState } from "expo-router";
+import { emitMatchNotification } from "@/lib/match-alert-emitter";
 
 let Notifications: typeof import("expo-notifications") | null = null;
 try {
@@ -91,6 +92,7 @@ export function BackgroundNotificationHandler() {
     }).catch(() => {});
 
     let notifSub: { remove: () => void } | null = null;
+    let foregroundSub: { remove: () => void } | null = null;
     if (Notifications) {
       try {
         notifSub = Notifications.addNotificationResponseReceivedListener((response) => {
@@ -99,6 +101,16 @@ export function BackgroundNotificationHandler() {
         });
       } catch {
         // no-op: ignore listener registration failures
+      }
+      try {
+        foregroundSub = Notifications.addNotificationReceivedListener((notification) => {
+          const data = notification.request.content.data as { type?: string } | undefined;
+          if (data?.type === "match") {
+            emitMatchNotification();
+          }
+        });
+      } catch {
+        // no-op: ignore foreground listener registration failures
       }
     }
 
@@ -109,6 +121,7 @@ export function BackgroundNotificationHandler() {
 
     return () => {
       notifSub?.remove();
+      foregroundSub?.remove();
       linkingSub.remove();
     };
   }, [router]);
