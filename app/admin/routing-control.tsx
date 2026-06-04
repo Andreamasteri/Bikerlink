@@ -104,9 +104,25 @@ export default function RoutingControlScreen() {
             onValueChange={(val) => killSwitchMutation.mutate(val)}
             trackColor={{ false: Colors.border, true: Colors.success + "88" }}
             thumbColor={enabled ? Colors.success : Colors.textSecondary}
-            disabled={killSwitchMutation.isPending || isLoading}
+            disabled={killSwitchMutation.isPending || isLoading || envOverride === "forced-off"}
           />
         </View>
+        {envOverride === "forced-on" && (
+          <View style={styles.envBannerInfo}>
+            <MaterialCommunityIcons name="information-outline" size={14} color={Colors.accent} />
+            <Text style={styles.envBannerInfoText}>
+              Env ROUTING_DISABLED=0 — routing forzato ON. Il toggle imposta il valore DB (ha effetto dopo la rimozione dell'env).
+            </Text>
+          </View>
+        )}
+        {envOverride === "forced-off" && (
+          <View style={styles.envBannerWarn}>
+            <MaterialCommunityIcons name="alert" size={14} color={Colors.error} />
+            <Text style={styles.envBannerWarnText}>
+              Env ROUTING_DISABLED forza il routing SPENTO. Rimuovi la variabile d'ambiente per riabilitare il toggle.
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Test routing */}
@@ -267,4 +283,18 @@ const styles = StyleSheet.create({
   },
   byEngineName: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, textTransform: "capitalize" },
   byEngineStat: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: Colors.textSecondary },
+  envBannerInfo: {
+    flexDirection: "row", alignItems: "flex-start", gap: 6,
+    marginTop: 8, paddingHorizontal: 10, paddingVertical: 8,
+    backgroundColor: Colors.accent + "18", borderRadius: 8,
+    borderWidth: 1, borderColor: Colors.accent + "44",
+  },
+  envBannerInfoText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.accent, flex: 1, lineHeight: 16 },
+  envBannerWarn: {
+    flexDirection: "row", alignItems: "flex-start", gap: 6,
+    marginTop: 8, paddingHorizontal: 10, paddingVertical: 8,
+    backgroundColor: Colors.error + "18", borderRadius: 8,
+    borderWidth: 1, borderColor: Colors.error + "44",
+  },
+  envBannerWarnText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.error, flex: 1, lineHeight: 16 },
 });
