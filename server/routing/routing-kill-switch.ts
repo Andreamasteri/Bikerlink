@@ -25,9 +25,14 @@ const ENV_RAW = process.env.ROUTING_DISABLED;
 /** env="0" → routing forzato ON (prevale sempre sul DB). */
 const HARD_ON = ENV_RAW === "0";
 /** env settata a un valore non vuoto diverso da "0" → routing forzato OFF. */
-const HARD_OFF = ENV_RAW !== undefined && ENV_RAW !== "" && ENV_RAW !== "0";
+export const HARD_OFF = ENV_RAW !== undefined && ENV_RAW !== "" && ENV_RAW !== "0";
 
-/** true quando un hard override env è attivo (in entrambe le direzioni). */
+/**
+ * true quando un hard override env è attivo (in entrambe le direzioni).
+ * Nota: HARD_ON NON blocca il soft toggle — l'utente può pre-impostare il
+ * valore DB anche quando l'env forza ON (il toggle avrà effetto quando l'env
+ * verrà rimossa). Solo HARD_OFF blocca effettivamente il toggle.
+ */
 export const HAS_HARD_ENV_OVERRIDE = HARD_ON || HARD_OFF;
 
 /** Cache in-memory del soft toggle DB. null = non ancora letto. */

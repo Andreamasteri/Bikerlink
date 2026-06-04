@@ -22,6 +22,7 @@ import {
   getRoutingKillSwitchState,
   setRoutingEnabled,
   HAS_HARD_ENV_OVERRIDE,
+  HARD_OFF,
 } from "../../../routing/routing-kill-switch";
 import { getInfo as getValhallaInfo } from "../../../routing/valhalla-client";
 import { getActiveRouter } from "../../../routing/router-selector";
@@ -116,18 +117,21 @@ router.get("/status", async (_req: Request, res: Response) => {
 });
 
 /**
- * PUT /kill-switch — imposta il soft toggle DB. Bloccato (409) se un hard
- * override env è attivo, perché in quel caso il toggle non avrebbe effetto.
+ * PUT /kill-switch — imposta il soft toggle DB.
+ * Bloccato (409) solo se HARD_OFF (env forza routing SPENTO), perché in quel
+ * caso il toggle è completamente ignorato a runtime. Quando HARD_ON (env="0",
+ * routing forzato ON) il toggle DB può essere pre-impostato: avrà effetto
+ * non appena l'env override verrà rimosso.
  */
 router.put("/kill-switch", async (req: Request, res: Response) => {
   const { enabled } = req.body ?? {};
   if (typeof enabled !== "boolean") {
     return res.status(400).json({ ok: false, message: "Campo 'enabled' (boolean) richiesto." });
   }
-  if (HAS_HARD_ENV_OVERRIDE) {
+  if (HARD_OFF) {
     return res.status(409).json({
       ok: false,
-      message: "Override env ROUTING_DISABLED attivo: il toggle soft non ha effetto finché l'env è impostata.",
+      message: "ROUTING_DISABLED forza il routing SPENTO via env: rimuovi la variabile d'ambiente per riabilitare il toggle.",
     });
   }
   await setRoutingEnabled(enabled);

@@ -70,6 +70,7 @@ export default function RoutingControlScreen() {
   });
 
   const enabled = data?.killSwitch.enabled ?? false;
+  const envOverride = data?.killSwitch.envOverride ?? null;
   const m = data?.metrics;
 
   return (
