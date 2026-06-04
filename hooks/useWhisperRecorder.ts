@@ -50,8 +50,7 @@ export function useWhisperRecorder(): UseWhisperRecorderReturn {
 
       await AudioModule.setAudioModeAsync({ allowsRecording: true });
 
-      const { AudioRecorder } = await import("expo-audio");
-      const rec = new AudioRecorder({
+      const rec = new AudioModule.AudioRecorder({
         extension: ".m4a",
         sampleRate: 16000,
         numberOfChannels: 1,
