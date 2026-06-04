@@ -8,6 +8,25 @@ import { gpsErrorSchema } from "@shared/validators";
 const ADMIN_EMAIL = "bikerlinkapp@gmail.com";
 const router = Router();
 
+const DEDUPE_WINDOW_MS = 30 * 60 * 1000;
+const emailDedupeMap = new Map<string, number>();
+let dedupeCleanupCounter = 0;
+
+function shouldSendEmail(fingerprint: string): boolean {
+  const now = Date.now();
+  dedupeCleanupCounter++;
+  if (dedupeCleanupCounter >= 50) {
+    dedupeCleanupCounter = 0;
+    for (const [k, ts] of emailDedupeMap) {
+      if (now - ts > DEDUPE_WINDOW_MS) emailDedupeMap.delete(k);
+    }
+  }
+  const last = emailDedupeMap.get(fingerprint);
+  if (last !== undefined && now - last < DEDUPE_WINDOW_MS) return false;
+  emailDedupeMap.set(fingerprint, now);
+  return true;
+}
+
 const MAX_STRING_LEN = 2000;
 const MAX_STACK_LEN = 5000;
 
@@ -127,11 +146,16 @@ router.post("/", errorsRateLimiter, errorsJson, async (req: Request, res: Respon
 
     console.error("[GPS_ERROR]", JSON.stringify(logEntry));
 
-    sendEmail(
-      ADMIN_EMAIL,
-      `[BikerLink] Errore GPS — ${platform}`,
-      buildErrorEmailHtml({ ...logEntry, userId: String(userId) })
-    ).catch((err) => console.error("[EMAIL] Errore invio notifica GPS error:", err));
+    const fingerprint = `${context}::${errorMessage.slice(0, 80)}`;
+    if (shouldSendEmail(fingerprint)) {
+      sendEmail(
+        ADMIN_EMAIL,
+        `[BikerLink] Errore GPS — ${platform}`,
+        buildErrorEmailHtml({ ...logEntry, userId: String(userId) })
+      ).catch((err) => console.error("[EMAIL] Errore invio notifica GPS error:", err));
+    } else {
+      console.warn("[GPS_ERROR] Email soppressa (deduplicazione 30 min):", fingerprint);
+    }
 
     storage.createGpsError({
       userId: String(userId),
