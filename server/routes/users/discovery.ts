@@ -126,9 +126,8 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
       ? [...onlineTracker.getAvailableBikerIds(countriesParam), ...onlineTracker.getAvailableZavorrinaIds(countriesParam)]
       : onlineTracker.getOnlineUserIds(countriesParam);
 
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const onlineResultsRaw = trackerAvailableIds.length > 0
-      ? await storage.getOnlineUsersList(since, lat, lng, countriesParam, trackerAvailableIds as string[])
+      ? await storage.getOnlineUsersList(undefined, lat, lng, countriesParam, trackerAvailableIds as string[])
       : [];
     const onlineResults = onlineResultsRaw.filter((r) => !isSystemAccount(r.user) && !blockedIds.has(r.user.id));
     type OnlineRow = typeof onlineResults[number];
@@ -138,14 +137,18 @@ router.get("/online-list", requireAuth, async (req: Request, res: Response) => {
       try {
         const { db } = await import("../../db");
         const { users: usersTable, userProfiles: profilesTable } = await import("@shared/db");
-        const { eq, and, notInArray: notInArr, inArray: inArr } = await import("drizzle-orm");
-        const { sql: sqlTag } = await import("drizzle-orm");
+        const { eq, and, notInArray: notInArr, inArray: inArr, sql: sqlTag } = await import("drizzle-orm");
         const distanceExpr = lat != null && lng != null
           ? sqlTag<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${profilesTable.latitude})) * cos(radians(${profilesTable.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${profilesTable.latitude}))))`.as("distance")
           : sqlTag<number>`0`.as("distance");
         const offlineConditions: import("drizzle-orm").SQL<unknown>[] = [
+          eq(usersTable.status, "active"),
+          eq(usersTable.isFake, false),
+          eq(usersTable.ghostMode, false),
           notInArr(usersTable.id, [requesterId, ...Array.from(blockedIds)]),
           ...systemAccountConditions(usersTable),
+          sqlTag`${profilesTable.latitude} IS NOT NULL`,
+          sqlTag`${profilesTable.longitude} IS NOT NULL`,
         ];
         if (countriesParam && countriesParam.length > 0) {
           offlineConditions.push(inArr(usersTable.country, countriesParam));

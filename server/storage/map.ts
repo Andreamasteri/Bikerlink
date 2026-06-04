@@ -88,15 +88,18 @@ export class MapStorage extends PlannedRoutesStorage {
     return result[0]?.count ?? 0;
   }
 
-  async getOnlineUsersList(since: Date, lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: User; profile: UserProfile | null; distance: number }>> {
+  async getOnlineUsersList(since?: Date, lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: User; profile: UserProfile | null; distance: number }>> {
     const distanceExpr = lat != null && lng != null
       ? sql<number>`(6371 * acos(cos(radians(${lat})) * cos(radians(${userProfiles.latitude})) * cos(radians(${userProfiles.longitude}) - radians(${lng})) + sin(radians(${lat})) * sin(radians(${userProfiles.latitude}))))`.as("distance")
       : sql<number>`0`.as("distance");
-    const conditions: SQL<unknown>[] = [eq(users.status, "active"), eq(users.isFake, false), eq(users.ghostMode, false), ...systemAccountConditions(users)];
+    const conditions: SQL<unknown>[] = [
+      eq(users.status, "active"), eq(users.isFake, false), eq(users.ghostMode, false),
+      ...systemAccountConditions(users),
+      sql`${userProfiles.latitude} IS NOT NULL`,
+      sql`${userProfiles.longitude} IS NOT NULL`,
+    ];
     if (onlineIds && onlineIds.length > 0) {
       conditions.push(inArray(users.id, onlineIds));
-    } else if (!onlineIds) {
-      conditions.push(gte(users.lastLoginAt, since));
     }
     if (countries && countries.length > 0) conditions.push(inArray(users.country, countries));
     const results = await db

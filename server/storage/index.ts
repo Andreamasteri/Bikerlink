@@ -350,7 +350,7 @@ export interface IStorage {
   deletePlannedRoute(id: string): Promise<void>;
   upsertRouteWeatherCache(data: InsertRouteWeatherCache): Promise<RouteWeatherCache>;
   getRouteWeatherCache(routeId: string): Promise<RouteWeatherCache | undefined>;
-  getOnlineUsersList(since: Date, lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: import("@shared/db").User; profile: import("@shared/db").UserProfile | null; distance: number }>>;
+  getOnlineUsersList(since?: Date, lat?: number, lng?: number, countries?: string[], onlineIds?: string[]): Promise<Array<{ user: import("@shared/db").User; profile: import("@shared/db").UserProfile | null; distance: number }>>;
   getAvailableUsersList(lat?: number, lng?: number): Promise<Array<{ user: import("@shared/db").User; profile: import("@shared/db").UserProfile; distance: number }>>;
   getAllExistingProposalProfileMatchKeys(): Promise<Set<string>>;
   getActedUponBikerZavarrinaPairs(): Promise<Set<string>>;
