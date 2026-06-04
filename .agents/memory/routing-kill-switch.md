@@ -20,3 +20,10 @@ const — all gating must call `isRoutingEnabled()` (async) or
 `isRoutingEnabledSync()` (uses cache, assumes disabled if never read). When env
 override is active, the admin PUT /kill-switch returns 409 because the soft
 toggle has no effect until the env is removed.
+
+**Current state (post-fix):** `ROUTING_DISABLED` env var was deleted from all
+environments and the admin UI's "override env attivo" warning was removed from
+`app/admin/routing-control.tsx`. The DB row `routing_kill_switch` was inserted
+with `value='true'` so routing stays ON. The soft toggle is now the sole control
+in every environment. The backend 409/hard-override code path is kept as dormant
+safety — do not delete it, but the UI no longer surfaces it.

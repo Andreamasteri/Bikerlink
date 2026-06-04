@@ -13,6 +13,7 @@
 
 import { Router, type Request, type Response } from "express";
 import { getNominatimHealthSnapshot } from "../../lib/nominatim-client";
+import { ACTIVE_PROFILE } from "../../graphhopper-client";
 
 const router = Router();
 
@@ -108,7 +109,7 @@ async function graphHopperRouteProbe(
       signal: controller.signal,
       body: JSON.stringify({
         points: [[9.19, 45.46], [9.08, 45.81]],
-        profile: "motorcycle",
+        profile: ACTIVE_PROFILE,
         points_encoded: true,
         instructions: false,
         calc_points: false,

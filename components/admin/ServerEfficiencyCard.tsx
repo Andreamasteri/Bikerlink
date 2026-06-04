@@ -134,7 +134,7 @@ export function ServerEfficiencyCard() {
         testID="server-efficiency-card-header"
       >
         <MaterialCommunityIcons name="server" size={18} color={healthColor} />
-        <Text style={srvStyles.cardTitle}>Replit Container</Text>
+        <Text style={srvStyles.cardTitle}>Efficienza Server Replit (Cloud)</Text>
         <View style={srvStyles.headerRight}>
           {isLoading && <ActivityIndicator size="small" color={healthColor} />}
           {error && !isLoading && (

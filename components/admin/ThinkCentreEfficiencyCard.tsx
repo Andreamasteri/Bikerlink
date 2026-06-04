@@ -87,7 +87,7 @@ export function ThinkCentreEfficiencyCard() {
         testID="thinkcentre-efficiency-card-header"
       >
         <MaterialCommunityIcons name="home-assistant" size={18} color={headerColor} />
-        <Text style={styles.cardTitle}>Efficienza ThinkCentre</Text>
+        <Text style={styles.cardTitle}>Efficienza ThinkCentre (Casa)</Text>
         <View style={styles.headerRight}>
           {isLoading && <ActivityIndicator size="small" color={headerColor} />}
           {error && !isLoading && (
