@@ -184,7 +184,22 @@ router.put("/:id", requireAuth, async (req: Request, res: Response) => {
     }
 
     const motorcycle = await storage.updateUserMotorcycle(motoId, updateData as Partial<import("@shared/db").InsertUserMotorcycle>);
-    return res.json(motorcycle);
+    res.json(motorcycle);
+
+    const effectiveBrand = (b.brand !== undefined ? b.brand : existing.brand) ?? undefined;
+    const effectiveModel = (b.model !== undefined ? b.model : existing.model) ?? undefined;
+    const effectiveRidingStyle = (b.ridingStyle !== undefined ? b.ridingStyle : existing.ridingStyle) ?? undefined;
+    const effectiveMotoType = (b.motorcycleType !== undefined ? b.motorcycleType : existing.motorcycleType) ?? undefined;
+    const ridingStyleChanged = b.ridingStyle !== undefined && b.ridingStyle !== existing.ridingStyle;
+    const brandChanged = b.brand !== undefined && b.brand !== existing.brand;
+    const modelChanged = b.model !== undefined && b.model !== existing.model;
+    const motoTypeChanged = b.motorcycleType !== undefined && b.motorcycleType !== existing.motorcycleType;
+    if (ridingStyleChanged || brandChanged || modelChanged || motoTypeChanged) {
+      runMatchingInBackground(userId, motoId, effectiveBrand, effectiveModel, effectiveRidingStyle, effectiveMotoType).catch((e) =>
+        console.error("[matching background PUT error]", e),
+      );
+    }
+    return;
   } catch (error) {
     console.error("Update motorcycle error:", error);
     return sendError(res, 500, "Errore interno del server");
