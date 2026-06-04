@@ -129,8 +129,8 @@ export function MapsHealthCard() {
               color={r.ok ? "#22c55e" : "#ef4444"}
             />
             <Text style={s.healthLabel}>{r.kind === "tile" ? "tile" : "engine"} {r.id}</Text>
-            <Text style={s.muted}>
-              {r.latencyMs != null ? `${r.latencyMs}ms` : r.error?.slice(0, 30) ?? "—"}
+            <Text style={[s.muted, !r.ok && r.latencyMs == null ? s.errInline : null]}>
+              {r.latencyMs != null ? `${r.latencyMs}ms` : r.ok ? "—" : (r.error?.slice(0, 35) ?? "offline")}
             </Text>
           </View>
         ))}

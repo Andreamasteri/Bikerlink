@@ -1,4 +1,4 @@
-// Task #2686 — Health check periodico per tile servers + routing engines.
+// Health check periodico per tile servers + routing engines.
 // HEAD ping con timeout breve. Risultati ritornati come array a maps-collector.
 import { logger } from "../../lib/logger";
 
@@ -17,13 +17,31 @@ export interface HealthCheckResult {
   severity?: "warn" | "high" | "critical";
 }
 
-interface Target { kind: "tile" | "engine"; id: string; url: string; }
+interface Target { kind: "tile" | "engine"; id: string; url: string; headers?: Record<string, string>; }
+
+/**
+ * Classifica un errore di rete in un messaggio leggibile (italiano).
+ * "fetch failed" / ENOTFOUND → DNS non risolve (tunnel offline o dominio inesistente).
+ * AbortError → timeout.
+ * ECONNREFUSED → porta chiusa.
+ */
+function classifyNetworkError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const name = err instanceof Error ? err.name : "";
+  if (name === "AbortError") return "timeout";
+  const lower = msg.toLowerCase();
+  if (lower.includes("enotfound") || lower.includes("getaddrinfo") || lower.includes("fetch failed")) {
+    return "DNS non risolve — tunnel offline?";
+  }
+  if (lower.includes("econnrefused")) return "connessione rifiutata";
+  if (lower.includes("econnreset") || lower.includes("socket hang up")) return "connessione interrotta";
+  return msg.slice(0, 100);
+}
 
 function tileTargets(): Target[] {
-  // Endpoint statici (z/x/y noti) - 0/0/0 esiste per tutti gli schemi standard.
   return [
     { kind: "tile", id: "carto-light", url: "https://a.basemaps.cartocdn.com/light_all/0/0/0.png" },
-    { kind: "tile", id: "carto-dark", url: "https://a.basemaps.cartocdn.com/dark_all/0/0/0.png" },
+    { kind: "tile", id: "carto-dark",  url: "https://a.basemaps.cartocdn.com/dark_all/0/0/0.png" },
     { kind: "tile", id: "osm-standard", url: "https://tile.openstreetmap.org/0/0/0.png" },
   ];
 }
@@ -32,7 +50,9 @@ function engineTargets(): Target[] {
   const out: Target[] = [];
   const ghBase = process.env.GRAPHHOPPER_SELF_HOSTED_URL ?? process.env.GRAPHHOPPER_URL;
   if (ghBase) {
-    out.push({ kind: "engine", id: "graphhopper", url: `${ghBase.replace(/\/$/, "")}/health` });
+    const ghHeaders: Record<string, string> = {};
+    if (process.env.GRAPHHOPPER_TOKEN) ghHeaders["X-GH-Token"] = process.env.GRAPHHOPPER_TOKEN;
+    out.push({ kind: "engine", id: "graphhopper", url: `${ghBase.replace(/\/$/, "")}/health`, headers: ghHeaders });
   }
   const valhalla = process.env.VALHALLA_URL;
   if (valhalla) {
@@ -52,9 +72,13 @@ async function pingOne(t: Target): Promise<HealthCheckResult> {
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   const started = Date.now();
   try {
-    // HEAD per tile (più leggero); GET con header range per engine.
     const method = t.kind === "tile" ? "HEAD" : "GET";
-    const resp = await fetch(t.url, { method, signal: ctrl.signal, redirect: "follow" });
+    const resp = await fetch(t.url, {
+      method,
+      signal: ctrl.signal,
+      redirect: "follow",
+      headers: t.headers ?? {},
+    });
     const latencyMs = Date.now() - started;
     const ok = resp.status < 500 && (t.kind === "engine" || resp.status < 400);
     return {
@@ -64,8 +88,60 @@ async function pingOne(t: Target): Promise<HealthCheckResult> {
   } catch (err) {
     return {
       kind: t.kind, id: t.id, url: t.url, ok: false, latencyMs: null,
-      error: (err as Error).message?.slice(0, 200),
+      error: classifyNetworkError(err),
       severity: t.kind === "engine" ? "critical" : "high",
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * GraphHopper: double-probe come in thinkcentre-health.ts.
+ * 1) GET /health (endpoint dedicato, se esposto)
+ * 2) POST /route minimale (prova del nove per deploy senza /health)
+ * Entrambi i tentativi usano il GRAPHHOPPER_TOKEN se configurato.
+ */
+async function pingGraphHopper(t: Target): Promise<HealthCheckResult> {
+  const primary = await pingOne(t);
+  if (primary.ok) return primary;
+
+  // Se l'errore è di rete (DNS/timeout/refused) il fallback /route non aiuta:
+  // il server è irraggiungibile. Lo segnaliamo direttamente senza tentare.
+  const isNetErr = primary.latencyMs === null;
+  if (isNetErr) return primary;
+
+  // Il server è raggiungibile ma /health ha risposto male (404, 403…):
+  // proviamo /route minimale come fallback (Milano→Como).
+  const base = t.url.replace(/\/health$/, "");
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
+  const started = Date.now();
+  try {
+    const resp = await fetch(`${base}/route`, {
+      method: "POST",
+      signal: ctrl.signal,
+      headers: { "Content-Type": "application/json", ...(t.headers ?? {}) },
+      body: JSON.stringify({
+        points: [[9.19, 45.46], [9.08, 45.81]],
+        profile: "motorcycle",
+        points_encoded: true,
+        instructions: false,
+        calc_points: false,
+      }),
+    });
+    const latencyMs = Date.now() - started;
+    const ok = resp.status >= 200 && resp.status < 300;
+    return {
+      kind: t.kind, id: t.id, url: t.url, ok, latencyMs, statusCode: resp.status,
+      error: ok ? undefined : `HTTP ${resp.status} (route fallback)`,
+      severity: ok ? undefined : "critical",
+    };
+  } catch (err) {
+    return {
+      kind: t.kind, id: t.id, url: t.url, ok: false, latencyMs: null,
+      error: classifyNetworkError(err),
+      severity: "critical",
     };
   } finally {
     clearTimeout(timer);
@@ -81,10 +157,18 @@ export async function runMapsHealthChecks(force = false): Promise<HealthCheckRes
   if (!force && now - lastRunAt < CACHE_TTL_MS && cachedResults.length > 0) {
     return cachedResults;
   }
-  const targets = [...tileTargets(), ...engineTargets()];
-  const results = await Promise.all(targets.map(pingOne));
+  const tiles = tileTargets();
+  const engines = engineTargets();
+
+  const tileResults = await Promise.all(tiles.map(pingOne));
+  const engineResults = await Promise.all(engines.map((t) =>
+    t.id === "graphhopper" ? pingGraphHopper(t) : pingOne(t),
+  ));
+
+  const results = [...tileResults, ...engineResults];
   cachedResults = results;
   lastRunAt = now;
+
   const downs = results.filter((r) => !r.ok);
   if (downs.length > 0) {
     log.warn({ downs: downs.map((d) => ({ id: d.id, kind: d.kind, error: d.error })) }, "health-check problemi rilevati");
