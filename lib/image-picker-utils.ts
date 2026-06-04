@@ -22,9 +22,31 @@
 
 import * as ImagePicker from "expo-image-picker";
 import * as ImageManipulator from "expo-image-manipulator";
+import { requireOptionalNativeModule } from "expo-modules-core";
 import { Alert, Platform, ActionSheetIOS } from "react-native";
 import { File as EFSFile } from "expo-file-system";
 import { sendStartupBeacon } from "@/lib/startup-beacon";
+
+/**
+ * expo-image-manipulator espone solo un wrapper JS attorno al modulo nativo
+ * `ExpoImageManipulator`. Se quel modulo nativo NON è presente nel binario
+ * installato (es. l'APK è stato compilato prima che la dipendenza venisse
+ * aggiunta), QUALSIASI accesso a `ImageManipulator.manipulateAsync` chiama
+ * internamente `requireNativeModule('ExpoImageManipulator')`, che LANCIA
+ * ("Cannot find native module 'ExpoImageManipulator'"). Quell'errore viene
+ * intercettato dal global error handler → ErrorBoundary → crash percepito,
+ * anche dentro un try/catch locale.
+ *
+ * Un aggiornamento OTA spedisce solo JS e NON può aggiungere il modulo nativo
+ * al binario già installato. Quindi qui rileviamo la disponibilità del modulo
+ * SENZA lanciare (`requireOptionalNativeModule` ritorna `null` se assente) e
+ * saltiamo del tutto l'ottimizzazione quando non c'è: l'upload usa l'immagine
+ * già compressa dal picker (`quality`). Quando un nuovo build nativo includerà
+ * il modulo, l'ottimizzazione si riattiverà automaticamente.
+ */
+const hasImageManipulatorNativeModule =
+  Platform.OS === "web" ||
+  requireOptionalNativeModule("ExpoImageManipulator") != null;
 
 export interface BulkImageAsset {
   uri: string;
@@ -85,6 +107,13 @@ export async function optimizeImageForUpload(
   uri: string,
   dimensions?: { width?: number; height?: number }
 ): Promise<string> {
+  if (!hasImageManipulatorNativeModule) {
+    // Modulo nativo assente nel binario installato: non possiamo (e non
+    // dobbiamo) toccare ImageManipulator, altrimenti lancia e crasha l'app.
+    // L'immagine del picker è già compressa via `quality`: la usiamo così.
+    sendStartupBeacon("img_manipulate_skipped_no_native");
+    return uri;
+  }
   try {
     const w = dimensions?.width ?? 0;
     const h = dimensions?.height ?? 0;
