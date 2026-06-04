@@ -247,7 +247,7 @@ export function useTrackingState() {
     sensors.accelBaselineRef.current = null; sensors.accelCalibSamples.current = []; sensors.maxAccelGRef.current = 0; sensors.maxDecelGRef.current = 0; sensors.maxTiltDegRef.current = 0; sensors.maxLateralGRef.current = 0; sensors.sensorStartingRef.current = false;
     sprint.sprintStartTimeRef.current = null; sprint.sprintPhaseRef.current = "waiting"; sprint.setSprintGoFired(false); sprint.sprint0to100MsRef.current = null;
     gps.emaSpeedRef.current = 0; stats.lastAvgSpeedUpdateRef.current = 0; stats.pausedMsRef.current = 0; stats.isPausedRef.current = false;
-    sensors.setIsCalibrating(false); refs.gpsOfflineBufferRef.current = []; refs.gpsOfflineWriteCountRef.current = 0; refs.bufferWriteQueueRef.current = Promise.resolve();
+    sensors.setIsCalibrating(false);
     gps.gpsWasLostRef.current = false; refs.telemetryAccumRef.current = []; gps.gpsBlackoutCountRef.current = 0; gps.gpsBlackoutSecondsRef.current = 0;
     bg.pendingBgToastCountRef.current = 0; gps.gpsBlackoutStartRef.current = null; handsOffDismissedForRideRef.current = false;
     totalGpsPointsRef.current = 0; bg.bgStartPointsRef.current = 0; bg.bgPointsCountRef.current = 0;
@@ -264,13 +264,7 @@ export function useTrackingState() {
     setSprintMeasuringBroadcast(false);
     refs.pointsBufferRef.current = [];
     stats.setPointsBuffered(0);
-    refs.gpsOfflineBufferRef.current = [];
-    refs.gpsOfflineWriteCountRef.current = 0;
     if (failedId) apiRequest("DELETE", `/api/routes/${failedId}`).catch(() => {});
-    AsyncStorage.getItem(GPS_BUFFER_SEGCOUNT_KEY).then(rawN => {
-      const n = rawN ? parseInt(rawN, 10) : 0;
-      return AsyncStorage.multiRemove([GPS_BUFFER_SEGCOUNT_KEY, ...Array.from({ length: n }, (_, i) => GPS_BUFFER_SEG_KEY(i))]);
-    }).catch(() => {});
     sprint.sprintPhaseRef.current = "waiting"; sprint.sprint0to100MsRef.current = null; sprint.sprintStartTimeRef.current = null;
     sprint.setSprintPhase("waiting"); sprint.setSprint0to100Ms(null);
   }, [cleanupTracking, sprint, session, stats, refs]);
@@ -347,7 +341,7 @@ export function useTrackingState() {
     if (smoothedSpeed > gps.maxSpeedRef.current) { gps.maxSpeedRef.current = smoothedSpeed; gps.setMaxSpeed(smoothedSpeed); }
     if (altitude != null && altitude > gps.maxAltRef.current) { gps.maxAltRef.current = altitude; gps.setMaxAltitude(altitude); }
     const point: GpsPoint = { latitude, longitude, altitude: altitude ?? 0, speedKmh: smoothedSpeed, timestamp: new Date(now).toISOString(), accelG: sensors.currentAccelGRef.current, tiltDeg: sensors.currentTiltDegRef.current };
-    refs.pointsBufferRef.current.push(point); stats.setPointsBuffered(refs.pointsBufferRef.current.length); refs.appendPointToOfflineBuffer(point);
+    refs.pointsBufferRef.current.push(point); stats.setPointsBuffered(refs.pointsBufferRef.current.length);
     if (settings.sensorsEnabledRef.current) refs.telemetryAccumRef.current.push({ timestamp: point.timestamp, lat: latitude, lon: longitude, leanAngle: sensors.currentTiltDegRef.current, gForceX: sensors.currentAccelGRef.current, speedKmh: smoothedSpeed });
     if (settings.handsOffEnabledRef.current && !handsOffDismissedForRideRef.current) {
       if (smoothedSpeed >= settings.handsOffSpeedRef.current) {
@@ -437,10 +431,6 @@ export function useTrackingState() {
         }
       }
       session.setCompletedRouteId(rId); mapState.setSummaryRoutePoints(gps.mapCoordsRef.current.map(c => ({ lat: c.latitude, lng: c.longitude }))); session.setSummaryVisible(true); refetchRecords();
-      AsyncStorage.getItem(GPS_BUFFER_SEGCOUNT_KEY).then(rawN => {
-        const n = rawN ? parseInt(rawN, 10) : 0;
-        return AsyncStorage.multiRemove([GPS_BUFFER_SEGCOUNT_KEY, ...Array.from({ length: n }, (_, i) => GPS_BUFFER_SEG_KEY(i))]);
-      }).catch(() => {});
     } catch (e) { logGpsError(e, "handleStop"); Alert.alert(t("common.error"), t("tracking.routeUpdateError")); }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
     finally { session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false); (VolumeManager as any).showNativeVolumeUI(true); }
@@ -501,6 +491,17 @@ export function useTrackingState() {
       Animated.sequence([Animated.timing(bg.bgToastAnim, { toValue: 1, duration: 400, useNativeDriver: true }), Animated.delay(4000), Animated.timing(bg.bgToastAnim, { toValue: 0, duration: 400, useNativeDriver: true })]).start(() => bg.setBgToastVisible(false));
     }
   }, [isTabFocused, bg]);
+
+  // Cleanup una-tantum del buffer GPS offline legacy (funzione rimossa).
+  // Questi segmenti ring non venivano mai riletti per il recovery e potevano
+  // crescere fino a saturare AsyncStorage (SQLITE_FULL), rompendo la mappa.
+  // Li svuotiamo al mount per liberare i device già intasati.
+  useEffect(() => {
+    AsyncStorage.multiRemove([
+      GPS_BUFFER_SEGCOUNT_KEY,
+      ...Array.from({ length: 50 }, (_, i) => GPS_BUFFER_SEG_KEY(i)),
+    ]).catch(() => {});
+  }, []);
 
   return {
     state: {

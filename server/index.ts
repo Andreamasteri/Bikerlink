@@ -366,6 +366,9 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
     const { scheduleNightlyVacuum } = await import("./vacuum-service");
     scheduleNightlyVacuum();
 
+    const { scheduleLogRetention } = await import("./jobs/log-retention");
+    scheduleLogRetention();
+
     const { scheduleNightlyMapMatching } = await import("./map-matching-job");
     scheduleNightlyMapMatching();
 
