@@ -71,7 +71,6 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       zoom: map.getZoom(),
       minZoom: map.getMinZoom(),
       maxZoom: map.getMaxZoom(),
-      bearing: 0,
       lat: c.lat,
       lng: c.lng
     });

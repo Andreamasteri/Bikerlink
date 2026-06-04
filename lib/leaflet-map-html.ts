@@ -146,14 +146,6 @@ ${LIVE_MAP_STYLES}
     }
   })();
 
-  function getMapBearing() {
-    /* leaflet-rotate espone map.getBearing(); fallback 0 se il plugin
-       non fosse disponibile (parità API con MapLibre). */
-    try {
-      return (typeof map.getBearing === "function") ? (map.getBearing() || 0) : 0;
-    } catch(e) { return 0; }
-  }
-
   function postViewState() {
     var c = map.getCenter();
     postMsg({
@@ -161,7 +153,6 @@ ${LIVE_MAP_STYLES}
       zoom: map.getZoom(),
       minZoom: map.getMinZoom(),
       maxZoom: map.getMaxZoom(),
-      bearing: getMapBearing(),
       lat: c.lat,
       lng: c.lng
     });
@@ -178,12 +169,6 @@ ${LIVE_MAP_STYLES}
     updateLegendVisibility();
     postViewState();
   });
-
-  /* Rotazione live (Task #3124): aggiorna la bussola RN in tempo reale
-     mentre l'utente ruota con due dita. "rotate" scatta in continuo durante
-     il gesto; "rotateend" chiude l'aggiornamento al rilascio. */
-  map.on("rotate", postViewState);
-  map.on("rotateend", postViewState);
 
   /* ── SVG icons ────────────────────────────────────────────────────── */
   var SVG = {
@@ -527,19 +512,6 @@ ${LIVE_MAP_STYLES}
       var z = Number(level);
       if (!isFinite(z)) return;
       map.setZoom(z, { animate: false });
-    },
-
-    resetBearing: function() {
-      /* Riporta la mappa a nord con animazione (Task #3124).
-         leaflet-rotate espone map.setBearing(deg); il secondo argomento
-         {animate:true} fa la transizione dolce. Fallback silenzioso se il
-         plugin non fosse disponibile. */
-      try {
-        if (typeof map.setBearing === "function") {
-          map.setBearing(0, { animate: true });
-          postViewState();
-        }
-      } catch(e) {}
     },
 
     updateHazards: function(jsonStr) {

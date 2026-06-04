@@ -107,7 +107,6 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       zoom: map.getZoom(),
       minZoom: map.getMinZoom(),
       maxZoom: map.getMaxZoom(),
-      bearing: 0,
       lat: c.lat,
       lng: c.lng
     });
@@ -126,8 +125,7 @@ html, body, #map { width: 100%; height: 100%; background: #1a1a1a; }
       var level = data && typeof data === "object" ? data.zoom : Number(data);
       if (typeof level !== "number" || !isFinite(level)) return;
       map.setZoom(level);
-    },
-    resetBearing: function() {}
+    }
   };
 
   map.on("zoomend", postViewState);

@@ -11,7 +11,6 @@ import { useLocationWatch } from "@/hooks/useLocationWatch";
 import { MapFilterBar } from "@/components/map/MapFilterBar";
 import { MapControls } from "@/components/map/MapControls";
 import { MapZoomSlider } from "@/components/map/MapZoomSlider";
-import { MapNorthCompass } from "@/components/map/MapNorthCompass";
 import { MapStyleToggle } from "@/components/MapStyleToggle";
 import { useMapStyle } from "@/hooks/useMapStyle";
 import { MAP_STYLE_PRESETS } from "@/lib/maplibre/style-presets";
@@ -59,7 +58,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     zoom: 6,
     minZoom: 0,
     maxZoom: 19,
-    bearing: 0,
     lat: 41.9028,
     lng: 12.4964,
   });
@@ -214,10 +212,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
     inject("window.leafletBridge && window.leafletBridge.setZoom(" + z + ")");
   }, [inject]);
 
-  const handleResetBearing = useCallback(() => {
-    inject("window.leafletBridge && window.leafletBridge.resetBearing()");
-  }, [inject]);
-
   const mapHtml = LEAFLET_MAP_HTML;
   const mapBaseUrl = getApiUrl();
   /* Memoize WebView source: react-native-webview shallow-compares the source
@@ -289,14 +283,6 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
           bottomOffset={313}
           leftOffset={15}
           onZoomChange={handleZoomChange}
-        />
-      )}
-      {mapReady && filterBarTopOffset != null && (
-        <MapNorthCompass
-          bearing={viewState.bearing}
-          onResetBearing={handleResetBearing}
-          topOffset={filterBarTopOffset + 44}
-          leftOffset={15}
         />
       )}
       {showHazardReportButton && hazardsEnabled && (
