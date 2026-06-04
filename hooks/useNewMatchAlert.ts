@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "expo-router";
 import { useAuth } from "@/lib/auth-context";
 import { apiRequest } from "@/lib/query-client";
 import { onMatchNotification } from "@/lib/match-alert-emitter";
@@ -32,10 +33,20 @@ function isAfterBaseline(item: MatchItem, baseline: Date): boolean {
   return itemTime > baseline.getTime();
 }
 
+const MATCH_QUERIES = [
+  "/api/proposals/garage-matches",
+  "/api/proposals/biker-matches",
+  "/api/proposals/matches",
+] as const;
+
 export function useNewMatchAlert() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const serverLastSeenAt = (user as { lastSeenMatchAt?: string | null } | null)?.lastSeenMatchAt;
+
+  const pathname = usePathname();
+  const queryClient = useQueryClient();
+  const isOnMatchTab = pathname === "/match" || pathname === "/(tabs)/match";
 
   const [visible, setVisible] = useState(false);
   const [seenLoaded, setSeenLoaded] = useState(false);
@@ -44,6 +55,8 @@ export function useNewMatchAlert() {
   const prevUserIdRef = useRef<string | null>(null);
   const serverSyncPendingRef = useRef(false);
   const serverSyncedRef = useRef(false);
+  const isOnMatchTabRef = useRef(isOnMatchTab);
+  useEffect(() => { isOnMatchTabRef.current = isOnMatchTab; }, [isOnMatchTab]);
 
   useEffect(() => {
     if (prevUserIdRef.current === userId) return;
@@ -122,6 +135,16 @@ export function useNewMatchAlert() {
     updateServerSeenTimestamp();
   }, []);
 
+  const showAlertOrRefresh = useCallback(() => {
+    if (isOnMatchTabRef.current) {
+      MATCH_QUERIES.forEach((key) => {
+        queryClient.invalidateQueries({ queryKey: [key] });
+      });
+    } else {
+      setVisible(true);
+    }
+  }, [queryClient]);
+
   const addSeen = useCallback((ids: string[]) => {
     ids.forEach((id) => seenRef.current.add(id));
     if (seenRef.current.size > MAX_SEEN_IDS) {
@@ -160,7 +183,7 @@ export function useNewMatchAlert() {
           .filter((id) => !seenRef.current.has(id));
         if (newIds.length > 0) {
           addSeen(newIds);
-          setVisible(true);
+          showAlertOrRefresh();
           maybeSyncToServer();
         }
       } else {
@@ -173,10 +196,10 @@ export function useNewMatchAlert() {
     const newIds = ids.filter((id) => !seenRef.current.has(id));
     if (newIds.length > 0) {
       addSeen(newIds);
-      setVisible(true);
+      showAlertOrRefresh();
       maybeSyncToServer();
     }
-  }, [seenLoaded, serverLastSeenAt, addSeen, markSourceInitialized, maybeSyncToServer]);
+  }, [seenLoaded, serverLastSeenAt, addSeen, markSourceInitialized, maybeSyncToServer, showAlertOrRefresh]);
 
   const enabled = !!userId && seenLoaded;
 
@@ -213,10 +236,10 @@ export function useNewMatchAlert() {
   useEffect(() => {
     if (!userId) return;
     return onMatchNotification(() => {
-      setVisible(true);
+      showAlertOrRefresh();
       maybeSyncToServer();
     });
-  }, [userId, maybeSyncToServer]);
+  }, [userId, maybeSyncToServer, showAlertOrRefresh]);
 
   const dismiss = useCallback(() => {
     setVisible(false);
