@@ -114,9 +114,15 @@ export function useWhisperRecorder(): UseWhisperRecorderReturn {
         let errMsg = "Errore trascrizione";
         try {
           const errData = JSON.parse(response.body) as { message?: string };
-          errMsg = errData.message ?? errMsg;
+          if (errData.message) errMsg = errData.message;
         } catch {
           // body non JSON: manteniamo il messaggio di default
+        }
+        if (response.status === 503 || response.status === 502) {
+          const lower = errMsg.toLowerCase();
+          if (lower.includes("non configurato") || lower.includes("non raggiungibile") || lower.includes("fallback cloud non configurato")) {
+            errMsg = "Servizio di trascrizione non disponibile";
+          }
         }
         setError(errMsg);
         setTranscribing(false);
