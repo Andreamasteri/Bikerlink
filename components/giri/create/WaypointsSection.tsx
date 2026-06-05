@@ -47,9 +47,15 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
   const measureInput = useCallback((index: number) => {
     const ref = inputRefs.current[index];
     if (ref) {
-      ref.measure((_x, _y, width, height, pageX, pageY) => {
-        setOverlayMeasure({ x: pageX, y: pageY, width, height });
-      });
+      if (Platform.OS === "web") {
+        ref.measure((_x, _y, width, height, pageX, pageY) => {
+          setOverlayMeasure({ x: pageX, y: pageY, width, height });
+        });
+      } else {
+        ref.measureInWindow((x, y, width, height) => {
+          setOverlayMeasure({ x, y, width, height });
+        });
+      }
     }
   }, []);
 
