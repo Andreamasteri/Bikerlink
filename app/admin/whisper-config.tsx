@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -31,11 +31,20 @@ interface WhisperConfigData {
   envOverride: string | null;
 }
 
+interface FormatProbeResult {
+  ok: boolean;
+  latency_ms: number | null;
+  error?: string;
+  text?: string;
+}
+
 interface TestResult {
   ok: boolean;
   latency_ms: number | null;
   text?: string;
   error?: string;
+  wav?: FormatProbeResult;
+  m4a?: FormatProbeResult;
 }
 
 const PROVIDER_ICONS: Record<SttProviderId, string> = {
@@ -68,6 +77,7 @@ export default function WhisperConfigScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [testResults, setTestResults] = useState<Record<string, TestResult | "loading">>({});
+  const autoTestedRef = useRef(false);
 
   const { data, isLoading, error } = useQuery<WhisperConfigData>({
     queryKey: ["/api/admin/whisper-config"],
@@ -99,6 +109,16 @@ export default function WhisperConfigScreen() {
       Alert.alert("Errore reset", e.message);
     },
   });
+
+  useEffect(() => {
+    if (!data || autoTestedRef.current) return;
+    const homeStatus = data.statuses.find((s) => s.id === "home");
+    if (homeStatus?.configured) {
+      autoTestedRef.current = true;
+      testProvider("home");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
 
   const activeChain: SttProviderId[] = data?.chain ?? [];
 
@@ -157,11 +177,24 @@ export default function WhisperConfigScreen() {
         return;
       }
 
+      const parseFormatProbe = (r: unknown): FormatProbeResult | undefined => {
+        if (!r || typeof r !== "object") return undefined;
+        const fr = r as Record<string, unknown>;
+        return {
+          ok: Boolean(fr.ok),
+          latency_ms: typeof fr.latency_ms === "number" ? fr.latency_ms : null,
+          error: fr.error != null ? String(fr.error) : undefined,
+          text: fr.text != null ? String(fr.text) : undefined,
+        };
+      };
+
       const result: TestResult = {
         ok: Boolean(raw.ok),
         latency_ms: typeof raw.latency_ms === "number" ? raw.latency_ms : null,
         error: raw.error != null ? String(raw.error) : raw.message != null ? String(raw.message) : undefined,
         text: raw.text != null ? String(raw.text) : undefined,
+        wav: parseFormatProbe(raw.wav),
+        m4a: parseFormatProbe(raw.m4a),
       };
       setTestResults((prev) => ({ ...prev, [id]: result }));
     } catch (e) {
@@ -303,11 +336,28 @@ export default function WhisperConfigScreen() {
 
             {testResult && testResult !== "loading" && (
               <View style={[styles.testResult, testResult.ok ? styles.testResultOk : styles.testResultFail]}>
-                <Text style={styles.testResultText}>
-                  {testResult.ok
-                    ? `✅ OK — ${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"}${testResult.text ? ` — "${testResult.text}"` : ""}`
-                    : `❌ ${testResult.error ?? "Errore sconosciuto"} (${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"})`}
-                </Text>
+                {status.id === "home" && testResult.wav != null ? (
+                  <>
+                    <Text style={styles.testResultText}>
+                      {testResult.wav.ok
+                        ? `✅ WAV — ${testResult.wav.latency_ms != null ? `${testResult.wav.latency_ms}ms` : "—"}${testResult.wav.text ? ` — "${testResult.wav.text}"` : ""}`
+                        : `❌ WAV — ${testResult.wav.error ?? "Errore"} (${testResult.wav.latency_ms != null ? `${testResult.wav.latency_ms}ms` : "—"})`}
+                    </Text>
+                    {testResult.m4a != null && (
+                      <Text style={[styles.testResultText, styles.testResultSubline]}>
+                        {testResult.m4a.ok
+                          ? `✅ M4A — ${testResult.m4a.latency_ms != null ? `${testResult.m4a.latency_ms}ms` : "—"}`
+                          : `❌ M4A — ${testResult.m4a.error ?? "Errore"} (${testResult.m4a.latency_ms != null ? `${testResult.m4a.latency_ms}ms` : "—"})`}
+                      </Text>
+                    )}
+                  </>
+                ) : (
+                  <Text style={styles.testResultText}>
+                    {testResult.ok
+                      ? `✅ OK — ${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"}${testResult.text ? ` — "${testResult.text}"` : ""}`
+                      : `❌ ${testResult.error ?? "Errore sconosciuto"} (${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"})`}
+                  </Text>
+                )}
               </View>
             )}
           </View>
@@ -546,6 +596,10 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     color: Colors.text,
+  },
+  testResultSubline: {
+    marginTop: 4,
+    opacity: 0.85,
   },
   resetBtn: {
     flexDirection: "row",

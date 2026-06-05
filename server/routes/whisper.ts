@@ -49,6 +49,7 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
         const whisperToken = process.env.WHISPER_TOKEN;
         if (!whisperUrl) continue;
 
+        const homeStart = Date.now();
         try {
           const transcribeEndpoint = whisperUrl.replace(/\/$/, "") + "/inference";
           const formData = new FormData();
@@ -88,7 +89,16 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
           return res.json({ text: data.text.trim(), source: "home" });
         } catch (homeErr) {
           const msg = homeErr instanceof Error ? homeErr.message : String(homeErr);
-          console.warn(`[Whisper] Provider "home" non disponibile, passo al successivo: ${msg}`);
+          const latencyMs = Date.now() - homeStart;
+          const errType =
+            homeErr instanceof Error && homeErr.name === "AbortError"
+              ? "timeout"
+              : msg.startsWith("Server di casa error")
+                ? "http"
+                : "network";
+          console.warn(
+            `[whisper/home] fallito — motivo: ${msg} | latenza: ${latencyMs}ms | tipo: ${errType}`
+          );
         }
         continue;
       }

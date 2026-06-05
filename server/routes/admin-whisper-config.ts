@@ -49,6 +49,61 @@ function buildSilentWav(): Buffer {
   return buffer;
 }
 
+/**
+ * Genera un file M4A minimale valido (solo ftyp box).
+ * Serve per testare se whisper.cpp accetta il contenitore M4A prima ancora di decodificare audio.
+ * Il file non contiene audio reale: il server risponderà con un errore di decodifica se
+ * supporta M4A, oppure con "formato non supportato" se M4A non è abilitato.
+ */
+function buildMinimalM4a(): Buffer {
+  return Buffer.from([
+    0x00, 0x00, 0x00, 0x14, // size = 20 bytes
+    0x66, 0x74, 0x79, 0x70, // 'ftyp'
+    0x4d, 0x34, 0x41, 0x20, // major brand: 'M4A '
+    0x00, 0x00, 0x00, 0x00, // minor version
+    0x4d, 0x34, 0x41, 0x20, // compatible brand: 'M4A '
+  ]);
+}
+
+interface FormatProbeResult {
+  ok: boolean;
+  latency_ms: number;
+  error?: string;
+  text?: string;
+}
+
+/** Invia un file audio a /inference e ritorna il risultato con latenza. */
+async function probeHomeFormat(
+  endpoint: string,
+  headers: Record<string, string>,
+  buf: Buffer,
+  mime: string,
+  filename: string,
+  timeoutMs: number,
+): Promise<FormatProbeResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const t0 = Date.now();
+  try {
+    const formData = new FormData();
+    formData.append("file", new Blob([new Uint8Array(buf)], { type: mime }), filename);
+    formData.append("response_format", "json");
+    const r = await fetch(endpoint, { method: "POST", headers, body: formData, signal: controller.signal });
+    const latency_ms = Date.now() - t0;
+    if (!r.ok) {
+      const errText = await r.text().catch(() => "");
+      return { ok: false, latency_ms, error: `HTTP ${r.status}: ${errText}`.slice(0, 200) };
+    }
+    const data = (await r.json()) as { text?: string };
+    return { ok: true, latency_ms, text: (data.text ?? "").trim().slice(0, 200) };
+  } catch (e) {
+    const latency_ms = Date.now() - t0;
+    return { ok: false, latency_ms, error: (e instanceof Error ? e.message : String(e)).slice(0, 200) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── GET /whisper-config ───────────────────────────────────────────────────────
 router.get("/whisper-config", async (_req: Request, res: Response) => {
   try {
@@ -106,41 +161,30 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
         return;
       }
 
-      const formData = new FormData();
-      const blob = new Blob([new Uint8Array(wav)], { type: "audio/wav" });
-      formData.append("file", blob, "silence.wav");
-      formData.append("response_format", "json");
-
+      const endpoint = whisperUrl.replace(/\/$/, "") + "/inference";
       const headers: Record<string, string> = {};
       if (whisperToken) headers["X-Whisper-Token"] = whisperToken;
 
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
-      try {
-        const homeRes = await fetch(
-          whisperUrl.replace(/\/$/, "") + "/inference",
-          { method: "POST", headers, body: formData, signal: controller.signal }
-        );
-        clearTimeout(timeout);
-        const latency_ms = Date.now() - start;
-        if (!homeRes.ok) {
-          const errText = await homeRes.text().catch(() => "");
-          const error = `HTTP ${homeRes.status}: ${errText}`.slice(0, 200);
-          console.log(`[whisper-test] home ok=false latency_ms=${latency_ms} error="${error}"`);
-          res.json({ ok: false, latency_ms, error });
-          return;
-        }
-        const data = (await homeRes.json()) as { text?: string };
-        const text = (data.text ?? "").trim().slice(0, 200);
-        console.log(`[whisper-test] home ok=true latency_ms=${latency_ms} text="${text}"`);
-        res.json({ ok: true, latency_ms, text });
-      } catch (e) {
-        clearTimeout(timeout);
-        const latency_ms = Date.now() - start;
-        const error = (e instanceof Error ? e.message : String(e)).slice(0, 200);
-        console.log(`[whisper-test] home ok=false latency_ms=${latency_ms} error="${error}"`);
-        res.json({ ok: false, latency_ms, error });
-      }
+      // Prova WAV (formato sicuro) e m4a (formato reale del telefono) in sequenza.
+      // Questo permette di capire se un fallback "home" è dovuto al formato o alla connettività.
+      const wavResult = await probeHomeFormat(endpoint, headers, wav, "audio/wav", "silence.wav", 15000);
+      const m4aResult = await probeHomeFormat(endpoint, headers, buildMinimalM4a(), "audio/x-m4a", "silence.m4a", 10000);
+
+      const latency_ms = Date.now() - start;
+      const ok = wavResult.ok;
+      console.log(
+        `[whisper-test] home ok=${ok} latency_ms=${latency_ms}` +
+        ` wav=${wavResult.ok ? "ok" : `fail:${wavResult.error ?? "?"}`}` +
+        ` m4a=${m4aResult.ok ? "ok" : `fail:${m4aResult.error ?? "?"}`}`
+      );
+      res.json({
+        ok,
+        latency_ms,
+        text: wavResult.text,
+        error: ok ? undefined : wavResult.error,
+        wav: { ok: wavResult.ok, latency_ms: wavResult.latency_ms, error: wavResult.error, text: wavResult.text },
+        m4a: { ok: m4aResult.ok, latency_ms: m4aResult.latency_ms, error: m4aResult.error },
+      });
       return;
     }
 

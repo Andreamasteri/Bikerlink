@@ -228,18 +228,51 @@ async function probeOllama(): Promise<ServiceHealth> {
   return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error: r.error };
 }
 
+/**
+ * Probe Whisper reale: POST /inference con WAV silenzioso minimo (0.5s, 16kHz mono).
+ * OK solo se risponde 2xx — un semplice GET / non garantisce che /inference funzioni.
+ * Timeout ridotto a 8s (< PROBE_TIMEOUT_MS globale di 5s non basterebbe per /inference).
+ */
 async function probeWhisper(): Promise<ServiceHealth> {
   const base = process.env.WHISPER_URL?.replace(/\/$/, "");
   const token = process.env.WHISPER_TOKEN;
   if (!base) {
     return { key: "whisper", label: "Whisper ASR", configured: false, ok: false, latencyMs: null, url: null };
   }
+
+  // WAV silenzioso minimale: 0.5s, mono 16kHz 16-bit PCM (stessa funzione di admin-whisper-config)
+  const sampleRate = 16000;
+  const numSamples = Math.floor(sampleRate * 0.5);
+  const dataSize = numSamples * 2; // 16-bit mono
+  const wav = Buffer.alloc(44 + dataSize, 0);
+  wav.write("RIFF", 0); wav.writeUInt32LE(36 + dataSize, 4); wav.write("WAVE", 8);
+  wav.write("fmt ", 12); wav.writeUInt32LE(16, 16); wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22); wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * 2, 28); wav.writeUInt16LE(2, 32); wav.writeUInt16LE(16, 34);
+  wav.write("data", 36); wav.writeUInt32LE(dataSize, 40);
+
   const headers: Record<string, string> = {};
   if (token) headers["X-Whisper-Token"] = token;
-  // whisper.cpp non ha un endpoint di health: una risposta < 500 (anche 404/405)
-  // significa "server raggiungibile"; solo un 5xx o errore di rete = offline.
-  const r = await httpProbe(`${base}/`, headers, (status) => status < 500);
-  return { key: "whisper", label: "Whisper ASR", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error: r.error };
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8_000);
+  const t0 = Date.now();
+  try {
+    const formData = new FormData();
+    formData.append("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "probe.wav");
+    formData.append("response_format", "json");
+    const res = await fetch(`${base}/inference`, { method: "POST", headers, body: formData, signal: controller.signal });
+    const latencyMs = Date.now() - t0;
+    if (res.status >= 200 && res.status < 300) {
+      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base) };
+    }
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error: `HTTP ${res.status}` };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error: sanitizeError(msg) };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function probeNominatim(): Promise<ServiceHealth> {
