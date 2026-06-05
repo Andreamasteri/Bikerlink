@@ -57,15 +57,57 @@ export default function ChatScreen() {
 
   const { data: conversations, isLoading } = useQuery<ConversationItem[]>({
     queryKey: ["/api/chat/conversations"],
-    refetchInterval: 15000,
+    refetchInterval: 60000,
   });
 
   const { data: friends } = useQuery<FriendItem[]>({
     queryKey: ["/api/friends"],
   });
 
-  useChatSSE(() => {
-    queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+  useChatSSE((event) => {
+    if (
+      (event.type === "new_message" || event.type === "conversation_update") &&
+      event.message
+    ) {
+      const msg = event.message as {
+        id: string;
+        content: string | null;
+        messageType: string;
+        createdAt: string;
+        senderId: string;
+      };
+      let didUpdate = false;
+      queryClient.setQueryData<ConversationItem[]>(
+        ["/api/chat/conversations"],
+        (old) => {
+          if (!old) return old;
+          const idx = old.findIndex((c) => c.id === event.conversationId);
+          if (idx === -1) return old;
+          didUpdate = true;
+          const conv = old[idx];
+          const newLastMessage = {
+            id: msg.id,
+            content: msg.content,
+            messageType: msg.messageType,
+            createdAt: msg.createdAt,
+            senderId: msg.senderId,
+          };
+          const updatedConv = {
+            ...conv,
+            lastMessage: newLastMessage,
+            updatedAt: msg.createdAt,
+            unreadCount: msg.senderId !== userId ? conv.unreadCount + 1 : conv.unreadCount,
+          };
+          const rest = old.filter((_, i) => i !== idx);
+          return [updatedConv, ...rest];
+        }
+      );
+      if (!didUpdate) {
+        queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+      }
+    } else {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+    }
   });
 
   useEffect(() => {

@@ -109,17 +109,33 @@ export default function ChatConversationScreen() {
 
   const { data: messages, isLoading } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
-    refetchInterval: 15000,
+    refetchInterval: 60000,
     enabled: !!id,
   });
 
   useChatSSE((event) => {
     if (event.type === "message_deleted" && event.conversationId === id) {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+    } else if (event.type === "new_message" && event.conversationId === id && event.message) {
+      const incoming = event.message as unknown as ChatMessage;
+      if (incoming.senderId !== userId) {
+        queryClient.setQueryData<ChatMessage[]>(
+          ["/api/chat/conversations", id, "messages"],
+          (old) => {
+            if (!old) return [incoming];
+            if (old.some((m) => m.id === incoming.id)) return old;
+            return [incoming, ...old];
+          }
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
+    } else if (event.type === "conversation_update") {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
     } else if (event.conversationId === id) {
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
     }
-    queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
   });
 
   useEffect(() => {
@@ -154,11 +170,56 @@ export default function ChatConversationScreen() {
       const res = await apiRequest("POST", `/api/chat/conversations/${id}/messages`, data);
       return await res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+    onMutate: async (data) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/chat/conversations", id, "messages"] });
+      const previousMessages = queryClient.getQueryData<ChatMessage[]>(["/api/chat/conversations", id, "messages"]);
+      const optimisticId = `optimistic-${Date.now()}`;
+      const optimisticMessage: ChatMessage = {
+        id: optimisticId,
+        conversationId: id,
+        senderId: userId,
+        messageType: data.messageType,
+        content: data.content ?? null,
+        imageUrl: null,
+        latitude: data.latitude ?? null,
+        longitude: data.longitude ?? null,
+        isFiltered: false,
+        createdAt: new Date().toISOString(),
+        sender: user
+          ? {
+              id: user.id,
+              nickname: user.nickname ?? "",
+              avatarUrl: user.avatarUrl ?? null,
+              userType: user.userType ?? "biker",
+              sex: user.sex ?? null,
+            }
+          : null,
+      };
+      queryClient.setQueryData<ChatMessage[]>(
+        ["/api/chat/conversations", id, "messages"],
+        (old) => (old ? [optimisticMessage, ...old] : [optimisticMessage])
+      );
+      return { previousMessages, optimisticId };
+    },
+    onSuccess: (newMessage, _data, context) => {
+      queryClient.setQueryData<ChatMessage[]>(
+        ["/api/chat/conversations", id, "messages"],
+        (old) => {
+          if (!old) return [newMessage];
+          return old.map((m) => (m.id === context?.optimisticId ? newMessage : m));
+        }
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/chat/conversations"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _data, context) => {
+      if (context?.previousMessages !== undefined) {
+        queryClient.setQueryData(["/api/chat/conversations", id, "messages"], context.previousMessages);
+      } else if (context?.optimisticId) {
+        queryClient.setQueryData<ChatMessage[]>(
+          ["/api/chat/conversations", id, "messages"],
+          (old) => old ? old.filter((m) => m.id !== context.optimisticId) : old
+        );
+      }
       const msg = error?.message || t("chat.sendMessageError");
       Alert.alert("Errore invio", msg.replace(/^\d+:\s*/, ""));
     },
