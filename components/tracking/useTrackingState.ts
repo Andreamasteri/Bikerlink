@@ -407,17 +407,18 @@ export function useTrackingState() {
 
   const handleStop = useCallback(async () => {
     if (session.phaseRef.current === "idle") return;
+    const rId = refs.routeIdRef.current;
     session.setLoading(true); cleanupTracking();
-    const rId = refs.routeIdRef.current; if (!rId) { session.setPhase("idle"); session.setLoading(false); return; }
+    if (!rId) { session.setPhase("idle"); session.setLoading(false); return; }
     await flushPoints();
     try {
       const updateData: {
-        status: string; totalDistanceKm: number; maxSpeedKmh: number; avgSpeedKmh: number; maxAltitude: number;
+        status: string; stoppedAt: string; totalDistanceKm: number; maxSpeedKmh: number; avgSpeedKmh: number; maxAltitude: number;
         durationSeconds: number; idleTimeSeconds: number; maxAccelerationG: number | null;
         isSprint: boolean; sprint0to100Ms: number | null; gpsBlackoutCount: number; gpsBlackoutSeconds: number;
         telemetryData?: string;
       } = {
-        status: "completed", totalDistanceKm: gps.totalKmRef.current, maxSpeedKmh: gps.maxSpeedRef.current, avgSpeedKmh: stats.avgSpeedDisplayKmh, maxAltitude: gps.maxAltRef.current,
+        status: "completed", stoppedAt: new Date().toISOString(), totalDistanceKm: gps.totalKmRef.current, maxSpeedKmh: gps.maxSpeedRef.current, avgSpeedKmh: stats.avgSpeedDisplayKmh, maxAltitude: gps.maxAltRef.current,
         durationSeconds: Math.floor(stats.totalMs / 1000), idleTimeSeconds: Math.floor(stats.idleMsRef.current / 1000), maxAccelerationG: sensors.maxAccelGRef.current,
         isSprint: settings.is0100EnabledRef.current, sprint0to100Ms: sprint.sprint0to100MsRef.current, gpsBlackoutCount: gps.gpsBlackoutCountRef.current, gpsBlackoutSeconds: Math.floor(gps.gpsBlackoutSecondsRef.current / 1000),
       };
