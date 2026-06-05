@@ -195,7 +195,7 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
 
       const endpoint = whisperUrl.replace(/\/$/, "") + "/inference";
       const headers: Record<string, string> = {};
-      if (whisperToken) headers["X-Whisper-Token"] = whisperToken;
+      if (whisperToken) headers["Authorization"] = `Bearer ${whisperToken}`;
 
       const wavResult = await probeHomeFormat(logId, endpoint, headers, wav, "audio/wav", "silence.wav", 15000);
       const m4aResult = await probeHomeFormat(logId, endpoint, headers, buildMinimalM4a(), "audio/x-m4a", "silence.m4a", 10000);
@@ -244,7 +244,7 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
         const t0 = Date.now();
         const groqRes = await fetch(groqUrl, {
           method: "POST",
-          headers: { Authorization: `Bearer ${groqKey}` },
+          headers: { Authorization: `Bearer ${groqKey}`, "Accept-Encoding": "identity" },
           body: formData,
         });
         const latency_ms = Date.now() - t0;
@@ -257,6 +257,13 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
           const error = `HTTP ${groqRes.status}: ${rawText}`.slice(0, 200);
           console.log(`[whisper-test/${logId}] groq ok=false latency_ms=${latency_ms} error="${error}"`);
           res.json({ ok: false, latency_ms, error, session_ok: sessionOk, body_raw: bodyPreview });
+          return;
+        }
+
+        if (rawText.charCodeAt(0) === 0) {
+          const encoding = groqRes.headers.get("content-encoding") ?? "unknown";
+          console.log(`[whisper-test/${logId}] groq BINARY_RESPONSE content-encoding="${encoding}"`);
+          res.json({ ok: false, latency_ms, error: `Risposta binaria/compressa non parsabile (content-encoding: ${encoding})`, session_ok: sessionOk, body_raw: bodyPreview });
           return;
         }
 
@@ -306,7 +313,7 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
         const t0 = Date.now();
         const openaiRes = await fetch(openaiUrl, {
           method: "POST",
-          headers: { Authorization: `Bearer ${openaiKey}` },
+          headers: { Authorization: `Bearer ${openaiKey}`, "Accept-Encoding": "identity" },
           body: formData,
         });
         const latency_ms = Date.now() - t0;
@@ -319,6 +326,13 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
           const error = `HTTP ${openaiRes.status}: ${rawText}`.slice(0, 200);
           console.log(`[whisper-test/${logId}] openai ok=false latency_ms=${latency_ms} error="${error}"`);
           res.json({ ok: false, latency_ms, error, session_ok: sessionOk, body_raw: bodyPreview });
+          return;
+        }
+
+        if (rawText.charCodeAt(0) === 0) {
+          const encoding = openaiRes.headers.get("content-encoding") ?? "unknown";
+          console.log(`[whisper-test/${logId}] openai BINARY_RESPONSE content-encoding="${encoding}"`);
+          res.json({ ok: false, latency_ms, error: `Risposta binaria/compressa non parsabile (content-encoding: ${encoding})`, session_ok: sessionOk, body_raw: bodyPreview });
           return;
         }
 
@@ -419,7 +433,7 @@ router.post("/whisper-config/diagnose", async (req: Request, res: Response) => {
       }
 
       const headers: Record<string, string> = {};
-      if (whisperToken) headers["X-Whisper-Token"] = whisperToken;
+      if (whisperToken) headers["Authorization"] = `Bearer ${whisperToken}`;
       const wavRes = await probeHomeFormat(logId, `${baseUrl}/inference`, headers, wav, "audio/wav", "silence.wav", 15000);
       steps.push({
         label: "home — trascrizione WAV",
@@ -474,7 +488,7 @@ router.post("/whisper-config/diagnose", async (req: Request, res: Response) => {
         const t0 = Date.now();
         const r = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
           method: "POST",
-          headers: { Authorization: `Bearer ${groqKey}` },
+          headers: { Authorization: `Bearer ${groqKey}`, "Accept-Encoding": "identity" },
           body: formData,
           signal: AbortSignal.timeout(20000),
         });
@@ -483,6 +497,9 @@ router.post("/whisper-config/diagnose", async (req: Request, res: Response) => {
         const bodyPreview = rawText.slice(0, 300);
         if (!r.ok) {
           steps.push({ label: "groq — trascrizione WAV", ok: false, latency_ms, detail: `HTTP ${r.status} — body: "${bodyPreview.slice(0, 120)}"` });
+        } else if (rawText.charCodeAt(0) === 0) {
+          const encoding = r.headers.get("content-encoding") ?? "unknown";
+          steps.push({ label: "groq — trascrizione WAV", ok: false, latency_ms, detail: `BINARY_RESPONSE — content-encoding: ${encoding}` });
         } else {
           let parsed: { text?: string } | null = null;
           try { parsed = JSON.parse(rawText) as { text?: string }; } catch { /* ignore */ }
@@ -541,7 +558,7 @@ router.post("/whisper-config/diagnose", async (req: Request, res: Response) => {
         const t0 = Date.now();
         const r = await fetch("https://api.openai.com/v1/audio/transcriptions", {
           method: "POST",
-          headers: { Authorization: `Bearer ${openaiKey}` },
+          headers: { Authorization: `Bearer ${openaiKey}`, "Accept-Encoding": "identity" },
           body: formData,
           signal: AbortSignal.timeout(20000),
         });
@@ -550,6 +567,9 @@ router.post("/whisper-config/diagnose", async (req: Request, res: Response) => {
         const bodyPreview = rawText.slice(0, 300);
         if (!r.ok) {
           steps.push({ label: "openai — trascrizione WAV", ok: false, latency_ms, detail: `HTTP ${r.status} — body: "${bodyPreview.slice(0, 120)}"` });
+        } else if (rawText.charCodeAt(0) === 0) {
+          const encoding = r.headers.get("content-encoding") ?? "unknown";
+          steps.push({ label: "openai — trascrizione WAV", ok: false, latency_ms, detail: `BINARY_RESPONSE — content-encoding: ${encoding}` });
         } else {
           let parsed: { text?: string } | null = null;
           try { parsed = JSON.parse(rawText) as { text?: string }; } catch { /* ignore */ }

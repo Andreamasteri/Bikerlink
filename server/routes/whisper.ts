@@ -59,7 +59,7 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
 
           const headers: Record<string, string> = {};
           if (whisperToken) {
-            headers["X-Whisper-Token"] = whisperToken;
+            headers["Authorization"] = `Bearer ${whisperToken}`;
           }
 
           const controller = new AbortController();
@@ -120,7 +120,7 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
           try {
             groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
               method: "POST",
-              headers: { Authorization: `Bearer ${groqKey}` },
+              headers: { Authorization: `Bearer ${groqKey}`, "Accept-Encoding": "identity" },
               body: formData,
               signal: groqController.signal,
             });
@@ -138,7 +138,13 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
             throw new Error(`Groq error ${groqRes.status}`);
           }
 
-          const data = (await groqRes.json()) as { text?: string };
+          const groqRaw = await groqRes.text().catch(() => "");
+          if (groqRaw.charCodeAt(0) === 0) {
+            const enc = groqRes.headers.get("content-encoding") ?? "unknown";
+            console.warn(`[Whisper] Groq risposta binaria/compressa non parsabile (content-encoding: ${enc})`);
+            throw new Error(`Groq risposta binaria/compressa (content-encoding: ${enc})`);
+          }
+          const data = JSON.parse(groqRaw) as { text?: string };
           if (!data.text) {
             throw new Error("Risposta Groq senza testo");
           }
@@ -168,7 +174,7 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
           try {
             openaiRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
               method: "POST",
-              headers: { Authorization: `Bearer ${openaiKey}` },
+              headers: { Authorization: `Bearer ${openaiKey}`, "Accept-Encoding": "identity" },
               body: formData,
               signal: openaiController.signal,
             });
@@ -185,7 +191,13 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
             throw new Error(`OpenAI error ${openaiRes.status}`);
           }
 
-          const data = (await openaiRes.json()) as { text?: string };
+          const openaiRaw = await openaiRes.text().catch(() => "");
+          if (openaiRaw.charCodeAt(0) === 0) {
+            const enc = openaiRes.headers.get("content-encoding") ?? "unknown";
+            console.warn(`[Whisper] OpenAI risposta binaria/compressa non parsabile (content-encoding: ${enc})`);
+            throw new Error(`OpenAI risposta binaria/compressa (content-encoding: ${enc})`);
+          }
+          const data = JSON.parse(openaiRaw) as { text?: string };
           if (!data.text) {
             throw new Error("Risposta OpenAI senza testo");
           }
