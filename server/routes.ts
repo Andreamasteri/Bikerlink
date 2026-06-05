@@ -52,6 +52,7 @@ import analyticsEventsRoutes from "./routes/analytics-events";
 import sprintsRoutes from "./routes/sprints";
 import roadHazardsRoutes from "./routes/road-hazards";
 import wipStubsRouter from "./routes/wip-stubs";
+import routeCompletionRouter from "./routes/route-completion";
 import { publicMediaRouter, adminMediaRouter } from "./routes/media-library";
 import { db } from "./db";
 import { userFavorites } from "@shared/db";
@@ -310,6 +311,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Task #2698 — AI Assistant utente (sessione richiesta, no admin role).
   const { default: aiAssistantRoutes } = await import("./routes/ai-assistant");
   app.use("/api", aiAssistantRoutes);
+
+  // Route-completion: PATCH /routes/:id (con telemetria), voice-notes,
+  // planned-routes/weather. Estratto da wip-stubs per rispettare limite 600 righe.
+  app.use("/api", routeCompletionRouter);
 
   // Task #2632 — Stub endpoints per chiamate client senza handler reale.
   // Mounted ULTIMO sotto /api/ così non sovrascrive route esistenti più

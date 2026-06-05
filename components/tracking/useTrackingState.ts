@@ -11,7 +11,7 @@ import { useT } from "@/lib/language-context";
 import { useUnits } from "@/lib/units-context";
 import { useMapConfig } from "@/lib/map-context";
 import { useApiDebugLog } from "@/hooks/useApiDebugLog";
-import { apiRequest, getQueryFn } from "@/lib/query-client";
+import { apiRequest, getQueryFn, queryClient } from "@/lib/query-client";
 import { haversineKm } from "@/lib/geo";
 import { setTrackingActive, setHandsOffBroadcast, setSprintMeasuringBroadcast } from "@/lib/tracking-active";
 import { logGpsError } from "@/lib/gps-logger";
@@ -424,6 +424,9 @@ export function useTrackingState() {
       };
       if (settings.sensorsEnabledRef.current && refs.telemetryAccumRef.current.length > 0) updateData.telemetryData = JSON.stringify(refs.telemetryAccumRef.current);
       await apiRequest("PATCH", `/api/routes/${rId}`, updateData);
+      if (settings.sensorsEnabledRef.current && refs.telemetryAccumRef.current.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
+      }
       session.setCompletedRouteId(rId); mapState.setSummaryRoutePoints(gps.mapCoordsRef.current.map(c => ({ lat: c.latitude, lng: c.longitude }))); session.setSummaryVisible(true); refetchRecords();
       try {
         if (battery.rideStartBatteryLevelRef.current !== null) {
