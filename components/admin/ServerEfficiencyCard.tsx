@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -78,16 +78,10 @@ function formatUptime(sec: number): string {
   return `${s}s`;
 }
 
-interface ServerEfficiencyCardProps {
-  enabled?: boolean;
-  onSettled?: () => void;
-}
-
-export function ServerEfficiencyCard({ enabled = true, onSettled }: ServerEfficiencyCardProps) {
+export function ServerEfficiencyCard() {
   const [collapsed, setCollapsed] = useState(true);
-  const settledRef = useRef(false);
 
-  const { data, isLoading, error, isSuccess, isError, fetchStatus } = useQuery<ServerMetrics>({
+  const { data, isLoading, error } = useQuery<ServerMetrics>({
     queryKey: ["/api/admin/server-metrics"],
     queryFn: async () => {
       const res = await fetch(new URL("/api/admin/server-metrics", getApiUrl()).toString(), {
@@ -97,12 +91,11 @@ export function ServerEfficiencyCard({ enabled = true, onSettled }: ServerEffici
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
-    enabled,
-    refetchInterval: enabled ? 5_000 : false,
+    refetchInterval: 5_000,
     staleTime: 4_000,
   });
 
-  const { data: logs, isSuccess: logsSuccess, isError: logsError, fetchStatus: logsFetchStatus } = useQuery<ServerLogs>({
+  const { data: logs } = useQuery<ServerLogs>({
     queryKey: ["/api/admin/server-logs"],
     queryFn: async () => {
       const res = await fetch(new URL("/api/admin/server-logs?lines=12", getApiUrl()).toString(), {
@@ -112,21 +105,9 @@ export function ServerEfficiencyCard({ enabled = true, onSettled }: ServerEffici
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
-    enabled,
-    refetchInterval: enabled ? 15_000 : false,
+    refetchInterval: 15_000,
     staleTime: 10_000,
   });
-
-  useEffect(() => {
-    if (
-      !settledRef.current &&
-      fetchStatus === "idle" && (isSuccess || isError) &&
-      logsFetchStatus === "idle" && (logsSuccess || logsError)
-    ) {
-      settledRef.current = true;
-      onSettled?.();
-    }
-  }, [isSuccess, isError, fetchStatus, logsSuccess, logsError, logsFetchStatus, onSettled]);
 
   const loadPerCore = data?.cpu.loadPerCore ?? 0;
   const healthColor = !data
@@ -155,12 +136,11 @@ export function ServerEfficiencyCard({ enabled = true, onSettled }: ServerEffici
         <MaterialCommunityIcons name="server" size={18} color={healthColor} />
         <Text style={srvStyles.cardTitle}>Efficienza Server Replit (Cloud)</Text>
         <View style={srvStyles.headerRight}>
-          {!enabled && <ActivityIndicator size="small" color="#6b7280" />}
-          {enabled && isLoading && <ActivityIndicator size="small" color={healthColor} />}
-          {enabled && error && !isLoading && (
+          {isLoading && <ActivityIndicator size="small" color={healthColor} />}
+          {error && !isLoading && (
             <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
           )}
-          {enabled && !isLoading && !error && data && (
+          {!isLoading && !error && data && (
             <View style={[srvStyles.healthDot, { backgroundColor: healthColor }]} />
           )}
           <CollapseChevron collapsed={collapsed} />

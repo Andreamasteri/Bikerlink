@@ -221,11 +221,6 @@ export default function AdminDashboard() {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
 
-  const [card1Done, setCard1Done] = useState(false);
-  const [card2Done, setCard2Done] = useState(false);
-  const [card3Done, setCard3Done] = useState(false);
-  const [card4Done, setCard4Done] = useState(false);
-
   const initialCollapsed = useMemo<Record<string, boolean>>(
     () => Object.fromEntries(adminGroups.map((g) => [g.title, !OPEN_BY_DEFAULT.has(g.title)])),
     []
@@ -296,25 +291,11 @@ export default function AdminDashboard() {
       {!isSearching && (
         <>
           <RoutingCloudBanner onPress={() => router.push("/admin/routing-health" as never)} />
-          <ServerEfficiencyCard
-            enabled={true}
-            onSettled={() => setCard1Done(true)}
-          />
-          <ThinkCentreEfficiencyCard
-            enabled={card1Done}
-            onSettled={() => setCard2Done(true)}
-          />
-          <ThinkCentreCard
-            enabled={card2Done}
-            onSettled={() => setCard3Done(true)}
-          />
-          <GraphHopperCard
-            enabled={card3Done}
-            onSettled={() => setCard4Done(true)}
-          />
-          <TelemetryCard
-            enabled={card4Done}
-          />
+          <ServerEfficiencyCard />
+          <ThinkCentreEfficiencyCard />
+          <ThinkCentreCard />
+          <GraphHopperCard />
+          <TelemetryCard />
         </>
       )}
 

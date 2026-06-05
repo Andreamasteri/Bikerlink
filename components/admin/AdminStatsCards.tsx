@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Modal, Pressable } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -31,15 +31,8 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-interface GraphHopperCardProps {
-  enabled?: boolean;
-  onSettled?: () => void;
-}
-
-export function GraphHopperCard({ enabled = true, onSettled }: GraphHopperCardProps) {
-  const settledRef = useRef(false);
-
-  const { data, isLoading, error, isSuccess, isError, fetchStatus } = useQuery<GHStatus>({
+export function GraphHopperCard() {
+  const { data, isLoading, error } = useQuery<GHStatus>({
     queryKey: ["/api/admin/graphhopper-status"],
     queryFn: async () => {
       const res = await fetch(new URL("/api/admin/graphhopper-status", getApiUrl()).toString(), {
@@ -49,16 +42,8 @@ export function GraphHopperCard({ enabled = true, onSettled }: GraphHopperCardPr
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
-    enabled,
     staleTime: 60_000,
   });
-
-  useEffect(() => {
-    if (!settledRef.current && fetchStatus === "idle" && (isSuccess || isError)) {
-      settledRef.current = true;
-      onSettled?.();
-    }
-  }, [isSuccess, isError, fetchStatus, onSettled]);
 
   const modeLabel: Record<string, string> = {
     "self-hosted": "Self-Hosted",
@@ -85,12 +70,11 @@ export function GraphHopperCard({ enabled = true, onSettled }: GraphHopperCardPr
         <MaterialCommunityIcons name="map-marker-path" size={18} color={color} />
         <Text style={ghStyles.cardTitle}>GraphHopper</Text>
         <View style={ghStyles.headerRight}>
-          {!enabled && <ActivityIndicator size="small" color="#6b7280" />}
-          {enabled && isLoading && <ActivityIndicator size="small" color={color} />}
-          {enabled && error && !isLoading && (
+          {isLoading && <ActivityIndicator size="small" color={color} />}
+          {error && !isLoading && (
             <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
           )}
-          {enabled && !isLoading && !error && data && (
+          {!isLoading && !error && data && (
             <View style={[ghStyles.healthDot, { backgroundColor: data.healthy ? "#22c55e" : "#ef4444" }]} />
           )}
           <CollapseChevron collapsed={collapsed} />
@@ -128,15 +112,8 @@ export function GraphHopperCard({ enabled = true, onSettled }: GraphHopperCardPr
   );
 }
 
-interface TelemetryCardProps {
-  enabled?: boolean;
-  onSettled?: () => void;
-}
-
-export function TelemetryCard({ enabled = true, onSettled }: TelemetryCardProps) {
-  const settledRef = useRef(false);
-
-  const { data, isLoading, error, isSuccess, isError, fetchStatus } = useQuery<TelemetryStats>({
+export function TelemetryCard() {
+  const { data, isLoading, error } = useQuery<TelemetryStats>({
     queryKey: ["/api/admin/telemetry-stats"],
     queryFn: async () => {
       const res = await fetch(new URL("/api/admin/telemetry-stats", getApiUrl()).toString(), {
@@ -146,16 +123,8 @@ export function TelemetryCard({ enabled = true, onSettled }: TelemetryCardProps)
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
-    enabled,
     staleTime: 60_000,
   });
-
-  useEffect(() => {
-    if (!settledRef.current && fetchStatus === "idle" && (isSuccess || isError)) {
-      settledRef.current = true;
-      onSettled?.();
-    }
-  }, [isSuccess, isError, fetchStatus, onSettled]);
 
   function formatDate(iso: string | null): string {
     if (!iso) return "—";
@@ -229,10 +198,9 @@ export function TelemetryCard({ enabled = true, onSettled }: TelemetryCardProps)
           <MaterialCommunityIcons name="information-outline" size={16} color={Colors.textSecondary} />
         </TouchableOpacity>
         <View style={telStyles.headerRight}>
-          {!enabled && <ActivityIndicator size="small" color="#6b7280" />}
-          {enabled && isLoading && <ActivityIndicator size="small" color="#22c55e" />}
-          {enabled && error && !isLoading && <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />}
-          {enabled && !isLoading && !error && isStale && (
+          {isLoading && <ActivityIndicator size="small" color="#22c55e" />}
+          {error && !isLoading && <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />}
+          {!isLoading && !error && isStale && (
             <MaterialCommunityIcons name="alert" size={16} color="#f59e0b" />
           )}
           <CollapseChevron collapsed={collapsed} />

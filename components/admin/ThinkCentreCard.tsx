@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
@@ -65,16 +65,10 @@ function serviceStatusLabel(s: ServiceHealth): string {
   return s.error ? `Offline · ${s.error}` : "Offline";
 }
 
-interface ThinkCentreCardProps {
-  enabled?: boolean;
-  onSettled?: () => void;
-}
-
-export function ThinkCentreCard({ enabled = true, onSettled }: ThinkCentreCardProps) {
+export function ThinkCentreCard() {
   const [collapsed, setCollapsed] = useState(true);
-  const settledRef = useRef(false);
 
-  const { data, isLoading, error, isSuccess, isError, fetchStatus } = useQuery<ThinkCentreHealth>({
+  const { data, isLoading, error } = useQuery<ThinkCentreHealth>({
     queryKey: ["/api/admin/thinkcentre-health"],
     queryFn: async () => {
       const res = await fetch(new URL("/api/admin/thinkcentre-health", getApiUrl()).toString(), {
@@ -84,17 +78,9 @@ export function ThinkCentreCard({ enabled = true, onSettled }: ThinkCentreCardPr
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
-    enabled,
-    refetchInterval: enabled ? 30_000 : false,
+    refetchInterval: 30_000,
     staleTime: 20_000,
   });
-
-  useEffect(() => {
-    if (!settledRef.current && fetchStatus === "idle" && (isSuccess || isError)) {
-      settledRef.current = true;
-      onSettled?.();
-    }
-  }, [isSuccess, isError, fetchStatus, onSettled]);
 
   const headerColor = data ? OVERALL_COLOR[data.overall] : "#6b7280";
 
@@ -109,17 +95,16 @@ export function ThinkCentreCard({ enabled = true, onSettled }: ThinkCentreCardPr
         <MaterialCommunityIcons name="home-assistant" size={18} color={headerColor} />
         <Text style={styles.cardTitle}>Server di casa (ThinkCentre)</Text>
         <View style={styles.headerRight}>
-          {!enabled && <ActivityIndicator size="small" color="#6b7280" />}
-          {enabled && isLoading && <ActivityIndicator size="small" color={headerColor} />}
-          {enabled && error && !isLoading && (
+          {isLoading && <ActivityIndicator size="small" color={headerColor} />}
+          {error && !isLoading && (
             <MaterialCommunityIcons name="alert-circle-outline" size={16} color="#ef4444" />
           )}
-          {enabled && !isLoading && !error && data && (
+          {!isLoading && !error && data && (
             <Text style={styles.headerCount}>
               {data.onlineCount}/{data.configuredCount}
             </Text>
           )}
-          {enabled && !isLoading && !error && data && (
+          {!isLoading && !error && data && (
             <View style={[styles.healthDot, { backgroundColor: headerColor }]} />
           )}
           <CollapseChevron collapsed={collapsed} />
