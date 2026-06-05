@@ -21,7 +21,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { apiRequest, queryClient } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 
-type RouteProviderId = "ollama" | "groq" | "gemini";
+type RouteProviderId = "ollama" | "groq" | "gemini" | "openai";
 
 interface ProviderStatus {
   id: RouteProviderId;
@@ -62,21 +62,24 @@ const PROVIDER_ICONS: Record<RouteProviderId, keyof typeof MaterialCommunityIcon
   ollama: "brain",
   groq: "lightning-bolt",
   gemini: "cloud-outline",
+  openai: "robot-outline",
 };
 
 const PROVIDER_COLORS: Record<RouteProviderId, string> = {
   ollama: "#FF6600",
   groq: "#7C3AED",
   gemini: "#0EA5E9",
+  openai: "#10A37F",
 };
 
 const PROVIDER_DESC: Record<RouteProviderId, string> = {
   ollama: "Self-hosted sul ThinkCentre. Gratuito e privato. Richiede OLLAMA_URL.",
   groq: "Cloud veloce (LPU hardware Groq). Free tier 1000 req/giorno. Richiede GROQ_API_KEY.",
-  gemini: "Fallback cloud finale (Google AI Studio). Free tier 1500 req/giorno. Richiede GEMINI_API_KEY.",
+  gemini: "Cloud (Google AI Studio). Free tier 1500 req/giorno. Richiede GEMINI_API_KEY.",
+  openai: "Fallback cloud finale (OpenAI). gpt-4o-mini. Richiede OPENAI_API_KEY.",
 };
 
-const ALL_PROVIDERS: RouteProviderId[] = ["ollama", "groq", "gemini"];
+const ALL_PROVIDERS: RouteProviderId[] = ["ollama", "groq", "gemini", "openai"];
 
 export default function AiRouteProvidersScreen() {
   const insets = useSafeAreaInsets();

@@ -29,6 +29,7 @@ const weatherWaypointsSchema = z.object({
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
 import { getGroqModel, isGroqConfigured } from "../../lib/groq-client";
+import { getOpenAiRouteModel, isOpenAiRouteConfigured } from "../../lib/openai-route-client";
 import { getEffectiveRouteChain } from "../../ai/route-provider-config";
 
 interface RouteAiOptions<T> {
@@ -43,7 +44,20 @@ interface RouteAiOptions<T> {
 }
 
 const NO_PROVIDER_MSG =
-  "Nessun provider AI disponibile: Ollama non raggiungibile, GROQ_API_KEY e GEMINI_API_KEY mancanti.";
+  "Nessun provider AI disponibile al momento, riprova tra qualche minuto.";
+
+/**
+ * Restituisce true se l'errore è un 429 rate-limit (qualsiasi provider).
+ * In questo caso il chiamante deve saltare IMMEDIATAMENTE al provider successivo
+ * senza retry sul provider corrente (maxRetries spreca tempo su un provider esaurito).
+ */
+function isRateLimitError(err: unknown): boolean {
+  const e = err as { status?: number; statusCode?: number; code?: number; message?: string };
+  const status = e?.status ?? e?.statusCode ?? e?.code;
+  if (status === 429) return true;
+  const msg = (e?.message ?? "").toLowerCase();
+  return msg.includes("429") || msg.includes("quota") || msg.includes("rate limit") || msg.includes("resource_exhausted");
+}
 
 function geminiModel(apiKey: string) {
   return createGoogleGenerativeAI({ apiKey })("gemini-1.5-flash");
@@ -75,37 +89,57 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
       }
       try {
         const { object } = await generateObject({
-          model: getOllamaModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
+          model: getOllamaModel(), schema, prompt: fullPrompt,
+          maxRetries: 0, temperature, abortSignal,
         });
         return { result: object, provider_used: "ollama" };
       } catch (err) {
         lastErr = err;
         if (isLast) throw err;
-        console.warn("[AI parse] Ollama non disponibile/risposta non valida, fallback provider successivo:", (err as Error)?.message ?? err);
+        const rateLimited = isRateLimitError(err);
+        console.warn(`[AI parse] Ollama ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida, fallback provider successivo"}:`, (err as Error)?.message ?? err);
       }
     } else if (providerId === "groq") {
       if (!isGroqConfigured) continue;
       try {
         const { object } = await generateObject({
-          model: getGroqModel(), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
+          model: getGroqModel(), schema, prompt: fullPrompt,
+          maxRetries: 0, temperature, abortSignal,
         });
         return { result: object, provider_used: "groq" };
       } catch (err) {
         lastErr = err;
         if (isLast) throw err;
-        console.warn("[AI parse] Groq non disponibile/risposta non valida, fallback provider successivo:", (err as Error)?.message ?? err);
+        const rateLimited = isRateLimitError(err);
+        console.warn(`[AI parse] Groq ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida, fallback provider successivo"}:`, (err as Error)?.message ?? err);
       }
     } else if (providerId === "gemini") {
       if (!apiKey) continue;
       try {
         const { object } = await generateObject({
-          model: geminiModel(apiKey), schema, prompt: fullPrompt, maxRetries, temperature, abortSignal,
+          model: geminiModel(apiKey), schema, prompt: fullPrompt,
+          maxRetries: 0, temperature, abortSignal,
         });
         return { result: object, provider_used: "gemini" };
       } catch (err) {
         lastErr = err;
         if (isLast) throw err;
-        console.warn("[AI parse] Gemini non disponibile/risposta non valida:", (err as Error)?.message ?? err);
+        const rateLimited = isRateLimitError(err);
+        console.warn(`[AI parse] Gemini ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida"}:`, (err as Error)?.message ?? err);
+      }
+    } else if (providerId === "openai") {
+      if (!isOpenAiRouteConfigured) continue;
+      try {
+        const { object } = await generateObject({
+          model: getOpenAiRouteModel(), schema, prompt: fullPrompt,
+          maxRetries: 0, temperature, abortSignal,
+        });
+        return { result: object, provider_used: "openai" };
+      } catch (err) {
+        lastErr = err;
+        if (isLast) throw err;
+        const rateLimited = isRateLimitError(err);
+        console.warn(`[AI parse] OpenAI ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida"}:`, (err as Error)?.message ?? err);
       }
     }
   }
@@ -189,9 +223,13 @@ async function bufferAndValidateStream(
 export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator<string> {
   const { prompt, apiKey, system, abortSignal, maxRetries = 2, temperature = 0.1, validate, onProviderSelected } = opts;
   const fullPrompt = `${system}\n\nRichiesta: ${prompt}`;
-  const streamOpts = { maxRetries, temperature, abortSignal, validate };
 
   const chain = await getEffectiveRouteChain();
+  let lastErr: unknown = null;
+
+  // maxRetries: 0 su ogni chiamata — il chain loop esterno gestisce il fallback.
+  // Questo garantisce skip immediato su 429 senza sprecare retry sullo stesso provider esaurito.
+  const streamOpts = { maxRetries: 0, temperature, abortSignal, validate };
 
   for (let i = 0; i < chain.length; i++) {
     const providerId = chain[i];
@@ -215,8 +253,10 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
         }
         console.warn("[AI stream] Ollama output non valido, fallback provider successivo.");
       } catch (err) {
+        lastErr = err;
         if (isLast) throw err;
-        console.warn("[AI stream] Ollama non disponibile/risposta non valida, fallback:", (err as Error)?.message ?? err);
+        const rateLimited = isRateLimitError(err);
+        console.warn(`[AI stream] Ollama ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida, fallback"}:`, (err as Error)?.message ?? err);
       }
     } else if (providerId === "groq") {
       if (!isGroqConfigured) continue;
@@ -232,20 +272,51 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
         }
         console.warn("[AI stream] Groq output non valido, fallback provider successivo.");
       } catch (err) {
+        lastErr = err;
         if (isLast) throw err;
-        console.warn("[AI stream] Groq non disponibile/risposta non valida, fallback:", (err as Error)?.message ?? err);
+        const rateLimited = isRateLimitError(err);
+        console.warn(`[AI stream] Groq ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida, fallback"}:`, (err as Error)?.message ?? err);
       }
     } else if (providerId === "gemini") {
       if (!apiKey) continue;
-      // Gemini bufferizzato + validato (Task #2862): se produce JSON malformato,
-      // lanciamo un errore pulito invece di emettere testo rotto.
-      const geminiBuffer = await bufferAndValidateStream(geminiModel(apiKey), fullPrompt, streamOpts);
-      if (!geminiBuffer) {
-        throw new Error("Gemini ha prodotto una risposta non valida: nessun provider disponibile ha restituito output utilizzabile.");
+      try {
+        const geminiBuffer = await bufferAndValidateStream(geminiModel(apiKey), fullPrompt, streamOpts);
+        if (!geminiBuffer) {
+          if (isLast) {
+            throw new Error("Gemini ha prodotto una risposta non valida: nessun provider disponibile ha restituito output utilizzabile.");
+          }
+          console.warn("[AI stream] Gemini output non valido, fallback provider successivo.");
+          continue;
+        }
+        onProviderSelected?.("gemini");
+        for (const chunk of geminiBuffer) yield chunk;
+        return;
+      } catch (err) {
+        lastErr = err;
+        if (isLast) throw err;
+        const rateLimited = isRateLimitError(err);
+        console.warn(`[AI stream] Gemini ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida"}:`, (err as Error)?.message ?? err);
       }
-      onProviderSelected?.("gemini");
-      for (const chunk of geminiBuffer) yield chunk;
-      return;
+    } else if (providerId === "openai") {
+      if (!isOpenAiRouteConfigured) continue;
+      try {
+        const openaiBuffer = await bufferAndValidateStream(getOpenAiRouteModel(), fullPrompt, streamOpts);
+        if (!openaiBuffer) {
+          if (isLast) {
+            throw new Error("OpenAI ha prodotto una risposta non valida: nessun provider disponibile ha restituito output utilizzabile.");
+          }
+          console.warn("[AI stream] OpenAI output non valido, fallback provider successivo.");
+          continue;
+        }
+        onProviderSelected?.("openai");
+        for (const chunk of openaiBuffer) yield chunk;
+        return;
+      } catch (err) {
+        lastErr = err;
+        if (isLast) throw err;
+        const rateLimited = isRateLimitError(err);
+        console.warn(`[AI stream] OpenAI ${rateLimited ? "429 rate-limit, skip immediato" : "non disponibile/risposta non valida"}:`, (err as Error)?.message ?? err);
+      }
     }
   }
 

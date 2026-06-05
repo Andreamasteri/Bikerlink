@@ -16,11 +16,12 @@
 import { storage } from "../storage";
 import { isOllamaConfigured } from "../lib/ollama-client";
 import { isGroqConfigured } from "../lib/groq-client";
+import { isOpenAiRouteConfigured } from "../lib/openai-route-client";
 
-export type RouteProviderId = "ollama" | "groq" | "gemini";
+export type RouteProviderId = "ollama" | "groq" | "gemini" | "openai";
 
-export const ALL_ROUTE_PROVIDERS: RouteProviderId[] = ["ollama", "groq", "gemini"];
-export const DEFAULT_ROUTE_CHAIN: RouteProviderId[] = ["ollama", "groq", "gemini"];
+export const ALL_ROUTE_PROVIDERS: RouteProviderId[] = ["ollama", "groq", "gemini", "openai"];
+export const DEFAULT_ROUTE_CHAIN: RouteProviderId[] = ["ollama", "groq", "gemini", "openai"];
 const DB_KEY = "ai_route_provider_chain";
 
 function parseChain(raw: string): RouteProviderId[] {
@@ -117,11 +118,19 @@ export async function getRouteProviderStatusList(): Promise<{
     },
     {
       id: "gemini",
-      label: "Gemini (cloud finale)",
+      label: "Gemini (cloud)",
       configured: geminiConfigured,
       inChain: chain.includes("gemini"),
       position: chain.includes("gemini") ? chain.indexOf("gemini") + 1 : null,
       envKey: "GEMINI_API_KEY",
+    },
+    {
+      id: "openai",
+      label: "OpenAI (gpt-4o-mini)",
+      configured: isOpenAiRouteConfigured,
+      inChain: chain.includes("openai"),
+      position: chain.includes("openai") ? chain.indexOf("openai") + 1 : null,
+      envKey: "OPENAI_API_KEY",
     },
   ];
 

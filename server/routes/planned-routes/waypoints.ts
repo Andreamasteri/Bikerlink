@@ -8,6 +8,7 @@ import { z } from "zod";
 import { generateRouteObject, streamRouteText } from "./waypoints.next";
 import { isOllamaConfigured } from "../../lib/ollama-client";
 import { isGroqConfigured } from "../../lib/groq-client";
+import { isOpenAiRouteConfigured } from "../../lib/openai-route-client";
 import { haversineKm } from "../../geo";
 const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
@@ -142,7 +143,7 @@ function geminiErrorMessage(err: unknown): { httpStatus: number; message: string
   const status = e?.status ?? e?.statusCode ?? e?.code;
   const isRateLimit = status === 429 || msg.includes("429") || msg.includes("quota") || msg.includes("rate limit") || msg.includes("resource_exhausted");
   if (isRateLimit) {
-    return { httpStatus: 429, message: "Troppe richieste AI: limite di utilizzo raggiunto, riprova tra qualche minuto" };
+    return { httpStatus: 429, message: "Tutti i servizi AI sono temporaneamente saturi, riprova tra qualche minuto" };
   }
   const isTransient = status === 503 || msg.includes("503") || msg.includes("unavailable") || msg.includes("overloaded");
   if (isTransient) {
@@ -199,7 +200,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
   const { prompt } = parsedAi.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey && !isOllamaConfigured && !isGroqConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama, Groq o GEMINI_API_KEY)");
+  if (!apiKey && !isOllamaConfigured && !isGroqConfigured && !isOpenAiRouteConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama, Groq, Gemini o OpenAI)");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
@@ -238,7 +239,7 @@ router.post("/ai-stream", async (req: Request, res: Response) => {
   const { prompt } = parsedAiStream.data;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey && !isOllamaConfigured && !isGroqConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama, Groq o GEMINI_API_KEY)");
+  if (!apiKey && !isOllamaConfigured && !isGroqConfigured && !isOpenAiRouteConfigured) return sendError(res, 503, "Servizio AI non disponibile: nessun provider configurato (Ollama, Groq, Gemini o OpenAI)");
 
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");

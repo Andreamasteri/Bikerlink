@@ -121,7 +121,10 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
       if (!openaiRes.ok) {
         const errText = await openaiRes.text().catch(() => "");
         console.error(`[Whisper] OpenAI error ${openaiRes.status}: ${errText}`);
-        return sendError(res, 502, `Errore dal servizio cloud: ${openaiRes.status}`);
+        if (openaiRes.status === 429) {
+          return sendError(res, 429, "Trascrizione vocale: limite di utilizzo raggiunto, riprova tra qualche minuto");
+        }
+        return sendError(res, 502, `Trascrizione vocale non disponibile (${openaiRes.status})`);
       }
 
       const data = (await openaiRes.json()) as { text?: string };

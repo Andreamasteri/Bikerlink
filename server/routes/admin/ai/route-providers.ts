@@ -26,6 +26,7 @@ import {
 import { storage } from "../../../storage";
 import { callOllamaChat, isOllamaConfigured } from "../../../lib/ollama-client";
 import { getGroqModel, isGroqConfigured } from "../../../lib/groq-client";
+import { getOpenAiRouteModel, isOpenAiRouteConfigured } from "../../../lib/openai-route-client";
 import { sanitizeError } from "./test-ollama";
 
 const router = Router();
@@ -69,7 +70,7 @@ router.get("/route-providers/config", async (_req: Request, res: Response) => {
 
 // ── POST /ai/route-providers/test ────────────────────────────────────────────
 const TestBody = z.object({
-  provider: z.enum(["ollama", "groq", "gemini"]),
+  provider: z.enum(["ollama", "groq", "gemini", "openai"]),
 });
 
 router.post("/route-providers/test", async (req: Request, res: Response) => {
@@ -119,6 +120,17 @@ router.post("/route-providers/test", async (req: Request, res: Response) => {
       res.json({ ok: true, latency_ms: Date.now() - start, reply: text.trim().slice(0, 120) });
       return;
     }
+
+    if (provider === "openai") {
+      if (!isOpenAiRouteConfigured) {
+        res.json({ ok: false, latency_ms: 0, error: "OPENAI_API_KEY non configurata." });
+        return;
+      }
+      const model = getOpenAiRouteModel();
+      const { text } = await generateText({ model, prompt: "Reply with only the word: PONG", maxRetries: 0 });
+      res.json({ ok: true, latency_ms: Date.now() - start, reply: text.trim().slice(0, 120) });
+      return;
+    }
   } catch (err: unknown) {
     const latency_ms = Date.now() - start;
     const msg = err instanceof Error ? err.message : String(err);
@@ -150,7 +162,7 @@ router.get("/route-providers/stats", async (_req: Request, res: Response) => {
 
 // ── POST /ai/route-providers/config ──────────────────────────────────────────
 const ConfigBody = z.object({
-  chain: z.array(z.enum(["ollama", "groq", "gemini"])).min(1),
+  chain: z.array(z.enum(["ollama", "groq", "gemini", "openai"])).min(1),
 });
 
 router.post("/route-providers/config", async (req: Request, res: Response) => {
