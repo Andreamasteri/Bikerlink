@@ -114,11 +114,19 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
           formData.append("model", "whisper-large-v3-turbo");
           formData.append("response_format", "json");
 
-          const groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${groqKey}` },
-            body: formData,
-          });
+          const groqController = new AbortController();
+          const groqTimeout = setTimeout(() => groqController.abort(), 20000);
+          let groqRes: Awaited<ReturnType<typeof fetch>>;
+          try {
+            groqRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${groqKey}` },
+              body: formData,
+              signal: groqController.signal,
+            });
+          } finally {
+            clearTimeout(groqTimeout);
+          }
 
           if (!groqRes.ok) {
             const errText = await groqRes.text().catch(() => "");
@@ -154,17 +162,25 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
           formData.append("model", "whisper-1");
           formData.append("response_format", "json");
 
-          const openaiRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${openaiKey}` },
-            body: formData,
-          });
+          const openaiController = new AbortController();
+          const openaiTimeout = setTimeout(() => openaiController.abort(), 25000);
+          let openaiRes: Awaited<ReturnType<typeof fetch>>;
+          try {
+            openaiRes = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${openaiKey}` },
+              body: formData,
+              signal: openaiController.signal,
+            });
+          } finally {
+            clearTimeout(openaiTimeout);
+          }
 
           if (!openaiRes.ok) {
             const errText = await openaiRes.text().catch(() => "");
             console.warn(`[Whisper] OpenAI error ${openaiRes.status}: ${errText}`);
             if (openaiRes.status === 429) {
-              return sendError(res, 429, "Trascrizione vocale: limite di utilizzo raggiunto, riprova tra qualche minuto");
+              console.warn(`[Whisper] OpenAI rate-limit, passo al successivo`);
             }
             throw new Error(`OpenAI error ${openaiRes.status}`);
           }
