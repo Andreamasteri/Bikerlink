@@ -8,16 +8,18 @@ import {
   ActivityIndicator,
   Alert,
   AppState,
+  TouchableOpacity,
 } from "react-native";
 import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
-import { apiRequest, queryClient, getApiUrl } from "@/lib/query-client";
+import { apiRequest, queryClient, getApiUrl, getQueryFnWithTimeout } from "@/lib/query-client";
 import { showImagePickerMenu, uriToBlob } from "@/lib/image-picker-utils";
 import { useChatSSE } from "@/hooks/useChatSSE";
 import { useT } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 
 // Custom Components
 import { MessageBubble, ChatMessage } from "@/components/chat/MessageBubble";
@@ -73,7 +75,7 @@ export default function ChatConversationScreen() {
   const t = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { user } = (require("@/lib/auth-context")).useAuth();
+  const { user } = useAuth();
   const userId = user?.id || "";
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
@@ -91,7 +93,9 @@ export default function ChatConversationScreen() {
 
   const { data: conversationDetail } = useQuery<ConversationDetail>({
     queryKey: ["/api/chat/conversations", id],
+    queryFn: getQueryFnWithTimeout(15000),
     staleTime: 60000,
+    retry: false,
     enabled: !!id,
   });
 
@@ -107,9 +111,12 @@ export default function ChatConversationScreen() {
   const isMotoclubRef = useRef(false);
   if (conversation !== undefined) isMotoclubRef.current = isMotoclub;
 
-  const { data: messages, isLoading } = useQuery<ChatMessage[]>({
+  const { data: messages, isLoading, isError: isMessagesError, refetch: refetchMessages } = useQuery<ChatMessage[]>({
     queryKey: ["/api/chat/conversations", id, "messages"],
+    queryFn: getQueryFnWithTimeout(15000),
     refetchInterval: 60000,
+    staleTime: 60000,
+    retry: false,
     enabled: !!id,
   });
 
@@ -450,6 +457,14 @@ export default function ChatConversationScreen() {
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
+      ) : isMessagesError ? (
+        <View style={styles.centerContent}>
+          <Ionicons name="cloud-offline-outline" size={40} color={Colors.textSecondary} />
+          <Text style={styles.emptyChatText}>Impossibile caricare i messaggi</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetchMessages()}>
+            <Text style={styles.retryText}>Riprova</Text>
+          </TouchableOpacity>
+        </View>
       ) : (messages || []).length === 0 ? (
         <View style={styles.emptyChatOuter}>
           <Ionicons name="chatbubble-outline" size={40} color={Colors.textSecondary} />
@@ -516,6 +531,18 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.textSecondary,
     marginTop: 12,
+  },
+  retryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    backgroundColor: Colors.accent,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
   },
   welcomeBanner: {
     marginTop: 24,

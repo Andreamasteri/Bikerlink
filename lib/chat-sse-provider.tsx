@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef } from "react";
 import { AppState, type AppStateStatus } from "react-native";
-import { getApiUrl } from "@/lib/query-client";
+import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
 export interface ChatSseEvent {
   type: "new_message" | "conversation_update" | "message_deleted";
@@ -42,7 +42,7 @@ export function ChatSseProvider({ children, enabled }: { children: React.ReactNo
         const response = await fetch(url, {
           credentials: "include",
           signal: abortController.signal,
-          headers: { Accept: "text/event-stream" },
+          headers: authFetchHeaders({ Accept: "text/event-stream" }),
         });
 
         if (!response.ok || !response.body) {

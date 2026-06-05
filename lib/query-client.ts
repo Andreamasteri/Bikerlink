@@ -247,6 +247,41 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+/**
+ * Returns a QueryFunction identical to getQueryFn({ on401: "returnNull" }) but
+ * aborts the request after `timeoutMs` milliseconds if the server hasn't
+ * responded. When the timeout fires the fetch throws an AbortError which React
+ * Query treats as a query error, surfacing isError=true and triggering the
+ * "Riprova" path in the UI.
+ */
+export function getQueryFnWithTimeout<T>(timeoutMs = 15000): QueryFunction<T> {
+  const baseFn = getQueryFn<T>({ on401: "returnNull" });
+  return (ctx) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      controller.abort(new Error(`Request timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    const parentSignal = ctx.signal;
+    if (parentSignal) {
+      const onParentAbort = () => {
+        clearTimeout(timer);
+        controller.abort((parentSignal as AbortSignal & { reason?: unknown }).reason);
+      };
+      if (parentSignal.aborted) {
+        clearTimeout(timer);
+        controller.abort((parentSignal as AbortSignal & { reason?: unknown }).reason);
+      } else {
+        parentSignal.addEventListener("abort", onParentAbort, { once: true });
+      }
+    }
+
+    return Promise.resolve(baseFn({ ...ctx, signal: controller.signal })).finally(() => {
+      clearTimeout(timer);
+    });
+  };
+}
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

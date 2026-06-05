@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   AppState,
   Alert,
+  TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -19,7 +20,7 @@ import { InlineMiniPlayer } from "@/components/MiniPlayer";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
 import { useT } from "@/lib/language-context";
-import { apiRequest, queryClient } from "@/lib/query-client";
+import { apiRequest, queryClient, getQueryFnWithTimeout } from "@/lib/query-client";
 import { useChatSSE } from "@/hooks/useChatSSE";
 
 import { ChatListItem, ConversationItem } from "@/components/chat-list/ChatListItem";
@@ -55,9 +56,12 @@ export default function ChatScreen() {
   const [sortOrder, setSortOrder] = useState<"alpha" | "distance">("alpha");
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  const { data: conversations, isLoading } = useQuery<ConversationItem[]>({
+  const { data: conversations, isLoading, isError, refetch } = useQuery<ConversationItem[]>({
     queryKey: ["/api/chat/conversations"],
+    queryFn: getQueryFnWithTimeout(15000),
     refetchInterval: 60000,
+    staleTime: 60000,
+    retry: false,
   });
 
   const { data: friends } = useQuery<FriendItem[]>({
@@ -285,6 +289,14 @@ export default function ChatScreen() {
         <View style={styles.centerContent}>
           <ActivityIndicator size="large" color={Colors.accent} />
         </View>
+      ) : isError ? (
+        <View style={styles.centerContent}>
+          <Ionicons name="cloud-offline-outline" size={48} color={Colors.textSecondary} />
+          <Text style={styles.emptyText}>Impossibile caricare le chat</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={() => refetch()}>
+            <Text style={styles.retryText}>Riprova</Text>
+          </TouchableOpacity>
+        </View>
       ) : !conversations || conversations.length === 0 ? (
         <View style={styles.centerContent}>
           <Ionicons name="chatbubbles-outline" size={48} color={Colors.textSecondary} />
@@ -342,5 +354,17 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingTop: 8,
+  },
+  retryButton: {
+    marginTop: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    backgroundColor: Colors.accent,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: "#fff",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
   },
 });
