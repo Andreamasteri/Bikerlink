@@ -65,11 +65,9 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
   const openSuggestionsFor = useCallback((index: number, inputText: string) => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
     setFallbackForIndex(index);
-    if (!wpSuggestions || wpSuggestions.index !== index) {
-      onWpInputChange(inputText, index);
-    }
+    onWpInputChange(inputText, index);
     setFallbackVisible(true);
-  }, [wpSuggestions, onWpInputChange]);
+  }, [onWpInputChange]);
 
   return (
     <View style={s.section}>
@@ -191,7 +189,7 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
             bounces={false}
             showsVerticalScrollIndicator={false}
           >
-            {wpLoading && fallbackForIndex !== null && (!wpSuggestions || wpSuggestions.index !== fallbackForIndex) && (
+            {wpLoading && fallbackForIndex !== null && (
               <View style={s.panelRow}>
                 <ActivityIndicator size="small" color={colors.accent} />
                 <Text style={s.panelHintText}>Ricerca in corso…</Text>

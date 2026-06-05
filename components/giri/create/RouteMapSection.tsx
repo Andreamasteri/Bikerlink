@@ -104,7 +104,7 @@ const styles = (colors: ThemeColors) =>
     plannerMap: { flex: 1 },
     mapHintBadge: {
       position: "absolute",
-      bottom: 8,
+      top: 8,
       left: "50%",
       transform: [{ translateX: -70 }],
       backgroundColor: "rgba(0,0,0,0.7)",

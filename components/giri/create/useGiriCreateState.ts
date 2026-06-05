@@ -309,6 +309,8 @@ export function useGiriCreateState(language?: string) {
             async (resp) => { if (!resp.ok) return []; return resp.json(); }
           );
           setWpSuggestions({ index, results });
+        } catch {
+          setWpSuggestions({ index, results: [] });
         } finally {
           setWpLoading(false);
         }
