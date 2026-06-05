@@ -23,26 +23,18 @@ function CalibrationBanner({
 }) {
   if (isCalibrated) {
     return (
-      <View style={bannerStyles.successBanner}>
-        <View style={bannerStyles.successLeft} />
-        <View style={bannerStyles.bannerContent}>
-          <View style={bannerStyles.bannerRow}>
-            <Ionicons name="checkmark-circle" size={18} color={Colors.success} />
-            <Text style={bannerStyles.successTitle}>Telefono calibrato</Text>
-          </View>
-          <Text style={bannerStyles.bannerDesc}>
-            Il supporto manubrio è configurato correttamente. Accelerazione,
-            angolo di piega e G-force vengono misurati con precisione.
-          </Text>
-          <TouchableOpacity
-            style={bannerStyles.secondaryBtn}
-            onPress={onCalibrate}
-            activeOpacity={0.75}
-          >
-            <Ionicons name="refresh-outline" size={13} color={Colors.textSecondary} />
-            <Text style={bannerStyles.secondaryBtnText}>Ricalibrare</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={bannerStyles.calibratedHint}>
+        <Text style={bannerStyles.calibratedHintText}>
+          Hai già calibrato la posizione del telefono. Ricalibrala in caso venga montato in modo diverso.
+        </Text>
+        <TouchableOpacity
+          style={bannerStyles.recalibrateBtn}
+          onPress={onCalibrate}
+          activeOpacity={0.75}
+        >
+          <Ionicons name="refresh-outline" size={11} color={Colors.textSecondary} />
+          <Text style={bannerStyles.recalibrateBtnText}>Ricalibrare</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -262,28 +254,30 @@ export function IdleConfigScreen({
           />
         </View>
 
-        <View style={styles.featureItem}>
-          <View style={styles.featureIcon}>
-            <Ionicons
-              name="pulse-outline"
-              size={20}
-              color={sensorsEnabled ? Colors.accent : Colors.textSecondary}
-            />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.featureLabel, !sensorsEnabled && { color: Colors.textSecondary }]}>
-              {t("tracking.sensors")}
-            </Text>
-            <Text style={styles.featureDesc}>
-              {sensorsEnabled ? t("tracking.feature.sensors") : "Disattivati dall'admin"}
-            </Text>
-            <TouchableOpacity onPress={handleOpenMountCalib} style={{ marginTop: 4 }}>
-              <Text style={[styles.calibLink, isCalibrated && { color: Colors.success }]}>
-                {isCalibrated ? t("tracking.mountCalib.calibrated") : t("tracking.mountCalib.configure")}
+        {sensorsEnabled && (
+          <View style={styles.featureItem}>
+            <View style={styles.featureIcon}>
+              <Ionicons
+                name="pulse-outline"
+                size={20}
+                color={Colors.accent}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.featureLabel}>
+                {t("tracking.sensors")}
               </Text>
-            </TouchableOpacity>
+              <Text style={styles.featureDesc}>
+                {t("tracking.feature.sensors")}
+              </Text>
+              <TouchableOpacity onPress={handleOpenMountCalib} style={{ marginTop: 4 }}>
+                <Text style={[styles.calibLink, isCalibrated && { color: Colors.success }]}>
+                  {isCalibrated ? t("tracking.mountCalib.calibrated") : t("tracking.mountCalib.configure")}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.featureItem}>
           <View style={styles.featureIcon}>
@@ -571,6 +565,35 @@ const bannerStyles = StyleSheet.create({
   secondaryBtnText: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
+    color: Colors.textSecondary,
+  },
+  calibratedHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  calibratedHintText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    lineHeight: 16,
+  },
+  recalibrateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  recalibrateBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
     color: Colors.textSecondary,
   },
 });
