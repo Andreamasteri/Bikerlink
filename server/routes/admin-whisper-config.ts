@@ -85,6 +85,7 @@ router.put("/whisper-config", async (req: Request, res: Response) => {
 // ── POST /whisper-config/test/:providerId ──────────────────────────────────
 router.post("/whisper-config/test/:providerId", async (req: Request, res: Response) => {
   const providerId = req.params.providerId as SttProviderId;
+  console.log(`[whisper-test] ricevuto: ${providerId} — ip: ${req.ip}`);
   if (!ALL_STT_PROVIDERS.includes(providerId)) {
     sendError(res, 400, `Provider non valido: ${providerId}`);
     return;
@@ -99,7 +100,9 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
       const whisperUrl = process.env.WHISPER_URL;
       const whisperToken = process.env.WHISPER_TOKEN;
       if (!whisperUrl) {
-        res.json({ ok: false, latency_ms: 0, error: "WHISPER_URL non configurata." });
+        const payload = { ok: false, latency_ms: 0, error: "WHISPER_URL non configurata." };
+        console.log(`[whisper-test] home ok=false latency_ms=0 error="${payload.error}"`);
+        res.json(payload);
         return;
       }
 
@@ -122,16 +125,21 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
         const latency_ms = Date.now() - start;
         if (!homeRes.ok) {
           const errText = await homeRes.text().catch(() => "");
-          res.json({ ok: false, latency_ms, error: `HTTP ${homeRes.status}: ${errText}`.slice(0, 200) });
+          const error = `HTTP ${homeRes.status}: ${errText}`.slice(0, 200);
+          console.log(`[whisper-test] home ok=false latency_ms=${latency_ms} error="${error}"`);
+          res.json({ ok: false, latency_ms, error });
           return;
         }
         const data = (await homeRes.json()) as { text?: string };
-        res.json({ ok: true, latency_ms, text: (data.text ?? "").trim().slice(0, 200) });
+        const text = (data.text ?? "").trim().slice(0, 200);
+        console.log(`[whisper-test] home ok=true latency_ms=${latency_ms} text="${text}"`);
+        res.json({ ok: true, latency_ms, text });
       } catch (e) {
         clearTimeout(timeout);
         const latency_ms = Date.now() - start;
-        const msg = e instanceof Error ? e.message : String(e);
-        res.json({ ok: false, latency_ms, error: msg.slice(0, 200) });
+        const error = (e instanceof Error ? e.message : String(e)).slice(0, 200);
+        console.log(`[whisper-test] home ok=false latency_ms=${latency_ms} error="${error}"`);
+        res.json({ ok: false, latency_ms, error });
       }
       return;
     }
@@ -139,7 +147,9 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
     if (providerId === "groq") {
       const groqKey = process.env.GROQ_API_KEY;
       if (!groqKey) {
-        res.json({ ok: false, latency_ms: 0, error: "GROQ_API_KEY non configurata." });
+        const payload = { ok: false, latency_ms: 0, error: "GROQ_API_KEY non configurata." };
+        console.log(`[whisper-test] groq ok=false latency_ms=0 error="${payload.error}"`);
+        res.json(payload);
         return;
       }
 
@@ -158,15 +168,20 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
         const latency_ms = Date.now() - start;
         if (!groqRes.ok) {
           const errText = await groqRes.text().catch(() => "");
-          res.json({ ok: false, latency_ms, error: `HTTP ${groqRes.status}: ${errText}`.slice(0, 200) });
+          const error = `HTTP ${groqRes.status}: ${errText}`.slice(0, 200);
+          console.log(`[whisper-test] groq ok=false latency_ms=${latency_ms} error="${error}"`);
+          res.json({ ok: false, latency_ms, error });
           return;
         }
         const data = (await groqRes.json()) as { text?: string };
-        res.json({ ok: true, latency_ms, text: (data.text ?? "").trim().slice(0, 200) });
+        const text = (data.text ?? "").trim().slice(0, 200);
+        console.log(`[whisper-test] groq ok=true latency_ms=${latency_ms} text="${text}"`);
+        res.json({ ok: true, latency_ms, text });
       } catch (e) {
         const latency_ms = Date.now() - start;
-        const msg = e instanceof Error ? e.message : String(e);
-        res.json({ ok: false, latency_ms, error: msg.slice(0, 200) });
+        const error = (e instanceof Error ? e.message : String(e)).slice(0, 200);
+        console.log(`[whisper-test] groq ok=false latency_ms=${latency_ms} error="${error}"`);
+        res.json({ ok: false, latency_ms, error });
       }
       return;
     }
@@ -174,7 +189,9 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
     if (providerId === "openai") {
       const openaiKey = process.env.OPENAI_API_KEY;
       if (!openaiKey) {
-        res.json({ ok: false, latency_ms: 0, error: "OPENAI_API_KEY non configurata." });
+        const payload = { ok: false, latency_ms: 0, error: "OPENAI_API_KEY non configurata." };
+        console.log(`[whisper-test] openai ok=false latency_ms=0 error="${payload.error}"`);
+        res.json(payload);
         return;
       }
 
@@ -193,15 +210,20 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
         const latency_ms = Date.now() - start;
         if (!openaiRes.ok) {
           const errText = await openaiRes.text().catch(() => "");
-          res.json({ ok: false, latency_ms, error: `HTTP ${openaiRes.status}: ${errText}`.slice(0, 200) });
+          const error = `HTTP ${openaiRes.status}: ${errText}`.slice(0, 200);
+          console.log(`[whisper-test] openai ok=false latency_ms=${latency_ms} error="${error}"`);
+          res.json({ ok: false, latency_ms, error });
           return;
         }
         const data = (await openaiRes.json()) as { text?: string };
-        res.json({ ok: true, latency_ms, text: (data.text ?? "").trim().slice(0, 200) });
+        const text = (data.text ?? "").trim().slice(0, 200);
+        console.log(`[whisper-test] openai ok=true latency_ms=${latency_ms} text="${text}"`);
+        res.json({ ok: true, latency_ms, text });
       } catch (e) {
         const latency_ms = Date.now() - start;
-        const msg = e instanceof Error ? e.message : String(e);
-        res.json({ ok: false, latency_ms, error: msg.slice(0, 200) });
+        const error = (e instanceof Error ? e.message : String(e)).slice(0, 200);
+        console.log(`[whisper-test] openai ok=false latency_ms=${latency_ms} error="${error}"`);
+        res.json({ ok: false, latency_ms, error });
       }
       return;
     }
@@ -210,7 +232,7 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
   } catch (err) {
     const latency_ms = Date.now() - start;
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[admin/whisper-config/test/${providerId}] error:`, msg);
+    console.error(`[whisper-test] ${providerId} ok=false latency_ms=${latency_ms} error="${msg}"`);
     res.json({ ok: false, latency_ms, error: msg.slice(0, 200) });
   }
 });

@@ -33,7 +33,7 @@ interface WhisperConfigData {
 
 interface TestResult {
   ok: boolean;
-  latency_ms: number;
+  latency_ms: number | null;
   text?: string;
   error?: string;
 }
@@ -140,12 +140,34 @@ export default function WhisperConfigScreen() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
-      const result = await res.json() as TestResult;
+
+      const bodyText = await res.text().catch(() => "");
+      let raw: Record<string, unknown> = {};
+      try { raw = JSON.parse(bodyText) as Record<string, unknown>; } catch { /* non-JSON */ }
+
+      if (!res.ok) {
+        const jsonMsg = raw.message ?? raw.error;
+        const errMsg = jsonMsg != null
+          ? String(jsonMsg)
+          : `HTTP ${res.status}${bodyText ? `: ${bodyText.slice(0, 120)}` : ""}`;
+        setTestResults((prev) => ({
+          ...prev,
+          [id]: { ok: false, latency_ms: null, error: errMsg },
+        }));
+        return;
+      }
+
+      const result: TestResult = {
+        ok: Boolean(raw.ok),
+        latency_ms: typeof raw.latency_ms === "number" ? raw.latency_ms : null,
+        error: raw.error != null ? String(raw.error) : raw.message != null ? String(raw.message) : undefined,
+        text: raw.text != null ? String(raw.text) : undefined,
+      };
       setTestResults((prev) => ({ ...prev, [id]: result }));
     } catch (e) {
       setTestResults((prev) => ({
         ...prev,
-        [id]: { ok: false, latency_ms: 0, error: e instanceof Error ? e.message : "Errore" },
+        [id]: { ok: false, latency_ms: null, error: e instanceof Error ? e.message : "Errore di rete" },
       }));
     }
   }
@@ -283,8 +305,8 @@ export default function WhisperConfigScreen() {
               <View style={[styles.testResult, testResult.ok ? styles.testResultOk : styles.testResultFail]}>
                 <Text style={styles.testResultText}>
                   {testResult.ok
-                    ? `✅ OK — ${testResult.latency_ms}ms${testResult.text ? ` — "${testResult.text}"` : ""}`
-                    : `❌ ${testResult.error ?? "Errore"} (${testResult.latency_ms}ms)`}
+                    ? `✅ OK — ${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"}${testResult.text ? ` — "${testResult.text}"` : ""}`
+                    : `❌ ${testResult.error ?? "Errore sconosciuto"} (${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"})`}
                 </Text>
               </View>
             )}
