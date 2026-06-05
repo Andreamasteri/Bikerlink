@@ -344,7 +344,7 @@ export function useGiriCreateState(language?: string) {
   const handleCalculate = async () => {
     const resolved = waypoints.filter((wp) => wp.lat !== 0 || wp.lng !== 0);
     if (resolved.length < 2) {
-      Alert.alert("Waypoint non risolti", "Seleziona almeno 2 luoghi dalla lista suggerimenti."); return;
+      Alert.alert("Waypoint non risolti", "Tocca 📍 accanto ai campi non risolti per selezionare un luogo."); return;
     }
     const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
     setCalculating(true);

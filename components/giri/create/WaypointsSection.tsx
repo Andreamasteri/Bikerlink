@@ -41,6 +41,7 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
   const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
   const [fallbackVisible, setFallbackVisible] = useState(false);
+  const [fallbackForIndex, setFallbackForIndex] = useState<number | null>(null);
 
   const handleFocus = useCallback((index: number) => {
     if (blurTimer.current) clearTimeout(blurTimer.current);
@@ -58,7 +59,17 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
     onSelectSuggestion(index, geo);
     setFocusedIndex(null);
     setFallbackVisible(false);
+    setFallbackForIndex(null);
   }, [onSelectSuggestion]);
+
+  const openSuggestionsFor = useCallback((index: number, inputText: string) => {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+    setFallbackForIndex(index);
+    if (!wpSuggestions || wpSuggestions.index !== index) {
+      onWpInputChange(inputText, index);
+    }
+    setFallbackVisible(true);
+  }, [wpSuggestions, onWpInputChange]);
 
   return (
     <View style={s.section}>
@@ -106,6 +117,15 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
               )}
             </View>
 
+            {wpInputs[i]?.length >= 3 && waypoints[i].lat === 0 && (
+              <Pressable
+                style={s.persistentSuggestBtn}
+                onPress={() => openSuggestionsFor(i, wpInputs[i])}
+              >
+                <Text style={s.persistentSuggestBtnText}>📍 Suggerimenti</Text>
+              </Pressable>
+            )}
+
             {showInlinePanel && (
               <View style={s.inlinePanel}>
                 {isLoading && (
@@ -136,6 +156,7 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
                       style={s.fallbackInlineBtn}
                       onPress={() => {
                         if (blurTimer.current) clearTimeout(blurTimer.current);
+                        setFallbackForIndex(i);
                         setFallbackVisible(true);
                       }}
                     >
@@ -158,10 +179,10 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
         transparent
         animationType="slide"
         visible={fallbackVisible}
-        onRequestClose={() => setFallbackVisible(false)}
+        onRequestClose={() => { setFallbackVisible(false); setFallbackForIndex(null); }}
         statusBarTranslucent
       >
-        <Pressable style={s.modalBackdrop} onPress={() => setFallbackVisible(false)} />
+        <Pressable style={s.modalBackdrop} onPress={() => { setFallbackVisible(false); setFallbackForIndex(null); }} />
         <View style={s.modalSheet}>
           <View style={s.modalHandle} />
           <Text style={s.modalTitle}>Seleziona un luogo</Text>
@@ -170,7 +191,13 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
             bounces={false}
             showsVerticalScrollIndicator={false}
           >
-            {wpSuggestions?.results.map((geo, gi) => (
+            {wpLoading && fallbackForIndex !== null && (!wpSuggestions || wpSuggestions.index !== fallbackForIndex) && (
+              <View style={s.panelRow}>
+                <ActivityIndicator size="small" color={colors.accent} />
+                <Text style={s.panelHintText}>Ricerca in corso…</Text>
+              </View>
+            )}
+            {wpSuggestions && (fallbackForIndex === null || wpSuggestions.index === fallbackForIndex) && wpSuggestions.results.map((geo, gi) => (
               <Pressable
                 key={gi}
                 style={[s.suggestion, gi === (wpSuggestions?.results.length ?? 0) - 1 && { borderBottomWidth: 0 }]}
@@ -180,6 +207,12 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
                 <Text style={s.suggestionText} numberOfLines={2}>{geo.name}</Text>
               </Pressable>
             ))}
+            {wpSuggestions && (fallbackForIndex === null || wpSuggestions.index === fallbackForIndex) && !wpLoading && wpSuggestions.results.length === 0 && (
+              <View style={s.panelRow}>
+                <Ionicons name="search-outline" size={14} color={colors.textSecondary} />
+                <Text style={s.panelHintText}>Nessun risultato trovato</Text>
+              </View>
+            )}
           </ScrollView>
         </View>
       </Modal>
@@ -244,6 +277,19 @@ const styles = (colors: ThemeColors) => StyleSheet.create({
     borderTopColor: colors.border,
   },
   fallbackInlineBtnText: { fontFamily: "Inter_400Regular", fontSize: 12, color: colors.accent, flex: 1 },
+  persistentSuggestBtn: {
+    marginLeft: 20,
+    marginTop: 4,
+    marginBottom: 4,
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
+  },
+  persistentSuggestBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: colors.accent },
   addWpBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingVertical: 10, paddingHorizontal: 12 },
   addWpText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: colors.accent },
   modalBackdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.45)" },
