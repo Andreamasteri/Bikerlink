@@ -96,4 +96,5 @@ export interface InteractiveMapProps {
 
 export interface InteractiveMapHandle {
   focusOnCoordinate: (coords: { latitude: number; longitude: number; userId?: string }) => void;
+  invalidateSize: () => void;
 }

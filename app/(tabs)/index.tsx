@@ -173,7 +173,13 @@ export default function MapScreen() {
         Animated.timing(animWidth, { toValue: compactLayout.width, duration: 250, useNativeDriver: false }),
         Animated.timing(animHeight, { toValue: compactLayout.height, duration: 250, useNativeDriver: false }),
         Animated.timing(animRadius, { toValue: 20, duration: 250, useNativeDriver: false }),
-      ]).start();
+      ]).start(({ finished }) => {
+        if (finished) {
+          setTimeout(() => {
+            mapRef.current?.invalidateSize();
+          }, 50);
+        }
+      });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapFullscreen]);

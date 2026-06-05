@@ -201,6 +201,9 @@ const InteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapProps>(fun
         inject("setTimeout(function(){ window.leafletBridge && window.leafletBridge.highlightUser(" + JSON.stringify(coords.userId) + "); }, 600);");
       }
     },
+    invalidateSize: () => {
+      inject("window.leafletBridge && window.leafletBridge.invalidateSize ? window.leafletBridge.invalidateSize() : (window._map && window._map.invalidateSize())");
+    },
   }), [inject]);
 
   const centerOnUser = useCallback(() => {

@@ -539,6 +539,10 @@ ${LIVE_MAP_STYLES}
         });
         hazardsLayer.addLayer(marker);
       });
+    },
+
+    invalidateSize: function() {
+      map.invalidateSize({ animate: false });
     }
   };
 

@@ -104,6 +104,9 @@ const OpenLayersInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMap
       focusOnCoordinate: (coords: { latitude: number; longitude: number }) => {
         inject(`window.olBridge && window.olBridge.focusOn(${JSON.stringify({ lat: coords.latitude, lng: coords.longitude, zoom: 15 })})`);
       },
+      invalidateSize: () => {
+        inject("window.olBridge && window.olBridge.invalidateSize && window.olBridge.invalidateSize()");
+      },
     }), [inject]);
 
     const handleCenterOnUser = useCallback(() => {

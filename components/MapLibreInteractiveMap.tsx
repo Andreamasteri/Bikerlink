@@ -147,6 +147,9 @@ const MapLibreInteractiveMap = forwardRef<InteractiveMapHandle, InteractiveMapPr
         const payloadJson = JSON.stringify({ lat: coords.latitude, lng: coords.longitude, zoom: 15 });
         inject(`window.mlBridge && window.mlBridge.focusOn(${payloadJson})`);
       },
+      invalidateSize: () => {
+        inject("window.mlBridge && window.mlBridge.invalidateSize && window.mlBridge.invalidateSize()");
+      },
     }), [inject]);
 
     const handleCenterOnUser = useCallback(() => {
