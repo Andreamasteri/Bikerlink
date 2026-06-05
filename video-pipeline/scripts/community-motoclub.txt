@@ -1,0 +1,55 @@
+SCENA: Apertura — Il motociclista solitario
+PROMPT: lone motorcyclist on empty road at dusk, vast Italian countryside, sense of solitude and freedom, cinematic wide angle, warm golden light, dramatic clouds
+NARRAZIONE: Guidare da soli ha il suo fascino. Ma certi percorsi sono più belli se condivisi.
+DURATA: 6
+---
+SCENA: Il problema — Club inaccessibili
+PROMPT: motorcyclist looking at multiple social media apps and WhatsApp groups on phone, confused expression, messy chat notifications everywhere, disorganized groups, realistic photo
+NARRAZIONE: Trovare un motoclub vicino a te, organizzare un'uscita, gestire il gruppo... un caos su mille app diverse.
+DURATA: 7
+---
+SCENA: Introduzione community BikerLink
+PROMPT: smartphone showing BikerLink community tab with motoclub map pins across Italy, clean modern dark UI, profile avatars, motorcycle icons, warm orange accent colors
+NARRAZIONE: BikerLink ha costruito lo spazio che i motociclisti meritavano. Una community nata su due ruote.
+DURATA: 6
+---
+SCENA: Scoperta MotoClub locali
+PROMPT: BikerLink app screen showing nearby motoclub list with distance, members count and rating, pin map view of clubs in Piedmont region, user scrolling through options, cinematic close-up
+NARRAZIONE: Scopri i motoclub della tua zona, leggi le loro uscite programmate e chiedi di unirti in un tap.
+DURATA: 7
+---
+SCENA: Unirsi a un motoclub
+PROMPT: smooth UI animation of joining a motoclub in BikerLink app, welcome screen with club logo and member count increasing, notification "Benvenuto nel club!" appearing, warm colors
+NARRAZIONE: Nessun modulo da compilare, nessuna email. Ti unisci, e fai subito parte della famiglia.
+DURATA: 6
+---
+SCENA: Chat di gruppo e organizzazione uscite
+PROMPT: BikerLink group chat interface showing motoclub members planning a weekend ride, route preview shared in chat, poll for meeting point, emoji reactions, modern messaging UI
+NARRAZIONE: La chat del club è il quartier generale: uscite, voti, annunci. Tutto in un posto solo.
+DURATA: 7
+---
+SCENA: L'uscita di gruppo
+PROMPT: group of 8 motorcycles riding together on scenic Tuscan road, aerial drone shot, perfect formation, different bike models, sunny day, cinematic slow motion, freedom and brotherhood
+NARRAZIONE: Sabato mattina. Dieci motociclisti. Una strada curva disegnata da BikerLink. Questo è il motoclub del futuro.
+DURATA: 8
+---
+SCENA: Feature — Hashtag e filtraggio
+PROMPT: BikerLink chat showing hashtag filter feature, user typing #weekend and seeing only weekend rides, clean search UI, smooth animation, relevant posts highlighted, dark theme
+NARRAZIONE: Hashtag intelligenti nella chat: cerca #weekend, #strade-bianche o #giro-lago e trova subito quello che cerchi.
+DURATA: 6
+---
+SCENA: Feature — Heartbeat e presenze
+PROMPT: BikerLink interface showing real-time online members in a motoclub, green presence dots next to usernames, "Chi c'è in giro adesso?" section, live update animation
+NARRAZIONE: Vedi in tempo reale chi è online nel tuo club e chi è già in sella. Zero attese, connessione immediata.
+DURATA: 6
+---
+SCENA: Momento umano — Dopo l'uscita
+PROMPT: group of motorcyclists at outdoor cafe table, helmets on table, laughing and sharing photos on phones, Italian village piazza background, warm afternoon light, authentic friendship
+NARRAZIONE: Le strade finiscono. Le amicizie no. BikerLink è la community che ogni motociclista stava aspettando.
+DURATA: 7
+---
+SCENA: Call to action
+PROMPT: BikerLink app download screen showing community features highlights, multiple profile photos of diverse motorcyclists, download button animation, app store badges, energetic upbeat design
+NARRAZIONE: Entra nella community. Trova il tuo motoclub. Scarica BikerLink, è gratis.
+DURATA: 5
+---

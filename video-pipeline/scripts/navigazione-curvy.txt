@@ -1,0 +1,45 @@
+SCENA: Apertura — Il richiamo della strada
+PROMPT: cinematic aerial drone shot of a winding mountain road through Italian Alps at golden hour, dramatic lighting, empty road snaking through pine forest, mist in valleys, photorealistic
+NARRAZIONE: Ogni curva racconta una storia. Ogni percorso è un'avventura tutta tua.
+DURATA: 6
+---
+SCENA: Problema del motociclista
+PROMPT: frustrated motorcyclist in full gear looking at phone with confusing map app on screen, pulled over on roadside, scenic Italian countryside background, realistic photo style
+NARRAZIONE: Ma trovare le strade più belle, quelle lontane dal traffico, non è mai stato così difficile.
+DURATA: 6
+---
+SCENA: Introduzione BikerLink
+PROMPT: close-up of smartphone screen showing BikerLink app interface with curvy route highlighted in orange on map, motorcycle handlebar mount, mountain road visible through windshield, cinematic
+NARRAZIONE: Fino ad oggi. BikerLink calcola solo le strade che ami: curve, paesaggi, zero autostrade.
+DURATA: 7
+---
+SCENA: Algoritmo curvy in azione
+PROMPT: split screen showing boring straight highway route vs exciting winding mountain road route on digital map, orange highlighted curvy path, clean modern UI, blue sky
+NARRAZIONE: Il nostro algoritmo curvy analizza migliaia di chilometri e ti porta dove ogni svolta è un piacere.
+DURATA: 7
+---
+SCENA: In sella — Navigazione attiva
+PROMPT: first-person POV motorcycle rider on perfect mountain curve, lush green Italian landscape, BikerLink navigation HUD visible on screen, wind motion blur on sides, sunny day, GoPro style
+NARRAZIONE: Navigazione in tempo reale, waypoint curvosi, aggiornamenti live. Tutto progettato per il motociclista.
+DURATA: 8
+---
+SCENA: Feature — Stile percorso
+PROMPT: elegant smartphone UI showing three route style options: curvy icon, scenic icon, fast icon with smooth animation between selections, modern dark theme app design
+NARRAZIONE: Scegli il tuo stile: curvy massimo, panoramico, o veloce. La strada si adatta a te.
+DURATA: 6
+---
+SCENA: Feature — Dati stradali
+PROMPT: close-up of BikerLink app showing road quality rating, curve density graph, elevation profile and scenic score for a mountain route, clean infographic style on dark background
+NARRAZIONE: Qualità asfalto, densità curve, dislivello e indice panoramico per ogni tratto. Nessun'altra app ti dà questo.
+DURATA: 7
+---
+SCENA: Destinazione raggiunta
+PROMPT: motorcyclist removing helmet at mountain viewpoint, breathtaking panoramic view of Italian Alps, warm sunset light, sense of accomplishment and freedom, cinematic wide shot
+NARRAZIONE: Arrivi a destinazione sapendo di aver percorso la strada più bella possibile.
+DURATA: 6
+---
+SCENA: Call to action
+PROMPT: BikerLink app icon on smartphone screen, clean white background, animated download button, app store and play store logos, modern minimalist design, bright colors
+NARRAZIONE: Scarica BikerLink. Gratis, per sempre. Le strade più belle ti aspettano.
+DURATA: 5
+---
