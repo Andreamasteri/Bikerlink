@@ -279,6 +279,7 @@ import aiAssistantAdminRouter from './admin/ai-assistant';
 import backupPreviewRouter from './admin/backup-preview';
 import exportsRouter from './admin/exports';
 import legalRouter from './admin/legal';
+import whisperConfigRouter from './admin-whisper-config';
 import legalNextRouter from './admin/legal.next';
 // Task #2852 — Test stato server Ollama (provider AI primario).
 import aiTestOllamaRouter from './admin/ai/test-ollama';
@@ -410,6 +411,7 @@ router.use('/', _requireAdmin, metricsRouter);
 router.use('/', _requireAdmin, aiAssistantAdminRouter);
 router.use('/', _requireAdmin, backupPreviewRouter);
 router.use('/', _requireAdmin, exportsRouter);
+router.use('/', _requireAdmin, whisperConfigRouter);
 router.use('/legal', _requireAdmin, legalRouter);
 router.use('/legal', _requireAdmin, legalNextRouter);
 

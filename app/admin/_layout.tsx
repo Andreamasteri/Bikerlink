@@ -85,6 +85,7 @@ export default function AdminLayout() {
         <Stack.Screen name="ai-pinned" options={{ title: "AI — Insight Pinnati" }} />
         <Stack.Screen name="ai-layer" options={{ title: "AI Layer" }} />
         <Stack.Screen name="ai-hub" options={{ title: "Hub AI" }} />
+        <Stack.Screen name="whisper-config" options={{ title: "Voce & Trascrizione" }} />
       </Stack>
       {showFab ? <FabWidget /> : null}
     </View>
