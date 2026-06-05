@@ -69,6 +69,22 @@ export const COMPASS_DIRECTIONS: { label: string; deg: number }[] = [
   { label: "NO", deg: 315 },
 ];
 
+export interface PoiResult {
+  name: string;
+  lat: number;
+  lng: number;
+  address: string;
+  category: string;
+}
+
+export interface ResolvedPoiStop {
+  near: string;
+  query: string;
+  category: string;
+  options: PoiResult[];
+  selectedOption: PoiResult | null;
+}
+
 export interface MyStyleProfile {
   totalKm: number;
   targetKm: number;

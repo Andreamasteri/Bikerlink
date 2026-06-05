@@ -15,6 +15,7 @@ interface AiPreviewSectionProps {
   updatePreviewItemName: (idx: number, name: string) => void;
   regeocodePillItem: (idx: number, name: string) => void;
   handleConfirmPreview: () => void;
+  hasUnresolvedPois?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- mode is string union type
   setMode: (mode: any) => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- role from AI parse result
@@ -29,6 +30,7 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
   updatePreviewItemName,
   regeocodePillItem,
   handleConfirmPreview,
+  hasUnresolvedPois = false,
   setMode,
   pillRoleColor,
 }) => {
@@ -60,12 +62,18 @@ export const AiPreviewSection: React.FC<AiPreviewSectionProps> = ({
         ))}
       </View>
 
+      {hasUnresolvedPois && (
+        <Text style={[styles.poiHint, { color: colors.textSecondary }]}>
+          Seleziona una tappa per ogni fermata richiesta per continuare
+        </Text>
+      )}
+
       <View style={styles.footerButtons}>
         <Pressable
-          style={[styles.confirmBtn, { backgroundColor: colors.accent }]}
-          onPress={handleConfirmPreview}
+          style={[styles.confirmBtn, { backgroundColor: hasUnresolvedPois ? colors.surface : colors.accent, opacity: hasUnresolvedPois ? 0.5 : 1 }]}
+          onPress={hasUnresolvedPois ? undefined : handleConfirmPreview}
         >
-          <Text style={styles.confirmBtnText}>Conferma e Calcola</Text>
+          <Text style={[styles.confirmBtnText, { color: hasUnresolvedPois ? colors.textSecondary : "#000" }]}>Conferma e Calcola</Text>
         </Pressable>
         <Pressable
           style={[styles.cancelBtn, { backgroundColor: colors.surface }]}
@@ -85,8 +93,9 @@ const styles = StyleSheet.create({
   pill: { flexDirection: "row", alignItems: "center", paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, borderWidth: 1, gap: 8 },
   pillInput: { flex: 1, fontFamily: "Inter_500Medium", fontSize: 14, padding: 0 },
   footerButtons: { gap: 10 },
+  poiHint: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", marginBottom: 10 },
   confirmBtn: { paddingVertical: 14, borderRadius: 12, alignItems: "center" },
-  confirmBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#000" },
+  confirmBtnText: { fontFamily: "Inter_700Bold", fontSize: 15 },
   cancelBtn: { paddingVertical: 14, borderRadius: 12, alignItems: "center" },
   cancelBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
 });

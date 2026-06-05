@@ -8,7 +8,8 @@ import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import { 
   Waypoint, Style, DrivingProfile, Mode, RouteResult, 
-  WeatherWaypoint, AiPreviewState, AiPreviewItem, COMPASS_DIRECTIONS 
+  WeatherWaypoint, AiPreviewState, AiPreviewItem, COMPASS_DIRECTIONS,
+  ResolvedPoiStop, PoiResult
 } from "./types";
 import { calcRoute, parseAI, clientFallbackAiParse, fetchWeatherPreview, AiKeyMissingError } from "./api";
 
@@ -25,6 +26,7 @@ export function useGiriCreateState(language?: string) {
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPreview, setAiPreview] = useState<AiPreviewState | null>(null);
+  const [resolvedPoiStops, setResolvedPoiStops] = useState<ResolvedPoiStop[]>([]);
   const [aiProviderUsed, setAiProviderUsed] = useState<string | null>(null);
   const [aiFallbackBanner, setAiFallbackBanner] = useState(false);
   const [aiBannerReason, setAiBannerReason] = useState<"key_missing" | "generic">("generic");
@@ -127,6 +129,22 @@ export function useGiriCreateState(language?: string) {
     setAiLoading(true);
     try {
       const result = await parseAI(aiPrompt);
+
+      // Salva i poiStops risolti restituiti dal server (risultati Overpass + opzioni)
+      if (result.resolvedPoiStops && Array.isArray(result.resolvedPoiStops)) {
+        setResolvedPoiStops(
+          result.resolvedPoiStops.map((s: { near: string; query: string; category: string; options: PoiResult[] }) => ({
+            near: s.near,
+            query: s.query,
+            category: s.category,
+            options: Array.isArray(s.options) ? s.options : [],
+            selectedOption: s.options?.length === 1 ? s.options[0] : null,
+          }))
+        );
+      } else {
+        setResolvedPoiStops([]);
+      }
+
       const rawLocations: Array<{ role: AiPreviewItem["role"]; name: string }> = [];
       if (result.startLocation) rawLocations.push({ role: "start", name: result.startLocation });
       for (const wp of (result.waypoints ?? [])) rawLocations.push({ role: "waypoint", name: wp });
@@ -243,11 +261,34 @@ export function useGiriCreateState(language?: string) {
     });
   }, [logFetch]);
 
+  const selectPoiOption = useCallback((stopIdx: number, option: PoiResult) => {
+    setResolvedPoiStops((prev) => {
+      const updated = [...prev];
+      updated[stopIdx] = { ...updated[stopIdx], selectedOption: option };
+      return updated;
+    });
+  }, []);
+
+  const clearPoiOption = useCallback((stopIdx: number) => {
+    setResolvedPoiStops((prev) => {
+      const updated = [...prev];
+      updated[stopIdx] = { ...updated[stopIdx], selectedOption: null };
+      return updated;
+    });
+  }, []);
+
   const handleConfirmPreview = async () => {
     if (!aiPreview) return;
-    const newWps: Waypoint[] = aiPreview.items.map((item) => ({
+    const geoWps: Waypoint[] = aiPreview.items.map((item) => ({
       lat: item.lat, lng: item.lng, name: item.editedName || item.name
     }));
+    // Inserisce i POI selezionati come waypoint intermedi (prima dell'arrivo)
+    const poiWps: Waypoint[] = resolvedPoiStops
+      .filter((s) => s.selectedOption !== null)
+      .map((s) => ({ lat: s.selectedOption!.lat, lng: s.selectedOption!.lng, name: s.selectedOption!.name }));
+    const newWps: Waypoint[] = geoWps.length >= 2
+      ? [...geoWps.slice(0, -1), ...poiWps, geoWps[geoWps.length - 1]]
+      : [...geoWps, ...poiWps];
     const newInputs = newWps.map((wp) => wp.name);
     setTitle(aiPreview.title);
     setStyle(aiPreview.style);
@@ -467,6 +508,7 @@ export function useGiriCreateState(language?: string) {
     updatePreviewItemName, regeocodePillItem, handleConfirmPreview,
     handleWpInput, selectSuggestion, addWaypoint, removeWaypoint,
     handleCalculate, handleSave, saveMutationPending: saveMutation.isPending,
-    handleMapTap, aiProviderUsed
+    handleMapTap, aiProviderUsed,
+    resolvedPoiStops, selectPoiOption, clearPoiOption,
   };
 }

@@ -52,16 +52,18 @@ function buildFallbackRoute(waypoints: Array<{ lat: number; lng: number }>) {
 const AI_SYSTEM_PROMPT = `Sei un assistente per pianificazione giri in moto.
 Analizza la richiesta e restituisci SOLO un oggetto JSON con:
 - title: string
-- startLocation: string
-- endLocation: string
-- waypoints: string[]
+- startLocation: string (città o indirizzo geografico di partenza)
+- endLocation: string (città o indirizzo geografico di arrivo)
+- waypoints: string[] (SOLO luoghi geografici: città, strade, passi — NON ristoranti/hotel/locali)
+- poiStops: [{near: string, query: string, category: string}] o null — tappa di tipo POI (ristorante, hotel, rifugio, officina, ecc.). "near" = città/zona geografica vicino al POI (es: "Trieste"), "query" = descrizione del POI (es: "trattoria di carne"), "category" = tipo (restaurant|hotel|fuel|motorcycle|alpine_hut|camp_site|other)
 - style: "curvy"|"balanced"|"fast"
 - isRoundTrip: boolean
 - isMultiDay: boolean
 - daysEstimate: number
 - maxHoursPerDay: number (default 6)
 - avoidHighways: boolean
-- notes: string`;
+- notes: string
+IMPORTANTE: waypoints contiene SOLO luoghi geografici (città, strade, valichi). Ristoranti, hotel, rifugi, officine vanno in poiStops (non in waypoints).`;
 
 const AI_TIMEOUT_MS = parseInt(process.env.GEMINI_TIMEOUT_MS ?? "30000", 10) || 30000;
 const AI_MAX_RETRIES = 2;
@@ -71,6 +73,11 @@ const routeSchema = z.object({
   startLocation: z.string(),
   endLocation: z.string(),
   waypoints: z.array(z.string()),
+  poiStops: z.array(z.object({
+    near: z.string(),
+    query: z.string(),
+    category: z.string(),
+  })).optional().nullable(),
   style: z.enum(["curvy", "balanced", "fast"]),
   isRoundTrip: z.boolean(),
   isMultiDay: z.boolean(),
@@ -220,7 +227,36 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
     clearTimeout(timeout);
     req.off("close", onClose);
     console.info(`[AI parse] provider usato: ${provider_used}`);
-    return res.json({ ...object, provider_used });
+
+    // ── Risoluzione automatica poiStops ──────────────────────────────────────
+    const rawPoiStops = object.poiStops ?? [];
+    let resolvedPoiStops: Array<{ near: string; query: string; category: string; options: unknown[] }> = [];
+    if (rawPoiStops.length > 0) {
+      try {
+        const { searchPoi } = await import("../../lib/overpass-client");
+        const { geocode } = await import("../../lib/nominatim-client");
+        resolvedPoiStops = await Promise.all(
+          rawPoiStops.map(async (stop) => {
+            try {
+              const geoResults = await geocode(stop.near);
+              const geo = geoResults[0];
+              const options = geo ? await searchPoi(stop.query, geo.lat, geo.lng, 30) : [];
+              return { ...stop, options };
+            } catch {
+              return { ...stop, options: [] };
+            }
+          })
+        );
+      } catch (poiErr: unknown) {
+        console.warn("[AI parse] poiStops resolution error:", (poiErr as Error)?.message ?? poiErr);
+      }
+    }
+
+    return res.json({
+      ...object,
+      provider_used,
+      ...(resolvedPoiStops.length > 0 ? { resolvedPoiStops } : {}),
+    });
   } catch (err: unknown) {
     clearTimeout(timeout);
     req.off("close", onClose);

@@ -14,6 +14,7 @@ import { WaypointsSection } from "@/components/giri/create/WaypointsSection";
 import { RouteOptionsSection } from "@/components/giri/create/RouteOptionsSection";
 import { GarageIntegrationSection } from "@/components/giri/create/GarageIntegrationSection";
 import { AiPreviewSection } from "@/components/giri/create/AiPreviewSection";
+import { PoiStopSelector } from "@/components/giri/create/PoiStopSelector";
 import { AiInputSection } from "@/components/giri/create/AiInputSection";
 import { RouteStyleSection } from "@/components/giri/create/RouteStyleSection";
 import { DrivingProfileSection } from "@/components/giri/create/DrivingProfileSection";
@@ -69,7 +70,8 @@ export default function GiriCreateScreen() {
     updatePreviewItemName, regeocodePillItem, handleConfirmPreview,
     handleWpInput, selectSuggestion, addWaypoint, removeWaypoint,
     handleCalculate, handleSave, saveMutationPending,
-    handleMapTap
+    handleMapTap,
+    resolvedPoiStops, selectPoiOption, clearPoiOption,
   } = useGiriCreateState(language);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView ref type
@@ -182,9 +184,22 @@ export default function GiriCreateScreen() {
               setAiSuccessBanner={setAiSuccessBanner} aiSuccessTimer={aiSuccessTimer}
               updatePreviewItemName={updatePreviewItemName} regeocodePillItem={regeocodePillItem}
               handleConfirmPreview={handleConfirmPreview} setMode={setMode}
+              hasUnresolvedPois={resolvedPoiStops.some((s) => s.options.length > 0 && s.selectedOption === null)}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pill role helpers cast for prop compatibility
               pillRoleColor={pillRoleColor as any} pillRoleLabel={pillRoleLabel as any}
             />
+            {resolvedPoiStops.length > 0 && (
+              <View style={{ marginTop: 8 }}>
+                {resolvedPoiStops.map((stop, idx) => (
+                  <PoiStopSelector
+                    key={`${stop.near}-${stop.query}-${idx}`}
+                    stop={stop}
+                    onSelectOption={(opt) => selectPoiOption(idx, opt)}
+                    onClearSelection={() => clearPoiOption(idx)}
+                  />
+                ))}
+              </View>
+            )}
           </>
         )}
 

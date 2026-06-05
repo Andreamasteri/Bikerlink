@@ -347,6 +347,29 @@ geocodeRouter.get("/reverse", async (req: Request, res: Response) => {
 
 export const poiExtraRouter = Router();
 
+// ─── GET /poi-search — ricerca POI tramite Overpass con geocoding del luogo ───
+
+poiExtraRouter.get("/poi-search", async (req: Request, res: Response) => {
+  const { q, near } = req.query as { q?: string; near?: string };
+  if (!q || !near) return sendError(res, 400, "Parametri 'q' e 'near' obbligatori");
+
+  try {
+    const { geocode } = await import("../../lib/nominatim-client");
+    const { searchPoi } = await import("../../lib/overpass-client");
+
+    const geoResults = await geocode(near);
+    if (!geoResults.length) {
+      return res.json([]);
+    }
+    const geo = geoResults[0];
+    const results = await searchPoi(q, geo.lat, geo.lng, 30);
+    return res.json(results);
+  } catch (err) {
+    console.error("[poi-search] error:", err);
+    return sendError(res, 502, "Ricerca POI non disponibile");
+  }
+});
+
 poiExtraRouter.post("/poi-photo", async (req: Request, res: Response) => {
   const userId = requireAuth(req, res);
   if (!userId) return;
