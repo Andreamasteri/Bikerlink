@@ -17,6 +17,7 @@
 const SELF_HOSTED_URL = process.env.NOMINATIM_URL?.trim().replace(/\/$/, "") || undefined;
 const SELF_HOSTED_TOKEN = process.env.NOMINATIM_TOKEN ?? "";
 const PUBLIC_URL = "https://nominatim.openstreetmap.org";
+const PHOTON_URL = "https://photon.komoot.io";
 
 const BASE_URL = SELF_HOSTED_URL ?? PUBLIC_URL;
 const isSelfHosted = Boolean(SELF_HOSTED_URL);
@@ -182,10 +183,72 @@ export interface ReverseGeocodeResult {
 // ─── Geocode ──────────────────────────────────────────────────────────────────
 
 /**
+ * Geocodifica via Nominatim (self-hosted o pubblico).
+ * Lancia eccezione se il server è irraggiungibile o risponde con errore HTTP.
+ */
+async function geocodeNominatim(query: string): Promise<GeocodeResult[]> {
+  const path = `/search?q=${encodeURIComponent(query)}&format=json&limit=5&accept-language=it`;
+  const res = await nominatimFetch(path);
+  if (!res.ok) {
+    throw new Error(`Nominatim geocode HTTP ${res.status}`);
+  }
+  type NominatimResult = { display_name: string; lat: string; lon: string };
+  const data = await res.json() as NominatimResult[];
+  return data.map((r) => ({
+    name: r.display_name,
+    lat: parseFloat(r.lat),
+    lng: parseFloat(r.lon),
+  }));
+}
+
+/**
+ * Geocodifica via Photon (Komoot) — fallback gratuito basato su OSM.
+ * Risponde in formato GeoJSON: features[].properties + geometry.coordinates.
+ */
+async function geocodePhoton(query: string): Promise<GeocodeResult[]> {
+  const url = `${PHOTON_URL}/api/?q=${encodeURIComponent(query)}&limit=5&lang=it`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      headers: { "User-Agent": USER_AGENT },
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`Photon geocode HTTP ${res.status}`);
+    }
+    type PhotonFeature = {
+      geometry: { coordinates: [number, number] };
+      properties: {
+        name?: string;
+        city?: string;
+        state?: string;
+        country?: string;
+        street?: string;
+        housenumber?: string;
+      };
+    };
+    type PhotonResponse = { features: PhotonFeature[] };
+    const data = await res.json() as PhotonResponse;
+    return (data.features ?? []).map((f) => {
+      const p = f.properties;
+      const parts = [p.name, p.street && p.housenumber ? `${p.street} ${p.housenumber}` : p.street, p.city, p.state, p.country].filter(Boolean);
+      return {
+        name: parts.join(", "),
+        lat: f.geometry.coordinates[1],
+        lng: f.geometry.coordinates[0],
+      };
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Geocodifica una stringa di query testuale in coordinate geografiche.
- * Restituisce fino a 5 risultati ordinati per rilevanza.
- * I risultati sono cachati per 5 minuti per query univoca (case-insensitive,
- * trimmed) per ridurre le chiamate HTTP a Nominatim.
+ * Tenta prima il provider primario (self-hosted o nominatim.org), poi
+ * Photon (Komoot) come fallback se il primo fallisce. I risultati sono
+ * cachati per 5 minuti. Lancia eccezione solo se entrambi i provider falliscono.
  *
  * @param query   Stringa di ricerca (es: "Milano", "Via Roma, Roma")
  * @returns       Array di risultati con nome e coordinate
@@ -195,18 +258,22 @@ export async function geocode(query: string): Promise<GeocodeResult[]> {
   const cached = geocodeCache.get(cacheKey);
   if (cached !== undefined) return cached;
 
-  const path = `/search?q=${encodeURIComponent(query)}&format=json&limit=5&accept-language=it`;
-  const res = await nominatimFetch(path);
-  if (!res.ok) {
-    throw new Error(`Nominatim geocode HTTP ${res.status}`);
+  let results: GeocodeResult[] | null = null;
+  const primaryProvider = isSelfHosted ? "Nominatim self-hosted" : "Nominatim pubblico";
+
+  try {
+    results = await geocodeNominatim(query);
+    console.log(`[Nominatim] geocode OK via ${primaryProvider} — ${results.length} risultati per "${query}"`);
+  } catch (primaryErr) {
+    console.warn(`[Nominatim] geocode fallito via ${primaryProvider} (${(primaryErr as Error).message}) — fallback Photon`);
+    try {
+      results = await geocodePhoton(query);
+      console.log(`[Nominatim] geocode OK via Photon — ${results.length} risultati per "${query}"`);
+    } catch (photonErr) {
+      console.error(`[Nominatim] geocode fallito su entrambi i provider per "${query}": Photon → ${(photonErr as Error).message}`);
+      throw new Error("Geocoding non disponibile: entrambi i provider hanno fallito");
+    }
   }
-  type NominatimResult = { display_name: string; lat: string; lon: string };
-  const data = await res.json() as NominatimResult[];
-  const results: GeocodeResult[] = data.map((r) => ({
-    name: r.display_name,
-    lat: parseFloat(r.lat),
-    lng: parseFloat(r.lon),
-  }));
 
   geocodeCache.set(cacheKey, results, GEOCODE_TTL_MS);
   return results;

@@ -54,7 +54,7 @@ export function useGiriCreateState(language?: string) {
   const [waypoints, setWaypoints] = useState<Waypoint[]>([{ lat: 0, lng: 0, name: "" }, { lat: 0, lng: 0, name: "" }]);
   const [wpInputs, setWpInputs] = useState<string[]>(["", ""]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocoding suggestion results from API
-  const [wpSuggestions, setWpSuggestions] = useState<{ index: number; results: any[] } | null>(null);
+  const [wpSuggestions, setWpSuggestions] = useState<{ index: number; results: any[]; error?: boolean } | null>(null);
   const [wpLoading, setWpLoading] = useState(false);
 
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
@@ -347,11 +347,14 @@ export function useGiriCreateState(language?: string) {
           const results = await logFetch<any[]>(
             "/api/planned-routes/geocode", "GET",
             () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", text); return fetch(url.toString(), { credentials: "include" }); },
-            async (resp) => { if (!resp.ok) return []; return resp.json(); }
+            async (resp) => {
+              if (!resp.ok) throw new Error(`geocode HTTP ${resp.status}`);
+              return resp.json();
+            }
           );
           setWpSuggestions({ index, results });
         } catch {
-          setWpSuggestions({ index, results: [] });
+          setWpSuggestions({ index, results: [], error: true });
         } finally {
           setWpLoading(false);
         }

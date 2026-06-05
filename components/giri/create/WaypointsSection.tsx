@@ -13,7 +13,7 @@ interface GeoResult { name: string; lat: number; lng: number; }
 interface WaypointsSectionProps {
   waypoints: Waypoint[];
   wpInputs: string[];
-  wpSuggestions: { index: number; results: GeoResult[] } | null;
+  wpSuggestions: { index: number; results: GeoResult[]; error?: boolean } | null;
   wpLoading: boolean;
   isImportingGpx: boolean;
   onWpInputChange: (text: string, index: number) => void;
@@ -134,8 +134,14 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
                 )}
                 {!isLoading && wpSuggestions && wpSuggestions.index === i && wpSuggestions.results.length === 0 && (
                   <View style={s.panelRow}>
-                    <Ionicons name="search-outline" size={14} color={colors.textSecondary} />
-                    <Text style={s.panelHintText}>Nessun risultato trovato</Text>
+                    <Ionicons
+                      name={wpSuggestions.error ? "warning-outline" : "search-outline"}
+                      size={14}
+                      color={wpSuggestions.error ? colors.accent : colors.textSecondary}
+                    />
+                    <Text style={s.panelHintText}>
+                      {wpSuggestions.error ? "Ricerca non disponibile, riprova" : "Nessun risultato trovato"}
+                    </Text>
                   </View>
                 )}
                 {!isLoading && hasSuggestions && wpSuggestions && (
@@ -207,8 +213,14 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
             ))}
             {wpSuggestions && (fallbackForIndex === null || wpSuggestions.index === fallbackForIndex) && !wpLoading && wpSuggestions.results.length === 0 && (
               <View style={s.panelRow}>
-                <Ionicons name="search-outline" size={14} color={colors.textSecondary} />
-                <Text style={s.panelHintText}>Nessun risultato trovato</Text>
+                <Ionicons
+                  name={wpSuggestions.error ? "warning-outline" : "search-outline"}
+                  size={14}
+                  color={wpSuggestions.error ? colors.accent : colors.textSecondary}
+                />
+                <Text style={s.panelHintText}>
+                  {wpSuggestions.error ? "Ricerca non disponibile, riprova" : "Nessun risultato trovato"}
+                </Text>
               </View>
             )}
           </ScrollView>
