@@ -6,6 +6,7 @@ import { invalidateConvCache, escapeHtml } from "./utils";
 import { notifyChatEvent } from "../../chat-sse";
 import { sendChatPushNotifications, sendMotoclubPushNotifications } from "../../push-notifications";
 import { sendEmail } from "../../email";
+import { onlineTracker } from "../../online-tracker";
 
 export const fakeBotMessageCounts = new Map<string, number>();
 export const fakeBotLastReplies = new Map<string, string[]>();
@@ -381,41 +382,48 @@ export async function handleNotifications(conversationId: string, senderId: stri
 
     // EMAIL
     const targetProfile = await storage.getUserProfile(p.userId);
-    if (targetProfile?.emailChatNotifications && targetUser.email) {
-      const lastLogin = targetUser.lastLoginAt ? new Date(targetUser.lastLoginAt) : null;
-      const isOffline = !lastLogin || (Date.now() - lastLogin.getTime() > 15 * 60 * 1000);
-      if (isOffline) {
-        const senderNick = escapeHtml(senderUser?.nickname ?? "Un utente");
-        let preview: string;
-        if (messageType === "image") {
-          preview = "📸 ha inviato una foto";
-        } else if (messageType === "location") {
-          preview = "📍 ha condiviso una posizione";
-        } else {
-          const rawText = finalContent ?? "";
-          const truncated = rawText.length > 120 ? rawText.substring(0, 120) + "…" : rawText;
-          preview = escapeHtml(truncated);
-        }
-        const html = `
-          <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
-            <div style="text-align:center;margin-bottom:24px;">
-              <h1 style="color:#FF6B35;margin:0;font-size:26px;">🏍️ BikerLink</h1>
-              <p style="color:#888;font-size:13px;margin-top:4px;">U'll never ride alone</p>
-            </div>
-            <div style="background:#1a1a2e;border-radius:12px;padding:24px;color:#fff;">
-              <h2 style="margin-top:0;font-size:18px;">Nuovo messaggio da ${senderNick}</h2>
-              ${preview ? `<div style="background:#22222e;border-radius:8px;padding:14px;margin:16px 0;color:#ddd;font-size:15px;line-height:1.5;">${preview}</div>` : ""}
-              <p style="color:#999;font-size:13px;line-height:1.5;margin-bottom:0;">
-                Apri BikerLink per rispondere.
-              </p>
-            </div>
-            <p style="text-align:center;color:#666;font-size:12px;margin-top:20px;">
-              &copy; ${new Date().getFullYear()} BikerLink &mdash; Puoi disattivare questa notifica dal tab Chat dell'app.
+    const emailPref = !!targetProfile?.emailChatNotifications;
+    const hasEmail = !!targetUser.email;
+    const isOnline = onlineTracker.isOnline(p.userId);
+
+    if (!emailPref) {
+      console.log(`[EMAIL-NOTIFY] userId=${p.userId} result=skipped_pref emailPref=false`);
+    } else if (!hasEmail) {
+      console.log(`[EMAIL-NOTIFY] userId=${p.userId} result=skipped_no_email`);
+    } else if (isOnline) {
+      console.log(`[EMAIL-NOTIFY] userId=${p.userId} result=skipped_online`);
+    } else {
+      console.log(`[EMAIL-NOTIFY] userId=${p.userId} result=sent emailPref=true isOnline=false`);
+      const senderNick = escapeHtml(senderUser?.nickname ?? "Un utente");
+      let preview: string;
+      if (messageType === "image") {
+        preview = "📸 ha inviato una foto";
+      } else if (messageType === "location") {
+        preview = "📍 ha condiviso una posizione";
+      } else {
+        const rawText = finalContent ?? "";
+        const truncated = rawText.length > 120 ? rawText.substring(0, 120) + "…" : rawText;
+        preview = escapeHtml(truncated);
+      }
+      const html = `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:480px;margin:0 auto;padding:20px;">
+          <div style="text-align:center;margin-bottom:24px;">
+            <h1 style="color:#FF6B35;margin:0;font-size:26px;">🏍️ BikerLink</h1>
+            <p style="color:#888;font-size:13px;margin-top:4px;">U'll never ride alone</p>
+          </div>
+          <div style="background:#1a1a2e;border-radius:12px;padding:24px;color:#fff;">
+            <h2 style="margin-top:0;font-size:18px;">Nuovo messaggio da ${senderNick}</h2>
+            ${preview ? `<div style="background:#22222e;border-radius:8px;padding:14px;margin:16px 0;color:#ddd;font-size:15px;line-height:1.5;">${preview}</div>` : ""}
+            <p style="color:#999;font-size:13px;line-height:1.5;margin-bottom:0;">
+              Apri BikerLink per rispondere.
             </p>
           </div>
-        `;
-        sendEmail(targetUser.email, "Nuovo messaggio su BikerLink", html).catch((err) => console.error("[EMAIL] Invio notifica chat fallito:", err));
-      }
+          <p style="text-align:center;color:#666;font-size:12px;margin-top:20px;">
+            &copy; ${new Date().getFullYear()} BikerLink &mdash; Puoi disattivare questa notifica dal tab Chat dell'app.
+          </p>
+        </div>
+      `;
+      sendEmail(targetUser.email, "Nuovo messaggio su BikerLink", html).catch((err) => console.error("[EMAIL] Invio notifica chat fallito:", err));
     }
   }
 }
