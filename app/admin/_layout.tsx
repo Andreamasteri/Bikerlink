@@ -86,6 +86,8 @@ export default function AdminLayout() {
         <Stack.Screen name="ai-layer" options={{ title: "AI Layer" }} />
         <Stack.Screen name="ai-hub" options={{ title: "Hub AI" }} />
         <Stack.Screen name="whisper-config" options={{ title: "Voce & Trascrizione" }} />
+        <Stack.Screen name="telemetry-users" options={{ title: "Sessioni Utenti" }} />
+        <Stack.Screen name="telemetry-user/[userId]" options={{ title: "Dettaglio Sessioni" }} />
       </Stack>
       {showFab ? <FabWidget /> : null}
     </View>

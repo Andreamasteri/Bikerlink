@@ -13,6 +13,7 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import { TelemetryStats } from "@/components/admin/telemetry/TelemetryStats";
@@ -47,6 +48,16 @@ interface CurvyScoreStats {
   avgScore: number | null;
   lastRun: string | null;
   isRunning: boolean;
+}
+
+interface ErrorLogEntry {
+  ts: string;
+  type: "ERROR" | "WARN" | "INFO";
+  context: string;
+  message: string;
+  userId?: number;
+  sessionId?: string;
+  detail?: string;
 }
 
 async function adminFetch(path: string): Promise<Response> {
@@ -168,11 +179,13 @@ function InfoModal({ visible, onClose }: { visible: boolean; onClose: () => void
 export default function AdminTelemetryScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
+  const router = useRouter();
   const [targetInput, setTargetInput] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [runningJob, setRunningJob] = useState(false);
   const [runningCurvyJob, setRunningCurvyJob] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  const [showErrorLog, setShowErrorLog] = useState(false);
 
   const { data: stats, isLoading, error, refetch } = useQuery<TelemetryAdminStats>({
     queryKey: ["/api/admin/telemetry-stats"],
@@ -196,6 +209,13 @@ export default function AdminTelemetryScreen() {
     queryFn: () => adminFetch("/api/admin/curvy-score-stats").then((r) => r.json()),
     staleTime: 30_000,
     refetchInterval: (query) => (query.state.data?.isRunning ? 5_000 : 60_000),
+  });
+
+  const { data: errorLogData, refetch: refetchErrorLog } = useQuery<{ entries: ErrorLogEntry[]; count: number }>({
+    queryKey: ["/api/admin/telemetry/error-log"],
+    queryFn: () => adminFetch("/api/admin/telemetry/error-log").then((r) => r.json()),
+    staleTime: 15_000,
+    enabled: showErrorLog,
   });
 
   const handleSaveTarget = async () => {
@@ -369,6 +389,80 @@ export default function AdminTelemetryScreen() {
           isRunning={runningCurvyJob}
           formatLastRun={formatLastRun}
         />
+
+        <TouchableOpacity
+          style={styles.sessionUsersBtn}
+          onPress={() => router.push("/admin/telemetry-users" as never)}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="map-marker-path" size={18} color={Colors.accent} />
+          <Text style={styles.sessionUsersBtnText}>Sessioni per Utente</Text>
+          <Ionicons name="chevron-forward" size={16} color={Colors.accent} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.sessionUsersBtn, { marginTop: 6 }]}
+          onPress={() => { setShowErrorLog((v) => !v); if (!showErrorLog) refetchErrorLog(); }}
+          activeOpacity={0.8}
+        >
+          <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#ef4444" />
+          <Text style={[styles.sessionUsersBtnText, { color: "#ef4444", flex: 1 }]}>
+            Log Errori Pipeline
+          </Text>
+          {errorLogData && errorLogData.count > 0 && (
+            <View style={styles.errorBadge}>
+              <Text style={styles.errorBadgeText}>{errorLogData.count}</Text>
+            </View>
+          )}
+          <Ionicons name={showErrorLog ? "chevron-up" : "chevron-down"} size={16} color="#ef4444" />
+        </TouchableOpacity>
+
+        {showErrorLog && (
+          <View style={styles.errorLogContainer}>
+            {!errorLogData && (
+              <ActivityIndicator size="small" color="#ef4444" style={{ marginVertical: 12 }} />
+            )}
+            {errorLogData && errorLogData.entries.length === 0 && (
+              <View style={styles.errorLogEmpty}>
+                <Ionicons name="checkmark-circle-outline" size={24} color="#22c55e" />
+                <Text style={styles.errorLogEmptyText}>Nessun errore registrato</Text>
+              </View>
+            )}
+            {errorLogData && errorLogData.entries.map((entry, i) => (
+              <View key={i} style={styles.errorLogEntry}>
+                <View style={styles.errorLogEntryHeader}>
+                  <View style={[
+                    styles.errorLogTypePill,
+                    { backgroundColor: entry.type === "ERROR" ? "#ef444422" : entry.type === "WARN" ? "#f59e0b22" : "#3b82f622" }
+                  ]}>
+                    <Text style={[
+                      styles.errorLogTypeText,
+                      { color: entry.type === "ERROR" ? "#ef4444" : entry.type === "WARN" ? "#f59e0b" : "#3b82f6" }
+                    ]}>{entry.type}</Text>
+                  </View>
+                  <Text style={styles.errorLogContext}>[{entry.context}]</Text>
+                  {entry.userId && (
+                    <Text style={styles.errorLogMeta}>uid={entry.userId}</Text>
+                  )}
+                  <Text style={styles.errorLogTs}>
+                    {new Date(entry.ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                  </Text>
+                </View>
+                <Text style={styles.errorLogMessage}>{entry.message}</Text>
+              </View>
+            ))}
+            {errorLogData && errorLogData.entries.length > 0 && (
+              <TouchableOpacity
+                style={styles.errorLogRefreshBtn}
+                onPress={() => refetchErrorLog()}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="refresh" size={13} color={Colors.textSecondary} />
+                <Text style={styles.errorLogRefreshText}>Aggiorna log</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         <TouchableOpacity
           style={styles.refreshBtn}
@@ -549,5 +643,113 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: "#000",
+  },
+  sessionUsersBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  sessionUsersBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    color: Colors.accent,
+    flex: 1,
+  },
+  errorBadge: {
+    backgroundColor: "#ef4444",
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    minWidth: 22,
+    alignItems: "center",
+  },
+  errorBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: "#fff",
+  },
+  errorLogContainer: {
+    backgroundColor: Colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ef444430",
+    marginTop: 6,
+    padding: 12,
+    gap: 6,
+  },
+  errorLogEmpty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    justifyContent: "center",
+  },
+  errorLogEmptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "#22c55e",
+  },
+  errorLogEntry: {
+    borderRadius: 8,
+    backgroundColor: Colors.background,
+    padding: 8,
+    gap: 3,
+  },
+  errorLogEntryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flexWrap: "wrap",
+  },
+  errorLogTypePill: {
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  errorLogTypeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    textTransform: "uppercase",
+  },
+  errorLogContext: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    color: Colors.textSecondary,
+  },
+  errorLogMeta: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+  },
+  errorLogTs: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+    marginLeft: "auto" as unknown as number,
+  },
+  errorLogMessage: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.text,
+    lineHeight: 17,
+  },
+  errorLogRefreshBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    justifyContent: "center",
+    paddingTop: 6,
+  },
+  errorLogRefreshText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
   },
 });

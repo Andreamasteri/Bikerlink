@@ -166,6 +166,7 @@ const adminGroups: AdminGroup[] = [
       { key: "routing-hub", label: "Hub Routing", icon: "view-dashboard-variant", iconSet: "MaterialCommunityIcons", route: "/admin/routing-hub", accentColor: "#0EA5E9" },
       { key: "routing-control", label: "Controllo Routing", icon: "tune-variant", iconSet: "MaterialCommunityIcons", route: "/admin/routing-control", accentColor: "#9C27B0" },
       { key: "routing-health", label: "Routing Health", icon: "heart-pulse", iconSet: "MaterialCommunityIcons", route: "/admin/routing-health", accentColor: "#4CAF50" },
+      { key: "telemetry-users", label: "Sessioni Utenti", icon: "map-marker-path", iconSet: "MaterialCommunityIcons", route: "/admin/telemetry-users", accentColor: "#22C55E" },
     ],
   },
   {

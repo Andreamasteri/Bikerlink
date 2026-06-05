@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { rideTelemetry } from "@shared/db";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";
+import { logTelemetryEvent } from "../lib/telemetry-error-log";
 
 const router = Router();
 
@@ -29,6 +30,14 @@ router.post("/batch", async (req: Request, res: Response) => {
     const resolvedType = validSessionTypes.includes(session_type ?? "") ? session_type! : "ride";
 
     if (!Array.isArray(samples) || samples.length === 0) {
+      logTelemetryEvent({
+        ts: new Date().toISOString(),
+        type: "WARN",
+        context: "telemetry/batch",
+        message: "Payload senza samples",
+        userId,
+        sessionId: session_id,
+      });
       return sendError(res, 400, "samples[] obbligatorio e non vuoto");
     }
 
@@ -96,18 +105,67 @@ router.post("/batch", async (req: Request, res: Response) => {
       });
     }
 
+    const received = (samples as unknown[]).length;
+    const discarded = received - rows.length;
+
     if (rows.length === 0) {
+      logTelemetryEvent({
+        ts: new Date().toISOString(),
+        type: "WARN",
+        context: "telemetry/batch",
+        message: `Nessun campione valido — received=${received} valid=0 discarded=${discarded}`,
+        userId,
+        sessionId: session_id,
+      });
       return sendError(res, 400, "Nessun campione valido (ts, lat, lon obbligatori per ogni campione)");
     }
 
     const CHUNK = 500;
-    for (let i = 0; i < rows.length; i += CHUNK) {
-      await db.insert(rideTelemetry).values(rows.slice(i, i + CHUNK));
+    try {
+      for (let i = 0; i < rows.length; i += CHUNK) {
+        await db.insert(rideTelemetry).values(rows.slice(i, i + CHUNK));
+      }
+    } catch (dbErr) {
+      const msg = dbErr instanceof Error ? dbErr.message : String(dbErr);
+      const stack = dbErr instanceof Error ? dbErr.stack : undefined;
+      console.error(`[telemetry/batch] DB ERROR userId=${userId} sessionId=${session_id}: ${msg}`);
+      logTelemetryEvent({
+        ts: new Date().toISOString(),
+        type: "ERROR",
+        context: "telemetry/batch",
+        message: `DB insert fallito: ${msg}`,
+        userId,
+        sessionId: session_id,
+        detail: stack,
+      });
+      return sendError(res, 500, "Errore salvataggio campioni");
+    }
+
+    console.log(`[telemetry/batch] userId=${userId} sessionId=${session_id} received=${received} valid=${rows.length} discarded=${discarded}`);
+    if (discarded > 0) {
+      logTelemetryEvent({
+        ts: new Date().toISOString(),
+        type: "WARN",
+        context: "telemetry/batch",
+        message: `Campioni scartati — received=${received} valid=${rows.length} discarded=${discarded}`,
+        userId,
+        sessionId: session_id,
+      });
     }
 
     return res.status(200).json({ inserted: rows.length, session_id });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
     console.error("[telemetry/batch] error:", err);
+    logTelemetryEvent({
+      ts: new Date().toISOString(),
+      type: "ERROR",
+      context: "telemetry/batch",
+      message: `Errore inatteso: ${msg}`,
+      userId: (req as Request & { user?: { id?: number } }).user?.id,
+      detail: stack,
+    });
     return sendError(res, 500, "Errore interno del server");
   }
 });
