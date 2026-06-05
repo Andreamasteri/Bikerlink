@@ -5,6 +5,7 @@ import { rideTelemetry } from "@shared/db";
 import { requireUserId } from "../lib/auth-middleware";
 import { sendSuccess, sendError } from "../lib/api-response";
 import { logTelemetryEvent } from "../lib/telemetry-error-log";
+import { storage } from "../storage";
 
 const router = Router();
 
@@ -344,6 +345,27 @@ router.delete("/ideal-laps/:sessionId", async (req: Request, res: Response) => {
   } catch (err) {
     console.error("[telemetry/ideal-laps DELETE] error:", err);
     return sendError(res, 500, "Errore interno del server");
+  }
+});
+
+router.get("/sensor-settings", async (req: Request, res: Response) => {
+  const userId = requireUserId(req, res);
+  if (!userId) return;
+
+  try {
+    const [globalSetting, userRow] = await Promise.all([
+      storage.getAppSetting("telemetry_sensors_global_enabled"),
+      db.execute(sql`SELECT telemetry_disabled FROM users WHERE id = ${userId} LIMIT 1`),
+    ]);
+
+    const globalEnabled = globalSetting?.value !== "false";
+    const userRow0 = userRow.rows[0] as { telemetry_disabled?: boolean } | undefined;
+    const userEnabled = !(userRow0?.telemetry_disabled ?? false);
+
+    return res.json({ globalEnabled, userEnabled });
+  } catch (err) {
+    console.error("[telemetry/sensor-settings] error:", err);
+    return sendError(res, 500, "Errore lettura impostazioni sensori");
   }
 });
 

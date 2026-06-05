@@ -525,7 +525,7 @@ export function useTrackingState() {
     },
     handlers: {
       setProfile: settings.setProfile, setCountdownEnabled: settings.setCountdownEnabled, setCountdownSec: settings.setCountdownSec, setHandsOffEnabled: settings.setHandsOffEnabled, setHandsOffSpeedStr: settings.setHandsOffSpeedStr, setIs0100Enabled: settings.setIs0100Enabled,
-      setShowMyRoute: settings.setShowMyRoute, setSensorsEnabled: settings.setSensorsEnabled, setShowMountCalibWizard: settings.setShowMountCalibWizard, setMountAxisCalib: sensors.setMountAxisCalib, setPhase: session.setPhase, setLoading: session.setLoading, setSummaryVisible: session.setSummaryVisible,
+      setShowMyRoute: settings.setShowMyRoute, setShowMountCalibWizard: settings.setShowMountCalibWizard, setMountAxisCalib: sensors.setMountAxisCalib, setPhase: session.setPhase, setLoading: session.setLoading, setSummaryVisible: session.setSummaryVisible,
       setMapModalVisible: mapState.setMapModalVisible, setRouteMapVisible: mapState.setRouteMapVisible, setPublishRecord: session.setPublishRecord, setPublishCaption: session.setPublishCaption, setRideTitle: session.setRideTitle, setHistMapVisible: mapState.setHistMapVisible,
       setShowSensorOverlay: sensors.setShowSensorOverlay, setShowBatteryStats: battery.setShowBatteryStats, setDebugVisible, handleDebugTap, clearDebugLogs, handleStart, handleStop, handlePause, handleRecalibrate,
       handleDeleteRecord: (id: string) => stats.handleDeleteRecord(id, refetchRecords), handleViewHistoricalRoute: mapState.handleViewHistoricalRoute, handleExportGpx: mapState.handleExportGpx, handlePublish: session.handlePublish, discardSprintAttempt, refetchRecords,

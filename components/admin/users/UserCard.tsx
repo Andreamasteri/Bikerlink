@@ -21,6 +21,7 @@ export interface AdminUser {
   isPrimal?: boolean;
   hasLastfmData?: boolean;
   mapTester?: boolean;
+  telemetryDisabled?: boolean;
 }
 
 interface UserCardProps {
@@ -33,6 +34,7 @@ interface UserCardProps {
   onDeleteUser: (user: AdminUser) => void;
   onTogglePrimal: (id: string, isPrimal: boolean) => void;
   onToggleMapTester?: (id: string, enabled: boolean) => void;
+  onToggleTelemetryDisabled?: (id: string, disabled: boolean) => void;
   isLastfmPending?: boolean;
   currentAppVersion?: string;
 }
@@ -47,6 +49,7 @@ export const UserCard: React.FC<UserCardProps> = ({
   onDeleteUser,
   onTogglePrimal,
   onToggleMapTester,
+  onToggleTelemetryDisabled,
   isLastfmPending,
   currentAppVersion = "1.0.0",
 }) => {
@@ -78,6 +81,9 @@ export const UserCard: React.FC<UserCardProps> = ({
         )}
         {item.mapTester === true && (
           <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#0EA5E9" }}>MAP TESTER</Text>
+        )}
+        {item.telemetryDisabled === true && (
+          <Text style={{ fontSize: 10, fontWeight: "bold" as const, color: "#ef4444" }}>SENSORI OFF</Text>
         )}
         <Text style={styles.nickname}>{item.nickname}</Text>
         <Text style={styles.email}>{item.email}</Text>
@@ -166,6 +172,18 @@ export const UserCard: React.FC<UserCardProps> = ({
             style={styles.actionBtn}
           >
             <Ionicons name="map" size={22} color={item.mapTester ? "#0EA5E9" : Colors.border} />
+          </TouchableOpacity>
+        )}
+        {onToggleTelemetryDisabled && (
+          <TouchableOpacity
+            onPress={() => onToggleTelemetryDisabled(item.id, !item.telemetryDisabled)}
+            style={styles.actionBtn}
+          >
+            <Ionicons
+              name="pulse"
+              size={22}
+              color={item.telemetryDisabled ? "#ef4444" : Colors.border}
+            />
           </TouchableOpacity>
         )}
       </View>

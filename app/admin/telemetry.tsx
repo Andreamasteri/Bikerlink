@@ -7,8 +7,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Modal,
-  Pressable,
 } from "react-native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -20,6 +18,10 @@ import { TelemetryStats } from "@/components/admin/telemetry/TelemetryStats";
 import { TelemetryFilters } from "@/components/admin/telemetry/TelemetryFilters";
 import { MapMatchingSection } from "@/components/admin/telemetry/MapMatchingSection";
 import { CurvyScoreSection } from "@/components/admin/telemetry/CurvyScoreSection";
+import { InfoModal } from "@/components/admin/telemetry/InfoModal";
+import { SensorsGlobalCard } from "@/components/admin/telemetry/SensorsGlobalCard";
+import { ErrorLogPanel } from "@/components/admin/telemetry/ErrorLogPanel";
+import type { ErrorLogEntry } from "@/components/admin/telemetry/ErrorLogPanel";
 
 interface TelemetryAdminStats {
   activeUsers: number;
@@ -50,16 +52,6 @@ interface CurvyScoreStats {
   isRunning: boolean;
 }
 
-interface ErrorLogEntry {
-  ts: string;
-  type: "ERROR" | "WARN" | "INFO";
-  context: string;
-  message: string;
-  userId?: number;
-  sessionId?: string;
-  detail?: string;
-}
-
 async function adminFetch(path: string): Promise<Response> {
   const res = await fetch(new URL(path, getApiUrl()).toString(), {
     headers: { ...(await authFetchHeaders()) },
@@ -69,119 +61,13 @@ async function adminFetch(path: string): Promise<Response> {
   return res;
 }
 
-// ─── Info sections content ────────────────────────────────────────────────────
-const INFO_SECTIONS = [
-  {
-    icon: "crosshairs-gps" as const,
-    color: "#f59e0b",
-    title: "Cos'è la telemetria",
-    body:
-      "GPS + accelerometro raccolti a 1 campione/secondo durante ogni giro. I dati vengono bufferizzati in locale e inviati al server ogni 90 secondi (o ogni 200 campioni). Comprendono: coordinate, velocità, angolo di piega, G-force, altitudine.",
-  },
-  {
-    icon: "play-circle-outline" as const,
-    color: "#22c55e",
-    title: "Quando si raccolgono i dati",
-    body:
-      "La raccolta parte automaticamente quando il tracciamento GPS è attivo (bottone REC nella schermata mappa). Si ferma al termine del giro e i dati residui vengono inviati. Se l'app va in background, la raccolta continua con un task di sistema (richiede permesso posizione sempre).",
-  },
-  {
-    icon: "account-group" as const,
-    color: "#3b82f6",
-    title: "Riepilogo globale",
-    body:
-      'Aggrega tutti i giri di tutti gli utenti. "Utenti con dati" = almeno un giro registrato. "Campioni totali" = singole letture GPS. "Km totali" = somma delle distanze percorse, calcolata geometricamente dai campioni. I giri ideal_lap (pista) sono esclusi.',
-  },
-  {
-    icon: "chart-line" as const,
-    color: Colors.accent,
-    title: "Progresso collettivo",
-    body:
-      "Obiettivo di km aggregati per abilitare i percorsi personalizzati basati su dati reali. Quando raggiunto, l'algoritmo curvy route può usare telemetria vera invece dei dati OSM base. L'obiettivo è configurabile da questa schermata.",
-  },
-  {
-    icon: "map-marker-check" as const,
-    color: "#f59e0b",
-    title: "Map Matching OSM (Fase 2)",
-    body:
-      "Job notturno alle 02:00 che aggancia ogni campione GPS al segmento stradale OSM più vicino, tramite GraphHopper. Popola osm_way_id nella tabella telemetria. Richiede GraphHopper configurato (GRAPHHOPPER_URL o server ThinkCentre). Può essere eseguito manualmente.",
-  },
-  {
-    icon: "sine-wave" as const,
-    color: "#8b5cf6",
-    title: "Curvy Score (Fase 3)",
-    body:
-      "Job settimanale (domenica 03:00) che calcola il curvy_score di ogni segmento OSM basandosi sull'angolo di piega e G-force reali dei biker. Dipende dal Map Matching: deve essere eseguito dopo. Più biker percorrono la stessa strada, più lo score è preciso.",
-  },
-  {
-    icon: "alert-circle-outline" as const,
-    color: "#ef4444",
-    title: "Se i valori sono 0",
-    body:
-      "Nessun giro è ancora stato completato con la telemetria attiva. Per raccogliere dati: apri l'app su un dispositivo reale, vai sulla mappa, premi REC, fai un giro, premi di nuovo REC. I dati appariranno qui entro pochi minuti. Il simulatore non invia telemetria reale.",
-  },
-];
-
-function InfoModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
-  const insets = useSafeAreaInsets();
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.modalOverlay} onPress={onClose}>
-        <Pressable
-          style={[styles.modalSheet, { paddingBottom: insets.bottom + 24 }]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <View style={styles.modalHandle} />
-          <View style={styles.modalTitleRow}>
-            <Ionicons name="information-circle" size={20} color={Colors.accent} />
-            <Text style={styles.modalTitle}>Come funziona il monitor telemetria</Text>
-          </View>
-
-          <ScrollView
-            style={styles.modalScroll}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ gap: 16 }}
-          >
-            {INFO_SECTIONS.map((s) => (
-              <View key={s.title} style={styles.infoBlock}>
-                <View style={styles.infoBlockHeader}>
-                  <View style={[styles.infoIconBg, { backgroundColor: s.color + "22" }]}>
-                    <MaterialCommunityIcons name={s.icon} size={16} color={s.color} />
-                  </View>
-                  <Text style={styles.infoBlockTitle}>{s.title}</Text>
-                </View>
-                <Text style={styles.infoBlockBody}>{s.body}</Text>
-              </View>
-            ))}
-
-            <View style={styles.pipelineBanner}>
-              <Text style={styles.pipelineBannerTitle}>Pipeline completa</Text>
-              <Text style={styles.pipelineBannerBody}>
-                {"Giro completato  →  batch GPS inviato  →  Map Matching (02:00)  →  Curvy Score (dom. 03:00)  →  percorsi personalizzati"}
-              </Text>
-            </View>
-          </ScrollView>
-
-          <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose} activeOpacity={0.8}>
-            <Text style={styles.modalCloseBtnText}>Chiudi</Text>
-          </TouchableOpacity>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
-}
-
 export default function AdminTelemetryScreen() {
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const router = useRouter();
   const [targetInput, setTargetInput] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [savingSensors, setSavingSensors] = useState(false);
   const [runningJob, setRunningJob] = useState(false);
   const [runningCurvyJob, setRunningCurvyJob] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
@@ -218,6 +104,34 @@ export default function AdminTelemetryScreen() {
     enabled: showErrorLog,
   });
 
+  const { data: sensorsGlobal, refetch: refetchSensors } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/admin/sensors-global"],
+    queryFn: () => adminFetch("/api/admin/sensors-global").then((r) => r.json()),
+    staleTime: 30_000,
+  });
+
+  const handleToggleSensorsGlobal = async (value: boolean) => {
+    setSavingSensors(true);
+    try {
+      const res = await fetch(
+        new URL("/api/admin/sensors-global", getApiUrl()).toString(),
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+          credentials: "include",
+          body: JSON.stringify({ enabled: value }),
+        }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await refetchSensors();
+      qc.invalidateQueries({ queryKey: ["/api/admin/sensors-global"] });
+    } catch {
+      Alert.alert("Errore", "Impossibile aggiornare i sensori globali.");
+    } finally {
+      setSavingSensors(false);
+    }
+  };
+
   const handleSaveTarget = async () => {
     const val = parseInt(targetInput, 10);
     if (!Number.isFinite(val) || val < 10 || val > 100000) {
@@ -230,10 +144,7 @@ export default function AdminTelemetryScreen() {
         new URL("/api/admin/telemetry-target-km", getApiUrl()).toString(),
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(await authFetchHeaders()),
-          },
+          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
           credentials: "include",
           body: JSON.stringify({ target_km: val }),
         }
@@ -255,16 +166,9 @@ export default function AdminTelemetryScreen() {
     try {
       const res = await fetch(
         new URL("/api/admin/curvy-score/run", getApiUrl()).toString(),
-        {
-          method: "POST",
-          headers: { ...(await authFetchHeaders()) },
-          credentials: "include",
-        }
+        { method: "POST", headers: { ...(await authFetchHeaders()) }, credentials: "include" }
       );
-      if (res.status === 409) {
-        Alert.alert("Info", "Job curvy score già in esecuzione.");
-        return;
-      }
+      if (res.status === 409) { Alert.alert("Info", "Job curvy score già in esecuzione."); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       Alert.alert("Avviato", "Calcolo curvy score avviato in background. Aggiorna tra qualche minuto.");
       setTimeout(() => refetchCurvy(), 3_000);
@@ -281,16 +185,9 @@ export default function AdminTelemetryScreen() {
     try {
       const res = await fetch(
         new URL("/api/admin/map-matching/run", getApiUrl()).toString(),
-        {
-          method: "POST",
-          headers: { ...(await authFetchHeaders()) },
-          credentials: "include",
-        }
+        { method: "POST", headers: { ...(await authFetchHeaders()) }, credentials: "include" }
       );
-      if (res.status === 409) {
-        Alert.alert("Info", "Job già in esecuzione.");
-        return;
-      }
+      if (res.status === 409) { Alert.alert("Info", "Job già in esecuzione."); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       Alert.alert("Avviato", "Job map matching avviato in background. Aggiorna tra qualche minuto.");
       setTimeout(() => refetchMm(), 3_000);
@@ -312,9 +209,7 @@ export default function AdminTelemetryScreen() {
         day: "2-digit", month: "2-digit", year: "numeric",
         hour: "2-digit", minute: "2-digit",
       });
-    } catch {
-      return iso;
-    }
+    } catch { return iso; }
   };
 
   return (
@@ -343,24 +238,24 @@ export default function AdminTelemetryScreen() {
           Campioni GPS + sensori raccolti al termine di ogni giro
         </Text>
 
-        {isLoading && (
-          <ActivityIndicator style={{ marginTop: 32 }} color={Colors.accent} />
-        )}
-        {error && (
-          <Text style={styles.errorText}>Errore nel caricamento stats</Text>
-        )}
+        {isLoading && <ActivityIndicator style={{ marginTop: 32 }} color={Colors.accent} />}
+        {error && <Text style={styles.errorText}>Errore nel caricamento stats</Text>}
 
         {stats && stats.totalRides === 0 && !isLoading && (
           <View style={styles.emptyBanner}>
             <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#f59e0b" />
             <Text style={styles.emptyBannerText}>
               Nessun giro registrato. Fai un giro con il tracciamento attivo per vedere i dati.
-              Tocca{" "}
-              <Text style={{ color: Colors.accent }}>ⓘ</Text>
-              {" "}per maggiori informazioni.
+              Tocca <Text style={{ color: Colors.accent }}>ⓘ</Text> per maggiori informazioni.
             </Text>
           </View>
         )}
+
+        <SensorsGlobalCard
+          enabled={sensorsGlobal?.enabled}
+          saving={savingSensors}
+          onToggle={handleToggleSensorsGlobal}
+        />
 
         {stats && (
           <>
@@ -391,24 +286,22 @@ export default function AdminTelemetryScreen() {
         />
 
         <TouchableOpacity
-          style={styles.sessionUsersBtn}
+          style={styles.navBtn}
           onPress={() => router.push("/admin/telemetry-users" as never)}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons name="map-marker-path" size={18} color={Colors.accent} />
-          <Text style={styles.sessionUsersBtnText}>Sessioni per Utente</Text>
+          <Text style={styles.navBtnText}>Sessioni per Utente</Text>
           <Ionicons name="chevron-forward" size={16} color={Colors.accent} />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.sessionUsersBtn, { marginTop: 6 }]}
+          style={[styles.navBtn, { marginTop: 6 }]}
           onPress={() => { setShowErrorLog((v) => !v); if (!showErrorLog) refetchErrorLog(); }}
           activeOpacity={0.8}
         >
           <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#ef4444" />
-          <Text style={[styles.sessionUsersBtnText, { color: "#ef4444", flex: 1 }]}>
-            Log Errori Pipeline
-          </Text>
+          <Text style={[styles.navBtnText, { color: "#ef4444", flex: 1 }]}>Log Errori Pipeline</Text>
           {errorLogData && errorLogData.count > 0 && (
             <View style={styles.errorBadge}>
               <Text style={styles.errorBadgeText}>{errorLogData.count}</Text>
@@ -418,50 +311,7 @@ export default function AdminTelemetryScreen() {
         </TouchableOpacity>
 
         {showErrorLog && (
-          <View style={styles.errorLogContainer}>
-            {!errorLogData && (
-              <ActivityIndicator size="small" color="#ef4444" style={{ marginVertical: 12 }} />
-            )}
-            {errorLogData && errorLogData.entries.length === 0 && (
-              <View style={styles.errorLogEmpty}>
-                <Ionicons name="checkmark-circle-outline" size={24} color="#22c55e" />
-                <Text style={styles.errorLogEmptyText}>Nessun errore registrato</Text>
-              </View>
-            )}
-            {errorLogData && errorLogData.entries.map((entry, i) => (
-              <View key={i} style={styles.errorLogEntry}>
-                <View style={styles.errorLogEntryHeader}>
-                  <View style={[
-                    styles.errorLogTypePill,
-                    { backgroundColor: entry.type === "ERROR" ? "#ef444422" : entry.type === "WARN" ? "#f59e0b22" : "#3b82f622" }
-                  ]}>
-                    <Text style={[
-                      styles.errorLogTypeText,
-                      { color: entry.type === "ERROR" ? "#ef4444" : entry.type === "WARN" ? "#f59e0b" : "#3b82f6" }
-                    ]}>{entry.type}</Text>
-                  </View>
-                  <Text style={styles.errorLogContext}>[{entry.context}]</Text>
-                  {entry.userId && (
-                    <Text style={styles.errorLogMeta}>uid={entry.userId}</Text>
-                  )}
-                  <Text style={styles.errorLogTs}>
-                    {new Date(entry.ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-                  </Text>
-                </View>
-                <Text style={styles.errorLogMessage}>{entry.message}</Text>
-              </View>
-            ))}
-            {errorLogData && errorLogData.entries.length > 0 && (
-              <TouchableOpacity
-                style={styles.errorLogRefreshBtn}
-                onPress={() => refetchErrorLog()}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="refresh" size={13} color={Colors.textSecondary} />
-                <Text style={styles.errorLogRefreshText}>Aggiorna log</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          <ErrorLogPanel data={errorLogData} onRefresh={() => refetchErrorLog()} />
         )}
 
         <TouchableOpacity
@@ -546,105 +396,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 32,
   },
-  // ── Modal ────────────────────────────────────────────────────────────────────
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "flex-end",
-  },
-  modalSheet: {
-    backgroundColor: Colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 12,
-    paddingHorizontal: 20,
-    maxHeight: "88%",
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: Colors.border,
-    borderRadius: 2,
-    alignSelf: "center",
-    marginBottom: 16,
-  },
-  modalTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 17,
-    color: Colors.text,
-    flex: 1,
-  },
-  modalScroll: {
-    flexGrow: 0,
-  },
-  infoBlock: {
-    gap: 6,
-  },
-  infoBlockHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  infoIconBg: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  infoBlockTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  infoBlockBody: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    lineHeight: 19,
-    paddingLeft: 36,
-  },
-  pipelineBanner: {
-    backgroundColor: Colors.accent + "15",
-    borderWidth: 1,
-    borderColor: Colors.accent + "40",
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 4,
-  },
-  pipelineBannerTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: Colors.accent,
-    marginBottom: 4,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  pipelineBannerBody: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.text,
-    lineHeight: 18,
-  },
-  modalCloseBtn: {
-    backgroundColor: Colors.accent,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 20,
-  },
-  modalCloseBtnText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: "#000",
-  },
-  sessionUsersBtn: {
+  navBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
@@ -656,7 +408,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  sessionUsersBtnText: {
+  navBtnText: {
     fontFamily: "Inter_500Medium",
     fontSize: 14,
     color: Colors.accent,
@@ -674,82 +426,5 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_700Bold",
     fontSize: 11,
     color: "#fff",
-  },
-  errorLogContainer: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#ef444430",
-    marginTop: 6,
-    padding: 12,
-    gap: 6,
-  },
-  errorLogEmpty: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 8,
-    justifyContent: "center",
-  },
-  errorLogEmptyText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
-    color: "#22c55e",
-  },
-  errorLogEntry: {
-    borderRadius: 8,
-    backgroundColor: Colors.background,
-    padding: 8,
-    gap: 3,
-  },
-  errorLogEntryHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    flexWrap: "wrap",
-  },
-  errorLogTypePill: {
-    borderRadius: 4,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-  },
-  errorLogTypeText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 10,
-    textTransform: "uppercase",
-  },
-  errorLogContext: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 11,
-    color: Colors.textSecondary,
-  },
-  errorLogMeta: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: Colors.textSecondary,
-  },
-  errorLogTs: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: Colors.textSecondary,
-    marginLeft: "auto" as unknown as number,
-  },
-  errorLogMessage: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.text,
-    lineHeight: 17,
-  },
-  errorLogRefreshBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    justifyContent: "center",
-    paddingTop: 6,
-  },
-  errorLogRefreshText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: Colors.textSecondary,
   },
 });

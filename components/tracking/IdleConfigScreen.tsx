@@ -80,7 +80,6 @@ interface IdleConfigScreenProps {
   is0100Enabled: boolean;
   setIs0100Enabled: (v: boolean) => void;
   sensorsEnabled: boolean;
-  setSensorsEnabled: (v: boolean) => void;
   handsOffEnabled: boolean;
   setHandsOffEnabled: (v: boolean) => void;
   countdownEnabled: boolean;
@@ -103,7 +102,6 @@ export function IdleConfigScreen({
   is0100Enabled,
   setIs0100Enabled,
   sensorsEnabled,
-  setSensorsEnabled,
   handsOffEnabled,
   setHandsOffEnabled,
   countdownEnabled,
@@ -257,7 +255,6 @@ export function IdleConfigScreen({
               setIs0100Enabled(val);
               if (val) {
                 setProfile("race");
-                setSensorsEnabled(true);
               }
             }}
             trackColor={{ false: Colors.border, true: Colors.accentRed + "80" }}
@@ -274,23 +271,18 @@ export function IdleConfigScreen({
             />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.featureLabel}>{t("tracking.sensors")}</Text>
-            <Text style={styles.featureDesc}>{t("tracking.feature.sensors")}</Text>
-            {sensorsEnabled && (
-              <TouchableOpacity onPress={handleOpenMountCalib} style={{ marginTop: 4 }}>
-                <Text style={[styles.calibLink, isCalibrated && { color: Colors.success }]}>
-                  {isCalibrated ? t("tracking.mountCalib.calibrated") : t("tracking.mountCalib.configure")}
-                </Text>
-              </TouchableOpacity>
-            )}
+            <Text style={[styles.featureLabel, !sensorsEnabled && { color: Colors.textSecondary }]}>
+              {t("tracking.sensors")}
+            </Text>
+            <Text style={styles.featureDesc}>
+              {sensorsEnabled ? t("tracking.feature.sensors") : "Disattivati dall'admin"}
+            </Text>
+            <TouchableOpacity onPress={handleOpenMountCalib} style={{ marginTop: 4 }}>
+              <Text style={[styles.calibLink, isCalibrated && { color: Colors.success }]}>
+                {isCalibrated ? t("tracking.mountCalib.calibrated") : t("tracking.mountCalib.configure")}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <Switch
-            value={sensorsEnabled}
-            onValueChange={setSensorsEnabled}
-            disabled={is0100Enabled}
-            trackColor={{ false: Colors.border, true: Colors.accent + "80" }}
-            thumbColor={sensorsEnabled ? Colors.accent : Colors.textSecondary}
-          />
         </View>
 
         <View style={styles.featureItem}>

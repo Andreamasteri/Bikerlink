@@ -210,6 +210,17 @@ export default function AdminUsers() {
     onError: () => Alert.alert("Errore", "Impossibile aggiornare flag Map Tester"),
   });
 
+  const telemetryDisabledMutation = useMutation({
+    mutationFn: async ({ id, disabled }: { id: string; disabled: boolean }) => {
+      const res = await apiRequest("PUT", `/api/admin/users/${id}/telemetry-disabled`, { disabled });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: () => Alert.alert("Errore", "Impossibile aggiornare stato sensori utente"),
+  });
+
   const clearLastfmMutation = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
       const res = await apiRequest("DELETE", `/api/admin/users/${id}/lastfm`);
@@ -387,6 +398,22 @@ export default function AdminUsers() {
             onDeleteUser={handleDeleteUser}
             onTogglePrimal={(id, isPrimal) => primalMutation.mutate({ id, isPrimal })}
             onToggleMapTester={(id, enabled) => mapTesterMutation.mutate({ id, enabled })}
+            onToggleTelemetryDisabled={(id, disabled) => {
+              const user = users.find((u) => u.id === id);
+              const label = disabled ? "Disattivare i sensori" : "Riattivare i sensori";
+              Alert.alert(
+                label,
+                `${label} per ${user?.nickname ?? id}?`,
+                [
+                  { text: "Annulla", style: "cancel" },
+                  {
+                    text: "Conferma",
+                    style: disabled ? "destructive" : "default",
+                    onPress: () => telemetryDisabledMutation.mutate({ id, disabled }),
+                  },
+                ]
+              );
+            }}
             isLastfmPending={clearLastfmMutation.isPending}
             currentAppVersion={CURRENT_APP_VERSION}
           />

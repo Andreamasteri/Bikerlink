@@ -132,6 +132,33 @@ router.get("/curvy-score-stats", async (_req: Request, res: Response) => {
   }
 });
 
+const SENSORS_GLOBAL_SETTING = "telemetry_sensors_global_enabled";
+
+router.put("/sensors-global", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body as { enabled?: unknown };
+    if (typeof enabled !== "boolean") {
+      return sendError(res, 400, "enabled deve essere un booleano");
+    }
+    await storage.upsertAppSetting(SENSORS_GLOBAL_SETTING, String(enabled));
+    return res.json({ enabled });
+  } catch (err) {
+    console.error("[admin/sensors-global] error:", err);
+    return sendError(res, 500, "Errore aggiornamento sensori globali");
+  }
+});
+
+router.get("/sensors-global", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting(SENSORS_GLOBAL_SETTING);
+    const enabled = setting?.value !== "false";
+    return res.json({ enabled });
+  } catch (err) {
+    console.error("[admin/sensors-global GET] error:", err);
+    return sendError(res, 500, "Errore lettura sensori globali");
+  }
+});
+
 router.put("/telemetry-target-km", async (req: Request, res: Response) => {
   try {
     const { target_km } = req.body as { target_km?: unknown };

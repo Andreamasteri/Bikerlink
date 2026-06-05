@@ -205,7 +205,6 @@ function TrackingScreenInner() {
           is0100Enabled={state.is0100Enabled}
           setIs0100Enabled={handlers.setIs0100Enabled}
           sensorsEnabled={state.sensorsEnabled}
-          setSensorsEnabled={handlers.setSensorsEnabled}
           handsOffEnabled={state.handsOffEnabled}
           setHandsOffEnabled={handlers.setHandsOffEnabled}
           countdownEnabled={state.countdownEnabled}
