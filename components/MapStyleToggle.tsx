@@ -15,15 +15,16 @@ interface Props {
 const STYLE_ORDER: MapStyleId[] = ["day", "night", "satellite"];
 
 export function MapStyleToggle({ currentStyleId, onSelectStyle, bottomOffset, leftOffset, compact }: Props) {
+  const positionStyle = compact
+    ? styles.containerCompact
+    : [
+        styles.containerNormal,
+        bottomOffset != null && { bottom: bottomOffset },
+        leftOffset != null && { left: leftOffset },
+      ];
+
   return (
-    <View
-      style={[
-        styles.container,
-        compact && styles.containerCompact,
-        !compact && bottomOffset != null && { bottom: bottomOffset },
-        !compact && leftOffset != null && { left: leftOffset },
-      ]}
-    >
+    <View style={[styles.containerBase, positionStyle]}>
       {STYLE_ORDER.map((id) => {
         const preset = MAP_STYLE_PRESETS[id];
         const active = id === currentStyleId;
@@ -48,10 +49,8 @@ export function MapStyleToggle({ currentStyleId, onSelectStyle, bottomOffset, le
 }
 
 const styles = StyleSheet.create({
-  container: {
+  containerBase: {
     position: "absolute",
-    bottom: 84,
-    left: 12,
     backgroundColor: Colors.surface,
     borderRadius: 20,
     overflow: "hidden",
@@ -63,11 +62,13 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 4,
   },
+  containerNormal: {
+    bottom: 84,
+    left: 12,
+  },
   containerCompact: {
     right: 12,
     top: "50%",
-    left: undefined as unknown as number,
-    bottom: undefined as unknown as number,
     transform: [{ translateY: -54 }],
   },
   btn: {
