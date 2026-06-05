@@ -424,14 +424,16 @@ export function useTrackingState() {
       };
       if (settings.sensorsEnabledRef.current && refs.telemetryAccumRef.current.length > 0) updateData.telemetryData = JSON.stringify(refs.telemetryAccumRef.current);
       await apiRequest("PATCH", `/api/routes/${rId}`, updateData);
-      if (battery.rideStartBatteryLevelRef.current !== null) {
-        const diff = battery.rideStartBatteryLevelRef.current - await Battery.getBatteryLevelAsync();
-        if ((Date.now() - battery.rideStartBatteryTimeRef.current) / 60000 >= BATTERY_MIN_RIDE_MINUTES) {
-          await appendBatteryDrainSample(battery.rideBatteryProfileRef.current, Math.max(0, diff * 100));
-          battery.setBatteryDrainStats(await loadBatteryDrainStats());
-        }
-      }
       session.setCompletedRouteId(rId); mapState.setSummaryRoutePoints(gps.mapCoordsRef.current.map(c => ({ lat: c.latitude, lng: c.longitude }))); session.setSummaryVisible(true); refetchRecords();
+      try {
+        if (battery.rideStartBatteryLevelRef.current !== null) {
+          const diff = battery.rideStartBatteryLevelRef.current - await Battery.getBatteryLevelAsync();
+          if ((Date.now() - battery.rideStartBatteryTimeRef.current) / 60000 >= BATTERY_MIN_RIDE_MINUTES) {
+            await appendBatteryDrainSample(battery.rideBatteryProfileRef.current, Math.max(0, diff * 100));
+            battery.setBatteryDrainStats(await loadBatteryDrainStats());
+          }
+        }
+      } catch { /* battery level unavailable on this device — ignore silently */ }
     } catch (e) { logGpsError(e, "handleStop"); Alert.alert(t("common.error"), t("tracking.routeUpdateError")); }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
     finally { session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false); (VolumeManager as any).showNativeVolumeUI(true); }
