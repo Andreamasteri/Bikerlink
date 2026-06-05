@@ -4,7 +4,7 @@ import { storage } from "../../storage";
 import { db } from "../../db";
 import { users, conversationParticipants, messages, motoClubs, motoClubMembers } from "@shared/db";
 import { createConversationSchema } from "@shared/validators";
-import { inArray, desc, eq, and } from "drizzle-orm";
+import { inArray, desc, eq, and, sql } from "drizzle-orm";
 import { convCacheKey, convCache, CONV_CACHE_TTL_MS, pruneConvCache, invalidateConvCache } from "./utils";
 import { requireAuth } from "./auth";
 
@@ -209,19 +209,30 @@ router.post("/", async (req: Request, res: Response) => {
       }
     }
 
-    if (conversationType === "contact" && participantIds?.length === 1) {
+    if (participantIds?.length === 1 && (conversationType as string) !== "motoclub") {
       const targetUserId = participantIds[0];
-      const existing = await storage.getConversations(userId);
-      const contactThread = existing.find(c =>
-        c.conversationType === "contact" &&
-        (c as { participantCount?: number }).participantCount === 2
-      );
-      if (contactThread) {
-        const parts = await storage.getConversationParticipants(contactThread.id);
-        const hasBoth = parts.some(p => p.userId === userId) && parts.some(p => p.userId === targetUserId);
-        if (hasBoth) {
-          return res.json(contactThread);
-        }
+      const result = await db.execute(sql`
+        SELECT c.*
+        FROM conversations c
+        WHERE c.conversation_type IN ('private', 'contact', 'direct')
+          AND (
+            SELECT COUNT(*) FROM conversation_participants cp0
+            WHERE cp0.conversation_id = c.id
+          ) = 2
+          AND EXISTS (
+            SELECT 1 FROM conversation_participants cp1
+            WHERE cp1.conversation_id = c.id AND cp1.user_id = ${userId}
+          )
+          AND EXISTS (
+            SELECT 1 FROM conversation_participants cp2
+            WHERE cp2.conversation_id = c.id AND cp2.user_id = ${targetUserId}
+          )
+        ORDER BY c.created_at ASC
+        LIMIT 1
+      `);
+      const existingThread = result.rows[0];
+      if (existingThread) {
+        return res.json(existingThread);
       }
     }
 

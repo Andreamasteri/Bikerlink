@@ -238,20 +238,12 @@ export default function ChatScreen() {
 
   const handleFriendPress = useCallback(
     (friend: FriendItem) => {
-      const existing = conversations?.find((conv) =>
-        conv.conversationType === "contact" &&
-        conv.participants.some((p) => p.id === friend.id)
-      );
-      if (existing) {
-        router.push(`/chat/${existing.id}`);
-      } else {
-        createConversationMutation.mutate({
-          conversationType: "contact",
-          participantIds: [friend.id],
-        });
-      }
+      createConversationMutation.mutate({
+        conversationType: "private",
+        participantIds: [friend.id],
+      });
     },
-    [conversations, router, createConversationMutation]
+    [createConversationMutation]
   );
 
   const renderItem = useCallback(
