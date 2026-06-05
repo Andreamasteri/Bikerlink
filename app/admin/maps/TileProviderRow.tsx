@@ -10,8 +10,11 @@ export type ProviderStatusValue = "active" | "quota_exceeded" | "unreachable";
 export interface ProviderItem {
   id: string;
   label: string;
+  description?: string;
   category: TileCategory;
   cost: "free" | "api-key";
+  maxZoom?: number;
+  rendererCompat?: string[];
   keyRequired: boolean;
   keyAvailable: boolean;
   isActive: boolean;
@@ -43,6 +46,9 @@ export function TileProviderRow({ item, onSelect, isPending }: Props) {
   const statusCfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.active;
   const showStatusBadge = statusKey !== "active" || item.isActive;
 
+  const renderers = item.rendererCompat ?? [];
+  const multiRenderer = renderers.length > 1;
+
   return (
     <TouchableOpacity
       style={[styles.row, item.isActive && styles.rowActive]}
@@ -59,6 +65,9 @@ export function TileProviderRow({ item, onSelect, isPending }: Props) {
       />
       <View style={styles.info}>
         <Text style={[styles.label, item.isActive && styles.labelActive]}>{item.label}</Text>
+        {!!item.description && (
+          <Text style={styles.description} numberOfLines={1}>{item.description}</Text>
+        )}
         <View style={styles.badges}>
           <View style={[styles.catBadge, { backgroundColor: catColor + "20" }]}>
             <Text style={[styles.catText, { color: catColor }]}>{item.category}</Text>
@@ -75,6 +84,20 @@ export function TileProviderRow({ item, onSelect, isPending }: Props) {
               </Text>
             </View>
           )}
+          {item.maxZoom !== undefined && (
+            <View style={styles.infoBadge}>
+              <Text style={styles.infoBadgeText}>z{item.maxZoom}</Text>
+            </View>
+          )}
+          {multiRenderer ? (
+            <View style={[styles.infoBadge, styles.infoBadgeGreen]}>
+              <Text style={[styles.infoBadgeText, styles.infoBadgeTextGreen]}>multi-renderer</Text>
+            </View>
+          ) : renderers.length === 1 ? (
+            <View style={[styles.infoBadge, styles.infoBadgeGray]}>
+              <Text style={[styles.infoBadgeText, styles.infoBadgeTextGray]}>solo {renderers[0]}</Text>
+            </View>
+          ) : null}
           {showStatusBadge && (
             <View style={[styles.statusBadge, { backgroundColor: statusCfg.color + "20" }]}>
               <Ionicons name={statusCfg.icon} size={10} color={statusCfg.color} />
@@ -105,8 +128,14 @@ const styles = StyleSheet.create({
   },
   rowActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + "11" },
   info: { flex: 1 },
-  label: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, marginBottom: 4 },
+  label: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text, marginBottom: 2 },
   labelActive: { color: Colors.accent },
+  description: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    marginBottom: 4,
+  },
   badges: { flexDirection: "row", gap: 6, flexWrap: "wrap" },
   catBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   catText: { fontFamily: "Inter_500Medium", fontSize: 10 },
@@ -118,6 +147,15 @@ const styles = StyleSheet.create({
   keyBadgeMissing: { backgroundColor: "#ef444420" },
   keyText: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#f59e0b" },
   keyTextMissing: { color: "#ef4444" },
+  infoBadge: {
+    paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4,
+    backgroundColor: "#6b728018",
+  },
+  infoBadgeGreen: { backgroundColor: "#22c55e18" },
+  infoBadgeGray: { backgroundColor: "#6b728018" },
+  infoBadgeText: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#6b7280" },
+  infoBadgeTextGreen: { color: "#22c55e" },
+  infoBadgeTextGray: { color: "#6b7280" },
   check: { marginLeft: 4 },
   statusBadge: {
     flexDirection: "row",

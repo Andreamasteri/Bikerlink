@@ -18,6 +18,7 @@ router.get("/providers", async (_req: Request, res: Response) => {
         return {
           id: p.id,
           label: p.label,
+          description: p.description,
           category: p.category,
           cost: p.cost,
           maxZoom: p.maxZoom,
