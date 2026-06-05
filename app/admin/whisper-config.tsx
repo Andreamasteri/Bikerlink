@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import * as Clipboard from "expo-clipboard";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 import Colors from "@/constants/colors";
 import { styles } from "./whisper-config.styles";
@@ -36,6 +37,7 @@ interface FormatProbeResult {
   latency_ms: number | null;
   error?: string;
   text?: string;
+  body_raw?: string;
 }
 
 interface TestResult {
@@ -43,8 +45,17 @@ interface TestResult {
   latency_ms: number | null;
   text?: string;
   error?: string;
+  body_raw?: string;
+  session_ok?: boolean;
   wav?: FormatProbeResult;
   m4a?: FormatProbeResult;
+}
+
+interface DiagStep {
+  label: string;
+  ok: boolean;
+  latency_ms: number | null;
+  detail: string;
 }
 
 const PROVIDER_ICONS: Record<SttProviderId, string> = {
@@ -77,6 +88,8 @@ export default function WhisperConfigScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const [testResults, setTestResults] = useState<Record<string, TestResult | "loading">>({});
+  const [diagLoading, setDiagLoading] = useState(false);
+  const [diagSteps, setDiagSteps] = useState<DiagStep[] | null>(null);
   const autoTestedRef = useRef(false);
 
   const { data, isLoading, error } = useQuery<WhisperConfigData>({
@@ -153,6 +166,7 @@ export default function WhisperConfigScreen() {
 
   async function testProvider(id: SttProviderId) {
     setTestResults((prev) => ({ ...prev, [id]: "loading" }));
+    const callStart = Date.now();
     try {
       const url = new URL(`/api/admin/whisper-config/test/${id}`, getApiUrl()).toString();
       const res = await fetch(url, {
@@ -160,6 +174,7 @@ export default function WhisperConfigScreen() {
         credentials: "include",
         headers: { "Content-Type": "application/json", ...authFetchHeaders() },
       });
+      const clientLatency = Date.now() - callStart;
 
       const bodyText = await res.text().catch(() => "");
       let raw: Record<string, unknown> = {};
@@ -172,7 +187,12 @@ export default function WhisperConfigScreen() {
           : `HTTP ${res.status}${bodyText ? `: ${bodyText.slice(0, 120)}` : ""}`;
         setTestResults((prev) => ({
           ...prev,
-          [id]: { ok: false, latency_ms: null, error: errMsg },
+          [id]: {
+            ok: false,
+            latency_ms: clientLatency,
+            error: errMsg,
+            body_raw: bodyText ? bodyText.slice(0, 300) : undefined,
+          },
         }));
         return;
       }
@@ -185,24 +205,74 @@ export default function WhisperConfigScreen() {
           latency_ms: typeof fr.latency_ms === "number" ? fr.latency_ms : null,
           error: fr.error != null ? String(fr.error) : undefined,
           text: fr.text != null ? String(fr.text) : undefined,
+          body_raw: fr.body_raw != null ? String(fr.body_raw) : undefined,
         };
       };
 
       const result: TestResult = {
         ok: Boolean(raw.ok),
-        latency_ms: typeof raw.latency_ms === "number" ? raw.latency_ms : null,
+        latency_ms: typeof raw.latency_ms === "number" ? raw.latency_ms : clientLatency,
         error: raw.error != null ? String(raw.error) : raw.message != null ? String(raw.message) : undefined,
         text: raw.text != null ? String(raw.text) : undefined,
+        body_raw: raw.body_raw != null ? String(raw.body_raw) : undefined,
+        session_ok: typeof raw.session_ok === "boolean" ? raw.session_ok : undefined,
         wav: parseFormatProbe(raw.wav),
         m4a: parseFormatProbe(raw.m4a),
       };
       setTestResults((prev) => ({ ...prev, [id]: result }));
     } catch (e) {
+      const clientLatency = Date.now() - callStart;
       setTestResults((prev) => ({
         ...prev,
-        [id]: { ok: false, latency_ms: null, error: e instanceof Error ? e.message : "Errore di rete" },
+        [id]: { ok: false, latency_ms: clientLatency, error: e instanceof Error ? e.message : "Errore di rete" },
       }));
     }
+  }
+
+  async function runDiagnose() {
+    setDiagLoading(true);
+    setDiagSteps(null);
+    try {
+      const url = new URL("/api/admin/whisper-config/diagnose", getApiUrl()).toString();
+      const res = await fetch(url, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", ...authFetchHeaders() },
+      });
+      const bodyText = await res.text().catch(() => "");
+      if (!res.ok) {
+        const errDetail = bodyText ? bodyText.slice(0, 200) : `HTTP ${res.status}`;
+        setDiagSteps([{ label: "Errore server", ok: false, latency_ms: null, detail: errDetail }]);
+        return;
+      }
+      let parsed: { steps?: DiagStep[] } = {};
+      try { parsed = JSON.parse(bodyText) as { steps?: DiagStep[] }; } catch {
+        setDiagSteps([{ label: "Risposta non-JSON", ok: false, latency_ms: null, detail: bodyText.slice(0, 200) }]);
+        return;
+      }
+      setDiagSteps(parsed.steps ?? []);
+    } catch (e) {
+      setDiagSteps([{
+        label: "Errore di rete",
+        ok: false,
+        latency_ms: null,
+        detail: e instanceof Error ? e.message : "Impossibile raggiungere il server",
+      }]);
+    } finally {
+      setDiagLoading(false);
+    }
+  }
+
+  async function copyDiagLog() {
+    if (!diagSteps) return;
+    const lines = diagSteps.map((s) => {
+      const icon = s.ok ? "✅" : "❌";
+      const lat = s.latency_ms != null ? ` [${s.latency_ms}ms]` : "";
+      return `${icon} ${s.label}${lat}\n   ${s.detail}`;
+    });
+    const text = `=== Diagnosi Whisper — ${new Date().toISOString()} ===\n\n${lines.join("\n\n")}`;
+    await Clipboard.setStringAsync(text);
+    Alert.alert("Copiato", "Log diagnostica copiato negli appunti.");
   }
 
   if (isLoading) {
@@ -350,19 +420,90 @@ export default function WhisperConfigScreen() {
                           : `❌ M4A — ${testResult.m4a.error ?? "Errore"} (${testResult.m4a.latency_ms != null ? `${testResult.m4a.latency_ms}ms` : "—"})`}
                       </Text>
                     )}
+                    {!testResult.ok && testResult.wav.body_raw && (
+                      <View style={styles.bodyRawBox}>
+                        <Text style={styles.bodyRawText} numberOfLines={4}>
+                          {testResult.wav.body_raw.slice(0, 200)}
+                        </Text>
+                      </View>
+                    )}
                   </>
                 ) : (
-                  <Text style={styles.testResultText}>
-                    {testResult.ok
-                      ? `✅ OK — ${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"}${testResult.text ? ` — "${testResult.text}"` : ""}`
-                      : `❌ ${testResult.error ?? "Errore sconosciuto"} (${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"})`}
-                  </Text>
+                  <>
+                    <Text style={styles.testResultText}>
+                      {testResult.ok
+                        ? `✅ OK — ${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"}${testResult.text ? ` — "${testResult.text}"` : ""}`
+                        : `❌ ${testResult.error ?? "Errore sconosciuto"} (${testResult.latency_ms != null ? `${testResult.latency_ms}ms` : "—"})`}
+                    </Text>
+                    {!testResult.ok && testResult.session_ok === false && (
+                      <Text style={[styles.testResultText, styles.testResultSubline]}>
+                        ⚠️ Sessione admin non valida sul server
+                      </Text>
+                    )}
+                    {!testResult.ok && testResult.body_raw && (
+                      <View style={styles.bodyRawBox}>
+                        <Text style={styles.bodyRawText} numberOfLines={4}>
+                          {testResult.body_raw.slice(0, 200)}
+                        </Text>
+                      </View>
+                    )}
+                  </>
                 )}
               </View>
             )}
           </View>
         );
       })}
+
+      <TouchableOpacity
+        style={[styles.diagnoseBtn, diagLoading && styles.resetBtnDisabled]}
+        onPress={runDiagnose}
+        disabled={diagLoading}
+      >
+        {diagLoading ? (
+          <>
+            <ActivityIndicator size="small" color={Colors.accent} />
+            <Text style={styles.diagnoseBtnText}>Diagnosi in corso…</Text>
+          </>
+        ) : (
+          <>
+            <MaterialCommunityIcons name="stethoscope" size={16} color={Colors.accent} />
+            <Text style={styles.diagnoseBtnText}>Diagnosi completa</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      {diagSteps != null && (
+        <View style={styles.diagReport}>
+          <View style={styles.diagReportHeader}>
+            <MaterialCommunityIcons name="clipboard-list-outline" size={16} color={Colors.text} />
+            <Text style={styles.diagReportTitle}>Report diagnostica</Text>
+            <TouchableOpacity style={styles.copyLogBtn} onPress={copyDiagLog}>
+              <MaterialCommunityIcons name="content-copy" size={14} color={Colors.textSecondary} />
+              <Text style={styles.copyLogText}>Copia log</Text>
+            </TouchableOpacity>
+          </View>
+          {diagSteps.map((step, idx) => (
+            <View key={idx} style={[styles.diagStep, idx > 0 && styles.diagStepBorder]}>
+              <Text style={[styles.diagStepIcon, { color: step.ok ? "#22C55E" : "#ef4444" }]}>
+                {step.ok ? "✅" : "❌"}
+              </Text>
+              <View style={styles.diagStepBody}>
+                <Text style={styles.diagStepLabel}>
+                  {step.label}
+                  {step.latency_ms != null ? (
+                    <Text style={styles.diagStepLatency}> — {step.latency_ms}ms</Text>
+                  ) : null}
+                </Text>
+                <Text style={styles.diagStepDetail}>{step.detail}</Text>
+              </View>
+            </View>
+          ))}
+          {diagSteps.length === 0 && (
+            <Text style={styles.diagStepDetail}>Nessun dato restituito.</Text>
+          )}
+        </View>
+      )}
 
       <TouchableOpacity
         style={[styles.resetBtn, resetMutation.isPending && styles.resetBtnDisabled]}
