@@ -107,6 +107,7 @@ function gracefulShutdown(signal: string) {
   stopMatchingEngine();
   stopMetroMonitor();
   import("./jobs/thinkcentre-monitor").then(({ stopThinkCentreMonitor }) => stopThinkCentreMonitor()).catch(() => {});
+  import("./jobs/valhalla-monitor").then(({ stopValhallaMonitor }) => stopValhallaMonitor()).catch(() => {});
 
   activeConnections.forEach((socket) => socket.destroy());
   activeConnections.clear();
@@ -487,6 +488,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       startThinkCentreMonitor();
     } catch (e) {
       console.warn("[INIT] ThinkCentre monitor failed (non-fatal):", e);
+    }
+
+    // Valhalla monitor — push admin quando Valhalla (se engine attivo) va offline.
+    try {
+      const { startValhallaMonitor } = await import("./jobs/valhalla-monitor");
+      startValhallaMonitor();
+    } catch (e) {
+      console.warn("[INIT] Valhalla monitor failed (non-fatal):", e);
     }
 
     // Task #2533 — AI System Watchdog scheduler.
