@@ -9,7 +9,7 @@ import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import { 
   Waypoint, Style, DrivingProfile, Mode, RouteResult, 
   WeatherWaypoint, AiPreviewState, AiPreviewItem, COMPASS_DIRECTIONS,
-  ResolvedPoiStop, PoiResult
+  ResolvedPoiStop, PoiResult, GeoResult
 } from "./types";
 import { calcRoute, parseAI, clientFallbackAiParse, fetchWeatherPreview, AiKeyMissingError } from "./api";
 
@@ -72,6 +72,7 @@ export function useGiriCreateState(language?: string) {
   const suggestionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFittedWaypointSig = useRef<string>("");
   const bikerScoreAnim = useRef(new Animated.Value(0)).current;
+  const geocodeCache = useRef<Map<string, GeoResult[]>>(new Map());
 
   const handleTitleTap = useCallback(() => {
     titleTapCount.current += 1;
@@ -344,13 +345,23 @@ export function useGiriCreateState(language?: string) {
     const newWps = [...waypoints]; newWps[index] = { ...newWps[index], name: text, lat: 0, lng: 0 }; setWaypoints(newWps);
     setRouteResult(null);
     if (suggestionTimeout.current) clearTimeout(suggestionTimeout.current);
+    // Evict stale cache entries for this waypoint slot when the user types new text
+    for (const key of geocodeCache.current.keys()) {
+      if (key.startsWith(`${index}::`)) geocodeCache.current.delete(key);
+    }
     if (text.length >= 3) {
+      const cacheKey = `${index}::${text}`;
+      const cached = geocodeCache.current.get(cacheKey);
+      if (cached) {
+        setWpLoading(false);
+        setWpSuggestions({ index, results: cached });
+        return;
+      }
       setWpLoading(true);
       setWpSuggestions(null);
       suggestionTimeout.current = setTimeout(async () => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- geocode results from API
-          const results = await logFetch<any[]>(
+          const results = await logFetch<GeoResult[]>(
             "/api/planned-routes/geocode", "GET",
             () => { const url = new URL("/api/planned-routes/geocode", getApiUrl()); url.searchParams.set("q", text); return fetch(url.toString(), { credentials: "include" }); },
             async (resp) => {
@@ -358,6 +369,7 @@ export function useGiriCreateState(language?: string) {
               return resp.json();
             }
           );
+          geocodeCache.current.set(cacheKey, results);
           setWpSuggestions({ index, results });
         } catch {
           setWpSuggestions({ index, results: [], error: true });
