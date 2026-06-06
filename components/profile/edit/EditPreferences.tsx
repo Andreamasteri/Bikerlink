@@ -31,6 +31,8 @@ const LANGUAGES: Array<{ label: string; value: AppLanguage; flag: string }> = [
   { label: "Deutsch", value: "de", flag: "🇩🇪" },
   { label: "Español", value: "es", flag: "🇪🇸" },
   { label: "Français", value: "fr", flag: "🇫🇷" },
+  { label: "Ελληνικά", value: "el", flag: "🇬🇷" },
+  { label: "Türkçe", value: "tr", flag: "🇹🇷" },
 ];
 
 export function EditPreferences({
