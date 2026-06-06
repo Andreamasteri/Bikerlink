@@ -5,8 +5,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Modal, View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView,
-  ActivityIndicator, Platform, KeyboardAvoidingView,
+  ActivityIndicator, Platform,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -144,7 +145,7 @@ export default function AiCopilotDrawer({
           </TouchableOpacity>
         </View>
 
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
           <ScrollView
             ref={scrollRef}
             style={styles.thread}
@@ -168,7 +169,7 @@ export default function AiCopilotDrawer({
             {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
           </ScrollView>
 
-          <View style={[styles.inputRow, { paddingBottom: insets.bottom + 8 }]}>
+          <View style={[styles.inputRow, { paddingBottom: 8 }]}>
             <TextInput
               value={input} onChangeText={setInput}
               placeholder="Scrivi al Co-Pilot…"
