@@ -384,6 +384,7 @@ const en: Record<string, string> = {
   "match.emptyRouteTitle": "No GPS route matches",
   "match.emptyRouteDesc": "Once you record enough GPS tracks, we'll show bikers who ride the same roads.",
   "match.routeAffinityLabel": "Shared GPS routes",
+  "match.telemetryAffinityLabel": "Similar riding style",
   "match.commonPlaces": "Shared symbol places",
   "match.commonCellsCount": "{count} cells in common",
   "match.emptyBikerDesc": "The system finds bikers with the same motorcycle. Add your motorcycle to the garage to find matches!",

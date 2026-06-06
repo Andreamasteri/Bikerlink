@@ -25,6 +25,8 @@ interface Props {
   isPending: boolean;
   t: (key: string) => string;
   locale: string;
+  // Task #3393 — "telemetry" riusa questa card per i match per stile di guida.
+  variant?: "route" | "telemetry";
 }
 
 export function RouteAffinityMatchCard({
@@ -37,19 +39,26 @@ export function RouteAffinityMatchCard({
   isPending,
   t,
   locale,
+  variant = "route",
 }: Props) {
   const router = useRouter();
+  const isTelemetry = variant === "telemetry";
   const otherUserId: string = match.otherUserId ?? (match.userAId === currentUserId ? match.userBId : match.userAId);
   const otherNickname: string = match.otherNickname ?? (match.userAId === currentUserId ? match.userBNickname : match.userANickname) ?? "—";
-  const topPlaces: TopPlace[] = Array.isArray(match.topPlaces) ? match.topPlaces : [];
+  const topPlaces: TopPlace[] = isTelemetry || !Array.isArray(match.topPlaces) ? [] : match.topPlaces;
   const isNew = match.status === "new";
   const isAccepted = match.status === "accepted";
   const isRejected = match.status === "rejected";
-  const scorePct = Math.round((match.score ?? 0) * 100);
+  const scorePct = Math.round(((isTelemetry ? match.combinedScore : match.score) ?? 0) * 100);
 
   const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : Colors.accent;
-  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : t("match.routeAffinityLabel");
-  const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted ? "checkmark-circle" : isRejected ? "close-circle" : "map";
+  const baseLabel = isTelemetry ? t("match.telemetryAffinityLabel") : t("match.routeAffinityLabel");
+  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : baseLabel;
+  const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted
+    ? "checkmark-circle"
+    : isRejected
+      ? "close-circle"
+      : isTelemetry ? "speedometer" : "map";
 
   const createdDate = match.createdAt
     ? new Date(match.createdAt).toLocaleDateString(locale, {
@@ -57,7 +66,9 @@ export function RouteAffinityMatchCard({
       })
     : null;
 
-  const commonText = t("match.commonCellsCount").replace("{count}", String(match.commonCells ?? 0));
+  const commonText = isTelemetry
+    ? `${scorePct}% ${t("match.telemetryAffinityLabel")}`
+    : t("match.commonCellsCount").replace("{count}", String(match.commonCells ?? 0)) + ` · ${scorePct}%`;
 
   return (
     <View style={[styles.card, isRejected && styles.dimmed]}>
@@ -80,7 +91,7 @@ export function RouteAffinityMatchCard({
         <Ionicons name="bicycle" size={24} color={Colors.maleIcon} />
         <View style={{ flex: 1 }}>
           <Text style={styles.nickname}>{otherNickname}</Text>
-          <Text style={styles.subText}>{commonText} · {scorePct}%</Text>
+          <Text style={styles.subText}>{commonText}</Text>
         </View>
         <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
       </TouchableOpacity>

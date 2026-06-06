@@ -158,6 +158,9 @@ export const matchPreferences = pgTable("match_preferences", {
   // (tag-overlap + embedding similarity sui gusti musicali liberi).
   musicAffinity: boolean("music_affinity").notNull().default(true),
   bioAffinity: boolean("bio_affinity").notNull().default(true),
+  // Task #3393 — toggle dedicato per il matcher telemetry-affinity (stile di
+  // guida da ride_telemetry). Ortogonale a bikerBikerLeanAngle/AvgSpeed/AvgDuration.
+  telemetryAffinity: boolean("telemetry_affinity").notNull().default(true),
   // Task #2580 — allinea match_preferences al registry (timeOverlap #2521).
   timeOverlap: boolean("time_overlap").notNull().default(true),
   // Task #2528 — preferenza per ricevere inviti su giri pianificati compatibili.
@@ -313,6 +316,48 @@ export const userCurvyProfile = pgTable("user_curvy_profile", {
 
 export type UserCurvyProfile = typeof userCurvyProfile.$inferSelect;
 export type InsertUserCurvyProfile = typeof userCurvyProfile.$inferInsert;
+
+/**
+ * Task #3393 — Telemetry Affinity matches.
+ *
+ * Match per coppia di utenti basato sullo stile di guida aggregato in
+ * `user_telemetry_profile`. Score combinato:
+ *   combinedScore = 0.4 * algorithmicScore (Jaccard sui 3 bucket) +
+ *                   0.6 * embeddingScore (coseno pgvector su `telemetry_style`).
+ * `styleLabels` contiene le label comuni (es. ["sport_rider", "evening_rider"]).
+ */
+export const telemetryAffinityMatches = pgTable("telemetry_affinity_matches", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  userAId: varchar("user_a_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  userBId: varchar("user_b_id", { length: 36 })
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  algorithmicScore: doublePrecision("algorithmic_score").notNull().default(0),
+  embeddingScore: doublePrecision("embedding_score").notNull().default(0),
+  combinedScore: doublePrecision("combined_score").notNull(),
+  styleLabels: jsonb("style_labels").notNull().default(sql`'[]'::jsonb`),
+  status: varchar("status", { length: 20 }).notNull().default("new"),
+  notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
+  notifiedAt: timestamp("notified_at"),
+  archivedAt: timestamp("archived_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => [
+  index("telemetry_affinity_user_a_idx").on(table.userAId),
+  index("telemetry_affinity_user_b_idx").on(table.userBId),
+  index("telemetry_affinity_combined_score_idx").on(table.combinedScore),
+  index("telemetry_affinity_archived_at_idx").on(table.archivedAt),
+  uniqueIndex("telemetry_affinity_symmetric_idx").on(
+    sql`LEAST(${table.userAId}, ${table.userBId})`,
+    sql`GREATEST(${table.userAId}, ${table.userBId})`,
+  ),
+]);
+
+export type TelemetryAffinityMatch = typeof telemetryAffinityMatches.$inferSelect;
+export type InsertTelemetryAffinityMatch = typeof telemetryAffinityMatches.$inferInsert;
 
 /**
  * Task #2528 — Inviti a giri pianificati suggeriti dal matcher

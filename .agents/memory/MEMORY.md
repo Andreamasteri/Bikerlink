@@ -20,3 +20,4 @@
 - [AppSetting valueJson vs value](appsetting-valuejson.md) — upsertAppSetting(key, value?, valueJson?): il collector watchdog legge row.valueJson (JSONB), non row.value. Passare JSON come 2° arg (value stringa) lascia valueJson=null — usare sempre 3° arg per JSON strutturato.
 - [Deploy porta 5000 blindata](deploy-port-5000.md) — .replit [deployment] run DEVE usare PORT=5000; PORT=8081 fa fallire l'healthcheck → deploy abortisce. Non editare .replit direttamente: usare deployConfig(). Guard in post-merge.sh rileva la regressione.
 - [Install research first](install-research-first.md) — prima di installare/configurare qualsiasi software, recuperare sempre docs/repo/changelog/issues aggiornati; le conoscenze di training sono obsolete.
+- [Typecheck workflow stale logs](typecheck-stale-logs.md) — typecheck/typecheck-client sono check run-once; gli snapshot /tmp/logs NON si aggiornano al restart → status "failed" stantio; verità = `npx tsc --noEmit -p <proj>` diretto.

@@ -127,6 +127,40 @@ export const segmentTelemetry = pgTable("segment_telemetry", {
   index("segment_telemetry_curvy_score_idx").on(table.curvyScore),
 ]);
 
+/**
+ * Task #3393 — Telemetry Affinity: profilo aggregato per-utente.
+ *
+ * Alimentato da `ride_telemetry` (solo session_type != 'ideal_lap') dal job
+ * `aggregate-telemetry-profiles.ts`. Cattura il "carattere di guida" dell'utente
+ * in statistiche aggregate + bucket discreti usati dal matcher telemetry-affinity.
+ * `dataQuality` (= totalSessions) è il gate per la soglia minima (≥5 sessioni).
+ */
+export const userTelemetryProfile = pgTable("user_telemetry_profile", {
+  userId: varchar("user_id", { length: 36 })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  totalSessions: integer("total_sessions").notNull().default(0),
+  totalKm: doublePrecision("total_km").notNull().default(0),
+  avgSpeedKmh: doublePrecision("avg_speed_kmh").notNull().default(0),
+  p75SpeedKmh: doublePrecision("p75_speed_kmh").notNull().default(0),
+  avgLeanAngle: doublePrecision("avg_lean_angle").notNull().default(0),
+  maxLeanAvg: doublePrecision("max_lean_avg").notNull().default(0),
+  avgDurationMin: doublePrecision("avg_duration_min").notNull().default(0),
+  fractionMorning: doublePrecision("fraction_morning").notNull().default(0),
+  fractionEvening: doublePrecision("fraction_evening").notNull().default(0),
+  speedBucket: varchar("speed_bucket", { length: 10 }).notNull().default("medium"),
+  leanBucket: varchar("lean_bucket", { length: 10 }).notNull().default("touring"),
+  durationBucket: varchar("duration_bucket", { length: 10 }).notNull().default("medium"),
+  dataQuality: integer("data_quality").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => [
+  index("user_telemetry_profile_data_quality_idx").on(table.dataQuality),
+  index("user_telemetry_profile_buckets_idx").on(table.speedBucket, table.leanBucket),
+]);
+
+export type UserTelemetryProfile = typeof userTelemetryProfile.$inferSelect;
+export type InsertUserTelemetryProfile = typeof userTelemetryProfile.$inferInsert;
+
 export type CoordinateHistory = typeof coordinateHistory.$inferSelect;
 export type InsertCoordinateHistory = typeof coordinateHistory.$inferInsert;
 export type ArcadeScore = typeof arcadeScores.$inferSelect;

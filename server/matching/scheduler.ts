@@ -11,6 +11,8 @@ import { Cron } from "croner";
 import { runDetectNegativePatternsJob } from "./jobs/detect-negative-patterns";
 import { runRouteSimilarityMatching } from "./run-route-similarity";
 import { runBioAffinityMatching } from "./run-bio-affinity";
+import { runTelemetryAffinityMatching } from "./run-telemetry-affinity";
+import { aggregateTelemetryProfiles } from "../jobs/aggregate-telemetry-profiles";
 import { runDistanceMatching, runRouteTypeZoneMatching } from "./run-distance";
 import { runProposalToProfileMatching } from "./run-profile";
 import { recomputeAllUserMatchProfiles } from "./recompute-profiles";
@@ -436,6 +438,28 @@ export function startMatchingEngine(): void {
   setTimeout(() => { runBioAffinitySafe(); }, 2 * 60 * 1000);
   _engineTimers.push(setInterval(runBioAffinitySafe, 30 * 60 * 1000));
   console.log("[Matching] BioAffinity matcher schedulato (30 min)");
+
+  // Task #3393 — Telemetry Affinity: aggregazione profili + matcher giornaliero.
+  // L'aggregazione (ride_telemetry → user_telemetry_profile + embedding) precede
+  // sempre il matcher così i match usano dati freschi. Bassa frequenza (24h):
+  // lo stile di guida evolve lentamente ed è costoso (embeddings).
+  const runTelemetryAffinitySafe = async () => {
+    try {
+      const profiles = await aggregateTelemetryProfiles();
+      if (profiles > 0) {
+        console.log(`[Matching] TelemetryAffinity: ${profiles} profili aggregati`);
+      }
+      const count = await runTelemetryAffinityMatching();
+      if (count > 0) {
+        console.log(`[Matching] TelemetryAffinity ciclo: ${count} nuovi match`);
+      }
+    } catch (err) {
+      console.error("[Matching] TelemetryAffinity ciclo errore:", err);
+    }
+  };
+  setTimeout(() => { runTelemetryAffinitySafe(); }, 5 * 60 * 1000);
+  _engineTimers.push(setInterval(runTelemetryAffinitySafe, 24 * 60 * 60 * 1000));
+  console.log("[Matching] TelemetryAffinity matcher schedulato (24h)");
 }
 
 export function stopMatchingEngine(): void {

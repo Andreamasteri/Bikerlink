@@ -410,6 +410,7 @@ const it: Record<string, string> = {
   "match.emptyRouteTitle": "Nessun match per percorsi GPS",
   "match.emptyRouteDesc": "Quando registri abbastanza tracce GPS, ti mostriamo i biker che frequentano le tue stesse strade.",
   "match.routeAffinityLabel": "Stessi percorsi GPS",
+  "match.telemetryAffinityLabel": "Stile di guida simile",
   "match.commonPlaces": "Luoghi simbolo in comune",
   "match.commonCellsCount": "{count} celle in comune",
   "match.emptyBikerDesc": "Il sistema trova altri biker con la stessa moto. Aggiungi la tua moto al garage per trovare match!",

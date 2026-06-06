@@ -4,9 +4,9 @@ import {
   sosRequests,
   type SosRequest, type InsertSosRequest,
 } from "@shared/db";
-import { RouteAffinityMatchesStorage } from "./route-affinity-matches";
+import { TelemetryAffinityMatchesStorage } from "./telemetry-affinity-matches";
 
-export class SosStorage extends RouteAffinityMatchesStorage {
+export class SosStorage extends TelemetryAffinityMatchesStorage {
   async createSosRequest(data: InsertSosRequest): Promise<SosRequest> {
     const [req] = await db.insert(sosRequests).values(data).returning();
     return req;
