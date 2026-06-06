@@ -7,14 +7,201 @@ import { apiRequest } from "@/lib/query-client";
 import { ROUTING_OPTIONS, ROUTING_PROFILE_OPTIONS } from "@shared/maps-config";
 import type { RoutingEngineId, RoutingProfileId, MapsOption } from "@shared/maps-config";
 
+type GHErrorType = "tunnel_down" | "profile_missing" | "routing_error" | "ok";
+
+interface GHHealth {
+  ok: boolean;
+  status: string;
+  latency_ms: number | null;
+  last_check_at: number | null;
+  last_failure_at: number | null;
+  consecutive_failures: number;
+  error: string | null;
+  error_detail: string | null;
+  error_type: GHErrorType;
+  version: string | null;
+  available_profiles: string[] | null;
+  profiles_reachable: boolean;
+  profiles_error_reason: string | null;
+}
+
 interface RoutingHealth {
   self_hosted: boolean;
-  graphhopper: { ok: boolean; status: string; latency_ms: number | null; last_check_at: number | null; consecutive_failures: number; error: string | null };
+  graphhopper: GHHealth;
   cloud_fallback_available: boolean;
   cloud_fallback_active: boolean;
   routing_disabled: boolean;
   degraded: boolean;
   message: string;
+}
+
+interface TestRoutingResult {
+  ok: boolean;
+  engine?: string;
+  latency_ms?: number | null;
+  distanceKm?: number | null;
+  durationMinutes?: number | null;
+  error?: string;
+  source?: string;
+}
+
+function formatTime(ts: number | null): string {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function ErrorTypeIcon({ type, size = 14 }: { type: GHErrorType; size?: number }) {
+  if (type === "tunnel_down") return <Ionicons name="cloud-offline-outline" size={size} color={Colors.error} />;
+  if (type === "profile_missing") return <Ionicons name="settings-outline" size={size} color="#f59e0b" />;
+  if (type === "routing_error") return <Ionicons name="warning-outline" size={size} color={Colors.error} />;
+  return <Ionicons name="checkmark-circle" size={size} color={Colors.success} />;
+}
+
+function ErrorTypeLabel({ type }: { type: GHErrorType }) {
+  const labels: Record<GHErrorType, string> = {
+    tunnel_down: "Tunnel DuckDNS non raggiungibile",
+    profile_missing: "Profilo motorcycle mancante",
+    routing_error: "Errore di routing",
+    ok: "Operativo",
+  };
+  return <Text style={styles.errorTypeLabel}>{labels[type]}</Text>;
+}
+
+function ProfilesSection({
+  profiles,
+  profilesReachable,
+  profilesErrorReason,
+}: {
+  profiles: string[] | null;
+  profilesReachable: boolean;
+  profilesErrorReason: string | null;
+}) {
+  if (!profilesReachable) {
+    const label = profilesErrorReason === "timeout"
+      ? "Timeout — il tunnel DuckDNS non risponde"
+      : profilesErrorReason === "not_self_hosted"
+      ? null
+      : "Tunnel DuckDNS non raggiungibile — impossibile leggere i profili";
+
+    if (!label) return null;
+
+    return (
+      <View style={styles.profilesBox}>
+        <View style={styles.profileRow}>
+          <Ionicons name="cloud-offline-outline" size={13} color={Colors.textSecondary} />
+          <Text style={styles.profilesUnavailable}>{label}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  const hasMoto = profiles?.includes("motorcycle") ?? false;
+  const otherProfiles = (profiles ?? []).filter((p) => p !== "motorcycle");
+
+  return (
+    <View style={styles.profilesBox}>
+      <Text style={styles.profilesTitle}>Profili disponibili sul server:</Text>
+      <View style={styles.profilesList}>
+        <View style={styles.profileRow}>
+          <Ionicons
+            name={hasMoto ? "checkmark-circle" : "close-circle"}
+            size={12}
+            color={hasMoto ? Colors.success : Colors.error}
+          />
+          <Text style={[styles.profileName, hasMoto ? styles.profileNameMoto : styles.profileNameMissing]}>
+            motorcycle
+          </Text>
+          <Text style={hasMoto ? styles.profileMotoLabel : styles.profileMotoLabelErr}>
+            {hasMoto ? "← richiesto ✓" : "← MANCANTE"}
+          </Text>
+        </View>
+        {otherProfiles.map((p) => (
+          <View key={p} style={styles.profileRow}>
+            <Ionicons name="ellipse" size={8} color={Colors.textSecondary} />
+            <Text style={styles.profileName}>{p}</Text>
+          </View>
+        ))}
+      </View>
+      {!hasMoto && (
+        <View style={styles.profilesWarning}>
+          <Ionicons name="warning-outline" size={12} color="#f59e0b" />
+          <Text style={styles.profilesWarningText}>
+            Profilo "motorcycle" non trovato — routing userà il profilo fallback
+          </Text>
+        </View>
+      )}
+      {profiles === null && profilesReachable && (
+        <Text style={styles.profilesUnavailable}>
+          Endpoint /info raggiungibile ma nessun profilo restituito
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function TestRoutingButton({ selfHosted }: { selfHosted: boolean }) {
+  const [loading, setLoading] = React.useState(false);
+  const [result, setResult] = React.useState<TestRoutingResult | null>(null);
+
+  const handleTest = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await apiRequest("POST", "/api/admin/maps/test-routing");
+      const data = await res.json() as TestRoutingResult;
+      setResult(data);
+    } catch (err) {
+      setResult({ ok: false, error: err instanceof Error ? err.message : "Errore sconosciuto" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.testBox}>
+      <View style={styles.testHeader}>
+        <Ionicons name="speedometer-outline" size={13} color={Colors.accent} />
+        <Text style={styles.testTitle}>Prova route Mira → Belluno</Text>
+        <TouchableOpacity
+          style={[styles.testBtn, loading && styles.testBtnDisabled]}
+          onPress={handleTest}
+          disabled={loading}
+          activeOpacity={0.7}
+        >
+          {loading
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={styles.testBtnText}>Prova ora</Text>}
+        </TouchableOpacity>
+      </View>
+
+      {result && (
+        <View style={[styles.testResult, result.ok ? styles.testResultOk : styles.testResultErr]}>
+          {result.ok ? (
+            <>
+              <View style={styles.testResultRow}>
+                <Ionicons name="checkmark-circle" size={13} color={Colors.success} />
+                <Text style={styles.testResultText}>
+                  {result.engine ?? "—"} · {result.latency_ms}ms
+                </Text>
+              </View>
+              <Text style={styles.testResultMeta}>
+                {result.distanceKm != null ? `${result.distanceKm} km` : ""}
+                {result.distanceKm != null && result.durationMinutes != null ? " · " : ""}
+                {result.durationMinutes != null ? `~${result.durationMinutes} min` : ""}
+              </Text>
+            </>
+          ) : (
+            <View style={styles.testResultRow}>
+              <Ionicons name="alert-circle" size={13} color={Colors.error} />
+              <Text style={[styles.testResultText, styles.testResultErrText]} numberOfLines={3}>
+                {result.error ?? "Errore sconosciuto"}
+              </Text>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
 }
 
 function SelfHostStatus() {
@@ -28,14 +215,26 @@ function SelfHostStatus() {
 
   const disabled = data.routing_disabled;
   const down = data.degraded;
+  const gh = data.graphhopper;
+  const errorType = gh.error_type ?? "ok";
+
   const color = disabled ? Colors.textSecondary : down ? Colors.error : Colors.success;
-  const icon = disabled ? "pause-circle" : down ? "alert-circle" : "checkmark-circle";
+  const icon: keyof typeof Ionicons.glyphMap = disabled
+    ? "pause-circle"
+    : errorType === "tunnel_down"
+    ? "cloud-offline-outline"
+    : errorType === "profile_missing"
+    ? "settings-outline"
+    : down
+    ? "alert-circle"
+    : "checkmark-circle";
+
   const title = disabled
     ? "Server di casa: routing disabilitato"
     : `Server di casa: ${down ? "OFFLINE" : "online"}`;
-  const lastCheck = data.graphhopper.last_check_at
-    ? new Date(data.graphhopper.last_check_at).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })
-    : "—";
+
+  const lastCheck = formatTime(gh.last_check_at);
+  const lastFailure = formatTime(gh.last_failure_at);
 
   return (
     <View style={[styles.healthBox, { borderColor: color }]}>
@@ -43,13 +242,38 @@ function SelfHostStatus() {
         <Ionicons name={icon} size={14} color={color} />
         <Text style={[styles.healthTitle, { color }]}>{title}</Text>
       </View>
+
       <Text style={styles.healthMsg}>{data.message}</Text>
+
+      {down && gh.error && (
+        <View style={styles.errorDetailBox}>
+          <View style={styles.errorTypeRow}>
+            <ErrorTypeIcon type={errorType} size={12} />
+            <ErrorTypeLabel type={errorType} />
+          </View>
+          <Text style={styles.errorDetailText} numberOfLines={4}>
+            {gh.error}
+          </Text>
+        </View>
+      )}
+
       <Text style={styles.healthMeta}>
         Ultimo check: {lastCheck}
-        {data.graphhopper.latency_ms != null && !down ? ` · ${data.graphhopper.latency_ms}ms` : ""}
-        {down && data.graphhopper.consecutive_failures > 0 ? ` · ${data.graphhopper.consecutive_failures} fallimenti` : ""}
+        {gh.latency_ms != null && !down ? ` · ${gh.latency_ms}ms` : ""}
+        {down && gh.consecutive_failures > 0 ? ` · ${gh.consecutive_failures} fallimenti consecutivi` : ""}
+        {down && gh.last_failure_at ? ` · ultimo errore: ${lastFailure}` : ""}
         {data.cloud_fallback_active ? " · fallback Cloud attivo" : ""}
       </Text>
+
+      {data.self_hosted && (
+        <ProfilesSection
+          profiles={gh.available_profiles}
+          profilesReachable={gh.profiles_reachable ?? false}
+          profilesErrorReason={gh.profiles_error_reason ?? null}
+        />
+      )}
+
+      <TestRoutingButton selfHosted={data.self_hosted} />
     </View>
   );
 }
@@ -225,11 +449,82 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   title: { fontFamily: "Inter_600SemiBold", fontSize: 15, color: Colors.text },
-  healthBox: { backgroundColor: Colors.background, borderRadius: 8, borderWidth: 1, padding: 10, marginBottom: 10 },
-  healthHeader: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 },
+  healthBox: {
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    borderWidth: 1,
+    padding: 10,
+    marginBottom: 10,
+    gap: 6,
+  },
+  healthHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
   healthTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
-  healthMsg: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.text, marginBottom: 2 },
+  healthMsg: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.text },
   healthMeta: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary },
+  errorDetailBox: {
+    backgroundColor: Colors.error + "12",
+    borderRadius: 6,
+    padding: 8,
+    gap: 4,
+  },
+  errorTypeRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  errorTypeLabel: { fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.error },
+  errorDetailText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.error,
+    opacity: 0.85,
+  },
+  profilesBox: {
+    backgroundColor: Colors.surface,
+    borderRadius: 6,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 6,
+  },
+  profilesTitle: { fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.textSecondary },
+  profilesList: { gap: 3 },
+  profileRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  profileName: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.text },
+  profileNameMoto: { fontFamily: "Inter_600SemiBold", color: Colors.success },
+  profileNameMissing: { fontFamily: "Inter_600SemiBold", color: Colors.error },
+  profileMotoLabel: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.success },
+  profileMotoLabelErr: { fontFamily: "Inter_600SemiBold", fontSize: 10, color: Colors.error },
+  profilesWarning: { flexDirection: "row", alignItems: "flex-start", gap: 5, marginTop: 2 },
+  profilesWarningText: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#f59e0b", flex: 1 },
+  profilesUnavailable: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, flex: 1 },
+  testBox: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  testHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    padding: 8,
+    backgroundColor: Colors.surface,
+  },
+  testTitle: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.text, flex: 1 },
+  testBtn: {
+    backgroundColor: Colors.accent,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 6,
+    minWidth: 72,
+    alignItems: "center",
+  },
+  testBtnDisabled: { opacity: 0.6 },
+  testBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#fff" },
+  testResult: { padding: 8, gap: 3 },
+  testResultOk: { backgroundColor: Colors.success + "14" },
+  testResultErr: { backgroundColor: Colors.error + "12" },
+  testResultRow: { flexDirection: "row", alignItems: "flex-start", gap: 5 },
+  testResultText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.text, flex: 1 },
+  testResultErrText: { color: Colors.error },
+  testResultMeta: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginLeft: 18 },
   currentRow: { flexDirection: "row", flexWrap: "wrap", marginBottom: 8 },
   currentLabel: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
   currentValue: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.accent },

@@ -14,6 +14,8 @@ import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
 import {
   GH_BASE_URL, isSelfHosted, getServerInfo,
   getRoutingHealthSnapshot,
+  fetchSelfHostedProfiles,
+  classifyGHError,
   type GHServerInfo,
 } from "../../../graphhopper-client";
 import { isRoutingEnabled } from "../../../routing/routing-kill-switch";
@@ -42,10 +44,11 @@ function maskUrl(url: string): string {
  * chiamata + un probe diretto /health (GraphHopper) e /status (Valhalla).
  */
 router.get("/routing-health", async (_req: Request, res: Response) => {
-  const [ghInfo, valhallaInfo, engineSetting] = await Promise.all([
+  const [ghInfo, valhallaInfo, engineSetting, profilesResult] = await Promise.all([
     getServerInfo().catch((): GHServerInfo => ({ status: "error" })),
     getValhallaInfo().catch((): GHServerInfo => ({ status: "error" })),
     storage.getAppSetting("maps_routing_engine"),
+    fetchSelfHostedProfiles().catch(() => ({ reachable: false, profiles: null, error_reason: "exception" })),
   ]);
 
   const activeEngine = (engineSetting?.value ?? "graphhopper") as RoutingEngineId;
@@ -62,15 +65,26 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
   const activeEngineDown =
     activeEngine === "valhalla" ? valhallaDown : ghDown;
 
+  // Classifica il tipo di errore per il pannello admin
+  const errorType = classifyGHError(snap.error);
+
   let message: string;
   if (routingDisabled) {
     message = "Routing disabilitato via kill-switch.";
   } else if (activeEngine === "valhalla" && valhallaDown) {
     message = "Valhalla (server di casa) OFFLINE — fallback automatico a GraphHopper.";
   } else if (ghDown) {
-    message = snap.cloudFallbackAvailable
-      ? "Server di casa OFFLINE — routing servito dalla Cloud API (profilo car)."
-      : "Server di casa OFFLINE — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
+    if (errorType === "tunnel_down") {
+      message = snap.cloudFallbackAvailable
+        ? "Tunnel DuckDNS non raggiungibile — routing servito dalla Cloud API (profilo car)."
+        : "Tunnel DuckDNS non raggiungibile — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
+    } else if (errorType === "profile_missing") {
+      message = "Profilo motorcycle non disponibile sul server GH.";
+    } else {
+      message = snap.cloudFallbackAvailable
+        ? "Server di casa OFFLINE — routing servito dalla Cloud API (profilo car)."
+        : "Server di casa OFFLINE — nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY).";
+    }
   } else {
     message = "Server di routing operativo.";
   }
@@ -85,9 +99,15 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
       down: ghDown,
       latency_ms: snap.latencyMs,
       last_check_at: snap.lastCheckAt,
+      last_failure_at: snap.lastFailureAt,
       consecutive_failures: snap.consecutiveFailures,
       error: snap.error,
+      error_detail: snap.error,
+      error_type: errorType,
       version: ghInfo.version,
+      available_profiles: profilesResult.profiles,
+      profiles_reachable: profilesResult.reachable,
+      profiles_error_reason: profilesResult.error_reason,
     },
     valhalla: {
       status: valhallaInfo.status,
@@ -104,7 +124,7 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
   });
 });
 
-router.get("/test-routing", async (req: Request, res: Response) => {
+async function handleTestRouting(_req: Request, res: Response): Promise<Response> {
   if (!(await isRoutingEnabled())) {
     return res.json({
       ok: false,
@@ -185,6 +205,9 @@ router.get("/test-routing", async (req: Request, res: Response) => {
       ...diagnostics,
     });
   }
-});
+}
+
+router.get("/test-routing", handleTestRouting);
+router.post("/test-routing", handleTestRouting);
 
 export default router;

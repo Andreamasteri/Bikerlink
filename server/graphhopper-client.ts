@@ -109,6 +109,8 @@ export interface RoutingHealthSnapshot {
   ok: boolean | null;
   /** Timestamp (ms) dell'ultima interazione registrata. */
   lastCheckAt: number | null;
+  /** Timestamp (ms) dell'ultimo fallimento. */
+  lastFailureAt: number | null;
   /** Latenza (ms) dell'ultima interazione riuscita. */
   latencyMs: number | null;
   /** Messaggio di errore dell'ultima interazione fallita. */
@@ -124,6 +126,7 @@ export interface RoutingHealthSnapshot {
 const selfHostHealth = {
   ok: null as boolean | null,
   lastCheckAt: null as number | null,
+  lastFailureAt: null as number | null,
   latencyMs: null as number | null,
   error: null as string | null,
   consecutiveFailures: 0,
@@ -140,8 +143,10 @@ function recordSelfHostSuccess(latencyMs: number): void {
 }
 
 function recordSelfHostFailure(error: string, fellBackToCloud: boolean): void {
+  const now = Date.now();
   selfHostHealth.ok = false;
-  selfHostHealth.lastCheckAt = Date.now();
+  selfHostHealth.lastCheckAt = now;
+  selfHostHealth.lastFailureAt = now;
   selfHostHealth.latencyMs = null;
   selfHostHealth.error = error.slice(0, 300);
   selfHostHealth.consecutiveFailures += 1;
@@ -156,12 +161,94 @@ export function getRoutingHealthSnapshot(): RoutingHealthSnapshot {
     selfHosted: isSelfHosted,
     ok: selfHostHealth.ok,
     lastCheckAt: selfHostHealth.lastCheckAt,
+    lastFailureAt: selfHostHealth.lastFailureAt,
     latencyMs: selfHostHealth.latencyMs,
     error: selfHostHealth.error,
     consecutiveFailures: selfHostHealth.consecutiveFailures,
     cloudFallbackAvailable: canFallbackToCloud,
     cloudFallbackActive: selfHostHealth.cloudFallbackActive,
   };
+}
+
+export interface GHProfilesResult {
+  /** true se l'endpoint /info ha risposto (anche con errore HTTP non-auth) */
+  reachable: boolean;
+  /** Profili estratti da /info, oppure null se non disponibili o server unreachable */
+  profiles: string[] | null;
+  /** Motivo dettagliato in caso di fallimento: "timeout" | "network" | "http_NNN" | "parse" */
+  error_reason: string | null;
+}
+
+/**
+ * Recupera i profili supportati dal server GH self-hosted tramite /info.
+ * Restituisce un oggetto strutturato che distingue "tunnel giù" (reachable=false)
+ * da altri fallimenti (es. risposta malformata, auth).
+ */
+export async function fetchSelfHostedProfiles(): Promise<GHProfilesResult> {
+  if (!isSelfHosted) return { reachable: false, profiles: null, error_reason: "not_self_hosted" };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (SELF_HOSTED_TOKEN) headers["X-GH-Token"] = SELF_HOSTED_TOKEN;
+    const res = await fetch(`${GH_BASE_URL}/info`, { headers, signal: controller.signal });
+    clearTimeout(timer);
+    if (!res.ok) {
+      return { reachable: true, profiles: null, error_reason: `http_${res.status}` };
+    }
+    const data = await res.json() as Record<string, unknown>;
+    let profiles: string[] | null = null;
+    if (Array.isArray(data.supported_vehicles)) {
+      profiles = data.supported_vehicles as string[];
+    } else if (Array.isArray(data.profiles)) {
+      profiles = (data.profiles as Array<{ name: string } | string>).map(
+        (p) => (typeof p === "string" ? p : p.name),
+      );
+    }
+    return { reachable: true, profiles, error_reason: profiles ? null : "parse" };
+  } catch (err: unknown) {
+    clearTimeout(timer);
+    const isTimeout = err instanceof Error && err.name === "AbortError";
+    return {
+      reachable: false,
+      profiles: null,
+      error_reason: isTimeout ? "timeout" : "network",
+    };
+  }
+}
+
+/**
+ * Classifica il tipo di errore GH per il pannello admin.
+ */
+export function classifyGHError(
+  error: string | null,
+): "tunnel_down" | "profile_missing" | "routing_error" | "ok" {
+  if (!error) return "ok";
+  const lower = error.toLowerCase();
+  if (
+    lower.includes("aborterror") ||
+    lower.includes("aborted") ||
+    lower.includes("timeout") ||
+    lower.includes("econnrefused") ||
+    lower.includes("enotfound") ||
+    lower.includes("typeerror") ||
+    lower.includes("fetch failed") ||
+    lower.includes("network") ||
+    lower.includes("http 502") ||
+    lower.includes("http 503") ||
+    lower.includes("http 504") ||
+    lower.includes("connection refused")
+  ) {
+    return "tunnel_down";
+  }
+  if (
+    lower.includes("profile") ||
+    lower.includes("vehicle") ||
+    lower.includes("http 400")
+  ) {
+    return "profile_missing";
+  }
+  return "routing_error";
 }
 
 /**
