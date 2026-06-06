@@ -153,6 +153,33 @@ if [ "$RATCHET_EXIT" -ne 0 ]; then
   exit "$RATCHET_EXIT"
 fi
 
+# ── GUARD PORTA DEPLOY (.replit) ─────────────────────────────
+# La porta di deploy DEVE essere 5000. Se qualcuno la cambia (es. PORT=8081)
+# il container Replit non risponde all'healthcheck → deploy fallisce in silenzio.
+echo "════════════════════════════════════════"
+echo "  Guard porta deploy (.replit)"
+echo "════════════════════════════════════════"
+DEPLOY_PORT_OK=true
+if grep -q 'PORT=8081' .replit 2>/dev/null; then
+  echo "❌ ERRORE: .replit contiene PORT=8081 nel comando di deploy!"
+  echo "   La porta di deploy DEVE essere PORT=5000."
+  echo "   Fix: cambia la riga 'run' in [deployment] da PORT=8081 a PORT=5000."
+  DEPLOY_PORT_OK=false
+fi
+if ! grep -q 'PORT=5000' .replit 2>/dev/null; then
+  echo "❌ ERRORE: .replit non contiene PORT=5000 nel comando di deploy!"
+  echo "   Verifica la sezione [deployment] → run."
+  DEPLOY_PORT_OK=false
+fi
+if [ "$DEPLOY_PORT_OK" = true ]; then
+  echo "✅ Porta deploy corretta: PORT=5000 (deploy stabile)."
+else
+  echo "⚠️  Porta deploy errata rilevata — il prossimo publish fallirà."
+  echo "   Usa deployConfig() per correggere (non editare .replit direttamente)."
+fi
+echo "════════════════════════════════════════"
+echo ""
+
 # ── CLEANUP UTENTI SMOKE RESIDUI POST-MERGE ──────────────────
 echo "════════════════════════════════════════"
 echo "  Cleanup utenti smoke residui"
