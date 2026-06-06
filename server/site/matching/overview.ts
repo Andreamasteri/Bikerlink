@@ -19,7 +19,11 @@ export function buildMatchingOverview(baseUrl: string): { meta: PageMeta; body: 
         headline: "Come ti facciamo incontrare i biker giusti",
         description: "Il sistema di matching di BikerLink: 17 segnali, embeddings, geo e feedback loop.",
         url: `${baseUrl}/matching`,
+        inLanguage: "it-IT",
+        datePublished: "2024-10-01",
+        dateModified: "2025-05-15",
         publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        mainEntityOfPage: `${baseUrl}/matching`,
       },
     ],
   };

@@ -16,10 +16,15 @@ export function buildMatchingAI(baseUrl: string): { meta: PageMeta; body: string
       ]),
       {
         "@context": "https://schema.org",
-        "@type": "Article",
+        "@type": "TechArticle",
         headline: "Il Cervello AI di BikerLink",
         description: "6 AI specializzate, 8 modelli, 4 provider con failover automatico.",
         url: `${baseUrl}/matching/intelligenza-artificiale`,
+        inLanguage: "it-IT",
+        datePublished: "2024-11-01",
+        dateModified: "2025-05-15",
+        publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        mainEntityOfPage: `${baseUrl}/matching/intelligenza-artificiale`,
       },
     ],
   };

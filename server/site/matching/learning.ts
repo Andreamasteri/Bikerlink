@@ -21,6 +21,8 @@ export function buildMatchingLearning(baseUrl: string): { meta: PageMeta; body: 
         description: "Come il sistema di matching di BikerLink apprende dai tuoi feedback e migliora i suggerimenti nel tempo.",
         url: `${baseUrl}/matching/come-impara`,
         inLanguage: "it-IT",
+        datePublished: "2024-10-01",
+        dateModified: "2025-05-15",
         publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
         mainEntityOfPage: `${baseUrl}/matching/come-impara`,
       },

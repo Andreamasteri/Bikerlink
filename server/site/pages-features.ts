@@ -12,10 +12,33 @@ export function buildFeatures(
     title: "Funzionalità BikerLink — Mappa, MotoClub, SOS, Contest",
     description:
       "Tutte le funzioni BikerLink: mappa biker live, MotoClub con chat, SOS d'emergenza, contest fotografici, matching e tracking GPS.",
-    jsonld: breadcrumbsJsonLd(baseUrl, [
-      { name: "Home", path: "/" },
-      { name: "Funzionalità", path: "/features" },
-    ]),
+    jsonld: [
+      breadcrumbsJsonLd(baseUrl, [
+        { name: "Home", path: "/" },
+        { name: "Funzionalità", path: "/features" },
+      ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: "Funzionalità BikerLink",
+        description: "Tutte le funzioni BikerLink: mappa biker live, MotoClub con chat, SOS d'emergenza, contest fotografici, matching e tracking GPS.",
+        url: `${baseUrl}/features`,
+        inLanguage: "it-IT",
+        publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        mainEntity: {
+          "@type": "ItemList",
+          name: "Moduli BikerLink",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Mappa biker live", description: "Mappa interattiva con posizione live degli utenti online. Filtri per modello, brand, disponibilità a un giro.", url: `${baseUrl}/community` },
+            { "@type": "ListItem", position: 2, name: "MotoClub", description: "Sistema completo: creazione club, codici invito, pannello admin, approvazioni manuali o auto-join, chat di gruppo dedicata.", url: `${baseUrl}/motoclub` },
+            { "@type": "ListItem", position: 3, name: "SOS emergenza", description: "Un tasto invia la posizione ai biker nel raggio scelto con chat privata istantanea.", url: `${baseUrl}/sos` },
+            { "@type": "ListItem", position: 4, name: "Contest fotografici", description: "Concorsi fotografici settimanali con voto degli iscritti, categorie tematiche e classifica live.", url: `${baseUrl}/community` },
+            { "@type": "ListItem", position: 5, name: "Tracking GPS", description: "Tracker preciso con km, velocità media, G-force longitudinale e accelerazione. Storico privato e statistiche cumulative.", url: `${baseUrl}/about` },
+            { "@type": "ListItem", position: 6, name: "Matching biker", description: "Algoritmo basato su moto posseduta, stile di guida, zona e gusti musicali per trovare compagni di viaggio compatibili.", url: `${baseUrl}/matching` },
+          ],
+        },
+      },
+    ],
   };
   const feature = (
     tag: string,

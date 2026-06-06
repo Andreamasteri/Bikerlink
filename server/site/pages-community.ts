@@ -12,10 +12,38 @@ export function buildCommunity(
     title: "Community BikerLink — Mappa mondiale biker, contest, eventi",
     description:
       "La community BikerLink raccoglie motociclisti da tutto il mondo. Mappa interattiva degli iscritti, contest fotografici settimanali, eventi, chat e profili.",
-    jsonld: breadcrumbsJsonLd(baseUrl, [
-      { name: "Home", path: "/" },
-      { name: "Community", path: "/community" },
-    ]),
+    jsonld: [
+      breadcrumbsJsonLd(baseUrl, [
+        { name: "Home", path: "/" },
+        { name: "Community", path: "/community" },
+      ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "Community BikerLink — Mappa mondiale biker, contest, eventi",
+        description: "La community BikerLink raccoglie motociclisti da tutto il mondo. Mappa interattiva degli iscritti, contest fotografici settimanali, eventi, chat e profili.",
+        url: `${baseUrl}/community`,
+        inLanguage: "it-IT",
+        publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        mainEntity: {
+          "@type": "SoftwareApplication",
+          name: "BikerLink Community",
+          applicationCategory: "SocialNetworkingApplication",
+          operatingSystem: "Android, iOS",
+          description: "Rete mondiale di motociclisti con mappa interattiva live, contest fotografici settimanali, eventi e raduni, chat 1-to-1 e di gruppo, garage condiviso e profili verificati.",
+          featureList: [
+            "Mappa globale degli iscritti aggiornata ogni 5 minuti",
+            "Contest fotografici settimanali con voto della community",
+            "Calendario eventi e raduni con RSVP e geolocalizzazione",
+            "Chat private 1-to-1 e di gruppo MotoClub",
+            "Condivisione GPS volontaria in chat per ritrovarsi durante un giro",
+            "Garage condiviso: moto, storia, modifiche e foto",
+            "Profili verificati con moderazione attiva",
+          ],
+          offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+        },
+      },
+    ],
     headExtras: `<link rel="preconnect" href="https://unpkg.com" crossorigin />
 <link rel="preconnect" href="https://basemaps.cartocdn.com" crossorigin />`,
   };

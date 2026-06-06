@@ -16,13 +16,19 @@ export function buildMatchingPrivacy(baseUrl: string): { meta: PageMeta; body: s
       ]),
       {
         "@context": "https://schema.org",
-        "@type": "Article",
-        headline: "Privacy del matching BikerLink",
+        "@type": "WebPage",
+        name: "Privacy del matching BikerLink",
         description: "Quali dati usa il matching di BikerLink, come vengono protetti e quali sono i tuoi diritti.",
         url: `${baseUrl}/matching/privacy`,
         inLanguage: "it-IT",
+        datePublished: "2024-10-01",
+        dateModified: "2025-05-15",
         publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
         mainEntityOfPage: `${baseUrl}/matching/privacy`,
+        about: {
+          "@type": "Thing",
+          name: "Privacy e protezione dati nel sistema di matching BikerLink",
+        },
       },
     ],
   };

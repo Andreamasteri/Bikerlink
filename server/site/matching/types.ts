@@ -21,6 +21,8 @@ export function buildMatchingTypes(baseUrl: string): { meta: PageMeta; body: str
         description: "Tutti i tipi di match calcolati da BikerLink: stile di guida, moto, percorsi, esperienza e altri segnali.",
         url: `${baseUrl}/matching/tipi-di-match`,
         inLanguage: "it-IT",
+        datePublished: "2024-10-01",
+        dateModified: "2025-05-15",
         publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
         mainEntityOfPage: `${baseUrl}/matching/tipi-di-match`,
       },

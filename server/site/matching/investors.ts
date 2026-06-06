@@ -16,10 +16,15 @@ export function buildMatchingInvestors(baseUrl: string): { meta: PageMeta; body:
       ]),
       {
         "@context": "https://schema.org",
-        "@type": "Article",
+        "@type": "TechArticle",
         headline: "Matching BikerLink per Investitori",
         description: "Architettura tecnica, KPI e vantaggio competitivo del sistema matching BikerLink.",
         url: `${baseUrl}/matching/per-investitori`,
+        inLanguage: "it-IT",
+        datePublished: "2024-11-01",
+        dateModified: "2025-05-15",
+        publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        mainEntityOfPage: `${baseUrl}/matching/per-investitori`,
       },
     ],
   };

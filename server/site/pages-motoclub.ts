@@ -12,10 +12,37 @@ export function buildMotoclub(
     title: "MotoClub su BikerLink — Crea, gestisci, ride insieme",
     description:
       "I MotoClub di BikerLink: crea un club, invita i tuoi compagni con codici, gestisci approvazioni e usa la chat di gruppo dedicata. Pensato per veri equipaggi.",
-    jsonld: breadcrumbsJsonLd(baseUrl, [
-      { name: "Home", path: "/" },
-      { name: "MotoClub", path: "/motoclub" },
-    ]),
+    jsonld: [
+      breadcrumbsJsonLd(baseUrl, [
+        { name: "Home", path: "/" },
+        { name: "MotoClub", path: "/motoclub" },
+      ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "MotoClub su BikerLink — Crea, gestisci, ride insieme",
+        description: "I MotoClub di BikerLink: crea un club, invita i tuoi compagni con codici, gestisci approvazioni e usa la chat di gruppo dedicata. Pensato per veri equipaggi.",
+        url: `${baseUrl}/motoclub`,
+        inLanguage: "it-IT",
+        publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        mainEntity: {
+          "@type": "SoftwareApplication",
+          name: "BikerLink MotoClub",
+          applicationCategory: "SocialNetworkingApplication",
+          operatingSystem: "Android, iOS",
+          description: "Sistema completo per la gestione di club moto: creazione club, codici invito, pannello admin con approvazioni, ruoli, moderazione chat e pianificazione eventi.",
+          featureList: [
+            "Creazione club con nome, logo, descrizione e area geografica",
+            "Codici invito a uso singolo, multiplo o a scadenza",
+            "Approvazioni manuali o auto-join configurabili",
+            "Chat di gruppo dedicata con hashtag e moderazione",
+            "Ruoli: Founder, admin co-gestori, membro",
+            "Pianificazione giri/eventi con RSVP e condivisione percorso GPX",
+          ],
+          offers: { "@type": "Offer", price: "0", priceCurrency: "EUR" },
+        },
+      },
+    ],
   };
   const body = `
 <section class="page-hero">

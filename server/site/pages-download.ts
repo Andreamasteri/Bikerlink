@@ -12,10 +12,42 @@ export function buildDownload(
     title: "Scarica BikerLink — Android, iOS (in arrivo), APK diretto",
     description:
       "Scarica BikerLink per Android dal Google Play, prova l'APK diretto, o scansiona il QR code con Expo Go. Versione iOS in arrivo.",
-    jsonld: breadcrumbsJsonLd(baseUrl, [
-      { name: "Home", path: "/" },
-      { name: "Download", path: "/download" },
-    ]),
+    jsonld: [
+      breadcrumbsJsonLd(baseUrl, [
+        { name: "Home", path: "/" },
+        { name: "Download", path: "/download" },
+      ]),
+      {
+        "@context": "https://schema.org",
+        "@type": "MobileApplication",
+        name: "BikerLink",
+        description: "App per motociclisti italiani: mappa biker live, MotoClub, SOS emergenza, matching, tracking GPS e contest fotografici.",
+        url: `${baseUrl}/download`,
+        inLanguage: "it-IT",
+        applicationCategory: "SocialNetworkingApplication",
+        operatingSystem: "Android",
+        downloadUrl: `${baseUrl}/api/download/play`,
+        installUrl: `${baseUrl}/api/download/play`,
+        softwareVersion: "latest",
+        author: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        offers: {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "EUR",
+          availability: "https://schema.org/InStock",
+        },
+        featureList: [
+          "Mappa biker live con posizione degli utenti online",
+          "MotoClub: crea e gestisci club moto",
+          "SOS emergenza con allerta ai biker nel raggio scelto",
+          "Matching biker basato su 17 segnali di affinità",
+          "Tracking GPS con telemetria: km, velocità, lean angle, G-force",
+          "Contest fotografici settimanali",
+          "Aggiornamenti OTA automatici",
+        ],
+      },
+    ],
   };
   const body = `
 <section class="page-hero">

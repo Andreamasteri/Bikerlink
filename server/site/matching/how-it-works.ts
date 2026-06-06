@@ -16,10 +16,15 @@ export function buildMatchingHowItWorks(baseUrl: string): { meta: PageMeta; body
       ]),
       {
         "@context": "https://schema.org",
-        "@type": "Article",
+        "@type": "TechArticle",
         headline: "Come funziona il matching BikerLink",
         description: "Dal profilo al match in 5 step: profilo, tracking GPS, engine, filtri, proposta.",
         url: `${baseUrl}/matching/come-funziona`,
+        inLanguage: "it-IT",
+        datePublished: "2024-10-01",
+        dateModified: "2025-05-15",
+        publisher: { "@type": "Organization", name: "BikerLink", url: baseUrl },
+        mainEntityOfPage: `${baseUrl}/matching/come-funziona`,
       },
     ],
   };
