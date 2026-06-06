@@ -65,6 +65,10 @@ export function useGiriCreateState(language?: string) {
   const [weatherPreview, setWeatherPreview] = useState<WeatherWaypoint[] | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(false);
 
+  const [pendingMapTap, setPendingMapTap] = useState<{ lat: number; lng: number; name: string } | null>(null);
+  const [mapTapGeocoding, setMapTapGeocoding] = useState(false);
+  const mapTapRequestId = useRef(0);
+
   const suggestionTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastFittedWaypointSig = useRef<string>("");
   const bikerScoreAnim = useRef(new Animated.Value(0)).current;
@@ -464,24 +468,41 @@ export function useGiriCreateState(language?: string) {
     });
   };
 
-  const handleMapTap = async (lat: number, lng: number) => {
+  const handleMapTap = useCallback(async (lat: number, lng: number) => {
     const coordName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    let name = coordName;
+    mapTapRequestId.current += 1;
+    const myId = mapTapRequestId.current;
+    setMapTapGeocoding(true);
+    setPendingMapTap({ lat, lng, name: coordName });
     try {
       const resp = await apiRequest("GET", `/api/geocode/reverse?lat=${lat}&lon=${lng}`);
       const data = await resp.json() as { road?: string; suburb?: string; town?: string; city?: string; county?: string };
-      name = data.road ?? data.suburb ?? data.town ?? data.city ?? data.county ?? coordName;
+      const name = data.road ?? data.suburb ?? data.town ?? data.city ?? data.county ?? coordName;
+      if (mapTapRequestId.current === myId) {
+        setPendingMapTap({ lat, lng, name });
+      }
     } catch {
-      // fallback to coordinate name if reverse geocoding fails
+      // keep coordName as fallback (only if still the latest request)
+    } finally {
+      if (mapTapRequestId.current === myId) {
+        setMapTapGeocoding(false);
+      }
     }
+  }, []);
+
+  const confirmMapTap = useCallback((role: "start" | "waypoint" | "end") => {
+    if (!pendingMapTap) return;
+    const { lat, lng, name } = pendingMapTap;
     const newWps = [...waypoints];
     const newInputs = [...wpInputs];
-    const emptyIdx = newWps.findIndex((w) => w.lat === 0 && w.lng === 0);
-    if (emptyIdx !== -1) {
-      newWps[emptyIdx] = { lat, lng, name };
-      newInputs[emptyIdx] = name;
+    if (role === "start") {
+      newWps[0] = { lat, lng, name };
+      newInputs[0] = name;
+    } else if (role === "end") {
+      newWps[newWps.length - 1] = { lat, lng, name };
+      newInputs[newInputs.length - 1] = name;
     } else {
-      const insertAt = Math.max(0, newWps.length - 1);
+      const insertAt = Math.max(1, newWps.length - 1);
       newWps.splice(insertAt, 0, { lat, lng, name });
       newInputs.splice(insertAt, 0, name);
     }
@@ -489,7 +510,14 @@ export function useGiriCreateState(language?: string) {
     setWpInputs(newInputs);
     setRouteResult(null);
     setWeatherPreview(null);
-  };
+    setPendingMapTap(null);
+  }, [pendingMapTap, waypoints, wpInputs]);
+
+  const dismissMapTap = useCallback(() => {
+    mapTapRequestId.current += 1;
+    setPendingMapTap(null);
+    setMapTapGeocoding(false);
+  }, []);
 
   return {
     debugLogs, clearDebugLogs, debugVisible, setDebugVisible, handleTitleTap,
@@ -517,5 +545,6 @@ export function useGiriCreateState(language?: string) {
     handleMapTap, aiProviderUsed,
     routeError, setRouteError,
     resolvedPoiStops, selectPoiOption, clearPoiOption,
+    pendingMapTap, mapTapGeocoding, confirmMapTap, dismissMapTap,
   };
 }

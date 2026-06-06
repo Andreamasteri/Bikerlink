@@ -33,6 +33,7 @@ import { FuelPreview } from "@/components/giri/create/FuelPreview";
 import { WeatherPreviewRow } from "@/components/giri/create/WeatherPreviewRow";
 import { RouteResultSection } from "@/components/giri/create/RouteResultSection";
 import { useRouteMapLogic } from "@/components/giri/create/useRouteMapLogic";
+import { MapTapConfirmModal } from "@/components/giri/create/MapTapConfirmModal";
 import { useGiriCreateStyles } from "@/components/giri/create/styles";
 
 import { 
@@ -74,6 +75,7 @@ export default function GiriCreateScreen() {
     handleCalculate, handleSave, saveMutationPending,
     handleMapTap,
     resolvedPoiStops, selectPoiOption, clearPoiOption,
+    pendingMapTap, mapTapGeocoding, confirmMapTap, dismissMapTap,
   } = useGiriCreateState(language);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- WebView ref type
@@ -271,6 +273,16 @@ export default function GiriCreateScreen() {
       </ScrollView>
 
       {debugVisible && <DebugPanel logs={debugLogs} onClear={clearDebugLogs} />}
+
+      <MapTapConfirmModal
+        visible={!!pendingMapTap}
+        address={pendingMapTap?.name ?? ""}
+        geocoding={mapTapGeocoding}
+        onSetStart={() => confirmMapTap("start")}
+        onAddWaypoint={() => confirmMapTap("waypoint")}
+        onSetEnd={() => confirmMapTap("end")}
+        onDismiss={dismissMapTap}
+      />
     </View>
   );
 }
