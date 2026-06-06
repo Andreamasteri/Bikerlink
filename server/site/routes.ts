@@ -449,7 +449,6 @@ code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-fa
   // sitemap.xml — dynamic host, all public pages.
   app.get("/sitemap.xml", (req: Request, res: Response) => {
     const baseUrl = getBaseUrl(req);
-    const today = new Date().toISOString().split("T")[0];
     const entries = [
       ...PAGES.map((p) => ({
         loc: `${baseUrl}${p.route}`,
@@ -458,6 +457,7 @@ code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-fa
       })),
       { loc: `${baseUrl}/privacy`, priority: 0.3, changefreq: "yearly" },
       { loc: `${baseUrl}/terms`, priority: 0.3, changefreq: "yearly" },
+      { loc: `${baseUrl}/delete-account`, priority: 0.3, changefreq: "yearly" },
     ];
     const body =
       `<?xml version="1.0" encoding="UTF-8"?>\n` +
@@ -465,12 +465,59 @@ code{background:#f0f0f0;padding:1px 5px;border-radius:2px;font-size:11px;font-fa
       entries
         .map(
           (e) =>
-            `  <url>\n    <loc>${e.loc}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>${e.changefreq}</changefreq>\n    <priority>${e.priority.toFixed(1)}</priority>\n  </url>`,
+            `  <url>\n    <loc>${e.loc}</loc>\n    <changefreq>${e.changefreq}</changefreq>\n    <priority>${e.priority.toFixed(1)}</priority>\n  </url>`,
         )
         .join("\n") +
       `\n</urlset>\n`;
     res.setHeader("Content-Type", "application/xml; charset=utf-8");
     res.setHeader("Cache-Control", "public, max-age=86400");
     res.send(body);
+  });
+
+  // llms.txt — machine-readable site guide for AI crawlers.
+  app.get("/llms.txt", (req: Request, res: Response) => {
+    const baseUrl = getBaseUrl(req);
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=86400");
+    res.send(
+      [
+        "# BikerLink",
+        "",
+        "> BikerLink è l'app di social matching per motociclisti. Connette biker in base a stile di guida, moto, percorsi e passioni, usando telemetria reale e intelligenza artificiale.",
+        "",
+        "## Sezioni principali",
+        "",
+        `- Home: ${baseUrl}/`,
+        `- Funzionalità: ${baseUrl}/features`,
+        `- Sistema SOS: ${baseUrl}/sos`,
+        `- MotoClub: ${baseUrl}/motoclub`,
+        `- Community: ${baseUrl}/community`,
+        `- Download app: ${baseUrl}/download`,
+        `- Chi siamo: ${baseUrl}/about`,
+        `- FAQ: ${baseUrl}/faq`,
+        `- Contatti: ${baseUrl}/contact`,
+        "",
+        "## Matching AI",
+        "",
+        `- Panoramica matching: ${baseUrl}/matching`,
+        `- Come funziona: ${baseUrl}/matching/come-funziona`,
+        `- Tipi di match: ${baseUrl}/matching/tipi-di-match`,
+        `- Come impara: ${baseUrl}/matching/come-impara`,
+        `- Intelligenza artificiale: ${baseUrl}/matching/intelligenza-artificiale`,
+        `- Privacy matching: ${baseUrl}/matching/privacy`,
+        "",
+        "## Pagine legali e supporto",
+        "",
+        `- Privacy Policy: ${baseUrl}/privacy`,
+        `- Termini di Servizio: ${baseUrl}/terms`,
+        `- Elimina account: ${baseUrl}/delete-account`,
+        "",
+        "## Contatto",
+        "",
+        "- Supporto: support@bikerlink.app",
+        "- Privacy: privacy@bikerlink.app",
+        "",
+      ].join("\n"),
+    );
   });
 }
