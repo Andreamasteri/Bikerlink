@@ -393,7 +393,7 @@ export function useTrackingState() {
       if (status !== "granted") { session.setLoading(false); Alert.alert(t("tracking.permReq"), t("tracking.permDenied")); return; }
       Location.requestBackgroundPermissionsAsync().catch(() => {});
       const res = await apiRequest("POST", "/api/routes", { status: "active", isSprint: settings.is0100EnabledRef.current }) as unknown as { id: string };
-      refs.routeIdRef.current = res.id; resetTrackingState();
+      resetTrackingState(); refs.routeIdRef.current = res.id;
       if (settings.countdownEnabled) {
         session.setPhase("countdown"); session.setCountdownValue(parseInt(settings.countdownSec || "10", 10)); session.setLoading(false);
         refs.countdownTickRef.current = setInterval(() => session.setCountdownValue(v => {
