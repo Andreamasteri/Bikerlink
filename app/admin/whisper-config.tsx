@@ -72,9 +72,13 @@ const PROVIDER_COLORS: Record<SttProviderId, string> = {
 
 async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const url = new URL(path, getApiUrl()).toString();
+  const hasBody = options?.body != null;
   const res = await fetch(url, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...authFetchHeaders() },
+    headers: {
+      ...(hasBody ? { "Content-Type": "application/json" } : {}),
+      ...authFetchHeaders(),
+    },
     ...options,
   });
   if (!res.ok) {
@@ -172,7 +176,7 @@ export default function WhisperConfigScreen() {
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json", ...authFetchHeaders() },
+        headers: { ...authFetchHeaders() },
       });
       const clientLatency = Date.now() - callStart;
 
@@ -237,7 +241,7 @@ export default function WhisperConfigScreen() {
       const res = await fetch(url, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json", ...authFetchHeaders() },
+        headers: { ...authFetchHeaders() },
       });
       const bodyText = await res.text().catch(() => "");
       if (!res.ok) {
