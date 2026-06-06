@@ -13,7 +13,10 @@ const TARGET_KM = parseFloat(process.env.TELEMETRY_TARGET_KM ?? "1000");
 
 router.post("/batch", async (req: Request, res: Response) => {
   const userId = requireUserId(req, res);
-  if (!userId) return;
+  if (!userId) {
+    console.warn(`[telemetry/batch] AUTH FAIL — ip=${req.ip} ua=${String(req.headers["user-agent"] ?? "").slice(0, 80)}`);
+    return;
+  }
 
   try {
     const { session_id, session_type, samples, lap_name } = req.body as {

@@ -12,10 +12,13 @@ import {
 } from "@/lib/background-telemetry-task";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const SAMPLE_INTERVAL_MS = 1000;   // 1 Hz
-const FLUSH_INTERVAL_MS  = 90_000; // periodic flush every 90 s (min-gated)
-const FLUSH_MIN_SAMPLES  = 50;     // min samples before a periodic flush fires
-const FLUSH_MAX_SAMPLES  = 200;    // hard cap — flush immediately at this count
+const SAMPLE_INTERVAL_MS  = 1000;   // 1 Hz
+const FLUSH_INTERVAL_MS   = 30_000; // periodic flush every 30 s (was 90 s)
+const FLUSH_MIN_SAMPLES   = 5;      // min samples before a periodic flush fires (was 50)
+const FLUSH_MAX_SAMPLES   = 200;    // hard cap — flush immediately at this count
+const STOP_RETRY_DELAY_MS = 1_500;  // pause before retry flush on stopSession failure
+// AsyncStorage key prefix for samples persisted across sessions on flush failure.
+const UNSENT_PREFIX = "@bikerlink/telemetry_unsent_";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 export interface TelemetrySample {
@@ -55,6 +58,12 @@ function calcLeanAngle(x: number, z: number): number {
  * useTelemetry — collects GPS + accelerometer at 1 Hz while isActive is true,
  * buffers samples, and flushes batches to POST /api/telemetry/batch.
  *
+ * @param isActive  — true while the tracking session should be running
+ * @param externalGps — when true, skip opening a second watchPositionAsync
+ *   (caller must feed location updates via the returned pushLocation callback).
+ *   This prevents the double-subscription conflict when tracking.tsx already
+ *   has its own watchPositionAsync open.
+ *
  * Session lifecycle:
  *  - isActive true  → new session starts (new UUID, fresh buffer)
  *  - isActive false → session ends: subs stopped, remaining buffer force-flushed
@@ -64,7 +73,7 @@ function calcLeanAngle(x: number, z: number): number {
  *                        flushed to the server; foreground subs restarted
  *  - Component unmount → same as explicit stop
  */
-export function useTelemetry(isActive: boolean) {
+export function useTelemetry(isActive: boolean, externalGps = false) {
   const sessionIdRef   = useRef<string | null>(null);
   const bufferRef      = useRef<TelemetrySample[]>([]);
   const accelRef       = useRef<AccelReading>({ x: 0, y: 0, z: 1 });
@@ -76,6 +85,9 @@ export function useTelemetry(isActive: boolean) {
   const inBackgroundRef = useRef(false); // true while background task is handling collection
   // Serializes async AppState transitions so handoff/resume can never overlap.
   const transitionRef   = useRef<Promise<void>>(Promise.resolve());
+  // Stable ref to externalGps flag so callbacks don't capture a stale closure.
+  const externalGpsRef  = useRef(externalGps);
+  useEffect(() => { externalGpsRef.current = externalGps; }, [externalGps]);
 
   // ── flush foreground buffer to server ─────────────────────────────────────
   // force=true → send even when below FLUSH_MIN_SAMPLES (used for stop/background)
@@ -99,7 +111,7 @@ export function useTelemetry(isActive: boolean) {
         samples:      toSend,
       });
     } catch (err) {
-      // Re-queue on network failure to avoid data loss
+      // Re-queue on network/auth failure to avoid data loss
       bufferRef.current = [...toSend, ...bufferRef.current];
       console.warn("[useTelemetry] flush failed, re-queued", err);
     } finally {
@@ -149,6 +161,27 @@ export function useTelemetry(isActive: boolean) {
     }
   }, []);
 
+  // ── persist unsent samples to AsyncStorage on flush failure ──────────────
+  // Called when stopSession flush fails (auth / network). Samples are stored
+  // under a session-keyed entry and drained at the start of the next session.
+  const persistUnsentSamples = useCallback(async (
+    sessionId: string,
+    samples: TelemetrySample[]
+  ) => {
+    const key = `${UNSENT_PREFIX}${sessionId}`;
+    try {
+      await AsyncStorage.setItem(key, JSON.stringify({ sessionId, samples }));
+      console.warn(
+        `[useTelemetry] stopSession: ${samples.length} campioni persistiti in AsyncStorage (${key}) — saranno inviati alla prossima sessione.`
+      );
+    } catch (e) {
+      console.warn(
+        `[useTelemetry] stopSession: ${samples.length} campioni NON inviati — persist AsyncStorage fallito. Dati persi.`,
+        e
+      );
+    }
+  }, []);
+
   // ── full session stop: teardown + force flush + clear session ─────────────
   const stopSession = useCallback(async () => {
     if (!activeRef.current) return;
@@ -163,10 +196,80 @@ export function useTelemetry(isActive: boolean) {
     await drainAndFlushBackgroundBuffer();
     await AsyncStorage.removeItem(BG_TELEMETRY_SESSION_KEY);
 
-    await flush(true); // force-flush remaining foreground buffer
+    // First flush attempt
+    await flush(true);
+
+    // If flush failed, samples were re-queued by flush().
+    // Wait briefly and retry once — covers transient network/auth hiccups.
+    if (bufferRef.current.length > 0) {
+      console.warn(
+        `[useTelemetry] stopSession: primo flush fallito (${bufferRef.current.length} campioni). Retry tra ${STOP_RETRY_DELAY_MS}ms...`
+      );
+      await new Promise<void>((r) => setTimeout(r, STOP_RETRY_DELAY_MS));
+      await flush(true);
+    }
+
+    // If samples are still queued after retry, persist to AsyncStorage so
+    // they can be sent at the start of the next active session.
+    // Never silently drop data — we must not clear the buffer without at
+    // least attempting to save it somewhere durable.
+    if (bufferRef.current.length > 0) {
+      const sessionId = sessionIdRef.current;
+      const stranded  = [...bufferRef.current];
+      if (sessionId) {
+        await persistUnsentSamples(sessionId, stranded);
+      } else {
+        console.warn(
+          `[useTelemetry] stopSession: ${stranded.length} campioni persi — sessionId già null, impossibile persistere.`
+        );
+      }
+    }
+
     sessionIdRef.current = null;
     bufferRef.current = [];
-  }, [flush, teardown, drainAndFlushBackgroundBuffer]);
+  }, [flush, teardown, drainAndFlushBackgroundBuffer, persistUnsentSamples]);
+
+  // ── build a sample from a Location.LocationObject + current accelerometer ──
+  const buildSample = useCallback((loc: Location.LocationObject): TelemetrySample => {
+    const { latitude, longitude, altitude, speed, heading } = loc.coords;
+    const accel = accelRef.current;
+
+    const sample: TelemetrySample = {
+      ts:  loc.timestamp,
+      lat: latitude,
+      lon: longitude,
+    };
+
+    if (speed != null && speed >= 0) {
+      sample.speed_kmh = speed * 3.6;
+    }
+    if (altitude != null) {
+      sample.altitude_m = altitude;
+    }
+    if (heading != null && heading >= 0) {
+      sample.heading = heading;
+    }
+    sample.gforce_x   = accel.x;
+    sample.gforce_y   = accel.y;
+    sample.gforce_z   = accel.z;
+    sample.lean_angle = calcLeanAngle(accel.x, accel.z);
+
+    return sample;
+  }, []);
+
+  // ── accept an externally-provided location update ─────────────────────────
+  // Called by the parent (tracking.tsx) when externalGps=true so we never
+  // open a second watchPositionAsync alongside the one the screen already has.
+  const pushLocation = useCallback((loc: Location.LocationObject) => {
+    if (!activeRef.current || inBackgroundRef.current) return;
+
+    const sample = buildSample(loc);
+    bufferRef.current.push(sample);
+
+    if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) {
+      flush(true);
+    }
+  }, [buildSample, flush]);
 
   // ── start foreground location + accelerometer subscriptions ───────────────
   const startForegroundSubs = useCallback(async () => {
@@ -176,58 +279,84 @@ export function useTelemetry(isActive: boolean) {
       accelRef.current = data;
     });
 
-    // GPS at 1 Hz
-    try {
-      const sub = await Location.watchPositionAsync(
-        {
-          accuracy:         Location.Accuracy.BestForNavigation,
-          timeInterval:     SAMPLE_INTERVAL_MS,
-          distanceInterval: 0,
-        },
-        (loc) => {
-          if (!activeRef.current || inBackgroundRef.current) return;
-
-          const { latitude, longitude, altitude, speed, heading } = loc.coords;
-          const accel = accelRef.current;
-
-          const sample: TelemetrySample = {
-            ts:  loc.timestamp,
-            lat: latitude,
-            lon: longitude,
-          };
-
-          if (speed != null && speed >= 0) {
-            sample.speed_kmh = speed * 3.6;
+    // GPS at 1 Hz — skip when the caller feeds location externally to avoid
+    // the double-subscription conflict on Android (tracking.tsx already has
+    // its own watchPositionAsync open).
+    if (!externalGpsRef.current) {
+      try {
+        const sub = await Location.watchPositionAsync(
+          {
+            accuracy:         Location.Accuracy.BestForNavigation,
+            timeInterval:     SAMPLE_INTERVAL_MS,
+            distanceInterval: 0,
+          },
+          (loc) => {
+            if (!activeRef.current || inBackgroundRef.current) return;
+            const sample = buildSample(loc);
+            bufferRef.current.push(sample);
+            if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) {
+              flush(true);
+            }
           }
-          if (altitude != null) {
-            sample.altitude_m = altitude;
-          }
-          if (heading != null && heading >= 0) {
-            sample.heading = heading;
-          }
-          sample.gforce_x   = accel.x;
-          sample.gforce_y   = accel.y;
-          sample.gforce_z   = accel.z;
-          sample.lean_angle = calcLeanAngle(accel.x, accel.z);
-
-          bufferRef.current.push(sample);
-
-          // Immediate force-flush if hard cap hit
-          if (bufferRef.current.length >= FLUSH_MAX_SAMPLES) {
-            flush(true);
-          }
-        }
-      );
-      locationSubRef.current = sub;
-    } catch (err) {
-      console.warn("[useTelemetry] location subscription failed", err);
+        );
+        locationSubRef.current = sub;
+      } catch (err) {
+        console.warn("[useTelemetry] location subscription failed", err);
+      }
     }
 
     // Periodic min-gated flush
     flushTimerRef.current = setInterval(() => {
       flush(false); // respects FLUSH_MIN_SAMPLES
     }, FLUSH_INTERVAL_MS);
-  }, [flush]);
+  }, [flush, buildSample]);
+
+  // ── drain samples persisted by a previous failed stopSession flush ────────
+  // Runs at session start so no data is permanently stranded.
+  // Each key is removed after a successful (or definitively-failed) send attempt.
+  const drainUnsentStorage = useCallback(async () => {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const unsentKeys = keys.filter((k) => k.startsWith(UNSENT_PREFIX));
+      for (const key of unsentKeys) {
+        const raw = await AsyncStorage.getItem(key);
+        if (!raw) {
+          await AsyncStorage.removeItem(key);
+          continue;
+        }
+        let parsed: { sessionId: string; samples: TelemetrySample[] };
+        try {
+          parsed = JSON.parse(raw) as { sessionId: string; samples: TelemetrySample[] };
+        } catch {
+          await AsyncStorage.removeItem(key);
+          continue;
+        }
+        if (!parsed.samples || parsed.samples.length === 0) {
+          await AsyncStorage.removeItem(key);
+          continue;
+        }
+        try {
+          await apiRequest("POST", "/api/telemetry/batch", {
+            session_id:   parsed.sessionId,
+            session_type: "ride",
+            samples:      parsed.samples,
+          });
+          console.log(
+            `[useTelemetry] startSession: drained ${parsed.samples.length} campioni non inviati dalla sessione precedente (${parsed.sessionId}).`
+          );
+        } catch (e) {
+          console.warn(
+            `[useTelemetry] startSession: drain di ${parsed.samples.length} campioni fallito — dati persi definitivamente.`,
+            e
+          );
+        }
+        await AsyncStorage.removeItem(key);
+      }
+    } catch (e) {
+      // Non-fatal: a drain failure must never block session startup.
+      console.warn("[useTelemetry] drainUnsentStorage: errore (non bloccante)", e);
+    }
+  }, []);
 
   // ── start collection ───────────────────────────────────────────────────────
   const startSession = useCallback(async () => {
@@ -236,11 +365,15 @@ export function useTelemetry(isActive: boolean) {
     sessionIdRef.current = makeUUID();
     bufferRef.current    = [];
 
+    // Drain any samples persisted from a previous failed stopSession flush.
+    // Fire before startForegroundSubs so auth is more likely valid.
+    await drainUnsentStorage();
+
     // Persist session ID so the background task can tag its samples
     await AsyncStorage.setItem(BG_TELEMETRY_SESSION_KEY, sessionIdRef.current);
 
     await startForegroundSubs();
-  }, [startForegroundSubs]);
+  }, [startForegroundSubs, drainUnsentStorage]);
 
   // ── enqueue a serialized AppState transition ──────────────────────────────
   // All async handoff/resume work is chained onto transitionRef so that a
@@ -297,19 +430,35 @@ export function useTelemetry(isActive: boolean) {
   }, [enqueueTransition, startForegroundSubs, drainAndFlushBackgroundBuffer]);
 
   // ── react to isActive changes ──────────────────────────────────────────────
+  // IMPORTANT: no cleanup return here. If we returned a cleanup it would run
+  // *before* stopSession() on every isActive transition, setting activeRef=false
+  // and clearing the buffer first — causing stopSession() to immediately no-op
+  // and silently lose data. The unmount-only effect below handles component
+  // teardown independently.
   useEffect(() => {
     if (isActive) {
       startSession();
     } else {
       stopSession();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive]);
 
+  // ── unmount-only cleanup (no isActive dependency) ─────────────────────────
+  // Runs exactly once when the component that hosts this hook unmounts. If the
+  // session is still active at that point (i.e. stopSession was never awaited),
+  // do a best-effort fire-and-forget stop so subscriptions and background tasks
+  // are cleaned up. This is separate from the isActive effect so the cleanup
+  // cannot pre-empt stopSession's retry/persist logic during normal stops.
+  useEffect(() => {
     return () => {
-      // On unmount: full stop regardless of current isActive
+      if (!activeRef.current && !sessionIdRef.current) return; // already stopped
       activeRef.current    = false;
       inBackgroundRef.current = false;
       teardown();
-      // Best-effort final flush on unmount (fire-and-forget, not awaited)
+      // Best-effort final flush on unmount (fire-and-forget, not awaited).
+      // We cannot await here (cleanup functions are sync), so this may not
+      // complete the retry/persist path — accepted trade-off for unmount edge case.
       if (sessionIdRef.current && bufferRef.current.length > 0) {
         flush(true).catch(() => {});
       }
@@ -319,7 +468,7 @@ export function useTelemetry(isActive: boolean) {
       bufferRef.current = [];
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isActive]);
+  }, []); // intentionally empty — unmount only, refs are always current
 
   // ── serialized AppState handler ────────────────────────────────────────────
   // Only "background" triggers the background task handoff.
@@ -343,5 +492,5 @@ export function useTelemetry(isActive: boolean) {
     return () => sub.remove();
   }, [handoffToBackground, resumeFromBackground]);
 
-  return { sessionId: sessionIdRef.current };
+  return { sessionId: sessionIdRef.current, pushLocation };
 }

@@ -81,7 +81,9 @@ export default function TrackingScreen() {
   const pendingPointsRef = useRef<GpsPoint[]>([]);
   const lastSendRef = useRef<number>(0);
 
-  useTelemetry(isTracking);
+  const { pushLocation: pushTelemetryLocation } = useTelemetry(isTracking, true);
+  const pushTelemetryLocationRef = useRef(pushTelemetryLocation);
+  useEffect(() => { pushTelemetryLocationRef.current = pushTelemetryLocation; }, [pushTelemetryLocation]);
 
   const startMutation = useMutation({
     mutationFn: async (freq: number) => {
@@ -175,6 +177,10 @@ export default function TrackingScreen() {
           distanceInterval: 1,
         },
         (loc) => {
+          // Forward every GPS fix to the telemetry hook so it can build
+          // accelerometer-enriched samples without opening a second subscription.
+          pushTelemetryLocationRef.current(loc);
+
           const speedMs = loc.coords.speed ?? 0;
           const speedKmh = Math.max(0, speedMs * 3.6);
           const alt = loc.coords.altitude ?? 0;
