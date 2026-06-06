@@ -90,6 +90,7 @@ export function ThinkCentreCard() {
     },
     refetchInterval: 30_000,
     staleTime: 20_000,
+    refetchOnMount: true,
   });
 
   const headerColor = data ? OVERALL_COLOR[data.overall] : "#6b7280";

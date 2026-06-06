@@ -94,6 +94,7 @@ export function ServerEfficiencyCard() {
     },
     refetchInterval: 5_000,
     staleTime: 4_000,
+    refetchOnMount: true,
   });
 
   const { data: logs } = useQuery<ServerLogs>({
@@ -109,6 +110,7 @@ export function ServerEfficiencyCard() {
     },
     refetchInterval: 15_000,
     staleTime: 10_000,
+    refetchOnMount: true,
   });
 
   const loadPerCore = data?.cpu.loadPerCore ?? 0;

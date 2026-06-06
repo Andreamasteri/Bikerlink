@@ -56,6 +56,7 @@ export function ThinkCentreEfficiencyCard() {
     },
     refetchInterval: 10_000,
     staleTime: 8_000,
+    refetchOnMount: true,
   });
 
   const online = data?.online === true;

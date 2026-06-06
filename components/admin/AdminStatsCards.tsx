@@ -55,6 +55,7 @@ export function GraphHopperCard() {
       return res.json();
     },
     staleTime: 60_000,
+    refetchOnMount: true,
   });
 
   const modeLabel: Record<string, string> = {
@@ -153,6 +154,7 @@ export function TelemetryCard() {
     },
     staleTime: 60_000,
     enabled: !collapsed,
+    refetchOnMount: true,
   });
 
   function formatDate(iso: string | null): string {

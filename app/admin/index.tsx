@@ -39,6 +39,31 @@ type AdminGroup = AdminGroupHeader & {
 
 const OPEN_BY_DEFAULT = new Set<string>();
 
+/*
+ * SCELTA PROGETTUALE — Refetch al rimount del pannello admin
+ *
+ * Le card del pannello (ServerEfficiencyCard, ThinkCentreEfficiencyCard,
+ * ThinkCentreCard, GraphHopperCard, TelemetryCard) usano React Query con
+ * `refetchOnMount: true` (esplicito) e `refetchInterval` per i polling continui.
+ *
+ * Comportamento al rimount (es. tab switch o navigazione avanti/indietro):
+ * - Se i dati in cache sono ancora fresh (< staleTime), React Query li mostra
+ *   immediatamente senza fare una nuova richiesta di rete → esperienza fluida.
+ * - Se i dati sono stale (>= staleTime), React Query avvia automaticamente un
+ *   refetch in background al momento del rimount → dati sempre aggiornati.
+ *
+ * NON è stato implementato un pattern di caricamento sequenziale (card1Done…
+ * card4Done / settledRef) perché:
+ * 1. Ogni card interroga un endpoint indipendente — il parallelismo è corretto.
+ * 2. React Query gestisce il ciclo stale/refetch nativamente senza stato manuale.
+ * 3. Un reset manuale dei flag al rimount introdurrebbe complessità ingiustificata
+ *    e potrebbe causare flash di loading superflui su dati ancora freschi.
+ *
+ * Se in futuro si volesse caricare le card in sequenza (es. per ridurre il
+ * carico sul server al mount), si può usare `enabled` condizionale su ciascuna
+ * query, pilotato dallo stato `isSuccess` della query precedente.
+ */
+
 const adminGroups: AdminGroup[] = [
   {
     title: "Utenti",
