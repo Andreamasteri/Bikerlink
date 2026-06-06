@@ -1,5 +1,5 @@
 import React from "react";
-import { Text, Pressable, StyleSheet, ActivityIndicator } from "react-native";
+import { Text, Pressable, StyleSheet, ActivityIndicator, View } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
 import type { ThemeColors } from "@/constants/colors";
@@ -11,6 +11,7 @@ interface ActionButtonsSectionProps {
   routeResult: any;
   handleSave: () => void;
   saveMutationPending: boolean;
+  routeError?: string | null;
 }
 
 export const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
@@ -19,6 +20,7 @@ export const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
   routeResult,
   handleSave,
   saveMutationPending,
+  routeError,
 }) => {
   const colors = useColors();
   const s = styles(colors);
@@ -37,6 +39,17 @@ export const ActionButtonsSection: React.FC<ActionButtonsSectionProps> = ({
         )}
         <Text style={s.primaryBtnText}>{calculating ? "Calcolo in corso..." : "Calcola percorso"}</Text>
       </Pressable>
+
+      {!!routeError && !calculating && (
+        <View style={s.errorCard}>
+          <Ionicons name="warning-outline" size={16} color="#ef4444" />
+          <Text style={s.errorText} numberOfLines={3}>{routeError}</Text>
+          <Pressable onPress={handleCalculate} style={s.retryBtn} hitSlop={8}>
+            <Ionicons name="refresh-outline" size={15} color="#ef4444" />
+            <Text style={s.retryText}>Riprova</Text>
+          </Pressable>
+        </View>
+      )}
 
       {routeResult && (
         <Pressable
@@ -69,6 +82,38 @@ const styles = (colors: ThemeColors) =>
       marginBottom: 10,
     },
     primaryBtnText: { fontFamily: "Inter_700Bold", fontSize: 15, color: "#000" },
+    errorCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: "#ef444418",
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: "#ef444440",
+      padding: 12,
+      marginBottom: 10,
+    },
+    errorText: {
+      fontFamily: "Inter_400Regular",
+      fontSize: 13,
+      color: "#ef4444",
+      flex: 1,
+    },
+    retryBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#ef444460",
+    },
+    retryText: {
+      fontFamily: "Inter_600SemiBold",
+      fontSize: 12,
+      color: "#ef4444",
+    },
     saveBtn: {
       flexDirection: "row",
       alignItems: "center",

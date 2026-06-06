@@ -32,22 +32,6 @@ const router = Router();
 
 // ─── Routing helpers ──────────────────────────────────────────────────────────
 
-function buildFallbackRoute(waypoints: Array<{ lat: number; lng: number }>) {
-  let totalDist = 0;
-  for (let i = 1; i < waypoints.length; i++) {
-    totalDist += haversineKm(waypoints[i-1].lat, waypoints[i-1].lng, waypoints[i].lat, waypoints[i].lng);
-  }
-  const rawPoints = waypoints.map((wp) => ({ lat: wp.lat, lng: wp.lng }));
-  return {
-    encoded: null as string | null,
-    rawPoints,
-    distanceKm: Math.round(totalDist * 10) / 10,
-    durationMinutes: Math.round(totalDist / 70 * 60),
-    bikerScore: computeBikerScoreFromPoints(rawPoints),
-    approximate: true,
-    warning: "routing_unavailable" as const,
-  };
-}
 
 const AI_SYSTEM_PROMPT = `Sei un assistente per pianificazione giri in moto.
 Analizza la richiesta e restituisci SOLO un oggetto JSON con:
@@ -77,7 +61,7 @@ const routeSchema = z.object({
     near: z.string(),
     query: z.string(),
     category: z.string(),
-  })).optional().nullable(),
+  })).nullable(),
   style: z.enum(["curvy", "balanced", "fast"]),
   isRoundTrip: z.boolean(),
   isMultiDay: z.boolean(),
@@ -226,7 +210,7 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
     });
     clearTimeout(timeout);
     req.off("close", onClose);
-    console.info(`[AI parse] provider usato: ${provider_used}`);
+    console.info(`[AI parse] provider usato: ${provider_used} | poiStops raw: ${JSON.stringify(object.poiStops)}`);
 
     // ── Risoluzione automatica poiStops ──────────────────────────────────────
     const rawPoiStops = object.poiStops ?? [];
@@ -241,8 +225,10 @@ router.post("/ai-parse", async (req: Request, res: Response) => {
               const geoResults = await geocode(stop.near);
               const geo = geoResults[0];
               const options = geo ? await searchPoi(stop.query, geo.lat, geo.lng, 30) : [];
+              console.info(`[AI parse] poiStop "${stop.query}" near "${stop.near}" → ${options.length} risultati Overpass`);
               return { ...stop, options };
-            } catch {
+            } catch (stopErr) {
+              console.warn(`[AI parse] poiStop "${stop.query}" near "${stop.near}" — errore:`, (stopErr as Error)?.message ?? stopErr);
               return { ...stop, options: [] };
             }
           })
@@ -534,8 +520,13 @@ router.post("/calculate", async (req: Request, res: Response) => {
       weatherWarning,
     });
   } catch (err: unknown) {
-    console.error("[routing] error:", (err as Error)?.message ?? err);
-    return res.json(buildFallbackRoute(effectiveWaypoints));
+    const errMsg = (err as Error)?.message ?? "Errore di routing";
+    console.error("[routing] error:", errMsg);
+    const isWaypointError = errMsg.includes("HTTP 400") || errMsg.toLowerCase().includes("cannot find point") || errMsg.toLowerCase().includes("point 0 is out");
+    if (isWaypointError) {
+      return sendError(res, 422, "Waypoint non raggiungibili: verifica i punti selezionati sulla mappa");
+    }
+    return sendError(res, 503, "Server di routing non disponibile al momento, riprova tra qualche secondo");
   }
 });
 

@@ -59,6 +59,7 @@ export function useGiriCreateState(language?: string) {
 
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [calculating, setCalculating] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
   const [dismissedWarnings, setDismissedWarnings] = useState<Set<string>>(new Set());
 
   const [weatherPreview, setWeatherPreview] = useState<WeatherWaypoint[] | null>(null);
@@ -170,7 +171,8 @@ export function useGiriCreateState(language?: string) {
         isMultiDay: result.isMultiDay ?? false,
         daysEstimate: result.daysEstimate ?? 2,
         avoidHighways: result.avoidHighways ?? false,
-        items: initialItems
+        items: initialItems,
+        poiStops: Array.isArray(result.poiStops) ? result.poiStops : null,
       };
       if (result.provider_used) setAiProviderUsed(result.provider_used);
       setAiPreview(preview);
@@ -394,6 +396,7 @@ export function useGiriCreateState(language?: string) {
     }
     const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
     setCalculating(true);
+    setRouteError(null);
     setWeatherPreview(null);
     try {
       const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language);
@@ -411,7 +414,7 @@ export function useGiriCreateState(language?: string) {
       }
       autoLoadWeather(toCalc);
     } catch (err: unknown) {
-      Alert.alert("Errore", (err instanceof Error ? err.message : null) ?? "Calcolo percorso fallito");
+      setRouteError((err instanceof Error ? err.message : null) ?? "Calcolo percorso fallito");
     } finally { setCalculating(false); }
   };
 
@@ -512,6 +515,7 @@ export function useGiriCreateState(language?: string) {
     handleWpInput, selectSuggestion, addWaypoint, removeWaypoint,
     handleCalculate, handleSave, saveMutationPending: saveMutation.isPending,
     handleMapTap, aiProviderUsed,
+    routeError, setRouteError,
     resolvedPoiStops, selectPoiOption, clearPoiOption,
   };
 }

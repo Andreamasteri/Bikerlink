@@ -63,7 +63,8 @@ void _isRoutingEnabled().then((enabled) => {
   }
 });
 
-const DEFAULT_TIMEOUT_MS = 30_000;
+const SELF_HOSTED_TIMEOUT_MS = 9_000;
+const CLOUD_TIMEOUT_MS = 30_000;
 
 function buildHeaders(useCloud: boolean): Record<string, string> {
   const h: Record<string, string> = { "Content-Type": "application/json" };
@@ -82,8 +83,9 @@ function buildUrl(path: string, useCloud: boolean): string {
 }
 
 async function ghFetch(path: string, init: RequestInit, useCloud = false): Promise<Response> {
+  const timeoutMs = useCloud ? CLOUD_TIMEOUT_MS : SELF_HOSTED_TIMEOUT_MS;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(buildUrl(path, useCloud), {
       ...init,
@@ -335,30 +337,47 @@ export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
     return doFetch(true);
   }
 
-  const start = Date.now();
-  try {
+  // Self-hosted: tenta, poi 1 retry con breve backoff, poi fallback Cloud.
+  const attemptSelf = async (): Promise<RouteResult> => {
+    const t0 = Date.now();
     const out = await doFetch(false);
-    recordSelfHostSuccess(Date.now() - start);
+    recordSelfHostSuccess(Date.now() - t0);
     return out;
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (canFallbackToCloud && isSelfHostDown(err)) {
-      console.warn(`[GraphHopper] Self-hosted DOWN (${msg}) — fallback automatico alla Cloud API (profilo car).`);
-      try {
-        const out = await doFetch(true);
-        recordSelfHostFailure(msg, true);
-        return out;
-      } catch (cloudErr: unknown) {
-        const cloudMsg = cloudErr instanceof Error ? cloudErr.message : String(cloudErr);
-        recordSelfHostFailure(`self-host: ${msg} | cloud: ${cloudMsg}`, false);
-        throw new Error(`GraphHopper non disponibile (self-hosted offline e fallback Cloud fallito): ${cloudMsg.slice(0, 200)}`);
+  };
+
+  try {
+    return await attemptSelf();
+  } catch (firstErr: unknown) {
+    const firstMsg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+    if (!isSelfHostDown(firstErr)) {
+      recordSelfHostFailure(firstMsg, false);
+      throw firstErr instanceof Error ? firstErr : new Error(firstMsg);
+    }
+    // Errore transitorio: 1 retry dopo 400ms prima di scalare al cloud.
+    console.warn(`[GraphHopper] Self-hosted: errore transitorio (${firstMsg}), retry in 400ms…`);
+    await new Promise<void>((resolve) => setTimeout(resolve, 400));
+    try {
+      return await attemptSelf();
+    } catch (retryErr: unknown) {
+      const msg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+      if (canFallbackToCloud && isSelfHostDown(retryErr)) {
+        console.warn(`[GraphHopper] Self-hosted ancora offline dopo retry (${msg}) — fallback Cloud API (profilo car).`);
+        try {
+          const out = await doFetch(true);
+          recordSelfHostFailure(msg, true);
+          return out;
+        } catch (cloudErr: unknown) {
+          const cloudMsg = cloudErr instanceof Error ? cloudErr.message : String(cloudErr);
+          recordSelfHostFailure(`self-host: ${msg} | cloud: ${cloudMsg}`, false);
+          throw new Error(`GraphHopper non disponibile (self-hosted offline e fallback Cloud fallito): ${cloudMsg.slice(0, 200)}`);
+        }
       }
+      recordSelfHostFailure(msg, false);
+      if (isSelfHostDown(retryErr)) {
+        throw new Error(`Server di routing self-hosted offline e nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY). Dettaglio: ${msg.slice(0, 200)}`);
+      }
+      throw retryErr instanceof Error ? retryErr : new Error(msg);
     }
-    recordSelfHostFailure(msg, false);
-    if (isSelfHostDown(err)) {
-      throw new Error(`Server di routing self-hosted offline e nessun fallback Cloud configurato (GRAPHHOPPER_API_KEY). Dettaglio: ${msg.slice(0, 200)}`);
-    }
-    throw err instanceof Error ? err : new Error(msg);
   }
 }
 

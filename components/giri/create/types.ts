@@ -39,6 +39,12 @@ export interface AiPreviewItem {
   resolved: boolean;
 }
 
+export interface AiPoiStop {
+  near: string;
+  query: string;
+  category: string;
+}
+
 export interface AiPreviewState {
   title: string;
   style: Style;
@@ -48,6 +54,7 @@ export interface AiPreviewState {
   daysEstimate: number;
   avoidHighways: boolean;
   items: AiPreviewItem[];
+  poiStops?: AiPoiStop[] | null;
 }
 
 export const STYLE_LEVELS: { key: Style; label: string; shortLabel: string }[] = [

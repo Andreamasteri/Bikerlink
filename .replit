@@ -175,8 +175,4 @@ SMOKE_SEED_PASSWORD = "SmokeEQ_or56xnLYexcAg"
 
 [[ports]]
 localPort = 5000
-externalPort = 5000
-
-[[ports]]
-localPort = 8081
 externalPort = 80

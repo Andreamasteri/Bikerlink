@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect } from "react";
-import { View, ScrollView } from "react-native";
+import { View, ScrollView, Text } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -64,6 +65,7 @@ export default function GiriCreateScreen() {
     fuelLevel, setFuelLevel, waypoints,
     wpInputs, wpSuggestions, wpLoading,
     routeResult, setRouteResult, calculating, setCalculating,
+    routeError,
     dismissedWarnings, setDismissedWarnings,
     weatherPreview, weatherLoading,
     lastFittedWaypointSig, bikerScoreAnim,
@@ -188,18 +190,27 @@ export default function GiriCreateScreen() {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pill role helpers cast for prop compatibility
               pillRoleColor={pillRoleColor as any} pillRoleLabel={pillRoleLabel as any}
             />
-            {resolvedPoiStops.length > 0 && (
-              <View style={{ marginTop: 8 }}>
-                {resolvedPoiStops.map((stop, idx) => (
+            <View style={{ marginTop: 8 }}>
+              {resolvedPoiStops.length > 0 ? (
+                resolvedPoiStops.map((stop, idx) => (
                   <PoiStopSelector
                     key={`${stop.near}-${stop.query}-${idx}`}
                     stop={stop}
                     onSelectOption={(opt) => selectPoiOption(idx, opt)}
                     onClearSelection={() => clearPoiOption(idx)}
                   />
-                ))}
-              </View>
-            )}
+                ))
+              ) : (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, padding: 12, backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+                  <Ionicons name="information-circle-outline" size={16} color={colors.textSecondary} />
+                  <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: colors.textSecondary, flex: 1 }}>
+                    {aiPreview.poiStops && aiPreview.poiStops.length > 0
+                      ? "L'AI ha suggerito delle tappe ma non è stato possibile localizzarle sulla mappa"
+                      : "Nessun suggerimento AI generato per questo percorso"}
+                  </Text>
+                </View>
+              )}
+            </View>
           </>
         )}
 
@@ -248,7 +259,7 @@ export default function GiriCreateScreen() {
         <WeatherPreviewBanner weatherLoading={weatherLoading} weatherPreview={weatherPreview} />
         {weatherPreview && weatherPreview.length > 0 && <WeatherPreviewRow weather={weatherPreview} colors={colors} />}
 
-        <ActionButtonsSection calculating={calculating} handleCalculate={handleCalculate} routeResult={routeResult} handleSave={handleSave} saveMutationPending={saveMutationPending} />
+        <ActionButtonsSection calculating={calculating} handleCalculate={handleCalculate} routeResult={routeResult} handleSave={handleSave} saveMutationPending={saveMutationPending} routeError={routeError} />
 
         <RouteResultSection
           routeResult={routeResult} isRoundTrip={isRoundTrip} isMultiDay={isMultiDay}
