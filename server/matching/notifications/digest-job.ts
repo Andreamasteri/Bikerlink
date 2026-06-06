@@ -6,6 +6,7 @@ import { inArray } from "drizzle-orm";
 import { incrementDigestPushCount, getIndividualPushCount, getDailyBudget, incrementIndividualPushCount } from "./budget";
 import { sendMatchPushNotifications } from "../../push-notifications";
 import { listPendingDeliveries, recordDelivery } from "./deliveries";
+import type { MatchTable } from "./dispatcher-types";
 
 const TIMEZONE = "Europe/Rome";
 
@@ -54,6 +55,58 @@ function aggregate(
 }
 
 /**
+ * Fetches the match name (moto brand+model or proposal title) for a given
+ * match row. Returns undefined if the data is unavailable or the query fails.
+ */
+async function fetchMatchName(table: MatchTable, matchId: string): Promise<string | undefined> {
+  try {
+    if (table === "biker_zavorrina_matches") {
+      const result = await db.execute<{ brand: string | null; model: string | null }>(sql`
+        SELECT um.brand, um.model
+          FROM biker_zavorrina_matches bzm
+          JOIN user_motorcycles um ON um.id = bzm.biker_motorcycle_id
+         WHERE bzm.id = ${matchId}
+         LIMIT 1
+      `);
+      const row = result.rows[0];
+      if (row) {
+        const parts = [row.brand, row.model].filter(Boolean);
+        return parts.length > 0 ? parts.join(" ") : undefined;
+      }
+    } else if (table === "biker_biker_matches") {
+      const result = await db.execute<{ motorcycle_brand: string | null }>(sql`
+        SELECT motorcycle_brand FROM biker_biker_matches WHERE id = ${matchId} LIMIT 1
+      `);
+      const brand = result.rows[0]?.motorcycle_brand;
+      return brand ?? undefined;
+    } else if (table === "proposal_matches") {
+      const result = await db.execute<{ title: string | null }>(sql`
+        SELECT p.title
+          FROM proposal_matches pm
+          JOIN proposals p ON p.id = pm.proposal_id_1
+         WHERE pm.id = ${matchId}
+         LIMIT 1
+      `);
+      const title = result.rows[0]?.title;
+      return title ?? undefined;
+    } else if (table === "proposal_profile_matches") {
+      const result = await db.execute<{ title: string | null }>(sql`
+        SELECT p.title
+          FROM proposal_profile_matches ppm
+          JOIN proposals p ON p.id = ppm.proposal_id
+         WHERE ppm.id = ${matchId}
+         LIMIT 1
+      `);
+      const title = result.rows[0]?.title;
+      return title ?? undefined;
+    }
+  } catch (err) {
+    console.warn("[NotifDigest] fetchMatchName error (non-fatal):", err);
+  }
+  return undefined;
+}
+
+/**
  * Aggregate pending normal/low matches per-user and send a single digest push.
  * Records per-recipient delivery so each user only ever receives one push for
  * a given match — counterpart users may still get their own delivery later.
@@ -71,11 +124,12 @@ export async function runDigestPush(): Promise<{ usersNotified: number; matchesA
     const deliverable = perUser.filter((u) => active.has(u.userId) && !topOnly.has(u.userId));
     if (deliverable.length === 0) return { usersNotified: 0, matchesAggregated: 0 };
 
-    const targetIds = deliverable.map((u) => u.userId);
-    sendMatchPushNotifications(targetIds);
-
     let aggregated = 0;
     for (const u of deliverable) {
+      const firstRow = u.rows[0];
+      const matchName = firstRow ? await fetchMatchName(firstRow.table, firstRow.matchId) : undefined;
+      sendMatchPushNotifications([u.userId], { matchName });
+
       aggregated += u.count;
       await incrementDigestPushCount(u.userId);
       for (const r of u.rows) {
@@ -108,7 +162,7 @@ export async function runHighFlush(): Promise<{ pushed: number; demoted: number 
     const { active, topOnly } = await loadUserPushFilters(perUser.map((u) => u.userId));
     void topOnly; // high is still top-tier; topMatchesOnly does NOT suppress it
 
-    const pushedUsers: string[] = [];
+    let pushedCount = 0;
     const demotedRows = new Set<string>();
 
     for (const u of perUser) {
@@ -121,16 +175,16 @@ export async function runHighFlush(): Promise<{ pushed: number; demoted: number 
       if (used >= budget) {
         for (const r of u.rows) demotedRows.add(`${r.table}::${r.matchId}`);
       } else {
-        pushedUsers.push(u.userId);
+        const firstRow = u.rows[0];
+        const matchName = firstRow ? await fetchMatchName(firstRow.table, firstRow.matchId) : undefined;
+        sendMatchPushNotifications([u.userId], { matchName });
+
+        pushedCount += 1;
         await incrementIndividualPushCount(u.userId, 1);
         for (const r of u.rows) {
           await recordDelivery(r.table, r.matchId, u.userId, "push");
         }
       }
-    }
-
-    if (pushedUsers.length > 0) {
-      sendMatchPushNotifications(pushedUsers);
     }
 
     // Demote `high` rows that still have any undelivered participant after
@@ -157,8 +211,8 @@ export async function runHighFlush(): Promise<{ pushed: number; demoted: number 
       }
     }
 
-    console.log(`[NotifHighFlush] pushed=${pushedUsers.length}, demoted=${demotedCount}`);
-    return { pushed: pushedUsers.length, demoted: demotedCount };
+    console.log(`[NotifHighFlush] pushed=${pushedCount}, demoted=${demotedCount}`);
+    return { pushed: pushedCount, demoted: demotedCount };
   } catch (err) {
     console.error("[NotifHighFlush] Errore:", err);
     return { pushed: 0, demoted: 0 };
