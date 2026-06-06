@@ -312,6 +312,22 @@ $(bold "Cloudflare Tunnel")
   sudo cloudflared service install
   sudo systemctl enable --now cloudflared
 
+$(bold "Log auth-failure (401 token mismatch)")
+  Ogni servizio scrive i 401 da token errato in un log dedicato separato dall'access log:
+    /var/log/nginx/gh-auth-fail.log
+    /var/log/nginx/valhalla-auth-fail.log
+    /var/log/nginx/ollama-auth-fail.log
+    /var/log/nginx/whisper-auth-fail.log
+    /var/log/nginx/nominatim-auth-fail.log
+  Formato: timestamp | IP | request | header custom mascherato (4 char + ***) | Authorization mascherata
+  Lettura 401 in tempo reale (es. GraphHopper):
+    sudo tail -f /var/log/nginx/gh-auth-fail.log
+  Come interpretare le righe:
+    header=XXXX*** → token presente ma sbagliato (i 4 char aiutano a confrontare con .env.local)
+    header=-        → header assente: il client non ha inviato quel campo
+    authorization=Bearer XXXX*** → il client ha usato Bearer invece dell'header custom
+  Nessuna riga = nessun 401 → il token è corretto (o il servizio non è stato contattato).
+
 $(bold "Nota")
   $(if [[ "$GENERATED_ANY" == "1" ]]; then printf 'Token generati e salvati in %s (riusati nei config). ' "$ENV_LOCAL_FILE"; fi)I file contengono i token in chiaro (chmod 600). NON committarli.
   La cartella generated/ è ignorata da git.

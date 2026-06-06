@@ -125,6 +125,41 @@ echo
 echo "  Fingerprint uguali  → il token è allineato: il 401 ha un'altra causa."
 echo "  Fingerprint diversi → i token sono disallineati: rigenera e riallinea."
 
+# ── Log nginx auth-failure ────────────────────────────────────────────────────
+section "Log nginx 401 — token mismatch"
+
+cat <<'EOF'
+  I log dedicati ai 401 mostrano il token ricevuto mascherato (primi 4 char + ***)
+  e permettono di distinguere subito tra:
+    - Token corretto   → nessuna riga nel log auth-fail (nessun 401 emesso)
+    - Token sbagliato  → riga con header=XXXX*** (4 char visibili per confronto)
+    - Header assente   → riga con header=- (il client non ha inviato quel campo)
+    - Nginx down       → nessun log disponibile / connessione rifiutata
+
+  File di log (uno per servizio):
+    /var/log/nginx/gh-auth-fail.log
+    /var/log/nginx/valhalla-auth-fail.log
+    /var/log/nginx/ollama-auth-fail.log
+    /var/log/nginx/whisper-auth-fail.log
+    /var/log/nginx/nominatim-auth-fail.log
+
+  Lettura rapida — ultimi 20 eventi 401 per tutti i servizi:
+    sudo tail -n 20 /var/log/nginx/*-auth-fail.log
+
+  Monitoraggio in tempo reale (es. Ollama):
+    sudo tail -f /var/log/nginx/ollama-auth-fail.log
+
+  Conteggio 401 delle ultime 24 ore per servizio:
+    for f in /var/log/nginx/*-auth-fail.log; do
+      svc="$(basename "$f" -auth-fail.log)"
+      count="$(grep -c "$(date -u +%Y-%m-%dT)" "$f" 2>/dev/null || echo 0)"
+      printf "  %-12s %s eventi oggi\n" "$svc" "$count"
+    done
+
+  Formato riga: timestamp | IP | "METHOD /path HTTP/x" | header-servizio=XXXX*** | authorization=Bearer XXXX***
+  Se authorization="-" → il client non ha inviato header Authorization (solo header custom assente/sbagliato).
+EOF
+
 # ── Riallineamento ────────────────────────────────────────────────────────────
 section "Riallineamento (se i fingerprint non coincidono)"
 
