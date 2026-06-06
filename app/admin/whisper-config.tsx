@@ -21,6 +21,7 @@ interface SttProviderStatus {
   id: SttProviderId;
   label: string;
   configured: boolean;
+  tokenConfigured?: boolean;
   inChain: boolean;
   position: number | null;
   envKey: string | null;
@@ -355,6 +356,16 @@ export default function WhisperConfigScreen() {
                     </View>
                   )}
                 </View>
+
+                {status.id === "home" && status.configured && status.tokenConfigured === false && (
+                  <View style={styles.tokenWarnBanner}>
+                    <MaterialCommunityIcons name="key-alert-outline" size={14} color="#F59E0B" />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.tokenWarnText}>Token non impostato</Text>
+                      <Text style={styles.tokenWarnNote}>Se nginx richiede autenticazione, imposta WHISPER_TOKEN</Text>
+                    </View>
+                  </View>
+                )}
               </View>
 
               <View style={styles.cardActions}>

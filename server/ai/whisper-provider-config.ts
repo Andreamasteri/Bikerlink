@@ -65,6 +65,7 @@ export interface SttProviderStatus {
   id: SttProviderId;
   label: string;
   configured: boolean;
+  tokenConfigured?: boolean;
   inChain: boolean;
   position: number | null;
   envKey: string | null;
@@ -88,6 +89,7 @@ export async function getSttProviderStatusList(): Promise<{
       id: "home",
       label: "Server di casa (Whisper)",
       configured: homeConfigured,
+      tokenConfigured: Boolean(process.env.WHISPER_TOKEN),
       inChain: chain.includes("home"),
       position: chain.includes("home") ? chain.indexOf("home") + 1 : null,
       envKey: "WHISPER_URL",

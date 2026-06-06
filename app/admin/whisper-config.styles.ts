@@ -62,4 +62,7 @@ export const styles = StyleSheet.create({
   resetBtnText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.textSecondary },
   savingBanner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 },
   savingText: { fontFamily: "Inter_400Regular", fontSize: 13, color: Colors.textSecondary },
+  tokenWarnBanner: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 6, backgroundColor: "#F59E0B18", borderWidth: 1, borderColor: "#F59E0B44", borderRadius: 8, padding: 8 },
+  tokenWarnText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#F59E0B" },
+  tokenWarnNote: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#F59E0B", opacity: 0.85, marginTop: 1 },
 });
