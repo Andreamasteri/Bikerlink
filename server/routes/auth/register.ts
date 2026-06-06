@@ -169,6 +169,7 @@ router.post("/register", registerLimiter, async (req: Request, res: Response) =>
       country: data.country,
       eulaAccepted: true,
       privacyAccepted: true,
+      marketingConsent: data.marketingAccepted ?? false,
       consentAcceptedAt: new Date(),
       invitationCode: data.invitationCode,
       isPrimal,

@@ -66,8 +66,9 @@ export default function RegisterScreen() {
   const [showCountries, setShowCountries] = useState(false);
   const [region, setRegion] = useState("");
   const [showRegions, setShowRegions] = useState(false);
-  const [eulaAccepted, setEulaAccepted] = useState(false);
-  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [eulaAccepted, setEulaAccepted] = useState(true);
+  const [privacyAccepted, setPrivacyAccepted] = useState(true);
+  const [marketingAccepted, setMarketingAccepted] = useState(true);
 
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [privacyModalSeen, setPrivacyModalSeen] = useState(false);
@@ -220,6 +221,7 @@ export default function RegisterScreen() {
       country: country || PHONE_PREFIX_TO_COUNTRY[phonePrefix] || "IT",
       region: region || undefined,
       invitationCode: inviteCode.trim() ? inviteCode.trim().toUpperCase() : undefined,
+      marketingAccepted,
     };
 
     registerMutation.mutate(data, {
@@ -339,6 +341,8 @@ export default function RegisterScreen() {
             setEulaAccepted={setEulaAccepted}
             privacyAccepted={privacyAccepted}
             setPrivacyAccepted={setPrivacyAccepted}
+            marketingAccepted={marketingAccepted}
+            setMarketingAccepted={setMarketingAccepted}
             eulaTexts={EULA_TEXTS}
           />
         )}

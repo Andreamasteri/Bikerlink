@@ -46,6 +46,7 @@ export const users = pgTable("users", {
   emailVerified: boolean("email_verified").notNull().default(false),
   eulaAccepted: boolean("eula_accepted").notNull().default(false),
   privacyAccepted: boolean("privacy_accepted").notNull().default(false),
+  marketingConsent: boolean("marketing_consent").notNull().default(false),
   consentAcceptedAt: timestamp("consent_accepted_at"),
   deletionRequestedAt: timestamp("deletion_requested_at"),
   deletionScheduledFor: timestamp("deletion_scheduled_for"),

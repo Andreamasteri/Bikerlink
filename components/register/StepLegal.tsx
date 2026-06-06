@@ -19,6 +19,8 @@ interface StepLegalProps {
   setEulaAccepted: (v: boolean) => void;
   privacyAccepted: boolean;
   setPrivacyAccepted: (v: boolean) => void;
+  marketingAccepted: boolean;
+  setMarketingAccepted: (v: boolean) => void;
   eulaTexts: Record<AppLanguage, string>;
 }
 
@@ -27,6 +29,8 @@ export const StepLegal: React.FC<StepLegalProps> = ({
   setEulaAccepted,
   privacyAccepted,
   setPrivacyAccepted,
+  marketingAccepted,
+  setMarketingAccepted,
   eulaTexts,
 }) => {
   const router = useRouter();
@@ -76,6 +80,17 @@ export const StepLegal: React.FC<StepLegalProps> = ({
           </TouchableOpacity>
         </View>
       </View>
+
+      <TouchableOpacity
+        style={styles.checkboxRow}
+        onPress={() => setMarketingAccepted(!marketingAccepted)}
+        testID="marketing-checkbox"
+      >
+        <View style={[styles.checkbox, marketingAccepted && styles.checkboxChecked]}>
+          {marketingAccepted && <Ionicons name="checkmark" size={16} color={Colors.background} />}
+        </View>
+        <Text style={styles.checkboxLabel}>{t("register.step4.acceptMarketing")}</Text>
+      </TouchableOpacity>
     </View>
   );
 };

@@ -32,6 +32,7 @@ const es: Record<string, string> = {
   "register.step4.acceptPrivacy": "He leído y acepto la",
   "register.step4.privacyLinkLabel": "Política de privacidad",
   "register.step4.privacyRequired": "Debes aceptar la Política de privacidad",
+  "register.step4.acceptMarketing": "Acepto recibir actualizaciones por correo electrónico de BikerLink",
   "register.step4.tosLink": "Leer los Términos de Servicio completos →",
   "welcome.tosLink": "Términos de Servicio",
   "welcome.privacyLink": "Política de privacidad",

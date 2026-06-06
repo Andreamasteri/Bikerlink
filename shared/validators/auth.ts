@@ -19,6 +19,7 @@ export const registerSchema = z.object({
   eulaAccepted: z.literal(true, {
     message: "Devi accettare i termini di utilizzo",
   }),
+  marketingAccepted: z.boolean().optional().default(false),
   invitationCode: z.string().optional(),
 });
 export type RegisterInput = z.infer<typeof registerSchema>;
