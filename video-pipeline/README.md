@@ -1,8 +1,8 @@
 # BikerLink — Pipeline Video Promozionali
 
-Ambiente Linux nativo su SSD dedicato per generare video promozionali BikerLink con GPU AMD RX 580 tramite ROCm + ComfyUI.
+Ambiente Linux nativo su SSD dedicato per generare video promozionali BikerLink con GPU NVIDIA GTX 1070 tramite CUDA + ComfyUI.
 
-**Hardware target:** Intel i5-14400 · AMD RX 580 8 GB VRAM · SSD 120 GB · Ubuntu 22.04 LTS
+**Hardware target:** Intel i5-14400 · NVIDIA GTX 1070 8 GB VRAM · SSD 120 GB · Ubuntu 24.04 LTS
 
 ---
 
@@ -21,13 +21,27 @@ video-pipeline/
 
 ---
 
+## Prerequisiti hardware e software
+
+| Componente | Requisito |
+|------------|-----------|
+| CPU | Intel i5-14400 (o superiore) |
+| GPU | NVIDIA GTX 1070 8 GB VRAM (CUDA 11.x / 12.x) |
+| RAM | 16 GB consigliati |
+| Storage | SSD dedicato da 120 GB |
+| OS | Ubuntu 24.04 LTS (kernel 6.8+) |
+
+> La GTX 1070 è pienamente supportata da CUDA 12.x — nessun workaround necessario.
+
+---
+
 ## Primo avvio — Guida rapida
 
 ### Passo 1: Installa Ubuntu sull'SSD
 
 Segui la guida completa in [`UBUNTU-INSTALL.md`](UBUNTU-INSTALL.md).  
 In sintesi:
-1. Crea USB bootable con Rufus + ISO Ubuntu 22.04
+1. Crea USB bootable con Rufus + ISO Ubuntu 24.04
 2. Disabilita Secure Boot nel BIOS
 3. Installa Ubuntu sull'SSD da 120 GB (non toccare il disco Windows)
 4. Riavvia e seleziona l'SSD dal Boot Menu (F8/F11)
@@ -45,19 +59,27 @@ chmod +x setup.sh generate.sh
 ```
 
 Il setup installa automaticamente:
-- Driver AMDGPU + ROCm 5.7 (con workaround per RX 580/GFX803)
-- PyTorch con backend ROCm
+- Driver NVIDIA (tramite `ubuntu-drivers autoinstall`)
+- CUDA Toolkit 12.x da repository ufficiale NVIDIA
+- PyTorch con backend CUDA (`torch+cu121`)
 - ComfyUI + ComfyUI Manager
 - Modello Wan2.1-T2V-1.3B (~2.5 GB)
 - Piper TTS con voce italiana (paola-medium)
 - ffmpeg
 
-⚠️ **Riavvia il sistema dopo setup.sh** per caricare i moduli kernel AMDGPU:
+⚠️ **Riavvia il sistema dopo setup.sh** per caricare i moduli kernel NVIDIA:
 ```bash
 sudo reboot
 ```
 
-### Passo 4: Avvia ComfyUI
+### Passo 4: Verifica GPU
+
+```bash
+nvidia-smi
+nvcc --version
+```
+
+### Passo 5: Avvia ComfyUI
 
 ```bash
 ~/start-comfyui.sh
@@ -160,26 +182,33 @@ Seleziona l'SSD da 120 GB con Ubuntu. Windows rimane intoccato sul suo disco.
 ### ComfyUI non si avvia
 
 ```bash
-# Verifica che la GPU sia riconosciuta
-HSA_OVERRIDE_GFX_VERSION=8.0.3 rocminfo | grep -i "gfx\|Name"
+# Verifica che la GPU sia riconosciuta da CUDA
+nvidia-smi
+
+# Verifica PyTorch veda la GPU
+source ~/comfyui-venv/bin/activate
+python3 -c "import torch; avail=torch.cuda.is_available(); print('CUDA:', avail); print('GPU:', torch.cuda.get_device_name(0) if avail else 'non disponibile')"
 
 # Riavvia ComfyUI con log verbosi
 source ~/comfyui-venv/bin/activate
 cd ~/ComfyUI
-python main.py --listen --port 8188 --use-pytorch-cross-attention --lowvram
+python main.py --listen --port 8188 --lowvram
 ```
 
-### GPU non riconosciuta da ROCm
+### GPU non riconosciuta da CUDA
 
 ```bash
-# Verifica variabile ambiente
-echo $HSA_OVERRIDE_GFX_VERSION   # deve stampare: 8.0.3
+# Verifica driver
+nvidia-smi
 
-# Verifica appartenenza ai gruppi
-groups | grep -E "render|video"
+# Se nvidia-smi non trovato, verifica driver installati
+dpkg -l | grep nvidia
 
-# Se manca, aggiungiti e riavvia
-sudo usermod -aG render,video $USER && sudo reboot
+# Verifica che il modulo kernel sia caricato
+lsmod | grep nvidia
+
+# Se il modulo manca, riavvia il sistema
+sudo reboot
 ```
 
 ### Piper TTS non genera audio
@@ -196,7 +225,7 @@ aplay /tmp/test.wav
 
 - Aumenta `DURATA` delle scene a 7–8 secondi
 - Migliora i `PROMPT` con più dettagli visivi in inglese
-- Verifica che ComfyUI stia usando la GPU: nella UI web → icona settings → controlla "cuda" o "rocm"
+- Verifica che ComfyUI stia usando la GPU: nella UI web → icona settings → controlla che sia selezionato "cuda"
 
 ---
 

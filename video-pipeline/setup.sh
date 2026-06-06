@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
 # BikerLink Video Pipeline — setup.sh
-# Target: Ubuntu 22.04 LTS · AMD RX 580 8 GB · i5-14400 · SSD 120 GB
+# Target: Ubuntu 24.04 LTS · NVIDIA GTX 1070 8 GB · i5-14400 · SSD 120 GB
 # Eseguire al primo boot come utente normale (non root)
 # Uso: chmod +x setup.sh && ./setup.sh
 # =============================================================================
@@ -20,10 +20,10 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-log() { echo -e "${GREEN}[OK]${NC} $1" | tee -a "$LOG_FILE"; }
-warn() { echo -e "${YELLOW}[WARN]${NC} $1" | tee -a "$LOG_FILE"; }
-info() { echo -e "${BLUE}[INFO]${NC} $1" | tee -a "$LOG_FILE"; }
-err() { echo -e "${RED}[ERROR]${NC} $1" | tee -a "$LOG_FILE"; exit 1; }
+log()  { echo -e "${GREEN}[OK]${NC} $1"     | tee -a "$LOG_FILE"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $1"  | tee -a "$LOG_FILE"; }
+info() { echo -e "${BLUE}[INFO]${NC} $1"    | tee -a "$LOG_FILE"; }
+err()  { echo -e "${RED}[ERROR]${NC} $1"    | tee -a "$LOG_FILE"; exit 1; }
 
 echo "============================================="
 echo " BikerLink Video Pipeline — Setup"
@@ -44,12 +44,12 @@ sudo apt update -y 2>&1 | tee -a "$LOG_FILE"
 sudo apt upgrade -y 2>&1 | tee -a "$LOG_FILE"
 sudo apt install -y \
     curl wget git build-essential \
-    python3.10 python3.10-venv python3.10-dev python3-pip \
+    python3 python3-venv python3-dev python3-pip \
     ffmpeg \
     cmake ninja-build pkg-config \
     libssl-dev libffi-dev \
     dkms linux-headers-$(uname -r) \
-    software-properties-common apt-transport-https \
+    software-properties-common apt-transport-https ca-certificates \
     espeak-ng libsndfile1 \
     htop nvtop unzip \
     2>&1 | tee -a "$LOG_FILE"
@@ -57,83 +57,86 @@ sudo apt install -y \
 log "Pacchetti base installati"
 
 # =============================================================================
-# SEZIONE 2 — Driver AMDGPU + ROCm 5.7 (RX 580 / GFX803)
+# SEZIONE 2 — Driver NVIDIA + CUDA Toolkit
 # =============================================================================
-info "=== SEZIONE 2: Driver AMDGPU e ROCm 5.7 ==="
+info "=== SEZIONE 2: Driver NVIDIA e CUDA Toolkit ==="
 
-# Aggiunta utente al gruppo render e video (permessi GPU senza sudo)
-sudo usermod -aG render,video "$USER"
-log "Utente aggiunto ai gruppi render e video"
+# Aggiunta utente al gruppo video (permessi GPU senza sudo)
+sudo usermod -aG video "$USER"
+log "Utente aggiunto al gruppo video"
 
-# Rimozione eventuali installazioni ROCm precedenti
+# Rimozione eventuali residui ROCm/AMDGPU se presenti
 sudo apt remove -y rocm-libs rocm-dev rocm-utils 2>/dev/null || true
+sudo apt autoremove -y 2>/dev/null || true
 
-# Aggiunta repository ROCm 5.7
-ROCM_VERSION="5.7"
-ROCM_REPO_URL="https://repo.radeon.com/rocm/apt/${ROCM_VERSION}"
-
-wget -qO - https://repo.radeon.com/rocm/rocm.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/rocm.gpg
-echo "deb [arch=amd64 signed-by=/usr/share/keyrings/rocm.gpg] ${ROCM_REPO_URL} jammy main" \
-    | sudo tee /etc/apt/sources.list.d/rocm.list
-
-# Aggiunta repository amdgpu DKMS
-wget -qO - https://repo.radeon.com/amdgpu/latest/ubuntu/pool/main/a/amdgpu-install/amdgpu-install_*.deb 2>/dev/null || \
-    wget -qO /tmp/amdgpu-install.deb \
-        "https://repo.radeon.com/amdgpu-install/22.40.3/ubuntu/jammy/amdgpu-install_22.40.3.50403-1_all.deb"
-sudo apt install -y /tmp/amdgpu-install.deb 2>&1 | tee -a "$LOG_FILE" || true
-sudo amdgpu-install --usecase=rocm --no-32 -y 2>&1 | tee -a "$LOG_FILE" || {
-    warn "amdgpu-install fallito, installo ROCm manualmente via apt"
-    sudo apt update -y
-    sudo apt install -y rocm-hip-sdk rocm-opencl-sdk 2>&1 | tee -a "$LOG_FILE"
+# ubuntu-drivers rileva e installa il driver NVIDIA consigliato automaticamente
+# (su Ubuntu 24.04 LTS il kernel 6.8+ supporta nativamente i driver NVIDIA)
+info "Installazione driver NVIDIA tramite ubuntu-drivers..."
+sudo apt install -y ubuntu-drivers-common 2>&1 | tee -a "$LOG_FILE"
+sudo ubuntu-drivers autoinstall 2>&1 | tee -a "$LOG_FILE" || {
+    warn "ubuntu-drivers autoinstall fallito — ricerca driver NVIDIA raccomandato..."
+    RECOMMENDED=$(ubuntu-drivers devices 2>/dev/null | awk '/recommended/{print $3}' | head -1)
+    if [ -n "$RECOMMENDED" ]; then
+        info "Installo driver raccomandato: $RECOMMENDED"
+        sudo apt install -y "$RECOMMENDED" 2>&1 | tee -a "$LOG_FILE"
+    else
+        warn "Nessun driver raccomandato rilevato — installo nvidia-driver-open genererico"
+        sudo apt install -y nvidia-driver-open 2>&1 | tee -a "$LOG_FILE"
+    fi
 }
+log "Driver NVIDIA installati"
 
-# =============================================================================
-# WORKAROUND OBBLIGATORIO — RX 580 / GFX803 / Polaris
-# ROCm non riconosce nativamente GFX803 su versioni recenti.
-# HSA_OVERRIDE_GFX_VERSION=8.0.3 forza il runtime a trattare la GPU
-# come GFX803 abilitando tutte le operazioni HIP/ROCm.
-# =============================================================================
+# Aggiunta repository CUDA ufficiale NVIDIA per Ubuntu 24.04
+info "Configurazione repository CUDA per Ubuntu 24.04..."
+CUDA_KEYRING_URL="https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2404/x86_64/cuda-keyring_1.1-1_all.deb"
+wget -qO /tmp/cuda-keyring.deb "$CUDA_KEYRING_URL" 2>&1 | tee -a "$LOG_FILE"
+sudo dpkg -i /tmp/cuda-keyring.deb 2>&1 | tee -a "$LOG_FILE"
+rm /tmp/cuda-keyring.deb
+
+sudo apt update -y 2>&1 | tee -a "$LOG_FILE"
+
+# Installa CUDA Toolkit 12.x
+info "Installazione CUDA Toolkit 12.x (potrebbe richiedere qualche minuto)..."
+sudo apt install -y cuda-toolkit-12-6 2>&1 | tee -a "$LOG_FILE"
+log "CUDA Toolkit installato"
+
+# Aggiungi CUDA al PATH in ~/.bashrc
 BASHRC="$HOME/.bashrc"
-if ! grep -q "HSA_OVERRIDE_GFX_VERSION" "$BASHRC"; then
+if ! grep -q "CUDA_HOME" "$BASHRC"; then
     cat >> "$BASHRC" << 'EOF'
 
-# BikerLink GPU — Workaround RX 580 (GFX803/Polaris)
-export HSA_OVERRIDE_GFX_VERSION=8.0.3
-export ROCM_PATH=/opt/rocm
-export PATH="$ROCM_PATH/bin:$ROCM_PATH/hip/bin:$PATH"
-export LD_LIBRARY_PATH="$ROCM_PATH/lib:$ROCM_PATH/hip/lib:$LD_LIBRARY_PATH"
+# BikerLink GPU — NVIDIA CUDA (GTX 1070)
+export CUDA_HOME=/usr/local/cuda
+export PATH="$CUDA_HOME/bin:$PATH"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}"
 
 # ComfyUI output
 export BIKERLINK_VIDEOS="$HOME/bikerlink-videos"
 EOF
-    log "Variabili ambiente ROCm aggiunte a ~/.bashrc"
+    log "Variabili ambiente CUDA aggiunte a ~/.bashrc"
 fi
 
 # Applica nell'attuale sessione
-export HSA_OVERRIDE_GFX_VERSION=8.0.3
-export ROCM_PATH=/opt/rocm
-export PATH="$ROCM_PATH/bin:$ROCM_PATH/hip/bin:$PATH"
-export LD_LIBRARY_PATH="$ROCM_PATH/lib:$ROCM_PATH/hip/lib:${LD_LIBRARY_PATH:-}"
+export CUDA_HOME=/usr/local/cuda
+export PATH="$CUDA_HOME/bin:$PATH"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}"
 
-# Verifica ROCm
-info "Verifica ROCm (potrebbe richiedere il riavvio per i moduli kernel)..."
-if command -v rocminfo &>/dev/null; then
-    rocminfo 2>&1 | grep -E "Name|gfx|HSA Agent" | head -20 | tee -a "$LOG_FILE" || true
-    log "rocminfo eseguito con successo"
+# Verifica driver NVIDIA (richiede riavvio se appena installato)
+info "Verifica driver NVIDIA..."
+if command -v nvidia-smi &>/dev/null; then
+    nvidia-smi 2>&1 | tee -a "$LOG_FILE"
+    log "nvidia-smi OK"
 else
-    warn "rocminfo non trovato — potrebbe essere necessario riavviare il sistema e rieseguire lo script"
+    warn "nvidia-smi non trovato — probabilmente è necessario riavviare il sistema"
 fi
 
-# Regola udev per accesso GPU senza sudo
-if [ ! -f /etc/udev/rules.d/70-amdgpu.rules ]; then
-    sudo tee /etc/udev/rules.d/70-amdgpu.rules << 'EOF'
-SUBSYSTEM=="kfd", KERNEL=="kfd", TAG+="uaccess", GROUP="render", MODE="0660"
-SUBSYSTEM=="drm", KERNEL=="card*", TAG+="uaccess", GROUP="video", MODE="0660"
-SUBSYSTEM=="drm", KERNEL=="renderD*", TAG+="uaccess", GROUP="render", MODE="0660"
-EOF
-    sudo udevadm control --reload-rules
-    sudo udevadm trigger
-    log "Regole udev GPU configurate"
+# Verifica nvcc
+info "Verifica CUDA Toolkit (nvcc)..."
+if command -v nvcc &>/dev/null; then
+    nvcc --version 2>&1 | tee -a "$LOG_FILE"
+    log "nvcc OK"
+else
+    warn "nvcc non trovato nel PATH corrente — sarà disponibile dopo il riavvio"
 fi
 
 # =============================================================================
@@ -198,7 +201,7 @@ done
 log "I/O scheduler ottimizzato per SSD"
 
 # =============================================================================
-# SEZIONE 4 — Python venv + PyTorch ROCm + ComfyUI + Wan2.1 + Piper + ffmpeg
+# SEZIONE 4 — Python venv + PyTorch CUDA + ComfyUI + Wan2.1 + Piper + ffmpeg
 # =============================================================================
 info "=== SEZIONE 4: ComfyUI + Modello + TTS ==="
 
@@ -206,10 +209,10 @@ info "=== SEZIONE 4: ComfyUI + Modello + TTS ==="
 mkdir -p "$BIKERLINK_DIR"/{clips,voiceover,music,final}
 log "Directory output creata: $BIKERLINK_DIR"
 
-# Virtual environment Python 3.10
+# Virtual environment Python 3
 if [ ! -d "$VENV_DIR" ]; then
-    python3.10 -m venv "$VENV_DIR"
-    log "Virtualenv Python 3.10 creato in $VENV_DIR"
+    python3 -m venv "$VENV_DIR"
+    log "Virtualenv Python creato in $VENV_DIR"
 fi
 
 source "$VENV_DIR/bin/activate"
@@ -217,21 +220,24 @@ source "$VENV_DIR/bin/activate"
 # Aggiorna pip
 pip install --upgrade pip wheel setuptools 2>&1 | tee -a "$LOG_FILE"
 
-# PyTorch con backend ROCm 5.7
-info "Installazione PyTorch ROCm (potrebbe richiedere 10-15 minuti)..."
+# PyTorch con backend CUDA 12.x
+info "Installazione PyTorch CUDA (potrebbe richiedere 10-15 minuti)..."
 pip install torch torchvision torchaudio \
-    --index-url https://download.pytorch.org/whl/rocm5.7 \
+    --index-url https://download.pytorch.org/whl/cu121 \
     2>&1 | tee -a "$LOG_FILE"
-log "PyTorch ROCm installato"
+log "PyTorch CUDA installato"
 
-# Verifica PyTorch + GPU
+# Verifica PyTorch + GPU CUDA
 python3 -c "
 import torch
 print(f'PyTorch: {torch.__version__}')
-print(f'ROCm disponibile: {torch.cuda.is_available()}')
+print(f'CUDA disponibile: {torch.cuda.is_available()}')
 if torch.cuda.is_available():
     print(f'GPU: {torch.cuda.get_device_name(0)}')
     print(f'VRAM: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB')
+    print(f'CUDA version: {torch.version.cuda}')
+else:
+    print('ATTENZIONE: CUDA non disponibile — potrebbe essere necessario un riavvio')
 " 2>&1 | tee -a "$LOG_FILE" || warn "Verifica GPU fallita — potrebbe essere necessario un riavvio"
 
 # ComfyUI
@@ -301,16 +307,15 @@ fi
 # Crea script di avvio ComfyUI
 cat > "$HOME/start-comfyui.sh" << 'EOF'
 #!/usr/bin/env bash
-# Avvia ComfyUI con backend ROCm per RX 580
-export HSA_OVERRIDE_GFX_VERSION=8.0.3
-export ROCM_PATH=/opt/rocm
-export PATH="$ROCM_PATH/bin:$PATH"
+# Avvia ComfyUI con backend CUDA per GTX 1070
+export CUDA_HOME=/usr/local/cuda
+export PATH="$CUDA_HOME/bin:$PATH"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}"
 source "$HOME/comfyui-venv/bin/activate"
 cd "$HOME/ComfyUI"
 python main.py \
     --listen 0.0.0.0 \
     --port 8188 \
-    --use-pytorch-cross-attention \
     --lowvram \
     2>&1 | tee -a "$HOME/comfyui.log"
 EOF
@@ -459,14 +464,18 @@ echo " Setup completato!"
 echo "============================================="
 echo ""
 echo "Prossimi passi:"
-echo "  1. Riavvia il sistema per caricare i moduli kernel AMDGPU:"
+echo "  1. Riavvia il sistema per caricare i moduli kernel NVIDIA:"
 echo "     sudo reboot"
 echo ""
-echo "  2. Dopo il riavvio, avvia ComfyUI:"
+echo "  2. Dopo il riavvio, verifica la GPU:"
+echo "     nvidia-smi"
+echo "     nvcc --version"
+echo ""
+echo "  3. Avvia ComfyUI:"
 echo "     ~/start-comfyui.sh"
 echo "     Poi apri il browser: http://localhost:8188"
 echo ""
-echo "  3. Genera video BikerLink:"
+echo "  4. Genera video BikerLink:"
 echo "     chmod +x generate.sh && ./generate.sh scripts/navigazione-curvy.txt"
 echo ""
 echo "Log completo: $LOG_FILE"

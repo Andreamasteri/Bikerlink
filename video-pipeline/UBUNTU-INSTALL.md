@@ -1,6 +1,6 @@
-# Guida Installazione Ubuntu 22.04 LTS su SSD Dedicato
+# Guida Installazione Ubuntu 24.04 LTS su SSD Dedicato
 
-**Hardware target:** Intel i5-14400 · AMD RX 580 8 GB · SSD 120 GB dedicato
+**Hardware target:** Intel i5-14400 · NVIDIA GTX 1070 8 GB · SSD 120 GB dedicato
 
 ---
 
@@ -12,11 +12,13 @@
 
 ---
 
-## Passo 1 — Scaricare Ubuntu 22.04 LTS
+## Passo 1 — Scaricare Ubuntu 24.04 LTS
 
 1. Apri il browser su Windows e vai su:  
-   **https://releases.ubuntu.com/22.04/**
-2. Scarica `ubuntu-22.04.x-desktop-amd64.iso` (~4.7 GB)
+   **https://releases.ubuntu.com/24.04/**
+2. Scarica `ubuntu-24.04.x-desktop-amd64.iso` (~5.7 GB)
+
+> **Nota:** Ubuntu 24.04 LTS include il kernel Linux 6.8, che supporta nativamente i driver NVIDIA senza configurazione extra.
 
 ---
 
@@ -44,7 +46,7 @@
    - Per Gigabyte: **Del** o **F2**
 3. Nel BIOS:
    - Vai in **Boot** → **Boot Priority** (o Secure Boot)
-   - **Disabilita Secure Boot** (necessario per ROCm/AMDGPU DKMS)
+   - **Disabilita Secure Boot** (necessario per i moduli kernel NVIDIA DKMS)
    - Imposta come **primo dispositivo di boot** la chiavetta USB
 4. Salva e riavvia (**F10** → Save & Exit)
 
@@ -119,4 +121,5 @@ Dopo la prima installazione, per avviare Linux:
 | Il PC non vede la USB al boot | Verifica che Secure Boot sia disabilitato nel BIOS |
 | Il boot menu non appare | Prova F8, F11, F12, Esc (dipende dalla scheda madre) |
 | GRUB avvia Windows invece di Ubuntu | Entra nel BIOS e cambia la priorità di boot |
-| Schermo nero dopo il boot | Aggiungi `nomodeset` nei parametri GRUB (temporaneo, poi setup.sh installa i driver corretti) |
+| Schermo nero dopo il boot | Aggiungi `nomodeset` nei parametri GRUB (temporaneo, poi setup.sh installa i driver NVIDIA corretti) |
+| nvidia-smi non trovato dopo setup.sh | Riavvia il sistema: `sudo reboot` — i moduli kernel NVIDIA si caricano solo dopo il reboot |
