@@ -22,10 +22,10 @@ LEGACY components/admin/users/UserDetailModal.tsx 605
 LEGACY components/match/MatchCard.tsx 892
 LEGACY lib/i18n/de.ts 1168
 LEGACY lib/i18n/el.ts 1159
-LEGACY lib/i18n/en.ts 1231
+LEGACY lib/i18n/en.ts 1232
 LEGACY lib/i18n/es.ts 1168
 LEGACY lib/i18n/fr.ts 1168
-LEGACY lib/i18n/it.ts 1378
+LEGACY lib/i18n/it.ts 1379
 LEGACY lib/i18n/tr.ts 1159
 LEGACY lib/leaflet-bundle.ts 676
 LEGACY lib/leaflet-map-html.ts 642
