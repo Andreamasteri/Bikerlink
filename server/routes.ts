@@ -76,7 +76,7 @@ async function _requireAdmin(req: Request, res: Response, next: NextFunction) {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  app.set("trust proxy", 1);
+  app.set("trust proxy", true);
 
   // Internal tool routes — token auth only, no session, mounted before the Bearer bridge.
   app.use("/api/_internal", internalRouter);

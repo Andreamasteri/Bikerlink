@@ -14,23 +14,64 @@ import type { Request } from "express";
 // stored telemetry with arbitrary "source" addresses.
 //
 // `req.ip` is safe in this app because:
-//   - server/index.ts and server/routes.ts both call `app.set("trust proxy", 1)`,
-//   - so Express skips exactly one trusted hop (our reverse proxy) and uses
-//     the right-most XFF entry — i.e. the client IP that the proxy itself
-//     appended — as `req.ip`. Attacker-controlled left-most entries are
-//     ignored.
+//   - server/middleware.ts calls `app.set("trust proxy", true)`, which tells
+//     Express to trust all proxy hops in Replit's managed infra. Express then
+//     resolves req.ip to the left-most non-trusted (i.e. real client) IP in
+//     X-Forwarded-For rather than the raw socket address.
+//   - getTrustedClientIp() adds explicit loopback filtering and XFF/X-Real-IP
+//     fallbacks for cases where req.ip still resolves to a loopback address
+//     due to unusual proxy configurations.
 //
 // Concentrating the derivation here means a future maintainer who needs the
 // client IP can simply call this function instead of reaching for headers,
 // and any regression toward raw-header parsing becomes easy to grep for and
 // reject in code review.
+/** Returns true if the IP looks like a loopback / local address we should skip. */
+function isLoopback(ip: string): boolean {
+  return (
+    ip === "::1" ||
+    ip.startsWith("127.") ||
+    ip.startsWith("::ffff:127.")
+  );
+}
+
+/**
+ * Extract the first non-loopback IP from a comma-separated X-Forwarded-For
+ * value, or return undefined if nothing useful is found.
+ */
+function firstRealIpFromXff(xff: string | string[] | undefined): string | undefined {
+  if (!xff) return undefined;
+  const raw = Array.isArray(xff) ? xff.join(",") : xff;
+  for (const part of raw.split(",")) {
+    const candidate = part.trim();
+    if (candidate && !isLoopback(candidate)) return candidate;
+  }
+  return undefined;
+}
+
 export function getTrustedClientIp(req: Request): string | undefined {
-  // Fall back to the raw socket address only if Express was somehow unable to
-  // resolve req.ip (e.g. trust-proxy misconfiguration). The substring cap
-  // keeps a malformed value from blowing up downstream string columns or
-  // log lines.
-  const ip = (req.ip ?? req.socket?.remoteAddress ?? "").toString().substring(0, 64);
-  return ip.length > 0 ? ip : undefined;
+  // Primary: req.ip resolved by Express via trust-proxy setting.
+  // This is safe as long as trust-proxy is configured correctly.
+  const reqIp = (req.ip ?? "").toString().trim();
+  if (reqIp && !isLoopback(reqIp)) {
+    return reqIp.substring(0, 64);
+  }
+
+  // Fallback 1: parse X-Forwarded-For ourselves, picking the first
+  // non-loopback entry.  Handles the case where trust-proxy resolves to
+  // a loopback due to extra hops in Replit's infra.
+  const xffIp = firstRealIpFromXff(req.headers["x-forwarded-for"]);
+  if (xffIp) return xffIp.substring(0, 64);
+
+  // Fallback 2: X-Real-IP (set by some Nginx / Replit proxy configs).
+  const xRealIp = (req.headers["x-real-ip"] as string | undefined)?.trim();
+  if (xRealIp && !isLoopback(xRealIp)) return xRealIp.substring(0, 64);
+
+  // Last resort: raw socket address.
+  const socketIp = (req.socket?.remoteAddress ?? "").toString().trim();
+  if (socketIp) return socketIp.substring(0, 64);
+
+  return undefined;
 }
 
 // Task #1125: shared in-memory per-user + per-IP rate limit for abuse-prone

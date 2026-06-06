@@ -4,6 +4,14 @@ import { db } from "../db";
 import { siteVisits } from "@shared/db";
 import { getTrustedClientIp } from "./abuse-rate-limit";
 
+// geoip-lite: bundled ~60 MB IPv4+IPv6 database, zero runtime cost, no external calls.
+let geoip: typeof import("geoip-lite") | null = null;
+try {
+  geoip = require("geoip-lite") as typeof import("geoip-lite");
+} catch {
+  console.warn("[visitor-tracking] geoip-lite not available — country lookup disabled");
+}
+
 export const VISITOR_COOKIE_NAME = "bl_vid";
 const VISITOR_COOKIE_MAX_AGE_S = 365 * 24 * 60 * 60;
 
@@ -74,7 +82,8 @@ function pickLang(req: Request): string | null {
   return first.substring(0, 10);
 }
 
-function pickCountry(req: Request): string | null {
+function pickCountry(req: Request, ip: string | undefined): string | null {
+  // Priority 1: proxy-injected geo headers (Cloudflare, Vercel, generic).
   const candidates = [
     req.headers["cf-ipcountry"],
     req.headers["x-vercel-ip-country"],
@@ -83,6 +92,17 @@ function pickCountry(req: Request): string | null {
   for (const c of candidates) {
     if (typeof c === "string" && c.length === 2) return c.toUpperCase();
   }
+
+  // Priority 2: geoip-lite local database — zero cost, no network call.
+  if (geoip && ip) {
+    try {
+      const geo = geoip.lookup(ip);
+      if (geo?.country && geo.country.length === 2) return geo.country.toUpperCase();
+    } catch {
+      // non-blocking: lookup failure silently ignored
+    }
+  }
+
   return null;
 }
 
@@ -114,7 +134,7 @@ export function recordVisit(opts: RecordVisitOpts): void {
       ipHash: hashIp(ip),
       ipPrefix: ipPrefix(ip),
       lang: pickLang(req),
-      country: pickCountry(req),
+      country: pickCountry(req, ip),
     })
     .catch((err) => {
       console.warn("[site-visits] insert failed (non-blocking):", err?.message || err);

@@ -63,7 +63,25 @@ export function enforceOrigin(req: Request, res: Response, next: NextFunction): 
 }
 
 export function setupMiddleware(app: express.Application) {
-  app.set("trust proxy", 1);
+  // Trust all proxies in Replit's deployment (multiple reverse-proxy hops).
+  // Using `true` instead of `1` ensures req.ip always resolves to the real
+  // client IP regardless of how many hops Replit's infra uses.
+  app.set("trust proxy", true);
+  console.log(`[VISITOR-TRACKING] trust proxy set to: true (all proxies trusted)`);
+
+  // One-shot middleware: log the first request's resolved IP so we can verify
+  // in production logs that real IPs are being captured correctly.
+  let firstRequestLogged = false;
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    if (!firstRequestLogged) {
+      firstRequestLogged = true;
+      const xff = req.headers["x-forwarded-for"];
+      console.log(
+        `[VISITOR-TRACKING] first request — req.ip="${req.ip}" X-Forwarded-For="${xff ?? "(none)"}"`,
+      );
+    }
+    next();
+  });
 
   // CORS setup
   app.use((req, res, next) => {
