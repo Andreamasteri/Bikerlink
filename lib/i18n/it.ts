@@ -1,5 +1,4 @@
 import aiAssistantIt from "./ai-assistant-it";
-
 const it: Record<string, string> = {
   "app.name": "BikerLink",
   "app.tagline": "U'll never ride alone",

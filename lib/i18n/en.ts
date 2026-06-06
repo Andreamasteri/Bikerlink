@@ -1,7 +1,6 @@
 const en: Record<string, string> = {
   "app.name": "BikerLink",
   "app.tagline": "U'll never ride alone",
-
   "auth.login": "Log in",
   "auth.sessionExpired": "Session expired",
   "auth.loginToContinue": "Log in to continue",

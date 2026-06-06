@@ -1129,7 +1129,6 @@ const es: Record<string, string> = {
   "ready.privacy.offlineRandomizeLabel": "Aleatorizar posición sin conexión",
   "ready.privacy.offlineRandomizeDesc": "Al cerrar la app, tu posición se desplaza ±20 km.",
   "ready.privacy.moreOptions": "Más opciones de privacidad & GPS",
-
   "gps_error_title": "Error GPS",
   "gps_error_body": "No se pudieron guardar los puntos GPS. Se detectaron coordenadas inválidas.",
 
