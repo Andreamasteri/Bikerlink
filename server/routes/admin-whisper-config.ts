@@ -96,7 +96,7 @@ router.post("/whisper-config/test/:providerId", async (req: Request, res: Respon
 
       const endpoint = whisperUrl.replace(/\/$/, "") + "/inference";
       const headers: Record<string, string> = {};
-      if (whisperToken) headers["Authorization"] = `Bearer ${whisperToken}`;
+      if (whisperToken) headers["X-Whisper-Token"] = whisperToken;
 
       const wavResult = await probeHomeFormat(logId, endpoint, headers, wav, "audio/wav", "silence.wav", 15000);
       const m4aResult = await probeHomeFormat(logId, endpoint, headers, buildMinimalM4a(), "audio/x-m4a", "silence.m4a", 10000);
@@ -334,7 +334,7 @@ router.post("/whisper-config/diagnose", async (req: Request, res: Response) => {
       }
 
       const headers: Record<string, string> = {};
-      if (whisperToken) headers["Authorization"] = `Bearer ${whisperToken}`;
+      if (whisperToken) headers["X-Whisper-Token"] = whisperToken;
       const wavRes = await probeHomeFormat(logId, `${baseUrl}/inference`, headers, wav, "audio/wav", "silence.wav", 15000);
       steps.push({
         label: "home — trascrizione WAV",
@@ -490,6 +490,50 @@ router.post("/whisper-config/diagnose", async (req: Request, res: Response) => {
   const passCount = steps.filter((s) => s.ok).length;
   console.log(`[whisper-diagnose/${logId}] DONE steps=${steps.length} pass=${passCount} fail=${steps.length - passCount}`);
   res.json({ steps });
+});
+
+// ── GET /whisper-health ──────────────────────────────────────────────────────
+/**
+ * Proxy verso GET thinkcentre-agent:9101/whisper-health.
+ * Ritorna { status, lastCode, lastCheck, lastRestart, lastRestartReason, agentOnline }.
+ * Se l'agente non è raggiungibile → agentOnline=false, status="UNKNOWN".
+ */
+router.get("/whisper-health", async (_req: Request, res: Response) => {
+  const agentBase = process.env.THINKCENTRE_METRICS_URL?.replace(/\/$/, "");
+  if (!agentBase) {
+    return res.json({
+      agentOnline: false,
+      status: "UNKNOWN",
+      lastCode: null,
+      lastCheck: null,
+      lastRestart: null,
+      lastRestartReason: null,
+      reason: "THINKCENTRE_METRICS_URL non configurato",
+    });
+  }
+
+  const url = `${agentBase}/whisper-health`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5_000);
+  try {
+    const agentRes = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!agentRes.ok) {
+      return res.json({ agentOnline: false, status: "UNKNOWN", reason: `agent HTTP ${agentRes.status}` });
+    }
+    const data = await agentRes.json() as {
+      status?: string;
+      lastCode?: number | null;
+      lastCheck?: string | null;
+      lastRestart?: string | null;
+      lastRestartReason?: string | null;
+    };
+    return res.json({ agentOnline: true, ...data });
+  } catch (err) {
+    clearTimeout(timer);
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.json({ agentOnline: false, status: "UNKNOWN", reason: msg.slice(0, 120) });
+  }
 });
 
 // ── POST /whisper-config/reset ────────────────────────────────────────────────

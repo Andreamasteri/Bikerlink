@@ -65,4 +65,13 @@ export const styles = StyleSheet.create({
   tokenWarnBanner: { flexDirection: "row", alignItems: "flex-start", gap: 6, marginTop: 6, backgroundColor: "#F59E0B18", borderWidth: 1, borderColor: "#F59E0B44", borderRadius: 8, padding: 8 },
   tokenWarnText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#F59E0B" },
   tokenWarnNote: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#F59E0B", opacity: 0.85, marginTop: 1 },
+  watchdogCard: { borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 14 },
+  watchdogRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  watchdogTitleRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap" },
+  watchdogStatus: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  watchdogOffline: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary },
+  watchdogMeta: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  watchdogRefresh: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
+  watchdogRestartRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: "#F59E0B33" },
+  watchdogRestartText: { fontFamily: "Inter_400Regular", fontSize: 11, color: "#F59E0B", flex: 1 },
 });
