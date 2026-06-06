@@ -37,6 +37,7 @@ import { useTrackingStats } from "@/hooks/tracking/useTrackingStats";
 import { useTrackingMap } from "@/hooks/tracking/useTrackingMap";
 import { useTrackingSettings } from "@/hooks/tracking/useTrackingSettings";
 import { useTrackingRefs } from "@/hooks/tracking/useTrackingRefs";
+import { useOfflineQueue } from "@/hooks/tracking/useOfflineQueue";
 
 // Types
 export type Phase = "idle" | "countdown" | "active" | "paused";
@@ -142,6 +143,7 @@ export function useTrackingState() {
   const mapState = useTrackingMap();
   const settings = useTrackingSettings();
   const refs = useTrackingRefs();
+  const offlineQueue = useOfflineQueue();
 
   const [handsOffActive, setHandsOffActive] = useState(false);
   const { logs: debugLogs, clearLogs: clearDebugLogs, logFetch } = useApiDebugLog();
@@ -421,18 +423,18 @@ export function useTrackingState() {
     mapState.setSummaryRoutePoints(gps.mapCoordsRef.current.map(c => ({ lat: c.latitude, lng: c.longitude })));
 
     let patchFailed = false;
+    const updateData: {
+      status: string; stoppedAt: string; totalDistanceKm: number; maxSpeedKmh: number; avgSpeedKmh: number; maxAltitude: number;
+      durationSeconds: number; idleTimeSeconds: number; maxAccelerationG: number | null;
+      isSprint: boolean; sprint0to100Ms: number | null; gpsBlackoutCount: number; gpsBlackoutSeconds: number;
+      telemetryData?: string;
+    } = {
+      status: "completed", stoppedAt: new Date().toISOString(), totalDistanceKm: gps.totalKmRef.current, maxSpeedKmh: gps.maxSpeedRef.current, avgSpeedKmh: stats.avgSpeedDisplayKmh, maxAltitude: gps.maxAltRef.current,
+      durationSeconds: Math.floor(stats.totalMs / 1000), idleTimeSeconds: Math.floor(stats.idleMsRef.current / 1000), maxAccelerationG: sensors.maxAccelGRef.current,
+      isSprint: settings.is0100EnabledRef.current, sprint0to100Ms: sprint.sprint0to100MsRef.current, gpsBlackoutCount: gps.gpsBlackoutCountRef.current, gpsBlackoutSeconds: Math.floor(gps.gpsBlackoutSecondsRef.current / 1000),
+    };
+    if (settings.sensorsEnabledRef.current && refs.telemetryAccumRef.current.length > 0) updateData.telemetryData = JSON.stringify(refs.telemetryAccumRef.current);
     try {
-      const updateData: {
-        status: string; stoppedAt: string; totalDistanceKm: number; maxSpeedKmh: number; avgSpeedKmh: number; maxAltitude: number;
-        durationSeconds: number; idleTimeSeconds: number; maxAccelerationG: number | null;
-        isSprint: boolean; sprint0to100Ms: number | null; gpsBlackoutCount: number; gpsBlackoutSeconds: number;
-        telemetryData?: string;
-      } = {
-        status: "completed", stoppedAt: new Date().toISOString(), totalDistanceKm: gps.totalKmRef.current, maxSpeedKmh: gps.maxSpeedRef.current, avgSpeedKmh: stats.avgSpeedDisplayKmh, maxAltitude: gps.maxAltRef.current,
-        durationSeconds: Math.floor(stats.totalMs / 1000), idleTimeSeconds: Math.floor(stats.idleMsRef.current / 1000), maxAccelerationG: sensors.maxAccelGRef.current,
-        isSprint: settings.is0100EnabledRef.current, sprint0to100Ms: sprint.sprint0to100MsRef.current, gpsBlackoutCount: gps.gpsBlackoutCountRef.current, gpsBlackoutSeconds: Math.floor(gps.gpsBlackoutSecondsRef.current / 1000),
-      };
-      if (settings.sensorsEnabledRef.current && refs.telemetryAccumRef.current.length > 0) updateData.telemetryData = JSON.stringify(refs.telemetryAccumRef.current);
       await apiRequest("PATCH", `/api/routes/${rId}`, updateData);
       if (settings.sensorsEnabledRef.current && refs.telemetryAccumRef.current.length > 0) {
         queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
@@ -447,7 +449,11 @@ export function useTrackingState() {
           }
         }
       } catch { /* battery level unavailable on this device — ignore silently */ }
-    } catch (e) { logGpsError(e, "handleStop"); patchFailed = true; }
+    } catch (e) {
+      logGpsError(e, "handleStop");
+      patchFailed = true;
+      await offlineQueue.enqueue(rId, updateData as unknown as Record<string, unknown>, "complete").catch(() => {});
+    }
     finally {
       session.setSummaryPatchFailed(patchFailed);
       session.setSummaryVisible(true);
@@ -537,6 +543,7 @@ export function useTrackingState() {
       sprintPhase: sprint.sprintPhase, sprintGoFired: sprint.sprintGoFired, sprint0to100Ms: sprint.sprint0to100Ms, isNewRecord: sprint.isNewRecord, recordAnim: sprint.recordAnim, personalBestMs: sprint.personalBestMsRef.current,
       pointsSent: stats.pointsSent, pointsBuffered: stats.pointsBuffered, batteryDrainStats: battery.batteryDrainStats, showBatteryStats: battery.showBatteryStats, debugLogs, debugVisible, bgToastCount: bg.bgToastCount, bgToastVisible: bg.bgToastVisible, bgToastAnim: bg.bgToastAnim,
       records, phoneSensorsAdminEnabled, isPending: session.isPublishPending, speedUnit, distanceUnit, mapsEnabled, resolvedProvider,
+      offlineQueuePendingCount: offlineQueue.pendingCount, offlineQueueLastSyncedCount: offlineQueue.lastSyncedCount,
     },
     handlers: {
       setProfile: settings.setProfile, setCountdownEnabled: settings.setCountdownEnabled, setCountdownSec: settings.setCountdownSec, setHandsOffEnabled: settings.setHandsOffEnabled, setHandsOffSpeedStr: settings.setHandsOffSpeedStr, setIs0100Enabled: settings.setIs0100Enabled,
@@ -544,6 +551,7 @@ export function useTrackingState() {
       setMapModalVisible: mapState.setMapModalVisible, setRouteMapVisible: mapState.setRouteMapVisible, setPublishRecord: session.setPublishRecord, setPublishCaption: session.setPublishCaption, setRideTitle: session.setRideTitle, setHistMapVisible: mapState.setHistMapVisible,
       setShowSensorOverlay: sensors.setShowSensorOverlay, setShowBatteryStats: battery.setShowBatteryStats, setDebugVisible, handleDebugTap, clearDebugLogs, handleStart, handleStop, handlePause, handleRecalibrate,
       handleDeleteRecord: (id: string) => stats.handleDeleteRecord(id, refetchRecords), handleViewHistoricalRoute: mapState.handleViewHistoricalRoute, handleExportGpx: mapState.handleExportGpx, handlePublish: session.handlePublish, discardSprintAttempt, refetchRecords,
+      enqueueOfflinePatch: offlineQueue.enqueue, clearOfflineLastSynced: offlineQueue.clearLastSyncedCount,
       handleSaveVoiceNote: async (note: string): Promise<boolean> => {
         const rId = refs.routeIdRef.current;
         if (!rId) return false;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ActivityIndicator, Animated, Modal, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -36,6 +36,23 @@ function TrackingScreenInner() {
   const { state, handlers } = useTrackingState();
   const whisper = useWhisperRecorder();
   const [voiceNoteToast, setVoiceNoteToast] = useState<string | null>(null);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+  const syncToastAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (state.offlineQueueLastSyncedCount > 0) {
+      const count = state.offlineQueueLastSyncedCount;
+      handlers.clearOfflineLastSynced();
+      const msg = count === 1 ? "☁️ Gita sincronizzata" : `☁️ ${count} gite sincronizzate`;
+      setSyncToast(msg);
+      Animated.sequence([
+        Animated.timing(syncToastAnim, { toValue: 1, duration: 400, useNativeDriver: true }),
+        Animated.delay(3500),
+        Animated.timing(syncToastAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+      ]).start(() => setSyncToast(null));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.offlineQueueLastSyncedCount]);
 
   const handleVoiceNote = async () => {
     if (whisper.recording) {
@@ -267,7 +284,11 @@ function TrackingScreenInner() {
             try {
               await apiRequest("PATCH", `/api/routes/${state.completedRouteId}`, { title: state.rideTitle });
             } catch (_) {
-              // best-effort PATCH; ignore failures
+              await handlers.enqueueOfflinePatch(
+                state.completedRouteId,
+                { title: state.rideTitle },
+                "title"
+              ).catch(() => {});
             }
           }
           handlers.setSummaryVisible(false);
@@ -359,6 +380,31 @@ function TrackingScreenInner() {
         onPublish={handlers.handlePublish}
         t={t}
       />
+
+      {/* ── Offline sync toast ────────────────────────────────────────── */}
+      {syncToast !== null && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.bgToast,
+            {
+              bottom: insets.bottom + 130,
+              opacity: syncToastAnim,
+              transform: [
+                {
+                  translateY: syncToastAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [12, 0],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <Ionicons name="cloud-done-outline" size={14} color={Colors.success} />
+          <Text style={styles.bgToastText}>{syncToast}</Text>
+        </Animated.View>
+      )}
 
       {/* ── Background GPS toast ──────────────────────────────────────── */}
       {state.bgToastVisible && (
