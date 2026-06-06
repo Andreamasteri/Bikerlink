@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollViewCompat";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
@@ -25,6 +26,15 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      setIdentifier("");
+      setPassword("");
+      setError("");
+      setShowPassword(false);
+    }, [])
+  );
 
   const handleLogin = async () => {
     sendStartupBeacon("login_1_start");
@@ -95,8 +105,8 @@ export default function LoginScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="email-address"
-              textContentType="emailAddress"
-              autoComplete="email"
+              textContentType="oneTimeCode"
+              autoComplete="off"
               testID="login-identifier"
             />
           </View>
@@ -111,8 +121,8 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
-              textContentType="password"
-              autoComplete="password"
+              textContentType="newPassword"
+              autoComplete="off"
               testID="login-password"
             />
             <TouchableOpacity
