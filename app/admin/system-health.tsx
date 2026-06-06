@@ -19,6 +19,7 @@ import { WatchdogChat } from "@/components/admin/system-health/WatchdogChat";
 import { TrendsChart } from "@/components/admin/system-health/TrendsChart";
 import { MapsHealthCard } from "@/components/admin/system-health/MapsHealthCard";
 import { useAdminWatchdogAlerts } from "@/hooks/useAdminWatchdogAlerts";
+import { WhisperWatchdogBadge, type WhisperHealthData } from "@/components/admin/WhisperWatchdogBadge";
 
 interface Snapshot {
   status: "green" | "yellow" | "orange" | "red";
@@ -59,6 +60,12 @@ export default function SystemHealthScreen() {
   // Task #2555 — WS realtime: invalida lo snapshot non appena il watchdog
   // ne pubblica uno nuovo, eliminando la finestra fino a 15s del polling.
   useAdminWatchdogAlerts();
+
+  const whisperHealthQ = useQuery<WhisperHealthData>({
+    queryKey: ["/api/admin/whisper-health"],
+    queryFn: getQueryFnWithTimeout<WhisperHealthData>(10_000),
+    refetchInterval: 30_000,
+  });
 
   const proposalsQ = useQuery<{ logs: WatchdogLog[] }>({
     queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"],
@@ -204,6 +211,20 @@ export default function SystemHealthScreen() {
 
           <SectionTitle icon="map-marker-radius">Maps Health</SectionTitle>
           <MapsHealthCard />
+
+          <SectionTitle icon="microphone">Whisper Watchdog</SectionTitle>
+          {whisperHealthQ.isLoading ? (
+            <ActivityIndicator color={Colors.accent} style={{ marginBottom: 12 }} />
+          ) : whisperHealthQ.data ? (
+            <WhisperWatchdogBadge
+              health={whisperHealthQ.data}
+              updatedAt={whisperHealthQ.dataUpdatedAt}
+            />
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.muted}>Dati watchdog Whisper non disponibili.</Text>
+            </View>
+          )}
 
           <SectionTitle icon="robot-outline">Proposte AI in attesa</SectionTitle>
           <ProposalsCard
