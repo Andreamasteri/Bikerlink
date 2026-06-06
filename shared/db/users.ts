@@ -97,6 +97,7 @@ export const users = pgTable("users", {
   index("users_country_idx").on(table.country),
   index("users_user_type_idx").on(table.userType),
   index("users_active_pool_idx").on(table.status, table.isFake, table.ghostMode),
+  index("users_role_idx").on(table.role),
 ]);
 
 export const userPhotos = pgTable("user_photos", {
@@ -228,6 +229,7 @@ export const userDevices = pgTable("user_devices", {
   lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
 }, (table) => [
   index("user_devices_user_id_idx").on(table.userId),
+  index("user_devices_last_seen_at_idx").on(table.lastSeenAt),
   uniqueIndex("user_devices_user_model_uq").on(table.userId, table.model),
 ]);
 

@@ -47,6 +47,7 @@ export const adClicks = pgTable("ad_clicks", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("ad_clicks_campaign_id_idx").on(table.campaignId),
+  index("ad_clicks_user_id_idx").on(table.userId),
 ]);
 
 export type AdCampaign = typeof adCampaigns.$inferSelect;

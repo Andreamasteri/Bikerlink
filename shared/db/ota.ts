@@ -56,6 +56,7 @@ export const otaBootEvents = pgTable("ota_boot_events", {
 }, (table) => [
   index("ota_boot_events_release_id_idx").on(table.releaseId),
   index("ota_boot_events_event_type_idx").on(table.eventType),
+  index("ota_boot_events_user_id_idx").on(table.userId),
   uniqueIndex("ota_boot_events_unique_per_device").on(table.releaseId, table.deviceId, table.eventType),
 ]);
 

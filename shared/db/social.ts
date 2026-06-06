@@ -234,7 +234,11 @@ export const moderatorLogs = pgTable("moderator_logs", {
   targetId: varchar("target_id", { length: 36 }).notNull(),
   details: text("details"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => [
+  index("moderator_logs_target_id_idx").on(table.targetId),
+  index("moderator_logs_moderator_id_idx").on(table.moderatorId),
+  index("moderator_logs_created_at_idx").on(table.createdAt),
+]);
 
 export const fakeUserInteractions = pgTable("fake_user_interactions", {
   id: varchar("id", { length: 36 })
