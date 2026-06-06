@@ -45,10 +45,11 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
 export function GraphHopperCard() {
   const { data, isLoading, error } = useQuery<GHStatus>({
     queryKey: ["/api/admin/graphhopper-status"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await fetch(new URL("/api/admin/graphhopper-status", getApiUrl()).toString(), {
         headers: { ...(await authFetchHeaders()) },
         credentials: "include",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
@@ -126,10 +127,11 @@ export function GraphHopperCard() {
 export function TelemetryCard() {
   const { data, isLoading, error } = useQuery<TelemetryStats>({
     queryKey: ["/api/admin/telemetry-stats"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await fetch(new URL("/api/admin/telemetry-stats", getApiUrl()).toString(), {
         headers: { ...(await authFetchHeaders()) },
         credentials: "include",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();

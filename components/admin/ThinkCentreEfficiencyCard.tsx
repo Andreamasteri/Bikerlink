@@ -46,10 +46,10 @@ export function ThinkCentreEfficiencyCard() {
 
   const { data, isLoading, error } = useQuery<MetricsResponse>({
     queryKey: ["/api/admin/thinkcentre-metrics"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await fetch(
         new URL("/api/admin/thinkcentre-metrics", getApiUrl()).toString(),
-        { headers: { ...(await authFetchHeaders()) }, credentials: "include" },
+        { headers: { ...(await authFetchHeaders()) }, credentials: "include", signal: AbortSignal.any([signal, AbortSignal.timeout(10_000)]) },
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();

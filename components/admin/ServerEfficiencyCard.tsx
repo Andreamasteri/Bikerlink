@@ -83,10 +83,11 @@ export function ServerEfficiencyCard() {
 
   const { data, isLoading, error } = useQuery<ServerMetrics>({
     queryKey: ["/api/admin/server-metrics"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await fetch(new URL("/api/admin/server-metrics", getApiUrl()).toString(), {
         headers: { ...(await authFetchHeaders()) },
         credentials: "include",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
@@ -97,10 +98,11 @@ export function ServerEfficiencyCard() {
 
   const { data: logs } = useQuery<ServerLogs>({
     queryKey: ["/api/admin/server-logs"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await fetch(new URL("/api/admin/server-logs?lines=12", getApiUrl()).toString(), {
         headers: { ...(await authFetchHeaders()) },
         credentials: "include",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(5_000)]),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();

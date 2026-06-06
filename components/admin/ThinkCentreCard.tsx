@@ -79,10 +79,11 @@ export function ThinkCentreCard() {
 
   const { data, isLoading, error } = useQuery<ThinkCentreHealth>({
     queryKey: ["/api/admin/thinkcentre-health"],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await fetch(new URL("/api/admin/thinkcentre-health", getApiUrl()).toString(), {
         headers: { ...(await authFetchHeaders()) },
         credentials: "include",
+        signal: AbortSignal.any([signal, AbortSignal.timeout(12_000)]),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
