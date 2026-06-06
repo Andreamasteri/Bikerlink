@@ -13,9 +13,8 @@ import { Router, type Request, type Response } from "express";
 import { z } from "zod";
 import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
-import { sql } from "drizzle-orm";
-import { db } from "../../../db";
 import { sendError } from "../../../lib/api-response";
+import { getProviderStats7Days } from "../../../ai/route-provider-stats";
 import {
   getRouteProviderStatusList,
   setRouteProviderChain,
@@ -145,15 +144,8 @@ router.post("/route-providers/test", async (req: Request, res: Response) => {
 // ── GET /ai/route-providers/stats ─────────────────────────────────────────────
 router.get("/route-providers/stats", async (_req: Request, res: Response) => {
   try {
-    const rows = await db.execute(sql`
-      SELECT
-        COALESCE(metadata->>'provider_used', 'manual') AS provider,
-        COUNT(*)::int AS count
-      FROM planned_routes
-      GROUP BY COALESCE(metadata->>'provider_used', 'manual')
-      ORDER BY count DESC
-    `);
-    res.json({ stats: rows.rows });
+    const stats = await getProviderStats7Days();
+    res.json({ stats });
   } catch (err) {
     console.error("[admin/ai/route-providers/stats] GET error:", err);
     sendError(res, 500, (err as Error).message);

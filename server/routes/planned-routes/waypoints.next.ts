@@ -31,6 +31,7 @@ import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib
 import { getGroqModel, isGroqConfigured } from "../../lib/groq-client";
 import { getOpenAiRouteModel, isOpenAiRouteConfigured } from "../../lib/openai-route-client";
 import { getEffectiveRouteChain } from "../../ai/route-provider-config";
+import { incrementProviderStat } from "../../ai/route-provider-stats";
 
 interface RouteAiOptions<T> {
   prompt: string;
@@ -92,6 +93,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
           model: getOllamaModel(), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,
         });
+        incrementProviderStat("ollama");
         return { result: object, provider_used: "ollama" };
       } catch (err) {
         lastErr = err;
@@ -106,6 +108,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
           model: getGroqModel(), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,
         });
+        incrementProviderStat("groq");
         return { result: object, provider_used: "groq" };
       } catch (err) {
         lastErr = err;
@@ -120,6 +123,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
           model: geminiModel(apiKey), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,
         });
+        incrementProviderStat("gemini");
         return { result: object, provider_used: "gemini" };
       } catch (err) {
         lastErr = err;
@@ -134,6 +138,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
           model: getOpenAiRouteModel(), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,
         });
+        incrementProviderStat("openai");
         return { result: object, provider_used: "openai" };
       } catch (err) {
         lastErr = err;
@@ -244,6 +249,7 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
       try {
         const buffered = await bufferAndValidateStream(getOllamaModel(), fullPrompt, streamOpts);
         if (buffered) {
+          incrementProviderStat("ollama");
           onProviderSelected?.("ollama");
           for (const chunk of buffered) yield chunk;
           return;
@@ -263,6 +269,7 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
       try {
         const buffered = await bufferAndValidateStream(getGroqModel(), fullPrompt, streamOpts);
         if (buffered) {
+          incrementProviderStat("groq");
           onProviderSelected?.("groq");
           for (const chunk of buffered) yield chunk;
           return;
@@ -288,6 +295,7 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
           console.warn("[AI stream] Gemini output non valido, fallback provider successivo.");
           continue;
         }
+        incrementProviderStat("gemini");
         onProviderSelected?.("gemini");
         for (const chunk of geminiBuffer) yield chunk;
         return;
@@ -308,6 +316,7 @@ export async function* streamRouteText(opts: StreamRouteOptions): AsyncGenerator
           console.warn("[AI stream] OpenAI output non valido, fallback provider successivo.");
           continue;
         }
+        incrementProviderStat("openai");
         onProviderSelected?.("openai");
         for (const chunk of openaiBuffer) yield chunk;
         return;

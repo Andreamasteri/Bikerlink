@@ -222,7 +222,7 @@ export default function AiRouteProvidersScreen() {
 
       {statsData && statsData.stats.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Percorsi salvati per provider</Text>
+          <Text style={styles.cardTitle}>Parse AI — ultimi 7 giorni</Text>
           {statsData.stats.map((row) => {
             const color = PROVIDER_COLORS[row.provider as RouteProviderId] ?? Colors.textSecondary;
             const icon = PROVIDER_ICONS[row.provider as RouteProviderId] ?? "chart-bar";
