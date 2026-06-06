@@ -71,7 +71,11 @@ export function useEditProfileMutations() {
   const updateFloatingWidgetMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
       const prev = queryClient.getQueryData<ProfileData>(["/api/users/me"]);
+      const prevAuth = queryClient.getQueryData<Record<string, unknown>>(["/api/auth/me"]);
       queryClient.setQueryData<ProfileData>(["/api/users/me"], (old) =>
+        old ? { ...old, floatingWidgetEnabled: enabled } : old
+      );
+      queryClient.setQueryData<Record<string, unknown>>(["/api/auth/me"], (old) =>
         old ? { ...old, floatingWidgetEnabled: enabled } : old
       );
       try {
@@ -79,11 +83,13 @@ export function useEditProfileMutations() {
         return await res.json();
       } catch (e) {
         queryClient.setQueryData<ProfileData>(["/api/users/me"], prev);
+        queryClient.setQueryData<Record<string, unknown>>(["/api/auth/me"], prevAuth);
         throw e;
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
     },
     onError: (error: Error) => {
       Alert.alert(t("common.error"), (error as Error).message);
