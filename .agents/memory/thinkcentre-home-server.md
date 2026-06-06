@@ -29,3 +29,16 @@ indicatori per-servizio sparsi (routing-health, ai-hub, maps).
 considerato "online" per qualsiasi risposta HTTP < 500 (un 404/405 = server su, path/verbo
 diverso); solo 5xx o errore di rete/timeout = offline. Probare `/` con GET, non `/inference`
 (che è POST). Lo stesso vale per chiunque aggiunga health-check a servizi senza `/health`.
+
+## ⚠️ REGOLA CRITICA — URL Tailscale vietati in prod
+
+**Non usare mai URL `*.ts.net` (Tailscale) per i servizi del ThinkCentre nelle env var di produzione.**
+
+**Why:** il server Replit prod (`biker-link.replit.app`) è fuori dalla rete Tailscale → riceve 403 o timeout su qualsiasi `*.ts.net`. Funziona solo in dev locale (dove la macchina è nella stessa rete VPN).
+
+**How to apply:** per le env var `GRAPHHOPPER_URL`, `OLLAMA_URL`, `WHISPER_URL`, `NOMINATIM_URL` in produzione usare sempre:
+- IP pubblico del ThinkCentre (se statico), oppure
+- DuckDNS con nginx reverse proxy (Task #3306)
+
+Esempio sbagliato: `NOMINATIM_URL=https://bikerlink.tail5056aa.ts.net/nominatim`
+Esempio corretto: `NOMINATIM_URL=https://bikerlink.duckdns.org/nominatim`
