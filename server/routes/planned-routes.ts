@@ -9,11 +9,8 @@ import matchingIntegrationRouter from "./planned-routes/matching-integration";
 
 const router = Router();
 
-// Mount sub-routers
-// CRUD operations (/, /:id)
-router.use("/", crudRouter);
-
-// Waypoint management, AI, routing, weather, POI
+// Mount sub-routers — named routes FIRST, wildcard CRUD (/:id) LAST
+// Waypoint management, AI, routing, weather, POI, geocode
 router.use("/", waypointsRouter);
 
 // POI extra routes (poi-photo, poi-search) — companion di waypoints.ts
@@ -28,8 +25,11 @@ router.use("/", sharingNextRouter);
 // Elevation, multiday, style profile, hotels
 router.use("/", extrasRouter);
 
-// Task #2528 — integrazione matching ↔ planned routes
+// integrazione matching ↔ planned routes
 router.use("/", matchingIntegrationRouter);
+
+// CRUD operations (/, /:id) — MUST be last: GET /:id wildcard intercepts all unmatched GET paths
+router.use("/", crudRouter);
 
 // Export fallbackAiParse as it might be used elsewhere (though not in routes typically)
 export { fallbackAiParse } from "./planned-routes/utils";
