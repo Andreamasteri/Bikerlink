@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { Platform } from "react-native";
 import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getAppLanguage } from "@/lib/i18n";
 import type { AudioRecorder } from "expo-audio";
 
 export type WhisperSource = "home" | "cloud";
@@ -108,6 +109,7 @@ export function useWhisperRecorder(): UseWhisperRecorderReturn {
         fieldName: "file",
         mimeType: "audio/m4a",
         headers: authFetchHeaders(),
+        parameters: { language: getAppLanguage() },
       });
 
       if (response.status < 200 || response.status >= 300) {

@@ -41,6 +41,9 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
       req.file.buffer.byteOffset + req.file.buffer.byteLength
     ) as ArrayBuffer;
 
+    const rawLang = typeof req.body?.language === "string" ? req.body.language.trim() : "";
+    const lang = /^[a-z]{2}$/.test(rawLang) ? rawLang : "it";
+
     const chain = await getEffectiveSttChain();
 
     for (const providerId of chain) {
@@ -56,6 +59,7 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
           const blob = new Blob([arrayBuf], { type: mimetype });
           formData.append("file", blob, filename);
           formData.append("response_format", "json");
+          formData.append("language", lang);
 
           const headers: Record<string, string> = {};
           if (whisperToken) {
@@ -113,6 +117,7 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
           formData.append("file", blob, filename);
           formData.append("model", "whisper-large-v3-turbo");
           formData.append("response_format", "json");
+          formData.append("language", lang);
 
           const groqController = new AbortController();
           const groqTimeout = setTimeout(() => groqController.abort(), 20000);
@@ -167,6 +172,7 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
           formData.append("file", blob, filename);
           formData.append("model", "whisper-1");
           formData.append("response_format", "json");
+          formData.append("language", lang);
 
           const openaiController = new AbortController();
           const openaiTimeout = setTimeout(() => openaiController.abort(), 25000);
