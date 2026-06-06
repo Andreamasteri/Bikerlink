@@ -16,6 +16,7 @@ interface ServiceHealth {
   url: string | null;
   error?: string;
   tileVersion?: string;
+  tokenMissing?: boolean;
 }
 
 interface ThinkCentreHealth {
@@ -23,6 +24,13 @@ interface ThinkCentreHealth {
   onlineCount: number;
   configuredCount: number;
   services: ServiceHealth[];
+  tokenFingerprints?: {
+    graphhopper: string | null;
+    valhalla: string | null;
+    ollama: string | null;
+    whisper: string | null;
+    nominatim: string | null;
+  };
   checkedAt: number;
 }
 
@@ -62,6 +70,7 @@ function serviceStatusLabel(s: ServiceHealth): string {
     const base = s.latencyMs != null ? `Online · ${s.latencyMs} ms` : "Online";
     return s.tileVersion ? `${base} · tile ${s.tileVersion}` : base;
   }
+  if (s.tokenMissing) return "Offline · token assente in Replit";
   return s.error ? `Offline · ${s.error}` : "Offline";
 }
 
@@ -116,31 +125,46 @@ export function ThinkCentreCard() {
           {error && !isLoading && (
             <Text style={styles.errorText}>Impossibile leggere lo stato dei servizi.</Text>
           )}
-          {data?.services.map((s) => (
-            <View key={s.key} style={styles.row}>
-              <MaterialCommunityIcons
-                name={SERVICE_ICONS[s.key]}
-                size={18}
-                color={serviceColor(s)}
-                style={styles.rowIcon}
-              />
-              <View style={styles.rowText}>
-                <Text style={styles.rowLabel}>{s.label}</Text>
-                <Text style={styles.rowStatus} numberOfLines={1}>
-                  {serviceStatusLabel(s)}
-                  {s.configured && s.url ? ` · ${s.url}` : ""}
-                </Text>
+          {data?.services.map((s) => {
+            const fp = data.tokenFingerprints?.[s.key] ?? null;
+            const showFingerprint = s.configured && (!s.ok || s.tokenMissing) && fp;
+            return (
+              <View key={s.key} style={styles.row}>
+                <MaterialCommunityIcons
+                  name={SERVICE_ICONS[s.key]}
+                  size={18}
+                  color={serviceColor(s)}
+                  style={styles.rowIcon}
+                />
+                <View style={styles.rowText}>
+                  <Text style={styles.rowLabel}>{s.label}</Text>
+                  <Text style={styles.rowStatus} numberOfLines={1}>
+                    {serviceStatusLabel(s)}
+                    {s.configured && s.url ? ` · ${s.url}` : ""}
+                  </Text>
+                  {showFingerprint && (
+                    <Text style={styles.fingerprint} numberOfLines={1}>
+                      token Replit: {fp}…
+                    </Text>
+                  )}
+                  {s.configured && !s.ok && !fp && s.tokenMissing !== true && (
+                    <Text style={styles.fingerprint}>token Replit: non configurato</Text>
+                  )}
+                </View>
+                <View style={[styles.healthDot, { backgroundColor: serviceColor(s) }]} />
               </View>
-              <View style={[styles.healthDot, { backgroundColor: serviceColor(s) }]} />
-            </View>
-          ))}
+            );
+          })}
           {data && data.configuredCount > 0 && data.onlineCount === 0 && (
             <View style={styles.note}>
               <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
               <Text style={styles.noteText}>
                 Il server di casa è raggiungibile solo se acceso e con tunnel attivo. Se tutti i
                 servizi risultano offline, verifica che il ThinkCentre sia acceso e il tunnel
-                configurato (anche da cloud il probe passa solo via tunnel).
+                configurato (anche da cloud il probe passa solo via tunnel).{"\n"}
+                Per diagnosticare disallineamenti token, esegui{" "}
+                <Text style={styles.mono}>check-token-fingerprints.sh</Text> sul ThinkCentre e
+                confronta i fingerprint con quelli mostrati qui.
               </Text>
             </View>
           )}
@@ -191,12 +215,13 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 10,
   },
   rowIcon: {
     width: 22,
     textAlign: "center",
+    marginTop: 2,
   },
   rowText: {
     flex: 1,
@@ -211,6 +236,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textSecondary,
     marginTop: 1,
+  },
+  fingerprint: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "#6b7280",
+    marginTop: 2,
+    letterSpacing: 0.4,
+  },
+  mono: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "#9ca3af",
   },
   errorText: {
     fontFamily: "Inter_400Regular",

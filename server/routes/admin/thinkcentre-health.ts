@@ -12,6 +12,7 @@
  */
 
 import { Router, type Request, type Response } from "express";
+import { createHash } from "crypto";
 import { getNominatimHealthSnapshot } from "../../lib/nominatim-client";
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
 
@@ -31,6 +32,14 @@ interface ServiceHealth {
   error?: string;
   /** Versione del tileset Valhalla (versione engine + data tile), se disponibile. */
   tileVersion?: string;
+  /** URL configurato ma token assente: diverso da 401 (token presente ma sbagliato). */
+  tokenMissing?: boolean;
+}
+
+/** Prime 8 hex del SHA-256 del token — fingerprint sicuro senza esporre il valore. */
+function tokenFingerprint(token: string | undefined | null): string | null {
+  if (!token) return null;
+  return createHash("sha256").update(token).digest("hex").slice(0, 8);
 }
 
 /** Maschera un URL mostrando solo protocollo + hostname (mai path/query/credenziali). */
@@ -135,6 +144,7 @@ async function probeGraphHopper(): Promise<ServiceHealth> {
   if (!base) {
     return { key: "graphhopper", label: "GraphHopper", configured: false, ok: false, latencyMs: null, url: null };
   }
+  const tokenMissing = !token || token.trim() === "";
   const headers: Record<string, string> = {};
   if (token) headers["X-GH-Token"] = token;
 
@@ -150,7 +160,7 @@ async function probeGraphHopper(): Promise<ServiceHealth> {
     (status) => (status >= 200 && status < 300) || status === 401 || status === 403,
   );
   if (health.ok) {
-    return { key: "graphhopper", label: "GraphHopper", configured: true, ok: true, latencyMs: health.latencyMs, url: maskUrl(base) };
+    return { key: "graphhopper", label: "GraphHopper", configured: true, ok: true, latencyMs: health.latencyMs, url: maskUrl(base), tokenMissing };
   }
 
   // 2) Fallback: alcuni deploy dietro tunnel restituiscono 5xx su /health ma
@@ -164,6 +174,7 @@ async function probeGraphHopper(): Promise<ServiceHealth> {
     latencyMs: route.latencyMs,
     url: maskUrl(base),
     error: route.ok ? undefined : (route.error ?? health.error),
+    tokenMissing,
   };
 }
 
@@ -179,6 +190,7 @@ async function probeValhalla(): Promise<ServiceHealth> {
   if (!base) {
     return { key: "valhalla", label: "Valhalla", configured: false, ok: false, latencyMs: null, url: null };
   }
+  const tokenMissing = !apiKey || apiKey.trim() === "";
   const headers: Record<string, string> = {};
   if (apiKey) headers["X-Valhalla-Key"] = apiKey;
 
@@ -189,7 +201,7 @@ async function probeValhalla(): Promise<ServiceHealth> {
     const res = await fetch(`${base}/status`, { method: "GET", headers, signal: controller.signal });
     const latencyMs = Date.now() - t0;
     if (res.status < 200 || res.status >= 300) {
-      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error: `HTTP ${res.status}` };
+      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error: `HTTP ${res.status}`, tokenMissing };
     }
     const data = (await res.json().catch(() => ({}))) as {
       version?: string;
@@ -207,10 +219,11 @@ async function probeValhalla(): Promise<ServiceHealth> {
       latencyMs,
       url: maskUrl(base),
       tileVersion,
+      tokenMissing,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error: sanitizeError(msg) };
+    return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error: sanitizeError(msg), tokenMissing };
   } finally {
     clearTimeout(timer);
   }
@@ -222,10 +235,11 @@ async function probeOllama(): Promise<ServiceHealth> {
   if (!base) {
     return { key: "ollama", label: "Ollama AI", configured: false, ok: false, latencyMs: null, url: null };
   }
+  const tokenMissing = !token || token.trim() === "";
   const headers: Record<string, string> = {};
   if (token) headers["X-Ollama-Token"] = token;
   const r = await httpProbe(`${base}/api/tags`, headers);
-  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error: r.error };
+  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error: r.error, tokenMissing };
 }
 
 /**
@@ -239,6 +253,7 @@ async function probeWhisper(): Promise<ServiceHealth> {
   if (!base) {
     return { key: "whisper", label: "Whisper ASR", configured: false, ok: false, latencyMs: null, url: null };
   }
+  const tokenMissing = !token || token.trim() === "";
 
   // WAV silenzioso minimale: 0.5s, mono 16kHz 16-bit PCM (stessa funzione di admin-whisper-config)
   const sampleRate = 16000;
@@ -264,12 +279,12 @@ async function probeWhisper(): Promise<ServiceHealth> {
     const res = await fetch(`${base}/inference`, { method: "POST", headers, body: formData, signal: controller.signal });
     const latencyMs = Date.now() - t0;
     if (res.status >= 200 && res.status < 300) {
-      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base) };
+      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base), tokenMissing };
     }
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error: `HTTP ${res.status}` };
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error: `HTTP ${res.status}`, tokenMissing };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error: sanitizeError(msg) };
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error: sanitizeError(msg), tokenMissing };
   } finally {
     clearTimeout(timer);
   }
@@ -277,6 +292,8 @@ async function probeWhisper(): Promise<ServiceHealth> {
 
 async function probeNominatim(): Promise<ServiceHealth> {
   const snap = await getNominatimHealthSnapshot();
+  const token = process.env.NOMINATIM_TOKEN;
+  const tokenMissing = snap.configured && (!token || token.trim() === "");
   return {
     key: "nominatim",
     label: "Nominatim",
@@ -284,6 +301,7 @@ async function probeNominatim(): Promise<ServiceHealth> {
     ok: snap.ok,
     latencyMs: snap.latencyMs,
     url: snap.configured ? snap.url : null,
+    tokenMissing,
   };
 }
 
@@ -306,7 +324,16 @@ router.get("/thinkcentre-health", async (_req: Request, res: Response) => {
           : onlineCount === 0
             ? "red"
             : "yellow";
-    return res.json({ overall, onlineCount, configuredCount: configured.length, services, checkedAt: Date.now() });
+
+    const tokenFingerprints = {
+      graphhopper: tokenFingerprint(process.env.GRAPHHOPPER_TOKEN),
+      valhalla:    tokenFingerprint(process.env.VALHALLA_API_KEY),
+      ollama:      tokenFingerprint(process.env.OLLAMA_TOKEN),
+      whisper:     tokenFingerprint(process.env.WHISPER_TOKEN),
+      nominatim:   tokenFingerprint(process.env.NOMINATIM_TOKEN),
+    };
+
+    return res.json({ overall, onlineCount, configuredCount: configured.length, services, tokenFingerprints, checkedAt: Date.now() });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[admin/thinkcentre-health] errore:", msg);
