@@ -1,0 +1,16 @@
+[Unit]
+Description=BikerLink — git pull automatico
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=andrea
+Environment=HOME=/home/andrea
+ExecStart=/bin/bash /home/andrea/bikerlink/infra/self-host/bikerlink-update.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=bikerlink-update
+
+[Install]
+WantedBy=multi-user.target

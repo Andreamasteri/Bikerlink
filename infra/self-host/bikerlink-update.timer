@@ -1,0 +1,12 @@
+[Unit]
+Description=BikerLink — timer git pull ogni 5 minuti
+Requires=bikerlink-update.service
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=30s
+Persistent=true
+
+[Install]
+WantedBy=timers.target
