@@ -261,6 +261,21 @@ export default function GiriCreateScreen() {
         <WeatherPreviewBanner weatherLoading={weatherLoading} weatherPreview={weatherPreview} />
         {weatherPreview && weatherPreview.length > 0 && <WeatherPreviewRow weather={weatherPreview} colors={colors} />}
 
+        {(() => {
+          const unresolvedCount = waypoints.filter((wp, i) => (wpInputs[i] ?? "").trim().length > 0 && wp.lat === 0).length;
+          if (unresolvedCount === 0) return null;
+          return (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 10, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: "#f59e0b18", borderWidth: 1, borderColor: "#f59e0b55" }}>
+              <Ionicons name="warning-outline" size={15} color="#f59e0b" />
+              <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: "#f59e0b", flex: 1 }}>
+                {unresolvedCount === 1
+                  ? "1 luogo da confermare — tocca 📍 per selezionare"
+                  : `${unresolvedCount} luoghi da confermare — tocca 📍 per selezionare`}
+              </Text>
+            </View>
+          );
+        })()}
+
         <ActionButtonsSection calculating={calculating} handleCalculate={handleCalculate} routeResult={routeResult} handleSave={handleSave} saveMutationPending={saveMutationPending} routeError={routeError} />
 
         <RouteResultSection

@@ -244,6 +244,7 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
           <Text style={s.addWpText}>Importa GPX</Text>
         </Pressable>
       </View>
+
     </View>
   );
 };
