@@ -62,7 +62,7 @@ ${matchSubnav("/matching/per-investitori")}
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
       Scarica PDF tecnico
     </a>
-    <a class="btn btn-outline" href="/investors">Investor deck completo</a>
+    <a class="btn btn-outline" href="/matching/per-investitori">Technical deep dive per investitori</a>
   </div>
 </section>
 
@@ -263,7 +263,7 @@ flowchart TB
   <p>Siamo in fase early — il momento giusto per entrare. Scrivici per una call.</p>
   <div class="btn-row" style="justify-content:center">
     <a class="btn btn-primary" href="mailto:invest@bikerlink.app">📩 Contattaci</a>
-    <a class="btn btn-outline" href="/investors">Investor deck completo</a>
+    <a class="btn btn-outline" href="/matching/per-investitori">Technical deep dive per investitori</a>
     <a class="btn btn-outline" href="/matching/pdf" target="_blank" rel="noopener">📄 Scarica PDF</a>
   </div>
 </div>

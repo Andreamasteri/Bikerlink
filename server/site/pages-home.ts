@@ -199,7 +199,7 @@ export function buildHome(baseUrl: string, images?: LandingImages): { meta: Page
   <div class="home-hero-overlay" aria-hidden="true"></div>
   <div class="home-hero-inner">
     <div class="home-hero-eyebrow">La community italiana dei biker</div>
-    <h1 class="home-hero-title">BIKER<span class="dot">·</span>LINK</h1>
+    <h1 class="home-hero-title">BIKER<span class="dot">·</span>LINK<span style="display:block;font-size:0.27em;letter-spacing:5px;font-weight:700;color:rgba(255,255,255,0.5);margin-top:14px">APP PER MOTOCICLISTI</span></h1>
     <p class="home-hero-sub">U'll Never Ride Alone</p>
     <p class="home-hero-desc">La prima piattaforma verticale per motociclisti. Mappa live, MotoClub, SOS d'emergenza e contest fotografici — tutto gratis, per sempre.</p>
     <div class="home-hero-btns">

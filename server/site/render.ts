@@ -92,7 +92,7 @@ function footer(): string {
         <li><a href="/about" data-i18n="footer.about">Chi siamo</a></li>
         <li><a href="/faq" data-i18n="footer.faq">Domande frequenti</a></li>
         <li><a href="/contact" data-i18n="footer.contact">Contatti</a></li>
-        <li><a href="/investors" data-i18n="footer.investors">Investitori</a></li>
+        <li><a href="/matching/per-investitori" data-i18n="footer.investors">Investitori</a></li>
       </ul>
     </div>
     <div>

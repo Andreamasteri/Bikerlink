@@ -42,7 +42,7 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
   },
   {
     q: "Posso contattarvi per una partnership o per i media?",
-    a: "Certo. Scrivici a bikerlinkapp@gmail.com indicando 'Partnership' o 'Press' nell'oggetto. Per gli investitori c'è una pagina dedicata su /investors con metriche, modello di business e contatti.",
+    a: "Certo. Scrivici a bikerlinkapp@gmail.com indicando 'Partnership' o 'Press' nell'oggetto. Per gli investitori c'è una pagina dedicata su <a href='/matching/per-investitori'>metriche per investitori</a> con architettura tecnica, modello di business e contatti.",
   },
 ];
 

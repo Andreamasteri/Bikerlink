@@ -50,7 +50,7 @@ export function buildAbout(baseUrl: string): { meta: PageMeta; body: string } {
 
     <h2>Contatti</h2>
     <p>Per qualsiasi cosa — bug, partnership, stampa, investimenti — scrivici a <a href="mailto:bikerlinkapp@gmail.com">bikerlinkapp@gmail.com</a>. Rispondiamo in 48h max.</p>
-    <p>Per gli investitori c'è una pagina dedicata: <a href="/investors">/investors</a>.</p>
+    <p>Per gli investitori c'è una pagina dedicata: <a href="/matching/per-investitori">metriche per investitori</a>.</p>
   </div>
 </section>
 
@@ -126,7 +126,7 @@ export function buildContact(
       <li><strong>Privacy Policy</strong> — quali dati raccogliamo, dove finiscono, come cancellarli: leggi la <a href="/privacy">privacy policy</a>.</li>
       <li><strong>Termini di servizio</strong> — regole di comportamento, responsabilità, account: <a href="/terms">termini</a>.</li>
       <li><strong>Eliminazione account</strong> — puoi farlo direttamente dall'app o dalla <a href="/delete-account">pagina dedicata</a>.</li>
-      <li><strong>Investitori</strong> — metriche, modello di business, contatti dedicati: <a href="/investors">pagina investitori</a>.</li>
+      <li><strong>Investitori</strong> — metriche, modello di business, contatti dedicati: <a href="/matching/per-investitori">metriche per investitori</a>.</li>
     </ul>
 
     <h2>Tempi di risposta</h2>

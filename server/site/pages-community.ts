@@ -22,7 +22,7 @@ export function buildCommunity(
   const body = `
 <section class="page-hero">
   <div class="breadcrumb"><a href="/">Home</a> &nbsp;/&nbsp; Community</div>
-  <h1>COMMU<span class="accent">NITY</span></h1>
+  <h1>COMMUNITY <span class="accent">BIKER</span><span style="display:block;font-size:0.38em;letter-spacing:3px;font-weight:700;color:var(--text3);margin-top:10px">MAPPA MONDIALE E RADUNI</span></h1>
   <p class="lead">Riders da tutta Italia (e oltre). Mostriamo dove sono, cosa fanno, e perché vale la pena unirsi. Una rete pensata per chi vive la strada in moto e cerca persone vere con cui condividerla.</p>
 </section>
 

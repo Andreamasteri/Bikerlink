@@ -46,7 +46,7 @@ export function buildFeatures(
   const body = `
 <section class="page-hero">
   <div class="breadcrumb"><a href="/">Home</a> &nbsp;/&nbsp; Funzionalità</div>
-  <h1>FUNZIO<span class="accent">NALITÀ</span></h1>
+  <h1>FUNZIONALITÀ <span class="accent">BIKERLINK</span><span style="display:block;font-size:0.38em;letter-spacing:3px;font-weight:700;color:var(--text3);margin-top:10px">PER MOTOCICLISTI</span></h1>
   <p class="lead">Sei moduli costruiti per il motociclista italiano. Niente filler — ogni feature risolve un problema reale.</p>
 </section>
 
@@ -57,7 +57,7 @@ export function buildFeatures(
     ${feature("SOS", "Un tasto. La rete ti trova.", "Quando attivi l'SOS, la tua posizione precisa viene inviata ai motociclisti entro il raggio scelto. Chat privata istantanea con chi accetta. Tutto integrato, niente numeri da chiamare in panico.", "/assets/images/bike-road-2.webp", "Moto sulla strada — SOS emergenza biker", "/sos", "Come funziona l'SOS", 1200, 1800)}
     ${feature("Contest foto", "Mostra la tua moto. Vinci visibilità.", "Concorsi fotografici settimanali con voto degli iscritti. Categorie tematiche, classifica live, profili in evidenza per i vincitori. Pubblica la foto del tuo ultimo giro e raccontala.", "/assets/images/contest-1.webp", "Foto contest moto — BikerLink PicContest", "/community", "Vedi i contest", 1200, 800)}
     ${feature("Tracking GPS", "Registra ogni giro. Senza limiti.", "Tracker preciso con km, velocità media, G-force longitudinale e accelerazione. Storico privato, statistiche cumulative, e modalità Ghost se non vuoi essere visibile durante il giro.", "/assets/images/telemetry-dash.webp", "Dashboard telemetria moto — tracking GPS BikerLink", "/about", "Leggi la mission", 1024, 1024)}
-    ${feature("Matching biker", "Trova compagni di viaggio compatibili.", "Algoritmo basato su moto posseduta, stile di guida, zona, e gusti musicali (integrazione Last.fm opzionale). Più che un'app di incontri — un modo per non partire più da soli.", "/assets/images/card-biker.webp", "Biker solitario — matching compagni di viaggio", "/faq", "Domande frequenti", 800, 1200)}
+    ${feature("Matching biker", "Trova compagni di viaggio compatibili.", "Algoritmo basato su moto posseduta, stile di guida, zona, e gusti musicali (integrazione Last.fm opzionale). Più che un'app di incontri — un modo per non partire più da soli.", "/assets/images/card-biker.webp", "Biker solitario — matching compagni di viaggio", "/matching/come-funziona", "Come funziona il matching", 800, 1200)}
   </div>
 </section>
 
