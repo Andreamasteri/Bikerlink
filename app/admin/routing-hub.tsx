@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { ValhallaBenchCard } from "@/components/admin/ValhallaBenchCard";
 import type { RoutingStatus } from "./routing-control/types";
 
 interface QuickLink {
@@ -116,6 +117,12 @@ export default function RoutingHubScreen() {
             <Text style={styles.statLabel}>Errori</Text>
           </View>
         </View>
+      </View>
+
+      {/* Bench Valhalla */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Bench Valhalla</Text>
+        <ValhallaBenchCard />
       </View>
 
       {/* Quick links */}

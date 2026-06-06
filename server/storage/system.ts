@@ -98,6 +98,21 @@ export class SystemStorage extends AdsStorage {
     return db.select().from(appSettings);
   }
 
+  /**
+   * Upsert atomico di più app settings in un'unica transazione.
+   * Se una qualsiasi scrittura fallisce, l'intera operazione viene annullata
+   * (nessuno stato parziale persistito).
+   */
+  async upsertAppSettingsAtomic(entries: { key: string; value?: string; valueJson?: unknown }[]): Promise<void> {
+    await db.transaction(async (tx) => {
+      for (const e of entries) {
+        await tx.insert(appSettings)
+          .values({ key: e.key, value: e.value, valueJson: e.valueJson, updatedAt: new Date() })
+          .onConflictDoUpdate({ target: [appSettings.key], set: { value: e.value, valueJson: e.valueJson, updatedAt: new Date() } });
+      }
+    });
+  }
+
   async getPhoneSharedCount(conversationId: string, userId: string): Promise<number> {
     const [row] = await db.select().from(phoneSharingTracker).where(and(eq(phoneSharingTracker.conversationId, conversationId), eq(phoneSharingTracker.userId, userId))).limit(1);
     return row?.sharedCount ?? 0;

@@ -56,6 +56,33 @@ export interface RoutingStatus {
   metrics: RoutingCounters;
 }
 
+export interface ValhallaBenchEngineRun {
+  ok: boolean;
+  distanceKm: number | null;
+  durationMin: number | null;
+  latencyMs: number;
+  error?: string;
+}
+
+export interface ValhallaBenchRow {
+  id: string;
+  name: string;
+  gh: ValhallaBenchEngineRun;
+  valhalla: ValhallaBenchEngineRun;
+  deltaDistancePct: number | null;
+  deltaTimePct: number | null;
+  pass: boolean;
+}
+
+export interface ValhallaBenchResult {
+  ok: boolean;
+  passDeltaPct: number;
+  minPassForActivation: number;
+  score: { passed: number; total: number };
+  canActivate: boolean;
+  results: ValhallaBenchRow[];
+}
+
 export interface RoutingTestResult {
   ok: boolean;
   engine: string;

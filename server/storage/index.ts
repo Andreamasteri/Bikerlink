@@ -211,6 +211,7 @@ export interface IStorage {
   updateFeedbackTicket(id: string, updates: { status?: string; internalNote?: string }): Promise<FeedbackTicket | undefined>;
   getAppSetting(key: string): Promise<AppSetting | undefined>;
   upsertAppSetting(key: string, value?: string, valueJson?: unknown): Promise<AppSetting>;
+  upsertAppSettingsAtomic(entries: { key: string; value?: string; valueJson?: unknown }[]): Promise<void>;
   createVerificationCode(code: InsertVerificationCode): Promise<VerificationCode>;
   createPasswordResetToken(userId: string, token: string, expiresAt: Date): Promise<void>;
   getNearbyUsers(lat: number, lng: number, radiusKm: number, countries?: string[], motoTagIds?: string[]): Promise<Array<{ user: User; profile: UserProfile; distance: number }>>;
