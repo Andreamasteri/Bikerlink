@@ -135,12 +135,12 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
                 {!isLoading && wpSuggestions && wpSuggestions.index === i && wpSuggestions.results.length === 0 && (
                   <View style={s.panelRow}>
                     <Ionicons
-                      name={wpSuggestions.error ? "warning-outline" : "search-outline"}
+                      name={wpSuggestions.error ? "cloud-offline-outline" : "search-outline"}
                       size={14}
-                      color={wpSuggestions.error ? colors.accent : colors.textSecondary}
+                      color={wpSuggestions.error ? colors.accentRed : colors.textSecondary}
                     />
-                    <Text style={s.panelHintText}>
-                      {wpSuggestions.error ? "Ricerca non disponibile, riprova" : "Nessun risultato trovato"}
+                    <Text style={[s.panelHintText, wpSuggestions.error && { color: colors.accentRed }]}>
+                      {wpSuggestions.error ? "Impossibile raggiungere il server, controlla la connessione" : "Nessun risultato trovato"}
                     </Text>
                   </View>
                 )}
@@ -214,12 +214,12 @@ export const WaypointsSection: React.FC<WaypointsSectionProps> = ({
             {wpSuggestions && (fallbackForIndex === null || wpSuggestions.index === fallbackForIndex) && !wpLoading && wpSuggestions.results.length === 0 && (
               <View style={s.panelRow}>
                 <Ionicons
-                  name={wpSuggestions.error ? "warning-outline" : "search-outline"}
+                  name={wpSuggestions.error ? "cloud-offline-outline" : "search-outline"}
                   size={14}
-                  color={wpSuggestions.error ? colors.accent : colors.textSecondary}
+                  color={wpSuggestions.error ? colors.accentRed : colors.textSecondary}
                 />
-                <Text style={s.panelHintText}>
-                  {wpSuggestions.error ? "Ricerca non disponibile, riprova" : "Nessun risultato trovato"}
+                <Text style={[s.panelHintText, wpSuggestions.error && { color: colors.accentRed }]}>
+                  {wpSuggestions.error ? "Impossibile raggiungere il server, controlla la connessione" : "Nessun risultato trovato"}
                 </Text>
               </View>
             )}
