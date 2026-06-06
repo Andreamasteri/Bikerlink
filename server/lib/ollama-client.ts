@@ -8,7 +8,7 @@
  *   OLLAMA_URL    — URL base del server Ollama (es: https://bikerlink.tail5056aa.ts.net/ollama)
  *                   Se non impostata, le funzioni lanciano un errore catchable e il
  *                   chiamante ricade sul provider cloud (Gemini/OpenAI).
- *   OLLAMA_TOKEN  — Token per il server self-hosted (header X-Ollama-Token).
+ *   OLLAMA_TOKEN  — Token per il server self-hosted (header Authorization: Bearer).
  *   OLLAMA_MODEL  — Modello locale da usare.
  *                   Default: "bikerlink" se disponibile (Modelfile custom Task #3017),
  *                   altrimenti "llama3.2:latest".
@@ -63,7 +63,7 @@ export async function isOllamaReachable(): Promise<boolean> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
     const headers: Record<string, string> = OLLAMA_TOKEN
-      ? { "X-Ollama-Token": OLLAMA_TOKEN }
+      ? { "Authorization": `Bearer ${OLLAMA_TOKEN}` }
       : {};
     const res = await fetch(`${OLLAMA_URL}/`, { method: "HEAD", headers, signal: controller.signal });
     clearTimeout(timer);
@@ -94,7 +94,7 @@ export function getOllamaModel(model: string = OLLAMA_MODEL): LanguageModel {
   }
   const provider = createOllama({
     baseURL: `${OLLAMA_URL}/api`,
-    headers: OLLAMA_TOKEN ? { "X-Ollama-Token": OLLAMA_TOKEN } : undefined,
+    headers: OLLAMA_TOKEN ? { "Authorization": `Bearer ${OLLAMA_TOKEN}` } : undefined,
   });
   return provider(model);
 }

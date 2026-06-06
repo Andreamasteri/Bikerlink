@@ -237,9 +237,12 @@ async function probeOllama(): Promise<ServiceHealth> {
   }
   const tokenMissing = !token || token.trim() === "";
   const headers: Record<string, string> = {};
-  if (token) headers["X-Ollama-Token"] = token;
+  if (token) headers["Authorization"] = `Bearer ${token}`;
   const r = await httpProbe(`${base}/api/tags`, headers);
-  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error: r.error, tokenMissing };
+  const error = r.error === "HTTP 401"
+    ? "Token non valido (HTTP 401)"
+    : r.error;
+  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing };
 }
 
 /**
@@ -267,7 +270,7 @@ async function probeWhisper(): Promise<ServiceHealth> {
   wav.write("data", 36); wav.writeUInt32LE(dataSize, 40);
 
   const headers: Record<string, string> = {};
-  if (token) headers["X-Whisper-Token"] = token;
+  if (token) headers["Authorization"] = `Bearer ${token}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8_000);
@@ -281,7 +284,10 @@ async function probeWhisper(): Promise<ServiceHealth> {
     if (res.status >= 200 && res.status < 300) {
       return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base), tokenMissing };
     }
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error: `HTTP ${res.status}`, tokenMissing };
+    const error = res.status === 401
+      ? "Token non valido (HTTP 401)"
+      : `HTTP ${res.status}`;
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error: sanitizeError(msg), tokenMissing };

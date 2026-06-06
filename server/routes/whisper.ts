@@ -63,7 +63,7 @@ router.post("/transcribe", audioUpload.single("file"), async (req: Request, res:
 
           const headers: Record<string, string> = {};
           if (whisperToken) {
-            headers["X-Whisper-Token"] = whisperToken;
+            headers["Authorization"] = `Bearer ${whisperToken}`;
           }
 
           const controller = new AbortController();
