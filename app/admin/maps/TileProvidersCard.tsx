@@ -12,11 +12,19 @@ interface ProvidersResponse {
 }
 
 type SectionData = { title: TileCategory; data: ProviderItem[] };
+type CostFilter = "all" | "free" | "api-key";
 
 const ALL_CATEGORIES: TileCategory[] = ["base", "topo", "satellite", "overlay"];
 
-function groupByCategory(providers: ProviderItem[], filter: TileCategory | "all"): SectionData[] {
-  const filtered = filter === "all" ? providers : providers.filter((p) => p.category === filter);
+function groupByCategory(
+  providers: ProviderItem[],
+  categoryFilter: TileCategory | "all",
+  costFilter: CostFilter,
+): SectionData[] {
+  let filtered = categoryFilter === "all" ? providers : providers.filter((p) => p.category === categoryFilter);
+  if (costFilter !== "all") {
+    filtered = filtered.filter((p) => p.cost === costFilter);
+  }
   const map: Record<string, ProviderItem[]> = {};
   for (const p of filtered) {
     (map[p.category] ??= []).push(p);
@@ -27,6 +35,7 @@ function groupByCategory(providers: ProviderItem[], filter: TileCategory | "all"
 export function TileProvidersCard() {
   const [expanded, setExpanded] = React.useState(false);
   const [categoryFilter, setCategoryFilter] = React.useState<TileCategory | "all">("all");
+  const [costFilter, setCostFilter] = React.useState<CostFilter>("all");
 
   const { data, isLoading } = useQuery<ProvidersResponse>({
     queryKey: ["/api/admin/maps/providers"],
@@ -53,7 +62,7 @@ export function TileProvidersCard() {
     },
   });
 
-  const sections = data ? groupByCategory(data.providers, categoryFilter) : [];
+  const sections = data ? groupByCategory(data.providers, categoryFilter, costFilter) : [];
   const active = data?.providers.find((p) => p.isActive);
 
   return (
@@ -84,6 +93,19 @@ export function TileProvidersCard() {
               >
                 <Text style={[styles.filterChipText, categoryFilter === cat && styles.filterChipTextActive]}>
                   {cat === "all" ? "Tutti" : cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterRow}>
+            {(["all", "free", "api-key"] as CostFilter[]).map((cost) => (
+              <TouchableOpacity
+                key={cost}
+                style={[styles.filterChip, costFilter === cost && styles.filterChipCostActive]}
+                onPress={() => setCostFilter(cost)}
+              >
+                <Text style={[styles.filterChipText, costFilter === cost && styles.filterChipTextCostActive]}>
+                  {cost === "all" ? "Tutti i costi" : cost === "free" ? "Gratuito" : "API key"}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -130,8 +152,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background, marginRight: 8,
   },
   filterChipActive: { borderColor: Colors.accent, backgroundColor: Colors.accent + "15" },
+  filterChipCostActive: { borderColor: "#22c55e", backgroundColor: "#22c55e15" },
   filterChipText: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.text },
   filterChipTextActive: { color: Colors.accent, fontFamily: "Inter_500Medium" },
+  filterChipTextCostActive: { color: "#22c55e", fontFamily: "Inter_500Medium" },
   sectionLabel: {
     fontFamily: "Inter_500Medium", fontSize: 11, color: Colors.textSecondary,
     textTransform: "uppercase", letterSpacing: 0.5, marginTop: 12, marginBottom: 6,
