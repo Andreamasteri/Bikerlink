@@ -21,6 +21,12 @@ interface EditPreferencesProps {
   setShowLanguageDropdown: (show: boolean) => void;
   floatingWidgetEnabled: boolean;
   onToggleFloatingWidget: (enabled: boolean) => void;
+  isUpdatingFloatingWidget?: boolean;
+  adminWidgetEnabled: boolean;
+  assistantWidgetEnabled: boolean;
+  onToggleAssistantWidget: (enabled: boolean) => void;
+  isUpdatingAssistantWidget?: boolean;
+  assistantAdminDisabled: boolean;
   handleDeleteAccount: () => void;
   setShowRevokeConsentModal: (show: boolean) => void;
 }
@@ -44,6 +50,12 @@ export function EditPreferences({
   setShowLanguageDropdown,
   floatingWidgetEnabled,
   onToggleFloatingWidget,
+  isUpdatingFloatingWidget,
+  adminWidgetEnabled,
+  assistantWidgetEnabled,
+  onToggleAssistantWidget,
+  isUpdatingAssistantWidget,
+  assistantAdminDisabled,
   handleDeleteAccount,
   setShowRevokeConsentModal,
 }: EditPreferencesProps) {
@@ -124,18 +136,44 @@ export function EditPreferences({
 
       <View style={styles.fieldGroup}>
         <Text style={styles.groupTitle}>Impostazioni</Text>
+
         <View style={styles.toggleRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.toggleLabel}>Widget galleggiante</Text>
+            <Text style={[styles.toggleLabel, !adminWidgetEnabled && styles.toggleLabelDisabled]}>
+              Widget galleggiante
+            </Text>
             <Text style={styles.toggleSub}>
-              Mostra una bussola e dati telemetrici sopra altre app durante i giri
+              {adminWidgetEnabled
+                ? "Mostra una bussola e dati telemetrici sopra altre app durante i giri"
+                : "Disabilitato dall'amministratore"}
             </Text>
           </View>
           <Switch
-            value={floatingWidgetEnabled}
+            value={adminWidgetEnabled ? floatingWidgetEnabled : false}
             onValueChange={onToggleFloatingWidget}
             trackColor={{ false: Colors.border, true: Colors.accent }}
             thumbColor="#fff"
+            disabled={!adminWidgetEnabled || isUpdatingFloatingWidget}
+          />
+        </View>
+
+        <View style={[styles.toggleRow, { marginTop: 16 }]}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.toggleLabel, assistantAdminDisabled && styles.toggleLabelDisabled]}>
+              Widget AI
+            </Text>
+            <Text style={styles.toggleSub}>
+              {assistantAdminDisabled
+                ? "Disabilitato dall'amministratore"
+                : "Mostra l'assistente AI durante la navigazione"}
+            </Text>
+          </View>
+          <Switch
+            value={assistantAdminDisabled ? false : assistantWidgetEnabled}
+            onValueChange={onToggleAssistantWidget}
+            trackColor={{ false: Colors.border, true: Colors.accent }}
+            thumbColor="#fff"
+            disabled={assistantAdminDisabled || isUpdatingAssistantWidget}
           />
         </View>
       </View>
@@ -266,6 +304,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "500" as const,
     color: Colors.text,
+  },
+  toggleLabelDisabled: {
+    color: Colors.textSecondary,
   },
   toggleSub: {
     fontSize: 12,

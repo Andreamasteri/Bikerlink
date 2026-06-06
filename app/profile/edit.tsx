@@ -29,6 +29,8 @@ import { EditLocation } from "@/components/profile/edit/EditLocation";
 import { EditPreferences } from "@/components/profile/edit/EditPreferences";
 import { EditAssistantPrefs } from "@/components/profile/edit/EditAssistantPrefs";
 import { EditTags } from "@/components/profile/edit/EditTags";
+import { useAssistantPrefs } from "@/hooks/useAssistantPrefs";
+import { useAssistantEnabled } from "@/hooks/useAssistantEnabled";
 
 interface ProfileData {
   id: string;
@@ -144,6 +146,62 @@ export default function EditProfileScreen() {
       Alert.alert(t("common.error"), (error as Error).message);
     },
   });
+
+  const updateFloatingWidgetMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const prev = queryClient.getQueryData<ProfileData>(["/api/users/me"]);
+      queryClient.setQueryData<ProfileData>(["/api/users/me"], (old) =>
+        old ? { ...old, floatingWidgetEnabled: enabled } : old
+      );
+      try {
+        const res = await apiRequest("PUT", "/api/users/me", { floatingWidgetEnabled: enabled });
+        return await res.json();
+      } catch (e) {
+        queryClient.setQueryData<ProfileData>(["/api/users/me"], prev);
+        throw e;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+    },
+    onError: (error: Error) => {
+      Alert.alert(t("common.error"), (error as Error).message);
+    },
+  });
+
+  const assistantPrefsQ = useAssistantPrefs();
+  const { adminDisabledForPlatform: assistantAdminDisabled } = useAssistantEnabled();
+
+  type AssistantPrefsData = { prefs: { disabled?: boolean; proactiveDisabled?: boolean; onboardingDisabled?: boolean; updatedAt?: string } };
+  const updateAssistantPrefsMutation = useMutation({
+    mutationFn: async (patch: { disabled?: boolean }) => {
+      const res = await apiRequest("PATCH", "/api/users/me/assistant-prefs", patch);
+      return res.json() as Promise<AssistantPrefsData>;
+    },
+    onMutate: async (patch) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/users/me/assistant-prefs"] });
+      const prev = queryClient.getQueryData<AssistantPrefsData>(["/api/users/me/assistant-prefs"]);
+      queryClient.setQueryData<AssistantPrefsData>(["/api/users/me/assistant-prefs"], (old) =>
+        old ? { prefs: { ...old.prefs, ...patch } } : { prefs: patch }
+      );
+      return { prev };
+    },
+    onError: (_err, _patch, ctx) => {
+      if (ctx?.prev !== undefined) {
+        queryClient.setQueryData(["/api/users/me/assistant-prefs"], ctx.prev);
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/users/me/assistant-prefs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/ai/assistant/config"] });
+    },
+  });
+
+  const { data: adminWidgetData } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/settings/floating-widget"],
+    staleTime: 60_000,
+  });
+  const adminWidgetEnabled = adminWidgetData?.enabled !== false;
 
   const addMotoMutation = useMutation({
     mutationFn: async (data: Record<string, unknown>) => {
@@ -442,10 +500,16 @@ export default function EditProfileScreen() {
           setLanguage={setLanguage}
           showLanguageDropdown={showLanguageDropdown}
           setShowLanguageDropdown={setShowLanguageDropdown}
-          floatingWidgetEnabled={profile?.floatingWidgetEnabled ?? false}
-          onToggleFloatingWidget={(enabled) =>
-            updateProfileMutation.mutate({ floatingWidgetEnabled: enabled })
+          floatingWidgetEnabled={profile?.floatingWidgetEnabled ?? true}
+          onToggleFloatingWidget={(enabled) => updateFloatingWidgetMutation.mutate(enabled)}
+          isUpdatingFloatingWidget={updateFloatingWidgetMutation.isPending}
+          adminWidgetEnabled={adminWidgetEnabled}
+          assistantWidgetEnabled={!(assistantPrefsQ.data?.prefs?.disabled ?? false)}
+          onToggleAssistantWidget={(enabled) =>
+            updateAssistantPrefsMutation.mutate({ disabled: !enabled })
           }
+          isUpdatingAssistantWidget={updateAssistantPrefsMutation.isPending}
+          assistantAdminDisabled={assistantAdminDisabled}
           handleDeleteAccount={handleDeleteAccount}
           setShowRevokeConsentModal={setShowRevokeConsentModal}
         />
