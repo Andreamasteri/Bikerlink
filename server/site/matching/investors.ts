@@ -6,7 +6,7 @@ export function buildMatchingInvestors(baseUrl: string): { meta: PageMeta; body:
     path: "/matching/per-investitori",
     title: "Matching BikerLink per Investitori — Architettura tecnica e vantaggio competitivo",
     description: "Architettura tecnica del sistema matching BikerLink: PostgreSQL+PostGIS+pgvector, Redis+BullMQ, scoring engine, embeddings, feedback loop. KPI, stack completo e roadmap.",
-    ogImage: `${baseUrl}/assets/images/matching/matching-hero.webp`,
+    ogImage: `${baseUrl}/assets/images/playstore-feature-graphic.png`,
     headExtras: MATCHING_CSS,
     jsonld: [
       breadcrumbsJsonLd(baseUrl, [

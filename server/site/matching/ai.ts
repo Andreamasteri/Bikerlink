@@ -6,7 +6,7 @@ export function buildMatchingAI(baseUrl: string): { meta: PageMeta; body: string
     path: "/matching/intelligenza-artificiale",
     title: "Il Cervello AI di BikerLink — 6 AI specializzate, 8 modelli, 4 provider",
     description: "BikerLink non usa una sola AI: 6 sistemi specializzati, 8 modelli orchestrati in cascata (Anthropic, OpenAI, Google, self-hosted), failover automatico e 100% delle decisioni loggato e auditabile.",
-    ogImage: `${baseUrl}/assets/images/matching/matching-hero.webp`,
+    ogImage: `${baseUrl}/assets/images/playstore-feature-graphic.png`,
     headExtras: MATCHING_CSS,
     jsonld: [
       breadcrumbsJsonLd(baseUrl, [

@@ -6,7 +6,7 @@ export function buildMatchingHowItWorks(baseUrl: string): { meta: PageMeta; body
     path: "/matching/come-funziona",
     title: "Come funziona il matching BikerLink — Dal profilo al match in 5 step",
     description: "Il flow completo del sistema di matching BikerLink: profilo, tracking GPS, engine di scoring, filtri e proposta dei top match con badge di trasparenza.",
-    ogImage: `${baseUrl}/assets/images/matching/matching-hero.webp`,
+    ogImage: `${baseUrl}/assets/images/playstore-feature-graphic.png`,
     headExtras: MATCHING_CSS,
     jsonld: [
       breadcrumbsJsonLd(baseUrl, [

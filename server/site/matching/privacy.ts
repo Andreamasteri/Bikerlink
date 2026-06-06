@@ -6,7 +6,7 @@ export function buildMatchingPrivacy(baseUrl: string): { meta: PageMeta; body: s
     path: "/matching/privacy",
     title: "Privacy del matching BikerLink — Cosa raccogliamo e cosa non facciamo",
     description: "Privacy del sistema di matching BikerLink: dati raccolti, nessuna vendita a terzi, nessuna profilazione pubblicitaria, come disattivare ogni tipo di segnale. GDPR compliant.",
-    ogImage: `${baseUrl}/assets/images/matching/matching-hero.webp`,
+    ogImage: `${baseUrl}/assets/images/playstore-feature-graphic.png`,
     headExtras: MATCHING_CSS,
     jsonld: [
       breadcrumbsJsonLd(baseUrl, [

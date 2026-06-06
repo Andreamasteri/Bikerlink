@@ -6,7 +6,7 @@ export function buildMatchingLearning(baseUrl: string): { meta: PageMeta; body: 
     path: "/matching/come-impara",
     title: "Come impara il matching BikerLink — Feedback loop, decay e A/B testing",
     description: "Il sistema di matching BikerLink impara dai tuoi sì e dai tuoi no: feedback loop continuo, decay temporale, A/B testing e preferenze negative. Spiegato con esempi reali.",
-    ogImage: `${baseUrl}/assets/images/matching/matching-hero.webp`,
+    ogImage: `${baseUrl}/assets/images/playstore-feature-graphic.png`,
     headExtras: MATCHING_CSS,
     jsonld: [
       breadcrumbsJsonLd(baseUrl, [

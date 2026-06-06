@@ -6,7 +6,7 @@ export function buildMatchingTypes(baseUrl: string): { meta: PageMeta; body: str
     path: "/matching/tipi-di-match",
     title: "I 17 tipi di match BikerLink — Tutti i segnali di affinità spiegati",
     description: "Tutti i 17 segnali di affinità del sistema matching BikerLink: brand moto, distanza, musica, lean angle, route affinity, overlap temporale e altro. Spiegati in linguaggio semplice.",
-    ogImage: `${baseUrl}/assets/images/matching/matching-hero.webp`,
+    ogImage: `${baseUrl}/assets/images/playstore-feature-graphic.png`,
     headExtras: MATCHING_CSS,
     jsonld: [
       breadcrumbsJsonLd(baseUrl, [

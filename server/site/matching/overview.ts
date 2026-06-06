@@ -6,7 +6,7 @@ export function buildMatchingOverview(baseUrl: string): { meta: PageMeta; body: 
     path: "/matching",
     title: "Matching BikerLink — Come ti facciamo incontrare i biker giusti",
     description: "Il sistema di matching di BikerLink usa 17 segnali di affinità, embeddings semantici e telemetria reale per connetterti con i biker più compatibili. Scopri come funziona.",
-    ogImage: `${baseUrl}/assets/images/matching/matching-hero.webp`,
+    ogImage: `${baseUrl}/assets/images/playstore-feature-graphic.png`,
     headExtras: MATCHING_CSS,
     jsonld: [
       breadcrumbsJsonLd(baseUrl, [
