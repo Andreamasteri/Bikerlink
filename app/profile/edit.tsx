@@ -13,7 +13,7 @@ import { KeyboardAwareScrollViewCompat } from "@/components/KeyboardAwareScrollV
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
@@ -22,6 +22,7 @@ import { findCountryByRegion } from "@/lib/countries-regions";
 import { showImagePickerMenu, appendFileToForm } from "@/lib/image-picker-utils";
 import { useT } from "@/lib/language-context";
 import { updateUserSchema } from "@shared/validators";
+import { useMutation } from "@tanstack/react-query";
 
 import { EditBasicInfo } from "@/components/profile/edit/EditBasicInfo";
 import { EditMoto } from "@/components/profile/edit/EditMoto";
@@ -29,8 +30,7 @@ import { EditLocation } from "@/components/profile/edit/EditLocation";
 import { EditPreferences } from "@/components/profile/edit/EditPreferences";
 import { EditAssistantPrefs } from "@/components/profile/edit/EditAssistantPrefs";
 import { EditTags } from "@/components/profile/edit/EditTags";
-import { useAssistantPrefs } from "@/hooks/useAssistantPrefs";
-import { useAssistantEnabled } from "@/hooks/useAssistantEnabled";
+import { useEditProfileMutations } from "@/hooks/useEditProfileMutations";
 
 interface ProfileData {
   id: string;
@@ -131,98 +131,17 @@ export default function EditProfileScreen() {
     }
   }, [profile]);
 
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
-      const res = await apiRequest("PUT", "/api/users/me", data);
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
-      Alert.alert(t("common.success"), "Profilo aggiornato");
-      router.back();
-    },
-    onError: (error: Error) => {
-      Alert.alert(t("common.error"), (error as Error).message);
-    },
-  });
-
-  const updateFloatingWidgetMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const prev = queryClient.getQueryData<ProfileData>(["/api/users/me"]);
-      queryClient.setQueryData<ProfileData>(["/api/users/me"], (old) =>
-        old ? { ...old, floatingWidgetEnabled: enabled } : old
-      );
-      try {
-        const res = await apiRequest("PUT", "/api/users/me", { floatingWidgetEnabled: enabled });
-        return await res.json();
-      } catch (e) {
-        queryClient.setQueryData<ProfileData>(["/api/users/me"], prev);
-        throw e;
-      }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-    },
-    onError: (error: Error) => {
-      Alert.alert(t("common.error"), (error as Error).message);
-    },
-  });
-
-  const assistantPrefsQ = useAssistantPrefs();
-  const { adminDisabledForPlatform: assistantAdminDisabled } = useAssistantEnabled();
-
-  type AssistantPrefsData = { prefs: { disabled?: boolean; proactiveDisabled?: boolean; onboardingDisabled?: boolean; updatedAt?: string } };
-  const updateAssistantPrefsMutation = useMutation({
-    mutationFn: async (patch: { disabled?: boolean }) => {
-      const res = await apiRequest("PATCH", "/api/users/me/assistant-prefs", patch);
-      return res.json() as Promise<AssistantPrefsData>;
-    },
-    onMutate: async (patch) => {
-      await queryClient.cancelQueries({ queryKey: ["/api/users/me/assistant-prefs"] });
-      const prev = queryClient.getQueryData<AssistantPrefsData>(["/api/users/me/assistant-prefs"]);
-      queryClient.setQueryData<AssistantPrefsData>(["/api/users/me/assistant-prefs"], (old) =>
-        old ? { prefs: { ...old.prefs, ...patch } } : { prefs: patch }
-      );
-      return { prev };
-    },
-    onError: (_err, _patch, ctx) => {
-      if (ctx?.prev !== undefined) {
-        queryClient.setQueryData(["/api/users/me/assistant-prefs"], ctx.prev);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me/assistant-prefs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/assistant/config"] });
-    },
-  });
-
-  const { data: adminWidgetData } = useQuery<{ enabled: boolean }>({
-    queryKey: ["/api/settings/floating-widget"],
-    staleTime: 60_000,
-  });
-  const adminWidgetEnabled = adminWidgetData?.enabled !== false;
-
-  const addMotoMutation = useMutation({
-    mutationFn: async (data: Record<string, unknown>) => {
-      const res = await apiRequest("POST", "/api/motorcycles", data);
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-      setShowAddMoto(false);
-      setMotoBrand("");
-      setMotoModel("");
-      setMotoYear("");
-      setMotoDisplacement("");
-      setMotoType("");
-      setRidingStyle("");
-      Alert.alert(t("common.success"), "Moto aggiunta");
-    },
-    onError: (error: Error) => {
-      Alert.alert(t("common.error"), (error as Error).message);
-    },
-  });
+  const {
+    updateProfileMutation,
+    updateFloatingWidgetMutation,
+    updateAssistantPrefsMutation,
+    addMotoMutation,
+    deletePhotoMutation,
+    requestDeletionMutation,
+    adminWidgetEnabled,
+    assistantPrefsQ,
+    assistantAdminDisabled,
+  } = useEditProfileMutations();
 
   const uploadPhotoMutation = useMutation({
     mutationFn: async ({ uri, replacePhotoId }: { uri: string; replacePhotoId?: string }) => {
@@ -258,38 +177,24 @@ export default function EditProfileScreen() {
         const parsed = JSON.parse(msg);
         if (parsed?.message) msg = parsed.message;
       } catch {
-        // no-op: msg is already set as fallback
+        // no-op
       }
       Alert.alert(t("common.error"), msg);
     },
   });
 
-  const deletePhotoMutation = useMutation({
-    mutationFn: async (photoId: string) => {
-      await apiRequest("DELETE", `/api/users/me/photos/${photoId}`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
-    },
-  });
-
-  const requestDeletionMutation = useMutation({
-    mutationFn: async () => {
-      await apiRequest("POST", "/api/users/me/request-deletion");
-    },
-    onSuccess: () => {
-      Alert.alert(t("profile.accountScheduledDeletion"));
-      logoutMutation.mutate(undefined, {
-        onSuccess: () => {
-          router.replace("/welcome");
-        },
-      });
-    },
-  });
-
   const handleRequestDeletion = useCallback(() => {
-    requestDeletionMutation.mutate();
-  }, [requestDeletionMutation]);
+    requestDeletionMutation.mutate(undefined, {
+      onSuccess: () => {
+        Alert.alert(t("profile.accountScheduledDeletion"));
+        logoutMutation.mutate(undefined, {
+          onSuccess: () => {
+            router.replace("/welcome");
+          },
+        });
+      },
+    });
+  }, [requestDeletionMutation, logoutMutation, router, t]);
 
   const handleDeleteAccount = useCallback(() => {
     Alert.alert(
@@ -305,16 +210,11 @@ export default function EditProfileScreen() {
   const pickImageForSlot = useCallback((existingPhotoId?: string) => {
     showImagePickerMenu(
       (uri) => {
-        // Token per-richiesta: solo l'upload più recente azzera lo stato
-        // ottimistico, così un upload precedente che si conclude non nasconde
-        // la preview di uno ancora in corso.
         const token = ++uploadTokenRef.current;
-        // Preview ottimistica: mostra subito la foto locale (già compressa).
         setOptimisticPhoto({ uri, replaceId: existingPhotoId ?? null });
         if (existingPhotoId) {
           setReplacingSlot(existingPhotoId);
         }
-        // Sostituzione in un solo round-trip: il server cancella la vecchia.
         uploadPhotoMutation.mutate(
           { uri, replacePhotoId: existingPhotoId },
           {
@@ -381,7 +281,19 @@ export default function EditProfileScreen() {
     if (motoDisplacement) data.displacement = parseInt(motoDisplacement, 10);
     if (motoType) data.motorcycleType = motoType;
     if (ridingStyle) data.ridingStyle = ridingStyle;
-    addMotoMutation.mutate(data);
+    addMotoMutation.mutate(data, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["/api/users/me"] });
+        setShowAddMoto(false);
+        setMotoBrand("");
+        setMotoModel("");
+        setMotoYear("");
+        setMotoDisplacement("");
+        setMotoType("");
+        setRidingStyle("");
+        Alert.alert(t("common.success"), "Moto aggiunta");
+      },
+    });
   };
 
   const isBikerOrCoppia =
@@ -413,12 +325,7 @@ export default function EditProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <View
-        style={[
-          styles.headerBar,
-          { paddingTop: insets.top + 8 },
-        ]}
-      >
+      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -533,13 +440,7 @@ export default function EditProfileScreen() {
         >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Revoca consensi privacy</Text>
-            <Text
-              style={{
-                fontSize: 14,
-                color: Colors.textSecondary,
-                textAlign: "center",
-              }}
-            >
+            <Text style={styles.modalBody}>
               Questa azione revocherà i consensi obbligatori per l'uso dell'app.
               Verrai disconnesso e il tuo account verrà programmato per la
               cancellazione automatica tra 30 giorni.
@@ -609,6 +510,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600" as const,
     color: Colors.text,
+    textAlign: "center",
+  },
+  modalBody: {
+    fontSize: 14,
+    color: Colors.textSecondary,
     textAlign: "center",
   },
   modalButtons: {
