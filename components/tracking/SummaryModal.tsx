@@ -5,7 +5,9 @@ import {
   Modal,
   TextInput,
   TouchableOpacity,
+  ScrollView,
   StyleSheet,
+  Dimensions,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
@@ -136,6 +138,9 @@ export function SummaryModal({
     resetCountdown();
   };
 
+  const screenHeight = Dimensions.get("window").height;
+  const maxSheetHeight = screenHeight * 0.9;
+
   return (
     <Modal
       visible={visible}
@@ -144,127 +149,134 @@ export function SummaryModal({
       onRequestClose={onClose}
     >
       <View style={styles.summaryOverlay}>
-        <View style={[styles.summaryModal, { paddingTop: insets.top + 16 }]}>
-          <View style={styles.summaryTitleRow}>
-            <Ionicons name="flag-outline" size={24} color={Colors.success} />
-            <Text style={styles.summaryTitle}>{t("tracking.completed")}</Text>
-            <View style={styles.liveRunBadge}>
-              <Text style={styles.liveRunText}>{t("tracking.liveRun")}</Text>
-            </View>
-          </View>
-
-          {patchFailed && (
-            <View style={styles.syncWarningBanner}>
-              <Ionicons name="cloud-offline-outline" size={16} color={Colors.warning} />
-              <Text style={styles.syncWarningText}>{t("tracking.syncWarning")}</Text>
-            </View>
-          )}
-
-          <TextInput
-            style={styles.rideTitleInput}
-            value={rideTitle}
-            onChangeText={handleTitleChange}
-            placeholder={t("tracking.rideNamePlaceholder")}
-            placeholderTextColor={Colors.textSecondary}
-            maxLength={80}
-            returnKeyType="done"
-          />
-
-          <View style={styles.statsRow}>
-            <StatCard
-              icon="navigate-outline"
-              color={Colors.accent}
-              value={formatDistance(totalKm, distanceUnit, 3)}
-              label={t("tracking.distance")}
-            />
-            <StatCard
-              icon="flash"
-              color={Colors.accentRed}
-              value={formatSpeed(maxSpeed, speedUnit, 1)}
-              label={t("tracking.maxSpeed")}
-            />
-          </View>
-          <View style={styles.statsRow}>
-            <StatCard
-              icon="time-outline"
-              color={Colors.accent}
-              value={formatHMS(totalMs)}
-              label={t("tracking.totalTime")}
-            />
-            <StatCard
-              icon="speedometer-outline"
-              color={Colors.success}
-              value={formatSpeed(avgSpeedKmh, speedUnit, 1)}
-              label={t("tracking.avgSpeed")}
-            />
-          </View>
-          {sensorsEnabled && (
-            <>
-              <View style={styles.statsRow}>
-                <StatCard
-                  icon="pulse-outline"
-                  color={Colors.accentRed}
-                  value={maxAccelG.toFixed(2) + " G"}
-                  label={t("tracking.gMaxAccel")}
-                />
-                <StatCard
-                  icon="trending-down-outline"
-                  color={Colors.warning}
-                  value={maxDecelG.toFixed(2) + " G"}
-                  label={t("tracking.gMaxBrake")}
-                />
+        <View style={[styles.summaryModal, { paddingTop: insets.top + 16, maxHeight: maxSheetHeight }]}>
+          <ScrollView
+            style={styles.scrollContent}
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.summaryTitleRow}>
+              <Ionicons name="flag-outline" size={24} color={Colors.success} />
+              <Text style={styles.summaryTitle}>{t("tracking.completed")}</Text>
+              <View style={styles.liveRunBadge}>
+                <Text style={styles.liveRunText}>{t("tracking.liveRun")}</Text>
               </View>
-              <View style={styles.statsRow}>
-                <StatCard
-                  icon="compass-outline"
-                  color={Colors.accent}
-                  value={maxTiltDeg.toFixed(1) + "°"}
-                  label={t("tracking.tiltMax")}
-                />
-                <View style={[styles.statCardPlaceholder, { opacity: 0 }]} />
+            </View>
+
+            {patchFailed && (
+              <View style={styles.syncWarningBanner}>
+                <Ionicons name="cloud-offline-outline" size={16} color={Colors.warning} />
+                <Text style={styles.syncWarningText}>{t("tracking.syncWarning")}</Text>
               </View>
-            </>
-          )}
-          {is0100Enabled && sprint0to100Ms !== null && (
+            )}
+
+            <TextInput
+              style={styles.rideTitleInput}
+              value={rideTitle}
+              onChangeText={handleTitleChange}
+              placeholder={t("tracking.rideNamePlaceholder")}
+              placeholderTextColor={Colors.textSecondary}
+              maxLength={80}
+              returnKeyType="done"
+            />
+
             <View style={styles.statsRow}>
               <StatCard
-                icon="timer-outline"
-                color={Colors.accentRed}
-                value={(sprint0to100Ms / 1000).toFixed(2) + "s"}
-                label={`0→${convertSpeed(100, speedUnit).toFixed(0)} ${speedUnitLabel(speedUnit)}`}
+                icon="navigate-outline"
+                color={Colors.accent}
+                value={formatDistance(totalKm, distanceUnit, 3)}
+                label={t("tracking.distance")}
               />
-              {isNewRecord && (
-                <View style={styles.summaryRecordBadge}>
-                  <Ionicons name="trophy" size={16} color="#FFD700" />
-                  <Text style={styles.summaryRecordText}>{t("tracking.newRecord")}</Text>
-                </View>
-              )}
+              <StatCard
+                icon="flash"
+                color={Colors.accentRed}
+                value={formatSpeed(maxSpeed, speedUnit, 1)}
+                label={t("tracking.maxSpeed")}
+              />
             </View>
-          )}
+            <View style={styles.statsRow}>
+              <StatCard
+                icon="time-outline"
+                color={Colors.accent}
+                value={formatHMS(totalMs)}
+                label={t("tracking.totalTime")}
+              />
+              <StatCard
+                icon="speedometer-outline"
+                color={Colors.success}
+                value={formatSpeed(avgSpeedKmh, speedUnit, 1)}
+                label={t("tracking.avgSpeed")}
+              />
+            </View>
+            {sensorsEnabled && (
+              <>
+                <View style={styles.statsRow}>
+                  <StatCard
+                    icon="pulse-outline"
+                    color={Colors.accentRed}
+                    value={maxAccelG.toFixed(2) + " G"}
+                    label={t("tracking.gMaxAccel")}
+                  />
+                  <StatCard
+                    icon="trending-down-outline"
+                    color={Colors.warning}
+                    value={maxDecelG.toFixed(2) + " G"}
+                    label={t("tracking.gMaxBrake")}
+                  />
+                </View>
+                <View style={styles.statsRow}>
+                  <StatCard
+                    icon="compass-outline"
+                    color={Colors.accent}
+                    value={maxTiltDeg.toFixed(1) + "°"}
+                    label={t("tracking.tiltMax")}
+                  />
+                  <View style={[styles.statCardPlaceholder, { opacity: 0 }]} />
+                </View>
+              </>
+            )}
+            {is0100Enabled && sprint0to100Ms !== null && (
+              <View style={styles.statsRow}>
+                <StatCard
+                  icon="timer-outline"
+                  color={Colors.accentRed}
+                  value={(sprint0to100Ms / 1000).toFixed(2) + "s"}
+                  label={`0→${convertSpeed(100, speedUnit).toFixed(0)} ${speedUnitLabel(speedUnit)}`}
+                />
+                {isNewRecord && (
+                  <View style={styles.summaryRecordBadge}>
+                    <Ionicons name="trophy" size={16} color="#FFD700" />
+                    <Text style={styles.summaryRecordText}>{t("tracking.newRecord")}</Text>
+                  </View>
+                )}
+              </View>
+            )}
 
-          {showMyRoute && summaryRoutePoints.length >= 10 && (
-            <TouchableOpacity
-              style={styles.summaryRouteBtn}
-              onPress={() => setRouteMapVisible(true)}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="map-outline" size={16} color={Colors.accent} />
-              <Text style={styles.summaryRouteBtnText}>{t("tracking.viewRoute")}</Text>
-            </TouchableOpacity>
-          )}
+            {showMyRoute && summaryRoutePoints.length >= 10 && (
+              <TouchableOpacity
+                style={styles.summaryRouteBtn}
+                onPress={() => setRouteMapVisible(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="map-outline" size={16} color={Colors.accent} />
+                <Text style={styles.summaryRouteBtnText}>{t("tracking.viewRoute")}</Text>
+              </TouchableOpacity>
+            )}
 
-          <Text style={styles.summaryNote}>
-            {t("tracking.summaryNote")}
-          </Text>
-
-          <View style={styles.autoSaveRow}>
-            <Ionicons name="timer-outline" size={14} color={Colors.textSecondary} />
-            <Text style={styles.autoSaveText}>
-              {t("tracking.autoSaveIn")} {countdown}s…
+            <Text style={styles.summaryNote}>
+              {t("tracking.summaryNote")}
             </Text>
-          </View>
 
-          <View style={styles.summaryActions}>
+            <View style={styles.autoSaveRow}>
+              <Ionicons name="timer-outline" size={14} color={Colors.textSecondary} />
+              <Text style={styles.autoSaveText}>
+                {t("tracking.autoSaveIn")} {countdown}s…
+              </Text>
+            </View>
+          </ScrollView>
+
+          <View style={[styles.summaryActions, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
             <TouchableOpacity
               style={styles.summarySaveBtn}
               onPress={handleSave}
@@ -313,8 +325,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingHorizontal: 20,
-    paddingBottom: 40
+    paddingHorizontal: 20
+  },
+  scrollContent: {
+    flexShrink: 1
+  },
+  scrollContentContainer: {
+    paddingBottom: 8
   },
   summaryTitleRow: {
     flexDirection: "row",
@@ -435,7 +452,10 @@ const styles = StyleSheet.create({
   },
   summaryActions: {
     flexDirection: "row",
-    gap: 10
+    gap: 10,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border
   },
   summarySaveBtn: {
     flex: 2,
