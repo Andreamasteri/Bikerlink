@@ -21,6 +21,26 @@ const router = Router();
 const TARGET_KM_SETTING = "telemetry_target_km";
 const DEFAULT_TARGET_KM = parseFloat(process.env.TELEMETRY_TARGET_KM ?? "1000");
 
+const KM_WINDOW_DAYS = 90;
+
+type CacheEntry = { data: unknown; expiresAt: number };
+const serverCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
+function getCached<T>(key: string): T | null {
+  const entry = serverCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    serverCache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+function setCached(key: string, data: unknown): void {
+  serverCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+}
+
 async function getTargetKm(): Promise<number> {
   const setting = await storage.getAppSetting(TARGET_KM_SETTING);
   if (setting?.value) {
@@ -31,10 +51,17 @@ async function getTargetKm(): Promise<number> {
 }
 
 router.get("/telemetry-stats", async (_req: Request, res: Response) => {
+  const CACHE_KEY = "telemetry-stats";
+  const cached = getCached<object>(CACHE_KEY);
+  if (cached) return res.json(cached);
+
   try {
-    const [targetKm, countResult, kmResult] = await Promise.all([
-      getTargetKm(),
-      db.execute<{
+    const targetKm = await getTargetKm();
+
+    const [countResult, kmResult] = await db.transaction(async (tx) => {
+      await tx.execute(sql`SET LOCAL statement_timeout = '8000'`);
+
+      const count = await tx.execute<{
         users_with_telemetry: string;
         active_users_24h: string;
         total_rides: string;
@@ -49,8 +76,9 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
           MAX(created_at)::text AS latest_sample
         FROM ride_telemetry
         WHERE session_type NOT IN ('ideal_lap')
-      `),
-      db.execute<{ total_km: string }>(sql`
+      `);
+
+      const km = await tx.execute<{ total_km: string }>(sql`
         WITH ordered AS (
           SELECT
             session_id,
@@ -59,6 +87,7 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
             LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
           FROM ride_telemetry
           WHERE session_type NOT IN ('ideal_lap')
+            AND created_at >= NOW() - INTERVAL '${sql.raw(String(KM_WINDOW_DAYS))} days'
         ),
         distances AS (
           SELECT
@@ -75,8 +104,10 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
             AND ABS(lon - prev_lon) < 0.5
         )
         SELECT COALESCE(SUM(dist_km), 0)::text AS total_km FROM distances
-      `),
-    ]);
+      `);
+
+      return [count, km] as const;
+    });
 
     const countRow = countResult.rows[0];
     const activeUsers = parseInt(countRow?.active_users_24h ?? "0", 10);
@@ -89,7 +120,7 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
       ? Math.round((kmCollected / totalUsersWithTelemetry) * 10) / 10
       : 0;
 
-    return res.json({
+    const payload = {
       totalSamples,
       activeUsers,
       kmCollected,
@@ -97,9 +128,14 @@ router.get("/telemetry-stats", async (_req: Request, res: Response) => {
       totalRides,
       avgKmPerUser,
       targetKm,
-    });
+      kmWindowDays: KM_WINDOW_DAYS,
+    };
+
+    setCached(CACHE_KEY, payload);
+    return res.json(payload);
   } catch (err) {
-    console.error("[admin/telemetry-stats] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/telemetry-stats] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura statistiche telemetria");
   }
 });
@@ -109,7 +145,8 @@ router.get("/map-matching-stats", async (_req: Request, res: Response) => {
     const stats = await getMapMatchingStats();
     return res.json(stats);
   } catch (err) {
-    console.error("[admin/map-matching-stats] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/map-matching-stats] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura statistiche map matching");
   }
 });
@@ -127,7 +164,8 @@ router.get("/curvy-score-stats", async (_req: Request, res: Response) => {
       isRunning: raw.isRunning,
     });
   } catch (err) {
-    console.error("[admin/curvy-score-stats] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/curvy-score-stats] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura statistiche curvy score");
   }
 });
@@ -143,7 +181,8 @@ router.put("/sensors-global", async (req: Request, res: Response) => {
     await storage.upsertAppSetting(SENSORS_GLOBAL_SETTING, String(enabled));
     return res.json({ enabled });
   } catch (err) {
-    console.error("[admin/sensors-global] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/sensors-global] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore aggiornamento sensori globali");
   }
 });
@@ -154,7 +193,8 @@ router.get("/sensors-global", async (_req: Request, res: Response) => {
     const enabled = setting?.value !== "false";
     return res.json({ enabled });
   } catch (err) {
-    console.error("[admin/sensors-global GET] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/sensors-global GET] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura sensori globali");
   }
 });
@@ -169,7 +209,8 @@ router.put("/telemetry-target-km", async (req: Request, res: Response) => {
     await storage.upsertAppSetting(TARGET_KM_SETTING, String(val));
     return res.json({ target_km: val });
   } catch (err) {
-    console.error("[admin/telemetry-target-km] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/telemetry-target-km] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore aggiornamento obiettivo km");
   }
 });
@@ -290,7 +331,8 @@ router.get("/telemetry/users", async (req: Request, res: Response) => {
       limit,
     });
   } catch (err) {
-    console.error("[admin/telemetry/users] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/telemetry/users] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura utenti telemetria");
   }
 });
@@ -359,7 +401,8 @@ router.get("/telemetry/users/:userId/sessions", async (req: Request, res: Respon
 
     return res.json({ sessions, userId });
   } catch (err) {
-    console.error("[admin/telemetry/users/:userId/sessions] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/telemetry/users/:userId/sessions] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura sessioni utente");
   }
 });
@@ -410,16 +453,22 @@ router.get("/telemetry/sessions/:sessionId/samples", async (req: Request, res: R
 
     return res.json({ samples, total, sessionId });
   } catch (err) {
-    console.error("[admin/telemetry/sessions/:sessionId/samples] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/telemetry/sessions/:sessionId/samples] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura campioni sessione");
   }
 });
 
 router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
-  try {
-    const limit = Math.max(1, Math.min(20, parseInt(String(req.query.limit ?? "5"), 10) || 5));
+  const limit = Math.max(1, Math.min(20, parseInt(String(req.query.limit ?? "5"), 10) || 5));
+  const CACHE_KEY = `top-riders-${limit}`;
+  const cached = getCached<object>(CACHE_KEY);
+  if (cached) return res.json(cached);
 
-    const result = await db.execute<{
+  try {
+    const result = await db.transaction(async (tx) => {
+      await tx.execute(sql`SET LOCAL statement_timeout = '8000'`);
+      return tx.execute<{
       user_id: string;
       username: string;
       sample_count: string;
@@ -467,6 +516,7 @@ router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
       ORDER BY ua.sample_count DESC
       LIMIT ${limit}
     `);
+    });
 
     const riders = result.rows.map((r) => ({
       userId: parseInt(r.user_id, 10),
@@ -475,9 +525,12 @@ router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
       km: Math.round(parseFloat(r.km) * 10) / 10,
     }));
 
-    return res.json({ riders });
+    const payload = { riders };
+    setCached(CACHE_KEY, payload);
+    return res.json(payload);
   } catch (err) {
-    console.error("[admin/telemetry-top-riders] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/telemetry-top-riders] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura top rider");
   }
 });
@@ -487,7 +540,8 @@ router.get("/telemetry/error-log", (_req: Request, res: Response) => {
     const entries = getTelemetryErrorLog();
     return res.json({ entries, count: entries.length });
   } catch (err) {
-    console.error("[admin/telemetry/error-log] error:", err);
+    const cause = (err as any)?.cause?.message ?? "";
+    console.error("[admin/telemetry/error-log] error:", err, cause ? `| PG: ${cause}` : "");
     return sendError(res, 500, "Errore lettura log errori");
   }
 });
