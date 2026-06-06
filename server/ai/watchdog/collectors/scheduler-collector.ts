@@ -16,7 +16,7 @@ export async function collectScheduler(): Promise<Signal[]> {
       const ageMin = Math.floor(ageMs / 60_000);
       signals.push({
         source: "scheduler", metric: "scheduler.last_run_min_ago", value: ageMin, unit: "min",
-        severity: ageMin > 60 ? "high" : ageMin > 20 ? "warn" : "info",
+        severity: ageMin > 180 ? "high" : ageMin > 90 ? "warn" : "info",
         details: { lastRunAt: parsed?.lastRunAt },
       });
     } else {
