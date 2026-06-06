@@ -1,5 +1,6 @@
 {pkgs}: {
   deps = [
+    pkgs.zip
     pkgs.xorg.libXScrnSaver
     pkgs.xorg.libXi
     pkgs.xorg.libXtst
