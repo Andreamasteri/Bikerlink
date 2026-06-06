@@ -127,7 +127,8 @@ export function ThinkCentreCard() {
           )}
           {data?.services.map((s) => {
             const fp = data.tokenFingerprints?.[s.key] ?? null;
-            const showFingerprint = s.configured && (!s.ok || s.tokenMissing) && fp;
+            const showFingerprint = s.configured && fp != null;
+            const tokenOk = showFingerprint && s.ok;
             return (
               <View key={s.key} style={styles.row}>
                 <MaterialCommunityIcons
@@ -143,11 +144,21 @@ export function ThinkCentreCard() {
                     {s.configured && s.url ? ` · ${s.url}` : ""}
                   </Text>
                   {showFingerprint && (
-                    <Text style={styles.fingerprint} numberOfLines={1}>
-                      token Replit: {fp}…
-                    </Text>
+                    <View style={styles.fingerprintRow}>
+                      <Text style={styles.fingerprint} numberOfLines={1}>
+                        token Replit: {fp}…
+                      </Text>
+                      {tokenOk && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={11}
+                          color="#22c55e"
+                          style={styles.tokenOkIcon}
+                        />
+                      )}
+                    </View>
                   )}
-                  {s.configured && !s.ok && !fp && s.tokenMissing !== true && (
+                  {s.configured && !fp && (
                     <Text style={styles.fingerprint}>token Replit: non configurato</Text>
                   )}
                 </View>
@@ -155,17 +166,25 @@ export function ThinkCentreCard() {
               </View>
             );
           })}
-          {data && data.configuredCount > 0 && data.onlineCount === 0 && (
+          {data && data.configuredCount > 0 && (
             <View style={styles.note}>
               <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
-              <Text style={styles.noteText}>
-                Il server di casa è raggiungibile solo se acceso e con tunnel attivo. Se tutti i
-                servizi risultano offline, verifica che il ThinkCentre sia acceso e il tunnel
-                configurato (anche da cloud il probe passa solo via tunnel).{"\n"}
-                Per diagnosticare disallineamenti token, esegui{" "}
-                <Text style={styles.mono}>check-token-fingerprints.sh</Text> sul ThinkCentre e
-                confronta i fingerprint con quelli mostrati qui.
-              </Text>
+              <View style={styles.noteBody}>
+                <Text style={styles.noteText}>
+                  Il fingerprint del token Replit è sempre visibile per confronto preventivo — utile
+                  per verificare che una modifica ai secret sia stata applicata prima che scatti un
+                  401.
+                  {data.onlineCount === 0
+                    ? "\nTutti i servizi risultano offline: verifica che il ThinkCentre sia acceso e il tunnel configurato."
+                    : ""}
+                  {"\n"}Per confronto lato server esegui{" "}
+                  <Text style={styles.mono}>check-token-fingerprints.sh</Text> sul ThinkCentre.
+                </Text>
+                <View style={styles.legend}>
+                  <Ionicons name="checkmark-circle" size={11} color="#22c55e" />
+                  <Text style={styles.legendText}>token OK — servizio online + fingerprint presente</Text>
+                </View>
+              </View>
             </View>
           )}
         </View>
@@ -244,6 +263,15 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 0.4,
   },
+  fingerprintRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  tokenOkIcon: {
+    marginTop: 0,
+  },
   mono: {
     fontFamily: "Inter_400Regular",
     fontSize: 10,
@@ -263,11 +291,25 @@ const styles = StyleSheet.create({
     padding: 10,
     marginTop: 4,
   },
+  noteBody: {
+    flex: 1,
+    gap: 4,
+  },
   noteText: {
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: Colors.textSecondary,
-    flex: 1,
     lineHeight: 16,
+  },
+  legend: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+  },
+  legendText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
   },
 });
