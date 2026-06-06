@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,8 @@ import { StatCard } from "./StatCard";
 import { formatDistance, formatSpeed } from "@/lib/units";
 import { formatHMS, convertSpeed, speedUnitLabel } from "./tracking-utils";
 import { DistanceUnit, SpeedUnit } from "@/lib/units-context";
+
+const AUTO_SAVE_SECONDS = 30;
 
 interface SummaryModalProps {
   visible: boolean;
@@ -39,6 +41,7 @@ interface SummaryModalProps {
   onPublish: () => void;
   onSave: () => void;
   onDelete: () => void;
+  patchFailed?: boolean;
   t: (key: string) => string;
 }
 
@@ -67,8 +70,72 @@ export function SummaryModal({
   onPublish,
   onSave,
   onDelete,
+  patchFailed = false,
   t
 }: SummaryModalProps) {
+  const [countdown, setCountdown] = useState(AUTO_SAVE_SECONDS);
+  const countdownRef = useRef(AUTO_SAVE_SECONDS);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const savedRef = useRef(false);
+
+  const clearCountdownInterval = () => {
+    if (intervalRef.current !== null) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const resetCountdown = () => {
+    clearCountdownInterval();
+    countdownRef.current = AUTO_SAVE_SECONDS;
+    setCountdown(AUTO_SAVE_SECONDS);
+    startCountdown();
+  };
+
+  const startCountdown = () => {
+    intervalRef.current = setInterval(() => {
+      countdownRef.current -= 1;
+      setCountdown(countdownRef.current);
+      if (countdownRef.current <= 0) {
+        clearCountdownInterval();
+        if (!savedRef.current) {
+          savedRef.current = true;
+          onSave();
+        }
+      }
+    }, 1000);
+  };
+
+  useEffect(() => {
+    if (!visible) {
+      clearCountdownInterval();
+      return;
+    }
+    savedRef.current = false;
+    countdownRef.current = AUTO_SAVE_SECONDS;
+    setCountdown(AUTO_SAVE_SECONDS);
+    startCountdown();
+    return () => clearCountdownInterval();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  const handleSave = () => {
+    clearCountdownInterval();
+    savedRef.current = true;
+    onSave();
+  };
+
+  const handleDelete = () => {
+    clearCountdownInterval();
+    savedRef.current = true;
+    onDelete();
+  };
+
+  const handleTitleChange = (text: string) => {
+    setRideTitle(text);
+    resetCountdown();
+  };
+
   return (
     <Modal
       visible={visible}
@@ -86,10 +153,17 @@ export function SummaryModal({
             </View>
           </View>
 
+          {patchFailed && (
+            <View style={styles.syncWarningBanner}>
+              <Ionicons name="cloud-offline-outline" size={16} color={Colors.warning} />
+              <Text style={styles.syncWarningText}>{t("tracking.syncWarning")}</Text>
+            </View>
+          )}
+
           <TextInput
             style={styles.rideTitleInput}
             value={rideTitle}
-            onChangeText={setRideTitle}
+            onChangeText={handleTitleChange}
             placeholder={t("tracking.rideNamePlaceholder")}
             placeholderTextColor={Colors.textSecondary}
             maxLength={80}
@@ -183,10 +257,17 @@ export function SummaryModal({
             {t("tracking.summaryNote")}
           </Text>
 
+          <View style={styles.autoSaveRow}>
+            <Ionicons name="timer-outline" size={14} color={Colors.textSecondary} />
+            <Text style={styles.autoSaveText}>
+              {t("tracking.autoSaveIn")} {countdown}s…
+            </Text>
+          </View>
+
           <View style={styles.summaryActions}>
             <TouchableOpacity
               style={styles.summarySaveBtn}
-              onPress={onSave}
+              onPress={handleSave}
               activeOpacity={0.8}
             >
               <Ionicons name="checkmark-outline" size={18} color="#ffffff" />
@@ -202,7 +283,7 @@ export function SummaryModal({
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.summaryDeleteBtn}
-              onPress={onDelete}
+              onPress={handleDelete}
               activeOpacity={0.8}
             >
               <Ionicons name="trash-outline" size={16} color="#ef4444" />
@@ -258,6 +339,25 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Inter_700Bold",
     color: Colors.success
+  },
+  syncWarningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.warning + "18",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.warning + "40",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14
+  },
+  syncWarningText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.warning,
+    lineHeight: 16
   },
   rideTitleInput: {
     backgroundColor: Colors.surface,
@@ -318,8 +418,20 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     textAlign: "center",
     marginTop: 20,
-    marginBottom: 30,
+    marginBottom: 8,
     lineHeight: 18
+  },
+  autoSaveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginBottom: 20
+  },
+  autoSaveText: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular"
   },
   summaryActions: {
     flexDirection: "row",

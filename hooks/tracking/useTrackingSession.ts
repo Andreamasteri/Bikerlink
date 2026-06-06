@@ -13,6 +13,7 @@ export function useTrackingSession() {
 
   const [loading, setLoading] = useState(false);
   const [summaryVisible, setSummaryVisible] = useState(false);
+  const [summaryPatchFailed, setSummaryPatchFailed] = useState(false);
   const [rideTitle, setRideTitle] = useState<string>("");
   const [completedRouteId, setCompletedRouteId] = useState<string | null>(null);
   const [recoveredRecords, setRecoveredRecords] = useState<LocalRouteRecord[]>([]);
@@ -62,6 +63,8 @@ export function useTrackingSession() {
     setLoading,
     summaryVisible,
     setSummaryVisible,
+    summaryPatchFailed,
+    setSummaryPatchFailed,
     rideTitle,
     setRideTitle,
     completedRouteId,

@@ -594,6 +594,9 @@ const en: Record<string, string> = {
   "tracking.route": "Route",
   "tracking.viewRoute": "View route",
   "tracking.summaryNote": "You can review the ride in \"My routes\"",
+  "tracking.routeNotCreatedError": "The ride data could not be saved: the route was never created on the server.",
+  "tracking.autoSaveIn": "Auto-saving in",
+  "tracking.syncWarning": "Ride not synced — tap Save to retry.",
   "tracking.newRecord": "New Record!",
 
   "home.easterEggPrize": "Prize Unlocked!",

@@ -409,8 +409,18 @@ export function useTrackingState() {
     if (session.phaseRef.current === "idle") return;
     const rId = refs.routeIdRef.current;
     session.setLoading(true); cleanupTracking();
-    if (!rId) { session.setPhase("idle"); session.setLoading(false); return; }
+    if (!rId) {
+      session.setPhase("idle"); session.setLoading(false);
+      Alert.alert(t("common.error"), t("tracking.routeNotCreatedError"));
+      return;
+    }
     await flushPoints();
+
+    // Pre-set summary data so the modal always has it regardless of PATCH outcome
+    session.setCompletedRouteId(rId);
+    mapState.setSummaryRoutePoints(gps.mapCoordsRef.current.map(c => ({ lat: c.latitude, lng: c.longitude })));
+
+    let patchFailed = false;
     try {
       const updateData: {
         status: string; stoppedAt: string; totalDistanceKm: number; maxSpeedKmh: number; avgSpeedKmh: number; maxAltitude: number;
@@ -427,7 +437,7 @@ export function useTrackingState() {
       if (settings.sensorsEnabledRef.current && refs.telemetryAccumRef.current.length > 0) {
         queryClient.invalidateQueries({ queryKey: ["/api/telemetry/stats"] });
       }
-      session.setCompletedRouteId(rId); mapState.setSummaryRoutePoints(gps.mapCoordsRef.current.map(c => ({ lat: c.latitude, lng: c.longitude }))); session.setSummaryVisible(true); refetchRecords();
+      refetchRecords();
       try {
         if (battery.rideStartBatteryLevelRef.current !== null) {
           const diff = battery.rideStartBatteryLevelRef.current - await Battery.getBatteryLevelAsync();
@@ -437,9 +447,14 @@ export function useTrackingState() {
           }
         }
       } catch { /* battery level unavailable on this device — ignore silently */ }
-    } catch (e) { logGpsError(e, "handleStop"); Alert.alert(t("common.error"), t("tracking.routeUpdateError")); }
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
-    finally { session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false); (VolumeManager as any).showNativeVolumeUI(true); }
+    } catch (e) { logGpsError(e, "handleStop"); patchFailed = true; }
+    finally {
+      session.setSummaryPatchFailed(patchFailed);
+      session.setSummaryVisible(true);
+      session.setPhase("idle"); session.setLoading(false); setHandsOffActive(false); setHandsOffBroadcast(false);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- VolumeManager.showNativeVolumeUI not in typedefs
+      (VolumeManager as any).showNativeVolumeUI(true);
+    }
   }, [cleanupTracking, flushPoints, stats, gps, sensors, sprint, battery, refetchRecords, t, session, settings, mapState, refs]);
 
   const handlePause = useCallback(() => {
@@ -513,7 +528,7 @@ export function useTrackingState() {
     state: {
       profile: settings.profile, countdownEnabled: settings.countdownEnabled, countdownSec: settings.countdownSec, handsOffEnabled: settings.handsOffEnabled, handsOffSpeedStr: settings.handsOffSpeedStr,
       is0100Enabled: settings.is0100Enabled, showMyRoute: settings.showMyRoute, sensorsEnabled: settings.sensorsEnabled, showMountCalibWizard: settings.showMountCalibWizard, mountAxisCalib: sensors.mountAxisCalib,
-      phase: session.phase, handsOffActive, loading: session.loading, summaryVisible: session.summaryVisible, mapModalVisible: mapState.mapModalVisible, summaryRoutePoints: mapState.summaryRoutePoints, routeMapVisible: mapState.routeMapVisible,
+      phase: session.phase, handsOffActive, loading: session.loading, summaryVisible: session.summaryVisible, summaryPatchFailed: session.summaryPatchFailed, mapModalVisible: mapState.mapModalVisible, summaryRoutePoints: mapState.summaryRoutePoints, routeMapVisible: mapState.routeMapVisible,
       publishRecord: session.publishRecord, publishCaption: session.publishCaption, recoveredRecords: session.recoveredRecords, rideTitle: session.rideTitle, completedRouteId: session.completedRouteId,
       histMapVisible: mapState.histMapVisible, histMapPoints: mapState.histMapPoints, histMapRecord: mapState.histMapRecord, histMapLoading: mapState.histMapLoading,
       currentSpeed: gps.currentSpeed, gpsAccuracy: gps.gpsAccuracy, gpsLost: gps.gpsLost, totalKm: gps.totalKm, maxSpeed: gps.maxSpeed, maxAltitude: gps.maxAltitude, mapCoords: gps.mapCoords, currentCoord: gps.currentCoord,

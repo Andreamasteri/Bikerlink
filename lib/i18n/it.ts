@@ -614,6 +614,9 @@ const it: Record<string, string> = {
   "tracking.route": "Percorso",
   "tracking.viewRoute": "Vedi percorso",
   "tracking.summaryNote": "Puoi rivedere il giro in \"I miei percorsi\"",
+  "tracking.routeNotCreatedError": "I dati del giro non possono essere salvati: il percorso non è mai stato creato sul server.",
+  "tracking.autoSaveIn": "Salvataggio automatico tra",
+  "tracking.syncWarning": "Giro non sincronizzato — premi Salva per riprovare.",
   "tracking.newRecord": "Nuovo Record!",
 
   "home.easterEggPrize": "Premio Sbloccato!",
