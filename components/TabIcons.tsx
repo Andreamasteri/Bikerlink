@@ -1,7 +1,12 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { View, Text, type ColorValue } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useColors } from "@/hooks/useColors";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
 
 interface TabIconProps {
   name: string;
@@ -15,6 +20,74 @@ interface TabIconProps {
   hasActiveMatches?: boolean;
   statusIsAvailable?: boolean;
   isBikerOrCoppia?: boolean;
+}
+
+function MatchBadge({
+  count,
+  backgroundColor,
+}: {
+  count: number;
+  backgroundColor: string;
+}) {
+  const scale = useSharedValue(count > 0 ? 1 : 0);
+  const prevCount = useRef(count);
+  const hasMounted = useRef(false);
+
+  useEffect(() => {
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      prevCount.current = count;
+      return;
+    }
+    if (count > prevCount.current) {
+      scale.value = 0;
+      scale.value = withSpring(1, {
+        damping: 6,
+        stiffness: 280,
+        overshootClamping: false,
+      });
+    } else if (count === 0) {
+      scale.value = 0;
+    }
+    prevCount.current = count;
+  }, [count]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  if (count <= 0) return null;
+
+  return (
+    <Animated.View
+      style={[
+        {
+          position: "absolute",
+          top: -4,
+          right: -6,
+          minWidth: 16,
+          height: 16,
+          borderRadius: 8,
+          backgroundColor,
+          alignItems: "center",
+          justifyContent: "center",
+          paddingHorizontal: 2,
+        },
+        animatedStyle,
+      ]}
+    >
+      <Text
+        style={{
+          color: "#fff",
+          fontSize: 9,
+          fontFamily: "Inter_700Bold",
+          lineHeight: 12,
+        }}
+      >
+        {count > 99 ? "99+" : String(count)}
+      </Text>
+    </Animated.View>
+  );
 }
 
 export function TabIcon({
@@ -67,33 +140,7 @@ export function TabIcon({
       return (
         <View>
           <Ionicons name="flash" size={size} color={color} />
-          {newMatchCount > 0 && (
-            <View
-              style={{
-                position: "absolute",
-                top: -4,
-                right: -6,
-                minWidth: 16,
-                height: 16,
-                borderRadius: 8,
-                backgroundColor: colors.accent,
-                alignItems: "center",
-                justifyContent: "center",
-                paddingHorizontal: 2,
-              }}
-            >
-              <Text
-                style={{
-                  color: "#fff",
-                  fontSize: 9,
-                  fontFamily: "Inter_700Bold",
-                  lineHeight: 12,
-                }}
-              >
-                {newMatchCount > 99 ? "99+" : String(newMatchCount)}
-              </Text>
-            </View>
-          )}
+          <MatchBadge count={newMatchCount} backgroundColor={colors.accent} />
         </View>
       );
 
