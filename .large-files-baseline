@@ -21,10 +21,10 @@ LEGACY components/admin/ota/OtaPanel.tsx 816
 LEGACY components/admin/users/UserDetailModal.tsx 605
 LEGACY components/match/MatchCard.tsx 892
 LEGACY lib/i18n/de.ts 1168
-LEGACY lib/i18n/el.ts 1158
-LEGACY lib/i18n/en.ts 1230
-LEGACY lib/i18n/es.ts 1167
-LEGACY lib/i18n/fr.ts 1167
+LEGACY lib/i18n/el.ts 1159
+LEGACY lib/i18n/en.ts 1231
+LEGACY lib/i18n/es.ts 1168
+LEGACY lib/i18n/fr.ts 1168
 LEGACY lib/i18n/it.ts 1378
 LEGACY lib/i18n/tr.ts 1159
 LEGACY lib/leaflet-bundle.ts 676
@@ -41,3 +41,4 @@ LEGACY shared/db/matching.ts 631
 LOCKED server/routes/planned-routes/extras.ts 450
 LOCKED server/routes/planned-routes/sharing.ts 450
 LOCKED server/routes/planned-routes/waypoints.ts 550
+LEGACY server/index.ts 625
