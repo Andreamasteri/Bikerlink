@@ -237,7 +237,7 @@ async function probeOllama(): Promise<ServiceHealth> {
   }
   const tokenMissing = !token || token.trim() === "";
   const headers: Record<string, string> = {};
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (token) headers["X-Ollama-Token"] = token;
   const r = await httpProbe(`${base}/api/tags`, headers);
   const error = r.error === "HTTP 401"
     ? "Token non valido (HTTP 401)"
