@@ -482,23 +482,18 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] Critical reports notifier failed (non-fatal):", e);
     }
 
-    // ThinkCentre monitor — push admin quando i servizi self-hosted vanno offline/online.
+    // Monitors — push admin quando i servizi self-hosted o Valhalla vanno offline.
     try {
-      const { startThinkCentreMonitor } = await import("./jobs/thinkcentre-monitor");
+      const [{ startThinkCentreMonitor }, { startValhallaMonitor }] = await Promise.all([
+        import("./jobs/thinkcentre-monitor"),
+        import("./jobs/valhalla-monitor"),
+      ]);
       startThinkCentreMonitor();
-    } catch (e) {
-      console.warn("[INIT] ThinkCentre monitor failed (non-fatal):", e);
-    }
-
-    // Valhalla monitor — push admin quando Valhalla (se engine attivo) va offline.
-    try {
-      const { startValhallaMonitor } = await import("./jobs/valhalla-monitor");
       startValhallaMonitor();
     } catch (e) {
-      console.warn("[INIT] Valhalla monitor failed (non-fatal):", e);
+      console.warn("[INIT] Service monitors failed (non-fatal):", e);
     }
 
-    // Task #2533 — AI System Watchdog scheduler.
     try {
       const { startWatchdogScheduler } = await import("./ai/watchdog/scheduler");
       startWatchdogScheduler();
@@ -507,7 +502,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI Watchdog scheduler failed (non-fatal):", e);
     }
 
-    // Task #2694 — Campagne pubblicitarie self-check scheduler (ogni 6h).
     try {
       const { startCampaignsSelfCheckScheduler } = await import("./ai/watchdog/campaigns-self-check");
       startCampaignsSelfCheckScheduler();
@@ -516,7 +510,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] Campagne self-check scheduler failed (non-fatal):", e);
     }
 
-    // Task #3099 — AI conversation memory pruner (03:30 nightly).
     try {
       const { scheduleMemoryPruner } = await import("./ai/assistant/memory-pruner");
       scheduleMemoryPruner();
@@ -524,7 +517,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] Memory pruner scheduler failed (non-fatal):", e);
     }
 
-    // Task #2649 — AI Coordinator retention cleanup (04:30 nightly).
     try {
       const { startCoordinatorCleanupScheduler } = await import("./ai/coordinator/cleanup");
       startCoordinatorCleanupScheduler();
@@ -533,7 +525,6 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       console.warn("[INIT] AI Coordinator cleanup scheduler failed (non-fatal):", e);
     }
 
-    // Task #2654 — AI Coordinator wire (b): 5 AI + OTA orchestrator nel bus.
     try {
       const { wireOtaToCoordinator } = await import("./ai/coordinator/integrations/ota");
       const { wireModerationToCoordinator } = await import("./ai/coordinator/integrations/moderation");
