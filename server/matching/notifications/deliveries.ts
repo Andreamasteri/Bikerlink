@@ -21,6 +21,19 @@ export async function recordDelivery(
       VALUES (${table}, ${matchId}, ${userId}, ${channel}, NOW())
       ON CONFLICT (match_table, match_id, user_id) DO NOTHING
     `);
+    // Mark notified_at on the match row (first delivery wins; ON CONFLICT DO NOTHING on insert
+    // above means subsequent deliveries to the same match won't run this if already set).
+    if (table === "bio_affinity_matches") {
+      await db.execute(sql`
+        UPDATE bio_affinity_matches SET notified_at = NOW()
+         WHERE id = ${matchId} AND notified_at IS NULL
+      `);
+    } else if (table === "route_affinity_matches") {
+      await db.execute(sql`
+        UPDATE route_affinity_matches SET notified_at = NOW()
+         WHERE id = ${matchId} AND notified_at IS NULL
+      `);
+    }
   } catch (err) {
     console.warn("[NotifDeliveries] recordDelivery error:", err);
   }
@@ -95,6 +108,22 @@ export async function listPendingDeliveries(
       UNION ALL
       SELECT 'proposal_profile_matches', id::text, zavorrina_id
         FROM proposal_profile_matches
+       WHERE notification_priority IN (${prioLit})
+      UNION ALL
+      SELECT 'bio_affinity_matches', id::text, user_a_id
+        FROM bio_affinity_matches
+       WHERE notification_priority IN (${prioLit})
+      UNION ALL
+      SELECT 'bio_affinity_matches', id::text, user_b_id
+        FROM bio_affinity_matches
+       WHERE notification_priority IN (${prioLit})
+      UNION ALL
+      SELECT 'route_affinity_matches', id::text, user_a_id
+        FROM route_affinity_matches
+       WHERE notification_priority IN (${prioLit})
+      UNION ALL
+      SELECT 'route_affinity_matches', id::text, user_b_id
+        FROM route_affinity_matches
        WHERE notification_priority IN (${prioLit})
     )
     SELECT p.user_id, p.match_table, p.match_id

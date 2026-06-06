@@ -340,6 +340,11 @@ router.post("/verify-email", verifyEmailLimiter, async (req: Request, res: Respo
     await storage.deleteEmailVerificationTokens(user.id);
     clearVerifyAttempts(user.id);
 
+    db.insert(matchPreferences)
+      .values({ userId: user.id })
+      .onConflictDoNothing()
+      .catch((e) => console.warn("[VERIFY-EMAIL] match_preferences insert fallito (non bloccante):", e));
+
     req.session.userId = user.id;
     await new Promise<void>((resolve, reject) => {
       req.session.save((err) => { if (err) reject(err); else resolve(); });

@@ -45,6 +45,10 @@ async function setRowPriority(table: MatchTable, matchId: string, priority: Noti
       await db.execute(sql`UPDATE proposal_matches SET notification_priority = ${priority} WHERE id = ${matchId}`);
     } else if (table === "proposal_profile_matches") {
       await db.execute(sql`UPDATE proposal_profile_matches SET notification_priority = ${priority} WHERE id = ${matchId}`);
+    } else if (table === "bio_affinity_matches") {
+      await db.execute(sql`UPDATE bio_affinity_matches SET notification_priority = ${priority} WHERE id = ${matchId}`);
+    } else if (table === "route_affinity_matches") {
+      await db.execute(sql`UPDATE route_affinity_matches SET notification_priority = ${priority} WHERE id = ${matchId}`);
     }
   } catch (err) {
     console.warn("[NotifDispatcher] setRowPriority error:", err);

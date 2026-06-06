@@ -19,6 +19,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { users, userMotorcycles } from "./users";
+import { plannedRoutes } from "./planned-routes";
 
 export const zavarrinaWishlists = pgTable("zavorrina_wishlists", {
   id: varchar("id", { length: 36 })
@@ -273,10 +274,15 @@ export const routeAffinityMatches = pgTable("route_affinity_matches", {
   score: doublePrecision("score").notNull(),
   topPlaces: jsonb("top_places").notNull().default(sql`'[]'::jsonb`),
   status: varchar("status", { length: 20 }).notNull().default("new"),
+  notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
+  notifiedAt: timestamp("notified_at"),
+  archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("route_affinity_user_a_idx").on(table.userAId),
   index("route_affinity_user_b_idx").on(table.userBId),
+  index("route_affinity_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
+  index("route_affinity_archived_at_idx").on(table.archivedAt),
   uniqueIndex("route_affinity_symmetric_idx").on(
     sql`LEAST(${table.userAId}, ${table.userBId})`,
     sql`GREATEST(${table.userAId}, ${table.userBId})`,
@@ -333,6 +339,11 @@ export const plannedRouteInvites = pgTable("planned_route_invites", {
   index("planned_route_invites_route_idx").on(table.routeId),
   index("planned_route_invites_suggested_idx").on(table.suggestedUserId),
   uniqueIndex("planned_route_invites_unique_idx").on(table.routeId, table.suggestedUserId),
+  foreignKey({
+    name: "planned_route_invites_route_id_fk",
+    columns: [table.routeId],
+    foreignColumns: [plannedRoutes.id],
+  }).onDelete("cascade"),
 ]);
 
 export type PlannedRouteInvite = typeof plannedRouteInvites.$inferSelect;
@@ -355,11 +366,14 @@ export const bioAffinityMatches = pgTable("bio_affinity_matches", {
   similarity: doublePrecision("similarity").notNull(),
   model: varchar("model", { length: 80 }),
   status: varchar("status", { length: 20 }).notNull().default("new"),
+  notificationPriority: varchar("notification_priority", { length: 10 }).notNull().default("normal"),
+  notifiedAt: timestamp("notified_at"),
   archivedAt: timestamp("archived_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => [
   index("bio_affinity_user_a_idx").on(table.userAId),
   index("bio_affinity_user_b_idx").on(table.userBId),
+  index("bio_affinity_notif_pending_idx").on(table.notificationPriority, table.notifiedAt),
   uniqueIndex("bio_affinity_symmetric_idx").on(
     sql`LEAST(${table.userAId}, ${table.userBId})`,
     sql`GREATEST(${table.userAId}, ${table.userBId})`,

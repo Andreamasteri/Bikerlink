@@ -206,6 +206,10 @@ export async function runHighFlush(): Promise<{ pushed: number; demoted: number 
           await db.execute(sql`UPDATE proposal_matches SET notification_priority = 'normal' WHERE id = ${id} AND notification_priority = 'high'`);
         } else if (table === "proposal_profile_matches") {
           await db.execute(sql`UPDATE proposal_profile_matches SET notification_priority = 'normal' WHERE id = ${id} AND notification_priority = 'high'`);
+        } else if (table === "bio_affinity_matches") {
+          await db.execute(sql`UPDATE bio_affinity_matches SET notification_priority = 'normal' WHERE id = ${id} AND notification_priority = 'high'`);
+        } else if (table === "route_affinity_matches") {
+          await db.execute(sql`UPDATE route_affinity_matches SET notification_priority = 'normal' WHERE id = ${id} AND notification_priority = 'high'`);
         }
         demotedCount += 1;
       }
