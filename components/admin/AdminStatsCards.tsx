@@ -12,6 +12,17 @@ interface TelemetryStats {
   latestSample: string | null;
 }
 
+interface TopRider {
+  userId: number;
+  username: string;
+  sampleCount: number;
+  km: number;
+}
+
+interface TopRidersResponse {
+  riders: TopRider[];
+}
+
 interface GHStatus {
   mode: "self-hosted" | "cloud" | "disabled";
   profile: string;
@@ -126,6 +137,22 @@ export function TelemetryCard() {
     staleTime: 60_000,
   });
 
+  const [collapsed, setCollapsed] = useState(true);
+
+  const { data: topRidersData, isLoading: topRidersLoading, error: topRidersError } = useQuery<TopRidersResponse>({
+    queryKey: ["/api/admin/telemetry-top-riders"],
+    queryFn: async () => {
+      const res = await fetch(new URL("/api/admin/telemetry-top-riders?limit=5", getApiUrl()).toString(), {
+        headers: { ...(await authFetchHeaders()) },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    staleTime: 60_000,
+    enabled: !collapsed,
+  });
+
   function formatDate(iso: string | null): string {
     if (!iso) return "—";
     const d = new Date(iso);
@@ -140,7 +167,6 @@ export function TelemetryCard() {
       })()
     : false;
 
-  const [collapsed, setCollapsed] = useState(true);
   const [infoVisible, setInfoVisible] = useState(false);
 
   return (
@@ -235,6 +261,37 @@ export function TelemetryCard() {
           <View style={telStyles.lastSample}>
             <MaterialCommunityIcons name="clock-outline" size={12} color={Colors.textSecondary} />
             <Text style={telStyles.lastSampleText}>Ultimo campione: {data ? formatDate(data.latestSample) : "—"}</Text>
+          </View>
+
+          <View style={telStyles.topRidersSection}>
+            <View style={telStyles.topRidersHeader}>
+              <MaterialCommunityIcons name="podium" size={13} color={Colors.textSecondary} />
+              <Text style={telStyles.topRidersTitle}>Top rider — ultime 24h</Text>
+              {topRidersLoading && <ActivityIndicator size="small" color="#22c55e" style={{ marginLeft: "auto" }} />}
+            </View>
+            {!topRidersLoading && topRidersError && (
+              <View style={telStyles.topRidersErrorRow}>
+                <MaterialCommunityIcons name="alert-circle-outline" size={13} color="#ef4444" />
+                <Text style={telStyles.topRidersErrorText}>Errore caricamento rider</Text>
+              </View>
+            )}
+            {!topRidersLoading && !topRidersError && (!topRidersData?.riders || topRidersData.riders.length === 0) && (
+              <Text style={telStyles.topRidersEmpty}>Nessun rider attivo nelle ultime 24h</Text>
+            )}
+            {topRidersData?.riders.map((rider, idx) => (
+              <View key={rider.userId} style={telStyles.riderRow}>
+                <Text style={telStyles.riderRank}>{idx + 1}</Text>
+                <MaterialCommunityIcons name="account-circle-outline" size={16} color={Colors.textSecondary} />
+                <Text style={telStyles.riderName} numberOfLines={1}>{rider.username}</Text>
+                <View style={telStyles.riderStats}>
+                  <Text style={telStyles.riderSamples}>{rider.sampleCount.toLocaleString("it-IT")}</Text>
+                  <Text style={telStyles.riderStatLabel}>camp.</Text>
+                </View>
+                <View style={telStyles.riderKmBadge}>
+                  <Text style={telStyles.riderKm}>{rider.km} km</Text>
+                </View>
+              </View>
+            ))}
           </View>
         </>
       )}
@@ -392,6 +449,90 @@ const telStyles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     color: Colors.textSecondary,
+  },
+  topRidersSection: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: 12,
+  },
+  topRidersHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginBottom: 8,
+  },
+  topRidersTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  topRidersEmpty: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    fontStyle: "italic",
+    paddingVertical: 4,
+  },
+  topRidersErrorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 4,
+  },
+  topRidersErrorText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "#ef4444",
+  },
+  riderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    paddingVertical: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  riderRank: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    width: 14,
+    textAlign: "center",
+  },
+  riderName: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.text,
+    flex: 1,
+  },
+  riderStats: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 2,
+  },
+  riderSamples: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: Colors.text,
+  },
+  riderStatLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
+  },
+  riderKmBadge: {
+    backgroundColor: "rgba(34, 197, 94, 0.12)",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  riderKm: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: "#22c55e",
   },
   modalOverlay: {
     flex: 1,

@@ -415,6 +415,73 @@ router.get("/telemetry/sessions/:sessionId/samples", async (req: Request, res: R
   }
 });
 
+router.get("/telemetry-top-riders", async (req: Request, res: Response) => {
+  try {
+    const limit = Math.max(1, Math.min(20, parseInt(String(req.query.limit ?? "5"), 10) || 5));
+
+    const result = await db.execute<{
+      user_id: string;
+      username: string;
+      sample_count: string;
+      km: string;
+    }>(sql`
+      WITH recent AS (
+        SELECT
+          user_id,
+          session_id,
+          lat, lon,
+          LAG(lat) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lat,
+          LAG(lon) OVER (PARTITION BY session_id ORDER BY ts) AS prev_lon
+        FROM ride_telemetry
+        WHERE created_at >= NOW() - INTERVAL '24 hours'
+          AND session_type NOT IN ('ideal_lap')
+      ),
+      user_agg AS (
+        SELECT
+          user_id,
+          COUNT(*) AS sample_count,
+          COALESCE(SUM(
+            CASE
+              WHEN prev_lat IS NOT NULL AND prev_lon IS NOT NULL
+                AND ABS(lat - prev_lat) < 0.5 AND ABS(lon - prev_lon) < 0.5
+              THEN 2 * 6371 * ASIN(
+                SQRT(
+                  POWER(SIN(RADIANS(lat - prev_lat) / 2), 2)
+                  + COS(RADIANS(prev_lat)) * COS(RADIANS(lat))
+                  * POWER(SIN(RADIANS(lon - prev_lon) / 2), 2)
+                )
+              )
+              ELSE 0
+            END
+          ), 0) AS km
+        FROM recent
+        GROUP BY user_id
+      )
+      SELECT
+        ua.user_id::text,
+        COALESCE(u.username, 'utente#' || ua.user_id) AS username,
+        ua.sample_count::text,
+        ROUND(ua.km::numeric, 1)::text AS km
+      FROM user_agg ua
+      LEFT JOIN users u ON u.id = ua.user_id
+      ORDER BY ua.sample_count DESC
+      LIMIT ${limit}
+    `);
+
+    const riders = result.rows.map((r) => ({
+      userId: parseInt(r.user_id, 10),
+      username: r.username,
+      sampleCount: parseInt(r.sample_count, 10),
+      km: Math.round(parseFloat(r.km) * 10) / 10,
+    }));
+
+    return res.json({ riders });
+  } catch (err) {
+    console.error("[admin/telemetry-top-riders] error:", err);
+    return sendError(res, 500, "Errore lettura top rider");
+  }
+});
+
 router.get("/telemetry/error-log", (_req: Request, res: Response) => {
   try {
     const entries = getTelemetryErrorLog();
