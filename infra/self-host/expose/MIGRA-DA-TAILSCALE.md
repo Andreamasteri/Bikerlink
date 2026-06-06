@@ -16,6 +16,7 @@
 - [ ] **Passo 3** — Apri porte 80/443 sul router (port forwarding)
 - [ ] **Passo 4** — Genera i token di autenticazione
 - [ ] **Passo 5** — Installa Nginx e ottieni i certificati Let's Encrypt
+- [ ] **Passo 5b** — Attiva il rinnovo automatico dei certificati (timer systemd)
 - [ ] **Passo 6** — Genera e installa la config Nginx con `setup-expose.sh`
 - [ ] **Passo 7** — Verifica con `test-connectivity.sh` (tutti ✓)
 - [ ] **Passo 8** — Aggiorna i Secret Replit e riavvia il backend
@@ -170,6 +171,50 @@ sudo ls /etc/letsencrypt/live/bikerlink/
 **Troubleshooting certbot:**
 - `connection refused` → la porta 80 non è aperta (ricontrolla Passo 3) oppure nginx è ancora in ascolto.
 - `Too many requests` → Let's Encrypt ha un rate limit di 5 certificati/settimana per dominio. Usa `--staging` per testare.
+
+---
+
+## Passo 5b — Attiva il rinnovo automatico dei certificati
+
+I certificati Let's Encrypt scadono ogni **90 giorni**. Il timer systemd
+incluso nel progetto esegue `certbot renew --nginx` due volte al giorno e
+ricarica Nginx automaticamente dopo ogni rinnovo riuscito.
+
+```bash
+# 1. Copia i file di servizio e timer
+sudo cp infra/self-host/expose/certbot-renew.service /etc/systemd/system/
+sudo cp infra/self-host/expose/certbot-renew.timer   /etc/systemd/system/
+
+# 2. Ricarica systemd e attiva il timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now certbot-renew.timer
+
+# 3. Verifica che il timer sia attivo
+sudo systemctl status certbot-renew.timer
+# Output atteso: "active (waiting)" con la prossima scadenza indicata
+
+# 4. Test manuale (dry-run) — non rinnova davvero, simula soltanto
+sudo certbot renew --dry-run
+# Output atteso: "Congratulations, all simulated renewals succeeded"
+
+# 5. Controlla i log dell'ultima esecuzione del servizio
+sudo journalctl -u certbot-renew.service --no-pager -n 30
+```
+
+**Come funziona:**
+- Il timer scatta alle **04:30** e alle **16:30** ogni giorno, con un jitter
+  casuale fino a 60 minuti per non sovraccaricare i server Let's Encrypt.
+- `certbot renew` rinnova automaticamente i certificati solo se mancano
+  **meno di 30 giorni** alla scadenza; altrimenti termina senza fare nulla.
+- Il flag `--deploy-hook "systemctl reload nginx"` ricarica Nginx soltanto
+  quando avviene un rinnovo reale, senza interrompere il traffico.
+- `Persistent=true` nel timer assicura che, se il ThinkCentre era spento
+  all'orario programmato, l'esecuzione avvenga al successivo avvio.
+
+> **Troubleshooting:** se il dry-run fallisce con `connection refused` sulla
+> porta 80, Nginx è già in ascolto e certbot (in modalità `--nginx`) ne prende
+> il controllo temporaneamente — questo è normale. Se fallisce per altro,
+> controlla che le porte 80/443 siano ancora aperte nel router.
 
 ---
 

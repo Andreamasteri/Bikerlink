@@ -1,0 +1,18 @@
+[Unit]
+Description=Rinnovo certificati Let's Encrypt (Certbot) per BikerLink
+Documentation=https://certbot.eff.org/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/certbot renew --nginx --deploy-hook "systemctl reload nginx"
+# Mostra l'output nel journal
+StandardOutput=journal
+StandardError=journal
+# Continua anche se il certificato non è ancora vicino alla scadenza
+# (certbot skip automaticamente se mancano più di 30 giorni)
+SuccessExitStatus=0
+
+[Install]
+WantedBy=multi-user.target

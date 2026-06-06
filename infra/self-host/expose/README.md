@@ -179,6 +179,25 @@ sudo ls /etc/letsencrypt/live/bikerlink/
 > (port forwarding) è fatto correttamente, certbot troverà il dominio e
 > emetterà il certificato automaticamente.
 
+### Passo 6b — Attiva il rinnovo automatico dei certificati
+
+I certificati Let's Encrypt scadono ogni **90 giorni**. Installa il timer
+systemd incluso nel progetto per rinnovarli in automatico due volte al giorno:
+
+```bash
+sudo cp infra/self-host/expose/certbot-renew.service /etc/systemd/system/
+sudo cp infra/self-host/expose/certbot-renew.timer   /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now certbot-renew.timer
+
+# Verifica e test
+sudo systemctl status certbot-renew.timer   # deve mostrare "active (waiting)"
+sudo certbot renew --dry-run                # simula il rinnovo senza toccare nulla
+```
+
+Per i dettagli completi (jitter, deploy-hook, troubleshooting) vedi
+**Passo 5b** in `MIGRA-DA-TAILSCALE.md`.
+
 ### Passo 7 — Genera e installa la configurazione Nginx
 
 Esegui lo script **dalla cartella del progetto** (non sul ThinkCentre, ma
