@@ -1,26 +1,27 @@
 #!/usr/bin/env bash
 # =============================================================================
 # BikerLink — expose/setup-expose.sh
-# Genera i file di configurazione per esporre i servizi self-host (GraphHopper
-# e Valhalla) all'app cloud, compilando automaticamente i segnaposto a partire
-# dai template di questa cartella e dai valori del .env.local.
+# Genera i file di configurazione per esporre i servizi self-host (GraphHopper,
+# Valhalla, Ollama, Whisper, Nominatim) all'app cloud, compilando i segnaposto
+# nei template a partire dai valori del .env.local.
 #
 # Cosa fa:
-#   1. Legge i token (GRAPHHOPPER_TOKEN, VALHALLA_API_KEY) dal .env.local.
+#   1. Legge i token dal .env.local.
 #   2. Chiede/legge dominio base, origin web (CORS) e UUID del tunnel Cloudflare.
 #   3. Valida che i token forniti coincidano con quelli del .env.local.
 #   4. Produce i config compilati (senza segnaposto):
 #        - generated/nginx-bikerlink.conf
 #        - generated/cloudflared-config.yml
-#   I file template originali (nginx-bikerlink.conf, cloudflared-config.yml)
-#   restano intatti come riferimento.
+#   I file template originali restano intatti come riferimento.
 #
 # Uso:
 #   chmod +x setup-expose.sh && ./setup-expose.sh
 #   ./setup-expose.sh --gen-tokens   # genera i token mancanti e li scrive nel .env.local
 #
 # Variabili d'ambiente per modalità non-interattiva (CI / scripting):
-#   BASE_DOMAIN, APP_ORIGIN, TUNNEL_UUID, GRAPHHOPPER_TOKEN, VALHALLA_API_KEY,
+#   BASE_DOMAIN, APP_ORIGIN, TUNNEL_UUID,
+#   GRAPHHOPPER_TOKEN, VALHALLA_API_KEY,
+#   OLLAMA_TOKEN, WHISPER_TOKEN, NOMINATIM_TOKEN,
 #   ENV_LOCAL_FILE, NONINTERACTIVE=1, GEN_TOKENS=1
 # =============================================================================
 set -euo pipefail
@@ -67,7 +68,6 @@ read_env_value() {
   line="$(grep -E "^[[:space:]]*${key}=" "$file" | tail -n1 || true)"
   [[ -n "$line" ]] || return 1
   val="${line#*=}"
-  # Rimuove eventuali virgolette singole/doppie esterne.
   val="${val%\"}"; val="${val#\"}"
   val="${val%\'}"; val="${val#\'}"
   printf '%s' "$val"
@@ -130,19 +130,22 @@ else
 fi
 
 # Token attesi (dal .env.local). Possono essere vuoti o placeholder.
-ENV_GH_TOKEN="$(read_env_value GRAPHHOPPER_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+ENV_GH_TOKEN="$(read_env_value GRAPHHOPPER_TOKEN  "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 ENV_VALHALLA_KEY="$(read_env_value VALHALLA_API_KEY "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+ENV_OLLAMA_TOKEN="$(read_env_value OLLAMA_TOKEN     "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+ENV_WHISPER_TOKEN="$(read_env_value WHISPER_TOKEN   "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+ENV_NOMINATIM_TOKEN="$(read_env_value NOMINATIM_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "2/4 — Parametri di esposizione"
 # ─────────────────────────────────────────────────────────────────────────────
-BASE_DOMAIN="${BASE_DOMAIN:-$(ask "Dominio base (es: bikerlink.app)")}"
+BASE_DOMAIN="${BASE_DOMAIN:-$(ask "Dominio base (es: bikerlink.duckdns.org)")}"
 [[ -n "$BASE_DOMAIN" ]] || die "Dominio base obbligatorio."
 [[ "$BASE_DOMAIN" =~ ^[A-Za-z0-9.-]+\.[A-Za-z]{2,}$ ]] \
   || warn "Il dominio '$BASE_DOMAIN' non sembra valido: procedo comunque."
 
 APP_ORIGIN="${APP_ORIGIN:-$(ask "Origin web autorizzato per CORS" "https://${BASE_DOMAIN}")}"
-TUNNEL_UUID="${TUNNEL_UUID:-$(ask "Tunnel UUID Cloudflare (vuoto se usi solo Nginx)")}"
+TUNNEL_UUID="${TUNNEL_UUID:-$(ask "Tunnel UUID Cloudflare (vuoto se usi solo Nginx/DuckDNS)")}"
 
 ok "Dominio:     $BASE_DOMAIN"
 ok "App origin:  $APP_ORIGIN"
@@ -155,8 +158,6 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 section "3/4 — Token e validazione con .env.local"
 # ─────────────────────────────────────────────────────────────────────────────
-# Decide se generare un token mancante/placeholder: opt-in via --gen-tokens/
-# GEN_TOKENS=1, oppure prompt interattivo. Aggiorna GENERATED_TOKENS se sì.
 GENERATED_ANY=0
 should_generate() {
   local name="$1"
@@ -171,10 +172,6 @@ should_generate() {
   [[ "$reply" =~ ^[sSyY]$ ]]
 }
 
-# Risolve un token: usa la variabile d'ambiente se passata, altrimenti il valore
-# del .env.local; se entrambi mancano/placeholder lo genera (opt-in) o lo chiede.
-# NB: imposta la variabile globale RESOLVED_TOKEN (non usa command substitution,
-# così l'eventuale aggiornamento di GENERATED_ANY resta visibile al chiamante).
 RESOLVED_TOKEN=""
 resolve_token() {
   local name="$1" env_val="$2" provided="${3:-}"
@@ -192,25 +189,40 @@ resolve_token() {
   fi
 }
 
-resolve_token "GRAPHHOPPER_TOKEN" "$ENV_GH_TOKEN" "${GRAPHHOPPER_TOKEN:-}"
+resolve_token "GRAPHHOPPER_TOKEN" "$ENV_GH_TOKEN"       "${GRAPHHOPPER_TOKEN:-}"
 GH_TOKEN="$RESOLVED_TOKEN"
-resolve_token "VALHALLA_API_KEY" "$ENV_VALHALLA_KEY" "${VALHALLA_API_KEY:-}"
+resolve_token "VALHALLA_API_KEY"  "$ENV_VALHALLA_KEY"   "${VALHALLA_API_KEY:-}"
 VALHALLA_KEY="$RESOLVED_TOKEN"
+resolve_token "OLLAMA_TOKEN"      "$ENV_OLLAMA_TOKEN"   "${OLLAMA_TOKEN:-}"
+OLLAMA_TOKEN_VAL="$RESOLVED_TOKEN"
+resolve_token "WHISPER_TOKEN"     "$ENV_WHISPER_TOKEN"  "${WHISPER_TOKEN:-}"
+WHISPER_TOKEN_VAL="$RESOLVED_TOKEN"
+resolve_token "NOMINATIM_TOKEN"   "$ENV_NOMINATIM_TOKEN" "${NOMINATIM_TOKEN:-}"
+NOMINATIM_TOKEN_VAL="$RESOLVED_TOKEN"
 
 # Se abbiamo generato token, rileggiamo i valori dal .env.local così la
 # validazione successiva li riconosce come coincidenti (non più placeholder).
 if [[ "$GENERATED_ANY" == "1" ]]; then
-  ENV_GH_TOKEN="$(read_env_value GRAPHHOPPER_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+  ENV_GH_TOKEN="$(read_env_value GRAPHHOPPER_TOKEN  "$ENV_LOCAL_FILE" 2>/dev/null || true)"
   ENV_VALHALLA_KEY="$(read_env_value VALHALLA_API_KEY "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+  ENV_OLLAMA_TOKEN="$(read_env_value OLLAMA_TOKEN     "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+  ENV_WHISPER_TOKEN="$(read_env_value WHISPER_TOKEN   "$ENV_LOCAL_FILE" 2>/dev/null || true)"
+  ENV_NOMINATIM_TOKEN="$(read_env_value NOMINATIM_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 fi
 
-[[ -n "$GH_TOKEN" && "$GH_TOKEN" != "$PLACEHOLDER_VALUE" ]] \
+[[ -n "$GH_TOKEN"           && "$GH_TOKEN"           != "$PLACEHOLDER_VALUE" ]] \
   || die "GRAPHHOPPER_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
-[[ -n "$VALHALLA_KEY" && "$VALHALLA_KEY" != "$PLACEHOLDER_VALUE" ]] \
+[[ -n "$VALHALLA_KEY"       && "$VALHALLA_KEY"        != "$PLACEHOLDER_VALUE" ]] \
   || die "VALHALLA_API_KEY mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
+[[ -n "$OLLAMA_TOKEN_VAL"   && "$OLLAMA_TOKEN_VAL"    != "$PLACEHOLDER_VALUE" ]] \
+  || die "OLLAMA_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
+[[ -n "$WHISPER_TOKEN_VAL"  && "$WHISPER_TOKEN_VAL"   != "$PLACEHOLDER_VALUE" ]] \
+  || die "WHISPER_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
+[[ -n "$NOMINATIM_TOKEN_VAL" && "$NOMINATIM_TOKEN_VAL" != "$PLACEHOLDER_VALUE" ]] \
+  || die "NOMINATIM_TOKEN mancante. Generane uno con: openssl rand -base64 32 (o riesegui con --gen-tokens)"
 
-# Validazione: i token usati devono coincidere con quelli del .env.local
-# (se presenti e valorizzati). Disabilitabile con SKIP_TOKEN_VALIDATION=1.
+# Validazione: i token usati devono coincidere con quelli del .env.local.
+# Disabilitabile con SKIP_TOKEN_VALIDATION=1.
 validate_token() {
   local name="$1" used="$2" env_val="$3"
   if [[ -z "$env_val" || "$env_val" == "$PLACEHOLDER_VALUE" ]]; then
@@ -229,8 +241,11 @@ validate_token() {
   fi
 }
 
-validate_token "GRAPHHOPPER_TOKEN" "$GH_TOKEN" "$ENV_GH_TOKEN"
-validate_token "VALHALLA_API_KEY"  "$VALHALLA_KEY" "$ENV_VALHALLA_KEY"
+validate_token "GRAPHHOPPER_TOKEN" "$GH_TOKEN"           "$ENV_GH_TOKEN"
+validate_token "VALHALLA_API_KEY"  "$VALHALLA_KEY"       "$ENV_VALHALLA_KEY"
+validate_token "OLLAMA_TOKEN"      "$OLLAMA_TOKEN_VAL"   "$ENV_OLLAMA_TOKEN"
+validate_token "WHISPER_TOKEN"     "$WHISPER_TOKEN_VAL"  "$ENV_WHISPER_TOKEN"
+validate_token "NOMINATIM_TOKEN"   "$NOMINATIM_TOKEN_VAL" "$ENV_NOMINATIM_TOKEN"
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "4/4 — Generazione config compilati"
@@ -241,6 +256,9 @@ E_BASE_DOMAIN="$(sed_escape "$BASE_DOMAIN")"
 E_APP_ORIGIN="$(sed_escape "$APP_ORIGIN")"
 E_GH_TOKEN="$(sed_escape "$GH_TOKEN")"
 E_VALHALLA_KEY="$(sed_escape "$VALHALLA_KEY")"
+E_OLLAMA_TOKEN="$(sed_escape "$OLLAMA_TOKEN_VAL")"
+E_WHISPER_TOKEN="$(sed_escape "$WHISPER_TOKEN_VAL")"
+E_NOMINATIM_TOKEN="$(sed_escape "$NOMINATIM_TOKEN_VAL")"
 E_TUNNEL_UUID="$(sed_escape "${TUNNEL_UUID:-__TUNNEL_UUID__}")"
 
 # Nginx
@@ -249,6 +267,9 @@ sed \
   -e "s#__APP_ORIGIN__#${E_APP_ORIGIN}#g" \
   -e "s#__GH_TOKEN__#${E_GH_TOKEN}#g" \
   -e "s#__VALHALLA_KEY__#${E_VALHALLA_KEY}#g" \
+  -e "s#__OLLAMA_TOKEN__#${E_OLLAMA_TOKEN}#g" \
+  -e "s#__WHISPER_TOKEN__#${E_WHISPER_TOKEN}#g" \
+  -e "s#__NOMINATIM_TOKEN__#${E_NOMINATIM_TOKEN}#g" \
   "$NGINX_TEMPLATE" > "$NGINX_OUT"
 chmod 600 "$NGINX_OUT"
 ok "Generato $NGINX_OUT"
@@ -271,11 +292,20 @@ cat <<EOF
 
 $(bold "Config pronti in: ${OUT_DIR}")
 
-$(bold "Nginx + Let's Encrypt")
+$(bold "Nginx + Let's Encrypt (o DuckDNS)")
+  # 1. Ferma nginx prima di chiedere il certificato (challenge HTTP-01 porta 80)
+  sudo systemctl stop nginx
+
+  # 2. Emetti il certificato SAN unico (--cert-name bikerlink = lineage fisso)
+  sudo certbot certonly --standalone --cert-name bikerlink \\
+    -d gh.${BASE_DOMAIN} -d valhalla.${BASE_DOMAIN} \\
+    -d ollama.${BASE_DOMAIN} -d whisper.${BASE_DOMAIN} \\
+    -d nominatim.${BASE_DOMAIN}
+
+  # 3. Installa il config e avvia nginx
   sudo cp ${NGINX_OUT} /etc/nginx/sites-available/bikerlink
   sudo ln -sf /etc/nginx/sites-available/bikerlink /etc/nginx/sites-enabled/
-  sudo certbot --nginx -d gh.${BASE_DOMAIN} -d valhalla.${BASE_DOMAIN}
-  sudo nginx -t && sudo systemctl reload nginx
+  sudo nginx -t && sudo systemctl start nginx && sudo systemctl enable nginx
 
 $(bold "Cloudflare Tunnel")
   sudo cp ${CLOUDFLARED_OUT} /etc/cloudflared/config.yml
@@ -285,6 +315,18 @@ $(bold "Cloudflare Tunnel")
 $(bold "Nota")
   $(if [[ "$GENERATED_ANY" == "1" ]]; then printf 'Token generati e salvati in %s (riusati nei config). ' "$ENV_LOCAL_FILE"; fi)I file contengono i token in chiaro (chmod 600). NON committarli.
   La cartella generated/ è ignorata da git.
+
+$(bold "Secrets Replit da aggiornare")
+  OLLAMA_URL=https://ollama.${BASE_DOMAIN}
+  OLLAMA_TOKEN=<valore da .env.local>
+  WHISPER_URL=https://whisper.${BASE_DOMAIN}
+  WHISPER_TOKEN=<valore da .env.local>
+  NOMINATIM_URL=https://nominatim.${BASE_DOMAIN}
+  NOMINATIM_TOKEN=<valore da .env.local>
+  GRAPHHOPPER_URL=https://gh.${BASE_DOMAIN}
+  GRAPHHOPPER_TOKEN=<valore da .env.local>
+  VALHALLA_URL=https://valhalla.${BASE_DOMAIN}
+  VALHALLA_API_KEY=<valore da .env.local>
 
 EOF
 ok "Fatto."
