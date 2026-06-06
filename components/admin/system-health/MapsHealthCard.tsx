@@ -5,7 +5,8 @@ import React from "react";
 import { View, Text, StyleSheet, Switch, ActivityIndicator, TouchableOpacity, Alert } from "react-native";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getQueryFnWithTimeout, ServerBusyError } from "@/lib/query-client";
+import { ErrorRetryCard } from "@/components/admin/shared/ErrorRetryCard";
 import Colors from "@/constants/colors";
 import { router } from "expo-router";
 
@@ -35,13 +36,29 @@ export function MapsHealthCard() {
   const qc = useQueryClient();
   const summaryQ = useQuery<SummaryResp>({
     queryKey: ["/api/admin/watchdog/maps/summary"],
-    queryFn: async () => (await apiRequest("GET", "/api/admin/watchdog/maps/summary")).json(),
+    queryFn: getQueryFnWithTimeout<SummaryResp>(10_000),
     refetchInterval: 20_000,
+    retry: (count, err) => {
+      if (err instanceof ServerBusyError) return count < 3;
+      return false;
+    },
+    retryDelay: (index, err) => {
+      if (err instanceof ServerBusyError) return Math.min(8_000, 2_000 * Math.pow(2, index));
+      return 1_000;
+    },
   });
   const bucketsQ = useQuery<BucketsResp>({
-    queryKey: ["/api/admin/watchdog/maps/buckets", 1440],
-    queryFn: async () => (await apiRequest("GET", "/api/admin/watchdog/maps/buckets?minutes=1440")).json(),
+    queryKey: ["/api/admin/watchdog/maps/buckets?minutes=1440"],
+    queryFn: getQueryFnWithTimeout<BucketsResp>(10_000),
     refetchInterval: 30_000,
+    retry: (count, err) => {
+      if (err instanceof ServerBusyError) return count < 3;
+      return false;
+    },
+    retryDelay: (index, err) => {
+      if (err instanceof ServerBusyError) return Math.min(8_000, 2_000 * Math.pow(2, index));
+      return 1_000;
+    },
   });
   const toggleFlag = useMutation({
     mutationFn: async (vars: { flag: FlagKey; enabled: boolean }) =>
@@ -56,6 +73,18 @@ export function MapsHealthCard() {
 
   if (summaryQ.isLoading) {
     return <View style={s.card}><ActivityIndicator color={Colors.accent} /></View>;
+  }
+  if (summaryQ.isError) {
+    return (
+      <ErrorRetryCard
+        message={
+          summaryQ.error instanceof Error && summaryQ.error.name === "AbortError"
+            ? "Il backend sta rispondendo lentamente — riprova"
+            : "Impossibile caricare Maps Health — riprova"
+        }
+        onRetry={() => { summaryQ.refetch(); bucketsQ.refetch(); }}
+      />
+    );
   }
   if (!summaryQ.data) {
     return <View style={s.card}><Text style={s.muted}>Maps health non disponibile.</Text></View>;

@@ -8,7 +8,8 @@ import {
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { apiRequest } from "@/lib/query-client";
+import { apiRequest, getQueryFnWithTimeout, ServerBusyError } from "@/lib/query-client";
+import { ErrorRetryCard } from "@/components/admin/shared/ErrorRetryCard";
 import Colors from "@/constants/colors";
 import { StatusBadge } from "@/components/admin/system-health/StatusBadge";
 import { ProblemsList, type Problem } from "@/components/admin/system-health/ProblemsList";
@@ -43,8 +44,16 @@ export default function SystemHealthScreen() {
 
   const snapQ = useQuery<SnapshotResp>({
     queryKey: ["/api/admin/watchdog/snapshot"],
-    queryFn: async () => (await apiRequest("GET", "/api/admin/watchdog/snapshot")).json(),
+    queryFn: getQueryFnWithTimeout<SnapshotResp>(10_000),
     refetchInterval: 15_000,
+    retry: (count, err) => {
+      if (err instanceof ServerBusyError) return count < 3;
+      return false;
+    },
+    retryDelay: (index, err) => {
+      if (err instanceof ServerBusyError) return Math.min(8_000, 2_000 * Math.pow(2, index));
+      return 1_000;
+    },
   });
 
   // Task #2555 — WS realtime: invalida lo snapshot non appena il watchdog
@@ -52,9 +61,17 @@ export default function SystemHealthScreen() {
   useAdminWatchdogAlerts();
 
   const proposalsQ = useQuery<{ logs: WatchdogLog[] }>({
-    queryKey: ["/api/admin/watchdog/logs", "proposal"],
-    queryFn: async () => (await apiRequest("GET", "/api/admin/watchdog/logs?kind=proposal&limit=30")).json(),
+    queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"],
+    queryFn: getQueryFnWithTimeout<{ logs: WatchdogLog[] }>(10_000),
     refetchInterval: 20_000,
+    retry: (count, err) => {
+      if (err instanceof ServerBusyError) return count < 3;
+      return false;
+    },
+    retryDelay: (index, err) => {
+      if (err instanceof ServerBusyError) return Math.min(8_000, 2_000 * Math.pow(2, index));
+      return 1_000;
+    },
   });
 
   const pendingProposals = (proposalsQ.data?.logs ?? []).filter((p) => p.status === "pending");
@@ -70,14 +87,14 @@ export default function SystemHealthScreen() {
     mutationFn: async () => (await apiRequest("POST", "/api/admin/watchdog/run-now")).json(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/snapshot"] });
-      qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs", "proposal"] });
+      qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] });
     },
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
   const proposeNow = useMutation({
     mutationFn: async () => (await apiRequest("POST", "/api/admin/watchdog/propose-now")).json(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs", "proposal"] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] }),
     onError: (err: Error) => Alert.alert("Errore", err.message),
   });
 
@@ -85,7 +102,7 @@ export default function SystemHealthScreen() {
     setBusyProposalId(id);
     try {
       await apiRequest("POST", `/api/admin/watchdog/proposals/${id}/accept`);
-      await qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs", "proposal"] });
+      await qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] });
       Alert.alert("Proposta accettata", "Ricorda: l'azione resta MANUALE. Esegui tu il fix.");
     } catch (err) {
       Alert.alert("Errore", (err as Error).message);
@@ -96,7 +113,7 @@ export default function SystemHealthScreen() {
     setBusyProposalId(id);
     try {
       await apiRequest("POST", `/api/admin/watchdog/proposals/${id}/reject`, { reason: "rifiutata da admin" });
-      await qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs", "proposal"] });
+      await qc.invalidateQueries({ queryKey: ["/api/admin/watchdog/logs?kind=proposal&limit=30"] });
     } catch (err) {
       Alert.alert("Errore", (err as Error).message);
     } finally { setBusyProposalId(null); }
@@ -136,6 +153,15 @@ export default function SystemHealthScreen() {
       {/* Stato + score */}
       {snapQ.isLoading ? (
         <ActivityIndicator color={Colors.accent} style={{ marginTop: 24 }} />
+      ) : snapQ.isError ? (
+        <ErrorRetryCard
+          message={
+            snapQ.error instanceof Error && snapQ.error.name === "AbortError"
+              ? "Il backend sta rispondendo lentamente — riprova"
+              : "Impossibile caricare lo snapshot — riprova"
+          }
+          onRetry={() => snapQ.refetch()}
+        />
       ) : !snap ? (
         <View style={styles.card}>
           <Text style={styles.muted}>Nessun snapshot ancora generato.</Text>

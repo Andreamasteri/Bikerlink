@@ -202,57 +202,75 @@ export default function SystemScreen() {
 
   const fetchSystemHealth = useCallback(async (signal?: AbortSignal): Promise<SystemHealth> => {
     const url = new URL("/api/admin/system-health", getApiUrl());
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new Error("Request timeout after 10000ms")), 10_000);
+    if (signal) {
+      if (signal.aborted) {
+        clearTimeout(timer);
+        controller.abort((signal as AbortSignal & { reason?: unknown }).reason);
+      } else {
+        signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          controller.abort((signal as AbortSignal & { reason?: unknown }).reason);
+        }, { once: true });
+      }
+    }
+    const combinedSignal = controller.signal;
     const doFetch = () =>
       fetch(url.toString(), {
         headers: authFetchHeaders(),
         credentials: "include",
-        signal
+        signal: combinedSignal,
       });
 
-    let res: Response;
     try {
-      res = await doFetch();
-    } catch (e: unknown) {
-      if (e instanceof Error && e.name === "AbortError") throw e;
-      throw new AdminFetchError("network", "network_unavailable");
-    }
+      let res: Response;
+      try {
+        res = await doFetch();
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === "AbortError") throw e;
+        throw new AdminFetchError("network", "network_unavailable");
+      }
 
-    // ── 401: silent re-auth one-shot prima di dichiarare la sessione scaduta.
-    // Caso tipico: cookie connect.sid stale dopo cold start, ma il Bearer
-    // token in AsyncStorage è ancora valido. Se /api/auth/me risponde 200,
-    // ritentiamo la fetch silenziosamente; se risponde 401, la sessione è
-    // davvero scaduta e segnaliamo l'errore tipizzato.
-    if (res.status === 401) {
-      const stillValid = await silentAuthRecheck();
-      if (stillValid) {
-        try {
-          res = await doFetch();
-        } catch (e: unknown) {
-          if (e instanceof Error && e.name === "AbortError") throw e;
-          throw new AdminFetchError("network", "network_unavailable");
+      // ── 401: silent re-auth one-shot prima di dichiarare la sessione scaduta.
+      // Caso tipico: cookie connect.sid stale dopo cold start, ma il Bearer
+      // token in AsyncStorage è ancora valido. Se /api/auth/me risponde 200,
+      // ritentiamo la fetch silenziosamente; se risponde 401, la sessione è
+      // davvero scaduta e segnaliamo l'errore tipizzato.
+      if (res.status === 401) {
+        const stillValid = await silentAuthRecheck();
+        if (stillValid) {
+          try {
+            res = await doFetch();
+          } catch (e: unknown) {
+            if (e instanceof Error && e.name === "AbortError") throw e;
+            throw new AdminFetchError("network", "network_unavailable");
+          }
         }
       }
-    }
 
-    if (res.status === 401 || res.status === 403) {
-      let reason: string | undefined;
-      try {
-        const body = (await res.json()) as { reason?: string };
-        reason = body?.reason;
-      } catch {
-        // no-op: reason stays undefined
+      if (res.status === 401 || res.status === 403) {
+        let reason: string | undefined;
+        try {
+          const body = (await res.json()) as { reason?: string };
+          reason = body?.reason;
+        } catch {
+          // no-op: reason stays undefined
+        }
+        throw new AdminFetchError(
+          res.status === 401 ? "session_expired" : "forbidden",
+          res.status === 401 ? "session_expired" : "forbidden",
+          res.status,
+          reason,
+        );
       }
-      throw new AdminFetchError(
-        res.status === 401 ? "session_expired" : "forbidden",
-        res.status === 401 ? "session_expired" : "forbidden",
-        res.status,
-        reason,
-      );
+      if (!res.ok) {
+        throw new AdminFetchError("server_error", `server_${res.status}`, res.status);
+      }
+      return (await res.json()) as SystemHealth;
+    } finally {
+      clearTimeout(timer);
     }
-    if (!res.ok) {
-      throw new AdminFetchError("server_error", `server_${res.status}`, res.status);
-    }
-    return (await res.json()) as SystemHealth;
   }, []);
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<SystemHealth, AdminFetchError>({
@@ -261,8 +279,9 @@ export default function SystemScreen() {
     refetchInterval: 30000,
     retry: (count, e) => {
       if (isAdminError(e) && (e.code === "session_expired" || e.code === "forbidden")) return false;
-      return count < 2;
-    }
+      return count < 3;
+    },
+    retryDelay: (index) => Math.min(8_000, 2_000 * Math.pow(2, index)),
   });
 
   const { data: restartHistory } = useQuery<RestartHistory>({
