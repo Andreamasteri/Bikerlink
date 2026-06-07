@@ -204,6 +204,129 @@ journalctl -u valhalla -f
 
 ---
 
+## Routing "ad aree regionali" (multi-istanza GraphHopper)
+
+Oltre al routing globale, BikerLink supporta un sistema di routing **per gruppi di
+nazioni**: l'Europa è divisa in 7 gruppi-area, ognuno servito da una **propria
+istanza GraphHopper** (GraphHopper 12) con il suo grafo. Le aree di nicchia restano
+spente finché non servono, per risparmiare RAM sul ThinkCentre.
+
+La **fonte di verità** dei gruppi (codici, porte, nazioni, bbox) è
+`shared/routing-areas.ts`. Gli script bash/infra ne tengono una copia parallela:
+se cambi codici o porte lì, aggiorna anche `download-regions.sh`, `build-regions.sh`,
+`docker-compose.yml` e `expose/nginx-bikerlink.conf`.
+
+| Codice | Nazioni | Porta interna | Path pubblico | Default |
+|--------|---------|---------------|---------------|---------|
+| `grecia` | Grecia, Albania | 8990 | `/areas/grecia` | ON |
+| `balcani` | Croazia, Bosnia, Montenegro, Serbia, Macedonia del Nord, Albania | 8991 | `/areas/balcani` | ON |
+| `est` | Romania, Ungheria, Bulgaria | 8992 | `/areas/est` | OFF |
+| `iberia` | Spagna, Portogallo | 8993 | `/areas/iberia` | ON |
+| `arco-alpino` | Italia, Austria, Svizzera, Slovenia | 8994 | `/areas/arco-alpino` | ON |
+| `germania-centro` | Germania, Rep. Ceca | 8995 | `/areas/germania-centro` | OFF |
+| `francia-benelux` | Francia, Belgio, Paesi Bassi, Lussemburgo | 8996 | `/areas/francia-benelux` | OFF |
+
+> Le porte sono bindate su `127.0.0.1`: l'accesso pubblico passa SOLO dal reverse
+> proxy nginx (`/areas/<codice>/...`, stesso token `X-GH-Token` del vecchio monolite).
+
+### 1. Scarica e unisci i dati per gruppo
+
+```bash
+cd infra/self-host
+./download-regions.sh                  # tutti i gruppi → ./data/<codice>.osm.pbf
+./download-regions.sh grecia balcani   # solo alcuni gruppi
+```
+
+Scarica i singoli `.pbf` nazionali da Geofabrik (cache condivisa in `data/countries/`,
+così Albania viene scaricata una volta sola) e li unisce per gruppo con `osmium`.
+Idempotente, verifica MD5, riprende i download interrotti.
+
+### 2. Builda i grafi (uno alla volta)
+
+```bash
+./build-regions.sh                     # tutti i gruppi
+./build-regions.sh grecia balcani      # solo alcuni gruppi
+GRAPHS_DIR=/mnt/nvme/graphs ./build-regions.sh   # grafi su NVMe dedicato
+```
+
+Per ogni gruppo lancia `docker run --import` con l'immagine **pinnata per digest**,
+forzando `RAM_STORE` via `JAVA_OPTS` per un import veloce. Continua anche se un
+gruppo fallisce (riepilogo finale ✓/✗). I grafi finiscono in `${GRAPHS_DIR}/<codice>`.
+
+> **Prima pulizia grafi:** le cartelle sono create da Docker come root. Per ripulirle
+> serve `sudo` una volta:
+> `sudo rm -rf graphs/{grecia,balcani,est,iberia,arco-alpino,germania-centro,francia-benelux}`.
+> Lo script NON usa `sudo` internamente (gira unattended senza prompt).
+
+### 3. Avvia le istanze abilitate
+
+I servizi `graphhopper-*` sono sotto il profilo `areas`: NON partono con un semplice
+`docker compose up -d` (che avvia solo postgres/redis/valhalla/pgadmin). Si accendono
+per nome:
+
+```bash
+docker compose up -d graphhopper-grecia graphhopper-balcani   # accendi
+docker compose stop  graphhopper-est                          # spegni
+curl http://localhost:8990/health                             # verifica (grecia)
+```
+
+### 4. Watchdog automatico (consigliato)
+
+`expose/areas-watchdog.sh` interroga l'app cloud per sapere quali aree sono abilitate
+e accende/spegne i container di conseguenza. Contratto dell'endpoint app (Task B):
+
+```json
+GET <APP_AREAS_URL>   (header X-GH-Token)
+{ "areas": [ { "code": "grecia", "enabled": true }, { "code": "est", "enabled": false } ] }
+```
+
+Configura `/etc/bikerlink-areas.env` e installa la unit systemd (timer ogni 1 min):
+
+```bash
+sudo tee /etc/bikerlink-areas.env >/dev/null <<'EOF'
+APP_AREAS_URL=https://bikerlink.app/api/routing/areas/status
+GH_TOKEN=<token>
+COMPOSE_DIR=/opt/bikerlink/self-host
+EOF
+
+sudo cp expose/areas-watchdog.service expose/areas-watchdog.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now areas-watchdog.timer
+journalctl -u areas-watchdog.service -f
+```
+
+> **Fail-safe:** se l'endpoint app non risponde o il payload è illeggibile, il
+> watchdog NON tocca i container (non spegne nulla per sbaglio).
+
+### 5. Metriche delle aree
+
+`expose/areas-metrics.py` (solo stdlib) espone su `127.0.0.1:9090` un JSON con stato
++ `docker stats` per ogni area. nginx lo pubblica su `/metrics/areas` (auth `X-GH-Token`):
+
+```bash
+sudo cp expose/areas-metrics.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now areas-metrics
+curl -H "X-GH-Token: <token>" https://gh.<dominio>/metrics/areas
+```
+
+### Aggiornare il pin dell'immagine GraphHopper
+
+L'immagine è **pinnata per digest** (riproducibilità) in `docker-compose.yml` e
+`build-regions.sh`. `latest` corrisponde a GraphHopper 12 (non esiste un tag `12.0`).
+Per aggiornare al digest corrente:
+
+```bash
+docker pull israelhikingmap/graphhopper:latest
+docker inspect --format='{{index .RepoDigests 0}}' israelhikingmap/graphhopper:latest
+# Sostituisci il nuovo sha256:... in docker-compose.yml (anchor x-gh-area)
+# e in build-regions.sh (GH_IMAGE). Poi ri-builda i grafi.
+```
+
+Override al volo senza editare i file: `GRAPHHOPPER_IMAGE=<ref> ./build-regions.sh`.
+
+---
+
 ## FAQ / Troubleshooting
 
 **Come verifico che i servizi siano attivi?**
@@ -322,10 +445,14 @@ automaticamente `SESSION_SECRET` e `OSM_UPDATE_SECRET` nel `.env.local`:
 | `setup.sh` | Setup end-to-end (prerequisiti, download, avvio, health check). |
 | `setup-missing.sh` | Setup parziale: installa solo postgres, redis, valhalla, pgadmin (GraphHopper già attivo). |
 | `download-osm.sh` | Scarica Europa + Ecuador, verifica MD5, merge in un unico PBF. |
+| `download-regions.sh` | Routing aree: scarica i `.pbf` nazionali e li unisce per gruppo (`data/<codice>.osm.pbf`). |
+| `build-regions.sh` | Routing aree: builda i grafi GraphHopper per gruppo (import RAM_STORE, immagine pinnata). |
 | `update-osm.sh` | Aggiornamento incrementale dati OSM (diff) + rebuild a caldo (incl. tile Valhalla). |
 | `build-valhalla-tiles.sh` | Builda/ricostruisce i tile Valhalla dal PBF, segue i log, verifica `/status`. |
-| `docker-compose.yml` | Definizione dei 5 servizi e dei volumi persistenti. |
-| `graphhopper/config.yml` | Config GraphHopper (profilo moto curvy, PBF unificato). |
+| `docker-compose.yml` | Servizi base (postgres, redis, valhalla, pgadmin) + 7 istanze GraphHopper-area (profilo `areas`). |
+| `graphhopper/config.yml` | Config GraphHopper 12 condivisa (4 profili moto/auto, MMAP in serving). |
+| `expose/areas-watchdog.sh` + `.service`/`.timer` | Routing aree: accende/spegne le istanze in base allo stato app. |
+| `expose/areas-metrics.py` + `.service` | Routing aree: collector metriche (docker stats) esposto su `/metrics/areas`. |
 | `.env.local.template` | Template variabili app con URL locali precompilati. |
 | `expose/` | Guida + config (Cloudflare Tunnel o Nginx+TLS) per esporre GraphHopper e Valhalla all'app cloud in modo sicuro. |
 | `.env` | (generato) credenziali dei container — non committare. |

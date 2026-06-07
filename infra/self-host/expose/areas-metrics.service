@@ -1,0 +1,18 @@
+[Unit]
+Description=BikerLink — collector metriche istanze GraphHopper-area
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/bikerlink-areas.env
+ExecStart=/usr/bin/python3 /opt/bikerlink/expose/areas-metrics.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=areas-metrics
+
+[Install]
+WantedBy=multi-user.target

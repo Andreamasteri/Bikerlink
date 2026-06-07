@@ -1,24 +1,60 @@
 # =============================================================================
 # BikerLink — Self-Host Stack (PC di casa / Ubuntu Server 24.04 LTS)
 #
-# Servizi:
+# Servizi base:
 #   - postgres   PostgreSQL 16 + PostGIS 3.4   → :5432
 #   - redis      Redis 7 Alpine                → :6379
-#   - graphhopper GraphHopper 9.x (motorcycle) → :8989
 #   - valhalla   Valhalla (motorcycle nativo)  → :8002
 #   - pgadmin    pgAdmin 4 (UI DB)             → :5050
 #
-# Tutti i dati persistono su volumi nominati. Il file PBF unificato
-# (data/europe-ecuador-merged.osm.pbf) viene generato da download-osm.sh
-# nella cartella ./data prima di avviare GraphHopper e Valhalla.
+# Routing "ad aree regionali" (sistema multi-istanza GraphHopper 12):
+#   - graphhopper-grecia           → 127.0.0.1:8990
+#   - graphhopper-balcani          → 127.0.0.1:8991
+#   - graphhopper-est              → 127.0.0.1:8992
+#   - graphhopper-iberia           → 127.0.0.1:8993
+#   - graphhopper-arco-alpino      → 127.0.0.1:8994
+#   - graphhopper-germania-centro  → 127.0.0.1:8995
+#   - graphhopper-francia-benelux  → 127.0.0.1:8996
 #
-# Variabili lette da .env (generato da setup.sh a partire da .env.local.template):
+# ⚠️ Codici/porte sincronizzati con shared/routing-areas.ts (FONTE DI VERITÀ).
+#
+# I servizi graphhopper-* sono sotto il profilo "areas": NON partono con un
+# semplice `docker compose up -d` (che avvia solo postgres/redis/valhalla/pgadmin).
+# Vengono accesi/spenti per nome dal watchdog in base allo stato abilitato:
+#     docker compose up -d graphhopper-<codice>
+#     docker compose stop  graphhopper-<codice>
+# (Specificare il servizio per nome attiva automaticamente il suo profilo.)
+#
+# Le porte GraphHopper sono bindate su 127.0.0.1: l'accesso pubblico passa SOLO
+# dal reverse proxy nginx (expose/nginx-bikerlink.conf, location /areas/<codice>/).
+#
+# I grafi vanno costruiti PRIMA con ./build-regions.sh (in ${GRAPHS_DIR}).
+#
+# Variabili lette da .env:
 #   POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
 #   PGADMIN_EMAIL, PGADMIN_PASSWORD
-#   GRAPHHOPPER_JAVA_OPTS
+#   GRAPHS_DIR    cartella host dei grafi (default ./graphs; idealmente su NVMe)
+#   DATA_DIR_HOST cartella host dei .pbf  (default ./data)
 # =============================================================================
 
 name: bikerlink-selfhost
+
+# Blocco comune a tutte le istanze GraphHopper-area. Le differenze per gruppo
+# (porta, cartella grafo, env FILE, heap) sono override nei singoli servizi.
+x-gh-area: &gh-area
+  # Immagine PINNATA per digest = riproducibilità. latest = GH 12 (NON esiste un
+  # tag semver 12.0 su Docker Hub: si pinna il manifest multi-arch per digest).
+  # Lo STESSO pin va usato in build-regions.sh. Aggiornare il pin: vedi README.md.
+  image: israelhikingmap/graphhopper@sha256:ca307b8952e5e1e662c150c2d14f1fe0c4a7761b998bb9a36d97ffcd1e99f1c8
+  restart: unless-stopped
+  # Profilo "areas": esclude questi servizi dall'up di default; il watchdog li
+  # accende per nome. Ogni servizio aggiunge anche il proprio codice come profilo.
+  healthcheck:
+    test: ["CMD-SHELL", "curl -fsS http://localhost:8989/health || exit 1"]
+    interval: 30s
+    timeout: 10s
+    retries: 10
+    start_period: 90s
 
 services:
   # ---------------------------------------------------------------------------
@@ -63,41 +99,122 @@ services:
       start_period: 10s
 
   # ---------------------------------------------------------------------------
-  # GraphHopper 9.x — profilo motorcycle curvy (engine principale)
+  # GraphHopper 12 — istanze per gruppo-area (vedi shared/routing-areas.ts)
+  #
+  # Pattern comune (<<: *gh-area) + override per gruppo:
+  #   - profiles      : ["areas", "<codice>"]  (controllo selettivo dal watchdog)
+  #   - ports         : "127.0.0.1:<porta>:8989"
+  #   - environment   : FILE=/data/<codice>.osm.pbf, GRAPH=/graphhopper/graph-cache,
+  #                     JAVA_OPTS heap (2g piccoli, 4g grandi)
+  #   - volumes       : ${GRAPHS_DIR}/<codice> → /graphhopper/graph-cache
+  #
+  # GRAPH/FILE via env sovrascrivono graph.location/datareader.file del config
+  # condiviso (vincolo critico GH: senza GRAPH i grafi collidono su /data/default-gh).
   # ---------------------------------------------------------------------------
-  graphhopper:
-    image: israelhikingmap/graphhopper:latest
-    container_name: bikerlink-graphhopper
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    # All'avvio: importa il grafo se non esiste, poi serve. La JVM eredita
-    # le opzioni heap da GRAPHHOPPER_JAVA_OPTS (settata da setup.sh in base alla RAM).
-    environment:
-      JAVA_OPTS: ${GRAPHHOPPER_JAVA_OPTS:--Xmx16g -Xms4g -XX:+UseG1GC}
-    command:
-      - "--input"
-      - "/data/europe-ecuador-merged.osm.pbf"
-      - "--config"
-      - "/graphhopper/config.yml"
-      - "--host"
-      - "0.0.0.0"
+  graphhopper-grecia:
+    <<: *gh-area
+    container_name: bikerlink-gh-grecia
+    profiles: ["areas", "grecia"]
     ports:
-      - "8989:8989"
+      - "127.0.0.1:8990:8989"
+    environment:
+      GRAPH: /graphhopper/graph-cache
+      FILE: /data/grecia.osm.pbf
+      JAVA_OPTS: ${GH_HEAP_GRECIA:--Xmx2g -Xms512m -XX:+UseG1GC}
     volumes:
-      # PBF unificato + grafo buildato persistente
-      - ./data:/data
-      # Config montata read-only
+      - ${DATA_DIR_HOST:-./data}:/data:ro
       - ./graphhopper/config.yml:/graphhopper/config.yml:ro
-      - ghgraph:/graphhopper/graph-cache
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8989/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 20
-      # Il primo import del grafo Europa può richiedere 30-60 min.
-      start_period: 60m
+      - ${GRAPHS_DIR:-./graphs}/grecia:/graphhopper/graph-cache
+
+  graphhopper-balcani:
+    <<: *gh-area
+    container_name: bikerlink-gh-balcani
+    profiles: ["areas", "balcani"]
+    ports:
+      - "127.0.0.1:8991:8989"
+    environment:
+      GRAPH: /graphhopper/graph-cache
+      FILE: /data/balcani.osm.pbf
+      JAVA_OPTS: ${GH_HEAP_BALCANI:--Xmx2g -Xms512m -XX:+UseG1GC}
+    volumes:
+      - ${DATA_DIR_HOST:-./data}:/data:ro
+      - ./graphhopper/config.yml:/graphhopper/config.yml:ro
+      - ${GRAPHS_DIR:-./graphs}/balcani:/graphhopper/graph-cache
+
+  graphhopper-est:
+    <<: *gh-area
+    container_name: bikerlink-gh-est
+    profiles: ["areas", "est"]
+    ports:
+      - "127.0.0.1:8992:8989"
+    environment:
+      GRAPH: /graphhopper/graph-cache
+      FILE: /data/est.osm.pbf
+      JAVA_OPTS: ${GH_HEAP_EST:--Xmx2g -Xms512m -XX:+UseG1GC}
+    volumes:
+      - ${DATA_DIR_HOST:-./data}:/data:ro
+      - ./graphhopper/config.yml:/graphhopper/config.yml:ro
+      - ${GRAPHS_DIR:-./graphs}/est:/graphhopper/graph-cache
+
+  graphhopper-iberia:
+    <<: *gh-area
+    container_name: bikerlink-gh-iberia
+    profiles: ["areas", "iberia"]
+    ports:
+      - "127.0.0.1:8993:8989"
+    environment:
+      GRAPH: /graphhopper/graph-cache
+      FILE: /data/iberia.osm.pbf
+      JAVA_OPTS: ${GH_HEAP_IBERIA:--Xmx2g -Xms512m -XX:+UseG1GC}
+    volumes:
+      - ${DATA_DIR_HOST:-./data}:/data:ro
+      - ./graphhopper/config.yml:/graphhopper/config.yml:ro
+      - ${GRAPHS_DIR:-./graphs}/iberia:/graphhopper/graph-cache
+
+  graphhopper-arco-alpino:
+    <<: *gh-area
+    container_name: bikerlink-gh-arco-alpino
+    profiles: ["areas", "arco-alpino"]
+    ports:
+      - "127.0.0.1:8994:8989"
+    environment:
+      GRAPH: /graphhopper/graph-cache
+      FILE: /data/arco-alpino.osm.pbf
+      JAVA_OPTS: ${GH_HEAP_ARCO_ALPINO:--Xmx4g -Xms1g -XX:+UseG1GC}
+    volumes:
+      - ${DATA_DIR_HOST:-./data}:/data:ro
+      - ./graphhopper/config.yml:/graphhopper/config.yml:ro
+      - ${GRAPHS_DIR:-./graphs}/arco-alpino:/graphhopper/graph-cache
+
+  graphhopper-germania-centro:
+    <<: *gh-area
+    container_name: bikerlink-gh-germania-centro
+    profiles: ["areas", "germania-centro"]
+    ports:
+      - "127.0.0.1:8995:8989"
+    environment:
+      GRAPH: /graphhopper/graph-cache
+      FILE: /data/germania-centro.osm.pbf
+      JAVA_OPTS: ${GH_HEAP_GERMANIA_CENTRO:--Xmx4g -Xms1g -XX:+UseG1GC}
+    volumes:
+      - ${DATA_DIR_HOST:-./data}:/data:ro
+      - ./graphhopper/config.yml:/graphhopper/config.yml:ro
+      - ${GRAPHS_DIR:-./graphs}/germania-centro:/graphhopper/graph-cache
+
+  graphhopper-francia-benelux:
+    <<: *gh-area
+    container_name: bikerlink-gh-francia-benelux
+    profiles: ["areas", "francia-benelux"]
+    ports:
+      - "127.0.0.1:8996:8989"
+    environment:
+      GRAPH: /graphhopper/graph-cache
+      FILE: /data/francia-benelux.osm.pbf
+      JAVA_OPTS: ${GH_HEAP_FRANCIA_BENELUX:--Xmx4g -Xms1g -XX:+UseG1GC}
+    volumes:
+      - ${DATA_DIR_HOST:-./data}:/data:ro
+      - ./graphhopper/config.yml:/graphhopper/config.yml:ro
+      - ${GRAPHS_DIR:-./graphs}/francia-benelux:/graphhopper/graph-cache
 
   # ---------------------------------------------------------------------------
   # Valhalla — engine alternativo (motorcycle nativo, fallback robusto)
@@ -109,17 +226,13 @@ services:
     ports:
       - "8002:8002"
     environment:
-      # Usa il PBF già scaricato in ./data (no download interno).
       use_tiles_ignore_pbf: "False"
       serve_tiles: "True"
       build_admins: "True"
       build_time_zones: "True"
       build_elevation: "False"
-      # Default False (serve i tile esistenti). build-valhalla-tiles.sh e
-      # update-osm.sh impostano VALHALLA_FORCE_REBUILD=True per rigenerare i tile.
       force_rebuild: "${VALHALLA_FORCE_REBUILD:-False}"
     volumes:
-      # custom_files contiene i .pbf da cui Valhalla builda i tile.
       - ./data:/custom_files
       - valhalladata:/custom_files/valhalla_tiles
     healthcheck:
@@ -127,7 +240,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 30
-      # Il build dei tile Valhalla per l'Europa può richiedere fino a 3h.
       start_period: 180m
 
   # ---------------------------------------------------------------------------
@@ -152,6 +264,5 @@ services:
 volumes:
   pgdata:
   redisdata:
-  ghgraph:
   valhalladata:
   pgadmindata:

@@ -1,0 +1,16 @@
+[Unit]
+Description=BikerLink — sync istanze GraphHopper-area con stato app (watchdog)
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/bikerlink-areas.env
+ExecStart=/opt/bikerlink/expose/areas-watchdog.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=areas-watchdog
+
+[Install]
+WantedBy=multi-user.target

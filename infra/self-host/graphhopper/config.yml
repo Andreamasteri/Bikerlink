@@ -1,114 +1,80 @@
 # =============================================================================
-# GraphHopper 9.x — Configurazione BikerLink (SELF-HOST PC di casa)
-# Profilo: motorcycle con preferenza curve (curvy roads)
-# Map Matching: abilitato
-# Custom Model API: abilitato per pesi telemetria dinamici (Fase 3)
+# BikerLink — GraphHopper config.yml CONDIVISO (GraphHopper 12)
 #
-# Differenze rispetto a graphhopper/config.yml (server Oracle):
-#   - datareader.file punta al PBF unificato Europa + Ecuador
-#   - bind_host = 0.0.0.0 (il container espone la porta a Docker, niente Nginx locale)
-#   - logging su console (i log del container sono raccolti da `docker compose logs`)
+# Questo è l'UNICO file di config: lo usano sia il BUILD (build-regions.sh) sia
+# il SERVING (docker-compose.yml), per OGNI gruppo-area. Ciò che cambia per
+# gruppo NON è in questo file ma viene passato come env all'entrypoint:
+#
+#   FILE  → -Ddw.graphhopper.datareader.file   (il .pbf del gruppo, es. /data/grecia.osm.pbf)
+#   GRAPH → -Ddw.graphhopper.graph.location    (la graph-cache del gruppo)
+#
+# I sysprop -Ddw.graphhopper.* sovrascrivono le chiavi qui sotto, quindi i valori
+# `datareader.file` e `graph.location` di default servono solo come fallback.
+#
+# ⚠️ VINCOLO CRITICO GH (entrypoint israelhikingmap): l'entrypoint forza
+# graph.location via sysprop. Senza la env GRAPH tutti i gruppi scrivono su
+# /data/default-gh e collidono. Vedi infra/self-host/README.md.
+#
+# DATAACCESS:
+#   - SERVING (questo default): MMAP → poco heap, il grafo resta su disco/NVMe.
+#   - BUILD: build-regions.sh forza RAM_STORE via JAVA_OPTS
+#     (-Ddw.graphhopper.graph.dataaccess.default_type=RAM_STORE) perché l'import
+#     è molto più veloce in RAM.
+#
+# Versione GraphHopper: 12 (immagine pinnata per digest, vedi docker-compose.yml).
 # =============================================================================
 
 graphhopper:
+  # Valori di default — sovrascritti per-gruppo dalle env FILE/GRAPH.
+  datareader.file: /data/area.osm.pbf
+  graph.location: /graphhopper/graph-cache
 
-  # --- Dati OSM ---
-  # File PBF unificato generato da download-osm.sh (Europa completa + Ecuador).
-  datareader.file: data/europe-ecuador-merged.osm.pbf
-
-  # Cartella dove viene salvato il grafo buildato (persistito su volume).
-  graph.location: data/europe-ecuador-gh
-
-  # --- Profili di routing ---
+  # ── Profili ────────────────────────────────────────────────────────────────
+  # 4 profili, tutti su custom model:
+  #   - motorcycle      → moto "curvy" (motorcycle + curvature), accelerato con LM
+  #   - motorcycle_fast → moto veloce (motorcycle), accelerato con CH
+  #   - car             → auto, CH
+  #   - car_fast        → auto veloce, CH
+  # I file custom_model_*.json sono quelli BUILT-IN dell'immagine GraphHopper
+  # (NON montare volumi custom_models: usiamo solo i preset ufficiali).
   profiles:
     - name: motorcycle
-      vehicle: motorcycle
-      weighting: custom
-      custom_model:
-        # Velocità base: usa la velocità massima della strada (limitata al profilo moto)
-        speed:
-          - if: "true"
-            limit_to: "max_speed"
-          # Autostrade: riduzione drastica (i bikers vogliono strade panoramiche)
-          - if: "road_class == MOTORWAY"
-            multiply_by: "0.1"
-          # Strade principali a lunga percorrenza: leggera penalità
-          - if: "road_class == PRIMARY"
-            multiply_by: "0.85"
-          # Strade secondarie e terziarie: leggero boost (più interessanti)
-          - if: "road_class == SECONDARY || road_class == TERTIARY"
-            multiply_by: "1.05"
-
-        # Priorità: penalizza strade monotone, premia quelle panoramiche
-        priority:
-          # Autostrade: fortemente penalizzate
-          - if: "road_class == MOTORWAY"
-            multiply_by: "0.05"
-          # Strade a pedaggio: penalizzate
-          - if: "toll == ALL"
-            multiply_by: "0.2"
-          # Sterrati/fuoristrada: penalizzati (moto stradali)
-          - if: "surface == UNPAVED || surface == GRAVEL"
-            multiply_by: "0.3"
-          # Strade secondarie: leggermente favorite
-          - if: "road_class == SECONDARY"
-            multiply_by: "1.1"
-          # Strade terziarie: favorite (spesso più panoramiche)
-          - if: "road_class == TERTIARY"
-            multiply_by: "1.2"
-          # Strade locali: preferite per routing curvy
-          - if: "road_class == RESIDENTIAL || road_class == UNCLASSIFIED"
-            multiply_by: "1.15"
-
-    # Profilo alternativo: motorcycle_fast (ottimizzato per tempo, non curve)
+      custom_model_files: [motorcycle.json, curvature.json]
     - name: motorcycle_fast
-      vehicle: motorcycle
-      weighting: fastest
+      custom_model_files: [motorcycle.json]
+    - name: car
+      custom_model_files: [car.json]
+    - name: car_fast
+      custom_model_files: [car.json]
 
-  # ---------------------------------------------------------------------------
-  # Strategia di accelerazione per i profili
-  #
-  # - motorcycle:      usa Landmark (LM) — compatibile con custom_model dinamici
-  #                    inviati per-request via API (Fase 3 telemetria).
-  # - motorcycle_fast: usa Contraction Hierarchies (CH) — massima velocità per
-  #                    routing senza customizzazione dinamica.
-  # ---------------------------------------------------------------------------
-  profiles_lm:
-    - profile: motorcycle
-      active_landmarks: 16
-
+  # Contraction Hierarchies (routing veloce, no flessibilità) per i profili "fast".
   profiles_ch:
     - profile: motorcycle_fast
+    - profile: car
+    - profile: car_fast
 
-  graph.flag_encoders: motorcycle
+  # Landmarks (flessibile, supporta i custom model a runtime) per la moto curvy.
+  profiles_lm:
+    - profile: motorcycle
 
-  # Necessario per esporre osm_way_id nei dettagli del Map Matching
-  graph.encoded_values: road_class,surface,toll,max_speed
-  prepare.ch.weightings: fastest
+  # Encoded values necessari ai custom model sopra (curvatura, classe strada, ecc.).
+  graph.encoded_values: car_access, car_average_speed, road_access, track_type, road_class, curvature, surface, road_environment, ferry_speed, max_speed
 
-  # --- Map Matching ---
-  map_matching:
-    enabled: true
-    max_visited_nodes: 10000
-    # Distanza massima dal punto GPS al segmento (metri)
-    measurement_error_sigma: 50.0
+  # Accesso ai dati del grafo: MMAP in serving (poco heap). In build viene
+  # forzato RAM_STORE via JAVA_OPTS da build-regions.sh.
+  graph.dataaccess.default_type: MMAP
 
-  # --- Custom Model API ---
-  # Permette di inviare custom model dinamici via API (necessario per Fase 3)
-  custom_model_dir: custom_models
+  # Strade da ignorare in import (non rilevanti per moto/auto): alleggerisce il grafo.
+  import.osm.ignored_highways: footway,construction,cycleway,path,steps
 
-  # --- Server HTTP ---
-  server:
-    application_connectors:
-      - type: http
-        port: 8989
-        # Bind su tutte le interfacce: Docker pubblica la porta verso l'host.
-        bind_host: 0.0.0.0
-    request_log:
-      appenders: []
-
-  # --- Logging ---
-  import.osm.ignored_highways: footway,cycleway,path,steps,platform
+server:
+  application_connectors:
+    - type: http
+      port: 8989
+      bind_host: 0.0.0.0
+  # Disattiva il request log (verboso, inutile dietro il reverse proxy).
+  request_log:
+    appenders: []
 
 logging:
   level: WARN
