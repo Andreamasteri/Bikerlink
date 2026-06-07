@@ -36,15 +36,10 @@ const MIGRATIONS_DIR = join(process.cwd(), "migrations");
 const KNOWN_UNMIGRATED = new Set<string>([
   // Tabelle dichiarate senza alcun CREATE TABLE in migrations/.
   "match_negative_preferences",
-  "pending_auto_suggestions",
-  "ai_messages",
-  // Colonne aggiunte solo via push (la tabella ha invece il CREATE). Mantenute
-  // anche se la rispettiva tabella è già allow-listata sopra: se in futuro si
-  // aggiunge un CREATE TABLE per quella tabella senza queste colonne, la
-  // guardia continuerebbe a segnalarle finché non vengono migrate davvero.
-  "pending_auto_suggestions.reject_count",
-  "user_music_tokens.provider_user_id",
-  "ai_messages.scopes",
+  // pending_auto_suggestions, ai_messages e le loro colonne reject_count /
+  // scopes sono ora coperte da migrations/0076_align_three_unmigrated_columns.sql
+  // (CREATE TABLE IF NOT EXISTS completi) — rimosse dall'allow-list.
+  // user_music_tokens.provider_user_id è coperta dallo stesso file (ALTER TABLE).
 ]);
 
 /** Legge le migration in ordine numerico e le concatena come elenco ordinato. */
