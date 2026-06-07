@@ -111,6 +111,36 @@ async function ghFetch(
   }
 }
 
+// ─── Ring-buffer storico eventi up/down ──────────────────────────────────────
+// Mantiene fino a HISTORY_MAX eventi nelle ultime 24h. Un evento viene
+// registrato solo quando lo stato cambia (up→down o down→up) per evitare
+// di saturare il buffer con chiamate ripetute dello stesso stato.
+
+export interface RoutingEvent {
+  ts: number;
+  type: "up" | "down";
+  error_type?: "tunnel_down" | "profile_missing" | "routing_error";
+  error?: string;
+  duration_ms?: number;
+}
+
+const HISTORY_MAX = 100;
+const HISTORY_TTL_MS = 24 * 60 * 60 * 1000;
+
+const routingHistory: RoutingEvent[] = [];
+let lastEventType: "up" | "down" | null = null;
+let downSince: number | null = null;
+
+function pushRoutingEvent(ev: RoutingEvent): void {
+  routingHistory.push(ev);
+  if (routingHistory.length > HISTORY_MAX) routingHistory.shift();
+}
+
+export function getRoutingHistory(): RoutingEvent[] {
+  const cutoff = Date.now() - HISTORY_TTL_MS;
+  return routingHistory.filter((e) => e.ts >= cutoff);
+}
+
 // ─── Stato salute routing self-hosted ────────────────────────────────────────
 // Aggiornato a ogni chiamata self-hosted (route/match/health). Consumato dal
 // pannello admin per segnalare quando il server di casa è offline.
@@ -147,12 +177,20 @@ const selfHostHealth = {
 };
 
 function recordSelfHostSuccess(latencyMs: number): void {
+  const now = Date.now();
   selfHostHealth.ok = true;
-  selfHostHealth.lastCheckAt = Date.now();
+  selfHostHealth.lastCheckAt = now;
   selfHostHealth.latencyMs = latencyMs;
   selfHostHealth.error = null;
   selfHostHealth.consecutiveFailures = 0;
   selfHostHealth.cloudFallbackActive = false;
+
+  if (lastEventType !== "up") {
+    const duration_ms = downSince != null ? now - downSince : undefined;
+    pushRoutingEvent({ ts: now, type: "up", duration_ms });
+    lastEventType = "up";
+    downSince = null;
+  }
 }
 
 function recordSelfHostFailure(error: string, fellBackToCloud: boolean): void {
@@ -164,6 +202,18 @@ function recordSelfHostFailure(error: string, fellBackToCloud: boolean): void {
   selfHostHealth.error = error.slice(0, 300);
   selfHostHealth.consecutiveFailures += 1;
   selfHostHealth.cloudFallbackActive = fellBackToCloud;
+
+  if (lastEventType !== "down") {
+    downSince = now;
+    const errType = classifyGHError(error);
+    pushRoutingEvent({
+      ts: now,
+      type: "down",
+      error_type: errType === "ok" ? undefined : errType,
+      error: error.slice(0, 200),
+    });
+    lastEventType = "down";
+  }
 }
 
 /**

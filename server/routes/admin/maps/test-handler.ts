@@ -14,6 +14,7 @@ import type { MapsRollout, RoutingEngineId } from "@shared/maps-config";
 import {
   GH_BASE_URL, isSelfHosted, getServerInfo,
   getRoutingHealthSnapshot,
+  getRoutingHistory,
   fetchSelfHostedProfiles,
   classifyGHError,
   type GHServerInfo,
@@ -122,6 +123,15 @@ router.get("/routing-health", async (_req: Request, res: Response) => {
     degraded: activeEngineDown,
     message,
   });
+});
+
+/**
+ * GET /api/admin/maps/routing-history
+ * Ring-buffer degli ultimi eventi up/down nelle ultime 24h (max 100 eventi).
+ */
+router.get("/routing-history", (_req: Request, res: Response) => {
+  const events = getRoutingHistory();
+  return res.json({ events, self_hosted: isSelfHosted });
 });
 
 async function handleTestRouting(_req: Request, res: Response): Promise<Response> {

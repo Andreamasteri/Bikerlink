@@ -9,6 +9,19 @@ import type { RoutingEngineId, RoutingProfileId, MapsOption } from "@shared/maps
 
 type GHErrorType = "tunnel_down" | "profile_missing" | "routing_error" | "ok";
 
+interface RoutingHistoryEvent {
+  ts: number;
+  type: "up" | "down";
+  error_type?: "tunnel_down" | "profile_missing" | "routing_error";
+  error?: string;
+  duration_ms?: number;
+}
+
+interface RoutingHistoryResponse {
+  events: RoutingHistoryEvent[];
+  self_hosted: boolean;
+}
+
 interface GHHealth {
   ok: boolean;
   status: string;
@@ -134,6 +147,88 @@ function ProfilesSection({
         <Text style={styles.profilesUnavailable}>
           Endpoint /info raggiungibile ma nessun profilo restituito
         </Text>
+      )}
+    </View>
+  );
+}
+
+function formatDuration(ms: number): string {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}min`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem > 0 ? `${h}h ${rem}min` : `${h}h`;
+}
+
+const ERROR_TYPE_LABELS: Record<string, string> = {
+  tunnel_down: "tunnel_down",
+  profile_missing: "profile_missing",
+  routing_error: "routing_error",
+};
+
+function RoutingHistorySection() {
+  const [expanded, setExpanded] = React.useState(false);
+  const { data, isLoading } = useQuery<RoutingHistoryResponse>({
+    queryKey: ["/api/admin/maps/routing-history"],
+    queryFn: async () => (await apiRequest("GET", "/api/admin/maps/routing-history")).json(),
+    refetchInterval: 30_000,
+    enabled: expanded,
+  });
+
+  const events = data?.events ?? [];
+  const displayed = [...events].reverse();
+
+  return (
+    <View style={styles.historyBox}>
+      <TouchableOpacity
+        style={styles.historyToggle}
+        onPress={() => setExpanded((v) => !v)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="time-outline" size={13} color={Colors.textSecondary} />
+        <Text style={styles.historyToggleText}>
+          Storico ultime 24h{events.length > 0 ? ` (${events.length} eventi)` : ""}
+        </Text>
+        <Ionicons
+          name={expanded ? "chevron-up" : "chevron-down"}
+          size={13}
+          color={Colors.textSecondary}
+          style={{ marginLeft: "auto" }}
+        />
+      </TouchableOpacity>
+
+      {expanded && (
+        <View style={styles.historyContent}>
+          {isLoading ? (
+            <ActivityIndicator size="small" color={Colors.textSecondary} style={{ marginVertical: 8 }} />
+          ) : displayed.length === 0 ? (
+            <Text style={styles.historyEmpty}>Nessun evento registrato nelle ultime 24h</Text>
+          ) : (
+            displayed.map((ev, i) => {
+              const isDown = ev.type === "down";
+              const color = isDown ? Colors.error : Colors.success;
+              const arrow = isDown ? "↓" : "↑";
+              const timeStr = new Date(ev.ts).toLocaleTimeString("it-IT", {
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+              const label = isDown
+                ? `${ev.error_type ? ERROR_TYPE_LABELS[ev.error_type] ?? ev.error_type : "offline"}`
+                : `online${ev.duration_ms != null ? ` (down ${formatDuration(ev.duration_ms)})` : ""}`;
+
+              return (
+                <View key={i} style={styles.historyRow}>
+                  <View style={[styles.historyDot, { backgroundColor: color }]} />
+                  <Text style={[styles.historyTime, { color: Colors.textSecondary }]}>{timeStr}</Text>
+                  <Text style={[styles.historyArrow, { color }]}>{arrow}</Text>
+                  <Text style={[styles.historyLabel, { color }]} numberOfLines={1}>{label}</Text>
+                </View>
+              );
+            })
+          )}
+        </View>
       )}
     </View>
   );
@@ -272,6 +367,8 @@ function SelfHostStatus() {
           profilesErrorReason={gh.profiles_error_reason ?? null}
         />
       )}
+
+      {data.self_hosted && <RoutingHistorySection />}
 
       <TestRoutingButton selfHosted={data.self_hosted} />
     </View>
@@ -557,4 +654,63 @@ const styles = StyleSheet.create({
   optionDesc: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
   stubBadge: { backgroundColor: "#9333ea22", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   stubBadgeText: { fontFamily: "Inter_500Medium", fontSize: 10, color: "#9333ea" },
+  historyBox: {
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+    marginTop: 2,
+  },
+  historyToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    padding: 8,
+    backgroundColor: Colors.surface,
+  },
+  historyToggleText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  historyContent: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 5,
+  },
+  historyEmpty: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textSecondary,
+    paddingVertical: 4,
+  },
+  historyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingVertical: 2,
+  },
+  historyDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  historyTime: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    minWidth: 40,
+  },
+  historyArrow: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    minWidth: 14,
+    textAlign: "center",
+  },
+  historyLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    flex: 1,
+  },
 });
