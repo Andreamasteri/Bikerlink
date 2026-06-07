@@ -162,8 +162,7 @@ router.post("/test", async (req: Request, res: Response) => {
     });
   }
 
-  const engineSetting = await storage.getAppSetting("maps_routing_engine");
-  const engine = (requestedEngine ?? engineSetting?.value ?? "graphhopper") as RoutingEngineId;
+  const engine = (requestedEngine ?? (await resolveRoutingEngine())) as RoutingEngineId;
 
   const routeReq: RouteRequest = {
     points: [MIRA, BELLUNO],
