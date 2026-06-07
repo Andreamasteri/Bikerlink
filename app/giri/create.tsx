@@ -114,6 +114,16 @@ export default function GiriCreateScreen() {
     queryKey: ["/api/motorcycles"]
   });
 
+  useEffect(() => {
+    if (motorcycles.length === 0) return;
+    setSelectedMotoId((current) => {
+      if (current !== null) return current;
+      if (motorcycles.length === 1) return motorcycles[0].id;
+      const defaultMoto = motorcycles.find((m) => m.isDefault);
+      return defaultMoto ? defaultMoto.id : null;
+    });
+  }, [motorcycles, setSelectedMotoId]);
+
   const { data: myStyleProfile } = useQuery<MyStyleProfile>({
     queryKey: ["/api/planned-routes/my-style-profile"],
     staleTime: 5 * 60 * 1000
@@ -185,6 +195,13 @@ export default function GiriCreateScreen() {
         showsVerticalScrollIndicator={false}
       >
         <ModeSelector mode={mode} setMode={setMode} colors={colors} />
+
+        <GarageIntegrationSection
+          motorcycles={motorcycles} selectedMotoId={selectedMotoId}
+          setSelectedMotoId={setSelectedMotoId} fuelLevel={fuelLevel}
+          setFuelLevel={setFuelLevel} autonomyKm={autonomyKm}
+          fuelStopsNeeded={fuelStopsNeeded}
+        />
 
         {mode === "ai" && (
           <AiInputSection aiPrompt={aiPrompt} setAiPrompt={setAiPrompt} aiLoading={aiLoading} handleAiParse={handleAiParse} />
@@ -260,13 +277,6 @@ export default function GiriCreateScreen() {
           avoidWeather={avoidWeather} setAvoidWeather={setAvoidWeather}
           visibility={visibility} setVisibility={setVisibility}
           COMPASS_DIRECTIONS={COMPASS_DIRECTIONS}
-        />
-
-        <GarageIntegrationSection
-          motorcycles={motorcycles} selectedMotoId={selectedMotoId}
-          setSelectedMotoId={setSelectedMotoId} fuelLevel={fuelLevel}
-          setFuelLevel={setFuelLevel} autonomyKm={autonomyKm}
-          fuelStopsNeeded={fuelStopsNeeded}
         />
 
         <MultiDayPreview isMultiDay={isMultiDay} daysCount={daysCount} routeResult={routeResult ?? { distanceKm: 0, durationMinutes: 0 } as RouteResult} />

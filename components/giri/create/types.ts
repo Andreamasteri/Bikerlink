@@ -31,7 +31,7 @@ export interface WeatherWaypoint {
   weatherDesc: string; isSuitable: boolean;
 }
 
-export interface UserMotorcycle { id: string; brand: string; model: string; year?: number | null; ridingStyle?: string | null; }
+export interface UserMotorcycle { id: string; brand: string; model: string; year?: number | null; ridingStyle?: string | null; isDefault?: boolean; }
 
 export interface AiPreviewItem {
   role: "start" | "waypoint" | "end";
