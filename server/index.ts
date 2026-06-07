@@ -435,19 +435,8 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
         .catch((e) => console.warn("[INIT][BG] saveSchemaSnapshot error:", e));
     });
 
-    // Task #3395 — Rete preventiva drift schema dev↔prod: subito dopo le
-    // migration, genera il manifest/fingerprint ed esegue i check schema-registry
-    // (trigger "boot"). Best-effort, fire-and-forget: non blocca l'avvio.
-    setImmediate(() => {
-      console.log("[INIT][BG] Starting boot schema drift check...");
-      import("./ai/db-integrity/boot-schema-check")
-        .then((m) => m.runBootSchemaDriftCheck())
-        .catch((e) => console.warn("[INIT][BG] boot schema drift check error:", e));
-    });
-
-    // OTA sync cron — ogni 15 min, sincronizza il branch EAS `production` nel DB
-    // per il tracking nel pannello admin. La distribuzione effettiva è gestita
-    // direttamente da EAS (`u.expo.dev`), non da questo server.
+    setImmediate(() => void import("./ai/db-integrity/boot-schema-check").then((m) => m.runBootSchemaDriftCheck()).catch((e) => console.warn("[INIT][BG] boot schema drift check error:", e)));
+    // OTA sync cron — ogni 15 min, sincronizza branch EAS `production` nel DB (distribuzione via EAS).
     const FIFTEEN_MIN_MS = 15 * 60 * 1000;
     const { syncProductionUpdates } = await import("./routes/admin/ota");
     setImmediate(() => {
