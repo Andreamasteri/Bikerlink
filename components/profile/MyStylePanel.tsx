@@ -2,7 +2,7 @@
 // Mostra le label di stile + i bucket chiave calcolati dal job telemetry-affinity
 // (user_telemetry_profile). Stato "dati insufficienti" sotto la soglia embedding.
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
@@ -91,6 +91,18 @@ export default function MyStylePanel() {
         <View style={styles.headerRow}>
           <MaterialCommunityIcons name="motorbike" size={16} color={colors.accent} />
           <Text style={[styles.title, { color: colors.text }]}>Il tuo stile di guida</Text>
+          <TouchableOpacity
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            onPress={() => {
+              Alert.alert(
+                "Come funziona il tuo stile",
+                "• Velocità — basata sulla velocità tipica delle tue sessioni (75° percentile). Sale se fai uscite più rapide su strade aperte o autostrade.\n\n• Piega — angolo medio di inclinazione rilevato dall'accelerometro. Cresce guidando su curve strette e strade montane.\n\n• Durata — media dei minuti per uscita. Uscite più lunghe (>60 min) la fanno salire nella fascia \"Lunga\".\n\n• Come si registra una sessione valida: avvia il tracking GPS durante un'uscita reale in moto. Il sistema scarta soste e tragitti a piedi automaticamente.\n\n• Il profilo si aggiorna dopo ogni nuova sessione registrata. Più esci, più il calcolo diventa preciso.",
+                [{ text: "Capito", style: "default" }]
+              );
+            }}
+          >
+            <Ionicons name="information-circle-outline" size={14} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
 
         {!data.hasEnoughData ? (
