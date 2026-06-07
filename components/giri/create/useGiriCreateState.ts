@@ -1,17 +1,21 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Alert, Animated } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useApiDebugLog } from "@/hooks/useApiDebugLog";
+
 import { 
   Waypoint, Style, DrivingProfile, VehicleProfile, Mode, RouteResult, 
   WeatherWaypoint, AiPreviewState, AiPreviewItem, COMPASS_DIRECTIONS,
   ResolvedPoiStop, PoiResult, GeoResult
 } from "./types";
 import { calcRoute, parseAI, clientFallbackAiParse, fetchWeatherPreview, AiKeyMissingError } from "./api";
+
+export const SELECTED_MOTO_STORAGE_KEY = "bikerlink_giri_selected_moto_id";
 
 export function useGiriCreateState(language?: string) {
   const router = useRouter();
@@ -50,7 +54,20 @@ export function useGiriCreateState(language?: string) {
   const [avoidUnpaved, setAvoidUnpaved] = useState(false);
   const [avoidWeather, setAvoidWeather] = useState(false);
   const [visibility, setVisibility] = useState<"public" | "private">("public");
-  const [selectedMotoId, setSelectedMotoId] = useState<string | null>(null);
+  const [selectedMotoId, _setSelectedMotoId] = useState<string | null>(null);
+
+  const setSelectedMotoId = useCallback((idOrUpdater: string | null | ((prev: string | null) => string | null)) => {
+    _setSelectedMotoId((prev) => {
+      const next = typeof idOrUpdater === "function" ? idOrUpdater(prev) : idOrUpdater;
+      if (next !== null) {
+        AsyncStorage.setItem(SELECTED_MOTO_STORAGE_KEY, next).catch(() => {});
+      } else {
+        AsyncStorage.removeItem(SELECTED_MOTO_STORAGE_KEY).catch(() => {});
+      }
+      return next;
+    });
+  }, []);
+
   const [fuelLevel, setFuelLevel] = useState<number>(100);
 
   const [waypoints, setWaypoints] = useState<Waypoint[]>([{ lat: 0, lng: 0, name: "" }, { lat: 0, lng: 0, name: "" }]);

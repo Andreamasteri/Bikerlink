@@ -1,4 +1,5 @@
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { View, ScrollView, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,7 +43,7 @@ import {
   UserMotorcycle, MyStyleProfile 
 } from "@/components/giri/create/types";
 import { calcRoute } from "@/components/giri/create/api";
-import { useGiriCreateState } from "@/components/giri/create/useGiriCreateState";
+import { useGiriCreateState, SELECTED_MOTO_STORAGE_KEY } from "@/components/giri/create/useGiriCreateState";
 
 export default function GiriCreateScreen() {
   const colors = useColors();
@@ -114,15 +115,29 @@ export default function GiriCreateScreen() {
     queryKey: ["/api/motorcycles"]
   });
 
+  // undefined = AsyncStorage not yet read; null = read, nothing saved; string = saved moto id
+  const [storedMotoId, setStoredMotoId] = useState<string | null | undefined>(undefined);
+  // Guard: hydrate selectedMotoId only once; subsequent motorcycles refetches must not overwrite in-session choice
+  const motoHydratedRef = React.useRef(false);
+
   useEffect(() => {
+    AsyncStorage.getItem(SELECTED_MOTO_STORAGE_KEY)
+      .then((id) => setStoredMotoId(id))
+      .catch(() => setStoredMotoId(null));
+  }, []);
+
+  useEffect(() => {
+    if (motoHydratedRef.current) return; // already initialized — protect in-session manual choices
     if (motorcycles.length === 0) return;
-    setSelectedMotoId((current) => {
-      if (current !== null) return current;
+    if (storedMotoId === undefined) return; // wait for AsyncStorage to finish loading
+    motoHydratedRef.current = true;
+    setSelectedMotoId(() => {
+      if (storedMotoId && motorcycles.some((m) => m.id === storedMotoId)) return storedMotoId;
       if (motorcycles.length === 1) return motorcycles[0].id;
       const defaultMoto = motorcycles.find((m) => m.isDefault);
       return defaultMoto ? defaultMoto.id : null;
     });
-  }, [motorcycles, setSelectedMotoId]);
+  }, [motorcycles, storedMotoId, setSelectedMotoId]);
 
   const { data: myStyleProfile } = useQuery<MyStyleProfile>({
     queryKey: ["/api/planned-routes/my-style-profile"],
