@@ -4,6 +4,7 @@ import { motoClubs, motoClubMembers, motoClubInvites, users, conversationPartici
 import { eq, and, sql } from "drizzle-orm";
 import { systemAccountConditions } from "../../lib/system-account-filter";
 import { createClubConversation, addMemberToConversation, removeMemberFromConversation, notifyTopMembersOfNewJoin } from "./utils";
+import { storage } from "../../storage";
 
 import { requireAuth } from "../../lib/auth-middleware";
 import { sendSuccess, sendError } from "../../lib/api-response";
@@ -34,6 +35,11 @@ router.post("/:id/join", requireAuth, async (req: Request, res: Response) => {
 
     const [club] = await db.select().from(motoClubs).where(and(eq(motoClubs.id, clubId as string), eq(motoClubs.isApproved, true))).limit(1);
     if (!club) return sendError(res, 404, "Club non trovato");
+
+    const requestingUser = await storage.getUser(userId);
+    if (requestingUser?.userType === "zavorrina" && !club.allowZavorrine) {
+      return sendError(res, 403, "Questo club non accetta zavorrine");
+    }
 
     const existing = await db.select().from(motoClubMembers)
       .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.userId, userId)))
@@ -133,6 +139,7 @@ router.get("/:id", requireAuth, async (req: Request, res: Response) => {
       parentClubId: motoClubs.parentClubId,
       latitude: motoClubs.latitude,
       longitude: motoClubs.longitude,
+      allowZavorrine: motoClubs.allowZavorrine,
       createdAt: motoClubs.createdAt,
       updatedAt: motoClubs.updatedAt,
       _proposedLatitude: motoClubs.proposedLatitude,
@@ -200,6 +207,7 @@ router.get("/:id/detail", requireAuth, async (req: Request, res: Response) => {
       parentClubId: motoClubs.parentClubId,
       latitude: motoClubs.latitude,
       longitude: motoClubs.longitude,
+      allowZavorrine: motoClubs.allowZavorrine,
       createdAt: motoClubs.createdAt,
       updatedAt: motoClubs.updatedAt,
       _proposedLatitude: motoClubs.proposedLatitude,

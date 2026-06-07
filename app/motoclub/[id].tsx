@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Switch,
 } from "react-native";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
@@ -39,6 +40,7 @@ interface ClubDetail {
   latitude: number | null;
   longitude: number | null;
   hasPendingLocationProposal?: boolean;
+  allowZavorrine: boolean;
   members: Member[];
   totalCount: number;
   hasMore: boolean;
@@ -141,6 +143,23 @@ export default function ClubDetailScreen() {
       setLoadingMore(false);
     }
   }
+
+  const myRole = club?.members?.find((m) => m.profileId === currentUser?.id)?.role ?? null;
+  const isClubAdmin = myRole === "admin";
+
+  const settingsMutation = useMutation({
+    mutationFn: async (allowZavorrine: boolean) => {
+      const res = await apiRequest("PATCH", `/api/motoclubs/${id}/settings`, { allowZavorrine });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { message?: string }).message || "Errore aggiornamento impostazioni");
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [queryKey] });
+    },
+    onError: (e: Error) => Alert.alert("Errore", e.message),
+  });
 
   const proposeLocationMutation = useMutation({
     mutationFn: async ({ latitude, longitude, address }: { latitude: number; longitude: number; address: string }) => {
@@ -344,6 +363,28 @@ export default function ClubDetailScreen() {
                 onPropose={() => setShowProposeModal(true)}
               />
             )}
+
+            {isClubAdmin && (
+              <View style={styles.adminSection}>
+                <Text style={styles.adminSectionTitle}>Impostazioni club</Text>
+                <View style={styles.adminToggleRow}>
+                  <View style={styles.adminToggleInfo}>
+                    <Ionicons name="people-outline" size={18} color={Colors.textSecondary} />
+                    <View style={styles.adminToggleText}>
+                      <Text style={styles.adminToggleLabel}>Accetta zavorrine</Text>
+                      <Text style={styles.adminToggleDesc}>Le zavorrine possono vedere e unirsi al club</Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={club.allowZavorrine}
+                    onValueChange={(v) => settingsMutation.mutate(v)}
+                    disabled={settingsMutation.isPending}
+                    trackColor={{ false: Colors.border, true: Colors.accent + "88" }}
+                    thumbColor={club.allowZavorrine ? Colors.accent : Colors.textSecondary}
+                  />
+                </View>
+              </View>
+            )}
           </View>
         }
       />
@@ -411,4 +452,37 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   toggleBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.accent },
+
+  adminSection: {
+    marginTop: 16,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 10,
+  },
+  adminSectionTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  adminToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  adminToggleInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+  },
+  adminToggleText: { flex: 1 },
+  adminToggleLabel: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.text },
+  adminToggleDesc: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
 });

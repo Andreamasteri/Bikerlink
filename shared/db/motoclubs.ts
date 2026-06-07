@@ -40,6 +40,7 @@ export const motoClubs = pgTable("moto_clubs", {
   proposedBy: varchar("proposed_by", { length: 36 })
     .references(() => users.id, { onDelete: "set null" }),
   proposedAt: timestamp("proposed_at"),
+  allowZavorrine: boolean("allow_zavorrine").notNull().default(true),
   createdBy: varchar("created_by", { length: 36 })
     .references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").notNull().defaultNow(),

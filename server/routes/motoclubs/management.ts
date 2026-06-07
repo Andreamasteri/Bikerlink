@@ -179,4 +179,34 @@ router.post("/:id/reject-location", requireAuth, async (req: Request, res: Respo
   }
 });
 
+router.patch("/:id/settings", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId!;
+    const clubId = req.params.id;
+
+    const [club] = await db.select().from(motoClubs).where(eq(motoClubs.id, clubId as string)).limit(1);
+    if (!club) return sendError(res, 404, "Club non trovato");
+
+    const [membership] = await db.select()
+      .from(motoClubMembers)
+      .where(and(eq(motoClubMembers.clubId, clubId as string), eq(motoClubMembers.userId, userId), eq(motoClubMembers.status, "active")))
+      .limit(1);
+    if (!membership || membership.role !== "admin") {
+      return sendError(res, 403, "Solo gli admin del club possono modificare le impostazioni");
+    }
+
+    const { allowZavorrine } = req.body as { allowZavorrine?: boolean };
+    if (typeof allowZavorrine !== "boolean") {
+      return sendError(res, 400, "allowZavorrine deve essere un booleano");
+    }
+
+    await db.update(motoClubs).set({ allowZavorrine, updatedAt: new Date() }).where(eq(motoClubs.id, clubId as string));
+
+    return sendSuccess(res);
+  } catch (e) {
+    console.error("[PATCH /motoclubs/:id/settings]", e);
+    return sendError(res, 500, "Errore interno");
+  }
+});
+
 export default router;

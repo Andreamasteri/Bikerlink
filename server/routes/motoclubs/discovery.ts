@@ -6,6 +6,7 @@ import { eq, and, desc, sql, or, ilike } from "drizzle-orm";
 import { systemAccountConditions } from "../../lib/system-account-filter";
 import { allLimited } from "../../lib/concurrency";
 import { getRegionCenter } from "../../../constants/regionCenters";
+import { storage } from "../../storage";
 
 import { requireAuth } from "../../lib/auth-middleware";
 
@@ -15,12 +16,17 @@ router.get("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const { type, search, country, region, language } = req.query as Record<string, string>;
 
+    const currentUserId = req.session.userId!;
+    const currentUser = await storage.getUser(currentUserId);
+    const isZavorrina = currentUser?.userType === "zavorrina";
+
     const _query = db.select({
       club: motoClubs,
       memberCount: sql<number>`(select count(*) from moto_club_members m where m.club_id = moto_clubs.id and m.status = 'active')::int`,
     }).from(motoClubs).where(eq(motoClubs.isApproved, true));
 
     const conditions: import("drizzle-orm").SQL<unknown>[] = [eq(motoClubs.isApproved, true)];
+    if (isZavorrina) conditions.push(eq(motoClubs.allowZavorrine, true));
 
     if (type) conditions.push(eq(motoClubs.clubType, type));
     if (search) {
