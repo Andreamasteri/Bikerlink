@@ -4,13 +4,10 @@ import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
+import { ErrorHistory, EventLog } from "./ThinkCentreCardParts";
+import type { HealthEvent } from "./ThinkCentreCardParts";
 
 type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim";
-
-interface ErrorEvent {
-  timestamp: number;
-  error: string;
-}
 
 interface ServiceHealth {
   key: ServiceKey;
@@ -22,7 +19,7 @@ interface ServiceHealth {
   error?: string;
   tileVersion?: string;
   tokenMissing?: boolean;
-  history: ErrorEvent[];
+  history: { timestamp: number; error: string }[];
 }
 
 interface ThinkCentreHealth {
@@ -38,6 +35,10 @@ interface ThinkCentreHealth {
     nominatim: string | null;
   };
   checkedAt: number;
+}
+
+interface HealthEventsResponse {
+  events: HealthEvent[];
 }
 
 const SERVICE_ICONS: Record<ServiceKey, keyof typeof MaterialCommunityIcons.glyphMap> = {
@@ -80,55 +81,6 @@ function serviceStatusLabel(s: ServiceHealth): string {
   return s.error ? `Offline · ${s.error}` : "Offline";
 }
 
-function formatTimestamp(ts: number): string {
-  const d = new Date(ts);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
-
-function ErrorHistory({ history }: { history: ErrorEvent[] }) {
-  const [open, setOpen] = useState(false);
-
-  if (!history || history.length === 0) return null;
-
-  return (
-    <View style={styles.historyContainer}>
-      <TouchableOpacity
-        style={styles.historyToggle}
-        onPress={() => setOpen((o) => !o)}
-        activeOpacity={0.7}
-        testID="thinkcentre-history-toggle"
-      >
-        <Ionicons
-          name="time-outline"
-          size={11}
-          color="#f59e0b"
-          style={styles.historyIcon}
-        />
-        <Text style={styles.historyToggleText}>
-          Ultimi errori ({history.length})
-        </Text>
-        <Ionicons
-          name={open ? "chevron-up" : "chevron-down"}
-          size={11}
-          color="#f59e0b"
-        />
-      </TouchableOpacity>
-
-      {open && (
-        <View style={styles.historyList}>
-          {history.map((ev, idx) => (
-            <View key={idx} style={styles.historyItem}>
-              <Text style={styles.historyTimestamp}>{formatTimestamp(ev.timestamp)}</Text>
-              <Text style={styles.historyError} numberOfLines={3}>{ev.error}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
 export function ThinkCentreCard() {
   const [collapsed, setCollapsed] = useState(true);
 
@@ -146,6 +98,21 @@ export function ThinkCentreCard() {
     refetchInterval: 30_000,
     staleTime: 20_000,
     refetchOnMount: true,
+  });
+
+  const { data: eventsData } = useQuery<HealthEventsResponse>({
+    queryKey: ["/api/admin/thinkcentre-events"],
+    queryFn: async () => {
+      const res = await fetch(new URL("/api/admin/thinkcentre-events", getApiUrl()).toString(), {
+        headers: { ...(await authFetchHeaders()) },
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+    enabled: !collapsed,
   });
 
   const { data: pushData, isLoading: pushLoading } = useQuery<{ enabled: boolean }>({
@@ -238,12 +205,7 @@ export function ThinkCentreCard() {
                         token Replit: {fp}…
                       </Text>
                       {tokenOk && (
-                        <Ionicons
-                          name="checkmark-circle"
-                          size={11}
-                          color="#22c55e"
-                          style={styles.tokenOkIcon}
-                        />
+                        <Ionicons name="checkmark-circle" size={11} color="#22c55e" style={styles.tokenOkIcon} />
                       )}
                     </View>
                   )}
@@ -291,6 +253,10 @@ export function ThinkCentreCard() {
             </View>
           )}
 
+          {eventsData && eventsData.events.length > 0 && (
+            <EventLog events={eventsData.events} />
+          )}
+
           <View style={styles.pushToggleRow}>
             <View style={styles.pushToggleLeft}>
               <Ionicons name="notifications-outline" size={15} color={Colors.textSecondary} />
@@ -323,86 +289,22 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  cardTitle: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 15,
-    color: Colors.text,
-  },
-  headerRight: {
-    marginLeft: "auto",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  headerCount: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: Colors.textSecondary,
-  },
-  healthDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  list: {
-    marginTop: 14,
-    gap: 10,
-  },
-  row: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 10,
-  },
-  rowIcon: {
-    width: 22,
-    textAlign: "center",
-    marginTop: 2,
-  },
-  rowText: {
-    flex: 1,
-  },
-  rowLabel: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
-    color: Colors.text,
-  },
-  rowStatus: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    marginTop: 1,
-  },
-  fingerprint: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "#6b7280",
-    marginTop: 2,
-    letterSpacing: 0.4,
-  },
-  fingerprintRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 2,
-  },
-  tokenOkIcon: {
-    marginTop: 0,
-  },
-  mono: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "#9ca3af",
-  },
-  errorText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    color: "#ef4444",
-  },
+  cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
+  cardTitle: { fontFamily: "Inter_700Bold", fontSize: 15, color: Colors.text },
+  headerRight: { marginLeft: "auto", flexDirection: "row", alignItems: "center", gap: 8 },
+  headerCount: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.textSecondary },
+  healthDot: { width: 10, height: 10, borderRadius: 5 },
+  list: { marginTop: 14, gap: 10 },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+  rowIcon: { width: 22, textAlign: "center", marginTop: 2 },
+  rowText: { flex: 1 },
+  rowLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text },
+  rowStatus: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 1 },
+  fingerprint: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#6b7280", marginTop: 2, letterSpacing: 0.4 },
+  fingerprintRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  tokenOkIcon: { marginTop: 0 },
+  mono: { fontFamily: "Inter_400Regular", fontSize: 10, color: "#9ca3af" },
+  errorText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#ef4444" },
   note: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -412,27 +314,10 @@ const styles = StyleSheet.create({
     padding: 10,
     marginTop: 4,
   },
-  noteBody: {
-    flex: 1,
-    gap: 4,
-  },
-  noteText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
-    color: Colors.textSecondary,
-    lineHeight: 16,
-  },
-  legend: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 2,
-  },
-  legendText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: Colors.textSecondary,
-  },
+  noteBody: { flex: 1, gap: 4 },
+  noteText: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, lineHeight: 16 },
+  legend: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 },
+  legendText: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
   retryButton: {
     flexDirection: "row",
     alignItems: "center",
@@ -446,57 +331,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(96, 165, 250, 0.25)",
     marginTop: 2,
   },
-  retryText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-    color: "#60a5fa",
-  },
-  historyContainer: {
-    marginTop: 6,
-  },
-  historyToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    alignSelf: "flex-start",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    backgroundColor: "rgba(245, 158, 11, 0.08)",
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: "rgba(245, 158, 11, 0.2)",
-  },
-  historyIcon: {
-    marginRight: 1,
-  },
-  historyToggleText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
-    color: "#f59e0b",
-  },
-  historyList: {
-    marginTop: 6,
-    gap: 5,
-    paddingLeft: 4,
-    borderLeftWidth: 2,
-    borderLeftColor: "rgba(245, 158, 11, 0.25)",
-  },
-  historyItem: {
-    gap: 1,
-    paddingLeft: 6,
-  },
-  historyTimestamp: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 9,
-    color: "#6b7280",
-    letterSpacing: 0.3,
-  },
-  historyError: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: "#9ca3af",
-    lineHeight: 14,
-  },
+  retryText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: "#60a5fa" },
   pushToggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -506,19 +341,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: Colors.border,
   },
-  pushToggleLeft: {
-    flex: 1,
-    gap: 2,
-    flexDirection: "column",
-  },
-  pushToggleLabel: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    color: Colors.text,
-  },
-  pushToggleSub: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 10,
-    color: Colors.textSecondary,
-  },
+  pushToggleLeft: { flex: 1, gap: 2, flexDirection: "column" },
+  pushToggleLabel: { fontFamily: "Inter_500Medium", fontSize: 13, color: Colors.text },
+  pushToggleSub: { fontFamily: "Inter_400Regular", fontSize: 10, color: Colors.textSecondary },
 });

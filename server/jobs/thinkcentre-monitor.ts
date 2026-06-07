@@ -27,7 +27,7 @@
  */
 
 import { db } from "../db";
-import { appSettings } from "@shared/db";
+import { appSettings, thinkcentreHealthEvents } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { sendSystemAlertPushToAdmins } from "../push-notifications";
 import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
@@ -93,6 +93,23 @@ function shouldNotifyService(key: ServiceKey): boolean {
   if (now - last < SERVICE_NOTIFY_COOLDOWN_MS) return false;
   lastServiceNotifiedAt.set(key, now);
   return true;
+}
+
+// ── Health event recorder ─────────────────────────────────────────────────────
+async function recordHealthEvent(
+  serviceKey: string | null,
+  transitionFrom: string,
+  transitionTo: string,
+): Promise<void> {
+  try {
+    await db.insert(thinkcentreHealthEvents).values({
+      serviceKey: serviceKey ?? undefined,
+      transitionFrom,
+      transitionTo,
+    });
+  } catch (err) {
+    console.warn("[thinkcentre-monitor] errore registrazione health event (non-fatal):", err);
+  }
 }
 
 // ── Motorcycle profile check ──────────────────────────────────────────────────
@@ -286,9 +303,18 @@ async function handlePerServiceNotifications(
     // Aggiorna stato corrente
     lastServiceStatuses.set(s.key, currentOk);
 
+    if (prevOk === undefined) continue; // primo ciclo per questo servizio
+
+    const prevStr = prevOk ? "ok" : "ko";
+    const currentStr = currentOk ? "ok" : "ko";
+
+    // Registra ogni transizione di stato (anche ko→ok)
+    if (prevOk !== currentOk) {
+      void recordHealthEvent(s.key, prevStr, currentStr);
+    }
+
     // Notifica solo se la feature è abilitata e il servizio è appena andato offline
     if (!pushEnabled) continue;
-    if (prevOk === undefined) continue; // primo ciclo per questo servizio
     if (prevOk === false && currentOk === false) continue; // già offline, niente spam
     if (currentOk) continue; // è tornato online o era già online
 
@@ -332,6 +358,7 @@ export async function runThinkCentreProbe(): Promise<void> {
   if (prev === current) return; // nessun cambiamento aggregato
 
   console.log(`[thinkcentre-monitor] stato cambiato: ${prev} → ${current}`);
+  void recordHealthEvent(null, prev, current);
 
   // ── Offline ────────────────────────────────────────────────────────────────
   if (current === "red") {

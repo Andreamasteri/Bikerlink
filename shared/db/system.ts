@@ -485,3 +485,18 @@ export const mapsQuota = pgTable("maps_quota", {
 ]);
 export type MapsQuota = typeof mapsQuota.$inferSelect;
 export type InsertMapsQuota = typeof mapsQuota.$inferInsert;
+
+export const thinkcentreHealthEvents = pgTable("thinkcentre_health_events", {
+  id: varchar("id", { length: 36 })
+    .primaryKey()
+    .default(sql`gen_random_uuid()`),
+  serviceKey: varchar("service_key", { length: 30 }),
+  transitionFrom: varchar("transition_from", { length: 20 }).notNull(),
+  transitionTo: varchar("transition_to", { length: 20 }).notNull(),
+  occurredAt: timestamp("occurred_at").notNull().defaultNow(),
+}, (table) => [
+  index("thinkcentre_health_events_occurred_at_idx").on(table.occurredAt),
+  index("thinkcentre_health_events_service_key_idx").on(table.serviceKey),
+]);
+export type ThinkcentreHealthEvent = typeof thinkcentreHealthEvents.$inferSelect;
+export type InsertThinkcentreHealthEvent = typeof thinkcentreHealthEvents.$inferInsert;

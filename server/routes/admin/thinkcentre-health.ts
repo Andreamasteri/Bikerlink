@@ -15,6 +15,9 @@ import { Router, type Request, type Response as ExpressResponse } from "express"
 import { createHash } from "crypto";
 import { getNominatimHealthSnapshot } from "../../lib/nominatim-client";
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
+import { db } from "../../db";
+import { thinkcentreHealthEvents } from "@shared/db";
+import { desc } from "drizzle-orm";
 
 const router = Router();
 
@@ -394,6 +397,22 @@ async function probeNominatim(): Promise<ServiceHealth> {
     history: getHistory("nominatim"),
   };
 }
+
+router.get("/thinkcentre-events", async (_req: Request, res: ExpressResponse) => {
+  try {
+    const limit = 20;
+    const events = await db
+      .select()
+      .from(thinkcentreHealthEvents)
+      .orderBy(desc(thinkcentreHealthEvents.occurredAt))
+      .limit(limit);
+    return res.json({ events });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[admin/thinkcentre-events] errore:", msg);
+    return res.status(500).json({ error: "Errore recupero eventi ThinkCentre" });
+  }
+});
 
 router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) => {
   try {
