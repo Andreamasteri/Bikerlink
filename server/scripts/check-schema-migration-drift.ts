@@ -34,12 +34,11 @@ const MIGRATIONS_DIR = join(process.cwd(), "migrations");
 // guardia resta verde sul drift noto MA continua a bloccare ogni NUOVO drift.
 // Formato: "table" per tabelle intere, "table.column" per singole colonne.
 const KNOWN_UNMIGRATED = new Set<string>([
-  // Tabelle dichiarate senza alcun CREATE TABLE in migrations/.
-  "match_negative_preferences",
   // pending_auto_suggestions, ai_messages e le loro colonne reject_count /
-  // scopes sono ora coperte da migrations/0076_align_three_unmigrated_columns.sql
+  // scopes sono coperte da migrations/0076_align_three_unmigrated_columns.sql
   // (CREATE TABLE IF NOT EXISTS completi) — rimosse dall'allow-list.
   // user_music_tokens.provider_user_id è coperta dallo stesso file (ALTER TABLE).
+  // match_negative_preferences è coperta da 0077_align_match_negative_preferences.sql.
 ]);
 
 /** Legge le migration in ordine numerico e le concatena come elenco ordinato. */
