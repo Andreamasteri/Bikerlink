@@ -1,0 +1,69 @@
+---
+name: "Vai con la build" — procedura APK completa
+description: Quando l'utente dice "Vai con la build" (o simili), eseguire esattamente questi passi nell'ordine indicato.
+---
+
+# "Vai con la build" — procedura APK
+
+## Trigger
+Frasi come: "Vai con la build", "Fai la build", "Build APK", "Lancia la build".
+
+## Passi in ordine
+
+### 1. Leggi le versioni attuali
+```bash
+node -e "const a=require('./app.json'); console.log(a.expo.version, a.expo.android?.versionCode, a.expo.runtimeVersion)"
+grep -E "versionCode|versionName" android/app/build.gradle | head -5
+```
+
+### 2. Proponi il nuovo versionCode e version
+Schema versioning: `<versionCode>.<ota_inglobate>.<ciclo_runtime>`
+- `versionCode` → incrementa di 1 rispetto al valore attuale in app.json
+- `version` → `<nuovo_versionCode>.<ota_pubblicate_nel_ciclo>.<ciclo_runtime>` (es. 56.5.10)
+- `runtimeVersion` → invariato a meno che non sia cambiata la runtime
+
+Chiedi conferma all'utente prima di procedere con il bump.
+
+### 3. Aggiorna app.json e build.gradle insieme
+- `app.json`: `expo.version` e `expo.android.versionCode`
+- `android/app/build.gradle`: `versionCode` e `versionName`
+
+I due file DEVONO essere allineati. Non aggiornare uno senza l'altro.
+
+### 4. Lancia la build EAS
+```bash
+GIT_INDEX_FILE=/tmp/eas-build-index npx eas build \
+  --platform android \
+  --profile release-apk \
+  --non-interactive \
+  --no-wait
+```
+Timeout bash: 600000ms (10 minuti — l'upload è ~127 MB).
+
+### 5. Comunica all'utente
+- Conferma che la build è stata inviata ad EAS
+- Fornisci il link alla dashboard EAS (viene stampato nel log)
+- Ricorda che `--no-wait` significa che la build gira in cloud; può scaricarla quando è pronta
+
+## Profilo EAS usato
+- Profile: `release-apk`
+- Platform: Android only
+- BuildType: APK (non AAB)
+- Channel: production
+- CredentialsSource: remote
+- GradleCommand: `:app:assembleRelease`
+- ABI: arm64-v8a (hardcoded in build.gradle)
+
+## Workaround obbligatorio
+Senza `GIT_INDEX_FILE=/tmp/eas-build-index` il comando fallisce con exit 254
+perché la sandbox Replit blocca `.git/index.lock`. Questo prefisso è SEMPRE necessario.
+
+## NON fare
+- Non usare `--profile production` (genera AAB per il Play Store, non APK)
+- Non usare `--profile preview` (channel staging, non production)
+- Non modificare eas.json
+- Non eseguire `npx expo build` (deprecato)
+- Non eseguire `npx eas submit` (non richiesto dall'utente)
+
+**Why:** L'utente installa l'APK direttamente sui propri dispositivi via EAS internal distribution.
+Non usa il Play Store per i cicli di test/sviluppo.

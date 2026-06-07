@@ -1,4 +1,5 @@
 - [EAS build — GIT_INDEX_FILE workaround](eas-build-git-lock.md) — `GIT_INDEX_FILE=/tmp/eas-build-index npx eas build ...` bypassa il blocco sandbox su .git/index.lock; profilo release-apk per APK production arm64.
+- ["Vai con la build" — procedura APK completa](apk-build-shortcut.md) — procedura step-by-step da eseguire quando l'utente dice "Vai con la build": bump versioni, aggiorna app.json+build.gradle, lancia EAS release-apk.
 - [GitHub sync force-push](github-sync-force-push.md) — origin/github sono mirror force-push del Replit; lock stale .git/refs/remotes/origin/main.lock NON fa fallire il push (rc=0 + "forced update"); usa --force se --force-with-lease dà "stale info".
 - [Repl Layer Size Limit](repl-layer-size.md) — .local/state/replit/ cresce nel tempo (transcript agente + log-query.db) → supera limite Cloud Run 2 GB → deploy silenziosamente fallisce senza log.
 - [Expo (tabs) route pollution](expo-tabs-route-pollution.md) — file helper (es. *.styles.ts) dentro app/(tabs)/ diventano tab-icona rotte; la custom tab bar renderizza ogni state.route. Tenerli in components/.
