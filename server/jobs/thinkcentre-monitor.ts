@@ -2,43 +2,85 @@
  * ThinkCentre Monitor — Push notifications admin.
  *
  * Ogni 5 minuti proba i servizi self-hosted sul ThinkCentre
- * (GraphHopper, Ollama, Whisper, Nominatim) e invia una push agli admin
- * quando il server passa da online → offline o da offline → online.
+ * (GraphHopper, Ollama, Whisper, Nominatim, Valhalla) e invia una push agli
+ * admin quando il server passa da online → offline o da offline → online.
  *
- * Stati:
+ * Stati globali:
  *   "green"  = tutti i servizi configurati rispondo
  *   "yellow" = alcuni su, alcuni giù
  *   "red"    = nessun servizio configurato risponde  ← "offline"
  *   "idle"   = nessun servizio configurato
  *
- * Notifiche inviate:
+ * Notifiche globali (transizione aggregata):
  *   - Transizione → red    : "🔴 ThinkCentre offline"
  *   - Transizione da red → non-red : "🟢 ThinkCentre tornato online"
  *   - Transizione green → yellow   : "🟡 ThinkCentre parzialmente offline"
  *
- * Throttle: min 10 min tra notifiche dello stesso tipo.
+ * Notifiche per-servizio (ok → ko):
+ *   - Ogni servizio configurato che passa da OK a KO riceve una notifica
+ *     individuale (es. "🔴 Ollama AI offline").
+ *   - Debounce: 15 min per servizio.
+ *   - Controllabile via AppSetting "thinkcentre_service_push_enabled"
+ *     (default: abilitato). Valore "false" disabilita le notifiche per-servizio.
+ *
+ * Throttle globale: min 10 min tra notifiche dello stesso tipo.
  */
 
 import { db } from "../db";
-import { users } from "@shared/db";
+import { users, appSettings } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
 import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
 
 // ── Config ────────────────────────────────────────────────────────────────────
-const PROBE_INTERVAL_MS = 5 * 60 * 1000;   // ogni 5 min
-const FIRST_PROBE_DELAY_MS = 2 * 60 * 1000; // delay iniziale al boot
+const PROBE_INTERVAL_MS = 5 * 60 * 1000;       // ogni 5 min
+const FIRST_PROBE_DELAY_MS = 2 * 60 * 1000;    // delay iniziale al boot
 const PROBE_TIMEOUT_MS = 5_000;
-const NOTIFY_COOLDOWN_MS = 10 * 60 * 1000;  // 10 min tra stesse notifiche
-const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+const NOTIFY_COOLDOWN_MS = 10 * 60 * 1000;     // 10 min tra stesse notifiche globali
+const SERVICE_NOTIFY_COOLDOWN_MS = 15 * 60 * 1000; // 15 min per notifiche per-servizio
 
 // ── State ─────────────────────────────────────────────────────────────────────
 type OverallStatus = "green" | "yellow" | "red" | "idle";
+type ServiceKey = "graphhopper" | "ollama" | "whisper" | "nominatim" | "valhalla";
+
+interface ServiceProbeResult {
+  key: ServiceKey;
+  label: string;
+  ok: boolean | null; // null = non configurato
+}
+
 let lastStatus: OverallStatus | null = null;
 let lastNotifiedAt = new Map<string, number>();
+
+/** Stato precedente per ogni singolo servizio configurato (ok/ko). */
+let lastServiceStatuses = new Map<ServiceKey, boolean>();
+/** Timestamp dell'ultima notifica per-servizio inviata. */
+let lastServiceNotifiedAt = new Map<ServiceKey, number>();
+
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 
+// ── AppSetting toggle ─────────────────────────────────────────────────────────
+/**
+ * Legge AppSetting "thinkcentre_service_push_enabled".
+ * Default: true (abilitato). "false" disabilita le notifiche per-servizio.
+ */
+async function isServicePushEnabled(): Promise<boolean> {
+  try {
+    const [row] = await db
+      .select({ value: appSettings.value })
+      .from(appSettings)
+      .where(eq(appSettings.key, "thinkcentre_service_push_enabled"))
+      .limit(1);
+    if (row?.value === "false") return false;
+  } catch (err) {
+    console.warn("[thinkcentre-monitor] errore lettura AppSetting (non-fatal):", err);
+  }
+  return true;
+}
+
 // ── Push helper ───────────────────────────────────────────────────────────────
+const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
+
 async function pushAdmins(title: string, body: string, data: Record<string, unknown>): Promise<number> {
   try {
     const rows = await db
@@ -77,6 +119,14 @@ function shouldNotify(eventKey: string): boolean {
   return true;
 }
 
+function shouldNotifyService(key: ServiceKey): boolean {
+  const now = Date.now();
+  const last = lastServiceNotifiedAt.get(key) ?? 0;
+  if (now - last < SERVICE_NOTIFY_COOLDOWN_MS) return false;
+  lastServiceNotifiedAt.set(key, now);
+  return true;
+}
+
 // ── Motorcycle profile check ──────────────────────────────────────────────────
 /**
  * Verifica che il server GH self-hosted esponga il profilo "motorcycle".
@@ -88,8 +138,6 @@ export async function checkMotorcycleProfile(): Promise<void> {
   try {
     const result = await fetchSelfHostedProfiles();
     if (!result.reachable) {
-      // Server non raggiungibile — non è un errore di profilo, è già gestito
-      // dalla notifica "ThinkCentre offline".
       return;
     }
     if (!result.profiles) {
@@ -144,11 +192,8 @@ async function probeGraphHopperOk(): Promise<boolean | null> {
   const token = process.env.GRAPHHOPPER_TOKEN;
   if (token) headers["X-GH-Token"] = token;
 
-  // 1) /health endpoint — 2xx o 401/403 = GraphHopper attivo (auth richiesta).
-  //    Altri 4xx (404, 429…) e 5xx restano "giù" → fallback /route.
   if (await httpProbe(`${base}/health`, headers, (s) => (s >= 200 && s < 300) || s === 401 || s === 403)) return true;
 
-  // 2) Fallback: route probe minimale (Milano→Como)
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
@@ -196,45 +241,127 @@ async function probeNominatimOk(): Promise<boolean | null> {
   return snap.ok;
 }
 
+async function probeValhallaOk(): Promise<boolean | null> {
+  const base = process.env.VALHALLA_URL?.replace(/\/$/, "");
+  if (!base) return null;
+  const headers: Record<string, string> = {};
+  const apiKey = process.env.VALHALLA_API_KEY;
+  if (apiKey) headers["X-Valhalla-Key"] = apiKey;
+  return httpProbe(`${base}/status`, headers);
+}
+
 // ── Probe aggregato ───────────────────────────────────────────────────────────
-async function getOverallStatus(): Promise<OverallStatus> {
-  const results = await Promise.allSettled([
-    probeGraphHopperOk(),
-    probeOllamaOk(),
-    probeWhisperOk(),
-    probeNominatimOk(),
-  ]);
+interface AggregateProbeResult {
+  overall: OverallStatus;
+  services: ServiceProbeResult[];
+}
 
-  const values = results.map((r) => (r.status === "fulfilled" ? r.value : false));
-  const configured = values.filter((v) => v !== null);
-  if (configured.length === 0) return "idle";
+async function runAllProbes(): Promise<AggregateProbeResult> {
+  const probes: Array<{ key: ServiceKey; label: string; fn: () => Promise<boolean | null> }> = [
+    { key: "graphhopper", label: "GraphHopper", fn: probeGraphHopperOk },
+    { key: "ollama", label: "Ollama AI", fn: probeOllamaOk },
+    { key: "whisper", label: "Whisper ASR", fn: probeWhisperOk },
+    { key: "nominatim", label: "Nominatim", fn: probeNominatimOk },
+    { key: "valhalla", label: "Valhalla", fn: probeValhallaOk },
+  ];
 
-  const onlineCount = configured.filter((v) => v === true).length;
-  if (onlineCount === configured.length) return "green";
-  if (onlineCount === 0) return "red";
-  return "yellow";
+  const results = await Promise.allSettled(probes.map((p) => p.fn()));
+
+  const services: ServiceProbeResult[] = probes.map((p, i) => {
+    const r = results[i];
+    const ok = r.status === "fulfilled" ? r.value : false;
+    return { key: p.key, label: p.label, ok };
+  });
+
+  const configured = services.filter((s) => s.ok !== null);
+  let overall: OverallStatus;
+  if (configured.length === 0) {
+    overall = "idle";
+  } else {
+    const onlineCount = configured.filter((s) => s.ok === true).length;
+    if (onlineCount === configured.length) overall = "green";
+    else if (onlineCount === 0) overall = "red";
+    else overall = "yellow";
+  }
+
+  return { overall, services };
+}
+
+// ── Notifiche per-servizio ────────────────────────────────────────────────────
+/**
+ * Controlla le transizioni ok→ko per ogni servizio configurato e invia
+ * notifiche push individuali se:
+ *   - AppSetting "thinkcentre_service_push_enabled" != "false"
+ *   - Il servizio era OK e ora è KO (prima run = nessuna notifica)
+ *   - Debounce 15 min per servizio non ancora scaduto
+ */
+async function handlePerServiceNotifications(
+  services: ServiceProbeResult[],
+  isFirstRun: boolean,
+): Promise<void> {
+  if (isFirstRun) {
+    // Prima run: inizializza stato senza notificare
+    for (const s of services) {
+      if (s.ok !== null) lastServiceStatuses.set(s.key, s.ok === true);
+    }
+    return;
+  }
+
+  const pushEnabled = await isServicePushEnabled();
+
+  for (const s of services) {
+    if (s.ok === null) continue; // non configurato
+
+    const currentOk = s.ok === true;
+    const prevOk = lastServiceStatuses.get(s.key);
+
+    // Aggiorna stato corrente
+    lastServiceStatuses.set(s.key, currentOk);
+
+    // Notifica solo se la feature è abilitata e il servizio è appena andato offline
+    if (!pushEnabled) continue;
+    if (prevOk === undefined) continue; // primo ciclo per questo servizio
+    if (prevOk === false && currentOk === false) continue; // già offline, niente spam
+    if (currentOk) continue; // è tornato online o era già online
+
+    // prevOk === true && currentOk === false → servizio appena offline
+    if (!shouldNotifyService(s.key)) continue;
+
+    const n = await pushAdmins(
+      `🔴 ${s.label} offline`,
+      `Il servizio ${s.label} sul ThinkCentre non risponde`,
+      { type: "thinkcentre_service_offline", service: s.key },
+    );
+    console.log(`[thinkcentre-monitor] notifica per-servizio inviata: ${s.key} offline → ${n} admin`);
+  }
 }
 
 // ── Ciclo principale ──────────────────────────────────────────────────────────
 export async function runThinkCentreProbe(): Promise<void> {
-  let current: OverallStatus;
+  let probeResult: AggregateProbeResult;
   try {
-    current = await getOverallStatus();
+    probeResult = await runAllProbes();
   } catch (err) {
     console.warn("[thinkcentre-monitor] probe error (non-fatal):", err);
     return;
   }
 
+  const { overall: current, services } = probeResult;
   const prev = lastStatus;
+  const isFirstRun = prev === null;
   lastStatus = current;
 
-  // Prima esecuzione: nessuna notifica, solo inizializza lo stato
-  if (prev === null) {
+  // Prima esecuzione: inizializza stato senza notifiche aggregate
+  if (isFirstRun) {
     console.log(`[thinkcentre-monitor] stato iniziale: ${current}`);
+    await handlePerServiceNotifications(services, true);
     return;
   }
 
-  if (prev === current) return; // nessun cambiamento
+  // ── Notifiche per-servizio ────────────────────────────────────────────────
+  await handlePerServiceNotifications(services, false);
+
+  if (prev === current) return; // nessun cambiamento aggregato
 
   console.log(`[thinkcentre-monitor] stato cambiato: ${prev} → ${current}`);
 
@@ -265,8 +392,6 @@ export async function runThinkCentreProbe(): Promise<void> {
       );
       console.log(`[thinkcentre-monitor] notifica online inviata a ${n} admin`);
     }
-    // Verifica il profilo motorcycle dopo ogni recovery: potrebbe essere
-    // stato rimosso/riscritto durante il riavvio del ThinkCentre.
     void checkMotorcycleProfile();
     return;
   }
@@ -291,7 +416,6 @@ export async function runThinkCentreProbe(): Promise<void> {
 export function startThinkCentreMonitor(): void {
   if (intervalHandle) return;
 
-  // Primo probe con ritardo per non saturare il boot
   const firstTimer = setTimeout(async () => {
     await runThinkCentreProbe();
     intervalHandle = setInterval(async () => {
@@ -299,7 +423,6 @@ export function startThinkCentreMonitor(): void {
     }, PROBE_INTERVAL_MS);
   }, FIRST_PROBE_DELAY_MS);
 
-  // Pulizia timer iniziale se stop() viene chiamato prima che scatti
   (firstTimer as unknown as { _thinkcentreFirst: boolean })._thinkcentreFirst = true;
   console.log(`[thinkcentre-monitor] avviato (primo probe tra ${FIRST_PROBE_DELAY_MS / 1000}s, poi ogni ${PROBE_INTERVAL_MS / 60000} min)`);
 }
@@ -310,5 +433,7 @@ export function stopThinkCentreMonitor(): void {
     intervalHandle = null;
   }
   lastNotifiedAt.clear();
+  lastServiceNotifiedAt.clear();
+  lastServiceStatuses.clear();
   lastStatus = null;
 }

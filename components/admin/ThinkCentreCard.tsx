@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Switch } from "react-native";
 import { MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
-import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
+import { getApiUrl, authFetchHeaders, queryClient } from "@/lib/query-client";
 
 type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim";
 
@@ -148,6 +148,38 @@ export function ThinkCentreCard() {
     refetchOnMount: true,
   });
 
+  const { data: pushData, isLoading: pushLoading } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/admin/settings/thinkcentre-service-push"],
+    queryFn: async () => {
+      const res = await fetch(
+        new URL("/api/admin/settings/thinkcentre-service-push", getApiUrl()).toString(),
+        { headers: { ...(await authFetchHeaders()) }, credentials: "include" },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    staleTime: 60_000,
+  });
+
+  const pushMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await fetch(
+        new URL("/api/admin/settings/thinkcentre-service-push", getApiUrl()).toString(),
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", ...(await authFetchHeaders()) },
+          credentials: "include",
+          body: JSON.stringify({ enabled }),
+        },
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["/api/admin/settings/thinkcentre-service-push"] });
+    },
+  });
+
   const headerColor = data ? OVERALL_COLOR[data.overall] : "#6b7280";
 
   return (
@@ -258,6 +290,24 @@ export function ThinkCentreCard() {
               </View>
             </View>
           )}
+
+          <View style={styles.pushToggleRow}>
+            <View style={styles.pushToggleLeft}>
+              <Ionicons name="notifications-outline" size={15} color={Colors.textSecondary} />
+              <Text style={styles.pushToggleLabel}>Push per servizio offline</Text>
+              <Text style={styles.pushToggleSub}>15 min debounce · solo transizioni ok→ko</Text>
+            </View>
+            {pushLoading || pushMutation.isPending ? (
+              <ActivityIndicator size="small" color={Colors.textSecondary} />
+            ) : (
+              <Switch
+                value={pushData?.enabled ?? true}
+                onValueChange={(val) => pushMutation.mutate(val)}
+                trackColor={{ false: Colors.border, true: "#f59e0b" }}
+                thumbColor={(pushData?.enabled ?? true) ? Colors.text : Colors.textSecondary}
+              />
+            )}
+          </View>
         </View>
       )}
     </View>
@@ -401,6 +451,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#60a5fa",
   },
+<<<<<<< HEAD
   historyContainer: {
     marginTop: 6,
   },
@@ -446,5 +497,29 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#9ca3af",
     lineHeight: 14,
+  },
+  pushToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingTop: 10,
+    marginTop: 6,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+  },
+  pushToggleLeft: {
+    flex: 1,
+    gap: 2,
+    flexDirection: "column",
+  },
+  pushToggleLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    color: Colors.text,
+  },
+  pushToggleSub: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: Colors.textSecondary,
   },
 });

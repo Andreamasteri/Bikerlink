@@ -79,4 +79,37 @@ router.put("/maintenance", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * GET /thinkcentre-service-push
+ * Legge l'AppSetting "thinkcentre_service_push_enabled".
+ * Default: true (notifiche per-servizio abilitate).
+ */
+router.get("/thinkcentre-service-push", async (_req: Request, res: Response) => {
+  try {
+    const setting = await storage.getAppSetting("thinkcentre_service_push_enabled");
+    const enabled = setting?.value !== "false";
+    return res.json({ enabled });
+  } catch (_error) {
+    return sendError(res, 500, "Errore lettura impostazione push ThinkCentre");
+  }
+});
+
+/**
+ * PUT /thinkcentre-service-push
+ * Body: { enabled: boolean }
+ * Scrive l'AppSetting "thinkcentre_service_push_enabled".
+ */
+router.put("/thinkcentre-service-push", async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== "boolean") {
+      return sendError(res, 400, "Campo 'enabled' deve essere un booleano");
+    }
+    await storage.upsertAppSetting("thinkcentre_service_push_enabled", enabled ? "true" : "false");
+    return res.json({ ok: true, enabled });
+  } catch (_error) {
+    return sendError(res, 500, "Errore salvataggio impostazione push ThinkCentre");
+  }
+});
+
 export default router;
