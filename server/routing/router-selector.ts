@@ -89,20 +89,22 @@ async function wrapMetrics(
   engine: MetricsEngine,
   fn: () => Promise<RouteResult>,
   res?: Response,
+  bboxKey?: string,
 ): Promise<RouteResult> {
+  const meta = bboxKey ? { bboxKey } : undefined;
   const started = Date.now();
   try {
     const out = await fn();
     const latency = Date.now() - started;
     const fallbackTo = res?.getHeader("X-Routing-Fallback");
     if (typeof fallbackTo === "string" && fallbackTo.length > 0) {
-      recordRoutingSuccess(fallbackTo as MetricsEngine, latency);
+      recordRoutingSuccess(fallbackTo as MetricsEngine, latency, meta);
     } else {
-      recordRoutingSuccess(engine, latency);
+      recordRoutingSuccess(engine, latency, meta);
     }
     return out;
   } catch (err) {
-    recordRoutingFailure(engine);
+    recordRoutingFailure(engine, meta);
     throw err;
   }
 }
@@ -337,25 +339,45 @@ export async function aiOverride(
       decisionLatencyMs: Date.now() - started, dualScores: null,
     });
     if (decision.engine === "valhalla") {
-      return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, opts.isMapTester, res), res);
+      return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, opts.isMapTester, res), res, ctx.bboxKey);
     }
-    return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
+    return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res, ctx.bboxKey);
   }
 
   // Confidence bassa: confronto a doppia route + score qualità. Usiamo gli engine
   // GREZZI (no fallback cross-engine): un fallback Valhalla→GraphHopper renderebbe
   // i due candidati identici e falserebbe lo score/attribuzione. Se un engine
-  // grezzo fallisce, viene semplicemente escluso dai candidati.
+  // grezzo fallisce, viene semplicemente escluso dai candidati. Misuriamo la
+  // latenza di OGNI engine separatamente e registriamo l'esito di OGNI candidato
+  // (non solo del vincitore): la latenza del vincitore NON deve includere
+  // l'overhead AI+confronto, altrimenti i segnali salute/latenza si falsano.
   const aerialKm = aerialKmOf(req.points);
   const scoreReq: RouteRequest = { ...req, details: Array.from(new Set([...(req.details ?? []), "road_class"])) };
+  const timed = async (fn: () => Promise<RouteResult>): Promise<{ result: RouteResult; latencyMs: number }> => {
+    const t0 = Date.now();
+    const result = await fn();
+    return { result, latencyMs: Date.now() - t0 };
+  };
   const [gh, val] = await Promise.allSettled([
-    graphHopperRoute(scoreReq, opts.isMapTester),
-    valhallaCalculateRoute(scoreReq),
+    timed(() => graphHopperRoute(scoreReq, opts.isMapTester)),
+    timed(() => valhallaCalculateRoute(scoreReq)),
   ]);
 
   const candidates: Array<{ engine: "graphhopper" | "valhalla"; result: RouteResult; score: number }> = [];
-  if (gh.status === "fulfilled") candidates.push({ engine: "graphhopper", result: gh.value, score: scoreRoute(gh.value, aerialKm, ctx.style).score });
-  if (val.status === "fulfilled") candidates.push({ engine: "valhalla", result: val.value, score: scoreRoute(val.value, aerialKm, ctx.style).score });
+  if (gh.status === "fulfilled") {
+    const score = scoreRoute(gh.value.result, aerialKm, ctx.style).score;
+    candidates.push({ engine: "graphhopper", result: gh.value.result, score });
+    recordRoutingSuccess("graphhopper", gh.value.latencyMs, { bboxKey: ctx.bboxKey, score });
+  } else {
+    recordRoutingFailure("graphhopper", { bboxKey: ctx.bboxKey });
+  }
+  if (val.status === "fulfilled") {
+    const score = scoreRoute(val.value.result, aerialKm, ctx.style).score;
+    candidates.push({ engine: "valhalla", result: val.value.result, score });
+    recordRoutingSuccess("valhalla", val.value.latencyMs, { bboxKey: ctx.bboxKey, score });
+  } else {
+    recordRoutingFailure("valhalla", { bboxKey: ctx.bboxKey });
+  }
 
   if (candidates.length === 0) {
     recordAiDecision({
@@ -368,7 +390,6 @@ export async function aiOverride(
 
   candidates.sort((a, b) => b.score - a.score);
   const winner = candidates[0];
-  recordRoutingSuccess(winner.engine, Date.now() - started);
   if (res && !res.headersSent) res.setHeader("X-Routing-Ai-Compare", winner.engine);
   recordAiDecision({
     ts: Date.now(), mode: "ai-dual-compare", chosenEngine: winner.engine,

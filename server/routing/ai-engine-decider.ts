@@ -10,7 +10,7 @@
 import { z } from "zod";
 import { generateObject } from "ai";
 import { runWithFallback } from "../ai/moderation/provider";
-import { getRoutingCounters, getRecentLatencies } from "./routing-metrics";
+import { getRoutingCounters, getRecentLatencies, getBboxEngineQuality, bboxKeyOf, type BboxEngineQuality } from "./routing-metrics";
 
 // Engine candidati per la selezione AI: solo i due self-hosted. Gli engine cloud
 // (mapbox/tomtom) restano fuori dalla scelta automatica.
@@ -20,10 +20,14 @@ export type AiCandidateEngine = (typeof AI_CANDIDATE_ENGINES)[number];
 export interface AiRoutingContext {
   style: string;
   area: { centerLat: number; centerLon: number };
+  /** Cella geografica (~0.5°) cui si riferisce bboxQuality. */
+  bboxKey: string;
   hourOfDay: number;
   valhallaConfigured: boolean;
   engineHealth: Record<string, { success: number; fallback: number; failure: number; down: boolean }>;
   recentLatencyMs: Record<string, number | null>;
+  /** Storico qualità per-engine (24h) specifico di questa bbox: success/failure, latenza e score medi. */
+  bboxQuality: Record<string, BboxEngineQuality>;
 }
 
 export interface AiEngineDecision {
@@ -45,12 +49,13 @@ const SYSTEM_PROMPT = `Sei il selettore di motore di routing per un'app di itine
 Scegli quale engine self-hosted usare per una specifica richiesta di percorso:
 - "graphhopper": robusto, ottimo per percorsi curvy con custom model, default affidabile.
 - "valhalla": profilo motorcycle nativo, buono su percorsi lunghi e tornanti, può essere meno stabile.
-Ricevi un contesto JSON con: stile percorso, area, ora del giorno, salute recente e latenze dei due engine, e se Valhalla è configurato.
+Ricevi un contesto JSON con: stile percorso, area, ora del giorno, salute recente e latenze globali dei due engine, se Valhalla è configurato, e bboxQuality (storico qualità 24h dei due engine NELLA stessa zona geografica della richiesta: success/failure, avgLatencyMs, avgScore — score qualità più alto = percorso migliore).
 Regole:
 - Se valhallaConfigured è false, scegli SEMPRE graphhopper con confidence alta.
-- Preferisci l'engine con salute migliore (meno failure/fallback, non down) e latenza più bassa.
+- Dai priorità a bboxQuality quando ha dati: nella stessa zona preferisci l'engine con avgScore più alto e meno failure; è il segnale più rilevante.
+- In assenza di dati bbox, usa la salute globale: preferisci l'engine con meno failure/fallback (non down) e latenza più bassa.
 - Per stile "curvy"/"extra_curvy" Valhalla è spesso preferibile SE sano; per "fast"/"balanced" GraphHopper è una scelta sicura.
-- Imposta confidence < 0.6 quando i due engine sono equivalenti o i dati sono insufficienti: attiverà il confronto a doppia route.
+- Imposta confidence < 0.6 quando i due engine sono equivalenti o i dati (globali e bbox) sono insufficienti: attiverà il confronto a doppia route.
 Rispondi SOLO con: engine, confidence (0..1), reason (breve, in italiano).`;
 
 /** True se la modalità AI è attiva (legge il raw setting, non resolveRoutingEngine). */
@@ -72,6 +77,7 @@ export function buildAiRoutingContext(points: [number, number][], style: string)
   const lons = points.map((p) => p[0]).filter((n) => Number.isFinite(n));
   const centerLat = lats.length ? lats.reduce((a, b) => a + b, 0) / lats.length : 0;
   const centerLon = lons.length ? lons.reduce((a, b) => a + b, 0) / lons.length : 0;
+  const bboxKey = bboxKeyOf(centerLat, centerLon);
 
   const engineHealth: AiRoutingContext["engineHealth"] = {};
   for (const e of AI_CANDIDATE_ENGINES) {
@@ -82,6 +88,7 @@ export function buildAiRoutingContext(points: [number, number][], style: string)
   return {
     style,
     area: { centerLat: Math.round(centerLat * 1000) / 1000, centerLon: Math.round(centerLon * 1000) / 1000 },
+    bboxKey,
     hourOfDay: new Date().getHours(),
     valhallaConfigured: Boolean(process.env.VALHALLA_URL),
     engineHealth,
@@ -89,6 +96,7 @@ export function buildAiRoutingContext(points: [number, number][], style: string)
       graphhopper: latencies.graphhopper ?? null,
       valhalla: latencies.valhalla ?? null,
     },
+    bboxQuality: getBboxEngineQuality(bboxKey),
   };
 }
 
