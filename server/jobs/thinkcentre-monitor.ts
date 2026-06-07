@@ -27,8 +27,9 @@
  */
 
 import { db } from "../db";
-import { users, appSettings } from "@shared/db";
+import { appSettings } from "@shared/db";
 import { eq } from "drizzle-orm";
+import { sendSystemAlertPushToAdmins } from "../push-notifications";
 import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
 import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
 
@@ -78,39 +79,6 @@ async function isServicePushEnabled(): Promise<boolean> {
   return true;
 }
 
-// ── Push helper ───────────────────────────────────────────────────────────────
-const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
-
-async function pushAdmins(title: string, body: string, data: Record<string, unknown>): Promise<number> {
-  try {
-    const rows = await db
-      .select({ token: users.expoPushToken })
-      .from(users)
-      .where(eq(users.role, "admin"));
-
-    const msgs = rows
-      .map((r) => r.token)
-      .filter((t): t is string => !!t && (t.startsWith("ExponentPushToken[") || t.startsWith("ExpoPushToken[")))
-      .map((to) => ({ to, title, body, sound: "default" as const, channelId: "matches", data }));
-
-    if (msgs.length === 0) return 0;
-
-    const resp = await fetch(EXPO_PUSH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(msgs),
-    });
-    if (!resp.ok) {
-      console.warn("[thinkcentre-monitor] push HTTP", resp.status);
-      return 0;
-    }
-    return msgs.length;
-  } catch (err) {
-    console.warn("[thinkcentre-monitor] push error (non-fatal):", err);
-    return 0;
-  }
-}
-
 function shouldNotify(eventKey: string): boolean {
   const now = Date.now();
   const last = lastNotifiedAt.get(eventKey) ?? 0;
@@ -150,7 +118,7 @@ export async function checkMotorcycleProfile(): Promise<void> {
         `[thinkcentre-monitor] ⚠️ Profilo "motorcycle" MANCANTE dal server GH. Profili disponibili: ${profilesList}`,
       );
       if (shouldNotify("motorcycle_missing")) {
-        const n = await pushAdmins(
+        const n = await sendSystemAlertPushToAdmins(
           '⚠️ Profilo motorcycle mancante',
           `Il server GraphHopper risponde ma non ha il profilo "motorcycle". Profili disponibili: ${profilesList}`,
           { type: "gh_motorcycle_missing", profiles: result.profiles },
@@ -327,7 +295,7 @@ async function handlePerServiceNotifications(
     // prevOk === true && currentOk === false → servizio appena offline
     if (!shouldNotifyService(s.key)) continue;
 
-    const n = await pushAdmins(
+    const n = await sendSystemAlertPushToAdmins(
       `🔴 ${s.label} offline`,
       `Il servizio ${s.label} sul ThinkCentre non risponde`,
       { type: "thinkcentre_service_offline", service: s.key },
@@ -368,7 +336,7 @@ export async function runThinkCentreProbe(): Promise<void> {
   // ── Offline ────────────────────────────────────────────────────────────────
   if (current === "red") {
     if (shouldNotify("offline")) {
-      const n = await pushAdmins(
+      const n = await sendSystemAlertPushToAdmins(
         "🔴 ThinkCentre offline",
         "Nessun servizio self-hosted risponde (GraphHopper, Ollama, Whisper)",
         { type: "thinkcentre_offline" },
@@ -385,7 +353,7 @@ export async function runThinkCentreProbe(): Promise<void> {
       ? "Tutti i servizi sono tornati operativi"
       : "Alcuni servizi sono tornati online (stato parziale)";
     if (shouldNotify("online")) {
-      const n = await pushAdmins(
+      const n = await sendSystemAlertPushToAdmins(
         `${icon} ThinkCentre tornato online`,
         detail,
         { type: "thinkcentre_online", status: current },
@@ -399,7 +367,7 @@ export async function runThinkCentreProbe(): Promise<void> {
   // ── Degradato (green → yellow) ────────────────────────────────────────────
   if (prev === "green" && current === "yellow") {
     if (shouldNotify("degraded")) {
-      const n = await pushAdmins(
+      const n = await sendSystemAlertPushToAdmins(
         "🟡 ThinkCentre parzialmente offline",
         "Uno o più servizi self-hosted non rispondono",
         { type: "thinkcentre_degraded" },

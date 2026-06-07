@@ -253,6 +253,9 @@ router.put("/profile/dynamic", requireAuth, async (req: Request, res: Response) 
       if (typeof notificationPreferences.chat === "boolean") merged.chat = notificationPreferences.chat;
       if (typeof notificationPreferences.motoclub === "boolean") merged.motoclub = notificationPreferences.motoclub;
       if (typeof notificationPreferences.eventi === "boolean") merged.eventi = notificationPreferences.eventi;
+      if (typeof (notificationPreferences as { system_alerts?: unknown }).system_alerts === "boolean") {
+        (merged as { system_alerts?: boolean }).system_alerts = (notificationPreferences as { system_alerts: boolean }).system_alerts;
+      }
       updateData.notificationPreferences = merged;
     }
 

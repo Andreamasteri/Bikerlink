@@ -451,7 +451,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#60a5fa",
   },
-<<<<<<< HEAD
   historyContainer: {
     marginTop: 6,
   },

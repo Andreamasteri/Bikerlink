@@ -3,7 +3,7 @@ import { users, userProfiles, appSettings } from "@shared/db";
 import { inArray, eq } from "drizzle-orm";
 import it from "../lib/i18n/it";
 
-type NotificationPrefKey = "matches" | "zoneProposals" | "chat" | "motoclub" | "eventi";
+type NotificationPrefKey = "matches" | "zoneProposals" | "chat" | "motoclub" | "eventi" | "system_alerts";
 
 async function filterUserIdsByPreference(
   userIds: string[],
@@ -503,6 +503,54 @@ export async function sendDrivingStyleChangePushNotification(
     return 1;
   } catch (err) {
     console.warn("[Push] sendDrivingStyleChangePushNotification error (non-fatal):", err);
+    return 0;
+  }
+}
+
+export async function sendSystemAlertPushToAdmins(
+  title: string,
+  body: string,
+  data: Record<string, unknown>,
+): Promise<number> {
+  try {
+    const adminRows = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.role, "admin"));
+
+    const adminIds = adminRows.map((r) => r.id);
+    if (adminIds.length === 0) return 0;
+
+    const filteredIds = await filterUserIdsByPreference(adminIds, "system_alerts");
+    if (filteredIds.length === 0) return 0;
+
+    const rows = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(inArray(users.id, filteredIds));
+
+    const userIdByToken = new Map<string, string>();
+    const messages: ExpoPushMessage[] = [];
+
+    for (const row of rows) {
+      if (row.expoPushToken && isValidExpoPushToken(row.expoPushToken)) {
+        userIdByToken.set(row.expoPushToken, row.id);
+        messages.push({
+          to: row.expoPushToken,
+          title,
+          body,
+          sound: "default" as const,
+          data,
+          channelId: "matches",
+        });
+      }
+    }
+
+    if (messages.length === 0) return 0;
+    await sendExpoMessages(messages, userIdByToken);
+    return messages.length;
+  } catch (err) {
+    console.warn("[Push] sendSystemAlertPushToAdmins error (non-fatal):", err);
     return 0;
   }
 }

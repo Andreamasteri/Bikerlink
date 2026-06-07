@@ -42,6 +42,7 @@ export const updateDynamicProfileSchema = z.object({
     chat: z.boolean().optional(),
     motoclub: z.boolean().optional(),
     eventi: z.boolean().optional(),
+    system_alerts: z.boolean().optional(),
   }).optional(),
 });
 export type UpdateDynamicProfileInput = z.infer<typeof updateDynamicProfileSchema>;

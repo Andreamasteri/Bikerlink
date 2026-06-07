@@ -161,7 +161,7 @@ export const userProfiles = pgTable("user_profiles", {
   preferredMapStyle: varchar("preferred_map_style", { length: 20 }),
   emailChatNotifications: boolean("email_chat_notifications").notNull().default(true),
   notificationPreferences: jsonb("notification_preferences")
-    .$type<{ matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean }>()
+    .$type<{ matches: boolean; zoneProposals: boolean; chat: boolean; motoclub: boolean; eventi: boolean; system_alerts?: boolean }>()
     .notNull()
     .default(sql`'{"matches":true,"zoneProposals":true,"chat":true,"motoclub":true,"eventi":true}'::jsonb`),
   pushNotificationsEnabled: boolean("push_notifications_enabled").notNull().default(true),

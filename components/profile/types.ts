@@ -40,6 +40,7 @@ export interface ProfileData {
       chat?: boolean;
       motoclub?: boolean;
       eventi?: boolean;
+      system_alerts?: boolean;
     } | null;
     pushNotificationsEnabled?: boolean;
   };
