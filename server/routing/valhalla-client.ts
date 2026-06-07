@@ -13,6 +13,17 @@
 import type { RouteRequest, RouteResult, MapMatchResult, GHPoint, GHServerInfo } from "./graphhopper-adapter";
 import { buildValhallaRoutePayload, buildValhallaTracePayload } from "./valhalla/request-builder";
 import { mapValhallaResponse, mapValhallaTraceResponse, type ValhallaRouteResponse } from "./valhalla/response-mapper";
+import {
+  buildValhallaIsochronePayload,
+  mapValhallaIsochroneResponse,
+  type IsochroneResult,
+} from "./valhalla/isochrone-builder";
+import {
+  buildValhallaMatrixPayload,
+  mapValhallaMatrixResponse,
+  type MatrixResult,
+  type LatLon,
+} from "./valhalla/matrix-builder";
 
 const VALHALLA_BASE_URL = process.env.VALHALLA_URL?.replace(/\/$/, "") ?? "";
 const VALHALLA_API_KEY = process.env.VALHALLA_API_KEY ?? "";
@@ -94,6 +105,53 @@ export async function matchTrace(points: GHPoint[], profile?: string): Promise<M
 
   const raw = await res.json();
   return mapValhallaTraceResponse(raw);
+}
+
+/**
+ * Calcola l'area raggiungibile da un punto in X minuti (isocrone) via Valhalla /isochrone.
+ * Restituisce un GeoJSON FeatureCollection con un Polygon per ogni intervallo richiesto.
+ */
+export async function getIsochrone(
+  lat: number,
+  lon: number,
+  minutesList: number[],
+): Promise<IsochroneResult> {
+  const payload = buildValhallaIsochronePayload(lat, lon, minutesList);
+  const res = await valhallaFetch("/isochrone", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Valhalla /isochrone error ${res.status}: ${text.slice(0, 300)}`);
+  }
+
+  const raw = await res.json();
+  return mapValhallaIsochroneResponse(raw);
+}
+
+/**
+ * Calcola la matrice di tempi/distanze tra N origini e M destinazioni
+ * via Valhalla /sources_to_targets.
+ */
+export async function getMatrix(
+  origins: LatLon[],
+  destinations: LatLon[],
+): Promise<MatrixResult> {
+  const payload = buildValhallaMatrixPayload(origins, destinations);
+  const res = await valhallaFetch("/sources_to_targets", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Valhalla /sources_to_targets error ${res.status}: ${text.slice(0, 300)}`);
+  }
+
+  const raw = await res.json();
+  return mapValhallaMatrixResponse(raw, origins, destinations);
 }
 
 /**

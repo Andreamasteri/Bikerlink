@@ -21,6 +21,7 @@ import motorcycleRoutes from "./routes/motorcycles";
 import proposalRoutes from "./routes/proposals";
 import trackingRoutes from "./routes/tracking";
 import routingAreasRouter from "./routes/routing-areas";
+import valhallaFunctionsRouter from "./routes/routing/valhalla-functions";
 import wishlistRoutes from "./routes/wishlist";
 import feedbackRoutes from "./routes/feedback";
 import invitationRoutes from "./routes/invitations";
@@ -269,6 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/invitations", invitationRoutes);
   app.use("/api/routes", trackingRoutes);
   app.use("/api/routing", routingAreasRouter);
+  app.use("/api/routing", valhallaFunctionsRouter);
 
   const { default: whisperRoutes } = await import("./routes/whisper");
   app.use("/api/whisper", whisperRoutes);
