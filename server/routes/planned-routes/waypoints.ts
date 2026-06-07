@@ -343,6 +343,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
     waypoints,
     style = "curvy",
     drivingProfile = "geometric",
+    routingProfile,
     avoidHighways = false,
     avoidTolls = false,
     avoidFerries = false,
@@ -357,6 +358,10 @@ router.post("/calculate", async (req: Request, res: Response) => {
 
   const normStyle = normalizeStyle(style);
   const normProfile = normalizeDrivingProfile(drivingProfile);
+  // "auto panoramica": profilo veicolo Valhalla (costing auto curvy). È un asse
+  // distinto dallo stile/telemetria moto — quando attivo, il router-selector
+  // instrada SEMPRE a Valhalla senza fallback a GraphHopper.
+  const isAutoCurvy = routingProfile === "auto_curvy";
 
   const DIRECTION_DEGREES: Record<string, number> = {
     N: 0, NE: 45, E: 90, SE: 135, S: 180, SO: 225, O: 270, NO: 315,
@@ -389,7 +394,7 @@ router.post("/calculate", async (req: Request, res: Response) => {
   try {
     const body: Record<string, unknown> = {
       points: effectiveWaypoints.map((wp) => [wp.lng, wp.lat]),
-      profile: ACTIVE_PROFILE,
+      profile: isAutoCurvy ? "auto_curvy" : ACTIVE_PROFILE,
       instructions: true,
       calc_points: true,
       points_encoded: false,
@@ -439,7 +444,9 @@ router.post("/calculate", async (req: Request, res: Response) => {
     // Strato telemetrico opzionale (real / my_style): applicato SOLO se i
     // segmenti effettivi del percorso hanno copertura curvy_score valida.
     // Altrimenti si mantiene il percorso geometrico e si segnala il warning.
-    if (normProfile !== "geometric") {
+    // Saltato per "auto panoramica": la telemetria è specifica per la moto e
+    // Valhalla non applica il custom_model GraphHopper.
+    if (!isAutoCurvy && normProfile !== "geometric") {
       const routeWayIds = extractRouteWayIds(path as { details?: Record<string, unknown> });
       const telemetry = await buildTelemetryWeightsForRoute(normProfile, userId, routeWayIds);
       if (telemetry.applied) {
@@ -529,6 +536,9 @@ router.post("/calculate", async (req: Request, res: Response) => {
     const isWaypointError = errMsg.includes("HTTP 400") || errMsg.toLowerCase().includes("cannot find point") || errMsg.toLowerCase().includes("point 0 is out");
     if (isWaypointError) {
       return sendError(res, 422, "Waypoint non raggiungibili: verifica i punti selezionati sulla mappa");
+    }
+    if (isAutoCurvy) {
+      return sendError(res, 503, "Server panoramico non disponibile al momento. Riprova più tardi o scegli un altro profilo.");
     }
     return sendError(res, 503, "Server di routing non disponibile al momento, riprova tra qualche secondo");
   }

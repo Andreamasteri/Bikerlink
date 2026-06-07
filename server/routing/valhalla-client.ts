@@ -180,3 +180,29 @@ export async function getInfo(): Promise<GHServerInfo> {
     return { status: "error", graph_loaded: false, version: msg };
   }
 }
+
+// Cache di salute Valhalla per endpoint pubblici (gate UI "auto panoramica").
+// Evita di interrogare /status del server self-hosted a ogni richiesta client.
+let healthCache: { available: boolean; ts: number } | null = null;
+const HEALTH_TTL_MS = 30_000;
+
+/**
+ * Restituisce true se Valhalla è configurato e raggiungibile (status "ok"),
+ * con una cache TTL breve. Usato per abilitare/disabilitare il profilo
+ * "auto panoramica" lato client senza martellare il server di routing.
+ */
+export async function isValhallaAvailableCached(): Promise<boolean> {
+  const now = Date.now();
+  if (healthCache && now - healthCache.ts < HEALTH_TTL_MS) {
+    return healthCache.available;
+  }
+  let available = false;
+  try {
+    const info = await getInfo();
+    available = info.status === "ok";
+  } catch {
+    available = false;
+  }
+  healthCache = { available, ts: now };
+  return available;
+}

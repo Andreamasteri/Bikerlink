@@ -13,7 +13,7 @@
  */
 import type { RoutingEngineId } from "./maps-config";
 
-export type RoutingFunctionId = "routing" | "map_matching" | "isochrone" | "matrix";
+export type RoutingFunctionId = "routing" | "auto_curvy" | "map_matching" | "isochrone" | "matrix";
 
 export interface RoutingFunctionDef {
   id: RoutingFunctionId;
@@ -32,6 +32,13 @@ export const ROUTING_FUNCTIONS: RoutingFunctionDef[] = [
     description: "Calcolo del percorso tra waypoint (route planning, percorsi curvy).",
     supportedEngines: ["graphhopper", "valhalla", "tomtom", "mapbox-directions"],
     defaultEngine: "graphhopper",
+  },
+  {
+    id: "auto_curvy",
+    label: "Percorso auto curvy",
+    description: "Percorso panoramico per automobili (statali/provinciali, no autostrade) via Valhalla.",
+    supportedEngines: ["valhalla"],
+    defaultEngine: "valhalla",
   },
   {
     id: "map_matching",
@@ -63,6 +70,7 @@ export const ROUTING_FUNCTION_ENGINES_KEY = "routing_function_engines";
 
 export const DEFAULT_FUNCTION_ENGINES: RoutingFunctionEngineMap = {
   routing: "graphhopper",
+  auto_curvy: "valhalla",
   map_matching: "graphhopper",
   isochrone: "valhalla",
   matrix: "valhalla",

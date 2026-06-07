@@ -7,7 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, getApiUrl } from "@/lib/query-client";
 import { useApiDebugLog } from "@/hooks/useApiDebugLog";
 import { 
-  Waypoint, Style, DrivingProfile, Mode, RouteResult, 
+  Waypoint, Style, DrivingProfile, VehicleProfile, Mode, RouteResult, 
   WeatherWaypoint, AiPreviewState, AiPreviewItem, COMPASS_DIRECTIONS,
   ResolvedPoiStop, PoiResult, GeoResult
 } from "./types";
@@ -36,6 +36,8 @@ export function useGiriCreateState(language?: string) {
   const [title, setTitle] = useState("Giro in moto");
   const [style, setStyle] = useState<Style>("curvy");
   const [drivingProfile, setDrivingProfile] = useState<DrivingProfile>("geometric");
+  // Profilo veicolo: "moto" (default) o "auto_curvy" (auto panoramica via Valhalla).
+  const [vehicleProfile, setVehicleProfile] = useState<VehicleProfile>("moto");
   const [isRoundTrip, setIsRoundTrip] = useState(false);
   const [roundTripHours, setRoundTripHours] = useState(3);
   const [headingDeg, setHeadingDeg] = useState<number | null>(null);
@@ -320,7 +322,7 @@ export function useGiriCreateState(language?: string) {
         "/api/planned-routes/calculate", "POST",
         () => {
           const url = new URL("/api/planned-routes/calculate", getApiUrl());
-          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, drivingProfile, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language }) });
+          return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, drivingProfile, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language, ...(vehicleProfile === "auto_curvy" ? { routingProfile: "auto_curvy" } : {}) }) });
         },
         async (resp) => { if (!resp.ok) { const b = await resp.json().catch(() => ({})); throw new Error(b.message ?? "Calcolo fallito"); } return resp.json(); }
       );
@@ -415,7 +417,7 @@ export function useGiriCreateState(language?: string) {
     setRouteError(null);
     setWeatherPreview(null);
     try {
-      const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language);
+      const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, vehicleProfile === "auto_curvy" ? "auto_curvy" : undefined);
       setRouteResult(result);
       setDismissedWarnings(new Set());
       if (result.durationMinutes > 480 && !isMultiDay) {
@@ -538,6 +540,7 @@ export function useGiriCreateState(language?: string) {
     aiPreview, setAiPreview, aiFallbackBanner, setAiFallbackBanner, aiBannerReason,
     aiSuccessBanner, setAiSuccessBanner, aiSuccessTimer,
     title, setTitle, style, setStyle, drivingProfile, setDrivingProfile,
+    vehicleProfile, setVehicleProfile,
     isRoundTrip, setIsRoundTrip, roundTripHours, setRoundTripHours,
     headingDeg, setHeadingDeg, isMultiDay, setIsMultiDay,
     daysCount, setDaysCount, maxHoursPerDay, setMaxHoursPerDay,

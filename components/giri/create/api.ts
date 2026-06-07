@@ -1,7 +1,7 @@
 import { getApiUrl } from "@/lib/query-client";
 import { Ionicons } from "@expo/vector-icons";
 import { AiKeyMissingError, isAiKeyMissingResponse } from "@/lib/ai-errors";
-import { Waypoint, Style, DrivingProfile, RouteResult, WeatherWaypoint } from "./types";
+import { Waypoint, Style, DrivingProfile, RoutingProfile, RouteResult, WeatherWaypoint } from "./types";
 
 // Re-export per i consumatori che importano da questo modulo.
 export { AiKeyMissingError } from "@/lib/ai-errors";
@@ -28,6 +28,7 @@ export async function calcRoute(
   isRoundTrip?: boolean,
   headingDeg?: number | null,
   language?: string,
+  routingProfile?: RoutingProfile,
 ): Promise<RouteResult> {
   const url = new URL("/api/planned-routes/calculate", getApiUrl());
   const resp = await fetch(url.toString(), {
@@ -37,6 +38,7 @@ export async function calcRoute(
       waypoints, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather,
       roundTripHours, isRoundTrip, language,
       ...(headingDeg !== null && headingDeg !== undefined ? { headingDeg } : {}),
+      ...(routingProfile ? { routingProfile } : {}),
     }),
   });
   if (!resp.ok) {

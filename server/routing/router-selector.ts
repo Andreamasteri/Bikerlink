@@ -273,6 +273,14 @@ export async function getActiveRouter(
     throw new RoutingDisabledError();
   }
 
+  // Profilo "auto panoramica" (auto_curvy): instradato SEMPRE a Valhalla con
+  // costing `auto` panoramico, senza fallback a GraphHopper. Se Valhalla è down,
+  // l'errore propaga e l'endpoint mostra un avviso esplicito — GH Cloud farebbe
+  // solo un percorso diretto car, non panoramico, quindi NON degradiamo.
+  if (req.profile === "auto_curvy") {
+    return wrapMetrics("valhalla", () => valhallaCalculateRoute(req), res);
+  }
+
   if (!isNewEngineEnabled(opts)) {
     return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
   }

@@ -1,5 +1,9 @@
 export type Style = "direct" | "fast" | "balanced" | "curvy" | "extra_curvy";
 export type DrivingProfile = "geometric" | "real" | "my_style";
+// Profilo veicolo: "moto" usa il routing moto standard; "auto_curvy" instrada
+// a Valhalla con costing auto panoramico. Asse distinto da Style/DrivingProfile.
+export type VehicleProfile = "moto" | "auto_curvy";
+export type RoutingProfile = "auto_curvy";
 export type Mode = "ai" | "ai-preview" | "manual";
 export type CompassDir = "N" | "NE" | "E" | "SE" | "S" | "SO" | "O" | "NO";
 

@@ -61,6 +61,7 @@ import { userFavorites } from "@shared/db";
 import { eq, and } from "drizzle-orm";
 import { onlineTracker } from "./online-tracker";
 import { registerClientSettingsRoutes } from "./routes/client-settings";
+import { registerClientSettingsExtraRoutes } from "./routes/client-settings-extra";
 import { registerMoreRoutes } from "./routes/more-routes";
 import { registerMoreRoutes2 } from "./routes/more-routes-2";
 
@@ -552,6 +553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   registerClientSettingsRoutes(app);
+  registerClientSettingsExtraRoutes(app);
 
   registerMoreRoutes(app);
   registerMoreRoutes2(app);

@@ -19,6 +19,7 @@ import { PoiStopSelector } from "@/components/giri/create/PoiStopSelector";
 import { AiInputSection } from "@/components/giri/create/AiInputSection";
 import { RouteStyleSection } from "@/components/giri/create/RouteStyleSection";
 import { DrivingProfileSection } from "@/components/giri/create/DrivingProfileSection";
+import { VehicleProfileSection } from "@/components/giri/create/VehicleProfileSection";
 import { RouteMapSection } from "@/components/giri/create/RouteMapSection";
 import { RouteTitleSection } from "@/components/giri/create/RouteTitleSection";
 import { ActionButtonsSection } from "@/components/giri/create/ActionButtonsSection";
@@ -56,6 +57,7 @@ export default function GiriCreateScreen() {
     aiPreview, setAiPreview, aiFallbackBanner, setAiFallbackBanner, aiBannerReason,
     aiSuccessBanner, setAiSuccessBanner, aiSuccessTimer,
     title, setTitle, style, setStyle, drivingProfile, setDrivingProfile,
+    vehicleProfile, setVehicleProfile,
     isRoundTrip, setIsRoundTrip, roundTripHours, setRoundTripHours,
     headingDeg, setHeadingDeg, isMultiDay, setIsMultiDay,
     daysCount, setDaysCount, maxHoursPerDay, setMaxHoursPerDay,
@@ -117,6 +119,14 @@ export default function GiriCreateScreen() {
     staleTime: 5 * 60 * 1000
   });
 
+  // Gate per il profilo "auto panoramica": disponibile solo se il server Valhalla
+  // self-hosted è raggiungibile. Se non lo è, l'opzione resta visibile ma bloccata.
+  const { data: valhallaHealth } = useQuery<{ available: boolean }>({
+    queryKey: ["/api/settings/valhalla-available"],
+    staleTime: 60 * 1000
+  });
+  const autoCurvyAvailable = valhallaHealth?.available === true;
+
   useRouteMapLogic({
     routeResult,
     webviewRef,
@@ -134,7 +144,7 @@ export default function GiriCreateScreen() {
       const toCalc = isRoundTrip ? [...resolved, resolved[0]] : resolved;
       setCalculating(true);
       try {
-        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language);
+        const result = await calcRoute(toCalc, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, roundTripHours, isRoundTrip, headingDeg, language, vehicleProfile === "auto_curvy" ? "auto_curvy" : undefined);
         setRouteResult(result);
         setDismissedWarnings(new Set());
       } catch {
@@ -144,7 +154,7 @@ export default function GiriCreateScreen() {
       }
     }, 500);
     return () => { if (autoCalcTimeout.current) clearTimeout(autoCalcTimeout.current); };
-  }, [waypoints, style, drivingProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, isRoundTrip, roundTripHours, headingDeg, mode, language, setRouteResult, setCalculating, setDismissedWarnings]);
+  }, [waypoints, style, drivingProfile, vehicleProfile, avoidHighways, avoidTolls, avoidFerries, avoidUnpaved, avoidWeather, isRoundTrip, roundTripHours, headingDeg, mode, language, setRouteResult, setCalculating, setDismissedWarnings]);
 
   const avgKmPerLiter = 18;
   const tankEstimateL = 15;
@@ -222,7 +232,10 @@ export default function GiriCreateScreen() {
             {aiFallbackBanner && <AiFallbackBanner onDismiss={() => setAiFallbackBanner(false)} reason={aiBannerReason} />}
             <RouteTitleSection title={title} setTitle={setTitle} />
             <RouteStyleSection style={style} setStyle={setStyle} STYLE_LEVELS={STYLE_LEVELS} />
-            <DrivingProfileSection drivingProfile={drivingProfile} setDrivingProfile={setDrivingProfile} myStyleProfile={myStyleProfile} />
+            <VehicleProfileSection vehicleProfile={vehicleProfile} setVehicleProfile={setVehicleProfile} autoCurvyAvailable={autoCurvyAvailable} />
+            {vehicleProfile !== "auto_curvy" && (
+              <DrivingProfileSection drivingProfile={drivingProfile} setDrivingProfile={setDrivingProfile} myStyleProfile={myStyleProfile} />
+            )}
             <WaypointsSection
               waypoints={waypoints} wpInputs={wpInputs} wpSuggestions={wpSuggestions}
               wpLoading={wpLoading} isImportingGpx={isImportingGpx} onWpInputChange={handleWpInput}

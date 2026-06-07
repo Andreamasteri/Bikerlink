@@ -17,6 +17,22 @@ const MOTORCYCLE_COSTING_OPTIONS = {
   country_crossing_penalty: 0,
 } as const;
 
+/**
+ * Profilo "auto panoramica" (auto_curvy): costing `auto` ottimizzato per strade
+ * panoramiche — penalizza autostrade e pedaggi, favorisce statali/provinciali.
+ *   use_highways: 0.2  — penalizza fortemente le autostrade
+ *   use_tolls: 0.2     — evita per quanto possibile i pedaggi
+ *   use_ferry: 0.5     — ferries consentiti con peso neutro (medio)
+ *   use_living_streets: 0.4  — apprezza le strade minori panoramiche
+ */
+const AUTO_CURVY_COSTING_OPTIONS = {
+  use_highways: 0.2,
+  use_tolls: 0.2,
+  use_ferry: 0.5,
+  use_living_streets: 0.4,
+  country_crossing_penalty: 0,
+} as const;
+
 interface ValhallaLocation {
   lat: number;
   lon: number;
@@ -32,9 +48,19 @@ export interface ValhallaRoutePayload {
 }
 
 function resolveCosting(profile?: string): string {
+  if (profile === "car" || profile === "auto_curvy") return "auto";
   if (!profile || profile === "motorcycle") return "motorcycle";
-  if (profile === "car") return "auto";
   return "motorcycle";
+}
+
+/**
+ * Seleziona le costing_options Valhalla in base al profilo richiesto.
+ * Solo "auto_curvy" usa i parametri panoramici; tutti gli altri profili
+ * mantengono il comportamento storico (MOTORCYCLE_COSTING_OPTIONS).
+ */
+function resolveCostingOptions(profile?: string): Record<string, unknown> {
+  if (profile === "auto_curvy") return { ...AUTO_CURVY_COSTING_OPTIONS };
+  return { ...MOTORCYCLE_COSTING_OPTIONS };
 }
 
 /**
@@ -59,7 +85,7 @@ export function buildValhallaRoutePayload(req: RouteRequest): ValhallaRoutePaylo
     locations: buildLocations(req.points),
     costing,
     costing_options: {
-      [costing]: MOTORCYCLE_COSTING_OPTIONS,
+      [costing]: resolveCostingOptions(req.profile),
     },
     directions_options: {
       language: "it-IT",
