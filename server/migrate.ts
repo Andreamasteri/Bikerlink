@@ -2,6 +2,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 import { pool } from "./db";
+import { assertNoDuplicateMigrationPrefixes } from "./migration-prefix-guard";
 
 const MIGRATIONS_DIR = path.resolve(process.cwd(), "migrations");
 const MIGRATIONS_HASH_CACHE = path.resolve(process.cwd(), "server_dist", ".migrations-hash");
@@ -207,6 +208,11 @@ export async function applyMigration(
 
 export async function runMigrations(): Promise<void> {
   const all = allMigrationFiles();
+
+  // Blocca prefissi numerici duplicati NUOVI prima di toccare il DB.
+  // I duplicati storici noti (0067, 0072) emettono solo un warning.
+  assertNoDuplicateMigrationPrefixes(all);
+
   const currentHash = computeMigrationsHash(all);
   const cachedHash = readCachedHash();
 
