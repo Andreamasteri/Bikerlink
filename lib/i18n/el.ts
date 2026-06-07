@@ -558,6 +558,7 @@ const el: Record<string, string> = {
   "garage.saveError": "Σφάλμα αποθήκευσης",
   "garage.fillRequired": "Συμπλήρωσε όλα τα υποχρεωτικά πεδία",
   "garage.defaultBadge": "Προεπιλογή",
+  "garage.setDefault": "Ορισμός ως προεπιλογή",
   "garage.forSaleBadge": "Προς Πώληση",
   "match.change": "Αλλαγή",
   "match.musicCriteria.tracks": "Τραγούδια",

@@ -630,6 +630,7 @@ const en: Record<string, string> = {
   "garage.saveError": "Save error",
   "garage.fillRequired": "Fill in all required fields",
   "garage.defaultBadge": "Default",
+  "garage.setDefault": "Set as default",
   "garage.forSaleBadge": "For Sale",
 
   "match.change": "Change",

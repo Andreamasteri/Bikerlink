@@ -568,6 +568,7 @@ const fr: Record<string, string> = {
   "garage.saveError": "Erreur lors de l'enregistrement",
   "garage.fillRequired": "Remplis tous les champs obligatoires",
   "garage.defaultBadge": "Par défaut",
+  "garage.setDefault": "Définir par défaut",
   "garage.forSaleBadge": "À vendre",
   "match.change": "Modifier",
   "match.musicCriteria.tracks": "Titres",

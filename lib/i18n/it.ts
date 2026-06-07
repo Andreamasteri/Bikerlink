@@ -650,6 +650,7 @@ const it: Record<string, string> = {
   "garage.saveError": "Errore nel salvataggio",
   "garage.fillRequired": "Compila tutti i campi obbligatori",
   "garage.defaultBadge": "Predefinita",
+  "garage.setDefault": "Imposta come predefinita",
   "garage.forSaleBadge": "In Vendita",
 
   "match.change": "Cambia",

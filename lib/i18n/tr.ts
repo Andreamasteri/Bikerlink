@@ -559,6 +559,7 @@ const tr: Record<string, string> = {
   "garage.saveError": "Kaydetme hatası",
   "garage.fillRequired": "Tüm zorunlu alanları doldur",
   "garage.defaultBadge": "Varsayılan",
+  "garage.setDefault": "Varsayılan olarak ayarla",
   "garage.forSaleBadge": "Satılık",
   "match.change": "Değiştir",
   "match.musicCriteria.tracks": "Parçalar",

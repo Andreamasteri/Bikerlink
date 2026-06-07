@@ -9,6 +9,8 @@ interface MotoCardProps {
   item: any;
   onPress: () => void;
   onDelete: () => void;
+  onSetDefault: () => void;
+  isSettingDefault?: boolean;
   marketplaceEnabled: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- moto item from API
   getMotoDisplayName: (item: any) => string;
@@ -20,6 +22,8 @@ export const MotoCard: React.FC<MotoCardProps> = ({
   item,
   onPress,
   onDelete,
+  onSetDefault,
+  isSettingDefault = false,
   marketplaceEnabled,
   getMotoDisplayName,
   getMotoTypeLabel,
@@ -48,9 +52,28 @@ export const MotoCard: React.FC<MotoCardProps> = ({
             )}
           </View>
         </View>
-        <Pressable onPress={onDelete} hitSlop={10}>
-          <Ionicons name="trash-outline" size={20} color={Colors.accentRed} />
-        </Pressable>
+        <View style={styles.actions}>
+          {!item.isDefault && (
+            <Pressable
+              onPress={onSetDefault}
+              hitSlop={10}
+              disabled={isSettingDefault}
+              accessibilityLabel={t("garage.setDefault")}
+            >
+              <Ionicons
+                name="star-outline"
+                size={20}
+                color={isSettingDefault ? Colors.textSecondary : Colors.accent}
+              />
+            </Pressable>
+          )}
+          {item.isDefault && (
+            <Ionicons name="star" size={20} color={Colors.accent} />
+          )}
+          <Pressable onPress={onDelete} hitSlop={10}>
+            <Ionicons name="trash-outline" size={20} color={Colors.accentRed} />
+          </Pressable>
+        </View>
       </View>
       <View style={styles.cardDetails}>
         <View style={styles.detailChip}>
@@ -81,4 +104,5 @@ const styles = StyleSheet.create({
   cardDetails: { flexDirection: "row", gap: 12, marginTop: 12 },
   detailChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: Colors.surfaceLight, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8 },
   detailText: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  actions: { flexDirection: "row", alignItems: "center", gap: 12 },
 });

@@ -121,6 +121,19 @@ function GarageContent() {
     },
   });
 
+  const setDefaultMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("PUT", `/api/motorcycles/${id}`, { isDefault: true });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/motorcycles"] });
+    },
+    onError: (err: Error) => {
+      Alert.alert(t("common.error"), err.message || t("garage.saveError"));
+    },
+  });
+
   const resetForm = () => {
     setForm({ brand: "", model: "", displacement: "", motorcycleType: "", ridingStyle: "", isDefault: false, isForSale: false, saleDescription: "", motoDescription: "" });
     setEditingId(null);
@@ -213,6 +226,8 @@ function GarageContent() {
                 item={item}
                 onPress={() => openEdit(item)}
                 onDelete={() => handleDelete(item.id, getMotoDisplayName(item))}
+                onSetDefault={() => setDefaultMutation.mutate(item.id)}
+                isSettingDefault={setDefaultMutation.isPending && setDefaultMutation.variables === item.id}
                 marketplaceEnabled={marketplaceEnabled}
                 getMotoDisplayName={getMotoDisplayName}
                 getMotoTypeLabel={getMotoTypeLabel}
