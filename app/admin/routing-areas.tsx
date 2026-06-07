@@ -585,7 +585,6 @@ const styles = StyleSheet.create({
   logMain: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.text },
   logReason: { fontFamily: "Inter_400Regular", fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
 
-  // Empty
   emptyCard: {
     flexDirection: "row",
     alignItems: "center",
