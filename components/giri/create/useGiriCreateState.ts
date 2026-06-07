@@ -322,7 +322,7 @@ export function useGiriCreateState(language?: string) {
           const url = new URL("/api/planned-routes/calculate", getApiUrl());
           return fetch(url.toString(), { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ waypoints: toCalc, style: aiPreview.style, drivingProfile, avoidHighways: aiPreview.avoidHighways, avoidTolls: false, isRoundTrip: aiPreview.isRoundTrip, roundTripDirection: aiPreview.roundTripDirection ?? null, language }) });
         },
-        async (resp) => { if (!resp.ok) throw new Error("Calcolo fallito"); return resp.json(); }
+        async (resp) => { if (!resp.ok) { const b = await resp.json().catch(() => ({})); throw new Error(b.message ?? "Calcolo fallito"); } return resp.json(); }
       );
       setRouteResult(result);
       setDismissedWarnings(new Set());

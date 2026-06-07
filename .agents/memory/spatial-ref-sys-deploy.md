@@ -30,3 +30,7 @@ must be owner of table spatial_ref_sys
 
 **Why:** the failing DDL runs at Replit's platform level with our non-owner DB role; no app-side config has been found that suppresses it on the copy-OFF path.
 **How to apply:** if this error reappears, do NOT re-investigate drizzle.config.ts filters or deploy-build.sh — both are already ruled out. Either wait for the Replit support fix, or (pre-launch only) publish with copy ON.
+
+## Runtime PostGIS is safe — only migrations are the risk
+The deploy failure is caused exclusively by **schema-diff/migration** DDL touching the PostGIS system table. **Calling PostGIS functions at runtime is fine** and does NOT trigger it. So when a task asks for PostGIS point-in-area matching, prefer runtime `ST_Contains(ST_MakeEnvelope(minLon,minLat,maxLon,maxLat,4326), ST_SetSRID(ST_MakePoint(lon,lat),4326))` built from values passed as query params (e.g. `unnest(...)::float8[] WITH ORDINALITY`) — no new table, no migration, no deploy risk. PostGIS itself is already enabled (migration 0041).
+**Why:** satisfies a "use PostGIS" requirement without re-introducing the copy-OFF deploy failure.

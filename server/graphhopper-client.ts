@@ -19,6 +19,12 @@ const CLOUD_URL = "https://graphhopper.com/api/1";
 
 export const GH_BASE_URL = SELF_HOSTED_URL ?? CLOUD_URL;
 export const isSelfHosted = Boolean(SELF_HOSTED_URL);
+/**
+ * Base self-hosted "pulita" (senza slash finale), stringa vuota se non
+ * configurata. Usata dal routing ad aree per costruire l'URL per-istanza
+ * (`${SELF_HOSTED_BASE_URL}/areas/<codice>`).
+ */
+export const SELF_HOSTED_BASE_URL = SELF_HOSTED_URL ?? "";
 
 /**
  * Quando il routing è self-hosted (PC di casa esposto via tunnel/Nginx) ma è
@@ -74,20 +80,27 @@ function buildHeaders(useCloud: boolean): Record<string, string> {
   return h;
 }
 
-function buildUrl(path: string, useCloud: boolean): string {
+function buildUrl(path: string, useCloud: boolean, baseOverride?: string): string {
   if (!useCloud && isSelfHosted) {
-    return `${GH_BASE_URL}${path}`;
+    // baseOverride: usato dal routing ad aree per puntare l'istanza per-area.
+    const base = baseOverride && baseOverride.length > 0 ? baseOverride : GH_BASE_URL;
+    return `${base}${path}`;
   }
   const sep = path.includes("?") ? "&" : "?";
   return `${CLOUD_URL}${path}${sep}key=${CLOUD_API_KEY}`;
 }
 
-async function ghFetch(path: string, init: RequestInit, useCloud = false): Promise<Response> {
+async function ghFetch(
+  path: string,
+  init: RequestInit,
+  useCloud = false,
+  baseOverride?: string,
+): Promise<Response> {
   const timeoutMs = useCloud ? CLOUD_TIMEOUT_MS : SELF_HOSTED_TIMEOUT_MS;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(buildUrl(path, useCloud), {
+    const res = await fetch(buildUrl(path, useCloud, baseOverride), {
       ...init,
       headers: { ...buildHeaders(useCloud), ...(init.headers as Record<string, string> ?? {}) },
       signal: controller.signal,
@@ -377,7 +390,10 @@ export interface RouteResult {
  * Calcola un percorso tra due o più waypoint.
  * Supporta sia self-hosted che Cloud API come fallback.
  */
-export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
+export async function calculateRoute(
+  req: RouteRequest,
+  opts?: { selfHostedBaseUrl?: string },
+): Promise<RouteResult> {
   if (!(await _isRoutingEnabled())) {
     throw new Error("Routing disabilitato via kill-switch.");
   }
@@ -411,7 +427,7 @@ export async function calculateRoute(req: RouteRequest): Promise<RouteResult> {
       method: "POST",
       headers: extraHeaders,
       body: JSON.stringify(fetchBody),
-    }, useCloud);
+    }, useCloud, useCloud ? undefined : opts?.selfHostedBaseUrl);
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(`HTTP ${res.status}: GraphHopper /route — ${text.slice(0, 300)}`);

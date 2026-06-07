@@ -8,6 +8,9 @@ import { checkQuota } from "./mapbox/quota-guard";
 import { checkQuota as checkTomTomQuota } from "./tomtom/quota-guard";
 import { recordRoutingFallback, recordRoutingFailure, recordRoutingSuccess } from "./routing-metrics";
 import { isRoutingEnabled } from "./routing-kill-switch";
+import { isAreaRoutingActive } from "./routing-area-mode";
+import { resolveRoutingArea } from "./routing-area-resolver";
+import { ROUTING_AREA_OUTCOMES, type RoutingAreaCode } from "@shared/routing-areas";
 
 /** Errore lanciato quando il routing è disabilitato dal kill-switch (admin/env). */
 export class RoutingDisabledError extends Error {
@@ -15,6 +18,50 @@ export class RoutingDisabledError extends Error {
     super("Routing disabilitato dal kill-switch.");
     this.name = "RoutingDisabledError";
   }
+}
+
+/**
+ * Errore: i waypoint non condividono una singola area di routing (rotta tra
+ * gruppi diversi). Esito bloccante quando il routing ad aree è attivo.
+ */
+export class CrossGroupRoutingError extends Error {
+  readonly code = ROUTING_AREA_OUTCOMES.CROSS_GROUP;
+  constructor(public readonly codes: RoutingAreaCode[]) {
+    super(`Routing tra gruppi diversi: ${codes.join(", ") || "nessun gruppo comune"}`);
+    this.name = "CrossGroupRoutingError";
+  }
+}
+
+/**
+ * Errore: l'area del punto di partenza non è abilitata/coperta. Esito bloccante
+ * quando il routing ad aree è attivo.
+ */
+export class AreaNotEnabledError extends Error {
+  readonly code = ROUTING_AREA_OUTCOMES.AREA_NOT_ENABLED;
+  constructor(public readonly areaCode: RoutingAreaCode | null) {
+    super(`Area di routing non abilitata${areaCode ? `: ${areaCode}` : ""}`);
+    this.name = "AreaNotEnabledError";
+  }
+}
+
+/**
+ * Instrada la richiesta verso GraphHopper applicando il routing ad aree quando
+ * attivo: risolve l'istanza per-area e lancia un errore tipizzato sugli esiti
+ * bloccanti. Con routing ad aree disattivo si comporta come prima (istanza
+ * globale unica) — impatto zero sul comportamento storico.
+ */
+async function graphHopperRoute(req: RouteRequest, isMapTester: boolean): Promise<RouteResult> {
+  if (await isAreaRoutingActive(isMapTester)) {
+    const resolution = await resolveRoutingArea(req.points);
+    if (resolution.kind === ROUTING_AREA_OUTCOMES.CROSS_GROUP) {
+      throw new CrossGroupRoutingError(resolution.codes);
+    }
+    if (resolution.kind === ROUTING_AREA_OUTCOMES.AREA_NOT_ENABLED) {
+      throw new AreaNotEnabledError(resolution.area?.codice ?? null);
+    }
+    return routeViaGraphHopper(req, resolution.url);
+  }
+  return routeViaGraphHopper(req);
 }
 
 interface RouterSelectorOptions {
@@ -66,6 +113,7 @@ function isTransientMapboxError(err: unknown): boolean {
  */
 async function routeViaValhallaWithFallback(
   req: RouteRequest,
+  isMapTester: boolean,
   res?: Response
 ): Promise<RouteResult> {
   try {
@@ -80,7 +128,7 @@ async function routeViaValhallaWithFallback(
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
     recordRoutingFallback("valhalla", "graphhopper");
-    return routeViaGraphHopper(req);
+    return graphHopperRoute(req, isMapTester);
   }
 }
 
@@ -91,6 +139,7 @@ async function routeViaValhallaWithFallback(
  */
 async function routeViaMapboxWithFallback(
   req: RouteRequest,
+  isMapTester: boolean,
   res?: Response
 ): Promise<RouteResult> {
   const quota = await checkQuota();
@@ -100,7 +149,7 @@ async function routeViaMapboxWithFallback(
     if (res && !res.headersSent) {
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
-    return routeViaGraphHopper(req);
+    return graphHopperRoute(req, isMapTester);
   }
 
   try {
@@ -115,7 +164,7 @@ async function routeViaMapboxWithFallback(
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
     recordRoutingFallback("mapbox", "graphhopper");
-    return routeViaGraphHopper(req);
+    return graphHopperRoute(req, isMapTester);
   }
 }
 
@@ -141,6 +190,7 @@ function isTransientTomTomError(err: unknown): boolean {
  */
 async function routeViaTomTomWithFallback(
   req: RouteRequest,
+  isMapTester: boolean,
   res?: Response
 ): Promise<RouteResult> {
   const quota = await checkTomTomQuota();
@@ -150,7 +200,7 @@ async function routeViaTomTomWithFallback(
     if (res && !res.headersSent) {
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
-    return routeViaGraphHopper(req);
+    return graphHopperRoute(req, isMapTester);
   }
 
   try {
@@ -165,7 +215,7 @@ async function routeViaTomTomWithFallback(
       res.setHeader("X-Routing-Fallback", "graphhopper");
     }
     recordRoutingFallback("tomtom", "graphhopper");
-    return routeViaGraphHopper(req);
+    return graphHopperRoute(req, isMapTester);
   }
 }
 
@@ -208,12 +258,12 @@ export async function getActiveRouter(
   };
 
   if (!isNewEngineEnabled(opts)) {
-    return wrapMetrics("graphhopper", () => routeViaGraphHopper(req));
+    return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester));
   }
-  if (opts.engine === "valhalla") return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, res));
-  if (opts.engine === "mapbox-directions") return wrapMetrics("mapbox", () => routeViaMapboxWithFallback(req, res));
-  if (opts.engine === "tomtom") return wrapMetrics("tomtom", () => routeViaTomTomWithFallback(req, res));
-  return wrapMetrics("graphhopper", () => routeViaGraphHopper(req));
+  if (opts.engine === "valhalla") return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, opts.isMapTester, res));
+  if (opts.engine === "mapbox-directions") return wrapMetrics("mapbox", () => routeViaMapboxWithFallback(req, opts.isMapTester, res));
+  if (opts.engine === "tomtom") return wrapMetrics("tomtom", () => routeViaTomTomWithFallback(req, opts.isMapTester, res));
+  return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester));
 }
 
 export async function resolveActiveEngine(opts: RouterSelectorOptions): Promise<RoutingEngineId> {

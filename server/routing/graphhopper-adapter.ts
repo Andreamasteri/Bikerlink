@@ -9,8 +9,11 @@ import {
   type GHServerInfo,
 } from "../graphhopper-client";
 
-export async function routeViaGraphHopper(req: RouteRequest): Promise<RouteResult> {
-  return calculateRoute(req);
+export async function routeViaGraphHopper(
+  req: RouteRequest,
+  selfHostedBaseUrl?: string,
+): Promise<RouteResult> {
+  return calculateRoute(req, selfHostedBaseUrl ? { selfHostedBaseUrl } : undefined);
 }
 
 export async function matchViaGraphHopper(

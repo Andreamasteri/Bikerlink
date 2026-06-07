@@ -246,3 +246,32 @@ export function findRoutingAreasForPoint(
 export function routingAreaUrl(area: RoutingArea, baseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, "")}${area.path}`;
 }
+
+// =============================================================================
+// Esiti tipizzati del routing ad aree (contratto server ⇄ frontend)
+//
+// Quando il routing ad aree è attivo, una richiesta può non essere servibile da
+// una singola istanza per-area. In quel caso il server risponde 422 con
+// `{ code, message }`: il codice è stabile (machine-readable, in lockstep con il
+// frontend), il messaggio è la stringa amichevole in italiano già pronta da
+// mostrare all'utente. Tenere codici e messaggi qui evita divergenze.
+// =============================================================================
+
+/** Codici stabili degli esiti bloccanti del routing ad aree. */
+export const ROUTING_AREA_OUTCOMES = {
+  /** I waypoint non condividono una singola area: rotta tra gruppi diversi. */
+  CROSS_GROUP: "cross_group",
+  /** L'area del punto di partenza non è (ancora) abilitata/coperta. */
+  AREA_NOT_ENABLED: "area_not_enabled",
+} as const;
+
+export type RoutingAreaOutcomeCode =
+  (typeof ROUTING_AREA_OUTCOMES)[keyof typeof ROUTING_AREA_OUTCOMES];
+
+/** Messaggi utente (italiano) associati a ciascun esito bloccante. */
+export const ROUTING_AREA_OUTCOME_MESSAGES: Record<RoutingAreaOutcomeCode, string> = {
+  [ROUTING_AREA_OUTCOMES.CROSS_GROUP]:
+    "Questo percorso attraversa più aree regionali: per ora puoi pianificare un giro solo all'interno di una singola area.",
+  [ROUTING_AREA_OUTCOMES.AREA_NOT_ENABLED]:
+    "Il routing non è ancora disponibile nel tuo paese: stiamo ampliando la copertura, riprova presto.",
+};

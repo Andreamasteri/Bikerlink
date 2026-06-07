@@ -12,8 +12,13 @@ import { isOpenAiRouteConfigured } from "../../lib/openai-route-client";
 import { haversineKm } from "../../geo";
 const poiPhotoSchema = z.object({ poiId: z.string().min(1, "poiId obbligatorio") });
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
-import { getActiveRouter } from "../../routing/router-selector";
+import {
+  getActiveRouter,
+  CrossGroupRoutingError,
+  AreaNotEnabledError,
+} from "../../routing/router-selector";
 import type { RouteRequest } from "../../routing/graphhopper-adapter";
+import { ROUTING_AREA_OUTCOME_MESSAGES } from "@shared/routing-areas";
 import {
   buildGeometricWeights,
   buildTelemetryWeightsForRoute,
@@ -520,6 +525,14 @@ router.post("/calculate", async (req: Request, res: Response) => {
       weatherWarning,
     });
   } catch (err: unknown) {
+    // Esiti bloccanti del routing ad aree: risposta 422 tipizzata { code, message }
+    // con messaggio amichevole in italiano (lockstep col contratto condiviso).
+    if (err instanceof CrossGroupRoutingError || err instanceof AreaNotEnabledError) {
+      return res.status(422).json({
+        code: err.code,
+        message: ROUTING_AREA_OUTCOME_MESSAGES[err.code],
+      });
+    }
     const errMsg = (err as Error)?.message ?? "Errore di routing";
     console.error("[routing] error:", errMsg);
     const isWaypointError = errMsg.includes("HTTP 400") || errMsg.toLowerCase().includes("cannot find point") || errMsg.toLowerCase().includes("point 0 is out");
