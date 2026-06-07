@@ -80,7 +80,7 @@ export async function runTelemetryAffinityMatching(): Promise<number> {
     const rowsRes = await db.execute<TelemetryRow>(sql`
       SELECT
         e.entity_id AS user_id,
-        up.club_id AS club_id,
+        mcm.club_id AS club_id,
         e.embedding::text AS embedding,
         e.model AS model,
         tp.speed_bucket AS speed_bucket,
@@ -91,7 +91,11 @@ export async function runTelemetryAffinityMatching(): Promise<number> {
       FROM embeddings e
       INNER JOIN users u ON u.id = e.entity_id
       INNER JOIN user_telemetry_profile tp ON tp.user_id = e.entity_id
-      LEFT JOIN user_profiles up ON up.user_id = e.entity_id
+      LEFT JOIN LATERAL (
+        SELECT club_id FROM moto_club_members
+        WHERE user_id = e.entity_id AND status = 'active'
+        LIMIT 1
+      ) mcm ON true
       WHERE e.entity_type = 'user'
         AND e.field = 'telemetry_style'
         AND u.is_fake = false
