@@ -114,7 +114,7 @@ router.post("/route-providers/test", async (req: Request, res: Response) => {
         res.json({ ok: false, latency_ms: 0, error: "GEMINI_API_KEY (o GOOGLE_API_KEY) non configurata." });
         return;
       }
-      const model = createGoogleGenerativeAI({ apiKey })("gemini-1.5-flash");
+      const model = createGoogleGenerativeAI({ apiKey })("gemini-2.0-flash");
       const { text } = await generateText({ model, prompt: "Reply with only the word: PONG", maxRetries: 0 });
       res.json({ ok: true, latency_ms: Date.now() - start, reply: text.trim().slice(0, 120) });
       return;

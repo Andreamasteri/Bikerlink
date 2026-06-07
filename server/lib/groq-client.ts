@@ -26,6 +26,14 @@ import type { LanguageModel } from "ai";
 const GROQ_API_KEY = process.env.GROQ_API_KEY ?? "";
 const GROQ_MODEL = process.env.GROQ_MODEL ?? "llama-3.3-70b-versatile";
 
+/**
+ * Modello Groq dedicato al parsing strutturato (generateObject / json_schema).
+ * Deve essere un modello che supporta structured outputs — NON tutti lo fanno
+ * (es. openai/gpt-oss-20b non lo supporta). Se GROQ_PARSE_MODEL non è impostato,
+ * usa llama-3.3-70b-versatile che supporta json_schema nativamente.
+ */
+const GROQ_PARSE_MODEL = process.env.GROQ_PARSE_MODEL ?? "llama-3.3-70b-versatile";
+
 /** true quando GROQ_API_KEY è impostata (Groq abilitato come fallback cloud). */
 export const isGroqConfigured = Boolean(GROQ_API_KEY);
 
@@ -41,4 +49,18 @@ export function getGroqModel(model: string = GROQ_MODEL): LanguageModel {
   }
   const provider = createGroq({ apiKey: GROQ_API_KEY });
   return provider(model);
+}
+
+/**
+ * Modello Groq per parsing strutturato (generateObject / json_schema).
+ * Usa sempre GROQ_PARSE_MODEL (default llama-3.3-70b-versatile) che supporta
+ * structured outputs, indipendentemente da GROQ_MODEL che può puntare a modelli
+ * non compatibili (es. openai/gpt-oss-20b che non supporta json_schema).
+ */
+export function getGroqParseModel(): LanguageModel {
+  if (!GROQ_API_KEY) {
+    throw new Error("Groq non configurato: variabile GROQ_API_KEY mancante.");
+  }
+  const provider = createGroq({ apiKey: GROQ_API_KEY });
+  return provider(GROQ_PARSE_MODEL);
 }

@@ -28,7 +28,7 @@ const weatherWaypointsSchema = z.object({
 });
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
-import { getGroqModel, isGroqConfigured } from "../../lib/groq-client";
+import { getGroqParseModel, isGroqConfigured } from "../../lib/groq-client";
 import { getOpenAiRouteModel, isOpenAiRouteConfigured } from "../../lib/openai-route-client";
 import { getEffectiveRouteChain } from "../../ai/route-provider-config";
 import { incrementProviderStat } from "../../ai/route-provider-stats";
@@ -61,7 +61,7 @@ function isRateLimitError(err: unknown): boolean {
 }
 
 function geminiModel(apiKey: string) {
-  return createGoogleGenerativeAI({ apiKey })("gemini-1.5-flash");
+  return createGoogleGenerativeAI({ apiKey })("gemini-2.0-flash");
 }
 
 /**
@@ -105,7 +105,7 @@ export async function generateRouteObject<T>(opts: RouteAiOptions<T>): Promise<{
       if (!isGroqConfigured) continue;
       try {
         const { object } = await generateObject({
-          model: getGroqModel(), schema, prompt: fullPrompt,
+          model: getGroqParseModel(), schema, prompt: fullPrompt,
           maxRetries: 0, temperature, abortSignal,
         });
         incrementProviderStat("groq");
