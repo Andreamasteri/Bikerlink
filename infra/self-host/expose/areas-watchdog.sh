@@ -20,6 +20,11 @@
 #
 # Oppure /etc/bikerlink-areas.env con APP_AREAS_URL / GH_TOKEN / COMPOSE_DIR.
 # Log: journalctl -u areas-watchdog.service -n 50
+#
+# EVENTS FILE: ogni avvio/stop di container viene scritto in AREAS_EVENTS_FILE
+# (default /var/lib/bikerlink/watchdog-events.jsonl) come riga JSON:
+#   {"ts":"2026-06-07T10:00:00Z","code":"grecia","action":"start","reason":"enabled→up"}
+# Il collector areas-metrics.py legge gli ultimi N eventi per esporli nella relay.
 # =============================================================================
 set -uo pipefail
 
@@ -34,12 +39,50 @@ COMPOSE_DIR="${COMPOSE_DIR:-/opt/bikerlink/self-host}"
 APP_AREAS_URL="${APP_AREAS_URL:-}"
 GH_TOKEN="${GH_TOKEN:-}"
 
+# File JSONL dove vengono registrati gli eventi start/stop container.
+# Leggibile da areas-metrics.py per esporli nella relay metriche.
+AREAS_EVENTS_FILE="${AREAS_EVENTS_FILE:-/var/lib/bikerlink/watchdog-events.jsonl}"
+# Numero massimo di righe da tenere nel file (ruota per troncamento).
+EVENTS_MAX_LINES=200
+
 # Tutti i codici area validi (sync con shared/routing-areas.ts).
 ALL_CODES="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
 
-ts()  { date '+%Y-%m-%d %H:%M:%S'; }
-log() { echo "[areas-watchdog] $(ts) $*"; }
-err() { echo "[areas-watchdog] $(ts) ERRORE: $*" >&2; }
+ts()      { date '+%Y-%m-%d %H:%M:%S'; }
+ts_iso()  { date -u '+%Y-%m-%dT%H:%M:%SZ'; }
+log()     { echo "[areas-watchdog] $(ts) $*"; }
+err()     { echo "[areas-watchdog] $(ts) ERRORE: $*" >&2; }
+
+# Scrive un evento nel file JSONL (crea la dir se necessario; ruota se troppo lungo).
+# Usage: write_event <code> <action> <reason>
+write_event() {
+  local code="$1" action="$2" reason="$3"
+  local dir
+  dir="$(dirname "$AREAS_EVENTS_FILE")"
+  if [[ ! -d "$dir" ]]; then
+    mkdir -p "$dir" 2>/dev/null || { err "impossibile creare dir eventi: $dir"; return; }
+  fi
+  # Riga JSON su una riga sola (no jq richiesto).
+  local ts_val
+  ts_val="$(ts_iso)"
+  # Escaping manuale dei caratteri speciali nelle stringhe (code/action/reason
+  # sono valori controllati, ma sanitizziamo per sicurezza).
+  local esc_code esc_action esc_reason
+  esc_code="${code//\"/\\\"}"
+  esc_action="${action//\"/\\\"}"
+  esc_reason="${reason//\"/\\\"}"
+  printf '{"ts":"%s","code":"%s","action":"%s","reason":"%s"}\n' \
+    "$ts_val" "$esc_code" "$esc_action" "$esc_reason" \
+    >> "$AREAS_EVENTS_FILE" 2>/dev/null || { err "impossibile scrivere in $AREAS_EVENTS_FILE"; return; }
+  # Ruota se supera il limite: mantieni solo le ultime EVENTS_MAX_LINES righe.
+  local line_count
+  line_count="$(wc -l < "$AREAS_EVENTS_FILE" 2>/dev/null || echo 0)"
+  if [[ "$line_count" -gt "$EVENTS_MAX_LINES" ]]; then
+    local tmp
+    tmp="$(mktemp)"
+    tail -n "$EVENTS_MAX_LINES" "$AREAS_EVENTS_FILE" > "$tmp" && mv "$tmp" "$AREAS_EVENTS_FILE"
+  fi
+}
 
 command -v docker >/dev/null 2>&1 || { err "'docker' non installato."; exit 1; }
 command -v curl   >/dev/null 2>&1 || { err "'curl' non installato.";   exit 1; }
@@ -97,12 +140,24 @@ while IFS=: read -r code enabled; do
       : # già su
     else
       log "area '$code' ABILITATA ma giù → avvio container"
-      if dc up -d "graphhopper-${code}"; then CHANGED=1; else err "avvio '$code' fallito"; fi
+      if dc up -d "graphhopper-${code}"; then
+        CHANGED=1
+        write_event "$code" "start" "abilitata→avvio"
+      else
+        err "avvio '$code' fallito"
+        write_event "$code" "start_failed" "avvio fallito"
+      fi
     fi
   else
     if is_running "$code"; then
       log "area '$code' DISABILITATA ma su → spengo container"
-      if dc stop "graphhopper-${code}"; then CHANGED=1; else err "stop '$code' fallito"; fi
+      if dc stop "graphhopper-${code}"; then
+        CHANGED=1
+        write_event "$code" "stop" "disabilitata→spento"
+      else
+        err "stop '$code' fallito"
+        write_event "$code" "stop_failed" "stop fallito"
+      fi
     fi
   fi
 done <<< "$STATES"

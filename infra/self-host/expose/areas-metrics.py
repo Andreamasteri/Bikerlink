@@ -50,6 +50,13 @@ GH_TOKEN = os.environ.get("GH_TOKEN", "")
 PORT = int(os.environ.get("METRICS_PORT", "9090"))
 BIND = os.environ.get("METRICS_BIND", "127.0.0.1")
 
+# File JSONL scritto da areas-watchdog.sh con gli eventi start/stop container.
+# Deve corrispondere ad AREAS_EVENTS_FILE nel watchdog (stesso default).
+EVENTS_FILE = os.environ.get(
+    "AREAS_EVENTS_FILE", "/var/lib/bikerlink/watchdog-events.jsonl"
+)
+EVENTS_MAX_RETURN = 50  # quanti eventi esporre al massimo nella relay
+
 
 def _run(args, timeout=10):
     """Esegue un comando e ritorna stdout (str) o '' in caso di errore."""
@@ -100,6 +107,36 @@ def _stats():
     return result
 
 
+def _collect_events():
+    """Legge gli ultimi EVENTS_MAX_RETURN eventi dal file JSONL del watchdog.
+
+    Ogni riga del file è un oggetto JSON:
+      {"ts":"...","code":"...","action":"...","reason":"..."}
+    Gli eventi sono restituiti in ordine decrescente (più recente prima),
+    come si aspetta la UI Log Watchdog.
+    Ritorna una lista vuota se il file non esiste o non è leggibile.
+    """
+    try:
+        with open(EVENTS_FILE, "r", encoding="utf-8") as fh:
+            lines = fh.readlines()
+    except (FileNotFoundError, PermissionError, OSError):
+        return []
+
+    events = []
+    for line in reversed(lines):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        events.append(obj)
+        if len(events) >= EVENTS_MAX_RETURN:
+            break
+    return events
+
+
 def collect():
     """Raccoglie lo snapshot completo delle metriche per tutte le aree."""
     running = _running_containers()
@@ -120,6 +157,7 @@ def collect():
     return {
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "areas": areas,
+        "events": _collect_events(),
     }
 
 
