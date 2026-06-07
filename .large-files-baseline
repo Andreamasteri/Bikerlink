@@ -20,13 +20,13 @@ LEGACY app/proposals/create.tsx 659
 LEGACY components/admin/ota/OtaPanel.tsx 816
 LEGACY components/admin/users/UserDetailModal.tsx 605
 LEGACY components/match/MatchCard.tsx 892
-LEGACY lib/i18n/de.ts 1367
+LEGACY lib/i18n/de.ts 1368
 LEGACY lib/i18n/el.ts 1160
 LEGACY lib/i18n/en.ts 1398
 LEGACY lib/i18n/es.ts 1367
 LEGACY lib/i18n/fr.ts 1367
-LEGACY lib/i18n/it.ts 1382
-LEGACY lib/i18n/tr.ts 1160
+LEGACY lib/i18n/it.ts 1383
+LEGACY lib/i18n/tr.ts 1161
 LEGACY lib/leaflet-bundle.ts 676
 LEGACY lib/leaflet-map-html.ts 642
 LEGACY scripts/verify-matching-integration.ts 746

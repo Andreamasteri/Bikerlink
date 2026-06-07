@@ -28,7 +28,7 @@ const weatherWaypointsSchema = z.object({
 });
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { getOllamaModel, isOllamaConfigured, isOllamaReachable } from "../../lib/ollama-client";
-import { getGroqParseModel, isGroqConfigured } from "../../lib/groq-client";
+import { getGroqModel, getGroqParseModel, isGroqConfigured } from "../../lib/groq-client";
 import { getOpenAiRouteModel, isOpenAiRouteConfigured } from "../../lib/openai-route-client";
 import { getEffectiveRouteChain } from "../../ai/route-provider-config";
 import { incrementProviderStat } from "../../ai/route-provider-stats";
