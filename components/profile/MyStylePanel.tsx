@@ -7,6 +7,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { useColors } from "@/hooks/useColors";
 import { useAuth } from "@/lib/auth-context";
+import { useT } from "@/lib/language-context";
 
 type StyleProfile = {
   speedBucket: string;
@@ -31,19 +32,19 @@ type MyStyleResponse = {
   profile: StyleProfile | null;
 };
 
-const LABEL_INFO: Record<string, { text: string; icon: keyof typeof Ionicons.glyphMap }> = {
-  calm_rider: { text: "Guida tranquilla", icon: "leaf-outline" },
-  steady_rider: { text: "Guida regolare", icon: "speedometer-outline" },
-  fast_rider: { text: "Guida veloce", icon: "flash-outline" },
-  sport_rider: { text: "Guida sportiva", icon: "rocket-outline" },
-  touring_lean: { text: "Piega da turismo", icon: "compass-outline" },
-  dynamic_lean: { text: "Piega dinamica", icon: "swap-horizontal-outline" },
-  aggressive_lean: { text: "Piega aggressiva", icon: "trending-up-outline" },
-  short_rides: { text: "Uscite brevi", icon: "time-outline" },
-  medium_rides: { text: "Uscite medie", icon: "time-outline" },
-  long_rides: { text: "Uscite lunghe", icon: "infinite-outline" },
-  morning_rider: { text: "Rider del mattino", icon: "sunny-outline" },
-  evening_rider: { text: "Rider della sera", icon: "moon-outline" },
+const LABEL_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  calm_rider: "leaf-outline",
+  steady_rider: "speedometer-outline",
+  fast_rider: "flash-outline",
+  sport_rider: "rocket-outline",
+  touring_lean: "compass-outline",
+  dynamic_lean: "swap-horizontal-outline",
+  aggressive_lean: "trending-up-outline",
+  short_rides: "time-outline",
+  medium_rides: "time-outline",
+  long_rides: "infinite-outline",
+  morning_rider: "sunny-outline",
+  evening_rider: "moon-outline",
 };
 
 function speedBucketLabel(b: string): string {
@@ -74,6 +75,7 @@ function durationBucketLabel(b: string): string {
 export default function MyStylePanel() {
   const colors = useColors();
   const { user } = useAuth();
+  const t = useT();
 
   const { data, isLoading } = useQuery<MyStyleResponse>({
     queryKey: ["/api/proposals/my-telemetry-style"],
@@ -131,15 +133,17 @@ export default function MyStylePanel() {
           <>
             <View style={styles.chipsRow}>
               {data.labels.map((label) => {
-                const info = LABEL_INFO[label];
-                if (!info) return null;
+                const icon = LABEL_ICON[label];
+                if (!icon) return null;
                 return (
                   <View
                     key={label}
                     style={[styles.chip, { backgroundColor: colors.accent + "1A", borderColor: accentSoft }]}
                   >
-                    <Ionicons name={info.icon} size={12} color={colors.accent} />
-                    <Text style={[styles.chipText, { color: colors.accent }]}>{info.text}</Text>
+                    <Ionicons name={icon} size={12} color={colors.accent} />
+                    <Text style={[styles.chipText, { color: colors.accent }]}>
+                      {t(`match.styleLabel.${label}`)}
+                    </Text>
                   </View>
                 );
               })}
