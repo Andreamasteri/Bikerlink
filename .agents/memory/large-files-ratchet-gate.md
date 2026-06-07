@@ -29,3 +29,10 @@ enough), not by touching the failing task.
 split new oversized components into sibling files (move their styles too), and for a LEGACY +1
 regression just remove one line to return to baseline. Re-run `npx tsx scripts/check-large-files-ratchet.ts`
 and both typechecks before finishing.
+
+**i18n files (`lib/i18n/en.ts`, `lib/i18n/it.ts`) recur here:** every feature that adds translation
+keys grows them past baseline, and the keys CANNOT be deleted (merged features use them). Non-destructive
+fix: pack several flat dotted keys onto a single physical line (`"a": "x", "b": "y", ...`) in the same
+logical group — line count drops while every key/value is preserved. Keep en/it symmetric. Full-project
+`tsc --noEmit` often times out (>120s); since compaction changes no keys/values the typecheck state is
+unchanged, so an `esbuild --bundle` syntax check on the two files is sufficient to confirm validity.
