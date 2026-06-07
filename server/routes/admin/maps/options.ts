@@ -24,6 +24,7 @@ export const AVAILABLE_ENGINES: OptionEntry<RoutingEngineId>[] = [
   { id: "valhalla", label: "Valhalla", implemented: true },
   { id: "mapbox-directions", label: "Mapbox Directions", implemented: false },
   { id: "tomtom", label: "TomTom Routing", implemented: true },
+  { id: "ai", label: "AI (auto-selezione)", implemented: true },
 ];
 
 export const AVAILABLE_PROFILES: OptionEntry<RoutingProfileId>[] = [

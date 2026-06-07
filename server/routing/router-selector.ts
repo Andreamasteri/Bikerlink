@@ -11,6 +11,10 @@ import { isRoutingEnabled } from "./routing-kill-switch";
 import { isAreaRoutingActive } from "./routing-area-mode";
 import { resolveRoutingArea } from "./routing-area-resolver";
 import { ROUTING_AREA_OUTCOMES, type RoutingAreaCode } from "@shared/routing-areas";
+import { decideEngineWithAI, type AiRoutingContext } from "./ai-engine-decider";
+import { scoreRoute } from "./route-quality-score";
+import { recordAiDecision } from "./ai-decision-log";
+import { haversineKm } from "../geo";
 
 /** Errore lanciato quando il routing è disabilitato dal kill-switch (admin/env). */
 export class RoutingDisabledError extends Error {
@@ -64,10 +68,43 @@ async function graphHopperRoute(req: RouteRequest, isMapTester: boolean): Promis
   return routeViaGraphHopper(req);
 }
 
-interface RouterSelectorOptions {
+export interface RouterSelectorOptions {
   rollout: MapsRollout;
   engine: RoutingEngineId;
   isMapTester: boolean;
+  /** Modalità AI attiva (maps_routing_engine === "ai"). */
+  aiMode?: boolean;
+  /** Contesto per il decider AI; presente solo quando aiMode è true. */
+  aiContext?: AiRoutingContext;
+}
+
+type MetricsEngine = "graphhopper" | "valhalla" | "mapbox" | "tomtom";
+
+/**
+ * Esegue `fn` registrando metriche di esito + latenza. Se la richiesta è stata
+ * servita via fallback (header X-Routing-Fallback impostato dalle funzioni
+ * routeViaXxxWithFallback), il successo è attribuito all'engine di destinazione.
+ */
+async function wrapMetrics(
+  engine: MetricsEngine,
+  fn: () => Promise<RouteResult>,
+  res?: Response,
+): Promise<RouteResult> {
+  const started = Date.now();
+  try {
+    const out = await fn();
+    const latency = Date.now() - started;
+    const fallbackTo = res?.getHeader("X-Routing-Fallback");
+    if (typeof fallbackTo === "string" && fallbackTo.length > 0) {
+      recordRoutingSuccess(fallbackTo as MetricsEngine, latency);
+    } else {
+      recordRoutingSuccess(engine, latency);
+    }
+    return out;
+  } catch (err) {
+    recordRoutingFailure(engine);
+    throw err;
+  }
 }
 
 function isNewEngineEnabled(opts: RouterSelectorOptions): boolean {
@@ -234,36 +271,112 @@ export async function getActiveRouter(
     throw new RoutingDisabledError();
   }
 
-  const wrapMetrics = async (
-    engine: "graphhopper" | "valhalla" | "mapbox" | "tomtom",
-    fn: () => Promise<RouteResult>,
-  ): Promise<RouteResult> => {
-    try {
-      const out = await fn();
-      // Se la richiesta è stata servita tramite fallback (header impostato dalle
-      // funzioni routeViaXxxWithFallback), `recordRoutingFallback` per l'engine
-      // originale è già stato registrato — qui contiamo il successo per
-      // l'engine di destinazione (GraphHopper) e NON per quello originale.
-      const fallbackTo = res?.getHeader("X-Routing-Fallback");
-      if (typeof fallbackTo === "string" && fallbackTo.length > 0) {
-        recordRoutingSuccess(fallbackTo as "graphhopper" | "valhalla" | "mapbox" | "tomtom");
-      } else {
-        recordRoutingSuccess(engine);
-      }
-      return out;
-    } catch (err) {
-      recordRoutingFailure(engine);
-      throw err;
-    }
-  };
-
   if (!isNewEngineEnabled(opts)) {
-    return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester));
+    return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
   }
-  if (opts.engine === "valhalla") return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, opts.isMapTester, res));
-  if (opts.engine === "mapbox-directions") return wrapMetrics("mapbox", () => routeViaMapboxWithFallback(req, opts.isMapTester, res));
-  if (opts.engine === "tomtom") return wrapMetrics("tomtom", () => routeViaTomTomWithFallback(req, opts.isMapTester, res));
-  return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester));
+
+  // Modalità AI: un modello sceglie l'engine ottimale. Se l'AI non risponde
+  // entro il timeout (o non sceglie), aiOverride ritorna null e si ricade sulla
+  // logica normale sotto (opts.engine, che in modalità AI è il safe default).
+  if (opts.aiMode && opts.aiContext) {
+    const aiResult = await aiOverride(req, opts, res);
+    if (aiResult) return aiResult;
+  }
+
+  if (opts.engine === "valhalla") return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, opts.isMapTester, res), res);
+  if (opts.engine === "mapbox-directions") return wrapMetrics("mapbox", () => routeViaMapboxWithFallback(req, opts.isMapTester, res), res);
+  if (opts.engine === "tomtom") return wrapMetrics("tomtom", () => routeViaTomTomWithFallback(req, opts.isMapTester, res), res);
+  return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
+}
+
+/** Somma delle distanze aeree (haversine) tra waypoint consecutivi. */
+function aerialKmOf(points: [number, number][]): number {
+  let km = 0;
+  for (let i = 1; i < points.length; i++) {
+    km += haversineKm(points[i - 1][1], points[i - 1][0], points[i][1], points[i][0]);
+  }
+  return km;
+}
+
+/**
+ * Hook AI del selettore (#3191). Chiamato quando la modalità AI è attiva:
+ * 1. Chiede al modello l'engine ottimale (timeout 800ms).
+ * 2. Se confidence ≥ 0.6 → usa direttamente l'engine scelto (con i fallback esistenti).
+ * 3. Se confidence < 0.6 → esegue entrambe le route in parallelo e sceglie quella
+ *    con lo score qualità migliore per lo stile richiesto.
+ * 4. Se l'AI non risponde / nessuna route riesce → ritorna null (il chiamante
+ *    ricade sul selettore normale). Ogni esito viene loggato per il pannello admin.
+ */
+export async function aiOverride(
+  req: RouteRequest,
+  opts: RouterSelectorOptions,
+  res?: Response,
+): Promise<RouteResult | null> {
+  const ctx = opts.aiContext;
+  if (!ctx) return null;
+
+  const started = Date.now();
+  const decision = await decideEngineWithAI(ctx);
+
+  if (!decision) {
+    recordAiDecision({
+      ts: Date.now(), mode: "fallback-smart", chosenEngine: opts.engine,
+      confidence: null, reason: "AI non disponibile entro il timeout — selettore normale",
+      provider: null, decisionLatencyMs: Date.now() - started, dualScores: null,
+    });
+    return null;
+  }
+
+  if (res && !res.headersSent) res.setHeader("X-Routing-Ai", decision.engine);
+
+  // Confidence alta: usa l'engine scelto direttamente.
+  if (decision.confidence >= 0.6) {
+    recordAiDecision({
+      ts: Date.now(), mode: "ai-direct", chosenEngine: decision.engine,
+      confidence: decision.confidence, reason: decision.reason, provider: decision.provider,
+      decisionLatencyMs: Date.now() - started, dualScores: null,
+    });
+    if (decision.engine === "valhalla") {
+      return wrapMetrics("valhalla", () => routeViaValhallaWithFallback(req, opts.isMapTester, res), res);
+    }
+    return wrapMetrics("graphhopper", () => graphHopperRoute(req, opts.isMapTester), res);
+  }
+
+  // Confidence bassa: confronto a doppia route + score qualità. Usiamo gli engine
+  // GREZZI (no fallback cross-engine): un fallback Valhalla→GraphHopper renderebbe
+  // i due candidati identici e falserebbe lo score/attribuzione. Se un engine
+  // grezzo fallisce, viene semplicemente escluso dai candidati.
+  const aerialKm = aerialKmOf(req.points);
+  const scoreReq: RouteRequest = { ...req, details: Array.from(new Set([...(req.details ?? []), "road_class"])) };
+  const [gh, val] = await Promise.allSettled([
+    graphHopperRoute(scoreReq, opts.isMapTester),
+    valhallaCalculateRoute(scoreReq),
+  ]);
+
+  const candidates: Array<{ engine: "graphhopper" | "valhalla"; result: RouteResult; score: number }> = [];
+  if (gh.status === "fulfilled") candidates.push({ engine: "graphhopper", result: gh.value, score: scoreRoute(gh.value, aerialKm, ctx.style).score });
+  if (val.status === "fulfilled") candidates.push({ engine: "valhalla", result: val.value, score: scoreRoute(val.value, aerialKm, ctx.style).score });
+
+  if (candidates.length === 0) {
+    recordAiDecision({
+      ts: Date.now(), mode: "fallback-smart", chosenEngine: opts.engine,
+      confidence: decision.confidence, reason: `${decision.reason} — entrambe le route hanno fallito`,
+      provider: decision.provider, decisionLatencyMs: Date.now() - started, dualScores: null,
+    });
+    return null;
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  const winner = candidates[0];
+  recordRoutingSuccess(winner.engine, Date.now() - started);
+  if (res && !res.headersSent) res.setHeader("X-Routing-Ai-Compare", winner.engine);
+  recordAiDecision({
+    ts: Date.now(), mode: "ai-dual-compare", chosenEngine: winner.engine,
+    confidence: decision.confidence, reason: decision.reason, provider: decision.provider,
+    decisionLatencyMs: Date.now() - started,
+    dualScores: Object.fromEntries(candidates.map((c) => [c.engine, Math.round(c.score * 100) / 100])),
+  });
+  return winner.result;
 }
 
 export async function resolveActiveEngine(opts: RouterSelectorOptions): Promise<RoutingEngineId> {

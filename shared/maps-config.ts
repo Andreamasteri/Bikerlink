@@ -1,7 +1,7 @@
 export type MapsRollout = "disabled" | "tester" | "all";
 export type MapsRendererId = "leaflet" | "maplibre" | "openlayers" | "maplibre-full-3d";
 export type MapsTileId = "carto-light" | "carto-dark" | "osm-standard";
-export type RoutingEngineId = "graphhopper" | "valhalla" | "mapbox-directions" | "tomtom";
+export type RoutingEngineId = "graphhopper" | "valhalla" | "mapbox-directions" | "tomtom" | "ai";
 export type RoutingProfileId = "motorcycle" | "car";
 
 export interface MapsOption<T extends string> {
@@ -82,6 +82,12 @@ export const ROUTING_OPTIONS: MapsOption<RoutingEngineId>[] = [
     id: "tomtom",
     label: "TomTom Routing",
     description: "Cloud — profilo motorcycle nativo + traffic real-time EU. 2.500 req/giorno gratuiti.",
+    implemented: true,
+  },
+  {
+    id: "ai",
+    label: "AI (auto-selezione)",
+    description: "Un modello AI sceglie l'engine ottimale per ogni richiesta (confronto qualità se incerto). Fallback automatico al selettore normale.",
     implemented: true,
   },
 ];

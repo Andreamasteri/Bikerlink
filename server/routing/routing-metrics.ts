@@ -3,7 +3,7 @@
 // finestra di tentativi consecutivi falliti. Consumato dal maps-collector.
 type Engine = "graphhopper" | "valhalla" | "mapbox" | "tomtom";
 
-interface Sample { ts: number; engine: Engine; outcome: "success" | "fallback" | "failure" }
+interface Sample { ts: number; engine: Engine; outcome: "success" | "fallback" | "failure"; latencyMs?: number }
 const SAMPLES_MAX = 1000;
 const samples: Sample[] = [];
 const consecutiveFailures: Partial<Record<Engine, number>> = {};
@@ -15,8 +15,8 @@ function push(s: Sample): void {
   if (samples.length > SAMPLES_MAX) samples.shift();
 }
 
-export function recordRoutingSuccess(engine: Engine): void {
-  push({ ts: Date.now(), engine, outcome: "success" });
+export function recordRoutingSuccess(engine: Engine, latencyMs?: number): void {
+  push({ ts: Date.now(), engine, outcome: "success", ...(latencyMs !== undefined ? { latencyMs } : {}) });
   consecutiveFailures[engine] = 0;
   delete enginesDown[engine];
 }
@@ -63,6 +63,27 @@ export function getRoutingCounters(windowMs: number = 5 * 60_000): RoutingCounte
     enginesDownOut[e] = enginesDown[e] ?? null;
   }
   return { windowMs, successes, fallbacks, failures, byEngine, enginesDown: enginesDownOut };
+}
+
+/**
+ * Latenza media (ms) dei successi recenti per engine, nella finestra data.
+ * Engine senza campioni con latenza → assente dalla mappa. Usato dall'AI
+ * Routing Engine Selector per arricchire il contesto della decisione.
+ */
+export function getRecentLatencies(windowMs: number = 5 * 60_000): Record<string, number> {
+  const since = Date.now() - windowMs;
+  const acc: Record<string, { sum: number; n: number }> = {};
+  for (const s of samples) {
+    if (s.ts < since || s.outcome !== "success" || s.latencyMs === undefined) continue;
+    acc[s.engine] = acc[s.engine] ?? { sum: 0, n: 0 };
+    acc[s.engine].sum += s.latencyMs;
+    acc[s.engine].n++;
+  }
+  const out: Record<string, number> = {};
+  for (const e of Object.keys(acc)) {
+    out[e] = Math.round(acc[e].sum / acc[e].n);
+  }
+  return out;
 }
 
 export function _resetRoutingMetricsForTests(): void {

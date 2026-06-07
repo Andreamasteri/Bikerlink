@@ -409,18 +409,8 @@ router.post("/calculate", async (req: Request, res: Response) => {
     if (avoidUnpaved) avoidRules.push({ if: "road_environment == UNPAVED", multiply_by: 0.0 });
     const basePriority = [...geo.priority, ...avoidRules];
 
-    const { storage: _st } = await import("../../storage");
-    const { resolveRoutingEngine } = await import("../../routing/function-engine-config");
-    const [rolloutSetting, routingEngine, routeUser] = await Promise.all([
-      _st.getAppSetting("maps_rollout"),
-      resolveRoutingEngine(),
-      _st.getUser(userId),
-    ]);
-    const routerOpts = {
-      rollout: (rolloutSetting?.value ?? "disabled") as import("@shared/maps-config").MapsRollout,
-      engine: routingEngine,
-      isMapTester: routeUser?.mapTester ?? false,
-    };
+    const { resolveRouterOpts } = await import("./waypoints.next");
+    const routerOpts = await resolveRouterOpts(userId, body.points as [number, number][], normStyle);
 
     const runRoute = (
       priorityRules: Array<{ if: string; multiply_by: number }>,

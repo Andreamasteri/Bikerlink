@@ -489,3 +489,35 @@ poiExtraRouter.post("/poi", async (req: Request, res: Response) => {
     return sendError(res, 502, "Punti di interesse non disponibili");
   }
 });
+
+/**
+ * Task #3191 — Risolve le opzioni del router selector per una richiesta di
+ * calcolo percorso, includendo la modalità AI quando attiva.
+ *
+ * Estratto qui (file "next") per mantenere waypoints.ts sotto il limite di
+ * dimensione. In modalità AI, `engine` resta il safe default restituito da
+ * resolveRoutingEngine ("graphhopper"), mentre aiMode/aiContext attivano l'hook
+ * AI nel selettore.
+ */
+export async function resolveRouterOpts(
+  userId: string,
+  points: [number, number][],
+  style: string,
+): Promise<import("../../routing/router-selector").RouterSelectorOptions> {
+  const { storage } = await import("../../storage");
+  const { resolveRoutingEngine } = await import("../../routing/function-engine-config");
+  const { isAiRoutingMode, buildAiRoutingContext } = await import("../../routing/ai-engine-decider");
+  const [rolloutSetting, routingEngine, routeUser, aiMode] = await Promise.all([
+    storage.getAppSetting("maps_rollout"),
+    resolveRoutingEngine(),
+    storage.getUser(userId),
+    isAiRoutingMode(),
+  ]);
+  return {
+    rollout: (rolloutSetting?.value ?? "disabled") as import("@shared/maps-config").MapsRollout,
+    engine: routingEngine,
+    isMapTester: routeUser?.mapTester ?? false,
+    aiMode,
+    aiContext: aiMode ? buildAiRoutingContext(points, style) : undefined,
+  };
+}

@@ -6,6 +6,7 @@ import testRoutingRouter from "./test-handler";
 import providersRouter from "./providers-handler";
 import tileProxyRouter from "./tile-proxy-handler";
 import valhallaBenchRouter from "./valhalla-bench";
+import aiDecisionsRouter from "./ai-decisions-handler";
 
 const router = Router();
 
@@ -16,5 +17,6 @@ router.use("/", testRoutingRouter);
 router.use("/", providersRouter);
 router.use("/", tileProxyRouter);
 router.use("/", valhallaBenchRouter);
+router.use("/", aiDecisionsRouter);
 
 export default router;

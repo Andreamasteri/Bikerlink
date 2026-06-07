@@ -13,6 +13,7 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { ValhallaBenchCard } from "@/components/admin/ValhallaBenchCard";
+import { AiDecisionsCard } from "@/components/admin/AiDecisionsCard";
 import type { RoutingStatus } from "./routing-control/types";
 
 interface QuickLink {
@@ -125,6 +126,12 @@ export default function RoutingHubScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Bench Valhalla</Text>
         <ValhallaBenchCard />
+      </View>
+
+      {/* Decisioni AI Engine Selector */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Decisioni AI Engine Selector</Text>
+        <AiDecisionsCard />
       </View>
 
       {/* Quick links */}
