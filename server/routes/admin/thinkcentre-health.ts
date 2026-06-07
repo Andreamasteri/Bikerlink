@@ -11,7 +11,7 @@
  * Ogni probe ha timeout breve (5 s) per non rallentare il caricamento admin.
  */
 
-import { Router, type Request, type Response } from "express";
+import { Router, type Request, type Response as ExpressResponse } from "express";
 import { createHash } from "crypto";
 import { getNominatimHealthSnapshot } from "../../lib/nominatim-client";
 import { ACTIVE_PROFILE } from "../../graphhopper-client";
@@ -66,7 +66,24 @@ function sanitizeError(msg: string): string {
   }
   out = out.replace(/(bearer)\s+\S+/gi, "$1 ***");
   out = out.replace(/(x-[a-z-]*token|authorization|api[-_]?key)\s*[:=]\s*\S+/gi, "$1: ***");
-  return out.slice(0, 200);
+  return out.slice(0, 400);
+}
+
+type FetchResponse = Awaited<ReturnType<typeof fetch>>;
+
+/**
+ * Legge il body testuale di una risposta HTTP con un timeout aggiuntivo.
+ * Ritorna stringa vuota in caso di errore o body non disponibile.
+ */
+async function readBodySafe(res: FetchResponse, timeoutMs = 2_000): Promise<string> {
+  try {
+    return await Promise.race([
+      res.text(),
+      new Promise<string>((_, reject) => setTimeout(() => reject(new Error("body-timeout")), timeoutMs)),
+    ]);
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -91,10 +108,12 @@ async function httpProbe(
     const res = await fetch(url, { method: "GET", headers, signal: controller.signal });
     const latencyMs = Date.now() - t0;
     if (isHealthy(res.status)) return { ok: true, latencyMs };
-    let body = "";
-    try { body = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
-    const errorMsg = body ? `HTTP ${res.status} · ${sanitizeError(body)}` : `HTTP ${res.status}`;
-    return { ok: false, latencyMs, error: errorMsg };
+    const body = await readBodySafe(res);
+    const bodySnippet = body.trim().slice(0, 400);
+    const error = bodySnippet
+      ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
+      : `HTTP ${res.status}`;
+    return { ok: false, latencyMs, error };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, latencyMs: null, error: sanitizeError(msg) };
@@ -132,10 +151,12 @@ async function graphHopperRouteProbe(
     });
     const latencyMs = Date.now() - t0;
     if (res.status >= 200 && res.status < 300) return { ok: true, latencyMs };
-    let body = "";
-    try { body = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
-    const errorMsg = body ? `HTTP ${res.status} · ${sanitizeError(body)}` : `HTTP ${res.status}`;
-    return { ok: false, latencyMs, error: errorMsg };
+    const body = await readBodySafe(res);
+    const bodySnippet = body.trim().slice(0, 400);
+    const error = bodySnippet
+      ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
+      : `HTTP ${res.status}`;
+    return { ok: false, latencyMs, error };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, latencyMs: null, error: sanitizeError(msg) };
@@ -172,6 +193,10 @@ async function probeGraphHopper(): Promise<ServiceHealth> {
   // 2) Fallback: alcuni deploy dietro tunnel restituiscono 5xx su /health ma
   //    instradano /route correttamente. Una vera richiesta di routing conferma.
   const route = await graphHopperRouteProbe(base, token);
+  if (!route.ok) {
+    const finalError = route.error ?? health.error;
+    console.error("[thinkcentre-probe] graphhopper KO", { status: finalError });
+  }
   return {
     key: "graphhopper",
     label: "GraphHopper",
@@ -207,10 +232,13 @@ async function probeValhalla(): Promise<ServiceHealth> {
     const res = await fetch(`${base}/status`, { method: "GET", headers, signal: controller.signal });
     const latencyMs = Date.now() - t0;
     if (res.status < 200 || res.status >= 300) {
-      let errBody = "";
-      try { errBody = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
-      const errMsg = errBody ? `HTTP ${res.status} · ${sanitizeError(errBody)}` : `HTTP ${res.status}`;
-      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error: errMsg, tokenMissing };
+      const body = await readBodySafe(res);
+      const bodySnippet = body.trim().slice(0, 400);
+      const error = bodySnippet
+        ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
+        : `HTTP ${res.status}`;
+      console.error("[thinkcentre-probe] valhalla KO", { status: res.status, error });
+      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing };
     }
     const data = (await res.json().catch(() => ({}))) as {
       version?: string;
@@ -248,11 +276,15 @@ async function probeOllama(): Promise<ServiceHealth> {
   const headers: Record<string, string> = {};
   if (token) headers["X-Ollama-Token"] = token;
   const r = await httpProbe(`${base}/api/tags`, headers);
-  const error = r.error === "HTTP 401"
-    ? "Token non valido (HTTP 401)"
-    : r.error === "HTTP 403"
-    ? "Accesso negato (HTTP 403) — verifica configurazione nginx"
-    : r.error;
+  let error = r.error;
+  if (r.error?.startsWith("HTTP 401")) {
+    error = `Token non valido — ${r.error}`;
+  } else if (r.error?.startsWith("HTTP 403")) {
+    error = `Accesso negato — ${r.error} — verifica configurazione nginx`;
+  }
+  if (!r.ok) {
+    console.error("[thinkcentre-probe] ollama KO", { error });
+  }
   return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing };
 }
 
@@ -295,15 +327,25 @@ async function probeWhisper(): Promise<ServiceHealth> {
     if (res.status >= 200 && res.status < 300) {
       return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base), tokenMissing };
     }
-    let errBody = "";
-    try { errBody = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
-    const error = res.status === 401
-      ? "Token non valido (HTTP 401)"
-      : errBody ? `HTTP ${res.status} · ${sanitizeError(errBody)}` : `HTTP ${res.status}`;
+    const body = await readBodySafe(res);
+    const bodySnippet = body.trim().slice(0, 400);
+    let error: string;
+    if (res.status === 401) {
+      error = bodySnippet
+        ? sanitizeError(`Token non valido — HTTP 401 — ${bodySnippet}`)
+        : "Token non valido (HTTP 401)";
+    } else {
+      error = bodySnippet
+        ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
+        : `HTTP ${res.status}`;
+    }
+    console.error("[thinkcentre-probe] whisper KO", { status: res.status, error });
     return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error: sanitizeError(msg), tokenMissing };
+    const error = sanitizeError(msg);
+    console.error("[thinkcentre-probe] whisper KO (rete/timeout)", { error });
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing };
   } finally {
     clearTimeout(timer);
   }
@@ -313,6 +355,9 @@ async function probeNominatim(): Promise<ServiceHealth> {
   const snap = await getNominatimHealthSnapshot();
   const token = process.env.NOMINATIM_TOKEN;
   const tokenMissing = snap.configured && (!token || token.trim() === "");
+  if (!snap.ok && snap.configured) {
+    console.error("[thinkcentre-probe] nominatim KO", { error: snap.error ?? "nessun dettaglio" });
+  }
   return {
     key: "nominatim",
     label: "Nominatim",
@@ -320,12 +365,12 @@ async function probeNominatim(): Promise<ServiceHealth> {
     ok: snap.ok,
     latencyMs: snap.latencyMs,
     url: snap.configured ? snap.url : null,
-    error: snap.error != null ? sanitizeError(snap.error) : undefined,
+    error: snap.error,
     tokenMissing,
   };
 }
 
-router.get("/thinkcentre-health", async (_req: Request, res: Response) => {
+router.get("/thinkcentre-health", async (_req: Request, res: ExpressResponse) => {
   try {
     const services = await Promise.all([
       probeGraphHopper(),

@@ -141,6 +141,10 @@ export interface NominatimHealthSnapshot {
   error?: string;
 }
 
+function sanitizeNominatimError(msg: string): string {
+  return msg.replace(/https?:\/\/[^\s"'`)]+/gi, (m) => maskUrl(m)).slice(0, 400);
+}
+
 /**
  * Probe leggero verso il server Nominatim (endpoint /status).
  * Usato dal pannello admin mappe per mostrare latenza e stato del geocoder.
@@ -157,16 +161,24 @@ export async function getNominatimHealthSnapshot(): Promise<NominatimHealthSnaps
       signal: controller.signal,
     });
     const latencyMs = Date.now() - t0;
-    if (!res.ok) {
-      let body = "";
-      try { body = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
-      const error = body ? `HTTP ${res.status} · ${body}` : `HTTP ${res.status}`;
-      return { configured: isSelfHosted, url: maskedUrl, latencyMs, ok: false, error };
+    if (res.ok) {
+      return { configured: isSelfHosted, url: maskedUrl, latencyMs, ok: true };
     }
-    return { configured: isSelfHosted, url: maskedUrl, latencyMs, ok: true };
+    let bodySnippet = "";
+    try {
+      const text = await Promise.race([
+        res.text(),
+        new Promise<string>((_, reject) => setTimeout(() => reject(new Error("body-timeout")), 2_000)),
+      ]);
+      bodySnippet = text.trim().slice(0, 400);
+    } catch { /* ignore */ }
+    const error = bodySnippet
+      ? sanitizeNominatimError(`HTTP ${res.status} — ${bodySnippet}`)
+      : `HTTP ${res.status}`;
+    return { configured: isSelfHosted, url: maskedUrl, latencyMs, ok: false, error };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { configured: isSelfHosted, url: maskedUrl, latencyMs: null, ok: false, error: msg };
+    return { configured: isSelfHosted, url: maskedUrl, latencyMs: null, ok: false, error: sanitizeNominatimError(msg) };
   } finally {
     clearTimeout(timer);
   }

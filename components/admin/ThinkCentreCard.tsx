@@ -77,7 +77,7 @@ function serviceStatusLabel(s: ServiceHealth): string {
 export function ThinkCentreCard() {
   const [collapsed, setCollapsed] = useState(true);
 
-  const { data, isLoading, error } = useQuery<ThinkCentreHealth>({
+  const { data, isLoading, error, refetch } = useQuery<ThinkCentreHealth>({
     queryKey: ["/api/admin/thinkcentre-health"],
     queryFn: async ({ signal }) => {
       const res = await fetch(new URL("/api/admin/thinkcentre-health", getApiUrl()).toString(), {
@@ -141,7 +141,7 @@ export function ThinkCentreCard() {
                 />
                 <View style={styles.rowText}>
                   <Text style={styles.rowLabel}>{s.label}</Text>
-                  <Text style={styles.rowStatus} numberOfLines={s.configured && !s.ok ? undefined : 1}>
+                  <Text style={styles.rowStatus}>
                     {serviceStatusLabel(s)}
                     {s.configured && s.url ? ` · ${s.url}` : ""}
                   </Text>
@@ -168,6 +168,17 @@ export function ThinkCentreCard() {
               </View>
             );
           })}
+          {data && data.configuredCount > 0 && data.onlineCount < data.configuredCount && (
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => { void refetch(); }}
+              activeOpacity={0.7}
+              testID="thinkcentre-retry-btn"
+            >
+              <Ionicons name="refresh-outline" size={13} color="#60a5fa" />
+              <Text style={styles.retryText}>Riprova ora</Text>
+            </TouchableOpacity>
+          )}
           {data && data.configuredCount > 0 && (
             <View style={styles.note}>
               <Ionicons name="information-circle-outline" size={14} color={Colors.textSecondary} />
@@ -313,5 +324,23 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 10,
     color: Colors.textSecondary,
+  },
+  retryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    alignSelf: "flex-start",
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    backgroundColor: "rgba(96, 165, 250, 0.1)",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(96, 165, 250, 0.25)",
+    marginTop: 2,
+  },
+  retryText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: "#60a5fa",
   },
 });
