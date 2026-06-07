@@ -241,6 +241,8 @@ async function probeOllama(): Promise<ServiceHealth> {
   const r = await httpProbe(`${base}/api/tags`, headers);
   const error = r.error === "HTTP 401"
     ? "Token non valido (HTTP 401)"
+    : r.error === "HTTP 403"
+    ? "Accesso negato (HTTP 403) — verifica configurazione nginx"
     : r.error;
   return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing };
 }
