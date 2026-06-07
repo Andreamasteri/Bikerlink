@@ -42,3 +42,4 @@ LOCKED server/routes/planned-routes/extras.ts 450
 LOCKED server/routes/planned-routes/sharing.ts 450
 LOCKED server/routes/planned-routes/waypoints.ts 550
 LEGACY server/index.ts 625
+LEGACY server/push-notifications.ts 625
