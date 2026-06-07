@@ -27,6 +27,12 @@ import {
 import { getInfo as getValhallaInfo } from "../../../routing/valhalla-client";
 import { getActiveRouter } from "../../../routing/router-selector";
 import { getRoutingCounters } from "../../../routing/routing-metrics";
+import {
+  getFunctionEngineConfig,
+  setFunctionEngineConfig,
+  resolveRoutingEngine,
+} from "../../../routing/function-engine-config";
+import { ROUTING_FUNCTIONS } from "@shared/routing-functions";
 import type { RouteRequest } from "../../../routing/graphhopper-adapter";
 import { SELF_HOSTED_TILES_URL, isTilesSelfHosted } from "../../../../lib/map-tiles";
 
@@ -52,15 +58,14 @@ function maskUrl(url: string): string {
  * engine (GraphHopper self-hosted, Cloud fallback, Valhalla, tiles) e contatori.
  */
 router.get("/status", async (_req: Request, res: Response) => {
-  const [killSwitch, ghInfo, valhallaInfo, engineSetting, rolloutSetting] = await Promise.all([
+  const [killSwitch, ghInfo, valhallaInfo, activeEngine, rolloutSetting] = await Promise.all([
     getRoutingKillSwitchState(),
     getServerInfo().catch((): GHServerInfo => ({ status: "error" })),
     getValhallaInfo().catch((): GHServerInfo => ({ status: "error" })),
-    storage.getAppSetting("maps_routing_engine"),
+    resolveRoutingEngine(),
     storage.getAppSetting("maps_rollout"),
   ]);
 
-  const activeEngine = (engineSetting?.value ?? "graphhopper") as RoutingEngineId;
   const rollout = (rolloutSetting?.value ?? "disabled") as MapsRollout;
   const snap = getRoutingHealthSnapshot();
   const counters = getRoutingCounters();
@@ -198,6 +203,40 @@ router.post("/test", async (req: Request, res: Response) => {
       latencyMs,
       error: msg.slice(0, 300),
     });
+  }
+});
+
+/**
+ * GET /function-engines — registro funzioni + engine ammessi + config corrente.
+ * Alimenta la schermata admin "Assegnazione funzioni per engine" (#3193).
+ */
+router.get("/function-engines", async (_req: Request, res: Response) => {
+  const config = await getFunctionEngineConfig();
+  return res.json({ functions: ROUTING_FUNCTIONS, config });
+});
+
+/**
+ * PUT /function-engines — aggiorna (parzialmente) la config per-funzione.
+ * Body: { config: { routing?, map_matching?, isochrone?, matrix? } } oppure la
+ * mappa direttamente. Valida engine↔funzione; 400 sul primo valore non valido.
+ */
+router.put("/function-engines", async (req: Request, res: Response) => {
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const partial = body.config ?? body;
+  if (!partial || typeof partial !== "object" || Array.isArray(partial)) {
+    return res.status(400).json({ ok: false, message: "Payload non valido: atteso un oggetto config." });
+  }
+  const known = new Set(ROUTING_FUNCTIONS.map((f) => f.id as string));
+  const unknownKeys = Object.keys(partial).filter((k) => !known.has(k));
+  if (unknownKeys.length > 0) {
+    return res.status(400).json({ ok: false, message: `Funzioni sconosciute: ${unknownKeys.join(", ")}.` });
+  }
+  try {
+    const config = await setFunctionEngineConfig(partial as Record<string, unknown>);
+    return res.json({ ok: true, config });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return res.status(400).json({ ok: false, message: msg });
   }
 });
 

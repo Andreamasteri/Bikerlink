@@ -410,14 +410,15 @@ router.post("/calculate", async (req: Request, res: Response) => {
     const basePriority = [...geo.priority, ...avoidRules];
 
     const { storage: _st } = await import("../../storage");
-    const [rolloutSetting, engineSetting, routeUser] = await Promise.all([
+    const { resolveRoutingEngine } = await import("../../routing/function-engine-config");
+    const [rolloutSetting, routingEngine, routeUser] = await Promise.all([
       _st.getAppSetting("maps_rollout"),
-      _st.getAppSetting("maps_routing_engine"),
+      resolveRoutingEngine(),
       _st.getUser(userId),
     ]);
     const routerOpts = {
       rollout: (rolloutSetting?.value ?? "disabled") as import("@shared/maps-config").MapsRollout,
-      engine: (engineSetting?.value ?? "graphhopper") as import("@shared/maps-config").RoutingEngineId,
+      engine: routingEngine,
       isMapTester: routeUser?.mapTester ?? false,
     };
 

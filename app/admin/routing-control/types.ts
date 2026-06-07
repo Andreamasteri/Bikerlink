@@ -83,6 +83,23 @@ export interface ValhallaBenchResult {
   results: ValhallaBenchRow[];
 }
 
+// ─── Assegnazione funzioni per engine (#3193) ────────────────────────────────
+
+export type RoutingFunctionId = "routing" | "map_matching" | "isochrone" | "matrix";
+
+export interface RoutingFunctionDef {
+  id: RoutingFunctionId;
+  label: string;
+  description: string;
+  supportedEngines: string[];
+  defaultEngine: string;
+}
+
+export interface FunctionEnginesResponse {
+  functions: RoutingFunctionDef[];
+  config: Record<RoutingFunctionId, string>;
+}
+
 export interface RoutingTestResult {
   ok: boolean;
   engine: string;
