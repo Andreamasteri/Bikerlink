@@ -1,9 +1,9 @@
 # BikerLink — Self-Host Stack (PC di casa)
 
 Setup completo per ospitare in casa tutti i servizi self-hostabili di BikerLink:
-**PostgreSQL + PostGIS, Redis, GraphHopper (profilo moto curvy), Valhalla, pgAdmin**.
-Lo stack scarica i dati OpenStreetMap (Europa completa + Ecuador), li unisce in un
-unico file e genera un `.env.local` precompilato con tutti gli URL locali.
+**PostgreSQL + PostGIS, Redis, 7 istanze GraphHopper (una per gruppo-area), Valhalla, pgAdmin**.
+Lo stack scarica i dati OpenStreetMap per ciascun gruppo di nazioni, costruisce i grafi
+per area e genera un `.env.local` precompilato con tutti gli URL locali.
 
 > **Cosa NON è incluso (resta cloud):** servizi AI (Anthropic, OpenAI, Gemini),
 > Mapbox tiles, TomTom, Last.fm, Expo Push. Non sono self-hostabili senza GPU/licenze
@@ -29,25 +29,27 @@ il repository Docker corretto (`download.docker.com/linux/ubuntu` o `.../debian`
 | Risorsa | Minimo | Raccomandato |
 |---------|--------|--------------|
 | RAM     | 32 GB  | 32 GB+       |
-| Disco   | 150 GB SSD | 250 GB SSD (NVMe) |
+| Disco   | 150 GB SSD | 300 GB SSD (NVMe) |
 | CPU     | 4 core | 8 core       |
-| Rete    | — | connessione veloce per i ~30 GB di download |
+| Rete    | — | connessione veloce per il download dei .pbf per area |
 
-Lo spazio serve per: download OSM (~35 GB) + merge (~35 GB) + grafo GraphHopper
-(~25 GB) + tile Valhalla (~25 GB) + DB/varie.
+Lo spazio serve per: .pbf nazionali (~15 GB per i 4 gruppi core) + .pbf per-gruppo
+(~8 GB) + grafi GraphHopper (~6-25 GB per gruppo, ~50 GB totale 4 core) +
+tile Valhalla (~25 GB) + DB/varie.
 
 ## Stima tempi (prima esecuzione)
 
 | Fase | Durata indicativa |
 |------|-------------------|
 | `apt` + install Docker | 5–10 min |
-| Download OSM (Europa + Ecuador) | ~2 h (dipende dalla banda) |
-| Merge PBF con osmium | 10–20 min |
-| Build grafo GraphHopper | ~45 min |
+| Download .pbf nazionali (4 gruppi core) | 30–90 min (dipende dalla banda) |
+| Merge PBF per gruppo (osmium) | 5–15 min per gruppo |
+| Build grafo GraphHopper per gruppo | 20–60 min per gruppo (RAM-dipendente) |
 | Build tile Valhalla | ~3 h |
 
-> GraphHopper e Valhalla buildano **in parallelo** dopo `docker compose up -d`.
-> Postgres, Redis e pgAdmin sono pronti in meno di un minuto.
+> I grafi vengono buildati **in sequenza** (uno alla volta) da `setup.sh` prima
+> di avviare i container. Postgres, Redis e pgAdmin partono in meno di un minuto.
+> Le istanze GraphHopper-area avviano velocemente una volta che il grafo è pronto.
 
 ---
 
@@ -61,57 +63,91 @@ sudo apt update && sudo apt upgrade -y
 cd infra/self-host
 
 # 3. Rendi eseguibili gli script
-chmod +x setup.sh download-osm.sh update-osm.sh
+chmod +x setup.sh download-regions.sh build-regions.sh update-osm.sh
 
-# 4. Lancia il setup completo (installa Docker, scarica OSM, avvia tutto)
+# 4. Lancia il setup completo (installa Docker, scarica OSM per area, builda grafi, avvia tutto)
 ./setup.sh
 ```
 
 `setup.sh` fa tutto in sequenza:
-1. Installa i prerequisiti via `apt` (Docker Engine + plugin compose, `osmium-tool`, `wget`).
-2. Verifica >100 GB liberi.
+1. Installa i prerequisiti via `apt` (Docker Engine + plugin compose, `osmium-tool`, `python3-pyosmium`, `wget`).
+2. Verifica >150 GB liberi.
 3. Genera `.env` con password casuali e `.env.local` (con `DATABASE_URL` già pronto).
-4. Chiede conferma e scarica i dati OSM (`download-osm.sh`).
-5. `docker compose up -d` e attende l'health di ogni servizio.
-6. Stampa il riepilogo finale con URL e credenziali.
+4. Chiede conferma e scarica i dati OSM per i gruppi core (`download-regions.sh`).
+5. Builda i grafi GraphHopper per i gruppi core (`build-regions.sh`).
+6. `docker compose up -d` (postgres, redis, valhalla, pgadmin) + avvia le istanze GraphHopper-area core; attende l'health di ogni servizio.
+7. Stampa il riepilogo finale con URL e credenziali.
 
 ### Solo download dati (senza avviare nulla)
 
-Se vuoi scaricare in anticipo tutti i file dati che ti servono:
+Se vuoi scaricare in anticipo i file dati per area:
 
 ```bash
-./download-osm.sh
+./download-regions.sh                      # tutti e 7 i gruppi
+./download-regions.sh grecia balcani       # solo alcuni gruppi
 ```
 
-Scarica Europa + Ecuador, verifica i checksum MD5 e genera
-`data/europe-ecuador-merged.osm.pbf`. È idempotente e riprende i download interrotti.
+Scarica i singoli `.pbf` nazionali da Geofabrik (cache condivisa in `data/countries/`),
+li unisce per gruppo con `osmium` e produce `data/<codice>.osm.pbf`. È idempotente,
+verifica i checksum MD5 e riprende i download interrotti.
 
 ---
 
 ## Servizi e porte
 
+### Servizi base (sempre attivi)
+
 | Servizio | URL locale | Health/Status |
 |----------|-----------|---------------|
 | PostgreSQL + PostGIS | `localhost:5432` | `pg_isready` |
 | Redis | `redis://localhost:6379` | `redis-cli ping` |
-| GraphHopper | `http://localhost:8989` | `GET /health` |
 | Valhalla | `http://localhost:8002` | `GET /status` |
 | pgAdmin 4 | `http://localhost:5050` | UI web |
 
 Le credenziali di Postgres e pgAdmin sono generate da `setup.sh` e salvate in `.env`
 (stampate anche nel riepilogo finale).
 
+### GraphHopper — istanze multi-area (profilo `areas`)
+
+| Codice | Porta interna | Health | Default |
+|--------|---------------|--------|---------|
+| `grecia` | `127.0.0.1:8990` | `GET /health` | ON |
+| `balcani` | `127.0.0.1:8991` | `GET /health` | ON |
+| `est` | `127.0.0.1:8992` | `GET /health` | OFF |
+| `iberia` | `127.0.0.1:8993` | `GET /health` | ON |
+| `arco-alpino` | `127.0.0.1:8994` | `GET /health` | ON |
+| `germania-centro` | `127.0.0.1:8995` | `GET /health` | OFF |
+| `francia-benelux` | `127.0.0.1:8996` | `GET /health` | OFF |
+
+> ⚠ Le porte sono bindate su `127.0.0.1`: **non accessibili da internet**.
+> L'accesso pubblico passa SOLO dal reverse proxy nginx
+> (`expose/nginx-bikerlink.conf`, location `/areas/<codice>/`).
+>
+> I servizi `graphhopper-*` sono sotto il profilo `areas` e **non partono**
+> con un semplice `docker compose up -d`. Si gestiscono per nome:
+> ```bash
+> docker compose up -d graphhopper-grecia   # accendi
+> docker compose stop  graphhopper-grecia   # spegni
+> ```
+
 ## Variabili d'ambiente per l'app
 
 `setup.sh` genera `.env.local` dal template `.env.local.template`, con già pronti:
 
 ```
-GRAPHHOPPER_URL=http://localhost:8989
+GRAPHHOPPER_URL=<INSERIRE>   # URL base del reverse proxy nginx (es. https://gh.<dominio>)
 VALHALLA_URL=http://localhost:8002
 REDIS_URL=redis://localhost:6379
 DATABASE_URL=postgresql://<user>:<password>@localhost:5432/bikerlink
 ROUTING_DISABLED=0
 ```
+
+**`GRAPHHOPPER_URL`** deve puntare alla **base del reverse proxy** che espone le 7
+istanze su `/areas/<codice>/`. Il server app costruisce l'URL per-area aggiungendo
+il path dell'area (es. `https://gh.bikerlink.app/areas/arco-alpino`).
+
+Per il deploy cloud su Replit imposta `GRAPHHOPPER_URL` nei Secrets di Replit
+con l'URL pubblico del tunnel (Cloudflare Tunnel o Nginx+TLS — vedi `expose/`).
 
 Le variabili cloud (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MAPBOX_ACCESS_TOKEN`,
 `TOMTOM_API_KEY`, `LASTFM_API_KEY`, ...) restano `<INSERIRE>`: vanno compilate a mano.
@@ -121,12 +157,16 @@ Le variabili cloud (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `MAPBOX_ACCESS_TOKEN`
 ## Aggiornare i dati OSM (senza ripartire da zero)
 
 ```bash
-./update-osm.sh
+./update-osm.sh                          # aggiorna tutti i gruppi attivi
+./update-osm.sh grecia balcani           # aggiorna solo alcuni gruppi
 ```
 
-Usa `pyosmium-up-to-date` per scaricare **solo i diff** OSM (non i 30 GB completi),
-ricostruisce il grafo GraphHopper in una cartella separata e fa lo swap a caldo
-(no downtime percepibile), poi rilancia il rebuild dei tile Valhalla in background.
+Usa `pyosmium-up-to-date` per applicare **solo i diff** OSM ai singoli file
+nazionali in `data/countries/` (nessun ri-download GB), ri-genera i merge per
+gruppo con `download-regions.sh`, ricostruisce i grafi per gruppo con
+`build-regions.sh` e riavvia le istanze in esecuzione **una alla volta**
+(le altre restano attive durante il rebuild). Poi rilancia il rebuild dei tile
+Valhalla se il container è in esecuzione.
 
 Schedulazione mensile via cron (1° del mese, 03:00 Europe/Rome):
 
@@ -157,8 +197,8 @@ modalità build (`force_rebuild=True`), mostra i log in tempo reale e attende ch
 `force_rebuild=False` e riavvia in modalità serve, poi stampa version + data tile.
 Se `/status` non torna online dopo il riavvio, lo script esce con errore.
 
-> Se il PBF unificato `data/europe-ecuador-merged.osm.pbf` manca, lo script lancia
-> automaticamente `./download-osm.sh` (download Europa + Ecuador + merge, ~2h).
+> Se nessun file `.osm.pbf` è presente in `./data/`, lo script chiede se vuoi
+> scaricarne uno con `./download-regions.sh` (uno o più gruppi-area).
 
 ### 2. Imposta il Secret `VALHALLA_URL`
 
@@ -331,33 +371,44 @@ Override al volo senza editare i file: `GRAPHHOPPER_IMAGE=<ref> ./build-regions.
 
 **Come verifico che i servizi siano attivi?**
 ```bash
-docker compose ps
-curl http://localhost:8989/health
-curl http://localhost:8002/status
+docker compose ps                          # servizi base
+docker compose ps --all                    # tutti (incluse istanze area)
+curl http://127.0.0.1:8994/health          # arco-alpino
+curl http://127.0.0.1:8990/health          # grecia
+curl http://localhost:8002/status          # valhalla
 ```
 
 **Dove vedo i log di un container?**
 ```bash
-docker compose logs -f graphhopper   # o: postgres / redis / valhalla / pgadmin
+docker compose logs -f graphhopper-arco-alpino   # o: grecia / balcani / iberia / ...
+docker compose logs -f valhalla
+docker compose logs -f postgres
 ```
 
-**Il build di GraphHopper o Valhalla fallisce — cosa faccio?**
-- Controlla i log: `docker compose logs graphhopper` (spesso è memoria insufficiente).
-- GraphHopper: riduci lo heap in `.env` (`GRAPHHOPPER_JAVA_OPTS=-Xmx12g -Xms4g`) e
-  rilancia `docker compose up -d --force-recreate graphhopper`.
-- Per forzare un rebuild pulito del grafo, rimuovi il volume:
-  `docker compose down && docker volume rm bikerlink-selfhost_ghgraph && docker compose up -d`.
-- Verifica che `data/europe-ecuador-merged.osm.pbf` esista e non sia corrotto
-  (rilancia `./download-osm.sh`, che ri-verifica i checksum).
+**Il build di GraphHopper per un'area fallisce — cosa faccio?**
+- Controlla l'output di `build-regions.sh`: spesso è memoria insufficiente.
+- Forza un rebuild pulito del grafo (rimuovi la cartella, poi ribuildi):
+  ```bash
+  sudo rm -rf graphs/arco-alpino          # serve sudo: le cartelle sono create da Docker
+  ./build-regions.sh arco-alpino
+  docker compose up -d graphhopper-arco-alpino
+  ```
+- Riduci l'heap via variabile d'ambiente se la RAM è limitata:
+  ```bash
+  BUILD_JAVA_OPTS="-Xmx12g -Xms4g -XX:+UseParallelGC" ./build-regions.sh arco-alpino
+  ```
+- Verifica che `data/arco-alpino.osm.pbf` esista e non sia corrotto:
+  rilancia `./download-regions.sh arco-alpino`, che ri-verifica i checksum.
 
-**Il download si è interrotto.** Rilancia `./download-osm.sh`: `wget -c` riprende da
-dove era e i checksum vengono ri-verificati.
+**Il download si è interrotto.** Rilancia `./download-regions.sh <codice>`:
+`wget -c` riprende da dove era e i checksum vengono ri-verificati.
 
 **Voglio fermare/riavviare tutto.**
 ```bash
-docker compose down        # ferma (i dati restano nei volumi)
-docker compose up -d        # riavvia
-docker compose down -v      # ATTENZIONE: cancella anche i volumi (dati persi)
+docker compose down               # ferma i servizi base (i dati restano nei volumi)
+docker compose up -d              # riavvia i servizi base
+docker compose up -d graphhopper-arco-alpino   # riavvia una singola area
+docker compose down -v            # ATTENZIONE: cancella anche i volumi (dati persi)
 ```
 
 **Posso eseguire `docker` senza sudo?** `setup.sh` aggiunge il tuo utente al gruppo
@@ -365,10 +416,10 @@ docker compose down -v      # ATTENZIONE: cancella anche i volumi (dati persi)
 
 ---
 
-## Setup parziale (GraphHopper già installato)
+## Setup parziale (solo servizi base)
 
-Se GraphHopper (porta 8989) e Ollama sono già attivi sul server e vuoi aggiungere
-solo i servizi rimanenti (**PostgreSQL, Redis, Valhalla, pgAdmin**), usa lo script
+Se alcune istanze `graphhopper-*` e Ollama sono già attivi sul server e vuoi aggiungere
+solo i servizi base (**PostgreSQL, Redis, Valhalla, pgAdmin**), usa lo script
 dedicato invece del `setup.sh` completo:
 
 ```bash
@@ -381,51 +432,36 @@ chmod +x setup-missing.sh
 
 | Aspetto | `setup.sh` | `setup-missing.sh` |
 |---------|------------|--------------------|
-| Servizi avviati | tutti e 5 | postgres, redis, valhalla, pgadmin |
-| GraphHopper | avviato | **saltato** (già attivo) |
-| Ollama | non gestito | **saltato** (già attivo) |
-| Verifica spazio disco | ✓ (>100 GB richiesti) | ✗ (non effettuata) |
-| Download dati OSM | ✓ (interattivo) | ✓ (prompt opzionale se PBF assente) |
+| Servizi base avviati | postgres, redis, valhalla, pgadmin | postgres, redis, valhalla, pgadmin |
+| Download dati OSM (GH) | ✓ (interattivo, via download-regions.sh) | ✓ (skip se PBF già presenti, prompt altrimenti) |
+| Build grafi GraphHopper | ✓ (build-regions.sh per gruppi core) | ✓ (skip se grafi già presenti) |
+| Istanze graphhopper-* | avviate (gruppi core) + health check | avviate (gruppi core) + health check |
+| Verifica spazio disco | ✓ (>150 GB richiesti) | ✗ (non effettuata) |
 | Generazione `.env` | ✓ | ✓ (stessa logica, non sovrascrive) |
 | Generazione `.env.local` | ✓ | ✓ (non sovrascrive se già presente) |
 
-### Dati OSM per Valhalla
-
-Se il file PBF non è presente in `./data/`, lo script lo rileva e chiede se vuoi
-scaricarlo subito:
-
-```
-  → Nessun file PBF trovato in ./data/
-  → Il download scarica Europa + Ecuador (~35 GB) e richiede circa 2 ore.
-  Vuoi scaricare i dati OSM ora? [s/N]
-```
-
-- **Rispondi `s`**: `download-osm.sh` viene eseguito in sequenza (download + verifica MD5
-  + merge osmium), poi Valhalla viene avviato con `--force-recreate` per triggerare il
-  build dei tile.
-- **Rispondi `N` / invio**: lo script salta il download e avvia ugualmente tutti i
-  servizi. Valhalla partirà vuoto e non calcolerà percorsi finché non riceverà i dati.
-
-> **Nota:** ogni volta che il file PBF è presente in `./data/`, lo script avvia Valhalla
-> con `--force-recreate`. Questo garantisce che il container costruisca i tile anche se
-> era già in esecuzione da prima del download. I tile già costruiti (nel volume Docker)
-> vengono preservati: se sono aggiornati, Valhalla li rileva e non riesegue il build.
-
-Puoi scaricare i dati in un secondo momento e poi rilanciare lo script:
+Flag opzionali di `setup-missing.sh`:
 
 ```bash
-# Download dei dati OSM (Europa + Ecuador, ~35 GB, idempotente)
-./download-osm.sh
+./setup-missing.sh --groups "grecia arco-alpino"   # solo determinati gruppi GH
+./setup-missing.sh --skip-gh                       # salta download/build/avvio GH
+./setup-missing.sh --gen-secrets                   # genera SESSION_SECRET e OSM_UPDATE_SECRET
+```
 
-# Rilancia setup-missing.sh: rileverà il PBF e riavvierà Valhalla con --force-recreate
-./setup-missing.sh
+### Dati OSM per Valhalla
+
+Se nessun `.osm.pbf` è presente in `./data/`, lo script chiede se vuoi scaricare
+i gruppi core. Valhalla usa qualsiasi PBF disponibile in `./data/`.
+
+Puoi scaricare i dati in un secondo momento:
+
+```bash
+./download-regions.sh arco-alpino grecia balcani iberia   # gruppi core
+./setup-missing.sh   # rilancia: rileverà i PBF e riavvierà Valhalla con --force-recreate
 
 # Oppure, se i servizi sono già tutti in piedi, riavvia solo Valhalla manualmente:
 docker compose up -d --force-recreate valhalla
 ```
-
-In modalità non-interattiva (`NONINTERACTIVE=1`), il download viene saltato
-automaticamente e viene stampato solo un avviso.
 
 ### Secret locali
 
@@ -442,12 +478,11 @@ automaticamente `SESSION_SECRET` e `OSM_UPDATE_SECRET` nel `.env.local`:
 
 | File | Scopo |
 |------|-------|
-| `setup.sh` | Setup end-to-end (prerequisiti, download, avvio, health check). |
-| `setup-missing.sh` | Setup parziale: installa solo postgres, redis, valhalla, pgadmin (GraphHopper già attivo). |
-| `download-osm.sh` | Scarica Europa + Ecuador, verifica MD5, merge in un unico PBF. |
-| `download-regions.sh` | Routing aree: scarica i `.pbf` nazionali e li unisce per gruppo (`data/<codice>.osm.pbf`). |
-| `build-regions.sh` | Routing aree: builda i grafi GraphHopper per gruppo (import RAM_STORE, immagine pinnata). |
-| `update-osm.sh` | Aggiornamento incrementale dati OSM (diff) + rebuild a caldo (incl. tile Valhalla). |
+| `setup.sh` | Setup end-to-end (prerequisiti, download aree, build grafi, avvio, health check). |
+| `setup-missing.sh` | Setup parziale: installa solo postgres, redis, valhalla, pgadmin (istanze graphhopper-* gestite separatamente). |
+| `download-regions.sh` | Scarica i `.pbf` nazionali e li unisce per gruppo-area (`data/<codice>.osm.pbf`). |
+| `build-regions.sh` | Builda i grafi GraphHopper per gruppo-area (import RAM_STORE, immagine pinnata). |
+| `update-osm.sh` | Aggiornamento incrementale OSM (diff per-paese) + rebuild grafi per area + restart istanze + tile Valhalla. |
 | `build-valhalla-tiles.sh` | Builda/ricostruisce i tile Valhalla dal PBF, segue i log, verifica `/status`. |
 | `docker-compose.yml` | Servizi base (postgres, redis, valhalla, pgadmin) + 7 istanze GraphHopper-area (profilo `areas`). |
 | `graphhopper/config.yml` | Config GraphHopper 12 condivisa (4 profili moto/auto, MMAP in serving). |

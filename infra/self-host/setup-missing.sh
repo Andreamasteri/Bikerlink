@@ -1,25 +1,34 @@
 #!/usr/bin/env bash
 # =============================================================================
 # BikerLink — setup-missing.sh
-# Installa i servizi mancanti su un server che ha già GraphHopper (porta 8989)
-# e Ollama attivi. Avvia solo: postgres, redis, valhalla, pgadmin.
+# Installa i servizi mancanti su un server che ha già Ollama attivo (e
+# opzionalmente alcune istanze graphhopper-* già buildabili). Avvia:
+#   - postgres, redis, valhalla, pgadmin (servizi base)
+#   - istanze graphhopper-* per i gruppi selezionati (default: core)
 #
 # Cosa fa:
 #   1. Verifica OS Ubuntu/Debian.
-#   2. Installa i prerequisiti via apt (Docker + plugin compose) se assenti.
+#   2. Installa i prerequisiti via apt (Docker + plugin compose, osmium-tool,
+#      python3-pyosmium) se assenti.
 #   3. Genera .env con password casuali (non sovrascrive se esiste già).
 #   4. Genera .env.local dal template con DATABASE_URL precompilato.
-#   5. docker compose up -d postgres redis valhalla pgadmin  (GraphHopper escluso).
-#   6. Attende l'health check di ciascun servizio.
-#   7. Stampa il riepilogo finale (URL, porte, credenziali).
+#   5. Verifica/scarica i PBF per i gruppi richiesti (download-regions.sh).
+#   6. Builda i grafi GraphHopper per i gruppi richiesti (build-regions.sh).
+#   7. docker compose up -d postgres redis valhalla pgadmin
+#      + avvia le istanze graphhopper-<codice> per i gruppi core.
+#   8. Attende l'health check di ciascun servizio.
+#   9. Stampa il riepilogo finale (URL, porte, credenziali).
 #
 # Uso:
 #   chmod +x setup-missing.sh && ./setup-missing.sh
 #   ./setup-missing.sh --gen-secrets   # genera anche i secret locali in .env.local
+#   ./setup-missing.sh --groups "grecia arco-alpino"  # solo alcuni gruppi GH
+#   ./setup-missing.sh --skip-gh       # salta tutto il flusso GraphHopper
 #
 # Variabili d'ambiente utili (CI / scripting non-interattivo):
 #   GEN_SECRETS=1      genera i secret locali mancanti senza prompt
-#   NONINTERACTIVE=1   disabilita i prompt
+#   NONINTERACTIVE=1   disabilita i prompt (usa i default)
+#   GROUPS_OVERRIDE="grecia balcani"   gruppi da buildare/avviare
 # =============================================================================
 set -euo pipefail
 
@@ -31,12 +40,21 @@ ENV_LOCAL_FILE="${SCRIPT_DIR}/.env.local"
 TEMPLATE_FILE="${SCRIPT_DIR}/.env.local.template"
 PLACEHOLDER_VALUE="<INSERIRE>"
 
+DATA_DIR="${DATA_DIR:-${SCRIPT_DIR}/data}"
+GRAPHS_DIR="${GRAPHS_DIR:-${SCRIPT_DIR}/graphs}"
+
+# Gruppi "core" (abilitati di default): sync con shared/routing-areas.ts.
+CORE_GROUPS="${GROUPS_OVERRIDE:-grecia balcani iberia arco-alpino}"
+ALL_GROUPS="grecia balcani est iberia arco-alpino germania-centro francia-benelux"
+SKIP_GH=0
+
 GEN_SECRETS="${GEN_SECRETS:-${GEN_TOKENS:-0}}"
 NONINTERACTIVE="${NONINTERACTIVE:-0}"
 
 # Timeout health check (secondi)
-TIMEOUT_FAST=120          # postgres, redis, pgadmin  (2 min)
-TIMEOUT_VALHALLA=$((3 * 60 * 60))  # 3h (build tile Europa se il PBF è presente)
+TIMEOUT_FAST=120                    # postgres, redis, pgadmin  (2 min)
+TIMEOUT_GH_SERVE=600               # 10 min (istanza GH che carica grafo pronto)
+TIMEOUT_VALHALLA=$((3 * 60 * 60))  # 3h (build tile Europa)
 
 # ── Libreria condivisa ────────────────────────────────────────────────────────
 # shellcheck source=lib/env-helpers.sh
@@ -50,27 +68,52 @@ info()    { echo -e "  \033[36m→\033[0m $*"; }
 section() { echo; bold "━━━ $* ━━━"; }
 
 # ── Argomenti CLI ─────────────────────────────────────────────────────────────
-for arg in "$@"; do
-  case "$arg" in
+args=("$@")
+for (( i=0; i<${#args[@]}; i++ )); do
+  case "${args[$i]}" in
     --gen-secrets|--gen-tokens) GEN_SECRETS=1 ;;
+    --skip-gh) SKIP_GH=1 ;;
+    --groups)
+      if (( i+1 < ${#args[@]} )); then
+        CORE_GROUPS="${args[$((i+1))]}"; i=$((i+1))
+      fi ;;
     -h|--help)
-      echo "Uso: $0 [--gen-secrets]"
+      echo "Uso: $0 [--gen-secrets] [--groups \"codice1 codice2 ...\"] [--skip-gh]"
       echo ""
       echo "  Installa i servizi mancanti (postgres, redis, valhalla, pgadmin)"
-      echo "  su un server che ha già GraphHopper e Ollama attivi."
+      echo "  e le istanze GraphHopper-area per i gruppi selezionati."
       echo ""
       echo "  --gen-secrets  Genera automaticamente i secret locali mancanti"
-      echo "                 (SESSION_SECRET, OSM_UPDATE_SECRET) con 'openssl rand -base64 32'"
-      echo "                 e li scrive nel .env.local. Equivalente a GEN_SECRETS=1."
+      echo "                 (SESSION_SECRET, OSM_UPDATE_SECRET)."
+      echo "  --groups       Gruppi GraphHopper da buildare/avviare"
+      echo "                 (default: grecia balcani iberia arco-alpino)."
+      echo "  --skip-gh      Salta completamente il flusso GraphHopper-area"
+      echo "                 (download, build, avvio istanze)."
       exit 0 ;;
-    *) die "Argomento sconosciuto: $arg (usa --help)" ;;
+    *) die "Argomento sconosciuto: ${args[$i]} (usa --help)" ;;
   esac
 done
 
+read -r -a CORE_GROUPS_ARR <<< "$CORE_GROUPS"
+
 [[ "$(id -u)" -eq 0 ]] && SUDO="" || SUDO="sudo"
 
+# Mappa codice → porta interna (sync con shared/routing-areas.ts).
+area_port() {
+  case "$1" in
+    grecia)          echo 8990 ;;
+    balcani)         echo 8991 ;;
+    est)             echo 8992 ;;
+    iberia)          echo 8993 ;;
+    arco-alpino)     echo 8994 ;;
+    germania-centro) echo 8995 ;;
+    francia-benelux) echo 8996 ;;
+    *)               echo 0 ;;
+  esac
+}
+
 # =============================================================================
-section "1/6 — Verifica sistema operativo"
+section "1/9 — Verifica sistema operativo"
 # =============================================================================
 if [[ -r /etc/os-release ]]; then
   # shellcheck disable=SC1091
@@ -84,13 +127,13 @@ else
 fi
 
 # =============================================================================
-section "2/6 — Prerequisiti (apt)"
+section "2/9 — Prerequisiti (apt)"
 # =============================================================================
 install_base_packages() {
   info "Aggiorno l'indice dei pacchetti..."
   $SUDO apt-get update -y
-  info "Installo wget, curl, ca-certificates, gnupg, osmium-tool..."
-  $SUDO apt-get install -y wget curl ca-certificates gnupg osmium-tool coreutils
+  info "Installo wget, curl, ca-certificates, gnupg, osmium-tool, python3-pyosmium..."
+  $SUDO apt-get install -y wget curl ca-certificates gnupg osmium-tool coreutils python3-pyosmium
 }
 
 install_docker() {
@@ -101,7 +144,6 @@ install_docker() {
   info "Installo Docker Engine + plugin compose dal repo ufficiale Docker..."
   $SUDO install -m 0755 -d /etc/apt/keyrings
 
-  # Rileva la distro (ubuntu o debian) per usare l'URL corretto del repo Docker.
   local distro codename os_id
   os_id="$(. /etc/os-release 2>/dev/null && echo "${ID:-ubuntu}")"
   case "$os_id" in
@@ -148,7 +190,6 @@ https://download.docker.com/linux/${distro} ${codename} stable" \
 install_base_packages
 install_docker
 
-# Wrapper: usa sudo per docker se l'utente non è ancora nel gruppo docker
 if docker info >/dev/null 2>&1; then
   DOCKER="docker"
 else
@@ -156,7 +197,7 @@ else
 fi
 
 # =============================================================================
-section "3/6 — Configurazione .env"
+section "3/9 — Configurazione .env"
 # =============================================================================
 gen_secret()     { openssl rand -hex 24 2>/dev/null || head -c 36 /dev/urandom | base64 | tr -dc 'a-zA-Z0-9' | head -c 36; }
 gen_b64_secret() {
@@ -164,35 +205,26 @@ gen_b64_secret() {
   openssl rand -base64 32
 }
 
-# Legge il valore di una chiave da un file .env (ultima occorrenza, trim quote).
 read_env_value() {
   local key="$1" file="$2" line val
   [[ -r "$file" ]] || return 1
   line="$(grep -E "^[[:space:]]*${key}=" "$file" | tail -n1 || true)"
   [[ -n "$line" ]] || return 1
-  val="${line#*=}"
-  val="${val%\"}"; val="${val#\"}"
-  val="${val%\'}"; val="${val#\'}"
+  val="${line#*=}"; val="${val%\"}"; val="${val#\"}"; val="${val%\'}"; val="${val#\'}"
   printf '%s' "$val"
 }
 
-# Escape per sed (sostituzione sicura su separatore '#').
 sed_escape() { printf '%s' "$1" | sed -e 's/[\#&]/\\&/g'; }
 
-# Inserisce/aggiorna una chiave nel file .env.local (crea il file se assente).
 upsert_env_value() {
   local key="$1" value="$2" file="$3" tmp esc_val
-  if [[ ! -e "$file" ]]; then
-    mkdir -p "$(dirname "$file")"
-    : > "$file"
-  fi
+  if [[ ! -e "$file" ]]; then mkdir -p "$(dirname "$file")"; : > "$file"; fi
   [[ -w "$file" ]] || die "Impossibile scrivere su $file (permessi?)."
   esc_val="$(sed_escape "$value")"
   if grep -qE "^[[:space:]]*${key}=" "$file"; then
     tmp="$(mktemp)"
     sed -E "s#^[[:space:]]*${key}=.*#${key}=${esc_val}#" "$file" > "$tmp"
-    cat "$tmp" > "$file"
-    rm -f "$tmp"
+    cat "$tmp" > "$file"; rm -f "$tmp"
   else
     printf '%s=%s\n' "$key" "$value" >> "$file"
   fi
@@ -217,9 +249,6 @@ else
   POSTGRES_DB="bikerlink"
   PGADMIN_EMAIL="admin@bikerlink.local"
   PGADMIN_PASSWORD="$(gen_secret)"
-  # GraphHopper è già attivo: usiamo un placeholder per GRAPHHOPPER_JAVA_OPTS
-  # in modo che docker-compose.yml non fallisca se viene riletto interamente.
-  GRAPHHOPPER_JAVA_OPTS="-Xmx16g -Xms4g -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
 
   cat > "$ENV_FILE" <<EOF
 # Generato automaticamente da setup-missing.sh il $(date '+%Y-%m-%d %H:%M:%S')
@@ -229,13 +258,11 @@ POSTGRES_PASSWORD="${POSTGRES_PASSWORD}"
 POSTGRES_DB="${POSTGRES_DB}"
 PGADMIN_EMAIL="${PGADMIN_EMAIL}"
 PGADMIN_PASSWORD="${PGADMIN_PASSWORD}"
-GRAPHHOPPER_JAVA_OPTS="${GRAPHHOPPER_JAVA_OPTS}"
 EOF
   chmod 600 "$ENV_FILE"
   ok "Generato .env con password casuali sicure."
 fi
 
-# Genera .env.local per l'app BikerLink a partire dal template.
 if [[ -f "$TEMPLATE_FILE" ]]; then
   if [[ -f "$ENV_LOCAL_FILE" ]]; then
     warn ".env.local già presente — non sovrascrivo."
@@ -250,7 +277,6 @@ else
   warn ".env.local.template non trovato — salto la generazione di .env.local"
 fi
 
-# Genera i secret puramente locali (SESSION_SECRET, OSM_UPDATE_SECRET) se assenti.
 if [[ -f "$ENV_LOCAL_FILE" ]]; then
   for secret_key in SESSION_SECRET OSM_UPDATE_SECRET; do
     cur_val="$(read_env_value "$secret_key" "$ENV_LOCAL_FILE" 2>/dev/null || true)"
@@ -268,74 +294,116 @@ if [[ -f "$ENV_LOCAL_FILE" ]]; then
 fi
 
 # =============================================================================
-section "4/6 — Verifica dati Valhalla (PBF)"
+section "4/9 — Download dati OSM per gruppi-area GraphHopper"
 # =============================================================================
-DATA_DIR="${DATA_DIR:-${SCRIPT_DIR}/data}"
 mkdir -p "$DATA_DIR"
 
-PBF_FILE="${DATA_DIR}/europe-ecuador-merged.osm.pbf"
-VALHALLA_FORCE_RECREATE=0
-
-if [[ -f "$PBF_FILE" ]]; then
-  ok "PBF trovato: ${PBF_FILE}"
-  info "Valhalla builderà i tile all'avvio (può richiedere fino a 3h per l'Europa)."
+if [[ "$SKIP_GH" == "1" ]]; then
+  info "Flusso GraphHopper saltato (--skip-gh)."
 else
-  warn "Nessun file PBF trovato in ${DATA_DIR}/"
-  warn "Senza dati OSM Valhalla si avvierà vuoto e non potrà calcolare percorsi."
+  DOWNLOAD_SCRIPT="${SCRIPT_DIR}/download-regions.sh"
+  [[ -f "$DOWNLOAD_SCRIPT" ]] || die "download-regions.sh non trovato in ${SCRIPT_DIR}/"
+  chmod +x "$DOWNLOAD_SCRIPT"
 
-  _do_download=0
-  if [[ "$NONINTERACTIVE" == "1" ]]; then
-    warn "Modalità non-interattiva: skip download automatico."
-    warn "Esegui './download-osm.sh' manualmente e poi rilancia questo script."
+  info "Gruppi GraphHopper richiesti: ${CORE_GROUPS}"
+
+  all_pbfs_present=true
+  for grp in "${CORE_GROUPS_ARR[@]}"; do
+    [[ -f "${DATA_DIR}/${grp}.osm.pbf" ]] || { all_pbfs_present=false; break; }
+  done
+
+  if [[ "$all_pbfs_present" == "true" ]]; then
+    ok "PBF per i gruppi richiesti già presenti in ${DATA_DIR}/ — salto il download."
   else
-    echo ""
-    info "Il download scarica Europa + Ecuador (~35 GB) e richiede circa 2 ore."
-    read -r -p "  Vuoi scaricare i dati OSM ora? [s/N] " _dl_reply
-    [[ "${_dl_reply,,}" == "s" || "${_dl_reply,,}" == "y" ]] && _do_download=1
-  fi
-
-  if [[ "$_do_download" == "1" ]]; then
-    DOWNLOAD_SCRIPT="${SCRIPT_DIR}/download-osm.sh"
-    [[ -f "$DOWNLOAD_SCRIPT" ]] || die "download-osm.sh non trovato in ${SCRIPT_DIR}/"
-    chmod +x "$DOWNLOAD_SCRIPT"
-    info "Avvio download-osm.sh (puoi interrompere con Ctrl-C e riprendere dopo)..."
-    "$DOWNLOAD_SCRIPT"
-    if [[ -f "$PBF_FILE" ]]; then
-      ok "PBF pronto: ${PBF_FILE}"
-      VALHALLA_FORCE_RECREATE=1
+    warn "Alcuni PBF mancanti — avvio download-regions.sh per i gruppi: ${CORE_GROUPS}"
+    if [[ "$NONINTERACTIVE" == "1" ]]; then
+      info "Modalità non-interattiva: procedo con il download."
+      DATA_DIR="$DATA_DIR" "$DOWNLOAD_SCRIPT" "${CORE_GROUPS_ARR[@]}"
     else
-      warn "download-osm.sh terminato ma il file PBF non risulta presente — controlla gli errori sopra."
+      echo ""
+      info "Il download scarica i .pbf nazionali per i gruppi: ${CORE_GROUPS}"
+      read -r -p "  Procedo con il download? [s/N] " _dl_reply
+      if [[ "${_dl_reply,,}" == "s" || "${_dl_reply,,}" == "y" ]]; then
+        DATA_DIR="$DATA_DIR" "$DOWNLOAD_SCRIPT" "${CORE_GROUPS_ARR[@]}"
+      else
+        warn "Download saltato. I grafi non verranno buildati per i gruppi senza PBF."
+        warn "Esegui manualmente: ./download-regions.sh ${CORE_GROUPS}"
+      fi
     fi
-  else
-    warn "Download saltato."
-    warn "Per scaricare i dati in seguito esegui: ./download-osm.sh"
-    warn "Poi rilancia questo script (o: docker compose up -d --force-recreate valhalla)."
   fi
 fi
 
 # =============================================================================
-section "5/6 — Avvio servizi mancanti (GraphHopper escluso)"
+section "5/9 — Build grafi GraphHopper per gruppi-area"
 # =============================================================================
-info "Avvio: postgres redis pgadmin  (GraphHopper già attivo — saltato)"
+if [[ "$SKIP_GH" == "1" ]]; then
+  info "Build GraphHopper saltato (--skip-gh)."
+else
+  BUILD_SCRIPT="${SCRIPT_DIR}/build-regions.sh"
+  [[ -f "$BUILD_SCRIPT" ]] || die "build-regions.sh non trovato in ${SCRIPT_DIR}/"
+  chmod +x "$BUILD_SCRIPT"
+
+  all_graphs_present=true
+  for grp in "${CORE_GROUPS_ARR[@]}"; do
+    [[ -d "${GRAPHS_DIR}/${grp}/edges" ]] || { all_graphs_present=false; break; }
+  done
+
+  if [[ "$all_graphs_present" == "true" ]]; then
+    ok "Grafi per i gruppi richiesti già presenti in ${GRAPHS_DIR}/ — salto il build."
+    info "Per forzare un rebuild: rimuovi le cartelle in ${GRAPHS_DIR}/ e rilancia."
+  else
+    # Builda solo i gruppi con PBF presente e grafo assente.
+    GROUPS_TO_BUILD=()
+    for grp in "${CORE_GROUPS_ARR[@]}"; do
+      if [[ ! -d "${GRAPHS_DIR}/${grp}/edges" ]]; then
+        if [[ -f "${DATA_DIR}/${grp}.osm.pbf" ]]; then
+          GROUPS_TO_BUILD+=("$grp")
+        else
+          warn "PBF assente per '${grp}' — grafo non buildato. Scarica con: ./download-regions.sh ${grp}"
+        fi
+      fi
+    done
+
+    if [[ ${#GROUPS_TO_BUILD[@]} -gt 0 ]]; then
+      info "Build grafi per: ${GROUPS_TO_BUILD[*]}"
+      warn "Il build può richiedere 20-60 min per area a seconda delle dimensioni e della RAM."
+      DATA_DIR="$DATA_DIR" GRAPHS_DIR="$GRAPHS_DIR" "$BUILD_SCRIPT" "${GROUPS_TO_BUILD[@]}"
+    else
+      info "Nessun gruppo da buildare (tutti già presenti o senza PBF)."
+    fi
+  fi
+fi
+
+# =============================================================================
+section "6/9 — Verifica dati Valhalla (PBF)"
+# =============================================================================
+PBF_SEARCH="$(find "$DATA_DIR" -maxdepth 1 -name "*.osm.pbf" 2>/dev/null | head -1 || true)"
+VALHALLA_FORCE_RECREATE=0
+
+if [[ -n "$PBF_SEARCH" ]]; then
+  ok "PBF trovato in ${DATA_DIR}/ ($(basename "$PBF_SEARCH"))"
+  info "Valhalla builderà i tile all'avvio (può richiedere fino a 3h)."
+  VALHALLA_FORCE_RECREATE=1
+else
+  warn "Nessun file .osm.pbf trovato in ${DATA_DIR}/"
+  warn "Valhalla si avvierà vuoto e non potrà calcolare percorsi."
+  info "Per aggiungere dati Valhalla: ./download-regions.sh arco-alpino  (o altri gruppi)"
+fi
+
+# =============================================================================
+section "7/9 — Avvio servizi base"
+# =============================================================================
+info "Avvio: postgres redis pgadmin valhalla..."
 $DOCKER compose --env-file "$ENV_FILE" up -d postgres redis pgadmin
 
 info "Avvio Valhalla..."
-if [[ -f "$PBF_FILE" ]]; then
-  # PBF presente: usa --force-recreate per garantire che Valhalla (anche se già
-  # in esecuzione senza dati) venga riavviato e costruisca i tile.
-  # I tile già costruiti (nel volume Docker) vengono preservati; il container
-  # li rileva all'avvio e non riesegue il build se sono aggiornati.
-  if [[ "$VALHALLA_FORCE_RECREATE" == "1" ]]; then
-    info "PBF appena scaricato — avvio Valhalla con --force-recreate per triggerare il build dei tile."
-  else
-    info "PBF presente — avvio Valhalla con --force-recreate per garantire il build dei tile."
-  fi
+if [[ "$VALHALLA_FORCE_RECREATE" == "1" ]]; then
+  info "PBF presente — avvio Valhalla con --force-recreate per triggerare il build dei tile."
   $DOCKER compose --env-file "$ENV_FILE" up -d --force-recreate valhalla
 else
   $DOCKER compose --env-file "$ENV_FILE" up -d valhalla
 fi
 
-# Attesa health check per servizio.
 wait_healthy() {
   local svc="$1" timeout="$2" elapsed=0 interval=10 status
   info "Attendo l'health di '${svc}' (timeout $((timeout / 60)) min)..."
@@ -362,18 +430,57 @@ wait_healthy() {
   return 1
 }
 
-wait_healthy postgres "$TIMEOUT_FAST"    || true
-wait_healthy redis    "$TIMEOUT_FAST"    || true
-wait_healthy pgadmin  "$TIMEOUT_FAST"    || true
+wait_healthy postgres "$TIMEOUT_FAST"     || true
+wait_healthy redis    "$TIMEOUT_FAST"     || true
+wait_healthy pgadmin  "$TIMEOUT_FAST"     || true
 wait_healthy valhalla "$TIMEOUT_VALHALLA" || true
 
-# Verifica che Valhalla abbia i tile pronti (non solo "vivo").
-# Dopo l'healthy-check il container è up ma i tile potrebbero essere ancora in build.
-# Esegue una route di prova Milano → Torino; stampa avviso ma NON esce in errore.
+# =============================================================================
+section "8/9 — Avvio istanze GraphHopper-area"
+# =============================================================================
+if [[ "$SKIP_GH" == "1" ]]; then
+  info "Avvio istanze GraphHopper saltato (--skip-gh)."
+else
+  info "Avvio istanze GraphHopper-area per i gruppi richiesti: ${CORE_GROUPS}..."
+  for grp in "${CORE_GROUPS_ARR[@]}"; do
+    svc="graphhopper-${grp}"
+    if [[ -d "${GRAPHS_DIR}/${grp}/edges" ]]; then
+      info "  Avvio ${svc}..."
+      $DOCKER compose --env-file "$ENV_FILE" up -d "$svc" || \
+        warn "  Avvio ${svc} fallito — verifica i log: $DOCKER compose logs ${svc}"
+    else
+      warn "  Grafo per '${grp}' non trovato in ${GRAPHS_DIR}/${grp}/ — ${svc} non avviato."
+      warn "  Esegui manualmente: ./build-regions.sh ${grp} && docker compose up -d ${svc}"
+    fi
+  done
+
+  # Attesa health per le istanze GraphHopper avviate.
+  wait_gh_healthy() {
+    local svc="$1" port="$2" timeout="$3" elapsed=0 interval=15
+    info "  Attendo /health di '${svc}' su :${port} (timeout $((timeout/60)) min)..."
+    while (( elapsed < timeout )); do
+      if curl -fsS --max-time 5 "http://127.0.0.1:${port}/health" >/dev/null 2>&1; then
+        ok "  '${svc}' healthy (dopo ${elapsed}s)"
+        return 0
+      fi
+      sleep "$interval"; elapsed=$((elapsed + interval))
+      if (( elapsed % 60 == 0 )); then info "  '${svc}' ancora in avvio (${elapsed}s)..."; fi
+    done
+    warn "  '${svc}' non healthy entro $((timeout/60)) min. Controlla: $DOCKER compose logs ${svc}"
+    return 1
+  }
+
+  for grp in "${CORE_GROUPS_ARR[@]}"; do
+    port="$(area_port "$grp")"
+    [[ "$port" -gt 0 ]] || continue
+    [[ -d "${GRAPHS_DIR}/${grp}/edges" ]] || continue
+    wait_gh_healthy "graphhopper-${grp}" "$port" "$TIMEOUT_GH_SERVE" || true
+  done
+fi
+
 wait_valhalla_tiles_ready() {
   local attempts=3 interval=15 attempt=0
   local valhalla_url="http://localhost:8002"
-  # Rotta di prova: Milano → Torino (entrambe in Europa, sempre nel PBF).
   local route_body='{"locations":[{"lon":9.1895,"lat":45.4654},{"lon":7.6869,"lat":45.0703}],"costing":"auto","directions_options":{"units":"kilometers"}}'
 
   info "Verifico che i tile Valhalla siano pronti (route di prova Milano → Torino)..."
@@ -382,11 +489,8 @@ wait_valhalla_tiles_ready() {
     attempt=$(( attempt + 1 ))
     local raw_response http_code body
     raw_response="$(curl -s -w '\n__HTTP_CODE__:%{http_code}' \
-      -X POST \
-      -H 'Content-Type: application/json' \
-      -d "$route_body" \
-      "${valhalla_url}/route" \
-      --max-time 30 2>/dev/null || true)"
+      -X POST -H 'Content-Type: application/json' -d "$route_body" \
+      "${valhalla_url}/route" --max-time 30 2>/dev/null || true)"
     http_code="$(printf '%s' "$raw_response" | grep '__HTTP_CODE__:' | sed 's/__HTTP_CODE__://' | tr -d '[:space:]')"
     body="$(printf '%s' "$raw_response" | grep -v '__HTTP_CODE__:' || true)"
 
@@ -396,22 +500,18 @@ wait_valhalla_tiles_ready() {
     fi
 
     if [[ -z "$http_code" ]]; then
-      warn "Tentativo ${attempt}/${attempts}: Valhalla non raggiungibile su ${valhalla_url}."
-    elif printf '%s' "$body" | grep -qiE "no data|no route|no path|tile.*not.*found|data.*not.*found|insufficient"; then
+      warn "Tentativo ${attempt}/${attempts}: Valhalla non raggiungibile."
+    elif printf '%s' "$body" | grep -qiE "no data|no route|tile.*not.*found|insufficient"; then
       warn "Tentativo ${attempt}/${attempts}: tile ancora in costruzione (HTTP ${http_code})."
     else
-      warn "Tentativo ${attempt}/${attempts}: risposta inattesa (HTTP ${http_code}): $(printf '%s' "$body" | head -c 200)"
+      warn "Tentativo ${attempt}/${attempts}: risposta inattesa (HTTP ${http_code})."
     fi
 
-    if (( attempt < attempts )); then
-      info "Riprovo tra ${interval}s..."
-      sleep "$interval"
-    fi
+    (( attempt < attempts )) && { info "Riprovo tra ${interval}s..."; sleep "$interval"; }
   done
 
-  warn "Tile Valhalla NON ancora pronti dopo ${attempts} tentativi."
-  warn "Il build dei tile può richiedere ore — Valhalla è vivo ma il calcolo percorsi non è ancora disponibile."
-  warn "Per monitorare il progresso: $DOCKER compose logs -f valhalla"
+  warn "Tile Valhalla NON ancora pronti — Valhalla è vivo ma il calcolo percorsi non è disponibile."
+  warn "Monitora con: $DOCKER compose logs -f valhalla"
   return 1
 }
 
@@ -419,7 +519,7 @@ VALHALLA_TILES_READY=0
 wait_valhalla_tiles_ready && VALHALLA_TILES_READY=1 || true
 
 # =============================================================================
-section "6/6 — Riepilogo"
+section "9/9 — Riepilogo"
 # =============================================================================
 check_env_quoted "$ENV_FILE"
 # shellcheck disable=SC1090
@@ -440,11 +540,11 @@ $(bold "BikerLink self-host — servizi avviati")
   Valhalla               http://localhost:8002   (status: /status)
 $(if [[ "$VALHALLA_TILES_READY" == "1" ]]; then
     echo "      ✓  Tile pronti — calcolo percorsi attivo."
-  elif [[ ! -f "$PBF_FILE" ]]; then
-    echo "      ⚠  Nessun PBF trovato — tile non costruiti. Esegui ./download-osm.sh"
+  elif [[ -z "$PBF_SEARCH" ]]; then
+    echo "      ⚠  Nessun PBF trovato — tile non costruiti."
+    echo "         Scarica con: ./download-regions.sh arco-alpino"
   else
-    echo "      ⚠  Tile ancora in costruzione (build in corso). Valhalla è vivo ma"
-    echo "         il calcolo percorsi non è ancora disponibile."
+    echo "      ⚠  Tile ancora in costruzione (build in corso)."
     echo "         Monitora con: docker compose logs -f valhalla"
   fi)
 
@@ -452,22 +552,37 @@ $(if [[ "$VALHALLA_TILES_READY" == "1" ]]; then
       email    : ${PGADMIN_EMAIL}
       password : ${PGADMIN_PASSWORD}
 
-  GraphHopper            http://localhost:8989   (già attivo — non toccato)
   Ollama                 già attivo — non toccato
+
+$(bold "GraphHopper — istanze multi-area (porte 8990-8996)")
+$(if [[ "$SKIP_GH" == "1" ]]; then
+  echo "  (saltate con --skip-gh)"
+else
+  for grp in "${CORE_GROUPS_ARR[@]}"; do
+    port="$(area_port "$grp")"
+    if [[ -d "${GRAPHS_DIR}/${grp}/edges" ]]; then
+      echo "  ${grp}  http://127.0.0.1:${port}  (health: /health)"
+    else
+      echo "  ${grp}  ⚠ grafo assente — avvia con: ./build-regions.sh ${grp} && docker compose up -d graphhopper-${grp}"
+    fi
+  done
+fi)
 
 $(bold "File generati")
   .env         credenziali dei container Docker
   .env.local   variabili per l'app BikerLink (DATABASE_URL già pronto)
                Variabili ${PLACEHOLDER_VALUE} da compilare manualmente:
+               GRAPHHOPPER_URL (URL base del proxy nginx), GRAPHHOPPER_TOKEN,
                ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY,
-               MAPBOX_ACCESS_TOKEN, TOMTOM_API_KEY, GRAPHHOPPER_TOKEN,
-               SESSION_SECRET, OSM_UPDATE_SECRET
+               MAPBOX_ACCESS_TOKEN, SESSION_SECRET, OSM_UPDATE_SECRET
 
 $(bold "Comandi utili")
-  docker compose ps                          stato dei servizi
-  docker compose logs -f valhalla            log Valhalla in tempo reale
-  docker compose down                        ferma i servizi
-  docker compose up -d postgres redis pgadmin   riavvia solo i 3 veloci
+  docker compose ps --all                        stato di tutti i container
+  docker compose logs -f graphhopper-arco-alpino log in tempo reale
+  docker compose stop  graphhopper-est           spegni un'area
+  docker compose up -d graphhopper-est           accendi un'area
+  docker compose down                            ferma i servizi
+  ./update-osm.sh                                aggiorna tutti i dati OSM
 
 EOF
-ok "Setup servizi mancanti completato."
+ok "Setup completato."
