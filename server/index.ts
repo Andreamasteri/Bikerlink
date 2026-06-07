@@ -489,8 +489,7 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
       ]);
       startThinkCentreMonitor();
       startValhallaMonitor();
-      // Verifica profilo motorcycle al boot (dopo 30s per non appesantire lo startup).
-      setTimeout(() => { void checkMotorcycleProfile(); }, 30_000);
+      setTimeout(() => { void checkMotorcycleProfile(); }, 30_000); // verifica profilo motorcycle al boot (30s delay)
     } catch (e) {
       console.warn("[INIT] Service monitors failed (non-fatal):", e);
     }
