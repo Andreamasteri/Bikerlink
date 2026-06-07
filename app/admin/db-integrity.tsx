@@ -25,6 +25,7 @@ interface Status {
   };
   schedule: { running: boolean; nightlyNext: string | null; weeklyNext: string | null; lastRunAt: string | null };
   snapshot: { hasRun: boolean; health: Health; bySeverity: Record<Severity, number>; criticalSamples: Array<{ checkId: string; checkName: string; count: number }> };
+  schemaManifest: null | { version: number; environment: string; capturedAt: string; tableCount: number; columnCount: number; hash: string };
   totalChecks: number;
   checks: Array<{ id: string; name: string; category: string; severity: Severity; cost: string; expensive: boolean; hasAutofix: boolean; autofixSafe: boolean }>;
 }
@@ -160,6 +161,31 @@ export default function DbIntegrityScreen() {
             <Text style={styles.cardMeta}>{data.totalChecks} check registrati totali</Text>
           </View>
 
+          <View style={[styles.card, { borderColor: Colors.border }]}>
+            <View style={styles.row}>
+              <MaterialCommunityIcons name="fingerprint" size={18} color={Colors.accent} />
+              <Text style={styles.cardTitle}>Schema fingerprint</Text>
+            </View>
+            {data.schemaManifest ? (
+              <>
+                <Text style={styles.cardMeta}>
+                  Ambiente {data.schemaManifest.environment} · {data.schemaManifest.tableCount} tabelle · {data.schemaManifest.columnCount} colonne
+                </Text>
+                <Text style={styles.hashText} selectable numberOfLines={2}>
+                  {data.schemaManifest.hash}
+                </Text>
+                <Text style={styles.cardMeta}>
+                  Aggiornato {new Date(data.schemaManifest.capturedAt).toLocaleString("it-IT")}
+                </Text>
+                <Text style={styles.cardMeta}>
+                  Confronta questo hash con quello di dev/prod: se combaciano, gli schemi sono allineati.
+                </Text>
+              </>
+            ) : (
+              <Text style={styles.cardMeta}>Manifest non ancora generato. Riavvia il backend o esegui un refresh.</Text>
+            )}
+          </View>
+
           <Text style={styles.sectionTitle}>Check registrati ({data.checks?.length ?? 0})</Text>
           {(() => {
             const order: Record<Severity, number> = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -261,6 +287,7 @@ const styles = StyleSheet.create({
   card: { borderWidth: 1, borderRadius: 12, padding: 14, marginBottom: 14, backgroundColor: Colors.surface },
   cardTitle: { color: Colors.text, fontFamily: "Inter_600SemiBold", fontSize: 16 },
   cardMeta: { color: Colors.textSecondary, fontSize: 12, marginTop: 4 },
+  hashText: { color: Colors.text, fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 6, backgroundColor: Colors.background, padding: 8, borderRadius: 6 },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   healthDot: { width: 12, height: 12, borderRadius: 6 },
   sevRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 },

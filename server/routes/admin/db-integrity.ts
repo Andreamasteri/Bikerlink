@@ -15,26 +15,50 @@ import { restoreFromQuarantine, purgeQuarantineRow } from "../../ai/db-integrity
 import { getDbIntegrityScheduleInfo } from "../../ai/db-integrity/scheduler";
 import { collectDbIntegrity } from "../../ai/db-integrity/collector";
 import { hashViolation } from "../../ai/db-integrity/framework";
+import {
+  loadPersistedManifest,
+  manifestSummary,
+  refreshSchemaManifest,
+} from "../../ai/db-integrity/schema-manifest";
 
 const router = Router();
 
 router.get("/db-integrity/status", async (_req, res) => {
-  const [summary, schedule, snapshot, checks] = await Promise.all([
+  const [summary, schedule, snapshot, checks, manifest] = await Promise.all([
     getLatestRunSummary(),
     Promise.resolve(getDbIntegrityScheduleInfo()),
     collectDbIntegrity(),
     loadAllChecks(),
+    loadPersistedManifest(),
   ]);
   return res.json({
     summary,
     schedule,
     snapshot,
+    schemaManifest: manifestSummary(manifest),
     totalChecks: checks.length,
     checks: checks.map((c) => ({
       id: c.id, name: c.name, category: c.category, severity: c.severity,
       cost: c.cost, expensive: !!c.expensive, hasAutofix: !!c.autofix, autofixSafe: !!c.autofix?.safe,
     })),
   });
+});
+
+// Task #3395 — Manifest/fingerprint completo dello schema (ispezione cross-ambiente).
+router.get("/db-integrity/schema-manifest", async (_req, res) => {
+  const manifest = await loadPersistedManifest();
+  if (!manifest) return sendError(res, 404, "Nessun manifest persistito. Esegui un refresh o riavvia il backend.");
+  return res.json({ manifest });
+});
+
+// Rigenera il manifest on-demand dal DB corrente e lo persiste.
+router.post("/db-integrity/schema-manifest/refresh", async (_req, res) => {
+  try {
+    const manifest = await refreshSchemaManifest();
+    return res.json({ summary: manifestSummary(manifest) });
+  } catch (err) {
+    return sendError(res, 500, (err as Error).message);
+  }
 });
 
 const runSchema = z.object({

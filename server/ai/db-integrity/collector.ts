@@ -2,7 +2,7 @@
 // Legge l'ultimo run e contribuisce al traffic light di sistema.
 import { db } from "../../db";
 import { dbIntegrityRuns, dbIntegrityViolations } from "@shared/db";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, ne } from "drizzle-orm";
 import type { Severity } from "./types";
 
 export interface DbIntegritySnapshot {
@@ -14,7 +14,10 @@ export interface DbIntegritySnapshot {
 }
 
 export async function collectDbIntegrity(): Promise<DbIntegritySnapshot> {
-  const [run] = await db.select().from(dbIntegrityRuns).orderBy(desc(dbIntegrityRuns.runAt)).limit(1);
+  // Esclude i run "boot" (scan parziale solo-schema) dal semaforo di salute.
+  const [run] = await db.select().from(dbIntegrityRuns)
+    .where(ne(dbIntegrityRuns.trigger, "boot"))
+    .orderBy(desc(dbIntegrityRuns.runAt)).limit(1);
   if (!run) return { hasRun: false, health: "green", bySeverity: { low: 0, medium: 0, high: 0, critical: 0 }, criticalSamples: [] };
   const vs = await db.select({
     severity: dbIntegrityViolations.severity,

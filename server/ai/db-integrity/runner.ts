@@ -6,7 +6,7 @@
 // Critical push: violazioni critical→push immediato via watchdog/alerts.
 import { db } from "../../db";
 import { dbIntegrityRuns, dbIntegrityViolations } from "@shared/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, ne, sql } from "drizzle-orm";
 import { loadAllChecks } from "./registry";
 import { executeCheck, hashViolation } from "./framework";
 import { runSafeAutofixes } from "./autofix";
@@ -16,7 +16,10 @@ import { emitDbViolation, emitDbAutofix } from "../coordinator/integrations/db-i
 const ADVISORY_LOCK_KEY = 0x4242_4242; // costante: solo lo scan db-integrity la usa.
 
 export interface RunOptions {
-  trigger?: "manual" | "cron" | "weekly" | "watchdog";
+  // "boot" = run post-migration al boot (solo check schema-registry). I run con
+  // trigger "boot" sono ESCLUSI da getLatestRunSummary/collector così non
+  // sovrascrivono il semaforo di salute basato sugli scan completi.
+  trigger?: "manual" | "cron" | "weekly" | "watchdog" | "boot";
   includeExpensive?: boolean;
   onlyCheckIds?: string[];
   dryRun?: boolean;
@@ -214,7 +217,10 @@ function healthFromSeverity(s: Record<Severity, number>): "green" | "yellow" | "
 }
 
 export async function getLatestRunSummary(): Promise<RunSummary | null> {
-  const [row] = await db.select().from(dbIntegrityRuns).orderBy(desc(dbIntegrityRuns.runAt)).limit(1);
+  // Esclude i run "boot" (scan parziale solo-schema) dal concetto di "ultimo run".
+  const [row] = await db.select().from(dbIntegrityRuns)
+    .where(ne(dbIntegrityRuns.trigger, "boot"))
+    .orderBy(desc(dbIntegrityRuns.runAt)).limit(1);
   if (!row) return null;
   const violations = await db
     .select({ severity: dbIntegrityViolations.severity, category: dbIntegrityViolations.category })
