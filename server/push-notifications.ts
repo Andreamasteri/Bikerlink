@@ -472,6 +472,41 @@ export async function sendWeeklyRecapPushNotifications(userIds: string[]): Promi
   }
 }
 
+export async function sendDrivingStyleChangePushNotification(
+  userId: string,
+  opts: { title: string; body: string },
+): Promise<number> {
+  try {
+    const filteredIds = await filterUserIdsByPreference([userId], "matches");
+    if (!filteredIds.length) return 0;
+    const [row] = await db
+      .select({ id: users.id, expoPushToken: users.expoPushToken })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!row?.expoPushToken || !isValidExpoPushToken(row.expoPushToken)) return 0;
+
+    const userIdByToken = new Map([[row.expoPushToken, row.id]]);
+    await sendExpoMessages(
+      [
+        {
+          to: row.expoPushToken,
+          title: opts.title,
+          body: opts.body,
+          sound: "default" as const,
+          data: { type: "driving_style_changed" },
+          channelId: "matches",
+        },
+      ],
+      userIdByToken,
+    );
+    return 1;
+  } catch (err) {
+    console.warn("[Push] sendDrivingStyleChangePushNotification error (non-fatal):", err);
+    return 0;
+  }
+}
+
 export async function sendOtaPendingApprovalPushToAdmins(version: string): Promise<void> {
   try {
     const adminRows = await db

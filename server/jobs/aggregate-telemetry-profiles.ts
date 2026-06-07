@@ -15,19 +15,56 @@
  * 05:00–11:59, sera 18:00–23:59.
  */
 
-import { sql } from "drizzle-orm";
+import { sql, inArray } from "drizzle-orm";
 import { db } from "../db";
-import { userTelemetryProfile } from "@shared/db";
+import { userTelemetryProfile, notifications } from "@shared/db";
 import type { InsertUserTelemetryProfile } from "@shared/db";
 import {
   generateTelemetryStyleEmbedding,
   MIN_SESSIONS_FOR_EMBED,
 } from "../ai/telemetry-style-embedder";
+import { sendDrivingStyleChangePushNotification } from "../push-notifications";
+import it from "../../lib/i18n/it";
 
 // Soglie bucket — esportate per riuso/test e per coerenza con la documentazione.
 export const SPEED_BUCKETS = { slow: 45, medium: 70, fast: 95 } as const; // km/h su p75
 export const LEAN_BUCKETS = { touring: 28, sport: 40 } as const; // gradi su avg lean
 export const DURATION_BUCKETS = { short: 30, medium: 90 } as const; // minuti
+
+const SPEED_LABELS: Record<string, string> = {
+  slow: "lento",
+  medium: "moderato",
+  fast: "veloce",
+  sport: "sportivo",
+};
+const LEAN_LABELS: Record<string, string> = {
+  touring: "touring",
+  sport: "sportivo",
+  aggressive: "aggressivo",
+};
+const DURATION_LABELS: Record<string, string> = {
+  short: "breve",
+  medium: "medio",
+  long: "lungo",
+};
+
+function describeBucketChange(
+  oldSpeed: string,
+  newSpeed: string,
+  oldLean: string,
+  newLean: string,
+  oldDuration: string,
+  newDuration: string,
+): string {
+  const parts: string[] = [];
+  if (oldSpeed !== newSpeed)
+    parts.push(`velocità: ${SPEED_LABELS[oldSpeed] ?? oldSpeed} → ${SPEED_LABELS[newSpeed] ?? newSpeed}`);
+  if (oldLean !== newLean)
+    parts.push(`piega: ${LEAN_LABELS[oldLean] ?? oldLean} → ${LEAN_LABELS[newLean] ?? newLean}`);
+  if (oldDuration !== newDuration)
+    parts.push(`durata: ${DURATION_LABELS[oldDuration] ?? oldDuration} → ${DURATION_LABELS[newDuration] ?? newDuration}`);
+  return parts.join(" · ");
+}
 
 function speedBucket(p75: number): string {
   if (p75 < SPEED_BUCKETS.slow) return "slow";
@@ -103,6 +140,30 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
     `);
     const rows = (rowsRes.rows ?? rowsRes) as AggRow[];
 
+    // Carica i profili esistenti in batch per rilevare i cambi di bucket senza N+1 query.
+    const existingUserIds = rows.map((r) => r.user_id);
+    const existingProfilesMap = new Map<string, { speedBucket: string; leanBucket: string; durationBucket: string }>();
+    if (existingUserIds.length > 0) {
+      const existing = await db
+        .select({
+          userId: userTelemetryProfile.userId,
+          speedBucket: userTelemetryProfile.speedBucket,
+          leanBucket: userTelemetryProfile.leanBucket,
+          durationBucket: userTelemetryProfile.durationBucket,
+        })
+        .from(userTelemetryProfile)
+        .where(inArray(userTelemetryProfile.userId, existingUserIds));
+      for (const p of existing) {
+        existingProfilesMap.set(p.userId, {
+          speedBucket: p.speedBucket,
+          leanBucket: p.leanBucket,
+          durationBucket: p.durationBucket,
+        });
+      }
+    }
+
+    let styleChangesNotified = 0;
+
     for (const r of rows) {
       const totalSessions = Number(r.total_sessions ?? 0);
       const avgSpeed = Number(r.avg_speed_kmh ?? 0);
@@ -156,6 +217,47 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
         .returning();
       profilesUpserted++;
 
+      // Rileva cambio di bucket rispetto al profilo precedente.
+      // Non notificare il primo inserimento (nessun old profile = prima aggregazione).
+      const oldProfile = existingProfilesMap.get(r.user_id);
+      const newSpeed = profile.speedBucket!;
+      const newLean = profile.leanBucket!;
+      const newDuration = profile.durationBucket!;
+      if (
+        oldProfile &&
+        (oldProfile.speedBucket !== newSpeed ||
+          oldProfile.leanBucket !== newLean ||
+          oldProfile.durationBucket !== newDuration)
+      ) {
+        const changeDesc = describeBucketChange(
+          oldProfile.speedBucket,
+          newSpeed,
+          oldProfile.leanBucket,
+          newLean,
+          oldProfile.durationBucket,
+          newDuration,
+        );
+        try {
+          await db.insert(notifications).values({
+            userId: r.user_id,
+            title: it["push.drivingStyleChanged.title"] ?? "Il tuo stile di guida è cambiato! 🏍️",
+            body: changeDesc,
+            notificationType: "driving_style_changed",
+          });
+        } catch (err) {
+          console.warn(`[TelemetryAggregation] notifica in-app fallita per ${r.user_id} (non fatale):`, err);
+        }
+        try {
+          const sent = await sendDrivingStyleChangePushNotification(r.user_id, {
+            title: it["push.drivingStyleChanged.title"] ?? "Il tuo stile di guida è cambiato! 🏍️",
+            body: changeDesc || (it["push.drivingStyleChanged.body"] ?? "Scopri come sei evoluto"),
+          });
+          styleChangesNotified += sent;
+        } catch (err) {
+          console.warn(`[TelemetryAggregation] push stile guida fallita per ${r.user_id} (non fatale):`, err);
+        }
+      }
+
       if (totalSessions >= MIN_SESSIONS_FOR_EMBED && upserted.length > 0) {
         try {
           const res = await generateTelemetryStyleEmbedding(upserted[0]);
@@ -170,7 +272,8 @@ export async function aggregateTelemetryProfiles(): Promise<number> {
     lastStats = { profilesUpserted, embeddingsGenerated, durationMs: elapsed };
     console.log(
       `[TelemetryAggregation] ${profilesUpserted} profili aggiornati, ` +
-        `${embeddingsGenerated} embedding generati in ${(elapsed / 1000).toFixed(1)}s`,
+        `${embeddingsGenerated} embedding generati, ` +
+        `${styleChangesNotified} notifiche stile guida in ${(elapsed / 1000).toFixed(1)}s`,
     );
     return profilesUpserted;
   } catch (err) {

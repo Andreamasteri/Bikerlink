@@ -1239,6 +1239,8 @@ const it: Record<string, string> = {
   "push.proposalMatch.body": "Una proposta compatibile è stata trovata per il tuo viaggio.",
   "push.zoneProposal.title": "C'è una proposta nella tua zona! 🏍️",
   "push.zoneProposal.body": "Apri BikerLink per scoprirla",
+  "push.drivingStyleChanged.title": "Il tuo stile di guida è cambiato! 🏍️",
+  "push.drivingStyleChanged.body": "Scopri come sei evoluto — registra nuove uscite per migliorare i match",
   "ready.privacy.title": "Privacy",
   "ready.privacy.visibleOnMap": "Sei visibile sulla mappa",
   "ready.privacy.hideFromMapLabel": "Non visibile sulla mappa",
