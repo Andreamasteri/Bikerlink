@@ -71,7 +71,10 @@ export function scoreRoute(result: RouteResult, aerialKm: number, style: RouteSt
   const detourNorm = clamp01((detourRatio - 1) / 1.5);
   // - velocità media: 30 km/h → 0, 110 km/h → 1 (proxy strade veloci)
   const speedNorm = clamp01((avgSpeedKmh - 30) / 80);
-  const hw = highwayFraction ?? 0;
+  // road_class assente (es. Valhalla che non espone i details) → valore NEUTRO
+  // (0.5), non best-case (0): altrimenti il termine anti-autostrada premierebbe
+  // ingiustamente l'engine senza dati nel confronto dual-compare.
+  const hw = highwayFraction ?? 0.5;
 
   const isFast = style === "fast" || style === "direct";
 
