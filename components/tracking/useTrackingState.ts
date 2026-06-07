@@ -394,8 +394,10 @@ export function useTrackingState() {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") { session.setLoading(false); Alert.alert(t("tracking.permReq"), t("tracking.permDenied")); return; }
       Location.requestBackgroundPermissionsAsync().catch(() => {});
-      const res = await apiRequest("POST", "/api/routes", { status: "active", isSprint: settings.is0100EnabledRef.current }) as unknown as { id: string };
+      const res = await apiRequest("POST", "/api/routes", { status: "active", isSprint: !!settings.is0100EnabledRef.current }) as unknown as { id: string };
+      if (!res?.id) throw new Error("Server did not return a valid route id");
       resetTrackingState(); refs.routeIdRef.current = res.id;
+      console.log("[handleStart] routeId set:", res.id);
       if (settings.countdownEnabled) {
         session.setPhase("countdown"); session.setCountdownValue(parseInt(settings.countdownSec || "10", 10)); session.setLoading(false);
         refs.countdownTickRef.current = setInterval(() => session.setCountdownValue(v => {

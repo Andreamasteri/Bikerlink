@@ -38,6 +38,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     const parsed = createRouteSchema.safeParse(req.body);
     if (!parsed.success) {
+      console.error("[POST /api/routes] validation failed:", parsed.error.issues);
       return sendError(res, 400, parsed.error.issues[0].message);
     }
     const { title, trackingFrequency, isSprint } = parsed.data;
