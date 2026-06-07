@@ -1,6 +1,14 @@
 // Health check periodico per tile servers + routing engines.
 // HEAD ping con timeout breve. Risultati ritornati come array a maps-collector.
+//
+// Task #3123 (Routing aree — C): oltre al monolite GraphHopper, quando il
+// routing ad aree è attivo si probano anche le singole istanze per-gruppo
+// abilitate (`${SELF_HOSTED_BASE_URL}/areas/<codice>`), con id `area-<codice>`.
 import { logger } from "../../lib/logger";
+import { SELF_HOSTED_BASE_URL, isSelfHosted } from "../../graphhopper-client";
+import { getRoutingAreaMode } from "../../routing/routing-area-mode";
+import { getAreaEnabledMap } from "../../routing/routing-area-state";
+import { ROUTING_AREAS, routingAreaUrl } from "@shared/routing-areas";
 
 const log = logger.child({ scope: "maps-watchdog", check: "health" });
 
@@ -65,6 +73,40 @@ function engineTargets(): Target[] {
     out.push({ kind: "engine", id: "tomtom", url: "https://api.tomtom.com/" });
   }
   return out;
+}
+
+/**
+ * Target per le istanze GraphHopper per-gruppo (routing ad aree).
+ * Solo quando il self-hosting è attivo, il master toggle non è "disabled" e il
+ * gruppo è abilitato (probare istanze spente sarebbe rumore inutile).
+ * id = `area-<codice>`, così maps-collector emette `health.engine.area-<codice>`.
+ */
+async function areaEngineTargets(): Promise<Target[]> {
+  if (!isSelfHosted || !SELF_HOSTED_BASE_URL) return [];
+  let mode: string;
+  try {
+    mode = await getRoutingAreaMode();
+  } catch {
+    return [];
+  }
+  if (mode === "disabled") return [];
+
+  let enabledMap: Record<string, boolean>;
+  try {
+    enabledMap = await getAreaEnabledMap();
+  } catch {
+    return [];
+  }
+
+  const headers: Record<string, string> = {};
+  if (process.env.GRAPHHOPPER_TOKEN) headers["X-GH-Token"] = process.env.GRAPHHOPPER_TOKEN;
+
+  return ROUTING_AREAS.filter((a) => enabledMap[a.codice]).map((a) => ({
+    kind: "engine" as const,
+    id: `area-${a.codice}`,
+    url: `${routingAreaUrl(a, SELF_HOSTED_BASE_URL)}/health`,
+    headers,
+  }));
 }
 
 async function pingOne(t: Target): Promise<HealthCheckResult> {
@@ -159,10 +201,12 @@ export async function runMapsHealthChecks(force = false): Promise<HealthCheckRes
   }
   const tiles = tileTargets();
   const engines = engineTargets();
+  const areaEngines = await areaEngineTargets();
+  const allEngines = [...engines, ...areaEngines];
 
   const tileResults = await Promise.all(tiles.map(pingOne));
-  const engineResults = await Promise.all(engines.map((t) =>
-    t.id === "graphhopper" ? pingGraphHopper(t) : pingOne(t),
+  const engineResults = await Promise.all(allEngines.map((t) =>
+    t.id === "graphhopper" || t.id.startsWith("area-") ? pingGraphHopper(t) : pingOne(t),
   ));
 
   const results = [...tileResults, ...engineResults];

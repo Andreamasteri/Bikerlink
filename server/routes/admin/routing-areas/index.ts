@@ -26,12 +26,36 @@ import {
   getRoutingArea,
   type RoutingAreaCode,
 } from "@shared/routing-areas";
+import { runMapsHealthChecks } from "../../../ai/watchdog/maps-health-checks";
 
 const router = Router();
 
 /** Cache breve della relay metriche ThinkCentre per non martellare il server di casa. */
 let areaMetricsCache: { at: number; data: unknown } | null = null;
 const AREA_METRICS_TTL_MS = 15_000;
+
+/**
+ * Esito sintetico delle probe di salute per-istanza (Task #3123 — C).
+ * Letto dai risultati cache-ati di runMapsHealthChecks (id `area-<codice>`):
+ * la UI lo unisce alla riga area per mostrare stato/latenza dell'ultima chiamata.
+ */
+type AreaHealth = { code: string; ok: boolean; latencyMs: number | null; error: string | null };
+
+async function areaHealthSummary(): Promise<AreaHealth[]> {
+  try {
+    const results = await runMapsHealthChecks();
+    return results
+      .filter((r) => r.id.startsWith("area-"))
+      .map((r) => ({
+        code: r.id.slice("area-".length),
+        ok: r.ok,
+        latencyMs: r.latencyMs,
+        error: r.error ?? null,
+      }));
+  } catch {
+    return [];
+  }
+}
 
 /**
  * GET / — master toggle (mode) + elenco gruppi con stato abilitato.
@@ -73,10 +97,13 @@ router.patch("/mode", async (req: Request, res: Response) => {
  */
 router.get("/metrics", async (_req: Request, res: Response) => {
   if (!isSelfHosted || !SELF_HOSTED_BASE_URL) {
-    return res.json({ available: false, reason: "not_self_hosted", areas: [] });
+    return res.json({ available: false, reason: "not_self_hosted", areas: [], health: [] });
   }
+  // Le probe di salute hanno la loro cache (5 min): le uniamo sempre fresche,
+  // anche quando la relay metriche ThinkCentre è servita dalla cache 15s.
+  const health = await areaHealthSummary();
   if (areaMetricsCache && Date.now() - areaMetricsCache.at < AREA_METRICS_TTL_MS) {
-    return res.json(areaMetricsCache.data);
+    return res.json({ ...(areaMetricsCache.data as Record<string, unknown>), health });
   }
   const token = process.env.GRAPHHOPPER_TOKEN ?? "";
   const controller = new AbortController();
@@ -88,12 +115,12 @@ router.get("/metrics", async (_req: Request, res: Response) => {
     });
     clearTimeout(timer);
     if (!upstream.ok) {
-      return res.status(502).json({ available: false, reason: `http_${upstream.status}`, areas: [] });
+      return res.status(502).json({ available: false, reason: `http_${upstream.status}`, areas: [], health });
     }
     const data = await upstream.json().catch(() => ({}));
     const payload = { available: true, ...(data as Record<string, unknown>) };
     areaMetricsCache = { at: Date.now(), data: payload };
-    return res.json(payload);
+    return res.json({ ...payload, health });
   } catch (err: unknown) {
     clearTimeout(timer);
     const msg = err instanceof Error ? err.message : String(err);
@@ -102,6 +129,7 @@ router.get("/metrics", async (_req: Request, res: Response) => {
       reason: "unreachable",
       error: msg.slice(0, 200),
       areas: [],
+      health,
     });
   }
 });

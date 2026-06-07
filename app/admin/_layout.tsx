@@ -72,6 +72,7 @@ export default function AdminLayout() {
         <Stack.Screen name="routing-hub" options={{ title: "Hub Routing" }} />
         <Stack.Screen name="routing-control" options={{ title: "Controllo Routing" }} />
         <Stack.Screen name="routing-health" options={{ title: "Routing Health" }} />
+        <Stack.Screen name="routing-areas" options={{ title: "Aree di routing" }} />
         <Stack.Screen name="device-stats" options={{ title: "Dispositivi Utenti" }} />
         <Stack.Screen name="tags" options={{ title: "Sistema Tag" }} />
         <Stack.Screen name="text-aliases" options={{ title: "Alias Testo" }} />

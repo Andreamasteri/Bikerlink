@@ -26,6 +26,7 @@ interface QuickLink {
 const QUICK_LINKS: QuickLink[] = [
   { key: "control", label: "Controllo", icon: "tune-variant", route: "/admin/routing-control", color: "#9C27B0" },
   { key: "health", label: "Health", icon: "heart-pulse", route: "/admin/routing-health", color: "#4CAF50" },
+  { key: "areas", label: "Aree di routing", icon: "map-marker-radius", route: "/admin/routing-areas", color: "#FF8A00" },
 ];
 
 export default function RoutingHubScreen() {
