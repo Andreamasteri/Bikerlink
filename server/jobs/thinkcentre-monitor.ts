@@ -23,7 +23,7 @@ import { db } from "../db";
 import { users } from "@shared/db";
 import { eq } from "drizzle-orm";
 import { getNominatimHealthSnapshot } from "../lib/nominatim-client";
-import { ACTIVE_PROFILE } from "../graphhopper-client";
+import { ACTIVE_PROFILE, fetchSelfHostedProfiles, isSelfHosted } from "../graphhopper-client";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const PROBE_INTERVAL_MS = 5 * 60 * 1000;   // ogni 5 min
@@ -75,6 +75,48 @@ function shouldNotify(eventKey: string): boolean {
   if (now - last < NOTIFY_COOLDOWN_MS) return false;
   lastNotifiedAt.set(eventKey, now);
   return true;
+}
+
+// ── Motorcycle profile check ──────────────────────────────────────────────────
+/**
+ * Verifica che il server GH self-hosted esponga il profilo "motorcycle".
+ * Se mancante: log warning + push admin (con throttle 10 min).
+ * Noop se GH non è self-hosted o se il server non è raggiungibile (tunnel giù).
+ */
+export async function checkMotorcycleProfile(): Promise<void> {
+  if (!isSelfHosted) return;
+  try {
+    const result = await fetchSelfHostedProfiles();
+    if (!result.reachable) {
+      // Server non raggiungibile — non è un errore di profilo, è già gestito
+      // dalla notifica "ThinkCentre offline".
+      return;
+    }
+    if (!result.profiles) {
+      console.warn("[thinkcentre-monitor] motorcycle check: /info non ha restituito profili (parse error)");
+      return;
+    }
+    if (!result.profiles.includes("motorcycle")) {
+      const profilesList = result.profiles.join(", ") || "(nessuno)";
+      console.warn(
+        `[thinkcentre-monitor] ⚠️ Profilo "motorcycle" MANCANTE dal server GH. Profili disponibili: ${profilesList}`,
+      );
+      if (shouldNotify("motorcycle_missing")) {
+        const n = await pushAdmins(
+          '⚠️ Profilo motorcycle mancante',
+          `Il server GraphHopper risponde ma non ha il profilo "motorcycle". Profili disponibili: ${profilesList}`,
+          { type: "gh_motorcycle_missing", profiles: result.profiles },
+        );
+        console.log(`[thinkcentre-monitor] notifica motorcycle_missing inviata a ${n} admin`);
+      }
+    } else {
+      console.log(
+        `[thinkcentre-monitor] motorcycle check OK — profilo presente (${result.profiles.length} profili totali)`,
+      );
+    }
+  } catch (err) {
+    console.warn("[thinkcentre-monitor] errore check profilo motorcycle (non-fatal):", err);
+  }
 }
 
 // ── Probe helpers ─────────────────────────────────────────────────────────────
@@ -223,6 +265,9 @@ export async function runThinkCentreProbe(): Promise<void> {
       );
       console.log(`[thinkcentre-monitor] notifica online inviata a ${n} admin`);
     }
+    // Verifica il profilo motorcycle dopo ogni recovery: potrebbe essere
+    // stato rimosso/riscritto durante il riavvio del ThinkCentre.
+    void checkMotorcycleProfile();
     return;
   }
 

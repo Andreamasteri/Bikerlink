@@ -483,12 +483,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
     // Monitors — push admin quando i servizi self-hosted o Valhalla vanno offline.
     try {
-      const [{ startThinkCentreMonitor }, { startValhallaMonitor }] = await Promise.all([
+      const [{ startThinkCentreMonitor, checkMotorcycleProfile }, { startValhallaMonitor }] = await Promise.all([
         import("./jobs/thinkcentre-monitor"),
         import("./jobs/valhalla-monitor"),
       ]);
       startThinkCentreMonitor();
       startValhallaMonitor();
+      // Verifica profilo motorcycle al boot (dopo 30s per non appesantire lo startup).
+      setTimeout(() => { void checkMotorcycleProfile(); }, 30_000);
     } catch (e) {
       console.warn("[INIT] Service monitors failed (non-fatal):", e);
     }
