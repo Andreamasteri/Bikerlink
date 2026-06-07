@@ -431,6 +431,7 @@ const it: Record<string, string> = {
   "match.blockUser": "Blocca Utente",
   "match.unblockUser": "Sblocca Utente",
   "match.userBlocked": "Utente bloccato",
+  "match.removeError": "Impossibile rimuovere il match. Riprova.",
   "match.blockUserConfirmTitle": "Blocca utente",
   "match.blockUserConfirmMsg": "Bloccare {nickname}? L'utente scomparirà dai match, dal profilo e dalla chat. Non potrete più interagire.",
   "match.bikerTabInfo": "Se rifiuti un match, il sistema lo ripropone al prossimo reset. Se blocchi un utente, non ti verrà ripresentato e non potrai interagirci.",

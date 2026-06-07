@@ -53,6 +53,22 @@ export class RouteAffinityMatchesStorage extends BikerMatchesStorage {
     return res.length > 0;
   }
 
+  async deleteRouteAffinityMatchByUser(id: string, userId: string): Promise<boolean> {
+    const res = await db
+      .delete(routeAffinityMatches)
+      .where(
+        and(
+          eq(routeAffinityMatches.id, id),
+          or(
+            eq(routeAffinityMatches.userAId, userId),
+            eq(routeAffinityMatches.userBId, userId),
+          ),
+        ),
+      )
+      .returning();
+    return res.length > 0;
+  }
+
   async deleteRouteAffinityMatchesBetween(userId1: string, userId2: string): Promise<number> {
     const res = await db
       .delete(routeAffinityMatches)

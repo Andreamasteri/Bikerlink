@@ -405,6 +405,7 @@ const en: Record<string, string> = {
   "match.blockUser": "Block User",
   "match.unblockUser": "Unblock User",
   "match.userBlocked": "User blocked",
+  "match.removeError": "Could not remove the match. Please try again.",
   "match.blockUserConfirmTitle": "Block user",
   "match.blockUserConfirmMsg": "Block {nickname}? They will disappear from matches, profile and chat. You will no longer be able to interact.",
   "match.bikerTabInfo": "If you reject a match, the system will re-propose it at the next reset. If you block a user, they won't be shown again and you won't be able to interact.",

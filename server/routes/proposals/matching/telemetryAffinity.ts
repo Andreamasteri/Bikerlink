@@ -130,10 +130,8 @@ router.delete("/telemetry-affinity-matches/:id", requireAuth, async (req: Reques
   try {
     const userId = req.session.userId as string;
     const matchId = req.params.id as string;
-    const match = await storage.getTelemetryAffinityMatch(matchId);
-    if (!match) return sendError(res, 404, "Match non trovato");
-    if (match.userAId !== userId && match.userBId !== userId) return sendError(res, 403, "Non autorizzato");
-    const ok = await storage.deleteTelemetryAffinityMatch(matchId);
+    const ok = await storage.deleteTelemetryAffinityMatchByUser(matchId, userId);
+    if (!ok) return sendError(res, 404, "Match non trovato o non autorizzato");
     return res.json({ ok });
   } catch (error) {
     console.error("Delete telemetry affinity match error:", error);

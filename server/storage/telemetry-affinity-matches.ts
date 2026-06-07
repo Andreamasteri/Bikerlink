@@ -69,6 +69,22 @@ export class TelemetryAffinityMatchesStorage extends RouteAffinityMatchesStorage
     return res.length > 0;
   }
 
+  async deleteTelemetryAffinityMatchByUser(id: string, userId: string): Promise<boolean> {
+    const res = await db
+      .delete(telemetryAffinityMatches)
+      .where(
+        and(
+          eq(telemetryAffinityMatches.id, id),
+          or(
+            eq(telemetryAffinityMatches.userAId, userId),
+            eq(telemetryAffinityMatches.userBId, userId),
+          ),
+        ),
+      )
+      .returning();
+    return res.length > 0;
+  }
+
   async deleteTelemetryAffinityMatchesBetween(userId1: string, userId2: string): Promise<number> {
     const res = await db
       .delete(telemetryAffinityMatches)

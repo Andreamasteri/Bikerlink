@@ -91,10 +91,8 @@ router.delete("/route-affinity-matches/:id", requireAuth, async (req: Request, r
   try {
     const userId = req.session.userId as string;
     const matchId = req.params.id as string;
-    const match = await storage.getRouteAffinityMatch(matchId);
-    if (!match) return sendError(res, 404, "Match non trovato");
-    if (match.userAId !== userId && match.userBId !== userId) return sendError(res, 403, "Non autorizzato");
-    const ok = await storage.deleteRouteAffinityMatch(matchId);
+    const ok = await storage.deleteRouteAffinityMatchByUser(matchId, userId);
+    if (!ok) return sendError(res, 404, "Match non trovato o non autorizzato");
     return res.json({ ok });
   } catch (error) {
     console.error("Delete route affinity match error:", error);

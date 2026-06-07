@@ -342,12 +342,14 @@ export interface IStorage {
   getRouteAffinityMatch(id: string): Promise<import("@shared/db").RouteAffinityMatch | undefined>;
   updateRouteAffinityMatch(id: string, data: Partial<import("@shared/db").InsertRouteAffinityMatch>): Promise<import("@shared/db").RouteAffinityMatch | undefined>;
   deleteRouteAffinityMatch(id: string): Promise<boolean>;
+  deleteRouteAffinityMatchByUser(id: string, userId: string): Promise<boolean>;
   deleteRouteAffinityMatchesBetween(userId1: string, userId2: string): Promise<number>;
   getUserTelemetryProfile(userId: string): Promise<import("@shared/db").UserTelemetryProfile | undefined>;
   getTelemetryAffinityMatchesForUser(userId: string): Promise<import("@shared/db").TelemetryAffinityMatch[]>;
   getTelemetryAffinityMatch(id: string): Promise<import("@shared/db").TelemetryAffinityMatch | undefined>;
   updateTelemetryAffinityMatch(id: string, data: Partial<import("@shared/db").InsertTelemetryAffinityMatch>): Promise<import("@shared/db").TelemetryAffinityMatch | undefined>;
   deleteTelemetryAffinityMatch(id: string): Promise<boolean>;
+  deleteTelemetryAffinityMatchByUser(id: string, userId: string): Promise<boolean>;
   deleteTelemetryAffinityMatchesBetween(userId1: string, userId2: string): Promise<number>;
   createPlannedRoute(data: InsertPlannedRoute): Promise<PlannedRoute>;
   getPlannedRoute(id: string): Promise<PlannedRoute | undefined>;

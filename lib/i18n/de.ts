@@ -359,6 +359,7 @@ const de: Record<string, string> = {
   "match.blockUser": "Nutzer blockieren",
   "match.unblockUser": "Blockierung aufheben",
   "match.userBlocked": "Nutzer blockiert",
+  "match.removeError": "Match konnte nicht entfernt werden. Bitte erneut versuchen.",
   "match.blockUserConfirmTitle": "Nutzer blockieren",
   "match.blockUserConfirmMsg": "{nickname} blockieren? Der Nutzer verschwindet aus Matches, Profil und Chat. Ihr könnt nicht mehr miteinander interagieren.",
   "match.bikerTabInfo": "Wenn du ein Match ablehnst, schlägt das System es beim nächsten Reset erneut vor. Wenn du einen Nutzer blockierst, wird er nicht mehr angezeigt.",

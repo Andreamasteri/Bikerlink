@@ -252,8 +252,31 @@ export default function MatchScreen() {
 
   const removeRouteAffinityMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("DELETE", `/api/proposals/route-affinity-matches/${matchId}`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
+      const previousRouteAffinity = queryClient.getQueryData(["/api/proposals/route-affinity-matches"]);
+      const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
+      queryClient.setQueryData(["/api/proposals/route-affinity-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousRouteAffinity, previousAccepted };
+    },
+    onError: (_err, _matchId, context: any) => {
+      if (context?.previousRouteAffinity !== undefined) {
+        queryClient.setQueryData(["/api/proposals/route-affinity-matches"], context.previousRouteAffinity);
+      }
+      if (context?.previousAccepted !== undefined) {
+        queryClient.setQueryData(["/api/proposals/matches/accepted"], context.previousAccepted);
+      }
+      Alert.alert(t("common.error"), t("match.removeError"));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/route-affinity-matches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
     },
   });
 
@@ -276,8 +299,31 @@ export default function MatchScreen() {
 
   const removeTelemetryAffinityMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("DELETE", `/api/proposals/telemetry-affinity-matches/${matchId}`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
+      const previousTelemetryAffinity = queryClient.getQueryData(["/api/proposals/telemetry-affinity-matches"]);
+      const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
+      queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousTelemetryAffinity, previousAccepted };
+    },
+    onError: (_err, _matchId, context: any) => {
+      if (context?.previousTelemetryAffinity !== undefined) {
+        queryClient.setQueryData(["/api/proposals/telemetry-affinity-matches"], context.previousTelemetryAffinity);
+      }
+      if (context?.previousAccepted !== undefined) {
+        queryClient.setQueryData(["/api/proposals/matches/accepted"], context.previousAccepted);
+      }
+      Alert.alert(t("common.error"), t("match.removeError"));
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/telemetry-affinity-matches"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
     },
   });
 
@@ -311,21 +357,90 @@ export default function MatchScreen() {
 
   const removeGarageMatchMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("DELETE", `/api/proposals/garage-matches/${matchId}`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/garage-matches"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
+      const previousGarage = queryClient.getQueryData(["/api/proposals/garage-matches"]);
+      const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
+      queryClient.setQueryData(["/api/proposals/garage-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousGarage, previousAccepted };
+    },
+    onError: (_err, _matchId, context: any) => {
+      if (context?.previousGarage !== undefined) {
+        queryClient.setQueryData(["/api/proposals/garage-matches"], context.previousGarage);
+      }
+      if (context?.previousAccepted !== undefined) {
+        queryClient.setQueryData(["/api/proposals/matches/accepted"], context.previousAccepted);
+      }
+      Alert.alert(t("common.error"), t("match.removeError"));
+    },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/garage-matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
     },
   });
 
   const removeBikerMatchMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("DELETE", `/api/proposals/biker-matches/${matchId}`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/biker-matches"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
+      const previousBiker = queryClient.getQueryData(["/api/proposals/biker-matches"]);
+      const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
+      queryClient.setQueryData(["/api/proposals/biker-matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousBiker, previousAccepted };
+    },
+    onError: (_err, _matchId, context: any) => {
+      if (context?.previousBiker !== undefined) {
+        queryClient.setQueryData(["/api/proposals/biker-matches"], context.previousBiker);
+      }
+      if (context?.previousAccepted !== undefined) {
+        queryClient.setQueryData(["/api/proposals/matches/accepted"], context.previousAccepted);
+      }
+      Alert.alert(t("common.error"), t("match.removeError"));
+    },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/biker-matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
     },
   });
 
   const removeProposalMatchMutation = useMutation({
     mutationFn: (matchId: string) => apiRequest("DELETE", `/api/proposals/matches/${matchId}`),
+    onMutate: async (matchId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches"] });
+      await queryClient.cancelQueries({ queryKey: ["/api/proposals/matches/accepted"] });
+      const previousProposal = queryClient.getQueryData(["/api/proposals/matches"]);
+      const previousAccepted = queryClient.getQueryData(["/api/proposals/matches/accepted"]);
+      queryClient.setQueryData(["/api/proposals/matches"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      queryClient.setQueryData(["/api/proposals/matches/accepted"], (old: any[]) =>
+        Array.isArray(old) ? old.filter((m: any) => m.id !== matchId) : old,
+      );
+      return { previousProposal, previousAccepted };
+    },
+    onError: (_err, _matchId, context: any) => {
+      if (context?.previousProposal !== undefined) {
+        queryClient.setQueryData(["/api/proposals/matches"], context.previousProposal);
+      }
+      if (context?.previousAccepted !== undefined) {
+        queryClient.setQueryData(["/api/proposals/matches/accepted"], context.previousAccepted);
+      }
+      Alert.alert(t("common.error"), t("match.removeError"));
+    },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches"] });
       queryClient.invalidateQueries({ queryKey: ["/api/proposals/matches/accepted"] });
     },
   });
