@@ -81,7 +81,7 @@ function engineTargets(): Target[] {
  * gruppo è abilitato (probare istanze spente sarebbe rumore inutile).
  * id = `area-<codice>`, così maps-collector emette `health.engine.area-<codice>`.
  */
-async function areaEngineTargets(): Promise<Target[]> {
+export async function areaEngineTargets(): Promise<Target[]> {
   if (!isSelfHosted || !SELF_HOSTED_BASE_URL) return [];
   let mode: string;
   try {

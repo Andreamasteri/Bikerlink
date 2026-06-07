@@ -41,7 +41,7 @@ const AREA_METRICS_TTL_MS = 15_000;
  */
 type AreaHealth = { code: string; ok: boolean; latencyMs: number | null; error: string | null };
 
-async function areaHealthSummary(): Promise<AreaHealth[]> {
+export async function areaHealthSummary(): Promise<AreaHealth[]> {
   try {
     const results = await runMapsHealthChecks();
     return results
