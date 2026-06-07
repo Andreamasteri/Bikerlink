@@ -145,9 +145,8 @@ export default function MatchScreen() {
     refetchOnMount: true,
   });
 
-  // Task #3393 — match per stile di guida (telemetria). Riusa il rendering
-  // route-affinity con label "Stile di guida simile".
-  const { data: telemetryAffinityMatches, refetch: telemetryAffinityRefetch } = useQuery<any[]>({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match data shape varies
+  const { data: telemetryAffinityMatches, isLoading: telemetryAffinityLoading, refetch: telemetryAffinityRefetch, isRefetching: telemetryAffinityRefetching } = useQuery<any[]>({
     queryKey: ["/api/proposals/telemetry-affinity-matches"],
     enabled: !!user,
     refetchInterval: 60000,
@@ -383,7 +382,8 @@ export default function MatchScreen() {
     else if (activeTab === "music") musicRefetch();
     else if (activeTab === "accepted") acceptedRefetch();
     else if (activeTab === "propProfile") propProfileRefetch();
-    else if (activeTab === "route") { routeAffinityRefetch(); telemetryAffinityRefetch(); }
+    else if (activeTab === "route") routeAffinityRefetch();
+    else if (activeTab === "telemetry") telemetryAffinityRefetch();
   }, [activeTab, proposalRefetch, garageRefetch, bikerRefetch, blockedRefetch, musicRefetch, acceptedRefetch, propProfileRefetch, routeAffinityRefetch, telemetryAffinityRefetch]);
 
   const handleUnblock = useCallback((blockedUserId: string) => {
@@ -401,9 +401,10 @@ export default function MatchScreen() {
     if (activeTab === "music") return musicMatches || [];
     if (activeTab === "propProfile") return propProfileMatches?.filter(m => m.status === "new") || [];
     if (activeTab === "route") {
-      const ra = (routeAffinityMatches?.filter(m => m.status === "new") || []).map(m => ({ ...m, _matchType: "routeAffinity" }));
-      const ta = (telemetryAffinityMatches?.filter(m => m.status === "new") || []).map(m => ({ ...m, _matchType: "telemetryAffinity" }));
-      return [...ra, ...ta];
+      return (routeAffinityMatches?.filter(m => m.status === "new") || []).map(m => ({ ...m, _matchType: "routeAffinity" }));
+    }
+    if (activeTab === "telemetry") {
+      return (telemetryAffinityMatches?.filter(m => m.status === "new") || []).map(m => ({ ...m, _matchType: "telemetryAffinity" }));
     }
     if (activeTab === "accepted") {
       const g = (garageMatches?.filter(m => m.status === "accepted") || []).map(m => ({ ...m, _matchType: "garage" }));
@@ -418,8 +419,8 @@ export default function MatchScreen() {
     return [];
   }, [activeTab, proposalMatches, garageMatches, bikerMatches, blockedUsers, musicMatches, acceptedMatches, propProfileMatches, routeAffinityMatches, telemetryAffinityMatches]);
 
-  const isLoading = proposalLoading || garageLoading || bikerLoading || blockedLoading || musicLoading || acceptedLoading || propProfileLoading || routeAffinityLoading;
-  const isRefetching = proposalRefetching || garageRefetching || bikerRefetching || blockedRefetching || musicRefetching || acceptedRefetching || propProfileRefetching || routeAffinityRefetching;
+  const isLoading = proposalLoading || garageLoading || bikerLoading || blockedLoading || musicLoading || acceptedLoading || propProfileLoading || routeAffinityLoading || telemetryAffinityLoading;
+  const isRefetching = proposalRefetching || garageRefetching || bikerRefetching || blockedRefetching || musicRefetching || acceptedRefetching || propProfileRefetching || routeAffinityRefetching || telemetryAffinityRefetching;
 
   const renderItem = useRenderItem({
     activeTab,
@@ -457,6 +458,7 @@ export default function MatchScreen() {
   const newBikerMatches = useMemo(() => bikerMatches?.filter(m => m.status === "new") || [], [bikerMatches]);
   const newProposalMatches = useMemo(() => proposalMatches?.filter(m => m.status === "pending") || [], [proposalMatches]);
   const newPropProfileMatches = useMemo(() => propProfileMatches?.filter(m => m.status === "new") || [], [propProfileMatches]);
+  const newTelemetryMatches = useMemo(() => telemetryAffinityMatches?.filter(m => m.status === "new") || [], [telemetryAffinityMatches]);
 
   const tabs: { key: TabKey; label: string; icon: keyof typeof Ionicons.glyphMap; count: number }[] = [
     { key: "biker", label: t("match.tabBiker"), icon: "bicycle", count: newBikerMatches.length },
@@ -465,6 +467,7 @@ export default function MatchScreen() {
     { key: "proposals", label: t("match.tabProposals"), icon: "flash", count: newProposalMatches.length },
     { key: "propProfile", label: t("match.tabPropProfile"), icon: "location", count: newPropProfileMatches.length },
     { key: "route", label: t("match.tabRoute"), icon: "map", count: (routeAffinityMatches?.filter((m) => m.status === "new") || []).length },
+    { key: "telemetry", label: t("match.tabTelemetry"), icon: "speedometer", count: newTelemetryMatches.length },
     { key: "accepted", label: t("match.tabAccepted"), icon: "checkmark-circle", count: 0 },
     { key: "blacklist", label: t("match.tabBlacklist"), icon: "ban", count: 0 },
   ];
@@ -477,6 +480,7 @@ export default function MatchScreen() {
     if (activeTab === "blacklist") return "ban-outline";
     if (activeTab === "propProfile") return "location-outline";
     if (activeTab === "route") return "map-outline";
+    if (activeTab === "telemetry") return "speedometer-outline";
     return "flash-outline";
   };
 
@@ -488,6 +492,7 @@ export default function MatchScreen() {
     if (activeTab === "blacklist") return t("match.emptyBlacklistTitle");
     if (activeTab === "propProfile") return t("match.emptyPropProfileTitle");
     if (activeTab === "route") return t("match.emptyRouteTitle");
+    if (activeTab === "telemetry") return t("match.emptyTelemetryTitle");
     return t("match.emptyProposalsTitle");
   };
 
@@ -499,6 +504,7 @@ export default function MatchScreen() {
     if (activeTab === "blacklist") return t("match.emptyBlacklistDesc");
     if (activeTab === "propProfile") return t("match.emptyPropProfileDesc");
     if (activeTab === "route") return t("match.emptyRouteDesc");
+    if (activeTab === "telemetry") return t("match.emptyTelemetryDesc");
     return t("match.emptyProposalsDesc");
   };
 

@@ -3,6 +3,7 @@ import { Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { GarageMatchCard, BikerBikerMatchCard, MatchCardFull, ProposalProfileMatchCard } from "@/components/match/MatchCard";
 import { RouteAffinityMatchCard } from "@/components/match/RouteAffinityMatchCard";
+import { TelemetryAffinityMatchCard } from "@/components/match/TelemetryAffinityMatchCard";
 import { BlacklistCard } from "@/components/match/tabs/BlacklistCard";
 import { MusicMatchCard } from "@/components/match/tabs/MusicMatchCard";
 import type { TabKey } from "@/components/match/TabBar";
@@ -81,6 +82,26 @@ export function useRenderItem(p: UseRenderItemParams): ({ item }: { item: any })
         );
       }
 
+      if (p.activeTab === "telemetry") {
+        const otherId: string = item.otherUserId ?? (item.userAId === p.userId ? item.userBId : item.userAId);
+        return (
+          <TelemetryAffinityMatchCard
+            match={item}
+            currentUserId={p.userId || ""}
+            onAccept={() => {
+              p.setPendingMatchId(item.id);
+              p.acceptTelemetryAffinityMutation.mutate(item.id);
+            }}
+            onReject={() => p.rejectTelemetryAffinityMutation.mutate(item.id)}
+            onChatPress={item.status === "accepted" ? () => p.startChatMutation.mutate(otherId) : undefined}
+            onRemove={item.status === "accepted" ? () => p.removeTelemetryAffinityMutation.mutate(item.id) : undefined}
+            isPending={p.pendingMatchId === item.id}
+            t={p.t}
+            locale={p.locale}
+          />
+        );
+      }
+
       if (p.activeTab === "accepted") {
         if (item._matchType === "biker") {
           const isBiker1 = item.biker1Id === p.userId;
@@ -151,9 +172,8 @@ export function useRenderItem(p: UseRenderItemParams): ({ item }: { item: any })
         if (item._matchType === "telemetryAffinity") {
           const otherId: string = item.otherUserId ?? (item.userAId === p.userId ? item.userBId : item.userAId);
           return (
-            <RouteAffinityMatchCard
+            <TelemetryAffinityMatchCard
               match={item}
-              variant="telemetry"
               currentUserId={p.userId || ""}
               onAccept={() => {}}
               onReject={() => {}}
@@ -182,25 +202,6 @@ export function useRenderItem(p: UseRenderItemParams): ({ item }: { item: any })
 
       if (p.activeTab === "route") {
         const otherId: string = item.otherUserId ?? (item.userAId === p.userId ? item.userBId : item.userAId);
-        if (item._matchType === "telemetryAffinity") {
-          return (
-            <RouteAffinityMatchCard
-              match={item}
-              variant="telemetry"
-              currentUserId={p.userId || ""}
-              onAccept={() => {
-                p.setPendingMatchId(item.id);
-                p.acceptTelemetryAffinityMutation.mutate(item.id);
-              }}
-              onReject={() => p.rejectTelemetryAffinityMutation.mutate(item.id)}
-              onChatPress={item.status === "accepted" ? () => p.startChatMutation.mutate(otherId) : undefined}
-              onRemove={item.status === "accepted" ? () => p.removeTelemetryAffinityMutation.mutate(item.id) : undefined}
-              isPending={p.pendingMatchId === item.id}
-              t={p.t}
-              locale={p.locale}
-            />
-          );
-        }
         return (
           <RouteAffinityMatchCard
             match={item}

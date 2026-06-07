@@ -4,14 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
 
-interface TopPlace {
-  cell: string;
-  label: string;
-  lat: number;
-  lon: number;
-  weight?: number;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- match shape varies
 type MatchShape = any;
 
@@ -27,7 +19,7 @@ interface Props {
   locale: string;
 }
 
-export function RouteAffinityMatchCard({
+export function TelemetryAffinityMatchCard({
   match,
   currentUserId,
   onAccept,
@@ -41,27 +33,30 @@ export function RouteAffinityMatchCard({
   const router = useRouter();
   const otherUserId: string = match.otherUserId ?? (match.userAId === currentUserId ? match.userBId : match.userAId);
   const otherNickname: string = match.otherNickname ?? (match.userAId === currentUserId ? match.userBNickname : match.userANickname) ?? "—";
-  const topPlaces: TopPlace[] = Array.isArray(match.topPlaces) ? match.topPlaces : [];
   const isNew = match.status === "new";
   const isAccepted = match.status === "accepted";
   const isRejected = match.status === "rejected";
-  const scorePct = Math.round((match.score ?? 0) * 100);
+  const scorePct = Math.round((match.combinedScore ?? 0) * 100);
+
+  const styleLabels: string[] = Array.isArray(match.styleLabels) ? match.styleLabels : [];
 
   const statusColor = isAccepted ? Colors.success : isRejected ? Colors.accentRed : Colors.accent;
-  const statusLabel = isAccepted ? t("match.accepted") : isRejected ? t("match.rejected") : t("match.routeAffinityLabel");
+  const statusLabel = isAccepted
+    ? t("match.accepted")
+    : isRejected
+      ? t("match.rejected")
+      : t("match.telemetryAffinityLabel");
   const statusIcon: keyof typeof Ionicons.glyphMap = isAccepted
     ? "checkmark-circle"
     : isRejected
       ? "close-circle"
-      : "map";
+      : "speedometer";
 
   const createdDate = match.createdAt
     ? new Date(match.createdAt).toLocaleDateString(locale, {
         day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
       })
     : null;
-
-  const commonText = t("match.commonCellsCount").replace("{count}", String(match.commonCells ?? 0)) + ` · ${scorePct}%`;
 
   return (
     <View style={[styles.card, isRejected && styles.dimmed]}>
@@ -81,27 +76,29 @@ export function RouteAffinityMatchCard({
         activeOpacity={0.7}
         onPress={() => otherUserId && router.push(`/profile/${otherUserId}` as never)}
       >
-        <Ionicons name="bicycle" size={24} color={Colors.maleIcon} />
+        <Ionicons name="speedometer" size={24} color={Colors.accent} />
         <View style={{ flex: 1 }}>
           <Text style={styles.nickname}>{otherNickname}</Text>
-          <Text style={styles.subText}>{commonText}</Text>
+          <Text style={styles.subText}>{`${scorePct}% ${t("match.telemetryAffinityLabel")}`}</Text>
         </View>
         <Ionicons name="chevron-forward" size={16} color={Colors.textSecondary} />
       </TouchableOpacity>
 
-      {topPlaces.length > 0 && (
-        <View style={styles.placesBlock}>
-          <Text style={styles.placesTitle}>{t("match.commonPlaces")}</Text>
-          {topPlaces.slice(0, 3).map((p) => (
-            <View key={p.cell} style={styles.placeRow}>
-              <Ionicons name="location" size={12} color={Colors.accent} />
-              <Text style={styles.placeText} numberOfLines={1}>
-                {p.label && p.label.trim().length > 0
-                  ? p.label
-                  : `${p.lat.toFixed(2)}, ${p.lon.toFixed(2)}`}
-              </Text>
-            </View>
-          ))}
+      {styleLabels.length > 0 && (
+        <View style={styles.labelsBlock}>
+          <Text style={styles.labelsTitle}>{t("match.telemetryStyleTitle")}</Text>
+          <View style={styles.chipsRow}>
+            {styleLabels.map((label) => {
+              const key = `match.styleLabel.${label}`;
+              const translated = t(key);
+              const display = translated !== key ? translated : label;
+              return (
+                <View key={label} style={styles.chip}>
+                  <Text style={styles.chipText}>{display}</Text>
+                </View>
+              );
+            })}
+          </View>
         </View>
       )}
 
@@ -148,17 +145,25 @@ const styles = StyleSheet.create({
   statusLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold", flex: 1 },
   date: { fontSize: 11, color: Colors.textSecondary },
   userRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  nickname: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.maleIcon },
+  nickname: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text },
   subText: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  placesBlock: {
+  labelsBlock: {
     backgroundColor: Colors.background,
     borderRadius: 8,
     padding: 8,
-    gap: 4,
+    gap: 6,
   },
-  placesTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary, marginBottom: 2 },
-  placeRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  placeText: { fontSize: 13, color: Colors.text, flex: 1 },
+  labelsTitle: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
+  chipsRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  chip: {
+    backgroundColor: Colors.accent + "22",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: Colors.accent + "44",
+  },
+  chipText: { fontSize: 12, color: Colors.accent, fontFamily: "Inter_500Medium" },
   chatBtn: {
     flexDirection: "row",
     alignItems: "center",
