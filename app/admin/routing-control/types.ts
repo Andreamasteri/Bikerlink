@@ -32,6 +32,7 @@ export interface RoutingStatus {
     consecutiveFailures: number;
     error: string | null;
     version?: string;
+    motorcycleProfileAvailable: boolean | null;
   };
   cloudFallback: {
     available: boolean;

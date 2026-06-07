@@ -16,6 +16,7 @@ import {
   GH_BASE_URL,
   getServerInfo,
   getRoutingHealthSnapshot,
+  fetchSelfHostedProfiles,
   type GHServerInfo,
 } from "../../../graphhopper-client";
 import {
@@ -58,12 +59,13 @@ function maskUrl(url: string): string {
  * engine (GraphHopper self-hosted, Cloud fallback, Valhalla, tiles) e contatori.
  */
 router.get("/status", async (_req: Request, res: Response) => {
-  const [killSwitch, ghInfo, valhallaInfo, activeEngine, rolloutSetting] = await Promise.all([
+  const [killSwitch, ghInfo, valhallaInfo, activeEngine, rolloutSetting, profilesResult] = await Promise.all([
     getRoutingKillSwitchState(),
     getServerInfo().catch((): GHServerInfo => ({ status: "error" })),
     getValhallaInfo().catch((): GHServerInfo => ({ status: "error" })),
     resolveRoutingEngine(),
     storage.getAppSetting("maps_rollout"),
+    fetchSelfHostedProfiles().catch(() => ({ reachable: false, profiles: null, error_reason: "exception" })),
   ]);
 
   const rollout = (rolloutSetting?.value ?? "disabled") as MapsRollout;
@@ -75,6 +77,13 @@ router.get("/status", async (_req: Request, res: Response) => {
   const valhallaOk = valhallaInfo.status === "ok";
   const valhallaConfigured = valhallaInfo.status !== "unconfigured";
   const valhallaDown = valhallaConfigured && !valhallaOk;
+
+  // null = non self-hosted o server non raggiungibile (impossibile determinarlo)
+  const motorcycleProfileAvailable: boolean | null = snap.selfHosted
+    ? (profilesResult.reachable && profilesResult.profiles !== null
+        ? profilesResult.profiles.includes("motorcycle")
+        : null)
+    : null;
 
   return res.json({
     killSwitch: {
@@ -96,6 +105,7 @@ router.get("/status", async (_req: Request, res: Response) => {
       consecutiveFailures: snap.consecutiveFailures,
       error: snap.error,
       version: ghInfo.version,
+      motorcycleProfileAvailable,
     },
     cloudFallback: {
       available: snap.cloudFallbackAvailable,

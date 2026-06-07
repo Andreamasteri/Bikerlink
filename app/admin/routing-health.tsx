@@ -37,18 +37,32 @@ function formatDate(ms: number | null): string {
   }
 }
 
+function MotorcycleProfileBadge({ available }: { available: boolean | null | undefined }) {
+  if (available === null || available === undefined) return null;
+  const ok = available === true;
+  const color = ok ? Colors.success : Colors.warning;
+  const label = ok ? "Profilo OK" : "⚠ Profilo mancante";
+  return (
+    <View style={[styles.badge, { backgroundColor: color + "22", borderColor: color, marginLeft: 6 }]}>
+      <Text style={[styles.badgeText, { color }]}>{label}</Text>
+    </View>
+  );
+}
+
 function EngineCard({
   title,
   icon,
   color,
   statusLabel,
   rows,
+  motorcycleProfileAvailable,
 }: {
   title: string;
   icon: string;
   color: string;
   statusLabel: string;
   rows: { label: string; value: string }[];
+  motorcycleProfileAvailable?: boolean | null;
 }) {
   return (
     <View style={styles.card}>
@@ -57,8 +71,13 @@ function EngineCard({
           <MaterialCommunityIcons name={icon as never} size={22} color={color} />
           <Text style={styles.cardTitle}>{title}</Text>
         </View>
-        <View style={[styles.badge, { backgroundColor: color + "22", borderColor: color }]}>
-          <Text style={[styles.badgeText, { color }]}>{statusLabel}</Text>
+        <View style={styles.cardHeaderBadges}>
+          {motorcycleProfileAvailable !== undefined && (
+            <MotorcycleProfileBadge available={motorcycleProfileAvailable} />
+          )}
+          <View style={[styles.badge, { backgroundColor: color + "22", borderColor: color }]}>
+            <Text style={[styles.badgeText, { color }]}>{statusLabel}</Text>
+          </View>
         </View>
       </View>
       <View style={styles.cardBody}>
@@ -148,6 +167,7 @@ export default function RoutingHealthScreen() {
                 ? "DOWN → CLOUD"
                 : gh?.down ? "DOWN" : gh?.ok ? "OK" : "—"
             }
+            motorcycleProfileAvailable={gh?.selfHosted ? (gh?.motorcycleProfileAvailable ?? null) : undefined}
             rows={[
               { label: "URL", value: gh?.url || "—" },
               { label: "Self-hosted", value: gh?.selfHosted ? "Sì" : "No" },
@@ -251,6 +271,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 14,
   },
   cardHeaderLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  cardHeaderBadges: { flexDirection: "row", alignItems: "center", flexShrink: 0 },
   cardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text, flex: 1 },
   badge: { borderRadius: 6, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontFamily: "Inter_700Bold", fontSize: 11, letterSpacing: 0.5 },
