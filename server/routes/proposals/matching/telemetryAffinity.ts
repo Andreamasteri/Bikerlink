@@ -5,8 +5,57 @@ import { storage } from "../../../storage";
 import { isSystemAccount } from "../../../lib/system-account-filter";
 import { sendError } from "../../../lib/api-response";
 import { requireAuth } from "../../../lib/auth-middleware";
+import { styleLabelsFromProfile, MIN_SESSIONS_FOR_EMBED } from "../../../ai/telemetry-style-embedder";
 
 const router = Router();
+
+// Task #3396 — il rider vede il PROPRIO stile di guida calcolato.
+// Read-only: espone label + bucket + statistiche chiave da `user_telemetry_profile`.
+// Stato "dati insufficienti" quando il profilo non raggiunge la soglia embedding.
+router.get("/my-telemetry-style", requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.session.userId as string;
+    const profile = await storage.getUserTelemetryProfile(userId);
+
+    if (!profile) {
+      return res.json({
+        hasEnoughData: false,
+        dataQuality: 0,
+        minSessions: MIN_SESSIONS_FOR_EMBED,
+        totalSessions: 0,
+        labels: [],
+        profile: null,
+      });
+    }
+
+    const hasEnoughData = (profile.dataQuality ?? 0) >= MIN_SESSIONS_FOR_EMBED;
+    const labels = hasEnoughData ? styleLabelsFromProfile(profile) : [];
+
+    return res.json({
+      hasEnoughData,
+      dataQuality: profile.dataQuality ?? 0,
+      minSessions: MIN_SESSIONS_FOR_EMBED,
+      totalSessions: profile.totalSessions ?? 0,
+      labels,
+      profile: {
+        speedBucket: profile.speedBucket,
+        leanBucket: profile.leanBucket,
+        durationBucket: profile.durationBucket,
+        avgSpeedKmh: profile.avgSpeedKmh,
+        p75SpeedKmh: profile.p75SpeedKmh,
+        avgLeanAngle: profile.avgLeanAngle,
+        maxLeanAvg: profile.maxLeanAvg,
+        avgDurationMin: profile.avgDurationMin,
+        fractionMorning: profile.fractionMorning,
+        fractionEvening: profile.fractionEvening,
+        updatedAt: profile.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("Get my telemetry style error:", error);
+    return sendError(res, 500, "Errore interno del server");
+  }
+});
 
 router.get("/telemetry-affinity-matches", requireAuth, async (req: Request, res: Response) => {
   try {

@@ -21,6 +21,7 @@ import { useUnits } from "@/lib/units-context";
 
 import type { ProfileData } from "@/components/profile/types";
 import TelemetryPanel from "@/components/profile/TelemetryPanel";
+import MyStylePanel from "@/components/profile/MyStylePanel";
 import TimeHeatmap from "@/components/profile/TimeHeatmap";
 import PhotoGrid from "@/components/profile/PhotoGrid";
 import NotificationsPanel from "@/components/profile/NotificationsPanel";
@@ -277,6 +278,8 @@ export default function ProfileScreen() {
         />
 
         {telemetryStats != null && <TelemetryPanel telemetryStats={telemetryStats} />}
+
+        {isBikerOrCoppia && <MyStylePanel />}
 
         {user?.id && <TimeHeatmap userId={user.id} />}
 

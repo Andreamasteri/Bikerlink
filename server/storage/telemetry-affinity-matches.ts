@@ -2,8 +2,10 @@ import { eq, and, or, sql, desc } from "drizzle-orm";
 import { db } from "../db";
 import {
   telemetryAffinityMatches,
+  userTelemetryProfile,
   type TelemetryAffinityMatch,
   type InsertTelemetryAffinityMatch,
+  type UserTelemetryProfile,
 } from "@shared/db";
 import { RouteAffinityMatchesStorage } from "./route-affinity-matches";
 
@@ -13,6 +15,15 @@ import { RouteAffinityMatchesStorage } from "./route-affinity-matches";
  * altro, poi score decrescente) e stesse operazioni CRUD.
  */
 export class TelemetryAffinityMatchesStorage extends RouteAffinityMatchesStorage {
+  // Task #3396 — profilo telemetria aggregato dell'utente (per il pannello "il tuo stile").
+  async getUserTelemetryProfile(userId: string): Promise<UserTelemetryProfile | undefined> {
+    const [row] = await db
+      .select()
+      .from(userTelemetryProfile)
+      .where(eq(userTelemetryProfile.userId, userId));
+    return row;
+  }
+
   async getTelemetryAffinityMatchesForUser(userId: string): Promise<TelemetryAffinityMatch[]> {
     return db
       .select()
