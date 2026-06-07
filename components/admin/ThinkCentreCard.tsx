@@ -141,7 +141,7 @@ export function ThinkCentreCard() {
                 />
                 <View style={styles.rowText}>
                   <Text style={styles.rowLabel}>{s.label}</Text>
-                  <Text style={styles.rowStatus} numberOfLines={1}>
+                  <Text style={styles.rowStatus} numberOfLines={s.configured && !s.ok ? undefined : 1}>
                     {serviceStatusLabel(s)}
                     {s.configured && s.url ? ` · ${s.url}` : ""}
                   </Text>

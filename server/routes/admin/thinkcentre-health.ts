@@ -91,7 +91,10 @@ async function httpProbe(
     const res = await fetch(url, { method: "GET", headers, signal: controller.signal });
     const latencyMs = Date.now() - t0;
     if (isHealthy(res.status)) return { ok: true, latencyMs };
-    return { ok: false, latencyMs, error: `HTTP ${res.status}` };
+    let body = "";
+    try { body = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
+    const errorMsg = body ? `HTTP ${res.status} · ${sanitizeError(body)}` : `HTTP ${res.status}`;
+    return { ok: false, latencyMs, error: errorMsg };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, latencyMs: null, error: sanitizeError(msg) };
@@ -129,7 +132,10 @@ async function graphHopperRouteProbe(
     });
     const latencyMs = Date.now() - t0;
     if (res.status >= 200 && res.status < 300) return { ok: true, latencyMs };
-    return { ok: false, latencyMs, error: `HTTP ${res.status}` };
+    let body = "";
+    try { body = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
+    const errorMsg = body ? `HTTP ${res.status} · ${sanitizeError(body)}` : `HTTP ${res.status}`;
+    return { ok: false, latencyMs, error: errorMsg };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, latencyMs: null, error: sanitizeError(msg) };
@@ -201,7 +207,10 @@ async function probeValhalla(): Promise<ServiceHealth> {
     const res = await fetch(`${base}/status`, { method: "GET", headers, signal: controller.signal });
     const latencyMs = Date.now() - t0;
     if (res.status < 200 || res.status >= 300) {
-      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error: `HTTP ${res.status}`, tokenMissing };
+      let errBody = "";
+      try { errBody = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
+      const errMsg = errBody ? `HTTP ${res.status} · ${sanitizeError(errBody)}` : `HTTP ${res.status}`;
+      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error: errMsg, tokenMissing };
     }
     const data = (await res.json().catch(() => ({}))) as {
       version?: string;
@@ -286,9 +295,11 @@ async function probeWhisper(): Promise<ServiceHealth> {
     if (res.status >= 200 && res.status < 300) {
       return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base), tokenMissing };
     }
+    let errBody = "";
+    try { errBody = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
     const error = res.status === 401
       ? "Token non valido (HTTP 401)"
-      : `HTTP ${res.status}`;
+      : errBody ? `HTTP ${res.status} · ${sanitizeError(errBody)}` : `HTTP ${res.status}`;
     return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -309,6 +320,7 @@ async function probeNominatim(): Promise<ServiceHealth> {
     ok: snap.ok,
     latencyMs: snap.latencyMs,
     url: snap.configured ? snap.url : null,
+    error: snap.error != null ? sanitizeError(snap.error) : undefined,
     tokenMissing,
   };
 }

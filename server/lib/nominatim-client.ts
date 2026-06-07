@@ -138,6 +138,7 @@ export interface NominatimHealthSnapshot {
   url: string;
   latencyMs: number | null;
   ok: boolean;
+  error?: string;
 }
 
 /**
@@ -156,9 +157,16 @@ export async function getNominatimHealthSnapshot(): Promise<NominatimHealthSnaps
       signal: controller.signal,
     });
     const latencyMs = Date.now() - t0;
-    return { configured: isSelfHosted, url: maskedUrl, latencyMs, ok: res.ok };
-  } catch {
-    return { configured: isSelfHosted, url: maskedUrl, latencyMs: null, ok: false };
+    if (!res.ok) {
+      let body = "";
+      try { body = (await res.text()).slice(0, 150).trim(); } catch { /* ignore */ }
+      const error = body ? `HTTP ${res.status} · ${body}` : `HTTP ${res.status}`;
+      return { configured: isSelfHosted, url: maskedUrl, latencyMs, ok: false, error };
+    }
+    return { configured: isSelfHosted, url: maskedUrl, latencyMs, ok: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { configured: isSelfHosted, url: maskedUrl, latencyMs: null, ok: false, error: msg };
   } finally {
     clearTimeout(timer);
   }
