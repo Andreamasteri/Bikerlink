@@ -15,11 +15,9 @@
  * Throttle: min 10 min tra notifiche dello stesso tipo.
  */
 
-import { db } from "../db";
-import { users } from "@shared/db";
-import { eq } from "drizzle-orm";
 import { getInfo as getValhallaInfo } from "../routing/valhalla-client";
 import { storage } from "../storage";
+import { sendSystemAlertPushToAdmins } from "../push-notifications";
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 const PROBE_INTERVAL_MS = 5 * 60 * 1000;    // ogni 5 min
@@ -27,7 +25,6 @@ const FIRST_PROBE_DELAY_MS = 3 * 60 * 1000; // delay iniziale al boot (sfasato d
 const NOTIFY_COOLDOWN_MS = 10 * 60 * 1000;  // 10 min tra stesse notifiche
 /** Quanti check consecutivi falliti prima di inviare l'alert offline. */
 const FAIL_THRESHOLD = 2;
-const EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send";
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let consecutiveFailures = 0;
@@ -35,37 +32,6 @@ let isAlertActive = false;
 let lastNotifiedAt = new Map<string, number>();
 let intervalHandle: ReturnType<typeof setInterval> | null = null;
 let firstProbeTimer: ReturnType<typeof setTimeout> | null = null;
-
-// ── Push helper ────────────────────────────────────────────────────────────────
-async function pushAdmins(title: string, body: string, data: Record<string, unknown>): Promise<number> {
-  try {
-    const rows = await db
-      .select({ token: users.expoPushToken })
-      .from(users)
-      .where(eq(users.role, "admin"));
-
-    const msgs = rows
-      .map((r) => r.token)
-      .filter((t): t is string => !!t && (t.startsWith("ExponentPushToken[") || t.startsWith("ExpoPushToken[")))
-      .map((to) => ({ to, title, body, sound: "default" as const, channelId: "matches", data }));
-
-    if (msgs.length === 0) return 0;
-
-    const resp = await fetch(EXPO_PUSH_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify(msgs),
-    });
-    if (!resp.ok) {
-      console.warn("[valhalla-monitor] push HTTP", resp.status);
-      return 0;
-    }
-    return msgs.length;
-  } catch (err) {
-    console.warn("[valhalla-monitor] push error (non-fatal):", err);
-    return 0;
-  }
-}
 
 function shouldNotify(eventKey: string): boolean {
   const now = Date.now();
@@ -119,7 +85,7 @@ export async function runValhallaProbe(): Promise<void> {
         consecutiveFailures = 0;
         console.log("[valhalla-monitor] Valhalla tornato raggiungibile — invio notifica recovery");
         if (shouldNotify("online")) {
-          const n = await pushAdmins(
+          const n = await sendSystemAlertPushToAdmins(
             "🟢 Valhalla tornato online",
             "Il server Valhalla (routing attivo) è nuovamente raggiungibile.",
             { type: "valhalla_online" },
@@ -141,7 +107,7 @@ export async function runValhallaProbe(): Promise<void> {
     if (consecutiveFailures >= FAIL_THRESHOLD && !isAlertActive) {
       isAlertActive = true;
       if (shouldNotify("offline")) {
-        const n = await pushAdmins(
+        const n = await sendSystemAlertPushToAdmins(
           "🔴 Valhalla offline",
           `Valhalla non risponde da ${consecutiveFailures} check consecutivi. Il routing è degradato al fallback.`,
           { type: "valhalla_offline", consecutiveFailures },
