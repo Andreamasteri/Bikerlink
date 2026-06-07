@@ -117,7 +117,7 @@ upsert_env_value() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-section "1/4 — Verifica template e .env.local"
+section "1/5 — Verifica template e .env.local"
 # ─────────────────────────────────────────────────────────────────────────────
 [[ -f "$NGINX_TEMPLATE" ]]       || die "Template Nginx non trovato: $NGINX_TEMPLATE"
 [[ -f "$CLOUDFLARED_TEMPLATE" ]] || die "Template cloudflared non trovato: $CLOUDFLARED_TEMPLATE"
@@ -137,7 +137,7 @@ ENV_WHISPER_TOKEN="$(read_env_value WHISPER_TOKEN   "$ENV_LOCAL_FILE" 2>/dev/nul
 ENV_NOMINATIM_TOKEN="$(read_env_value NOMINATIM_TOKEN "$ENV_LOCAL_FILE" 2>/dev/null || true)"
 
 # ─────────────────────────────────────────────────────────────────────────────
-section "2/4 — Parametri di esposizione"
+section "2/5 — Parametri di esposizione"
 # ─────────────────────────────────────────────────────────────────────────────
 BASE_DOMAIN="${BASE_DOMAIN:-$(ask "Dominio base (es: bikerlink.duckdns.org)")}"
 [[ -n "$BASE_DOMAIN" ]] || die "Dominio base obbligatorio."
@@ -156,7 +156,7 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-section "3/4 — Token e validazione con .env.local"
+section "3/5 — Token e validazione con .env.local"
 # ─────────────────────────────────────────────────────────────────────────────
 GENERATED_ANY=0
 should_generate() {
@@ -248,7 +248,7 @@ validate_token "WHISPER_TOKEN"     "$WHISPER_TOKEN_VAL"  "$ENV_WHISPER_TOKEN"
 validate_token "NOMINATIM_TOKEN"   "$NOMINATIM_TOKEN_VAL" "$ENV_NOMINATIM_TOKEN"
 
 # ─────────────────────────────────────────────────────────────────────────────
-section "4/4 — Generazione config compilati"
+section "4/5 — Generazione config compilati"
 # ─────────────────────────────────────────────────────────────────────────────
 mkdir -p "$OUT_DIR"
 
@@ -345,4 +345,29 @@ $(bold "Secrets Replit da aggiornare")
   VALHALLA_API_KEY=<valore da .env.local>
 
 EOF
+# ─────────────────────────────────────────────────────────────────────────────
+section "5/5 — Directory eventi watchdog"
+# ─────────────────────────────────────────────────────────────────────────────
+# /var/lib/bikerlink/ è la home dei file di stato del watchdog (es. watchdog-events.jsonl).
+# Il watchdog la crea al runtime, ma pre-crearla qui garantisce che il servizio
+# systemd (che può girare come utente ristretto) abbia sempre i permessi giusti
+# fin dal primo avvio, senza dipendere dall'ordine di esecuzione.
+# Sovrascrivibile via AREAS_EVENTS_FILE nel file /etc/bikerlink-areas.env.
+BIKERLINK_VAR_DIR="${BIKERLINK_VAR_DIR:-/var/lib/bikerlink}"
+if [[ -d "$BIKERLINK_VAR_DIR" ]]; then
+  ok "Directory eventi già esistente: $BIKERLINK_VAR_DIR"
+else
+  if sudo mkdir -p "$BIKERLINK_VAR_DIR" 2>/dev/null \
+      && sudo chown root:root "$BIKERLINK_VAR_DIR" \
+      && sudo chmod 755 "$BIKERLINK_VAR_DIR"; then
+    ok "Creata $BIKERLINK_VAR_DIR (proprietario: root, permessi: 755)"
+  else
+    warn "Impossibile creare $BIKERLINK_VAR_DIR (sudo mancante o non interattivo)."
+    info "Crea la directory manualmente prima di avviare il servizio:"
+    info "  sudo mkdir -p $BIKERLINK_VAR_DIR && sudo chmod 755 $BIKERLINK_VAR_DIR"
+    info "Il watchdog tenta di crearla al runtime, ma il servizio potrebbe fallire"
+    info "se gira come utente ristretto senza permessi di scrittura in /var/lib/."
+  fi
+fi
+
 ok "Fatto."

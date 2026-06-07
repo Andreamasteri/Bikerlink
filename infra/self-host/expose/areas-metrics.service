@@ -7,6 +7,10 @@ Requires=docker.service
 [Service]
 Type=simple
 EnvironmentFile=-/etc/bikerlink-areas.env
+# StateDirectory garantisce che /var/lib/bikerlink/ esista con i permessi corretti
+# prima che il collector tenti di leggere watchdog-events.jsonl.
+StateDirectory=bikerlink
+StateDirectoryMode=0755
 ExecStart=/usr/bin/python3 /opt/bikerlink/expose/areas-metrics.py
 Restart=on-failure
 RestartSec=5

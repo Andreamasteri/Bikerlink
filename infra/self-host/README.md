@@ -327,6 +327,7 @@ sudo tee /etc/bikerlink-areas.env >/dev/null <<'EOF'
 APP_AREAS_URL=https://bikerlink.app/api/routing/areas/status
 GH_TOKEN=<token>
 COMPOSE_DIR=/opt/bikerlink/self-host
+# AREAS_EVENTS_FILE=/var/lib/bikerlink/watchdog-events.jsonl  # default, sovrascrivibile
 EOF
 
 sudo cp expose/areas-watchdog.service expose/areas-watchdog.timer /etc/systemd/system/
