@@ -56,6 +56,7 @@ import roadHazardsRoutes from "./routes/road-hazards";
 import wipStubsRouter from "./routes/wip-stubs";
 import routeCompletionRouter from "./routes/route-completion";
 import { publicMediaRouter, adminMediaRouter } from "./routes/media-library";
+import gdprRoutes from "./routes/gdpr";
 import { db } from "./db";
 import { userFavorites } from "@shared/db";
 import { eq, and } from "drizzle-orm";
@@ -292,6 +293,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use("/api/admin", adminRoutes);
   app.use("/api/moderator", moderatorRoutes);
   app.use("/api/sos", sosRoutes);
+  app.use("/api/gdpr", gdprRoutes);
   app.use("/api/telemetry", telemetryRoutes);
   app.use("/api/telemetry", telemetryMapsRoutes);
   app.use("/api/motoclubs", motoclubsRoutes);
