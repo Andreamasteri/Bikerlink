@@ -22,6 +22,26 @@ const PROBE_TIMEOUT_MS = 5_000;
 
 type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim";
 
+/** Un singolo evento KO registrato nello storico in-memory. */
+interface ErrorEvent {
+  timestamp: number;
+  error: string;
+}
+
+/** Storico degli ultimi N eventi KO per servizio (in-memory, max 20). */
+const ERROR_HISTORY_MAX = 20;
+const errorHistory = new Map<ServiceKey, ErrorEvent[]>();
+
+function recordError(key: ServiceKey, error: string): void {
+  const prev = errorHistory.get(key) ?? [];
+  const next = [{ timestamp: Date.now(), error }, ...prev].slice(0, ERROR_HISTORY_MAX);
+  errorHistory.set(key, next);
+}
+
+function getHistory(key: ServiceKey): ErrorEvent[] {
+  return errorHistory.get(key) ?? [];
+}
+
 interface ServiceHealth {
   key: ServiceKey;
   label: string;
@@ -34,6 +54,8 @@ interface ServiceHealth {
   tileVersion?: string;
   /** URL configurato ma token assente: diverso da 401 (token presente ma sbagliato). */
   tokenMissing?: boolean;
+  /** Ultimi eventi KO registrati in memoria (max 20). */
+  history: ErrorEvent[];
 }
 
 /** Prime 8 hex del SHA-256 del token — fingerprint sicuro senza esporre il valore. */
@@ -169,33 +191,26 @@ async function probeGraphHopper(): Promise<ServiceHealth> {
   const base = process.env.GRAPHHOPPER_URL?.replace(/\/$/, "");
   const token = process.env.GRAPHHOPPER_TOKEN;
   if (!base) {
-    return { key: "graphhopper", label: "GraphHopper", configured: false, ok: false, latencyMs: null, url: null };
+    return { key: "graphhopper", label: "GraphHopper", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("graphhopper") };
   }
   const tokenMissing = !token || token.trim() === "";
   const headers: Record<string, string> = {};
   if (token) headers["X-GH-Token"] = token;
 
-  // 1) Tentativo veloce: endpoint /health dedicato.
-  //    Accettiamo anche 401/403: significano che GraphHopper HA risposto
-  //    (processo attivo) ma richiede autenticazione per questo endpoint.
-  //    Solo errori di rete/timeout o 5xx indicano servizio irraggiungibile.
   const health = await httpProbe(
     `${base}/health`,
     headers,
-    // 2xx = OK; 401/403 = GraphHopper risponde (auth richiesta ma processo attivo).
-    // Gli altri 4xx (404, 429…) e i 5xx restano "non sano" → cade sul fallback /route.
     (status) => (status >= 200 && status < 300) || status === 401 || status === 403,
   );
   if (health.ok) {
-    return { key: "graphhopper", label: "GraphHopper", configured: true, ok: true, latencyMs: health.latencyMs, url: maskUrl(base), tokenMissing };
+    return { key: "graphhopper", label: "GraphHopper", configured: true, ok: true, latencyMs: health.latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("graphhopper") };
   }
 
-  // 2) Fallback: alcuni deploy dietro tunnel restituiscono 5xx su /health ma
-  //    instradano /route correttamente. Una vera richiesta di routing conferma.
   const route = await graphHopperRouteProbe(base, token);
   if (!route.ok) {
-    const finalError = route.error ?? health.error;
+    const finalError = route.error ?? health.error ?? "errore sconosciuto";
     console.error("[thinkcentre-probe] graphhopper KO", { status: finalError });
+    recordError("graphhopper", finalError);
   }
   return {
     key: "graphhopper",
@@ -206,6 +221,7 @@ async function probeGraphHopper(): Promise<ServiceHealth> {
     url: maskUrl(base),
     error: route.ok ? undefined : (route.error ?? health.error),
     tokenMissing,
+    history: getHistory("graphhopper"),
   };
 }
 
@@ -219,7 +235,7 @@ async function probeValhalla(): Promise<ServiceHealth> {
   const base = process.env.VALHALLA_URL?.replace(/\/$/, "");
   const apiKey = process.env.VALHALLA_API_KEY;
   if (!base) {
-    return { key: "valhalla", label: "Valhalla", configured: false, ok: false, latencyMs: null, url: null };
+    return { key: "valhalla", label: "Valhalla", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("valhalla") };
   }
   const tokenMissing = !apiKey || apiKey.trim() === "";
   const headers: Record<string, string> = {};
@@ -238,7 +254,8 @@ async function probeValhalla(): Promise<ServiceHealth> {
         ? sanitizeError(`HTTP ${res.status} — ${bodySnippet}`)
         : `HTTP ${res.status}`;
       console.error("[thinkcentre-probe] valhalla KO", { status: res.status, error });
-      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing };
+      recordError("valhalla", error);
+      return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("valhalla") };
     }
     const data = (await res.json().catch(() => ({}))) as {
       version?: string;
@@ -257,10 +274,13 @@ async function probeValhalla(): Promise<ServiceHealth> {
       url: maskUrl(base),
       tileVersion,
       tokenMissing,
+      history: getHistory("valhalla"),
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error: sanitizeError(msg), tokenMissing };
+    const error = sanitizeError(msg);
+    recordError("valhalla", error);
+    return { key: "valhalla", label: "Valhalla", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, history: getHistory("valhalla") };
   } finally {
     clearTimeout(timer);
   }
@@ -270,7 +290,7 @@ async function probeOllama(): Promise<ServiceHealth> {
   const base = process.env.OLLAMA_URL?.replace(/\/$/, "");
   const token = process.env.OLLAMA_TOKEN;
   if (!base) {
-    return { key: "ollama", label: "Ollama AI", configured: false, ok: false, latencyMs: null, url: null };
+    return { key: "ollama", label: "Ollama AI", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("ollama") };
   }
   const tokenMissing = !token || token.trim() === "";
   const headers: Record<string, string> = {};
@@ -284,8 +304,9 @@ async function probeOllama(): Promise<ServiceHealth> {
   }
   if (!r.ok) {
     console.error("[thinkcentre-probe] ollama KO", { error });
+    if (error) recordError("ollama", error);
   }
-  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing };
+  return { key: "ollama", label: "Ollama AI", configured: true, ok: r.ok, latencyMs: r.latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("ollama") };
 }
 
 /**
@@ -297,7 +318,7 @@ async function probeWhisper(): Promise<ServiceHealth> {
   const base = process.env.WHISPER_URL?.replace(/\/$/, "");
   const token = process.env.WHISPER_TOKEN;
   if (!base) {
-    return { key: "whisper", label: "Whisper ASR", configured: false, ok: false, latencyMs: null, url: null };
+    return { key: "whisper", label: "Whisper ASR", configured: false, ok: false, latencyMs: null, url: null, history: getHistory("whisper") };
   }
   const tokenMissing = !token || token.trim() === "";
 
@@ -325,7 +346,7 @@ async function probeWhisper(): Promise<ServiceHealth> {
     const res = await fetch(`${base}/inference`, { method: "POST", headers, body: formData, signal: controller.signal });
     const latencyMs = Date.now() - t0;
     if (res.status >= 200 && res.status < 300) {
-      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base), tokenMissing };
+      return { key: "whisper", label: "Whisper ASR", configured: true, ok: true, latencyMs, url: maskUrl(base), tokenMissing, history: getHistory("whisper") };
     }
     const body = await readBodySafe(res);
     const bodySnippet = body.trim().slice(0, 400);
@@ -340,12 +361,14 @@ async function probeWhisper(): Promise<ServiceHealth> {
         : `HTTP ${res.status}`;
     }
     console.error("[thinkcentre-probe] whisper KO", { status: res.status, error });
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing };
+    recordError("whisper", error);
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper") };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     const error = sanitizeError(msg);
     console.error("[thinkcentre-probe] whisper KO (rete/timeout)", { error });
-    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing };
+    recordError("whisper", error);
+    return { key: "whisper", label: "Whisper ASR", configured: true, ok: false, latencyMs: null, url: maskUrl(base), error, tokenMissing, history: getHistory("whisper") };
   } finally {
     clearTimeout(timer);
   }
@@ -357,6 +380,7 @@ async function probeNominatim(): Promise<ServiceHealth> {
   const tokenMissing = snap.configured && (!token || token.trim() === "");
   if (!snap.ok && snap.configured) {
     console.error("[thinkcentre-probe] nominatim KO", { error: snap.error ?? "nessun dettaglio" });
+    if (snap.error) recordError("nominatim", snap.error);
   }
   return {
     key: "nominatim",
@@ -367,6 +391,7 @@ async function probeNominatim(): Promise<ServiceHealth> {
     url: snap.configured ? snap.url : null,
     error: snap.error,
     tokenMissing,
+    history: getHistory("nominatim"),
   };
 }
 

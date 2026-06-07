@@ -7,6 +7,11 @@ import { getApiUrl, authFetchHeaders } from "@/lib/query-client";
 
 type ServiceKey = "graphhopper" | "valhalla" | "ollama" | "whisper" | "nominatim";
 
+interface ErrorEvent {
+  timestamp: number;
+  error: string;
+}
+
 interface ServiceHealth {
   key: ServiceKey;
   label: string;
@@ -17,6 +22,7 @@ interface ServiceHealth {
   error?: string;
   tileVersion?: string;
   tokenMissing?: boolean;
+  history: ErrorEvent[];
 }
 
 interface ThinkCentreHealth {
@@ -72,6 +78,55 @@ function serviceStatusLabel(s: ServiceHealth): string {
   }
   if (s.tokenMissing) return "Offline · token assente in Replit";
   return s.error ? `Offline · ${s.error}` : "Offline";
+}
+
+function formatTimestamp(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function ErrorHistory({ history }: { history: ErrorEvent[] }) {
+  const [open, setOpen] = useState(false);
+
+  if (!history || history.length === 0) return null;
+
+  return (
+    <View style={styles.historyContainer}>
+      <TouchableOpacity
+        style={styles.historyToggle}
+        onPress={() => setOpen((o) => !o)}
+        activeOpacity={0.7}
+        testID="thinkcentre-history-toggle"
+      >
+        <Ionicons
+          name="time-outline"
+          size={11}
+          color="#f59e0b"
+          style={styles.historyIcon}
+        />
+        <Text style={styles.historyToggleText}>
+          Ultimi errori ({history.length})
+        </Text>
+        <Ionicons
+          name={open ? "chevron-up" : "chevron-down"}
+          size={11}
+          color="#f59e0b"
+        />
+      </TouchableOpacity>
+
+      {open && (
+        <View style={styles.historyList}>
+          {history.map((ev, idx) => (
+            <View key={idx} style={styles.historyItem}>
+              <Text style={styles.historyTimestamp}>{formatTimestamp(ev.timestamp)}</Text>
+              <Text style={styles.historyError} numberOfLines={3}>{ev.error}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
 }
 
 export function ThinkCentreCard() {
@@ -162,6 +217,9 @@ export function ThinkCentreCard() {
                   )}
                   {s.configured && !fp && (
                     <Text style={styles.fingerprint}>token Replit: non configurato</Text>
+                  )}
+                  {s.configured && !s.ok && s.history?.length > 0 && (
+                    <ErrorHistory history={s.history} />
                   )}
                 </View>
                 <View style={[styles.healthDot, { backgroundColor: serviceColor(s) }]} />
@@ -342,5 +400,51 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 12,
     color: "#60a5fa",
+  },
+  historyContainer: {
+    marginTop: 6,
+  },
+  historyToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    backgroundColor: "rgba(245, 158, 11, 0.08)",
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.2)",
+  },
+  historyIcon: {
+    marginRight: 1,
+  },
+  historyToggleText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: "#f59e0b",
+  },
+  historyList: {
+    marginTop: 6,
+    gap: 5,
+    paddingLeft: 4,
+    borderLeftWidth: 2,
+    borderLeftColor: "rgba(245, 158, 11, 0.25)",
+  },
+  historyItem: {
+    gap: 1,
+    paddingLeft: 6,
+  },
+  historyTimestamp: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 9,
+    color: "#6b7280",
+    letterSpacing: 0.3,
+  },
+  historyError: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    color: "#9ca3af",
+    lineHeight: 14,
   },
 });
