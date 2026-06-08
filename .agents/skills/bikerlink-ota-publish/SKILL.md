@@ -22,6 +22,19 @@ Attivare questa skill quando l'utente dice una delle seguenti (o varianti):
 
 ---
 
+## Contesto fisso (aggiornare dopo ogni APK bump)
+
+| Campo | Valore corrente |
+|-------|----------------|
+| `versionCode` APK | **55** |
+| `versionName` | **55.10.10** |
+| `runtimeVersion` | **10.0.0** |
+
+> ⚠️ Aggiornare questa tabella ad ogni nuovo APK, in lockstep con la tabella storica in `bikerlink-versioning/SKILL.md`.
+> I valori correnti sono sempre la fonte di verità: `node -e "const a=require('./app.json'); console.log(a.expo.android.versionCode, a.expo.runtimeVersion, a.expo.version)"`
+
+---
+
 ## ⚠️ VINCOLO CRITICO — Credenziali
 
 - **EAS_TOKEN** è l'**unico secret necessario** per pubblicare
@@ -103,7 +116,7 @@ Un publish riuscito mostra:
 ```
 ✔ Published!
 Branch             staging
-Runtime version    10.0.0
+Runtime version    <runtimeVersion>   ← corrisponde a expo.runtimeVersion in app.json (es. 10.0.0)
 Platform           android
 Update group ID    <uuid>
 Android update ID  <uuid>
@@ -115,7 +128,7 @@ EXIT=0
 > OTA<N> pubblicata ✓
 >
 > - Update group ID: `<uuid>`
-> - Runtime: `10.0.0`
+> - Runtime: `<runtimeVersion da app.json>` (es. `10.0.0`)
 > - Canale: staging
 >
 > Prossimo passo: apri il pannello OTA admin nell'app → Direct Apply su OTA<N> per testare, poi Approva per promuovere a production.
@@ -133,13 +146,21 @@ La promozione avviene tramite il pannello admin nell'app — non tramite CLI.
 
 ---
 
-## Storico OTA (per riferimento futuro)
+## Cicli precedenti (storico OTA)
 
-| OTA | APPLIED_OTA_NUMBER | Contenuto | Update group ID |
-|-----|-------------------|-----------|-----------------|
-| OTA1 | 1 | Prima release OTA | — |
-| OTA2 | 2 | Fix mappa nera Android APK (Leaflet WebView black map) | — |
-| OTA3 | 3 | Admin: pulsante "Forza Aggiornamento OTA" in OtaPanel | `efa135f0-1801-48fd-9b7c-871c6f415799` |
+> Aggiornare questa sezione dopo ogni APK bump: aggiungere la riga corrispondente all'APK appena pubblicato.
+> Il campo `APPLIED_OTA_NUMBER` in `constants/buildInfo.ts` è il contatore globale — non il numero dell'OTA nel ciclo APK corrente.
+
+### Ciclo 10 — runtimeVersion 10.0.0
+
+| APK base | OTA nel ciclo | Contenuto notevole | Update group ID |
+|----------|--------------|---------------------|-----------------|
+| v50 | OTA-1 | Prima OTA ciclo 10 | — |
+| v50 | OTA-2 | Fix mappa nera Android APK (Leaflet WebView black map) | — |
+| v50 | OTA-3 | Admin: pulsante "Forza Aggiornamento OTA" in OtaPanel | `efa135f0-1801-48fd-9b7c-871c6f415799` |
+| v53 | OTA-1 | Fix sistema mappe (tile ID, normalizeTileId), admin DB Debug/Dimensioni | — |
+| v53–v54 | OTA-2…10 | Task vari; v54 inglobava OTA-10 | — |
+| v55 | OTA-10 inglobata | Build corrente (vedi bikerlink-versioning per dettagli) | — |
 
 ---
 
