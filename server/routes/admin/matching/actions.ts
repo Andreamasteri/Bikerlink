@@ -1,10 +1,10 @@
 // Task #2603 — estratto da server/routes/admin/matching.ts (mechanical split)
 import { Router, type Request, type Response } from "express";
 import { db, pool } from "../../../db";
-import { bikerZavarrinaMatches, bikerBikerMatches } from "@shared/db";
+import { bikerZavarrinaMatches, bikerBikerMatches, proposalProfileMatches } from "@shared/db";
 import { MATCHING_REGISTRY } from "@shared/matching-registry";
 import { sendSuccess, sendError } from "../../../lib/api-response";
-import { sql } from "drizzle-orm";
+import { sql, or, eq } from "drizzle-orm";
 import { triggerMatchingRun } from "../../../matching-engine";
 import { forceUnlockMatching, getMatchingLockState } from "../../../matching/scheduler";
 
@@ -119,6 +119,35 @@ router.delete("/reset-matches", async (_req: Request, res: Response) => {
   } catch (error) {
     console.error("[admin/reset-matches] error:", error);
     return sendError(res, 500, "Errore reset match");
+  }
+});
+
+router.delete("/users/:userId/matches", async (req: Request, res: Response) => {
+  try {
+    const userId = req.params.userId as string;
+    if (!userId) return sendError(res, 400, "userId mancante");
+    const bbResult = await db.delete(bikerBikerMatches).where(
+      or(eq(bikerBikerMatches.biker1Id, userId), eq(bikerBikerMatches.biker2Id, userId))
+    ).returning({ id: bikerBikerMatches.id });
+    const bzResult = await db.delete(bikerZavarrinaMatches).where(
+      or(eq(bikerZavarrinaMatches.bikerId, userId), eq(bikerZavarrinaMatches.zavarrinaId, userId))
+    ).returning({ id: bikerZavarrinaMatches.id });
+    const ppResult = await db.delete(proposalProfileMatches).where(
+      or(eq(proposalProfileMatches.bikerId, userId), eq(proposalProfileMatches.zavarrinaId, userId))
+    ).returning({ id: proposalProfileMatches.id });
+    console.log(`[admin/users/${userId}/matches] bb=${bbResult.length} bz=${bzResult.length} pp=${ppResult.length}`);
+    return res.json({
+      success: true,
+      deleted: {
+        bikerBiker: bbResult.length,
+        bikerZavorrina: bzResult.length,
+        proposalProfile: ppResult.length,
+        total: bbResult.length + bzResult.length + ppResult.length,
+      },
+    });
+  } catch (error) {
+    console.error("[admin/users/:userId/matches] error:", error);
+    return sendError(res, 500, "Errore eliminazione match utente");
   }
 });
 

@@ -83,10 +83,12 @@ export class BikerMatchesStorage extends MatchingStorage {
       ON CONFLICT (LEAST(biker1_id, biker2_id), GREATEST(biker1_id, biker2_id), motorcycle_brand)
       DO UPDATE SET
         status = 'new',
+        archived_at = NULL,
         is_supermatch = EXCLUDED.is_supermatch,
         pair_type = EXCLUDED.pair_type,
         score_breakdown = EXCLUDED.score_breakdown
-      WHERE biker_biker_matches.status = 'rejected'
+      WHERE biker_biker_matches.status IN ('rejected', 'accepted')
+         OR biker_biker_matches.archived_at IS NOT NULL
       RETURNING *`);
     if (!result.rows || result.rows.length === 0) return undefined;
     const row = result.rows[0];
