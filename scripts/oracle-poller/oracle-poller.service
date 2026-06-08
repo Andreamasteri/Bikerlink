@@ -1,0 +1,33 @@
+[Unit]
+Description=Oracle Cloud ARM Instance Poller — BikerLink
+Documentation=https://github.com/your-org/bikerlink/blob/main/scripts/oracle-poller/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Esegue come utente corrente (non root).
+# Il valore viene sostituito da install.sh con l'utente reale.
+User=%i
+
+# Log su file dedicato
+StandardOutput=append:/var/log/oracle-poller.log
+StandardError=append:/var/log/oracle-poller.log
+
+# Il servizio si riavvia solo in caso di crash/errore.
+# Se lo script esce con 0 (istanza creata) il servizio NON viene riavviato.
+Restart=on-failure
+RestartSec=10
+
+# Timeout generoso per permettere il polling a lungo termine
+TimeoutStartSec=30
+TimeoutStopSec=15
+
+ExecStart=/usr/local/bin/oracle-poller.sh
+
+# Sicurezza minima (utente non-root, nessun privilegio aggiuntivo)
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
