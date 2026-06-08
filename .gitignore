@@ -84,3 +84,7 @@ exports/
 # Runtime upload assets (transient, not tracked)
 uploads/ads/
 logs/ota-timing.log
+
+# Oracle ARM Poller — config locale con OCID sensibili (mai committata)
+~/.oci/poller.conf
+.oci/poller.conf
