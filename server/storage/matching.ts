@@ -196,8 +196,40 @@ export class MatchingStorage extends ContestStorage {
   }
 
   async createMatch(data: InsertBikerZavarrinaMatch): Promise<BikerZavarrinaMatch | null> {
-    const [match] = await db.insert(bikerZavarrinaMatches).values(data).onConflictDoNothing().returning();
-    return match ?? null;
+    const scoreBreakdownJson = JSON.stringify(data.scoreBreakdown ?? {});
+    const result = await db.execute(sql`
+      INSERT INTO biker_zavorrina_matches
+        (id, biker_id, zavorrina_id, biker_motorcycle_id, wishlist_moto_id, status, is_supermatch, score_breakdown, notification_priority)
+      VALUES
+        (gen_random_uuid(), ${data.bikerId}, ${data.zavarrinaId}, ${data.bikerMotorcycleId}, ${data.wishlistMotoId},
+         ${data.status ?? 'new'}, ${data.isSupermatch ?? false}, ${scoreBreakdownJson}::jsonb, ${data.notificationPriority ?? 'normal'})
+      ON CONFLICT (biker_id, zavorrina_id, biker_motorcycle_id, wishlist_moto_id)
+      DO UPDATE SET
+        status               = 'new',
+        archived_at          = NULL,
+        notified_at          = NULL,
+        is_supermatch        = EXCLUDED.is_supermatch,
+        score_breakdown      = EXCLUDED.score_breakdown,
+        notification_priority = EXCLUDED.notification_priority
+      WHERE biker_zavorrina_matches.status = 'accepted'
+         OR biker_zavorrina_matches.archived_at IS NOT NULL
+      RETURNING *`);
+    if (!result.rows || result.rows.length === 0) return null;
+    const row = result.rows[0] as Record<string, unknown>;
+    return {
+      id: row.id as string,
+      bikerId: row.biker_id as string,
+      zavarrinaId: row.zavorrina_id as string,
+      bikerMotorcycleId: row.biker_motorcycle_id as string,
+      wishlistMotoId: row.wishlist_moto_id as string,
+      status: row.status as string,
+      isSupermatch: row.is_supermatch as boolean,
+      scoreBreakdown: (row.score_breakdown ?? {}) as Record<string, unknown>,
+      notificationPriority: row.notification_priority as string,
+      notifiedAt: (row.notified_at as Date | null) ?? null,
+      archivedAt: (row.archived_at as Date | null) ?? null,
+      createdAt: row.created_at as Date,
+    } as BikerZavarrinaMatch;
   }
 
   async getMatchesForUser(userId: string, options?: { includeArchived?: boolean; halfLifeDays?: number }): Promise<BikerZavarrinaMatch[]> {
